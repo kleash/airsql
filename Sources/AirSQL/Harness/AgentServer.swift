@@ -544,6 +544,7 @@ final class AgentServer {
         let base = try (arguments["in"] as? String).map { try scopes($0).last! } ?? mainWindow
         let point = NSPoint(x: base.frame.minX + x, y: base.frame.maxY - y)
         let window = (openSheets() + popovers(of: base)).reversed().first { $0.frame.contains(point) } ?? base
+        window.layoutIfNeeded()  // as AppKit lays a window out before it handles an event
         let location = NSPoint(x: point.x - window.frame.minX, y: point.y - window.frame.minY)
         guard let frameView = window.contentView?.superview ?? window.contentView, let hit = frameView.hitTest(location) else {
             throw Failure("Nothing at \(Int(x)), \(Int(y)).")

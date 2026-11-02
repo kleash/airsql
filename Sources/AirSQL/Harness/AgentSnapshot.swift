@@ -159,7 +159,9 @@ extension AgentServer {
         if include.contains("menus") { result["menus"] = menusJSON() }
         if let menu = contextMenu { result["contextMenu"] = menuJSON(menu.menu, in: menu.window) }
         if include.contains("elements"), let window = (arguments["in"] as? String).flatMap({ try? scopes($0).last }) ?? main?.window {
-            result["elements"] = ([window] + sheets(of: window) + popovers(of: window)).flatMap { AXNode.flatten($0) }
+            let windows = [window] + sheets(of: window) + popovers(of: window)
+            windows.forEach { $0.layoutIfNeeded() }  // the places a click will find, not those before a pending layout
+            result["elements"] = windows.flatMap { AXNode.flatten($0) }
                 .filter { !["group", "splitgroup", "scrollarea", "unknown"].contains($0.role) || !$0.id.isEmpty }
                 .map { $0.json(relativeTo: window) }
         }
