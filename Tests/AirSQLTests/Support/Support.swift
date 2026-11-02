@@ -1,7 +1,8 @@
 // Ported from AirSCP 1.4.0 Tests/AirSCPTests/Support.swift: the tests' isolation, polling and throwaway sshd. The
-// parts built on AirSCP's sessions, hosts, Runner and Keychain come with the lanes that port those types.
+// parts built on AirSCP's sessions, hosts and Runner come with the lanes that port those types.
 import Darwin
 import Foundation
+@testable import AirSQLCore
 
 /// Test-wide isolation, set up once: a short folder for everything the tests create, an ssh_config that every ssh the
 /// tests run gets with -F (never ~/.ssh/config), and an environment for the commands they run: a scratch HOME and no
@@ -32,6 +33,19 @@ enum TestEnvironment {
         try? "# The tests' ssh_config: no hosts, so nothing from ~/.ssh/config.\n"
             .write(toFile: sshConfig, atomically: true, encoding: .utf8)
         try? FileManager.default.createDirectory(atPath: root + "/local-home/.ssh", withIntermediateDirectories: true)
+        // Never the real settings folder, and so never the login Keychain: a throwaway instance's passwords stay in memory.
+        setenv("AIRSQL_SUPPORT_DIR", root + "/support", 1)
+        Keychain.memoryOnly = true
+        Keychain.readItem = { (errSecItemNotFound, nil) }
+        Keychain.writeItem = { _ in errSecSuccess }
+        // No window animations (a window freed while one runs crashed AirSCP's test process), and nothing an earlier run
+        // saved in the defaults.
+        UserDefaults.standard.register(defaults: ["NSAutomaticWindowAnimationsEnabled": false, "NSWindowResizeTime": 0.001])
+        UserDefaults.standard.removePersistentDomain(forName: ProcessInfo.processInfo.processName)
+        // After a menu, window-server events stop the main run loop: rerun it, as NSApp.run does.
+        if #available(macOS 27, *) {
+            RunLoop.main.add(Timer(timeInterval: 0, repeats: false) { _ in RunLoop.main.run() }, forMode: .common)
+        }
     }()
 }
 

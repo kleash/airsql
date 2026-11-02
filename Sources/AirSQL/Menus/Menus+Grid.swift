@@ -1,0 +1,8 @@
+import AppKit
+
+extension MainMenu {
+    /// Lanes L2 and L3 (the grid): the Data menu (Add Row, Delete Rows…, Set NULL, Apply Changes, Revert, Filter…, Go to
+    /// Row…, Load More…), Edit ▸ Copy with Headers and Copy As, and View ▸ Value Panel, Record View, Transpose, View As,
+    /// Chart, Column List…, Bigger, Smaller. Every command is in `Commands` already, with its shortcut.
+    static func addGridItems(_ menus: Menus) {}
+}

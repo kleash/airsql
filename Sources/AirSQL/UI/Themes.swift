@@ -1,0 +1,315 @@
+// Ported from AirSCP 1.4.0 Sources/AirSCP/Themes.swift (its AppKit half: the surfaces from system colours, the wash,
+// SurfaceView), with AirSQL's palette from docs/dev/mockups.html.
+import AirSQLCore
+import AppKit
+
+// Porcelain (light) and Deep Water (dark): AppKit's own colours as the appearance resolves them (light or dark,
+// Increase Contrast, the accent colour), plus a petrol accent when the person hasn't chosen one, Deep Water's petrol
+// wash, and fixed pairs chosen for data (value types, pending edits, SQL) and connections. No theme object, no setting.
+
+extension NSAppearance {
+    /// Deep Water; else Porcelain.
+    var isDark: Bool { bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
+}
+
+extension NSColor {
+    /// A colour for Porcelain and one for Deep Water (sRGB hex, as the mockups give them).
+    static func pair(_ light: UInt32, _ dark: UInt32) -> NSColor {
+        NSColor(name: nil) { $0.isDark ? hex(dark) : hex(light) }
+    }
+
+    static func hex(_ value: UInt32, alpha: CGFloat = 1) -> NSColor {
+        NSColor(srgbRed: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
+                blue: CGFloat(value & 0xFF) / 255, alpha: alpha)
+    }
+
+    // MARK: Surfaces
+
+    /// The window's ground: the toolbar, the tab strip, around sheets. macOS 26 draws windows in the content colour;
+    /// 7.5 % of labelColor gives the ground back its grey (Porcelain) and its lift (Deep Water).
+    static let ground = NSColor(name: nil) { surface(.windowBackgroundColor, $0, lifted: true) }
+    /// The editor, the grid, lists.
+    static let content = NSColor(name: nil) { surface(.controlBackgroundColor, $0, lifted: false) }
+    /// The navigator: the ground, 3.5 % towards labelColor (a shade darker in Porcelain, lighter in Deep Water).
+    static let side = NSColor(name: nil) { appearance in
+        var color = NSColor.ground
+        appearance.performAsCurrentDrawingAppearance { color = NSColor.ground.blended(withFraction: 0.035, of: .labelColor) ?? color }
+        return color
+    }
+    /// A bar (the grid bar, the status bar, result tabs): the ground at 40 % over the content.
+    static let bar = NSColor(name: nil) { appearance in
+        var color = NSColor.content
+        appearance.performAsCurrentDrawingAppearance { color = NSColor.content.blended(withFraction: 0.4, of: .ground) ?? color }
+        return color
+    }
+    /// A lighter separator, between rows and cells.
+    static let softSeparator = NSColor(name: nil) { appearance in
+        var color = NSColor.separatorColor
+        appearance.performAsCurrentDrawingAppearance { color = NSColor.separatorColor.withAlphaComponent(0.5) }
+        return color
+    }
+    /// A row under the pointer.
+    static let hover = NSColor(name: nil) { appearance in
+        var color = NSColor.labelColor
+        appearance.performAsCurrentDrawingAppearance { color = NSColor.labelColor.withAlphaComponent(appearance.isDark ? 0.06 : 0.045) }
+        return color
+    }
+
+    // MARK: Accent and pill
+
+    /// The person's accent colour when they chose one in System Settings, else AirSQL's petrol.
+    static let accent = NSColor(name: nil) { appearance in
+        if UserDefaults.standard.object(forKey: "AppleAccentColor") != nil { return .controlAccentColor }
+        return appearance.isDark ? hex(0x3FB6C8) : hex(0x0A7F91)
+    }
+    /// Text and symbols on the accent.
+    static let onAccent = pair(0xFFFFFF, 0x06181C)
+    /// The accent faintly behind content: a chip's or a banner's fill.
+    static let accentFill = NSColor(name: nil) { appearance in
+        var color = NSColor.accent
+        appearance.performAsCurrentDrawingAppearance {
+            color = NSColor.content.blended(withFraction: appearance.isDark ? 0.22 : 0.17, of: .accent) ?? color
+        }
+        return color
+    }
+    /// A selected row.
+    static let selectedRow = NSColor(name: nil) { appearance in
+        var color = NSColor.accent
+        appearance.performAsCurrentDrawingAppearance {
+            color = NSColor.content.blended(withFraction: appearance.isDark ? 0.14 : 0.1, of: .accent) ?? color
+        }
+        return color
+    }
+    /// The selected, active or primary fill: labelColor in Porcelain (its near-black pill), the accent in Deep Water.
+    static let pill = NSColor(name: nil) { $0.isDark ? .accent : .labelColor }
+    /// Text and symbols on a pill.
+    static let onPill = NSColor(name: nil) { $0.isDark ? hex(0x06181C) : .controlBackgroundColor }
+
+    // MARK: Data, pending changes, SQL
+
+    static let dataNumber = pair(0x1F5FBF, 0x7FB0F5)
+    static let dataDate = pair(0x8A4BAF, 0xC9A2E6)
+    static let dataBinary = pair(0x8B6A1A, 0xDCBC66)
+    static let dataJSON = pair(0x0F7A6B, 0x63CDB8)
+    static let dataNull = pair(0x9AA1AA, 0x6B7480)
+
+    static let pendingEdit = pair(0xFFF1C9, 0x43380F)
+    static let pendingEditLine = pair(0xD9A514, 0xE0B52E)
+    static let pendingInsert = pair(0xDDF5E3, 0x173A24)
+    static let pendingInsertLine = pair(0x2E9E5B, 0x4CC27B)
+    static let pendingDelete = pair(0xFBE0E0, 0x482023)
+    static let pendingDeleteLine = pair(0xD14343, 0xEF6B6B)
+
+    static let sqlKeyword = pair(0x9B2F8A, 0xE48DD4)
+    static let sqlString = pair(0xB5482A, 0xF2A582)
+    static let sqlNumber = pair(0x1F5FBF, 0x7FB0F5)
+    static let sqlComment = pair(0x6E7781, 0x7D8794)
+    static let sqlFunction = pair(0x0A7F91, 0x56C7D6)
+    static let sqlIdentifier = pair(0x4A5562, 0xB7C0CB)
+
+    // MARK: Status
+
+    static let statusOK = pair(0x2E8A52, 0x57C785)
+    static let statusWarning = pair(0xB26B00, 0xE6A43B)
+    static let statusBad = pair(0xC73636, 0xF07171)
+
+    private static func washes(_ appearance: NSAppearance) -> Bool {
+        appearance.isDark && !NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+    }
+
+    /// Deep Water's wash: 6 % petrol over its surfaces; none in Porcelain, nor with Increase Contrast.
+    private static func surface(_ base: NSColor, _ appearance: NSAppearance, lifted: Bool) -> NSColor {
+        var color = base
+        appearance.performAsCurrentDrawingAppearance {
+            if lifted, #available(macOS 26, *) { color = color.blended(withFraction: 0.075, of: .labelColor) ?? color }
+            if washes(appearance) { color = color.blended(withFraction: 0.06, of: hex(0x3FB6C8)) ?? color }
+        }
+        return color
+    }
+}
+
+extension ConnectionColour {
+    /// The same in both themes, as the mockups show them; nil for None.
+    var color: NSColor? {
+        switch self {
+        case .none: return nil
+        case .production: return .hex(0xD93A3A)
+        case .staging: return .hex(0xD9911E)
+        case .development: return .hex(0x2E9E5B)
+        case .test: return .hex(0x3A7BD9)
+        }
+    }
+}
+
+/// The one radius scale (plan §2.13): content inside a rounded shape is inset by at least its radius.
+enum Radius {
+    /// Cells, chips.
+    static let cell: CGFloat = 4
+    /// Controls, fields.
+    static let control: CGFloat = 6
+    /// Popovers, cards.
+    static let card: CGFloat = 8
+    /// Sheets.
+    static let sheet: CGFloat = 10
+    /// Windows.
+    static let window: CGFloat = 12
+}
+
+/// The 8-point spacing grid: `Spacing.unit` and its half and multiples.
+enum Spacing {
+    static let half: CGFloat = 4
+    static let unit: CGFloat = 8
+    static let double: CGFloat = 16
+    static let triple: CGFloat = 24
+}
+
+/// A plain surface in one of the colours above, with an optional rounded edge and hairline. The colour follows the
+/// appearance as the view redraws.
+final class SurfaceView: NSView {
+    var color: NSColor { didSet { needsDisplay = true } }
+    var radius: CGFloat { didSet { needsDisplay = true } }
+    var border: NSColor? { didSet { needsDisplay = true } }
+
+    init(_ color: NSColor, radius: CGFloat = 0, border: NSColor? = nil) {
+        self.color = color
+        self.radius = radius
+        self.border = border
+        super.init(frame: .zero)
+        wantsLayer = true
+        // Increase Contrast turns the wash off: the colour is worked out again as the layer is updated.
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(redraw),
+                                                          name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    @objc private func redraw() { needsDisplay = true }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        guard let layer else { return }
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer.backgroundColor = color.cgColor
+            layer.cornerRadius = radius
+            layer.borderWidth = border == nil ? 0 : 1 / max(1, window?.backingScaleFactor ?? 2)
+            layer.borderColor = border?.cgColor
+        }
+        layer.masksToBounds = radius > 0
+    }
+}
+
+/// A one-device-pixel line in `color` (a separator between bars), horizontal or vertical by its shape.
+final class Hairline: NSView {
+    var color: NSColor = .separatorColor { didSet { needsDisplay = true } }
+
+    convenience init(_ color: NSColor = .separatorColor) {
+        self.init(frame: .zero)
+        self.color = color
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        // Placed by constraints (its frame's own would hold it at zero).
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = color.cgColor }
+    }
+
+    /// A hairline's thickness on this screen.
+    var thickness: CGFloat { 1 / max(1, window?.backingScaleFactor ?? 2) }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric) }
+}
+
+/// A filled 8 pt dot: a connection's colour, a state.
+final class DotView: NSView {
+    var color: NSColor? { didSet { needsDisplay = true; isHidden = color == nil } }
+    let diameter: CGFloat
+
+    init(diameter: CGFloat = 8) {
+        self.diameter = diameter
+        super.init(frame: NSRect(x: 0, y: 0, width: diameter, height: diameter))
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: diameter, height: diameter) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let color else { return }
+        color.setFill()
+        NSBezierPath(ovalIn: bounds.insetBy(dx: max(0, (bounds.width - diameter) / 2), dy: max(0, (bounds.height - diameter) / 2))).fill()
+    }
+}
+
+/// A status in a capsule (11 pt semibold): tinted (its colour at 16 % behind it), the accent's fill, or neutral grey.
+/// The radius is half its height; the text is inset by at least that.
+final class ChipView: NSView {
+    enum Style { case tinted(NSColor), accent, neutral }
+
+    let label = NSTextField(labelWithString: "")
+    private let dot = DotView(diameter: 6)
+    var style: Style { didSet { needsDisplay = true; updateColors() } }
+
+    init(_ text: String, style: Style, dot: NSColor? = nil) {
+        self.style = style
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        label.stringValue = text
+        label.font = .systemFont(ofSize: 11, weight: .semibold)
+        label.lineBreakMode = .byTruncatingTail
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        self.dot.color = dot
+        let stack = NSStackView(views: [self.dot, label])
+        stack.spacing = 5
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -9),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            heightAnchor.constraint(equalToConstant: 18),
+        ])
+        updateColors()
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    var text: String {
+        get { label.stringValue }
+        set { label.stringValue = newValue }
+    }
+
+    func setDot(_ color: NSColor?) { dot.color = color }
+
+    private func updateColors() {
+        switch style {
+        case .tinted(let hue): label.textColor = hue
+        case .accent: label.textColor = .accent
+        case .neutral: label.textColor = .secondaryLabelColor
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let fill: NSColor
+        switch style {
+        case .tinted(let hue): fill = hue.withAlphaComponent(effectiveAppearance.isDark ? 0.2 : 0.16)
+        case .accent: fill = .accentFill
+        case .neutral: fill = .hover
+        }
+        fill.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
+    }
+}
