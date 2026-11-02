@@ -198,4 +198,28 @@ struct ClientToolsTests {
         #expect(await Runner.run(["/nowhere/mysqldump", "--version"]).status == 127)
         #expect(Runner.childEnvironment(["MYSQL_PWD": "x", "MYSQL_HOST": "h", "PATH": "/bin"], [:]).keys.sorted() == ["LC_CTYPE", "PATH"])
     }
+
+    @Test func aDumpThatWritesElsewhereIsFlagged() {
+        var scan = DumpScan()
+        // mysqldump --databases: CREATE DATABASE /*!32312 IF NOT EXISTS*/ `crm` …; USE `crm`; and the like.
+        scan.add(words: ["/*!40000", "DROP", "DATABASE", "IF", "EXISTS", "crm"].filter { !$0.hasPrefix("/*") }, line: 18)
+        scan.add(words: ["CREATE", "DATABASE", "IF", "NOT", "EXISTS", "crm", "DEFAULT", "CHARACTER", "SET", "utf8mb4"], line: 20)
+        scan.add(words: ["USE", "crm"], line: 22)
+        scan.add(words: ["DROP", "TABLE", "IF", "EXISTS", "a", ",", "b"], line: 30)
+        scan.add(words: ["DROP", "TABLE", "IF", "EXISTS", "c"], line: 40)
+        scan.add(words: ["SET", "@@GLOBAL.GTID_PURGED", "=", "'+'", "'3E11FA47-71CA-11E1-9E33-C80AA9429562:1-5'"], line: 50)
+        scan.add(words: ["USE", "crm"], line: 60)
+        scan.add(words: ["INSERT", "INTO", "t", "VALUES", "(", "1", ")"], line: 70)
+        #expect(scan.droppedTables == 3 && scan.target(picked: "shop") == "crm")
+        let warnings = scan.warnings(picked: "shop")
+        #expect(warnings.count == 4, "\(warnings)")
+        #expect(warnings[0].contains("drops the database “crm” (line 18)") && warnings[2].contains("switches to the database “crm”"))
+        #expect(warnings[3].contains("GTID_PURGED (line 50)"))
+        // The picked database itself: only dropping it is worth a word.
+        #expect(scan.warnings(picked: "crm").count == 2)
+        var plain = DumpScan()
+        plain.add(words: ["CREATE", "TABLE", "t", "(", "id", "INT", ")"], line: 1)
+        plain.add(words: ["CREATE", "OR", "REPLACE", "SCHEMA", "x"], line: 2)
+        #expect(plain.findings == [DumpScan.Finding(kind: .createDatabase, database: "x", line: 2)] && plain.target(picked: "p") == "p")
+    }
 }
