@@ -178,7 +178,7 @@ DELIMITER ;
 INSERT INTO customers (id, name, email, country, created_at) VALUES
     (1, 'Ada Lovelace', 'ADA@EXAMPLE.COM', 'GB', '2026-01-01 09:00:00.000'),
     (2, 'Grace Hopper', 'grace@example.com', 'US', '2026-01-02 09:30:00.250'),
-    (3, 'Linus Torvalds', 'linus@example.org', 'FI', '2026-01-03 10:00:00.500'),
+    (3, 'Lina Virtanen', 'lina@example.org', 'FI', '2026-01-03 10:00:00.500'),
     (4, 'Zoë Ünal', 'zoe@example.net', 'DE', '2026-01-04 11:15:00.750'),
     (5, 'محمد علي', 'mohammed@example.com', 'EG', '2026-01-05 12:00:00.000'),
     (6, 'דנה כהן', 'dana@example.com', 'IL', '2026-01-06 13:45:00.125'),
