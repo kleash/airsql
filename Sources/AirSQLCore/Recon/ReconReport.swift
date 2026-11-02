@@ -1,0 +1,162 @@
+import Foundation
+
+/// A compare's report to save: HTML to read or send, CSV for a spreadsheet (every difference, one per line),
+/// Markdown for a ticket. HTML and Markdown list at most `rowsShown` rows per table.
+public enum ReconReport {
+    public enum Format: String, CaseIterable {
+        case html, csv, markdown
+
+        public var fileExtension: String { self == .markdown ? "md" : rawValue }
+    }
+
+    public static let rowsShown = 1_000
+
+    /// One difference, as each format writes it.
+    struct Line {
+        var kind: String, object: String, status: String, difference: String, item: String, detail: String
+    }
+
+    public static func text(_ result: ReconResult, format: Format) -> String {
+        switch format {
+        case .csv: return csv(result)
+        case .markdown: return markdown(result)
+        case .html: return html(result)
+        }
+    }
+
+    /// The summary the compare window shows too.
+    public static func summary(_ result: ReconResult) -> [(label: String, value: String)] {
+        let tables = result.objects.filter { $0.kind == .table }
+        let others = result.objects.filter { $0.kind != .table }
+        let rows = tables.compactMap(\.data).filter(\.differs)
+        return [("tables match", "\(tables.filter { !$0.differs }.count)"),
+                ("tables differ in structure", "\(tables.filter { $0.status == .different }.count)"),
+                ("only in \(result.source.name)", "\(result.objects.filter { $0.status == .onlyInSource }.count)"),
+                ("only in \(result.target.name)", "\(result.objects.filter { $0.status == .onlyInTarget }.count)"),
+                ("rows differ in \(rows.count) tables", "\(rows.reduce(0) { $0 + $1.differenceCount })"),
+                ("views, routines, triggers and events differ",
+                 "\(others.filter { $0.status == .different }.count)")]
+    }
+
+    static func status(_ object: ReconObject, _ result: ReconResult) -> String {
+        switch object.status {
+        case .same: return object.data?.differs == true ? "different data" : "same"
+        case .different: return object.data?.differs == true ? "different structure and data" : "different structure"
+        case .onlyInSource: return "only in \(result.source.name)"
+        case .onlyInTarget: return "only in \(result.target.name)"
+        }
+    }
+
+    /// Every difference of an object: its structure parts, then its rows (at most `limit`).
+    static func lines(_ object: ReconObject, _ result: ReconResult, limit: Int = .max) -> [Line] {
+        let status = self.status(object, result)
+        func line(_ difference: String, _ item: String, _ detail: String) -> Line {
+            Line(kind: object.kind.rawValue, object: object.name, status: status, difference: difference, item: item,
+                 detail: detail)
+        }
+        var lines = object.parts.map { line("structure", "\($0.kind.rawValue) \($0.name)", $0.detail) }
+        guard let data = object.data else { return lines }
+        let columns = data.columns
+        let width = min(max(data.key.count, columns.isEmpty ? 0 : 1), columns.count)
+        func key(_ row: ReconRow) -> String {
+            (0..<width).map { "\(columns[$0].name)=\(value(row, $0, columns))" }.joined(separator: ", ")
+        }
+        func rest(_ row: ReconRow, _ side: String) -> String {
+            (["only in \(side)"] + (width..<columns.count).map { "\(columns[$0].name)=\(value(row, $0, columns))" })
+                .joined(separator: "; ")
+        }
+        switch data.outcome {
+        case .notCompared(let why): lines.append(line("rows", "", "not compared: \(why)"))
+        case .differentWithoutKey: lines.append(line("rows", "", "different (no key to match rows on)"))
+        case .tooManyDifferences:
+            lines.append(line("rows", "", "more than \(ReconDataCompare.maxDifferences) rows differ"))
+        case .same, .different:
+            let changes = data.changed.prefix(limit).map { change in
+                line("changed row", key(change.source), change.columns.map { column in
+                    "\(columns[column].name): \(value(change.target, column, columns)) → \(value(change.source, column, columns))"
+                }.joined(separator: "; "))
+            }
+            lines += data.missing.prefix(limit).map { line("missing row", key($0), rest($0, result.source.name)) }
+            lines += data.extra.prefix(limit).map { line("extra row", key($0), rest($0, result.target.name)) }
+            lines += changes
+        }
+        return lines
+    }
+
+    static func value(_ row: ReconRow, _ column: Int, _ columns: [ReconColumn]) -> String {
+        row.text(column, kind: columns[column].kind).map { "'\($0)'" } ?? "NULL"
+    }
+
+    private static func header(_ result: ReconResult) -> [String] {
+        let rules = result.options.ignore
+        let ignored = [rules.autoIncrement ? "AUTO_INCREMENT values" : nil, rules.definer ? "DEFINER" : nil,
+                       rules.collation ? "collations" : nil, rules.whitespace ? "whitespace" : nil].compactMap { $0 }
+        return ["\(result.source.name) · \(result.source.database) (\(result.source.version)) → "
+                    + "\(result.target.name) · \(result.target.database) (\(result.target.version))",
+                "Compared \(result.options.mode == .both ? "structure and data" : result.options.mode.rawValue) on "
+                    + ISO8601DateFormatter().string(from: Date()) + String(format: " in %.1f s; ", result.duration)
+                    + "\(result.rowsChecked) rows checked, \(result.rowsFetched) fetched",
+                ignored.isEmpty ? "Nothing ignored" : "Ignoring " + ignored.joined(separator: ", ")]
+    }
+
+    private static func csv(_ result: ReconResult) -> String {
+        func field(_ text: String) -> String {
+            // A leading =, +, - or @ would make a spreadsheet run the cell as a formula.
+            var text = text
+            if let first = text.unicodeScalars.first, "=+-@\t\r".unicodeScalars.contains(first) { text = "'" + text }
+            return text.contains(where: { $0 == "," || $0 == "\"" || $0.isNewline })
+                ? "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : text
+        }
+        var rows = ["kind,object,status,difference,item,detail"]
+        for object in result.objects where object.differs {
+            rows += lines(object, result).map { line in
+                [line.kind, line.object, line.status, line.difference, line.item, line.detail].map(field).joined(separator: ",")
+            }
+        }
+        return rows.joined(separator: "\r\n") + "\r\n"
+    }
+
+    private static func markdown(_ result: ReconResult) -> String {
+        func cell(_ text: String) -> String {
+            String(text.prefix(200)).replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "|", with: "\\|")
+                .components(separatedBy: .newlines).joined(separator: " ")
+        }
+        var text = ["# Compare report", ""] + header(result).map { $0 + "  " } + ["", "| | |", "|---:|---|"]
+        text += summary(result).map { "| \($0.value) | \(cell($0.label)) |" }
+        for object in result.objects where object.differs {
+            text += ["", "## \(object.kind.rawValue.capitalized) \(cell(object.name)): \(status(object, result))", "",
+                     "| Difference | Item | Detail |", "|---|---|---|"]
+            text += lines(object, result, limit: rowsShown).map { "| \($0.difference) | \(cell($0.item)) | \(cell($0.detail)) |" }
+        }
+        return text.joined(separator: "\n") + "\n"
+    }
+
+    private static func html(_ result: ReconResult) -> String {
+        func escape(_ text: String) -> String {
+            String(text.prefix(500)).replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+        }
+        var body = header(result).map { "<p>\(escape($0))</p>" }
+        body.append("<table class=summary>" + summary(result).map { "<tr><td>\($0.value)</td><td>\(escape($0.label))</td></tr>" }
+            .joined() + "</table>")
+        for object in result.objects where object.differs {
+            body.append("<h2>\(escape(object.kind.rawValue.capitalized)) \(escape(object.name)) "
+                        + "<small>\(escape(status(object, result)))</small></h2>")
+            body.append("<table><tr><th>Difference</th><th>Item</th><th>Detail</th></tr>" + lines(object, result, limit: rowsShown)
+                .map { "<tr><td>\(escape($0.difference))</td><td>\(escape($0.item))</td><td>\(escape($0.detail))</td></tr>" }
+                .joined() + "</table>")
+        }
+        return """
+            <!DOCTYPE html>
+            <html><head><meta charset="utf-8"><title>Compare report</title><style>
+            body { font: 14px -apple-system, system-ui, sans-serif; margin: 32px; color: #1d1d1f; }
+            table { border-collapse: collapse; margin: 8px 0 24px; } td, th { border: 1px solid #d2d2d7; padding: 4px 8px;
+            text-align: left; vertical-align: top; } .summary td:first-child { text-align: right; font-weight: 600; }
+            small { color: #6e6e73; font-weight: normal; }
+            </style></head><body><h1>Compare report</h1>
+            \(body.joined(separator: "\n"))
+            </body></html>
+
+            """
+    }
+}

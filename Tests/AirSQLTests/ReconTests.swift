@@ -354,4 +354,20 @@ struct ReconTests {
         let third = tally.add(source: [(key("e"), 6)], target: [])
         #expect(third == [key("e")] && tally.count == 1)
     }
+
+    @Test func reportsEscapeWhatTheyWrite() {
+        var result = Self.result()
+        let index = result.objects.firstIndex { $0.name == "customers" }!
+        result.objects[index].data?.missing.append(ReconRow([Array("7".utf8), Array("=HYPERLINK(\"x\"), <b>|".utf8)]))
+        let csv = ReconReport.text(result, format: .csv)
+        #expect(csv.hasPrefix("kind,object,status,difference,item,detail\r\n"))
+        #expect(csv.contains("table,customers,different data,missing row,id='5',only in Production; name='it's'\r\n"))
+        #expect(csv.contains(",missing row,id='7',\"only in Production; name='=HYPERLINK(\"\"x\"\"), <b>|'\"\r\n"))
+        #expect(csv.contains("changed row,id='2',name: 'b' → 'B'"))
+        let html = ReconReport.text(result, format: .html)
+        #expect(html.contains("&lt;b&gt;") && !html.contains("<b>|"))
+        let markdown = ReconReport.text(result, format: .markdown)
+        #expect(markdown.contains("<b>\\|") && markdown.contains("## Table orders: different structure"))
+        #expect(ReconReport.summary(result).first { $0.label == "only in Staging" }?.value == "1")
+    }
 }
