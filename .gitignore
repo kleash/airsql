@@ -1,0 +1,8 @@
+.build/
+build/
+vendor/
+.swiftpm/
+*.xcodeproj/
+.DS_Store
+testenv/.keys/
+testenv/.certs/

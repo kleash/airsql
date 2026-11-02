@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AirSQL 1.0 Scope</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: a planning sheet. Summary and decisions first, then the three headline features, then the full catalogue as one table per area. */
+  --ground: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #18202b;
+  --muted: #5b6573;
+  --line: #d9dee5;
+  --accent: #0b6b80;
+  --accent-soft: #e2f0f3;
+  --later: #8a6d1f;
+  --later-soft: #f6efd9;
+  --skip: #8b939e;
+  --warn: #a34a12;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #10151c; --surface: #171e27; --ink: #e4e9ef; --muted: #9aa5b3; --line: #2a3441;
+    --accent: #4fb8cc; --accent-soft: #15333b; --later: #d6b45c; --later-soft: #33290f; --skip: #6c7683; --warn: #f0965a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #10151c; --surface: #171e27; --ink: #e4e9ef; --muted: #9aa5b3; --line: #2a3441;
+  --accent: #4fb8cc; --accent-soft: #15333b; --later: #d6b45c; --later-soft: #33290f; --skip: #6c7683; --warn: #f0965a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.55 var(--font-body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 32px 20px 64px; display: grid; gap: 36px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 34px; font-weight: 600; letter-spacing: -0.01em; }
+h2 { font-size: 23px; font-weight: 600; }
+h3 { font-size: 17px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+a { color: var(--accent); }
+header { display: grid; gap: 10px; }
+.lede { color: var(--muted); font-size: 16px; }
+section { display: grid; gap: 16px; }
+.sub { color: var(--muted); }
+
+/* Summary tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 2px; border-top: 4px solid var(--c, var(--line)); }
+.tile b { font: 600 28px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 13px; }
+.tile small { color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
+
+/* Decisions */
+.decisions { display: grid; gap: 10px; counter-reset: d; }
+.decision { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; padding: 14px 16px; display: grid; gap: 6px; }
+.decision h3::before { counter-increment: d; content: "D" counter(d) "  "; font-family: var(--font-mono); color: var(--accent); font-size: 14px; }
+.decision p { color: var(--ink); }
+.decision .rec { color: var(--muted); font-size: 14px; }
+.decision .rec b { color: var(--accent); font-weight: 600; }
+
+/* Headline cards */
+.headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px; display: grid; gap: 10px; align-content: start; }
+.card .tag { font: 500 12px var(--font-mono); color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+.card li { font-size: 14px; }
+
+/* Routes diagram */
+.routes { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 10px; overflow-x: auto; }
+.route { display: grid; grid-template-columns: 210px 1fr; gap: 12px; align-items: center; min-width: 700px; }
+.route .name { font-size: 14px; font-weight: 500; }
+.hops { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.hop { font: 12px var(--font-mono); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--line); white-space: nowrap; background: var(--ground); }
+.hop.mac { background: var(--accent-soft); border-color: var(--accent); }
+.hop.db { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.hop.port { border-style: dashed; border-color: var(--accent); color: var(--accent); }
+.arrow { color: var(--muted); font-size: 13px; }
+.routes .foot { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 10px; min-width: 700px; }
+
+/* Controls */
+.controls { position: sticky; top: 0; z-index: 2; background: var(--ground); padding: 10px 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); }
+.controls input[type="search"] { flex: 1 1 220px; min-width: 0; font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.chip { font: 500 13px var(--font-body); padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btn { font: 500 13px var(--font-body); padding: 7px 12px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.status { font-size: 13px; color: var(--muted); min-height: 1em; }
+
+/* Catalogue tables */
+.group { display: grid; gap: 8px; }
+.group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.group-head .count { font: 12px var(--font-mono); color: var(--muted); }
+.tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font: 500 12px var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; background: var(--ground); }
+td.feat { width: 46%; }
+td.feat b { font-weight: 500; display: block; }
+td.feat span { color: var(--muted); font-size: 13px; }
+td.src, td.eff { white-space: nowrap; font: 12px var(--font-mono); color: var(--muted); }
+.src-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); }
+.src-A { border-color: var(--accent); color: var(--accent); }
+.src-D { border-color: var(--later); color: var(--later); }
+tr.tier-Skip td.feat b { text-decoration: line-through; color: var(--muted); }
+tr.changed td.feat b::after { content: " · changed"; font: 11px var(--font-mono); color: var(--warn); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { font: 500 12px var(--font-mono); padding: 5px 8px; border: 0; border-right: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-checked="true"][data-t="1.0"] { background: var(--accent); color: #fff; }
+.seg button[aria-checked="true"][data-t="1.x"] { background: var(--accent-soft); color: var(--accent); }
+.seg button[aria-checked="true"][data-t="Later"] { background: var(--later-soft); color: var(--later); }
+.seg button[aria-checked="true"][data-t="Skip"] { background: var(--ground); color: var(--ink); text-decoration: line-through; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+.legend b { color: var(--ink); font-weight: 500; }
+
+ol.milestones { margin: 0; padding-left: 22px; display: grid; gap: 8px; max-width: 80ch; }
+ol.milestones li b { font-weight: 600; }
+footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
+@media (max-width: 560px) { h1 { font-size: 27px; } .wrap { padding: 20px 16px 48px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>AirSQL 1.0 Scope</h1>
+  <p class="lede">A native Mac client for MariaDB and MySQL. This page lists every HeidiSQL feature, plus the DataGrip features and the AirSQL-only features asked for. The releases shown are the decided scope of 2 November 2026. Changing a row marks it as changed; copy the list to pass changes on.</p>
+</header>
+
+<section aria-labelledby="sum-h">
+  <h2 id="sum-h">Where the scope stands</h2>
+  <div class="tiles" id="tiles"></div>
+  <p class="sub">Effort: <b>S</b> is up to 2 days, <b>M</b> is about a week, <b>L</b> is 2 weeks or more, for one developer working with agents. The weeks figure adds up the 1.0 rows (S = 0.3, M = 1, L = 2.5) and is a rough guide only. Parallel agent lanes, as used for AirSCP, shorten the calendar time.</p>
+</section>
+
+<section aria-labelledby="dec-h">
+  <h2 id="dec-h">Decisions to settle before building</h2>
+  <div class="decisions">
+    <div class="decision">
+      <h3>How AirSQL talks to the database</h3>
+      <p>Choose between bundling MariaDB Connector/C (libmariadb, the library HeidiSQL itself uses) and writing the MySQL wire protocol in Swift.</p>
+      <p class="rec"><b>Suggested: libmariadb</b>, built by a pinned, checksummed script the way AirSCP builds FreeRDP, and linked against the OpenSSL that script already builds. It handles caching_sha2_password (MySQL 8 and 9), MariaDB ed25519, TLS, compression and multiple result sets. It is LGPL-2.1, so ship it as a dylib inside the app. A Swift protocol would need its own ed25519 code (CryptoKit only takes 32-byte seeds, and MariaDB hashes the password itself) and adds weeks of work. The mysql-nio package in the MySQLClient folder fails on caching_sha2_password and would break AirSCP's rule of no third-party Swift packages.</p>
+    </div>
+    <div class="decision">
+      <h3>Every route ends in a local port</h3>
+      <p>SSH routes forward with <code>ssh -L 127.0.0.1:&lt;port&gt;:db:3306</code> on AirSCP's ControlMaster session. Proxy-only routes get a small relay inside the app that listens on 127.0.0.1 and connects through SOCKS5 or HTTP CONNECT.</p>
+      <p class="rec"><b>Why it matters:</b> the driver, <code>mysqldump</code>, <code>mysql</code> and "Open in Terminal" all connect to the same 127.0.0.1 port. The client tools then work over every route without any proxy support of their own. AirSCP's <code>Session</code>, <code>Askpass</code> and <code>ProxyConnect</code> code does most of the SSH part already, and both apps are Apache 2.0 under the same author.</p>
+    </div>
+    <div class="decision">
+      <h3>What agents may do</h3>
+      <p>The request is for agents to read schema, write complex SQL and test it in the AirSQL console, where you can see and edit it.</p>
+      <p class="rec"><b>Decided for 1.0:</b> agents read schema, run read-only queries, place SQL in a console tab, and drive the whole UI as they do in AirSCP. A separate agent-write tool is skipped. Driving the UI means an agent could press Run, Apply or Drop, so 1.0 keeps AirSCP's "Ask before agents change things" setting, on by default: anything that changes data or structure waits for your OK. Read-only queries are checked twice: only SELECT, SHOW, EXPLAIN, DESCRIBE and WITH are accepted, on a session set to <code>SET SESSION TRANSACTION READ ONLY</code>. A read-only database user is the hard guarantee.</p>
+    </div>
+    <div class="decision">
+      <h3>A separate app, built like AirSCP</h3>
+      <p>Same toolchain: Swift 5 language mode, AppKit with SwiftUI, macOS 13.1 or later, Command Line Tools only, no third-party Swift packages, tooltips on every control, signed and notarized, Homebrew cask.</p>
+      <p class="rec"><b>Note:</b> HeidiSQL 12.x now ships a native macOS build (Apple silicon only). AirSQL stands out through its Mac-native UI, its SSH, jump host and proxy routes, its agent support, and builds for both Intel and Apple silicon. The MySQLClient attempt was dropped because it felt slow and lacked basics such as right-click menus, double-click to edit, multi-select and shortcuts. Those basics are now 1.0 rows with performance targets, in the first table below.</p>
+    </div>
+    <div class="decision">
+      <h3>The data grid is built natively</h3>
+      <p>No capable macOS grid library exists: the known Swift grids (SpreadsheetView, SwiftDataTables) are iOS only, and Mac database apps all build their own. <code>NSTableView</code> selects whole rows and slows down on wide tables, and MySQLClient used it and still felt laggy.</p>
+      <p class="rec"><b>Decided:</b> one custom grid view that draws only the visible cells, reused for table data, query results, Transpose and recon diffs. Rows stream in batches into a page cache off the main thread, and each cell's text is computed only when it scrolls into view. A single text field sits over the cell being edited. The grid exposes its visible cells to accessibility, for VoiceOver and for agents. <b>First, a 3-day spike</b> with pass marks: 1,000,000 rows × 50 columns and a 300-column table scroll at 120 Hz without dropped frames; ⌘/⇧ block selection, arrow and Tab moves, Return to edit, copy as TSV; Transpose switches instantly; VoiceOver reads the cells. Fall back to <code>NSTableView</code> only if the spike misses those marks.</p>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="head-h">
+  <h2 id="head-h">The four headline features</h2>
+  <div class="routes" aria-label="Connection routes">
+    <div class="route"><span class="name">Direct</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop db">MariaDB / MySQL :3306</span></div></div>
+    <div class="route"><span class="name">SSH tunnel</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop port">127.0.0.1:41xxx</span><span class="arrow">→</span><span class="hop">ssh bastion</span><span class="arrow">→</span><span class="hop db">db :3306</span></div></div>
+    <div class="route"><span class="name">SSH via jump hosts</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop port">127.0.0.1:41xxx</span><span class="arrow">→</span><span class="hop">jump 1</span><span class="arrow">→</span><span class="hop">jump 2</span><span class="arrow">→</span><span class="hop">ssh host</span><span class="arrow">→</span><span class="hop db">db :3306</span></div></div>
+    <div class="route"><span class="name">SSH + proxy</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop port">127.0.0.1:41xxx</span><span class="arrow">→</span><span class="hop">HTTP / SOCKS5 proxy</span><span class="arrow">→</span><span class="hop">ssh host</span><span class="arrow">→</span><span class="hop db">db :3306</span></div></div>
+    <div class="route"><span class="name">Proxy only (no SSH)</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop port">127.0.0.1:41xxx relay</span><span class="arrow">→</span><span class="hop">SOCKS5 / HTTP CONNECT</span><span class="arrow">→</span><span class="hop db">db :3306</span></div></div>
+    <p class="foot">The dashed box is the local port that the driver, the client tools and Terminal share. TLS to the database works on every route.</p>
+  </div>
+  <div class="headline">
+    <div class="card">
+      <span class="tag">Connections · from DataGrip</span>
+      <h3>SSH, jump host and proxy routes</h3>
+      <ul>
+        <li>SSH with a password, a key, ssh-agent or 2FA prompts. Your <code>~/.ssh/config</code> aliases work.</li>
+        <li>One or more jump hosts (ProxyJump), each with its own login.</li>
+        <li>SSH through an HTTP or SOCKS5 proxy, using AirSCP's ProxyCommand helper.</li>
+        <li>Proxy only: the database through SOCKS5 or HTTP CONNECT, with no SSH.</li>
+        <li>Host key trust sheet, reconnect after sleep, and a log of every command AirSQL runs.</li>
+        <li>Later: pick a host already saved in AirSCP as the SSH route.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">AI agents · like AirSCP</span>
+      <h3>MCP for Claude Code and Gemini CLI</h3>
+      <ul>
+        <li><code>claude mcp add airsql -- /Applications/AirSQL.app/Contents/MacOS/AirSQL --mcp</code>, and the same command with <code>gemini mcp add</code>. A Claude Code plugin as well.</li>
+        <li>Tools: <code>list_connections</code>, <code>list_databases</code>, <code>describe_table</code> (columns, indexes, foreign keys, DDL), <code>get_schema</code> (a compact dump of a whole database), <code>search_schema</code>.</li>
+        <li><code>run_query</code>: read-only, capped at a row limit. Results also appear in an Agent tab that you can watch.</li>
+        <li><code>open_in_console</code>: puts SQL in a console tab for you to edit and run. <code>read_console</code> gives the agent what you ran and the result or error.</li>
+        <li>Off until you turn it on. Access is set per connection (Off, Schema, or Schema + read). Agents never see passwords, and sample rows are off by default.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">Client tools · your binaries</span>
+      <h3>Point to mysql / mariadb tools for dump and restore</h3>
+      <ul>
+        <li>Settings ▸ Client tools: paths to <code>mysql</code> or <code>mariadb</code>, and to <code>mysqldump</code> or <code>mariadb-dump</code>. AirSQL finds them in Homebrew, <code>/usr/local/mysql/bin</code>, MAMP and PATH, and shows each version.</li>
+        <li>Override them per connection: MariaDB tools for MariaDB servers, MySQL 8 tools for MySQL 8. AirSQL warns about mismatches and adds <code>--column-statistics=0</code> when it is needed.</li>
+        <li>Export: pick databases and tables; structure, data or both; routines, events and triggers; single transaction; gzip; extra options. Shows the full command line, progress and Cancel.</li>
+        <li>Restore a <code>.sql</code> or <code>.sql.gz</code> file into a chosen database. The file goes through the app, so progress is real. Choose to stop at the first error or continue.</li>
+        <li>Passwords go in a temporary 0600 defaults file, never on the command line.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">Data grid · the heart of the app</span>
+      <h3>Understand, filter, search and edit any table</h3>
+      <ul>
+        <li>Understand: typed headers with key marks, selection totals in the status bar, a column summary from the server, and a value panel with a JSON tree, hex and images.</li>
+        <li>Filter and sort on the server (every row) or locally (loaded rows only). The bar always says which one is active.</li>
+        <li>Search all columns in one box, as in HeidiSQL, on the server or in the loaded rows, with matches highlighted.</li>
+        <li>Edit by type: date and timestamp pickers with the time zone shown, a JSON editor that checks before Apply, ENUM pick-lists, BIT checkboxes, a hex editor for BLOBs.</li>
+        <li>Auto-generated values are handled for you: AUTO_INCREMENT, DEFAULT and generated columns stay out of the INSERT, and the real values show after Apply.</li>
+        <li>Fast at a million rows; right-click, double-click, ⌘/⇧ multi-select and the keyboard work everywhere.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="lf-h">
+  <h2 id="lf-h">Look and feel (from the DataGrip and HeidiSQL research)</h2>
+  <div class="decisions">
+    <div class="decision"><h3>A layout you already know</h3><p>Connections and the navigator on the left, query and table tabs in the middle, results under the query. The tab toolbar holds Run, Explain, History, the transaction mode with Commit and Rollback, Cancel, and the database switcher. A connection's colour tints its tree, tabs and toolbar, so production always looks like production.</p></div>
+    <div class="decision"><h3>Fewer concepts than DataGrip</h3><p>One kind of query tab: bound to one connection, saved as a .sql file or kept unsaved and restored after relaunch. ⌘↩ runs the statement under the cursor and briefly highlights it, with no chooser popup; ⇧⌘↩ runs everything. Result tabs are reused unless pinned and are named from the comment above the query.</p></div>
+    <div class="decision"><h3>Nothing changes by surprise</h3><p>Grid edits wait for Apply and run in one transaction. An open transaction shows a badge, and closing a tab with uncommitted work asks first. On production connections the SQL preview is always shown first, and read-only is enforced by AirSQL itself.</p></div>
+    <div class="decision"><h3>Light where DataGrip is heavy</h3><p>Published targets: launch under 1 second, idle memory under 150 MB, the grid targets in grid-spec.md. Every schema shows by default, metadata comes from information_schema and is cached, and only what a DDL statement changed is refreshed.</p></div>
+  </div>
+  <p class="sub">The full merged grid spec, with every HeidiSQL and DataGrip grid feature and the Mac shortcut map, is in <code>grid-spec.md</code>, the plan in <code>plan.md</code> and the screens in <code>mockups.html</code>, all next to this page. The research notes are in <code>research.md</code>.</p>
+</section>
+
+<section aria-labelledby="cat-h">
+  <h2 id="cat-h">Full feature catalogue</h2>
+  <div class="legend">
+    <span><b>Source:</b> <span class="src-badge">HeidiSQL</span> its feature · <span class="src-badge src-D">DataGrip</span> borrowed · <span class="src-badge src-A">AirSQL</span> new or from AirSCP</span>
+    <span><b>Release:</b> 1.0 · 1.x (soon after) · Later · Skip</span>
+  </div>
+  <div class="controls" role="toolbar" aria-label="Filter and export">
+    <label for="q" class="mono" style="position:absolute;left:-9999px">Search features</label>
+    <input id="q" type="search" placeholder="Search features, e.g. index, proxy, export">
+    <button class="chip" data-f="all" aria-pressed="true" type="button">All</button>
+    <button class="chip" data-f="1.0" aria-pressed="false" type="button">1.0</button>
+    <button class="chip" data-f="1.x" aria-pressed="false" type="button">1.x</button>
+    <button class="chip" data-f="Later" aria-pressed="false" type="button">Later</button>
+    <button class="chip" data-f="Skip" aria-pressed="false" type="button">Skip</button>
+    <button class="btn" id="copy" type="button" title="Copy the 1.0 list as Markdown">Copy 1.0 list</button>
+    <button class="btn ghost" id="copyAll" type="button" title="Copy every row with its release as Markdown">Copy all</button>
+    <button class="btn ghost" id="reset" type="button" title="Put every row back to its suggested release">Reset</button>
+  </div>
+  <p class="status" id="status" role="status" aria-live="polite">Your changes are saved in this browser only. Use Copy to send them on.</p>
+  <div id="catalogue" style="display:grid;gap:26px"></div>
+</section>
+
+<section aria-labelledby="ms-h">
+  <h2 id="ms-h">Suggested build order for 1.0</h2>
+  <ol class="milestones">
+    <li><b>Connect.</b> libmariadb build script, saved connections in the Keychain, all five routes ending in a local port, TLS, navigator tree, process list. Ends with: browse any server you can reach today.</li>
+    <li><b>Grid spike (3 days)</b>, then <b>feel first.</b> Grid, tree and editor built with right-click, double-click, multi-select, shortcuts and the performance test from the first commit. Adding these later is the trap MySQLClient fell into.</li>
+    <li><b>Console.</b> Editor with highlighting and completion from cached schema, run and cancel, result tabs, history, SQL log, auto-commit with Commit and Rollback, safety prompts.</li>
+    <li><b>Agents.</b> <code>--mcp</code> server, schema tools, read-only <code>run_query</code>, <code>open_in_console</code>, activity list; then UI driving (snapshot, menu, press) behind the ask-first gate. This comes early because it reuses the schema cache and the console, and it is AirSQL's main difference from HeidiSQL.</li>
+    <li><b>Data and structure.</b> Grid editing with pending changes, value viewers, copy and export; table editor with columns, indexes and foreign keys; DDL editing for views and routines.</li>
+    <li><b>Client tools and data transfer.</b> Settings ▸ Client tools, Export and Restore sheets, Open in Terminal; built-in SQL export, copy to another server, CSV import, running a .sql file.</li>
+    <li><b>Compare and reconcile.</b> Structure diff first (it reuses the schema cache and DDL code), then data diff with server-side chunk checksums, then the sync script.</li>
+    <li><b>Liquibase.</b> Changelog from a schema (DDL, DML, both), and Save as Changeset on every change sheet. This reuses the SQL the table editor and grid already show.</li>
+    <li><b>Power features.</b> Maintenance, bulk table editor, find text on server, EXPLAIN plan, query profile, reformat, ER diagram.</li>
+    <li><b>Ship.</b> Tooltips on every control, docs site, agent guide, signing, notarization, Homebrew cask.</li>
+  </ol>
+</section>
+
+<footer>
+  <p>Sources: heidisql.com and HeidiSQL's source (12.22, master 48aaabb), DataGrip 2026.2 help, release notes and user discussion, and AirSCP 1.4.0's agent guide and architecture notes. Details in docs/dev/research.md.</p>
+  <p>Prepared 2 November 2026.</p>
+</footer>
+</div>
+
+<script>
+const GROUPS = [
+ { id: "feel", title: "Basics that make it feel native (missing from MySQLClient)", items: [
+  ["Right-click menus on the tree, grid cells, column headers, result tabs and editor", "Every menu item also in the menu bar, with its shortcut", "A", "1.0", "M"],
+  ["Single click shows, double click opens or edits", "Click a table: its data or structure shows. Double-click a cell: edit in place. Double-click a tree object: open its editor", "A", "1.0", "S"],
+  ["Multi-select with ⌘ and ⇧ in the grid, the tree and lists, with bulk actions", "Copy, delete, export or drop many at once; cell ranges as well as rows", "A", "1.0", "M"],
+  ["Keyboard shortcuts for every common action, shown in menus and tooltips", "HeidiSQL keys (F9, Ctrl+F9, F2) plus Mac keys (⌘↩, ⌘T, ⌘W, ⌘F, ⌘R refresh)", "A", "1.0", "S"],
+  ["Full keyboard use of the grid: arrows, Tab, Return to edit, Esc to cancel, ⌘⌫ to delete a row", "Type to start editing, as in Numbers", "A", "1.0", "M"],
+  ["Never laggy: queries off the main thread; 100,000 rows scroll smoothly; typing never waits", "Recycling NSTableView, results streamed in batches, a row cap; a performance test in CI fails the build when these slip", "A", "1.0", "M"],
+  ["Drag and drop: table and column names into the editor, .sql files onto the window", "", "A", "1.0", "S"],
+  ["Busy indicators everywhere: spinners where results will appear, progress and Cancel for anything over 2 s", "Tree nodes while loading, grid pages, running queries with a timer, connecting hop by hop, sheets with progress; the status bar lists running work", "A", "1.0", "M"]
+ ]},
+ { id: "conn", title: "Connections and routes", items: [
+  ["Saved connections with folders, colours and comments; passwords in the Keychain", "Colour marks production; folders as in HeidiSQL's session manager", "H", "1.0", "M"],
+  ["Several connections open at once, one tab each", "HeidiSQL: multiple connections in one window", "H", "1.0", "M"],
+  ["Direct TCP and Unix socket", "Socket for local servers (Homebrew, MAMP, DBngin)", "H", "1.0", "S"],
+  ["TLS: require, verify CA, verify identity; CA file, client certificate and key", "HeidiSQL's SSL tab", "H", "1.0", "M"],
+  ["Logins: native, caching_sha2_password, MariaDB ed25519, cleartext over TLS (PAM, LDAP)", "Comes with libmariadb", "H", "1.0", "S"],
+  ["SSH tunnel with password, key, ssh-agent or 2FA; ~/.ssh/config works", "Reuse AirSCP's Session, Askpass and host key Trust sheet", "D", "1.0", "M"],
+  ["SSH through one or more jump hosts", "ProxyJump chain, each hop with its own login", "D", "1.0", "S"],
+  ["SSH through an HTTP or SOCKS5 proxy", "AirSCP's ProxyConnect helper as ProxyCommand", "D", "1.0", "S"],
+  ["Database through a SOCKS5 or HTTP CONNECT proxy, no SSH", "Small relay inside the app on 127.0.0.1", "D", "1.0", "M"],
+  ["Every route ends in a local port shared by the driver, client tools and Terminal", "See decision D2", "A", "1.0", "M"],
+  ["Ask for user and password at each connect", "HeidiSQL: prompt for credentials", "H", "1.0", "S"],
+  ["Read-only connection", "Refuses writes from the console, the grid and agents", "D", "1.0", "S"],
+  ["Keep-alive, reconnect after sleep or network change, query timeout", "", "H", "1.0", "M"],
+  ["Full schema introspection at connect and on Refresh, in the background with progress", "One query per object kind for all databases; only what DDL touched is refreshed afterwards", "A", "1.0", "M"],
+  ["Safety settings on by default, overridable globally or per connection, with a strict Production preset", "Missing-WHERE prompt, write prompts, Apply preview, typed-name drops, restore prompts, agent caps and timeouts", "A", "1.0", "M"],
+  ["Show only some databases (database filter)", "", "H", "1.0", "S"],
+  ["Startup SQL per connection", "For example SET sql_mode or time_zone", "H", "1.0", "S"],
+  ["Compressed protocol", "", "H", "1.0", "S"],
+  ["Use a host, jump host or proxy saved in AirSCP", "Reads AirSCP's airscp.json", "A", "Skip", "S"],
+  ["Import sessions from HeidiSQL", "From HeidiSQL's exported settings file; helps people switch", "A", "1.x", "M"],
+  ["Connect from the command line or an airsql:// link", "HeidiSQL command-line switches", "H", "Later", "S"],
+  ["Named pipes and Windows authentication", "Windows only", "H", "Skip", "S"],
+  ["MS SQL, PostgreSQL, SQLite, Firebird, Interbase, Redshift, ProxySQL", "AirSQL is MariaDB and MySQL only", "H", "Skip", "L"]
+ ]},
+ { id: "ai", title: "AI agents (MCP)", items: [
+  ["AirSQL --mcp stdio server, set up for Claude Code and Gemini CLI, plus a Claude Code plugin", "Same pattern as AirSCP: the helper talks to the running app over a private socket", "A", "1.0", "M"],
+  ["Off until turned on; agent access per connection: Off, Schema, Schema + read", "Production-coloured connections start at Off", "A", "1.0", "S"],
+  ["Schema tools: connections, databases, describe table, compact schema dump, search columns", "Columns, indexes, foreign keys and DDL; output sized for an agent's context", "A", "1.0", "M"],
+  ["Read-only run_query with a row cap, shown to you in an Agent tab", "Statement allow-list plus a READ ONLY session", "A", "1.0", "M"],
+  ["open_in_console: SQL lands in a tab for you to edit and run", "Writes run only when you press Run", "A", "1.0", "S"],
+  ["read_console: the agent sees what you ran and the result or error", "So it can fix its query and try again", "A", "1.0", "S"],
+  ["Activity list of what each agent did, and one switch to turn agents off", "", "A", "1.0", "S"],
+  ["Agents never see passwords; sample rows off by default", "", "A", "1.0", "S"],
+  ["Few round trips: one context call, the whole schema in one compact call or as a cached resource, batched queries", "MCP structured output, tool annotations, schema resources with change notifications, schema hash so unchanged schemas are not resent", "A", "1.0", "M"],
+  ["Analytics for agents: profile a table in one call, larger read-only results, export results to a file", "A fourth access level, Schema + read + analytics; files go to an agent export folder you choose", "A", "1.0", "M"],
+  ["Agent writes after your approval", "A sheet shows the exact SQL; you approve or decline", "A", "Skip", "M"],
+  ["Agents drive the whole UI (snapshot, menu, press)", "AirSCP's full agent control", "A", "1.0", "L"]
+ ]},
+ { id: "tools", title: "Client tools (your mysql / mariadb binaries)", items: [
+  ["Settings ▸ Client tools: choose mysql/mariadb and mysqldump/mariadb-dump, found automatically, version shown", "Homebrew, /usr/local/mysql/bin, MAMP, PATH", "A", "1.0", "S"],
+  ["Client tools per connection, with a version mismatch warning", "MariaDB tools for MariaDB, MySQL 8 tools for MySQL 8", "A", "1.0", "S"],
+  ["Export with mysqldump: databases and tables, structure and data, routines, events, triggers, gzip", "Shows the full command, progress and Cancel", "H", "1.0", "M"],
+  ["Restore a .sql or .sql.gz file into a chosen database", "Progress by bytes read; stop at first error or continue", "H", "1.0", "M"],
+  ["Passwords in a temporary 0600 defaults file, never on the command line", "", "A", "1.0", "S"],
+  ["Client tools work over every route through the local port", "", "A", "1.0", "S"],
+  ["Open the mysql command line in Terminal with this connection", "HeidiSQL: launch mysql.exe with the current settings", "H", "1.0", "S"],
+  ["mydumper and myloader for parallel dump and restore", "For large databases", "A", "Skip", "M"],
+  ["Run the dump on the server over SSH and download the file", "Avoids pulling every row through the tunnel", "A", "Later", "M"]
+ ]},
+ { id: "recon", title: "Compare and reconcile", items: [
+  ["Compare any two databases, on the same or different connections", "For example production against staging, or MySQL 8 against MariaDB; each side uses its own route", "A", "1.0", "S"],
+  ["Structure compare (DDL): tables, columns, indexes, foreign keys, checks, views, routines, triggers, events", "Ignores noise you choose: AUTO_INCREMENT values, DEFINER, default collation, whitespace; maps MySQL and MariaDB type spellings", "D", "1.0", "L"],
+  ["Data compare (DML) by primary or unique key: missing, extra and changed rows, down to the cell", "Row counts and chunked checksums on each server first, so only differing chunks are fetched", "A", "1.0", "L"],
+  ["Structure and data in one run, with a summary: matching, different, only in source, only in target", "", "A", "1.0", "S"],
+  ["Choose tables, exclude columns (such as updated_at), add a WHERE per table, map renamed tables", "", "A", "1.0", "S"],
+  ["Sync script to make the target match: CREATE, ALTER, DROP, INSERT, UPDATE, DELETE in dependency order", "Opens in a console tab to review; never runs on its own", "A", "1.0", "M"],
+  ["Save the sync script as a Liquibase changeset", "Uses the Liquibase generator below", "A", "1.0", "S"],
+  ["Export the recon report as HTML, CSV or Markdown", "", "A", "1.0", "S"],
+  ["Agent tool to run a recon and read its report", "", "A", "1.x", "S"]
+ ]},
+ { id: "lb", title: "Liquibase changesets", items: [
+  ["Generate a Liquibase formatted SQL changelog from a schema: DDL, DML or DDL + DML", "Pick a database or some objects; tables, views, routines, triggers, events; data with an optional WHERE per table", "A", "1.0", "M"],
+  ["One changeset per object in dependency order, with author, id pattern and rollback", "Tables before foreign keys and views; --rollback DROP for DDL; splitStatements:false and endDelimiter for routines and triggers", "A", "1.0", "M"],
+  ["Save any change as a changeset: grid Apply, table editor ALTER, rename, drop, or a console statement", "Appends to a chosen changelog file; the sheet shows the changeset before saving", "A", "1.0", "M"],
+  ["Contexts, labels, comments and preconditions on generated changesets", "", "A", "1.x", "S"],
+  ["Agent tool to generate a changeset from objects or the console", "So an agent can hand over a migration with the SQL it wrote", "A", "1.x", "S"],
+  ["Run Liquibase update, status and rollback with your liquibase binary", "Through Settings ▸ Client tools, over the local port", "A", "Later", "M"]
+ ]},
+ { id: "nav", title: "Navigator", items: [
+  ["Tree: databases, tables, views, procedures, functions, triggers, events", "Grouped by type, loaded when opened", "H", "1.0", "M"],
+  ["Database view: tables with rows, size, engine, collation, last update", "", "H", "1.0", "S"],
+  ["Filter the tree by name", "", "H", "1.0", "S"],
+  ["Create and drop databases with charset and collation", "", "H", "1.0", "S"],
+  ["Rename, empty (truncate) and drop tables", "Each asks first and shows the SQL", "H", "1.0", "S"],
+  ["Favourite objects", "", "H", "Skip", "S"],
+  ["Copy a table to another database, with an optional WHERE", "", "H", "1.0", "M"],
+  ["Bulk table editor: move to another database, change engine or collation", "", "H", "1.0", "M"],
+  ["Maintenance: optimize, check, analyze, repair, checksum", "", "H", "1.0", "S"],
+  ["Find text in every table of a server", "", "H", "1.0", "M"]
+ ]},
+ { id: "editor", title: "Table and object editors", items: [
+  ["Columns: type, length, unsigned, null, default, auto increment, comment, collation, generated; reorder", "", "H", "1.0", "L"],
+  ["Indexes: primary, unique, fulltext, spatial, prefix length", "", "H", "1.0", "M"],
+  ["Foreign keys", "", "H", "1.0", "M"],
+  ["Table options: engine, collation, comment, auto increment, row format", "", "H", "1.0", "S"],
+  ["See the CREATE or ALTER SQL before it runs", "", "H", "1.0", "S"],
+  ["Views, procedures, functions, triggers and events edited as CREATE code", "", "H", "1.0", "M"],
+  ["Forms for routine parameters, trigger timing and event schedules", "", "H", "Skip", "M"],
+  ["Check constraints", "", "H", "1.0", "S"],
+  ["Partitions", "", "H", "Later", "M"],
+  ["MariaDB sequences and system-versioned tables", "", "A", "Later", "M"]
+ ]},
+ { id: "grid", title: "Data grid: understand the data", items: [
+  ["Column headers show name, type and key marks (primary, foreign, unique, indexed); the comment as tooltip", "Auto-increment, default and generated columns marked too; NULL-able columns marked", "A", "1.0", "S"],
+  ["Status bar: rows loaded and total, and for a selection its count, sum, average, min, max and distinct values", "Total is an estimate until you ask for an exact COUNT(*)", "D", "1.0", "S"],
+  ["Column summary: distinct values, NULLs, min, max and most frequent values, worked out on the server", "HeidiSQL's \"more values\", for the whole table and not just the loaded rows", "H", "1.0", "M"],
+  ["Value panel beside the grid: text with wrap, JSON as a tree, hex, image preview", "Follows the selected cell; shows the full value even when the cell shows a shortened one", "H", "1.0", "M"],
+  ["Colours by data type, a clear NULL style, and colours for pending inserts, edits and deletes", "", "H", "1.0", "S"],
+  ["Unix timestamp columns shown as dates, switched per column", "", "H", "1.0", "S"],
+  ["Transpose results: rows become columns, column names down the left", "DataGrip's Transpose (⌥⌘T); single-row results can transpose automatically; editing works the same", "D", "1.0", "S"],
+  ["One row as a form (fields listed top to bottom)", "", "D", "1.0", "S"],
+  ["Freeze the key column; auto-fit, resize, hide and reorder columns; remembered per table", "Widths kept when a query is re-run (a HeidiSQL complaint)", "H", "1.0", "S"],
+  ["Highlight cells equal to the focused value; heatmap colouring for a column or table", "", "H", "1.0", "S"],
+  ["View results as Table, Text (in the copy format) or a JSON tree", "", "D", "1.0", "S"],
+  ["Chart the results: bar, line, area, pie, scatter, histogram; save as PNG", "Swift Charts", "D", "1.0", "M"],
+  ["Compare two result grids, or a grid with a table: changed, added and removed rows", "Shares the recon diff engine", "D", "1.0", "M"],
+  ["Display types per column: binary(16) as UUID, binary as hex or text, number and date formats, time zone", "", "D", "1.0", "S"]
+ ]},
+ { id: "gridfind", title: "Data grid: filter, sort and search", items: [
+  ["Server-side filter and sort (all rows, loaded or not): WHERE bar with completion and history; click headers to ORDER BY, ⌥-click for more columns", "Last 20 filters per table; filter, sort and hidden columns remembered per table; a sort dialog for many columns", "H", "1.0", "M"],
+  ["Local filter and sort of the loaded rows, instant, with no query", "The bar always says which applies, for example \"Sorted on server\" or \"Filtered locally: 5,000 loaded rows\"", "D", "1.0", "M"],
+  ["Search all columns, as in HeidiSQL: one box builds a WHERE over every column, or searches only the loaded rows", "Non-text columns are cast for the search; matches are highlighted in the grid", "H", "1.0", "M"],
+  ["Quick filters from a cell or a selection: =, <>, <, >, LIKE, IN, IS NULL, IS NOT NULL", "Also from a prompt or the clipboard; each menu item shows its SQL; ⌥-click adds to the current filter", "H", "1.0", "S"],
+  ["Filter a column by ticking values in a list, as in a spreadsheet", "Values come from the server, with counts", "D", "1.0", "M"],
+  ["Find and replace in the grid; replacements become pending edits", "Regex, case, whole word; \"Filter rows\" hides non-matching loaded rows", "H", "1.0", "S"],
+  ["Paging with a row limit, Load more, Load all (asks first above a size you set)", "", "H", "1.0", "S"],
+  ["Go to row (⌘L), jump to a column from a searchable list (⌘J)", "", "D", "1.0", "S"],
+  ["Refresh, and refresh automatically every N seconds", "", "H", "1.0", "S"]
+ ]},
+ { id: "gridedit", title: "Data grid: edit", items: [
+  ["Edit cells, insert, duplicate and delete rows; changes wait for Apply and run in one transaction; SQL shown", "Leaving a row never writes (HeidiSQL auto-posts); deletes run in batches; uses a NOT NULL unique key when there is no primary key, read-only otherwise, with a note saying why", "H", "1.0", "L"],
+  ["Auto-generated values handled for you: AUTO_INCREMENT, DEFAULT and generated columns left out of the INSERT, then read back", "New rows show \"auto\" or \"default\" until saved; generated columns are read-only; the real id appears after Apply", "A", "1.0", "M"],
+  ["Insert value menu: NULL, DEFAULT, NOW(), CURRENT_TIMESTAMP(6), UUID(), UUID_SHORT()", "", "H", "1.0", "S"],
+  ["Date, time and timestamp editor: type or pick, fractional seconds, zero dates, time zone shown for TIMESTAMP", "Typing always works and ↑/↓ steps a part; the calendar opens only on request; never fills NOW() into a NULL you pass through", "A", "1.0", "M"],
+  ["JSON editor: pretty print, checked before Apply, tree view, saved compact or as typed", "Works for MySQL JSON and MariaDB's JSON (LONGTEXT with a JSON_VALID check)", "A", "1.0", "M"],
+  ["Pick-lists for ENUM and SET, checkboxes for BOOLEAN, TINYINT(1) and BIT(1)", "", "A", "1.0", "S"],
+  ["Long text in a multi-line editor; BLOBs in a hex editor; load a BLOB from a file or save it to one", "", "H", "1.0", "M"],
+  ["Numbers and DECIMAL kept exact, checked against the column type while you type", "Values travel as text, so nothing is rounded through Double", "A", "1.0", "S"],
+  ["Foreign key drop-down with search, and jump to the referenced or referencing rows", "The referenced label also shows in the grid cell; ⌘↓ opens related rows", "H", "1.0", "M"],
+  ["Paste a block from Excel or Numbers as pending edits and new rows", "", "D", "1.0", "M"],
+  ["Undo and redo pending changes before Apply; a failed Apply points to the row and cell", "", "A", "1.0", "S"],
+  ["Multi-cell edit: select cells, type once, every selected cell gets the value", "", "D", "1.0", "S"],
+  ["Edit JOIN results when every table's key is in the result (preview required)", "", "D", "1.0", "M"],
+  ["Virtual foreign keys you define, for navigation, drop-downs and completion", "Many MySQL schemas have no real foreign keys", "D", "1.0", "S"],
+  ["Edit as Table: selected INSERT statements in the console open as a grid", "", "D", "1.0", "S"],
+  ["Copy selected cells as TSV, CSV, SQL INSERT, JSON or Markdown", "Also INSERT IGNORE, REPLACE, UPDATE, DELETE, WHERE clause, JSON Lines, HTML, XML; the last format chosen becomes ⌘C's", "H", "1.0", "S"],
+  ["Export rows as CSV, JSON, SQL or Markdown", "", "H", "1.0", "S"],
+  ["Export rows as HTML, XML or Excel", "", "H", "1.0", "M"],
+  ["Edit the results of a single-table SELECT", "", "H", "1.0", "M"],
+  ["Export rows as LaTeX, Textile or PHP array", "", "H", "Skip", "S"]
+ ]},
+ { id: "sql", title: "SQL console", items: [
+  ["Tabs; open and save .sql files; unsaved tabs come back after relaunch", "", "H", "1.0", "M"],
+  ["Highlighting, line numbers, find and replace with regex", "", "H", "1.0", "M"],
+  ["Completion for keywords, functions, databases, tables, columns and aliases", "From the same schema cache agents read", "H", "1.0", "L"],
+  ["Run all, selection or statement at cursor; DELIMITER; Cancel (KILL QUERY)", "F9 and Ctrl+F9 as in HeidiSQL, plus ⌘↩", "H", "1.0", "M"],
+  ["Several result tabs; rows affected, timing, warnings; errors point to the line", "", "H", "1.0", "M"],
+  ["Auto-commit switch with Commit and Rollback", "", "D", "1.0", "S"],
+  ["Asks before UPDATE or DELETE without WHERE, and before writes on production", "", "D", "1.0", "S"],
+  ["Query history per connection, searchable", "", "H", "1.0", "S"],
+  ["SQL log of every statement AirSQL sends", "", "H", "1.0", "S"],
+  ["Run a .sql file inside the app, without client tools", "", "H", "1.0", "M"],
+  ["Reformat SQL", "", "H", "1.0", "M"],
+  ["Snippets", "", "H", "Skip", "S"],
+  ["Query helpers panel: columns, functions, keywords", "", "H", "1.0", "S"],
+  ["EXPLAIN as a table and a plan view", "", "D", "1.0", "M"],
+  ["Query profile (SHOW PROFILE, performance_schema)", "", "H", "1.0", "S"],
+  ["Bind parameters", "", "H", "Skip", "S"]
+ ]},
+ { id: "server", title: "Server, users and data transfer", items: [
+  ["Process list with Kill and auto-refresh", "", "H", "1.0", "S"],
+  ["Server variables, session and global, with edit", "", "H", "Skip", "S"],
+  ["Status counters and command statistics", "", "H", "1.x", "S"],
+  ["User manager: accounts, hosts, privileges, roles, limits, login plugin", "", "H", "Skip", "L"],
+  ["Import CSV with column mapping", "LOAD DATA LOCAL INFILE, or INSERTs when that is disabled", "H", "1.0", "M"],
+  ["Built-in SQL export without client tools; copy straight to another server", "", "H", "1.0", "L"],
+  ["Insert files into BLOB or TEXT columns", "", "H", "Skip", "S"],
+  ["Replication and binary log status", "", "A", "Skip", "M"]
+ ]},
+ { id: "app", title: "The app", items: [
+  ["Native AppKit and SwiftUI, light and dark, Intel and Apple silicon", "", "A", "1.0", "M"],
+  ["Every control has a tooltip; docs site; signed, notarized, Homebrew cask", "Same rules as AirSCP", "A", "1.0", "M"],
+  ["Settings: editor and grid fonts, row limit, how NULL looks", "", "H", "1.0", "S"],
+  ["Check for updates", "", "H", "Skip", "S"],
+  ["ER diagram of a database", "Tables and foreign keys, laid out automatically, exported as an image", "D", "1.0", "M"],
+  ["Translations", "", "H", "Skip", "M"]
+ ]}
+];
+const TIERS = ["1.0", "1.x", "Later", "Skip"];
+const SRC = { H: "HeidiSQL", D: "DataGrip", A: "AirSQL" };
+const WEEKS = { S: 0.3, M: 1, L: 2.5 };
+const KEY = "airsql-scope-v3";
+
+let choice = {};
+try { choice = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { choice = {}; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(choice)); } catch (e) {} }
+const idOf = (g, i) => g.id + "-" + i;
+const tierOf = (g, i) => choice[idOf(g, i)] || g.items[i][3];
+
+let filter = "all", query = "";
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function render() {
+  const root = document.getElementById("catalogue");
+  root.innerHTML = "";
+  GROUPS.forEach(g => {
+    const rows = g.items.map((it, i) => ({ it, i, t: tierOf(g, i) }))
+      .filter(r => (filter === "all" || r.t === filter) &&
+        (!query || (r.it[0] + " " + r.it[1] + " " + g.title).toLowerCase().includes(query)));
+    if (!rows.length) return;
+    const n10 = g.items.filter((_, i) => tierOf(g, i) === "1.0").length;
+    const box = document.createElement("div");
+    box.className = "group";
+    box.innerHTML = `<div class="group-head"><h3>${esc(g.title)}</h3><span class="count">${n10} of ${g.items.length} in 1.0</span></div>
+      <div class="tablebox"><table><thead><tr><th>Feature</th><th>Source</th><th>Effort</th><th>Release</th></tr></thead><tbody>${
+      rows.map(({ it, i, t }) => `<tr class="tier-${t}${choice[idOf(g, i)] && choice[idOf(g, i)] !== it[3] ? " changed" : ""}">
+        <td class="feat"><b>${esc(it[0])}</b>${it[1] ? `<span>${esc(it[1])}</span>` : ""}</td>
+        <td class="src"><span class="src-badge src-${it[2]}">${SRC[it[2]]}</span></td>
+        <td class="eff">${it[4]}</td>
+        <td><div class="seg" role="radiogroup" aria-label="Release for ${esc(it[0])}">${
+          TIERS.map(x => `<button type="button" role="radio" data-id="${idOf(g, i)}" data-t="${x}" aria-checked="${x === t}" title="Plan for ${x === "Skip" ? "never" : x}${x === it[3] ? " (suggested)" : ""}">${x}</button>`).join("")
+        }</div></td></tr>`).join("")
+      }</tbody></table></div>`;
+    root.appendChild(box);
+  });
+  if (!root.children.length) root.innerHTML = `<p class="sub">No feature matches. Clear the search or pick All.</p>`;
+  tiles();
+}
+
+function tiles() {
+  const c = { "1.0": 0, "1.x": 0, Later: 0, Skip: 0 }; let w = 0, changed = 0;
+  GROUPS.forEach(g => g.items.forEach((it, i) => {
+    const t = tierOf(g, i); c[t]++; if (t === "1.0") w += WEEKS[it[4]];
+    if (choice[idOf(g, i)] && choice[idOf(g, i)] !== it[3]) changed++;
+  }));
+  const tile = (n, label, col, note) => `<div class="tile" style="--c:${col}"><b>${n}</b><span>${label}</span>${note ? `<small>${note}</small>` : ""}</div>`;
+  document.getElementById("tiles").innerHTML =
+    tile(c["1.0"], "features in 1.0", "var(--accent)", `≈ ${Math.round(w)} weeks`) +
+    tile(c["1.x"], "in 1.x, soon after", "var(--accent-soft)") +
+    tile(c.Later, "later", "var(--later)") +
+    tile(c.Skip, "skipped", "var(--skip)") +
+    tile(changed, "changed from suggested", "var(--warn)", changed ? "saved in this browser" : "all as suggested");
+}
+
+document.getElementById("catalogue").addEventListener("click", e => {
+  const b = e.target.closest("button[data-id]"); if (!b) return;
+  choice[b.dataset.id] = b.dataset.t; save(); render();
+  const again = document.querySelector(`button[data-id="${b.dataset.id}"][data-t="${b.dataset.t}"]`);
+  if (again) again.focus();
+});
+document.querySelectorAll(".chip").forEach(ch => ch.addEventListener("click", () => {
+  filter = ch.dataset.f;
+  document.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", String(x === ch)));
+  render();
+}));
+document.getElementById("q").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); render(); });
+document.getElementById("reset").addEventListener("click", () => { choice = {}; save(); render(); say("Every row is back to its suggested release."); });
+
+function md(only) {
+  let out = only ? "# AirSQL 1.0 scope\n" : "# AirSQL feature plan\n";
+  GROUPS.forEach(g => {
+    const rows = g.items.map((it, i) => ({ it, t: tierOf(g, i) })).filter(r => !only || r.t === "1.0");
+    if (!rows.length) return;
+    out += `\n## ${g.title}\n`;
+    rows.forEach(({ it, t }) => { out += `- ${only ? "" : `[${t}] `}${it[0]} (${SRC[it[2]]}, ${it[4]})\n`; });
+  });
+  return out;
+}
+function say(s) { document.getElementById("status").textContent = s; }
+async function copy(text, what) {
+  try { await navigator.clipboard.writeText(text); say(`Copied ${what} as Markdown.`); }
+  catch (e) { say("This viewer blocked the clipboard. Select the text in the box below and copy it."); showText(text); }
+}
+function showText(text) {
+  let ta = document.getElementById("fallback");
+  if (!ta) { ta = document.createElement("textarea"); ta.id = "fallback"; ta.rows = 12; ta.style.cssText = "width:100%;font:12px var(--font-mono);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px"; document.getElementById("status").after(ta); }
+  ta.value = text; ta.select();
+}
+document.getElementById("copy").addEventListener("click", () => copy(md(true), "the 1.0 list"));
+document.getElementById("copyAll").addEventListener("click", () => copy(md(false), "every row"));
+render();
+</script>
+</body>
+</html>

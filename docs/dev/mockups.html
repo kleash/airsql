@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AirSQL Mockups and Plan</title>
+<style>
+/* Page chrome (not the app): neutral sheet that holds the window mockups. Layout: theme spec, then one section per screen, then the plan. */
+:root {
+  --pg-bg: #e9ebee; --pg-surface: #ffffff; --pg-ink: #1b2027; --pg-muted: #5d6672; --pg-line: #d5d9df; --pg-accent: #0e7c8c;
+  --pg-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --pg-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pg-bg: #0f1317; --pg-surface: #171c22; --pg-ink: #e5e9ee; --pg-muted: #98a2ae; --pg-line: #2a323b; --pg-accent: #4fc2d2; color-scheme: dark; } }
+:root[data-theme="dark"] { --pg-bg: #0f1317; --pg-surface: #171c22; --pg-ink: #e5e9ee; --pg-muted: #98a2ae; --pg-line: #2a323b; --pg-accent: #4fc2d2; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--pg-bg); color: var(--pg-ink); font: 14px/1.5 var(--pg-font); }
+.page { max-width: 1240px; margin: 0 auto; padding: 28px 20px 80px; display: grid; gap: 44px; }
+h1, h2, h3 { margin: 0; line-height: 1.2; text-wrap: balance; letter-spacing: -0.01em; }
+h1 { font-size: 32px; font-weight: 700; }
+h2 { font-size: 22px; font-weight: 650; }
+h3 { font-size: 15px; font-weight: 600; }
+p { margin: 0; max-width: 75ch; }
+.muted { color: var(--pg-muted); }
+code { font-family: var(--pg-mono); font-size: 0.9em; }
+section { display: grid; gap: 14px; }
+.sec-head { display: grid; gap: 6px; }
+.sec-head .num { font: 600 12px var(--pg-mono); color: var(--pg-accent); letter-spacing: .06em; text-transform: uppercase; }
+.notes { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.note { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; background: var(--pg-surface); border: 1px solid var(--pg-line); color: var(--pg-muted); }
+.note b { color: var(--pg-ink); font-weight: 600; }
+.stage { overflow-x: auto; padding: 4px 2px 18px; }
+.toggle { position: sticky; top: 0; z-index: 20; background: var(--pg-bg); padding: 10px 0; border-bottom: 1px solid var(--pg-line); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.toggle span { font-size: 13px; color: var(--pg-muted); }
+.seg { display: inline-flex; border: 1px solid var(--pg-line); border-radius: 7px; overflow: hidden; background: var(--pg-surface); }
+.seg button { font: 500 13px var(--pg-font); padding: 5px 12px; border: 0; background: transparent; color: var(--pg-ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--pg-ink); color: var(--pg-surface); }
+button:focus-visible { outline: 2px solid var(--pg-accent); outline-offset: 2px; }
+.toggle a { font-size: 13px; color: var(--pg-accent); text-decoration: none; }
+.toggle a:hover { text-decoration: underline; }
+
+/* ---------- AirSQL themes (the app). In Swift these resolve from system colours plus a wash; values here are what they resolve to with the default accent. ---------- */
+.win {
+  --ground: #eceef1; --content: #ffffff; --bar: #f4f5f7; --side: #e6e9ed; --sep: #d6dae0; --sep-soft: #e8ebef;
+  --label: #1c2129; --label2: #5e6774; --label3: #8a929d; --accent: #0a7f91; --accent-fill: #d5eef1; --on-accent: #ffffff;
+  --sel-row: #e6f3f5; --hover: #f1f3f6; --pill: #1c2129; --on-pill: #ffffff;
+  --t-num: #1f5fbf; --t-date: #8a4baf; --t-bin: #8b6a1a; --t-json: #0f7a6b; --t-null: #9aa1aa; --t-str: #1c2129;
+  --p-edit: #fff1c9; --p-edit-line: #d9a514; --p-ins: #ddf5e3; --p-ins-line: #2e9e5b; --p-del: #fbe0e0; --p-del-line: #d14343;
+  --s-kw: #9b2f8a; --s-str: #b5482a; --s-num: #1f5fbf; --s-com: #6e7781; --s-fn: #0a7f91; --s-id: #4a5562;
+  --c-prod: #d93a3a; --c-stage: #d9911e; --c-dev: #2e9e5b; --c-test: #3a7bd9;
+  --ok: #2e8a52; --warn: #b26b00; --bad: #c73636;
+  --shadow: 0 22px 60px rgba(20,30,45,.22), 0 2px 8px rgba(20,30,45,.12);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+.win[data-t="dark"] {
+  --ground: #161b21; --content: #1d232a; --bar: #1a2026; --side: #1a1f25; --sep: #2c343d; --sep-soft: #252c34;
+  --label: #e6eaef; --label2: #9aa4b1; --label3: #6f7985; --accent: #3fb6c8; --accent-fill: #173c43; --on-accent: #06181c;
+  --sel-row: #1d3238; --hover: #232a32; --pill: #3fb6c8; --on-pill: #06181c;
+  --t-num: #7fb0f5; --t-date: #c9a2e6; --t-bin: #dcbc66; --t-json: #63cdb8; --t-null: #6b7480; --t-str: #e6eaef;
+  --p-edit: #43380f; --p-edit-line: #e0b52e; --p-ins: #173a24; --p-ins-line: #4cc27b; --p-del: #482023; --p-del-line: #ef6b6b;
+  --s-kw: #e48dd4; --s-str: #f2a582; --s-num: #7fb0f5; --s-com: #7d8794; --s-fn: #56c7d6; --s-id: #b7c0cb;
+  --ok: #57c785; --warn: #e6a43b; --bad: #f07171;
+  --shadow: 0 22px 60px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+.win { width: 1180px; background: var(--ground); color: var(--label); font: 12.5px/1.35 var(--font); border-radius: 11px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--sep); position: relative; }
+.win.small { width: 900px; }
+.mono { font-family: var(--mono); }
+/* title bar + toolbar */
+.tb { height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--ground); border-bottom: 1px solid var(--sep); }
+.lights { display: flex; gap: 8px; margin-right: 10px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; background: #ff5f57; }
+.lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+.tbtn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 6px; color: var(--label); font-size: 12px; white-space: nowrap; }
+.tbtn.box { background: var(--content); border: 1px solid var(--sep); }
+.tbtn.prim { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.tbtn .k { color: var(--label3); font-size: 11px; }
+.tbtn.prim .k { color: inherit; opacity: .75; }
+.tsep { width: 1px; height: 20px; background: var(--sep); margin: 0 2px; }
+.flex1 { flex: 1; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.chip.prod { background: color-mix(in srgb, var(--c-prod) 16%, transparent); color: var(--c-prod); }
+.chip.tx { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.chip.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.chip.acc { background: var(--accent-fill); color: var(--accent); }
+.chip.grey { background: var(--hover); color: var(--label2); }
+/* prod tint strip under the toolbar */
+.tint { height: 3px; background: var(--c-prod); }
+/* body layout */
+.body { display: grid; grid-template-columns: 236px 1fr; height: 640px; }
+.body.tall { height: 700px; }
+.side { background: var(--side); border-right: 1px solid var(--sep); display: flex; flex-direction: column; min-width: 0; }
+.side .filter { margin: 8px 10px; height: 24px; border-radius: 6px; background: var(--content); border: 1px solid var(--sep); color: var(--label3); padding: 3px 8px; font-size: 12px; }
+.tree { flex: 1; overflow: hidden; padding: 2px 6px; }
+.tr { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 6px; border-radius: 5px; white-space: nowrap; color: var(--label); }
+.tr .tw { width: 10px; color: var(--label3); font-size: 9px; text-align: center; flex: none; }
+.tr .cnt { margin-left: auto; color: var(--label3); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tr.sel { background: var(--accent); color: var(--on-accent); }
+.tr.sel .cnt, .tr.sel .tw { color: inherit; opacity: .8; }
+.tr.head { color: var(--label3); font-size: 11px; font-weight: 600; letter-spacing: .02em; margin-top: 6px; }
+.ic { width: 15px; height: 15px; border-radius: 4px; font: 700 8.5px/15px var(--font); text-align: center; color: #fff; flex: none; }
+.ic.db { background: #6b7785; } .ic.t { background: #3a7bd9; } .ic.v { background: #8a4baf; } .ic.p { background: #2e9e5b; } .ic.f { background: #0a7f91; } .ic.tr2 { background: #d9911e; } .ic.e { background: #c2577a; }
+.ic.srv { border-radius: 50%; width: 9px; height: 9px; }
+.side-foot { border-top: 1px solid var(--sep); padding: 7px 12px; display: flex; gap: 8px; align-items: center; color: var(--label2); font-size: 11.5px; }
+/* main column */
+.main { display: flex; flex-direction: column; min-width: 0; background: var(--content); }
+.tabs { display: flex; align-items: flex-end; gap: 1px; height: 32px; background: var(--ground); border-bottom: 1px solid var(--sep); padding: 0 8px; }
+.tab { height: 27px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 7px 7px 0 0; color: var(--label2); font-size: 12px; white-space: nowrap; border: 1px solid transparent; border-bottom: 0; }
+.tab.on { background: var(--content); color: var(--label); border-color: var(--sep); position: relative; top: 1px; }
+.tab.on::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; border-radius: 7px 7px 0 0; background: var(--c-prod); }
+.tab .x { color: var(--label3); font-size: 10px; }
+.tab .mod { width: 6px; height: 6px; border-radius: 50%; background: var(--label2); }
+/* SQL editor */
+.editor { display: grid; grid-template-columns: 40px 1fr; font: 12.5px/19px var(--mono); padding: 8px 0; background: var(--content); border-bottom: 1px solid var(--sep); position: relative; }
+.gut { text-align: right; padding-right: 10px; color: var(--label3); user-select: none; }
+.code { white-space: pre; padding-left: 6px; overflow: hidden; }
+.kw { color: var(--s-kw); font-weight: 600; } .st { color: var(--s-str); } .nu { color: var(--s-num); } .cm { color: var(--s-com); font-style: italic; } .fn { color: var(--s-fn); } .id { color: var(--s-id); }
+.ran { background: color-mix(in srgb, var(--accent) 13%, transparent); box-shadow: inset 2px 0 0 var(--accent); display: block; margin-left: -6px; padding-left: 4px; }
+.cur { border-left: 2px solid var(--accent); margin-left: -1px; height: 16px; display: inline-block; vertical-align: -3px; }
+/* completion popup */
+.pop { position: absolute; background: var(--content); border: 1px solid var(--sep); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.18); font: 12px var(--font); z-index: 5; overflow: hidden; }
+.pop .row { display: flex; gap: 8px; align-items: center; padding: 4px 10px; white-space: nowrap; }
+.pop .row.on { background: var(--accent); color: var(--on-accent); }
+.pop .row .t2 { margin-left: auto; color: var(--label3); font-size: 11px; padding-left: 14px; }
+.pop .row.on .t2 { color: inherit; opacity: .8; }
+.pop .foot { border-top: 1px solid var(--sep-soft); padding: 5px 10px; color: var(--label2); font-size: 11px; background: var(--bar); white-space: normal; }
+/* results */
+.rtabs { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 8px; background: var(--bar); border-bottom: 1px solid var(--sep); }
+.rtab { padding: 3px 10px; border-radius: 6px; font-size: 11.5px; color: var(--label2); white-space: nowrap; }
+.rtab.on { background: var(--content); color: var(--label); border: 1px solid var(--sep); }
+.gbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bar); border-bottom: 1px solid var(--sep); font-size: 12px; }
+.where { flex: 1; display: flex; align-items: center; gap: 6px; height: 26px; border: 1px solid var(--sep); border-radius: 6px; background: var(--content); padding: 0 8px; font: 12px var(--mono); min-width: 0; overflow: hidden; white-space: nowrap; }
+.where .lbl { font: 600 10.5px var(--font); color: var(--label3); letter-spacing: .04em; }
+.search { width: 210px; height: 26px; border: 1px solid var(--sep); border-radius: 6px; background: var(--content); padding: 4px 8px; color: var(--label3); font-size: 12px; white-space: nowrap; overflow: hidden; }
+/* grid */
+.gridwrap { flex: 1; overflow: hidden; position: relative; min-height: 0; }
+table.g { border-collapse: separate; border-spacing: 0; font-size: 12px; width: max-content; min-width: 100%; }
+table.g th { position: sticky; top: 0; background: var(--bar); text-align: left; font-weight: 600; padding: 4px 9px 4px 8px; border-bottom: 1px solid var(--sep); border-right: 1px solid var(--sep-soft); white-space: nowrap; color: var(--label); }
+table.g th .ty { display: block; font: 400 10.5px var(--font); color: var(--label3); }
+table.g th .key { color: var(--warn); font-size: 10px; margin-right: 3px; }
+table.g th .fk { color: var(--accent); font-size: 10px; margin-right: 3px; }
+table.g th .so { color: var(--accent); font-size: 10px; margin-left: 4px; }
+table.g th.rn, table.g td.rn { color: var(--label3); text-align: right; background: var(--bar); font-weight: 400; width: 40px; font-variant-numeric: tabular-nums; position: sticky; left: 0; z-index: 1; }
+table.g th.rn { z-index: 2; }
+table.g td { padding: 0 9px; height: 23px; border-bottom: 1px solid var(--sep-soft); border-right: 1px solid var(--sep-soft); white-space: nowrap; max-width: 230px; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+table.g tr:nth-child(even) td:not(.rn) { background: color-mix(in srgb, var(--hover) 55%, var(--content)); }
+td.num { color: var(--t-num); text-align: right; } td.dt { color: var(--t-date); } td.bin { color: var(--t-bin); font-family: var(--mono); font-size: 11px; } td.js { color: var(--t-json); font-family: var(--mono); font-size: 11px; }
+td.nul { color: var(--t-null); font-style: italic; } td.pk { font-weight: 650; }
+td .fkl { color: var(--label3); margin-left: 6px; font-size: 11px; }
+table.g tr.selrow td:not(.rn) { background: var(--sel-row) !important; }
+td.sel { background: color-mix(in srgb, var(--accent) 20%, var(--content)) !important; }
+td.focus { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--content)) !important; }
+td.ed { background: var(--p-edit) !important; box-shadow: inset 3px 0 0 var(--p-edit-line); }
+tr.ins td:not(.rn) { background: var(--p-ins) !important; } tr.ins td.rn { box-shadow: inset 3px 0 0 var(--p-ins-line); color: var(--p-ins-line); }
+tr.del td:not(.rn) { background: var(--p-del) !important; text-decoration: line-through; color: var(--label2); } tr.del td.rn { box-shadow: inset 3px 0 0 var(--p-del-line); color: var(--p-del-line); }
+td.auto { color: var(--label3); font-style: italic; }
+td .hl { background: color-mix(in srgb, #f5c400 45%, transparent); border-radius: 2px; color: var(--label); }
+/* status bar */
+.status { height: 26px; display: flex; align-items: center; gap: 12px; padding: 0 10px; background: var(--bar); border-top: 1px solid var(--sep); font-size: 11.5px; color: var(--label2); white-space: nowrap; }
+.status b { color: var(--label); font-weight: 600; font-variant-numeric: tabular-nums; }
+.status .agg { margin-left: auto; display: flex; gap: 10px; }
+/* side panels */
+.split-r { display: grid; grid-template-columns: 1fr 300px; min-height: 0; flex: 1; }
+.panel { border-left: 1px solid var(--sep); background: var(--bar); display: flex; flex-direction: column; min-width: 0; }
+.panel .ph { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-bottom: 1px solid var(--sep); font-weight: 600; font-size: 12px; }
+.panel .pb { padding: 10px; font: 11.5px/18px var(--mono); overflow: hidden; flex: 1; background: var(--content); white-space: pre; }
+.minseg { display: inline-flex; margin-left: auto; border: 1px solid var(--sep); border-radius: 5px; overflow: hidden; font: 500 10.5px var(--font); }
+.minseg span { padding: 1px 6px; color: var(--label2); border-right: 1px solid var(--sep); }
+.minseg span:last-child { border-right: 0; }
+.minseg span.on { background: var(--pill); color: var(--on-pill); }
+.jk { color: var(--s-id); } .jstr { color: var(--s-str); } .jnum { color: var(--s-num); } .jb { color: var(--s-kw); }
+/* context menu */
+.menu { position: absolute; z-index: 8; background: color-mix(in srgb, var(--content) 94%, transparent); backdrop-filter: blur(12px); border: 1px solid var(--sep); border-radius: 8px; box-shadow: 0 12px 34px rgba(0,0,0,.24); padding: 5px; font-size: 12.5px; min-width: 230px; }
+.menu .mi { display: flex; align-items: center; gap: 10px; padding: 3px 10px; border-radius: 4px; white-space: nowrap; }
+.menu .mi .sc { margin-left: auto; color: var(--label3); font-size: 11.5px; padding-left: 18px; }
+.menu .mi .ar { margin-left: auto; color: var(--label3); }
+.menu .mi.on { background: var(--accent); color: var(--on-accent); }
+.menu .mi.on .sc, .menu .mi.on .ar { color: inherit; opacity: .85; }
+.menu .mi.dis { color: var(--label3); }
+.menu hr { border: 0; border-top: 1px solid var(--sep); margin: 4px 6px; }
+.menu .sql { margin-left: auto; font: 11px var(--mono); color: var(--label3); padding-left: 16px; }
+.menu .mi.on .sql { color: inherit; opacity: .85; }
+/* sheets */
+.dim { position: absolute; inset: 46px 0 0 0; background: rgba(0,0,0,.18); z-index: 9; }
+.win[data-t="dark"] .dim { background: rgba(0,0,0,.42); }
+.sheet { position: absolute; left: 50%; top: 46px; transform: translateX(-50%); z-index: 10; background: var(--ground); border: 1px solid var(--sep); border-top: 0; border-radius: 0 0 12px 12px; box-shadow: 0 24px 50px rgba(0,0,0,.3); width: 760px; display: grid; gap: 12px; padding: 18px 20px 16px; }
+.sheet h4 { margin: 0; font-size: 14px; font-weight: 650; }
+.sheet .cap { color: var(--label2); font-size: 11.5px; }
+.stabs { display: flex; justify-content: center; }
+.stabs .seg2 { display: inline-flex; background: var(--hover); border: 1px solid var(--sep); border-radius: 7px; padding: 2px; gap: 2px; }
+.stabs .seg2 span { padding: 3px 12px; border-radius: 5px; font-size: 12px; color: var(--label2); }
+.stabs .seg2 span.on { background: var(--content); color: var(--label); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.form { display: grid; grid-template-columns: 150px 1fr; gap: 8px 12px; align-items: center; }
+.form label { text-align: right; color: var(--label); font-size: 12.5px; }
+.field { height: 24px; border: 1px solid var(--sep); border-radius: 5px; background: var(--content); padding: 3px 8px; font-size: 12.5px; white-space: nowrap; overflow: hidden; }
+.field.ph { color: var(--label3); }
+.field.sm { width: 90px; display: inline-block; }
+.pop-btn { display: inline-flex; align-items: center; gap: 6px; height: 24px; border: 1px solid var(--sep); border-radius: 5px; background: var(--content); padding: 0 8px; font-size: 12.5px; }
+.pop-btn::after { content: "⌄"; color: var(--label3); margin-left: 4px; font-size: 11px; }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.chk i { width: 14px; height: 14px; border-radius: 4px; background: var(--accent); display: inline-block; position: relative; }
+.chk i::after { content: ""; position: absolute; left: 4px; top: 1.5px; width: 4px; height: 8px; border: solid var(--on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.chk i.off { background: var(--content); border: 1px solid var(--sep); }
+.chk i.off::after { display: none; }
+.btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.btn { height: 26px; padding: 0 14px; border-radius: 6px; font-size: 12.5px; display: inline-flex; align-items: center; background: var(--content); border: 1px solid var(--sep); }
+.btn.def { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; }
+.btn.danger { color: var(--bad); }
+.help { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--sep); background: var(--content); display: inline-grid; place-items: center; font-size: 12px; color: var(--label2); margin-right: auto; }
+.codebox { background: var(--content); border: 1px solid var(--sep); border-radius: 6px; padding: 8px 10px; font: 11.5px/17px var(--mono); white-space: pre; overflow: hidden; }
+/* route builder */
+.route { display: flex; align-items: center; gap: 6px; padding: 10px; background: var(--content); border: 1px solid var(--sep); border-radius: 8px; flex-wrap: nowrap; overflow: hidden; }
+.hop { padding: 6px 9px; border-radius: 6px; border: 1px solid var(--sep); background: var(--bar); font-size: 11.5px; white-space: nowrap; display: grid; gap: 1px; }
+.hop small { color: var(--label3); font-size: 10.5px; }
+.hop.mac { border-color: var(--accent); background: var(--accent-fill); }
+.hop.port { border-style: dashed; border-color: var(--accent); color: var(--accent); background: transparent; }
+.hop.db { background: var(--pill); color: var(--on-pill); border-color: transparent; }
+.hop.db small { color: inherit; opacity: .75; }
+.arr { color: var(--label3); }
+.ok-line { display: flex; gap: 8px; align-items: center; color: var(--ok); font-size: 12px; }
+/* lists & cards inside app */
+.list { border: 1px solid var(--sep); border-radius: 7px; background: var(--content); overflow: hidden; }
+.list .li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--sep-soft); font-size: 12px; }
+.list .li:last-child { border-bottom: 0; }
+.list .li .r { margin-left: auto; color: var(--label2); font-size: 11.5px; white-space: nowrap; }
+.list .li.on { background: var(--sel-row); }
+.bar-prog { height: 6px; border-radius: 3px; background: var(--hover); overflow: hidden; }
+.bar-prog i { display: block; height: 100%; width: 62%; background: var(--accent); border-radius: 3px; }
+.banner { display: flex; align-items: center; gap: 10px; padding: 7px 12px; font-size: 12px; background: var(--accent-fill); color: var(--label); border-bottom: 1px solid var(--sep); }
+.banner b { color: var(--accent); }
+.banner .btn { height: 22px; font-size: 11.5px; }
+/* diff */
+.diffcols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; font: 11.5px/18px var(--mono); }
+.diffcols > div { padding: 6px 10px; white-space: pre; overflow: hidden; background: var(--content); }
+.diffcols > div:first-child { border-right: 1px solid var(--sep); }
+.dminus { background: var(--p-del); display: block; margin: 0 -10px; padding: 0 10px; }
+.dplus { background: var(--p-ins); display: block; margin: 0 -10px; padding: 0 10px; }
+.summary { display: flex; gap: 8px; flex-wrap: wrap; }
+.sumbox { flex: 1; min-width: 120px; padding: 8px 10px; border: 1px solid var(--sep); border-radius: 7px; background: var(--content); display: grid; gap: 1px; }
+.sumbox b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.sumbox span { color: var(--label2); font-size: 11px; }
+.sumbox.bad b { color: var(--bad); } .sumbox.warn b { color: var(--warn); } .sumbox.ok b { color: var(--ok); }
+/* theme spec */
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 18px; }
+.speccard { background: var(--ground); color: var(--label); border-radius: 12px; border: 1px solid var(--sep); padding: 16px; display: grid; gap: 12px; box-shadow: var(--shadow); font: 12.5px/1.4 var(--font); }
+.speccard h3 { display: flex; align-items: baseline; gap: 10px; font-size: 16px; }
+.speccard h3 small { font-weight: 400; color: var(--label2); font-size: 12px; }
+.sw { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.sw div { border-radius: 7px; border: 1px solid var(--sep); overflow: hidden; background: var(--content); }
+.sw i { display: block; height: 30px; }
+.sw span { display: block; padding: 4px 6px; font-size: 10.5px; color: var(--label2); line-height: 1.25; }
+.sw span b { display: block; color: var(--label); font-weight: 600; font-size: 11px; }
+.sample { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sample .codebox { white-space: pre-wrap; }
+/* plan */
+.lanes { display: grid; gap: 10px; }
+.wave { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: stretch; }
+.wave .wl { background: var(--pg-ink); color: var(--pg-surface); border-radius: 8px; padding: 10px 12px; display: grid; align-content: start; gap: 2px; }
+.wave .wl b { font-size: 15px; } .wave .wl span { font-size: 12px; opacity: .8; }
+.wave .ln { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.lane { background: var(--pg-surface); border: 1px solid var(--pg-line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 5px; align-content: start; border-top: 3px solid var(--pg-accent); }
+.lane b { font-size: 13.5px; } .lane span { font-size: 12.5px; color: var(--pg-muted); }
+.lane code { font-size: 11px; color: var(--pg-muted); }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; counter-reset: st; }
+.step { background: var(--pg-surface); border: 1px solid var(--pg-line); border-radius: 8px; padding: 12px; display: grid; gap: 4px; align-content: start; }
+.step b::before { counter-increment: st; content: counter(st) "  "; font-family: var(--pg-mono); color: var(--pg-accent); }
+.step span { font-size: 12.5px; color: var(--pg-muted); }
+table.pt { border-collapse: collapse; width: 100%; background: var(--pg-surface); border: 1px solid var(--pg-line); border-radius: 8px; overflow: hidden; font-size: 13px; }
+table.pt th, table.pt td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--pg-line); vertical-align: top; }
+table.pt th { font-size: 12px; color: var(--pg-muted); font-weight: 600; background: var(--pg-bg); }
+.tablebox { overflow-x: auto; }
+footer { color: var(--pg-muted); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header style="display:grid;gap:8px">
+  <h1>AirSQL Mockups and Plan</h1>
+  <p class="muted">The chosen light and dark themes, a mockup of each major screen with realistic demo data, and the 1.0 build plan. Every screen follows the scope in <code>scope.html</code> and the grid spec in <code>grid-spec.md</code>. These pages are drawn in HTML: the real app is AppKit and uses the macOS system font and controls.</p>
+</header>
+
+<div class="toggle" role="toolbar" aria-label="Mockup theme">
+  <span>Show mockups in</span>
+  <div class="seg"><button type="button" data-set="light" aria-pressed="true">Porcelain (light)</button><button type="button" data-set="dark" aria-pressed="false">Deep Water (dark)</button></div>
+  <a href="#themes">Themes</a><a href="#s-main">Main window</a><a href="#s-grid">Grid</a><a href="#s-edit">Editing</a><a href="#s-trans">Transpose</a><a href="#s-conn">Connections</a><a href="#s-agent">Agents</a><a href="#s-tools">Client tools</a><a href="#s-recon">Recon</a><a href="#s-lb">Liquibase</a><a href="#s-te">Table editor</a><a href="#plan">Plan</a>
+</div>
+
+<!-- ================= THEMES ================= -->
+<section id="themes">
+  <div class="sec-head"><span class="num">Themes</span><h2>Porcelain and Deep Water</h2>
+  <p class="muted">Both are built from macOS system colours, the way AirSCP's are, so they follow the user's accent colour, Increase Contrast and Reduce Transparency without a theme setting. AirSQL adds a petrol-blue tint, colours chosen for data (value types, pending edits, SQL highlighting) and connection colours that tint the toolbar edge and active tab. Light: a cool grey window ground with white content and a near-black selected pill. Dark: blue-black surfaces with a 6% petrol wash, so long sessions are easy on the eyes and the accent stays readable.</p></div>
+  <div class="spec">
+    <div class="speccard win" data-fixed="light" data-t="light" style="width:auto">
+      <h3>Porcelain <small>light</small></h3>
+      <div class="sw">
+        <div><i style="background:var(--ground)"></i><span><b>Ground</b>window, toolbar</span></div>
+        <div><i style="background:var(--content)"></i><span><b>Content</b>editor, grid</span></div>
+        <div><i style="background:var(--side)"></i><span><b>Sidebar</b>navigator</span></div>
+        <div><i style="background:var(--bar)"></i><span><b>Bar</b>grid bar, status</span></div>
+        <div><i style="background:var(--accent)"></i><span><b>Accent</b>system accent</span></div>
+        <div><i style="background:var(--pill)"></i><span><b>Pill</b>selected segment</span></div>
+      </div>
+      <div class="sw">
+        <div><i style="background:var(--t-num)"></i><span><b>Number</b>right-aligned</span></div>
+        <div><i style="background:var(--t-date)"></i><span><b>Date/time</b></span></div>
+        <div><i style="background:var(--t-json)"></i><span><b>JSON</b></span></div>
+        <div><i style="background:var(--t-bin)"></i><span><b>Binary</b>hex</span></div>
+        <div><i style="background:var(--t-null)"></i><span><b>NULL</b>italic</span></div>
+        <div><i style="background:var(--p-edit);box-shadow:inset 4px 0 0 var(--p-edit-line)"></i><span><b>Edited</b>pending</span></div>
+        <div><i style="background:var(--p-ins);box-shadow:inset 4px 0 0 var(--p-ins-line)"></i><span><b>New row</b>pending</span></div>
+        <div><i style="background:var(--p-del);box-shadow:inset 4px 0 0 var(--p-del-line)"></i><span><b>Deleted</b>pending</span></div>
+      </div>
+      <div class="sample">
+        <div class="codebox"><span class="cm">-- top customers</span>
+<span class="kw">SELECT</span> c.<span class="id">`name`</span>, <span class="fn">SUM</span>(o.total) <span class="kw">AS</span> spent
+<span class="kw">FROM</span> customers c <span class="kw">JOIN</span> orders o
+  <span class="kw">ON</span> o.customer_id = c.id
+<span class="kw">WHERE</span> o.status = <span class="st">'paid'</span> <span class="kw">LIMIT</span> <span class="nu">20</span>;</div>
+        <div style="display:grid;gap:6px;align-content:start">
+          <span class="chip prod"><span class="dot" style="background:var(--c-prod)"></span>Production</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--c-stage) 18%,transparent);color:var(--c-stage)"><span class="dot" style="background:var(--c-stage)"></span>Staging</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--c-dev) 16%,transparent);color:var(--c-dev)"><span class="dot" style="background:var(--c-dev)"></span>Development</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--c-test) 16%,transparent);color:var(--c-test)"><span class="dot" style="background:var(--c-test)"></span>Test</span>
+        </div>
+      </div>
+    </div>
+    <div class="speccard win" data-fixed="dark" data-t="dark" style="width:auto">
+      <h3>Deep Water <small>dark</small></h3>
+      <div class="sw">
+        <div><i style="background:var(--ground)"></i><span><b>Ground</b>window, toolbar</span></div>
+        <div><i style="background:var(--content)"></i><span><b>Content</b>editor, grid</span></div>
+        <div><i style="background:var(--side)"></i><span><b>Sidebar</b>navigator</span></div>
+        <div><i style="background:var(--bar)"></i><span><b>Bar</b>grid bar, status</span></div>
+        <div><i style="background:var(--accent)"></i><span><b>Accent</b>system accent</span></div>
+        <div><i style="background:var(--pill)"></i><span><b>Pill</b>selected segment</span></div>
+      </div>
+      <div class="sw">
+        <div><i style="background:var(--t-num)"></i><span><b>Number</b>right-aligned</span></div>
+        <div><i style="background:var(--t-date)"></i><span><b>Date/time</b></span></div>
+        <div><i style="background:var(--t-json)"></i><span><b>JSON</b></span></div>
+        <div><i style="background:var(--t-bin)"></i><span><b>Binary</b>hex</span></div>
+        <div><i style="background:var(--t-null)"></i><span><b>NULL</b>italic</span></div>
+        <div><i style="background:var(--p-edit);box-shadow:inset 4px 0 0 var(--p-edit-line)"></i><span><b>Edited</b>pending</span></div>
+        <div><i style="background:var(--p-ins);box-shadow:inset 4px 0 0 var(--p-ins-line)"></i><span><b>New row</b>pending</span></div>
+        <div><i style="background:var(--p-del);box-shadow:inset 4px 0 0 var(--p-del-line)"></i><span><b>Deleted</b>pending</span></div>
+      </div>
+      <div class="sample">
+        <div class="codebox"><span class="cm">-- top customers</span>
+<span class="kw">SELECT</span> c.<span class="id">`name`</span>, <span class="fn">SUM</span>(o.total) <span class="kw">AS</span> spent
+<span class="kw">FROM</span> customers c <span class="kw">JOIN</span> orders o
+  <span class="kw">ON</span> o.customer_id = c.id
+<span class="kw">WHERE</span> o.status = <span class="st">'paid'</span> <span class="kw">LIMIT</span> <span class="nu">20</span>;</div>
+        <div style="display:grid;gap:6px;align-content:start">
+          <span class="chip prod"><span class="dot" style="background:var(--c-prod)"></span>Production</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--c-stage) 18%,transparent);color:var(--c-stage)"><span class="dot" style="background:var(--c-stage)"></span>Staging</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--c-dev) 16%,transparent);color:var(--c-dev)"><span class="dot" style="background:var(--c-dev)"></span>Development</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--c-test) 16%,transparent);color:var(--c-test)"><span class="dot" style="background:var(--c-test)"></span>Test</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="muted">Type: the macOS system font (SF Pro) for the interface, SF Mono for SQL, JSON and binary values. Grid rows are 23 pt high, with tabular figures so numbers line up. Contrast: every text colour meets WCAG AA (4.5:1) on its surface in both themes.</p>
+</section>
+
+<!-- ================= 1. MAIN WINDOW ================= -->
+<section id="s-main">
+  <div class="sec-head"><span class="num">Screen 1</span><h2>Main window: navigator, console and results</h2>
+  <p class="muted">A layout people already know: connections and the database tree on the left, query and table tabs in the middle, results under the query. The production connection tints the toolbar edge and the active tab red. ⌘↩ ran the statement under the cursor and briefly highlights it, with no "which statement?" popup. Completion offers the JOIN from the foreign key.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> navigator, console, completion, result tabs, Tx, SQL log</span><span class="note"><b>Lanes:</b> L1, L4, L5</span></div>
+  <div class="stage"><div class="win" data-t="light">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div>
+      <span class="tbtn box"><span class="dot" style="background:var(--c-prod)"></span>Production · shop ⌄</span>
+      <span class="tbtn box">shop ⌄</span><span class="tsep"></span>
+      <span class="tbtn prim">▶ Run <span class="k">⌘↩</span></span><span class="tbtn">Run all <span class="k">⇧⌘↩</span></span><span class="tbtn">Explain</span><span class="tsep"></span>
+      <span class="tbtn box">Tx: Manual ⌄</span><span class="tbtn">Commit</span><span class="tbtn">Rollback</span><span class="tbtn" style="color:var(--label3)">◼ Cancel</span>
+      <span class="flex1"></span><span class="chip tx">● Transaction open · 2 changes</span><span class="chip acc">Claude Code · reading schema</span>
+    </div>
+    <div class="tint"></div>
+    <div class="body">
+      <div class="side">
+        <div class="filter">Filter objects</div>
+        <div class="tree">
+          <div class="tr head">CONNECTIONS</div>
+          <div class="tr"><span class="tw">▾</span><span class="ic srv" style="background:var(--c-prod)"></span>Production · shop<span class="cnt">SSH</span></div>
+          <div class="tr" style="padding-left:20px"><span class="tw">▾</span><span class="ic db">DB</span>shop<span class="cnt">42</span></div>
+          <div class="tr" style="padding-left:34px"><span class="tw">▾</span><span class="ic t">T</span>Tables<span class="cnt">31</span></div>
+          <div class="tr" style="padding-left:48px"><span class="tw"></span><span class="ic t">T</span>addresses<span class="cnt">88 K</span></div>
+          <div class="tr sel" style="padding-left:48px"><span class="tw"></span><span class="ic t">T</span>customers<span class="cnt">412 K</span></div>
+          <div class="tr" style="padding-left:48px"><span class="tw"></span><span class="ic t">T</span>order_items<span class="cnt">9.8 M</span></div>
+          <div class="tr" style="padding-left:48px"><span class="tw"></span><span class="ic t">T</span>orders<span class="cnt">2.4 M</span></div>
+          <div class="tr" style="padding-left:48px"><span class="tw"></span><span class="ic t">T</span>payments<span class="cnt">2.3 M</span></div>
+          <div class="tr" style="padding-left:48px"><span class="tw"></span><span class="ic t">T</span>products<span class="cnt">6 K</span></div>
+          <div class="tr" style="padding-left:34px"><span class="tw">▸</span><span class="ic v">V</span>Views<span class="cnt">4</span></div>
+          <div class="tr" style="padding-left:34px"><span class="tw">▸</span><span class="ic p">P</span>Procedures<span class="cnt">3</span></div>
+          <div class="tr" style="padding-left:34px"><span class="tw">▸</span><span class="ic f">F</span>Functions<span class="cnt">2</span></div>
+          <div class="tr" style="padding-left:34px"><span class="tw">▸</span><span class="ic tr2">Tr</span>Triggers<span class="cnt">2</span></div>
+          <div class="tr" style="padding-left:34px"><span class="tw">▸</span><span class="ic e">E</span>Events<span class="cnt">1</span></div>
+          <div class="tr" style="padding-left:20px"><span class="tw">▸</span><span class="ic db">DB</span>analytics<span class="cnt">12</span></div>
+          <div class="tr"><span class="tw">▸</span><span class="ic srv" style="background:var(--c-stage)"></span>Staging · shop<span class="cnt">Jump</span></div>
+          <div class="tr"><span class="tw">▸</span><span class="ic srv" style="background:var(--c-dev)"></span>Local MariaDB 11.8<span class="cnt">Socket</span></div>
+          <div class="tr"><span class="tw">▸</span><span class="ic srv" style="background:var(--c-test)"></span>Reports replica<span class="cnt">Proxy</span></div>
+        </div>
+        <div class="side-foot"><span>＋</span><span>New connection</span><span class="flex1"></span><span>Processes</span></div>
+      </div>
+      <div class="main">
+        <div class="tabs"><span class="tab on">Top customers.sql <span class="mod"></span></span><span class="tab">customers <span class="x">✕</span></span><span class="tab">orders · structure <span class="x">✕</span></span><span class="tab">Query 4 <span class="x">✕</span></span><span class="tab" style="color:var(--label3)">＋</span></div>
+        <div class="editor">
+          <div class="gut">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10</div>
+<div class="code"><span class="cm">-- Top customers by paid orders, last 90 days</span>
+<span class="ran"><span class="kw">SELECT</span> c.id, c.<span class="id">`name`</span>, c.email, <span class="fn">COUNT</span>(o.id) <span class="kw">AS</span> orders, <span class="fn">SUM</span>(o.total) <span class="kw">AS</span> spent
+<span class="kw">FROM</span> customers c
+<span class="kw">JOIN</span> orders o <span class="kw">ON</span> o.customer_id = c.id
+<span class="kw">WHERE</span> o.status = <span class="st">'paid'</span> <span class="kw">AND</span> o.created_at &gt;= <span class="fn">NOW</span>() - <span class="kw">INTERVAL</span> <span class="nu">90</span> <span class="kw">DAY</span>
+<span class="kw">GROUP BY</span> c.id <span class="kw">ORDER BY</span> spent <span class="kw">DESC</span> <span class="kw">LIMIT</span> <span class="nu">200</span>;</span>
+
+<span class="cm">-- Refunds per product</span>
+<span class="kw">SELECT</span> p.sku, <span class="fn">SUM</span>(r.amount) <span class="kw">FROM</span> refunds r <span class="kw">JOIN</span> <span class="cur"></span></div>
+          <div class="pop" style="left:470px;top:178px;width:440px">
+            <div class="row on"><span class="ic t">T</span>products p <span class="kw" style="color:inherit">ON</span> p.id = r.product_id<span class="t2">foreign key</span></div>
+            <div class="row"><span class="ic t">T</span>orders o ON o.id = r.order_id<span class="t2">foreign key</span></div>
+            <div class="row"><span class="ic t">T</span>payments<span class="t2">table · 2.3 M</span></div>
+            <div class="row"><span class="ic v">V</span>product_sales<span class="t2">view</span></div>
+            <div class="foot">↩ insert · ⇥ insert table only · from cached schema, no network while typing</div>
+          </div>
+        </div>
+        <div class="rtabs"><span class="rtab on">Result 1 · 200 × 5</span><span class="rtab">Messages</span><span class="rtab">Plan</span><span class="flex1"></span><span style="color:var(--label3);font-size:11.5px">✱ Pin result · 38 ms · 200 rows</span></div>
+        <div class="gridwrap">
+          <table class="g">
+            <thead><tr><th class="rn">#</th><th><span class="key">⚿</span>id<span class="ty">int unsigned</span></th><th>name<span class="ty">varchar(120)</span></th><th>email<span class="ty">varchar(190)</span></th><th>orders<span class="ty">bigint</span></th><th>spent<span class="so">▼</span><span class="ty">decimal(12,2)</span></th></tr></thead>
+            <tbody>
+              <tr><td class="rn">1</td><td class="num pk">10482</td><td>Harbor Supply Co.</td><td>orders@harborsupply.example</td><td class="num">318</td><td class="num">184,220.50</td></tr>
+              <tr><td class="rn">2</td><td class="num pk">20311</td><td>Nordlicht GmbH</td><td>einkauf@nordlicht.example</td><td class="num">241</td><td class="num">152,904.00</td></tr>
+              <tr class="selrow"><td class="rn">3</td><td class="num pk">8890</td><td>Ama Mensah</td><td>ama.mensah@mail.example</td><td class="num">197</td><td class="num">98,415.75</td></tr>
+              <tr><td class="rn">4</td><td class="num pk">31207</td><td>Lucía Ortega</td><td>lucia.o@mail.example</td><td class="num">163</td><td class="num">87,002.10</td></tr>
+              <tr><td class="rn">5</td><td class="num pk">5521</td><td>Kestrel Outdoor</td><td>accounts@kestrel.example</td><td class="num">150</td><td class="num">80,660.00</td></tr>
+              <tr><td class="rn">6</td><td class="num pk">40112</td><td>Wei Zhang</td><td class="nul">NULL</td><td class="num">121</td><td class="num">61,309.40</td></tr>
+              <tr><td class="rn">7</td><td class="num pk">12034</td><td>Priya Raman</td><td>priya.r@mail.example</td><td class="num">117</td><td class="num">59,880.00</td></tr>
+              <tr><td class="rn">8</td><td class="num pk">27650</td><td>Tomás Novák</td><td>tomas.novak@mail.example</td><td class="num">109</td><td class="num">55,140.25</td></tr>
+              <tr><td class="rn">9</td><td class="num pk">33018</td><td>Bluefin Marine</td><td>billing@bluefin.example</td><td class="num">98</td><td class="num">52,775.00</td></tr>
+              <tr><td class="rn">10</td><td class="num pk">19944</td><td>Sofia Lindqvist</td><td>sofia.l@mail.example</td><td class="num">96</td><td class="num">49,310.60</td></tr>
+              <tr><td class="rn">11</td><td class="num pk">7302</td><td>Osei &amp; Partners</td><td>finance@osei.example</td><td class="num">91</td><td class="num">47,002.00</td></tr>
+              <tr><td class="rn">12</td><td class="num pk">45210</td><td>Hiroshi Tanaka</td><td class="nul">NULL</td><td class="num">88</td><td class="num">44,618.90</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="status"><span>SSH via bastion.example.com · MariaDB 11.8.3</span><span>r3 : c6</span><span class="agg"><span>Rows <b>200</b></span><span>Σ spent <b>1,962,481.20</b></span><span>Avg <b>9,812.41</b></span><span style="color:var(--accent)">SQL log</span></span></div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= 2. DATA GRID ================= -->
+<section id="s-grid">
+  <div class="sec-head"><span class="num">Screen 2</span><h2>Data grid: understand, filter and search a table</h2>
+  <p class="muted">The table tab for <code>orders</code>. The grid bar says where filtering runs: here on the server, so it covers all 2.4 M rows. The search box searches every column, as in HeidiSQL. A right-click on a cell offers quick filters that show their SQL. Foreign keys show the referenced customer's name in grey. The value panel shows the selected JSON cell as a tree, and the status bar totals the selection.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> grid understand + filter/sort/search groups</span><span class="note"><b>Lanes:</b> L2, L3</span></div>
+  <div class="stage"><div class="win" data-t="light">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div>
+      <span class="tbtn box"><span class="dot" style="background:var(--c-stage)"></span>Staging · shop ⌄</span><span class="tbtn box">shop ⌄</span><span class="tsep"></span>
+      <span class="tbtn box">Data</span><span class="tbtn">Structure</span><span class="tbtn">DDL</span><span class="tsep"></span>
+      <span class="tbtn">＋ Add row <span class="k">⌘I</span></span><span class="tbtn">Duplicate <span class="k">⌘D</span></span><span class="tbtn">Delete <span class="k">⌘⌫</span></span>
+      <span class="flex1"></span><span class="tbtn">Transpose <span class="k">⌥⌘T</span></span><span class="tbtn">Chart</span><span class="tbtn">⟳ <span class="k">⌘R</span></span>
+    </div>
+    <div class="tint" style="background:var(--c-stage)"></div>
+    <div class="main" style="height:600px">
+      <div class="gbar">
+        <span class="chip acc">On server · all rows</span>
+        <div class="where"><span class="lbl">WHERE</span><span><span class="id">status</span> <span class="kw">IN</span> (<span class="st">'paid'</span>, <span class="st">'shipped'</span>) <span class="kw">AND</span> <span class="id">total</span> &gt; <span class="nu">500</span></span></div>
+        <div class="where" style="flex:0 0 190px"><span class="lbl">ORDER BY</span><span>created_at <span class="kw">DESC</span></span></div>
+        <div class="search">⌕ Search all columns</div>
+        <span class="tbtn box">Columns 9/11</span>
+      </div>
+      <div class="split-r">
+        <div class="gridwrap">
+          <table class="g">
+            <thead><tr><th class="rn">#</th><th><span class="key">⚿</span>id<span class="ty">bigint unsigned · auto</span></th><th><span class="fk">↗</span>customer_id<span class="ty">int unsigned</span></th><th>status<span class="ty">enum</span></th><th>total<span class="ty">decimal(12,2)</span></th><th>created_at<span class="so">▼¹</span><span class="ty">timestamp(3)</span></th><th>shipped_on<span class="ty">date</span></th><th>meta<span class="ty">json</span></th><th>receipt_hash<span class="ty">binary(16)</span></th></tr></thead>
+            <tbody>
+              <tr><td class="rn">1</td><td class="num pk">2400981</td><td class="num">10482<span class="fkl">Harbor Supply Co.</span></td><td>paid</td><td class="num">1,240.00</td><td class="dt">2026-11-02 09:41:07.215</td><td class="nul">NULL</td><td class="js">{"channel":"web","items":3}</td><td class="bin">0x8F3A…E21C</td></tr>
+              <tr><td class="rn">2</td><td class="num pk">2400977</td><td class="num">8890<span class="fkl">Ama Mensah</span></td><td>shipped</td><td class="num">612.50</td><td class="dt">2026-11-02 09:38:52.004</td><td class="dt">2026-11-02</td><td class="js">{"channel":"app","items":1}</td><td class="bin">0x11C0…9A07</td></tr>
+              <tr><td class="rn">3</td><td class="num pk">2400969</td><td class="num">20311<span class="fkl">Nordlicht GmbH</span></td><td>paid</td><td class="num sel">3,905.20</td><td class="dt">2026-11-02 09:31:15.880</td><td class="nul">NULL</td><td class="js focus">{"channel":"b2b","po":"PO-7781","items":14}</td><td class="bin">0x5BE2…44D0</td></tr>
+              <tr><td class="rn">4</td><td class="num pk">2400951</td><td class="num">31207<span class="fkl">Lucía Ortega</span></td><td>paid</td><td class="num sel">540.00</td><td class="dt">2026-11-02 09:12:40.117</td><td class="nul">NULL</td><td class="js">{"channel":"web","items":2}</td><td class="bin">0xA0F9…1B3E</td></tr>
+              <tr><td class="rn">5</td><td class="num pk">2400940</td><td class="num">5521<span class="fkl">Kestrel Outdoor</span></td><td>shipped</td><td class="num sel">2,118.75</td><td class="dt">2026-11-02 08:57:03.662</td><td class="dt">2026-11-02</td><td class="js">{"channel":"b2b","items":9}</td><td class="bin">0x7D21…C5F8</td></tr>
+              <tr><td class="rn">6</td><td class="num pk">2400933</td><td class="num">40112<span class="fkl">Wei Zhang</span></td><td>paid</td><td class="num">799.00</td><td class="dt">2026-11-02 08:44:29.390</td><td class="nul">NULL</td><td class="js">{"channel":"app","items":1}</td><td class="bin">0x3E8C…0A6D</td></tr>
+              <tr><td class="rn">7</td><td class="num pk">2400920</td><td class="num">12034<span class="fkl">Priya Raman</span></td><td>shipped</td><td class="num">1,015.30</td><td class="dt">2026-11-01 23:59:58.001</td><td class="dt">2026-11-02</td><td class="js">{"channel":"web","items":4}</td><td class="bin">0xC4D7…88E2</td></tr>
+              <tr><td class="rn">8</td><td class="num pk">2400911</td><td class="num">10482<span class="fkl">Harbor Supply Co.</span></td><td>paid</td><td class="num">7,450.00</td><td class="dt">2026-11-01 23:40:12.508</td><td class="nul">NULL</td><td class="js">{"channel":"b2b","items":31}</td><td class="bin">0x09AB…F7C1</td></tr>
+              <tr><td class="rn">9</td><td class="num pk">2400902</td><td class="num">27650<span class="fkl">Tomás Novák</span></td><td>shipped</td><td class="num">688.90</td><td class="dt">2026-11-01 23:21:47.943</td><td class="dt">2026-11-02</td><td class="js">{"channel":"app","items":2}</td><td class="bin">0x62F0…3D19</td></tr>
+              <tr><td class="rn">10</td><td class="num pk">2400899</td><td class="num">8890<span class="fkl">Ama Mensah</span></td><td>paid</td><td class="num">905.00</td><td class="dt">2026-11-01 23:05:33.276</td><td class="nul">NULL</td><td class="js">{"channel":"web","items":3}</td><td class="bin">0xE513…6C4A</td></tr>
+            </tbody>
+          </table>
+          <div class="menu" style="left:300px;top:150px">
+            <div class="mi">Copy<span class="sc">⌘C</span></div>
+            <div class="mi">Copy As<span class="ar">▸</span></div>
+            <hr>
+            <div class="mi on">Quick Filter<span class="ar">▸</span></div>
+            <div class="mi">Column Summary…</div>
+            <div class="mi">Related Rows<span class="sc">⌘↓</span></div>
+            <hr>
+            <div class="mi">Set NULL<span class="sc">⌥⌘N</span></div>
+            <div class="mi">Insert Value<span class="ar">▸</span></div>
+            <div class="mi">Open in Value Panel<span class="sc">⇧↩</span></div>
+            <hr>
+            <div class="mi">Display As<span class="ar">▸</span></div>
+          </div>
+          <div class="menu" style="left:532px;top:212px;min-width:300px">
+            <div class="mi on">= 3,905.20 … 2,118.75<span class="sql">total IN (…3)</span></div>
+            <div class="mi">≠ selected values<span class="sql">NOT IN (…)</span></div>
+            <div class="mi">&gt; 3,905.20<span class="sql">total &gt; 3905.20</span></div>
+            <div class="mi">&lt; 3,905.20<span class="sql">total &lt; 3905.20</span></div>
+            <hr>
+            <div class="mi">= value from clipboard</div>
+            <div class="mi">Ask for a value…</div>
+            <div class="mi">IS NULL</div><div class="mi">IS NOT NULL</div>
+            <hr>
+            <div class="mi dis">⌥-click adds to the current filter</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">Value · meta <span class="minseg"><span>Text</span><span class="on">JSON</span><span>Hex</span></span></div>
+<div class="pb">▾ {object · 3 keys}
+  <span class="jk">"channel"</span>: <span class="jstr">"b2b"</span>
+  <span class="jk">"po"</span>: <span class="jstr">"PO-7781"</span>
+  <span class="jk">"items"</span>: <span class="jnum">14</span>
+
+<span style="color:var(--label3);font-family:var(--font)">Valid JSON · 41 bytes
+Edits here wait for Apply, like cells.</span></div>
+          <div class="ph" style="border-top:1px solid var(--sep)">Column summary · status</div>
+          <div class="pb" style="font-family:var(--font);white-space:normal;flex:0 0 auto;display:grid;gap:5px">
+            <div style="display:flex;justify-content:space-between"><span>paid</span><b>1,604,220</b></div>
+            <div class="bar-prog"><i style="width:68%"></i></div>
+            <div style="display:flex;justify-content:space-between"><span>shipped</span><b>702,118</b></div>
+            <div class="bar-prog"><i style="width:30%"></i></div>
+            <div style="display:flex;justify-content:space-between"><span>refunded</span><b>41,907</b></div>
+            <div class="bar-prog"><i style="width:2%"></i></div>
+            <span style="color:var(--label3);font-size:11px">From the server, within the current filter · 0 NULLs · 3 distinct</span>
+          </div>
+        </div>
+      </div>
+      <div class="status"><span>1,000 of ≈2,348,245 rows · <span style="color:var(--accent)">Count exactly</span> · <span style="color:var(--accent)">Load more ⌥⌘↓</span></span><span>r3 : c5 · 3 cells</span><span class="agg"><span>Count <b>3</b></span><span>Sum <b>6,563.95</b></span><span>Avg <b>2,187.98</b></span><span>Max <b>3,905.20</b></span></span></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= 3. EDITING ================= -->
+<section id="s-edit">
+  <div class="sec-head"><span class="num">Screen 3</span><h2>Editing: typed editors, pending changes, Apply preview</h2>
+  <p class="muted">Changes wait until you apply them: edited cells in amber, a new row in green, a deleted row struck through in red. The new row shows <i>auto</i> for the id and <i>default</i> for <code>created_at</code>, so neither goes into the INSERT, and the real values appear after Apply. The date editor takes typing straight away; the calendar only opens on request. Apply (⌘S) shows the SQL first, runs it in one transaction, and can save it as a Liquibase changeset.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> grid edit group, Liquibase "save any change"</span><span class="note"><b>Lanes:</b> L3, L8</span></div>
+  <div class="stage"><div class="win" data-t="light">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div>
+      <span class="tbtn box"><span class="dot" style="background:var(--c-dev)"></span>Local MariaDB 11.8 ⌄</span><span class="tbtn box">shop ⌄</span><span class="tsep"></span>
+      <span class="tbtn box">Data</span><span class="tbtn">Structure</span><span class="flex1"></span>
+      <span class="chip tx">4 pending changes</span><span class="tbtn">Revert <span class="k">⌥⌘Z</span></span><span class="tbtn prim">Apply <span class="k">⌘S</span></span>
+    </div>
+    <div class="tint" style="background:var(--c-dev)"></div>
+    <div class="main" style="height:380px">
+      <div class="gbar"><span class="chip grey">Local · 1,000 loaded rows</span><div class="where"><span class="lbl">WHERE</span><span style="color:var(--label3)">Type a condition, for example status = 'paid'</span></div><div class="search">⌕ Search all columns</div></div>
+      <div class="gridwrap">
+        <table class="g">
+          <thead><tr><th class="rn">#</th><th><span class="key">⚿</span>id<span class="ty">bigint unsigned · auto</span></th><th><span class="fk">↗</span>customer_id<span class="ty">int unsigned</span></th><th>status<span class="ty">enum</span></th><th>total<span class="ty">decimal(12,2)</span></th><th>created_at<span class="ty">timestamp(3) · default</span></th><th>gift<span class="ty">tinyint(1)</span></th><th>tags<span class="ty">set</span></th><th>note<span class="ty">text</span></th></tr></thead>
+          <tbody>
+            <tr><td class="rn">1</td><td class="num pk">2400981</td><td class="num">10482<span class="fkl">Harbor Supply Co.</span></td><td>paid</td><td class="num">1,240.00</td><td class="dt">2026-11-02 09:41:07.215</td><td>☐</td><td>b2b</td><td class="nul">NULL</td></tr>
+            <tr><td class="rn">2</td><td class="num pk">2400977</td><td class="num">8890<span class="fkl">Ama Mensah</span></td><td class="ed">refunded</td><td class="num">612.50</td><td class="dt">2026-11-02 09:38:52.004</td><td>☑</td><td>app,promo</td><td class="ed">Customer asked for refund on 2 Nov</td></tr>
+            <tr class="del"><td class="rn">3</td><td class="num pk">2400969</td><td class="num">20311</td><td>paid</td><td class="num">3,905.20</td><td class="dt">2026-11-02 09:31:15.880</td><td>☐</td><td>b2b</td><td class="nul">NULL</td></tr>
+            <tr><td class="rn">4</td><td class="num pk">2400951</td><td class="num">31207<span class="fkl">Lucía Ortega</span></td><td>paid</td><td class="num">540.00</td><td class="dt focus">2026-11-02 09:12:<span style="background:var(--accent);color:var(--on-accent);padding:0 1px">40</span>.117</td><td>☐</td><td>web</td><td class="nul">NULL</td></tr>
+            <tr><td class="rn">5</td><td class="num pk">2400940</td><td class="num">5521<span class="fkl">Kestrel Outdoor</span></td><td>shipped</td><td class="num">2,118.75</td><td class="dt">2026-11-02 08:57:03.662</td><td>☐</td><td>b2b</td><td class="nul">NULL</td></tr>
+            <tr class="ins"><td class="rn">＋</td><td class="auto">auto</td><td class="num">27650<span class="fkl">Tomás Novák</span></td><td>paid</td><td class="num">129.00</td><td class="auto">default</td><td>☐</td><td>web</td><td class="nul">NULL</td></tr>
+          </tbody>
+        </table>
+        <div class="pop" style="left:560px;top:176px;width:250px;padding:8px 10px;display:grid;gap:6px;font-size:11.5px">
+          <b style="font-size:12px">2026-11-02 09:12:40.117</b>
+          <span style="color:var(--label2)">↑ ↓ change the seconds · ⇥ next part · type to replace</span>
+          <span style="color:var(--label2)">TIMESTAMP · shown in session time zone <b style="color:var(--label)">Europe/Berlin (UTC+1)</b></span>
+          <div style="display:flex;gap:6px"><span class="btn" style="height:22px;font-size:11px">Now</span><span class="btn" style="height:22px;font-size:11px">Calendar…</span><span class="btn" style="height:22px;font-size:11px">NULL</span></div>
+        </div>
+        <div class="menu" style="left:372px;top:84px;min-width:150px">
+          <div class="mi">paid</div><div class="mi">shipped</div><div class="mi on">refunded</div><hr><div class="mi">NULL<span class="sc">⌥⌘N</span></div>
+        </div>
+      </div>
+      <div class="status"><span>1 edited row · 1 new · 1 deleted</span><span class="agg"><span>Preview SQL before Apply: <b>always on production</b></span></span></div>
+    </div>
+</div></div>
+  <p class="muted">Apply (⌘S) shows exactly what will run:</p>
+  <div class="stage"><div class="win small" data-t="light" style="height:380px">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div><span class="tbtn box"><span class="dot" style="background:var(--c-dev)"></span>Local MariaDB 11.8 · shop.orders</span></div>
+    <div class="dim"></div>
+    <div class="sheet" style="width:720px">
+      <h4>Apply 4 changes to shop.orders?</h4>
+      <span class="cap">They run in one transaction. If one fails, none are kept and the grid points to the cell.</span>
+<div class="codebox"><span class="kw">START TRANSACTION</span>;
+<span class="kw">UPDATE</span> <span class="id">`orders`</span> <span class="kw">SET</span> <span class="id">`status`</span> = <span class="st">'refunded'</span>, <span class="id">`note`</span> = <span class="st">'Customer asked for refund on 2 Nov'</span>
+  <span class="kw">WHERE</span> <span class="id">`id`</span> = <span class="nu">2400977</span>;
+<span class="kw">DELETE FROM</span> <span class="id">`orders`</span> <span class="kw">WHERE</span> <span class="id">`id`</span> <span class="kw">IN</span> (<span class="nu">2400969</span>);
+<span class="kw">INSERT INTO</span> <span class="id">`orders`</span> (<span class="id">`customer_id`</span>, <span class="id">`status`</span>, <span class="id">`total`</span>, <span class="id">`gift`</span>, <span class="id">`tags`</span>)
+  <span class="kw">VALUES</span> (<span class="nu">27650</span>, <span class="st">'paid'</span>, <span class="nu">129.00</span>, <span class="nu">0</span>, <span class="st">'web'</span>);
+<span class="kw">COMMIT</span>;</div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap"><span class="chk"><i class="off"></i>Save as Liquibase changeset in changelog/2026-11.sql</span><span class="chk"><i></i>Read new rows back (shows the new id)</span></div>
+      <div class="btns"><span class="help">?</span><span class="btn">Copy SQL</span><span class="btn">Cancel</span><span class="btn def">Apply</span></div>
+    </div>
+    </div></div>
+</section>
+
+<!-- ================= 4. TRANSPOSE ================= -->
+<section id="s-trans">
+  <div class="sec-head"><span class="num">Screen 4</span><h2>Transpose, record view and charts</h2>
+  <p class="muted">Transpose (⌥⌘T) turns rows into columns to compare a few wide rows side by side; editing works exactly as in the normal grid. Single-row results can transpose automatically. The chart turns any result into a bar, line, area, pie, scatter or histogram.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> Transpose, record view, charts, compare grids</span><span class="note"><b>Lane:</b> L2</span></div>
+  <div class="stage"><div class="win small" data-t="light">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div><span class="tbtn box">customers · 3 rows selected</span><span class="flex1"></span><span class="tbtn box" style="background:var(--pill);color:var(--on-pill)">Transposed</span><span class="tbtn">Record view <span class="k">⇧⌘↩</span></span><span class="tbtn">Chart</span></div>
+    <div style="display:grid;grid-template-columns:1fr 330px;height:330px;background:var(--content)">
+      <div class="gridwrap">
+        <table class="g">
+          <thead><tr><th class="rn">column</th><th>row 1 · id 10482</th><th>row 2 · id 20311</th><th>row 3 · id 8890</th></tr></thead>
+          <tbody>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">id</td><td class="num pk">10482</td><td class="num pk">20311</td><td class="num pk">8890</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">name</td><td>Harbor Supply Co.</td><td>Nordlicht GmbH</td><td>Ama Mensah</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">email</td><td>orders@harborsupply.example</td><td>einkauf@nordlicht.example</td><td>ama.mensah@mail.example</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">country</td><td>NL</td><td>DE</td><td class="ed">GH</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">tier</td><td>gold</td><td>gold</td><td>silver</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">credit_limit</td><td class="num">50,000.00</td><td class="num">40,000.00</td><td class="num">5,000.00</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">created_at</td><td class="dt">2019-04-11 10:02:51</td><td class="dt">2020-01-07 08:15:00</td><td class="dt">2023-06-30 19:44:12</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">last_login</td><td class="dt">2026-11-02 08:01:44</td><td class="nul">NULL</td><td class="dt">2026-11-01 21:13:09</td></tr>
+            <tr><td class="rn" style="text-align:left;color:var(--label);font-weight:600">prefs</td><td class="js">{"lang":"nl"}</td><td class="js">{"lang":"de"}</td><td class="js">{"lang":"en"}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel" style="padding:12px;gap:8px;display:grid;align-content:start">
+        <b style="font-size:12px">Spent by tier · last 90 days</b>
+        <svg viewBox="0 0 300 200" width="100%" role="img" aria-label="Bar chart: gold 1.2 million, silver 0.5 million, bronze 0.2 million">
+          <g font-size="10" fill="currentColor" style="color:var(--label2)">
+            <line x1="40" y1="170" x2="290" y2="170" stroke="var(--sep)"/>
+            <line x1="40" y1="120" x2="290" y2="120" stroke="var(--sep-soft)"/><line x1="40" y1="70" x2="290" y2="70" stroke="var(--sep-soft)"/><line x1="40" y1="20" x2="290" y2="20" stroke="var(--sep-soft)"/>
+            <text x="34" y="173" text-anchor="end">0</text><text x="34" y="123" text-anchor="end">0.4 M</text><text x="34" y="73" text-anchor="end">0.8 M</text><text x="34" y="23" text-anchor="end">1.2 M</text>
+            <rect x="60" y="20" width="50" height="150" rx="3" fill="var(--accent)"/><rect x="140" y="107.5" width="50" height="62.5" rx="3" fill="var(--accent)" opacity=".7"/><rect x="220" y="145" width="50" height="25" rx="3" fill="var(--accent)" opacity=".45"/>
+            <text x="85" y="186" text-anchor="middle">gold</text><text x="165" y="186" text-anchor="middle">silver</text><text x="245" y="186" text-anchor="middle">bronze</text>
+          </g>
+        </svg>
+        <span style="color:var(--label3);font-size:11px">Bar · x: tier · y: SUM(spent) · Save as PNG</span>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= 5. CONNECTIONS ================= -->
+<section id="s-conn">
+  <div class="sec-head"><span class="num">Screen 5</span><h2>Connection editor: SSH, jump hosts and proxies</h2>
+  <p class="muted">Routes are real fields, not driver properties. The route strip shows the path the connection takes, ending in a local port on this Mac that the app, <code>mysqldump</code> and Terminal all share. Test Connection reports each hop. Your <code>~/.ssh/config</code> hosts can be picked by name.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> connections and routes group</span><span class="note"><b>Lane:</b> L1</span></div>
+  <div class="stage"><div class="win" data-t="light" style="height:560px">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div><span class="tbtn box">New Connection</span></div>
+    <div class="dim"></div>
+    <div class="sheet" style="width:820px">
+      <div class="stabs"><div class="seg2"><span>General</span><span>TLS</span><span class="on">SSH and Proxy</span><span>Options</span><span>Agents</span></div></div>
+      <div class="form">
+        <label>Route</label><div><span class="pop-btn">SSH through a jump host</span></div>
+        <label>SSH host</label><div style="display:flex;gap:8px;align-items:center"><div class="field" style="flex:1">db-gw.internal.example</div><span>Port</span><div class="field sm">22</div></div>
+        <label>User</label><div class="field" style="width:280px">deploy</div>
+        <label>Log in with</label><div style="display:flex;gap:8px;align-items:center"><span class="pop-btn">Key from ssh-agent</span><span class="cap">or a key file, a password, or 2FA codes</span></div>
+        <label>Jump hosts</label><div class="list" style="width:100%">
+          <div class="li"><span class="ic srv" style="background:var(--label2)"></span>bastion.example.com<span class="r">from ~/.ssh/config · key</span></div>
+          <div class="li" style="color:var(--accent)">＋ Add jump host…</div>
+        </div>
+        <label>Proxy</label><div style="display:flex;gap:8px;align-items:center"><span class="pop-btn">Office SOCKS5 (proxy.example.com:1080)</span><span class="cap">Optional. Used to reach the first SSH host.</span></div>
+        <label>Database host</label><div style="display:flex;gap:8px;align-items:center"><div class="field" style="flex:1">10.20.0.15</div><span>Port</span><div class="field sm">3306</div></div>
+        <span></span><span class="cap">As the SSH host sees it, often 127.0.0.1 or a private address.</span>
+      </div>
+      <div class="route">
+        <div class="hop mac">This Mac<small>AirSQL</small></div><span class="arr">→</span>
+        <div class="hop port">127.0.0.1:41873<small>local port</small></div><span class="arr">→</span>
+        <div class="hop">SOCKS5 proxy<small>proxy.example.com</small></div><span class="arr">→</span>
+        <div class="hop">Jump host<small>bastion.example.com</small></div><span class="arr">→</span>
+        <div class="hop">SSH host<small>db-gw.internal.example</small></div><span class="arr">→</span>
+        <div class="hop db">MariaDB 11.8<small>10.20.0.15:3306</small></div>
+      </div>
+      <div class="ok-line">✓ Proxy 41 ms · ✓ bastion 88 ms (host key trusted) · ✓ db-gw 112 ms · ✓ MariaDB 11.8.3, TLS 1.3, ed25519 login</div>
+      <div class="btns"><span class="help">?</span><span class="btn">Test Connection</span><span class="btn">Cancel</span><span class="btn def">Save and Connect</span></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= 6. AGENTS ================= -->
+<section id="s-agent">
+  <div class="sec-head"><span class="num">Screen 6</span><h2>Agents: SQL proposed by Claude Code, run by you</h2>
+  <p class="muted">An agent connected over MCP read the schema and put a query into a console tab. Nothing runs until you press Run, and anything that would change data waits for your OK. The activity popover lists every agent action; agents never see passwords. Per-connection access is set in the connection's Agents tab, and production starts at Off.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> AI agents (MCP) group</span><span class="note"><b>Lane:</b> L7</span></div>
+  <div class="stage"><div class="win" data-t="light">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div>
+      <span class="tbtn box"><span class="dot" style="background:var(--c-stage)"></span>Staging · shop ⌄</span><span class="tbtn box">shop ⌄</span><span class="tsep"></span>
+      <span class="tbtn prim">▶ Run <span class="k">⌘↩</span></span><span class="tbtn">Explain</span><span class="flex1"></span><span class="chip acc">● Claude Code connected</span>
+    </div>
+    <div class="tint" style="background:var(--c-stage)"></div>
+    <div class="main" style="height:440px;position:relative">
+      <div class="tabs"><span class="tab on">Churn risk · from Claude Code</span><span class="tab">Agent · read-only results <span class="x">✕</span></span><span class="tab">Query 2 <span class="x">✕</span></span></div>
+      <div class="banner"><b>Proposed by Claude Code</b> · not run yet · edit it freely, then press Run<span class="flex1"></span><span class="btn">Explain first</span><span class="btn def" style="height:22px">Run ⌘↩</span></div>
+      <div class="editor" style="border-bottom:0">
+        <div class="gut">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11</div>
+<div class="code"><span class="cm">-- Customers with 3+ orders last year and none in the last 120 days</span>
+<span class="kw">WITH</span> last_year <span class="kw">AS</span> (
+  <span class="kw">SELECT</span> customer_id, <span class="fn">COUNT</span>(*) <span class="kw">AS</span> n, <span class="fn">MAX</span>(created_at) <span class="kw">AS</span> last_order
+  <span class="kw">FROM</span> orders <span class="kw">WHERE</span> status <span class="kw">IN</span> (<span class="st">'paid'</span>,<span class="st">'shipped'</span>)
+    <span class="kw">AND</span> created_at &gt;= <span class="fn">NOW</span>() - <span class="kw">INTERVAL</span> <span class="nu">1</span> <span class="kw">YEAR</span>
+  <span class="kw">GROUP BY</span> customer_id
+)
+<span class="kw">SELECT</span> c.id, c.<span class="id">`name`</span>, c.email, l.n, l.last_order
+<span class="kw">FROM</span> last_year l <span class="kw">JOIN</span> customers c <span class="kw">ON</span> c.id = l.customer_id
+<span class="kw">WHERE</span> l.n &gt;= <span class="nu">3</span> <span class="kw">AND</span> l.last_order &lt; <span class="fn">NOW</span>() - <span class="kw">INTERVAL</span> <span class="nu">120</span> <span class="kw">DAY</span>
+<span class="kw">ORDER BY</span> l.n <span class="kw">DESC</span>;</div>
+      </div>
+      <div class="menu" style="right:14px;top:118px;width:400px;padding:10px;display:grid;gap:8px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:8px"><b>Claude Code</b><span class="chip ok">Schema + read</span><span class="flex1"></span><span class="btn danger" style="height:22px;font-size:11px">Turn agents off</span></div>
+        <div class="list">
+          <div class="li">describe_table orders, customers<span class="r">09:52:10</span></div>
+          <div class="li">run_query · SELECT COUNT(*) … (read-only, 1 row)<span class="r">09:52:14</span></div>
+          <div class="li">explain · WITH last_year AS …<span class="r">09:52:19</span></div>
+          <div class="li on">open_in_console · "Churn risk"<span class="r">09:52:22</span></div>
+          <div class="li" style="color:var(--label2)">waiting · read_console after you run it</div>
+        </div>
+        <span style="color:var(--label3);font-size:11px">Agents never see passwords. Writes need your OK (Settings ▸ Agents ▸ Ask before agents change things).</span>
+      </div>
+      <div class="status" style="margin-top:auto"><span>Agent access on Staging: <b>Schema + read queries</b> · sample rows off</span><span class="agg"><span>Production: <b>Off</b></span></span></div>
+    </div>
+  </div></div>
+  <div class="codebox" style="background:var(--pg-surface);border-color:var(--pg-line);color:var(--pg-ink);font-family:var(--pg-mono);white-space:pre-wrap">claude mcp add airsql -- /Applications/AirSQL.app/Contents/MacOS/AirSQL --mcp
+gemini mcp add airsql /Applications/AirSQL.app/Contents/MacOS/AirSQL --mcp</div>
+</section>
+
+<!-- ================= 7. CLIENT TOOLS ================= -->
+<section id="s-tools">
+  <div class="sec-head"><span class="num">Screen 7</span><h2>Client tools: export with your own mysqldump</h2>
+  <p class="muted">Settings ▸ Client tools finds your <code>mysql</code>/<code>mariadb</code> and <code>mysqldump</code>/<code>mariadb-dump</code> binaries and shows each version. The Export sheet shows the exact command line it will run. The password goes in a temporary private file, never on the command line. The dump runs over the same local port as the connection, so it works over every SSH and proxy route.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> client tools group</span><span class="note"><b>Lane:</b> L6</span></div>
+  <div class="stage"><div class="win" data-t="light" style="height:520px">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div><span class="tbtn box"><span class="dot" style="background:var(--c-prod)"></span>Production · shop ⌄</span></div>
+    <div class="tint"></div>
+    <div class="dim"></div>
+    <div class="sheet" style="width:840px">
+      <h4>Export shop with mariadb-dump</h4>
+      <div style="display:grid;grid-template-columns:260px 1fr;gap:14px">
+        <div class="list" style="align-self:start">
+          <div class="li"><span class="chk"><i></i></span><b>shop</b><span class="r">42 objects</span></div>
+          <div class="li" style="padding-left:28px"><span class="chk"><i></i></span>customers<span class="r">412 K</span></div>
+          <div class="li" style="padding-left:28px"><span class="chk"><i></i></span>orders<span class="r">2.4 M</span></div>
+          <div class="li" style="padding-left:28px"><span class="chk"><i></i></span>order_items<span class="r">9.8 M</span></div>
+          <div class="li" style="padding-left:28px"><span class="chk"><i class="off"></i></span>audit_log<span class="r">51 M</span></div>
+          <div class="li" style="padding-left:28px"><span class="chk"><i></i></span>Views, routines, triggers, events</div>
+        </div>
+        <div class="form" style="grid-template-columns:120px 1fr">
+          <label>Content</label><div><span class="pop-btn">Structure and data</span></div>
+          <label>Options</label><div style="display:grid;gap:4px"><span class="chk"><i></i>One consistent snapshot (--single-transaction)</span><span class="chk"><i></i>Binary as hex (--hex-blob)</span><span class="chk"><i></i>Compress with gzip</span><span class="chk"><i class="off"></i>Add DROP TABLE before each table</span></div>
+          <label>Tool</label><div style="display:flex;gap:8px;align-items:center"><span class="pop-btn">mariadb-dump 11.8.3</span><span class="cap" style="color:var(--ok)">✓ matches the server</span></div>
+          <label>Save to</label><div class="field">~/Backups/shop-2026-11-02.sql.gz</div>
+          <label>Extra options</label><div class="field ph">Optional, for example --skip-triggers</div>
+        </div>
+      </div>
+      <div class="codebox" style="white-space:pre-wrap">/opt/homebrew/opt/mariadb/bin/mariadb-dump --defaults-extra-file=‹private temporary file› --host=127.0.0.1 --port=41873 --single-transaction --hex-blob --routines --events --triggers shop customers orders order_items … | gzip</div>
+      <div style="display:grid;gap:4px"><div style="display:flex;justify-content:space-between;font-size:12px"><span>Writing order_items · 1.9 GB of ≈3.1 GB</span><span style="color:var(--label2)">about 2 min left</span></div><div class="bar-prog"><i></i></div></div>
+      <div class="btns"><span class="help">?</span><span class="btn">Copy Command</span><span class="btn">Stop</span><span class="btn def" style="opacity:.55">Export</span></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= 8. RECON ================= -->
+<section id="s-recon">
+  <div class="sec-head"><span class="num">Screen 8</span><h2>Compare and reconcile two databases</h2>
+  <p class="muted">Pick any two databases, even on different servers and routes. Structure and data are compared in one run. For large tables each server checksums blocks of rows first, so only differing blocks come over the network. The sync script opens in a console tab for review and never runs on its own; it can also be saved as a Liquibase changeset.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> compare and reconcile group</span><span class="note"><b>Lane:</b> L8</span></div>
+  <div class="stage"><div class="win" data-t="light">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div>
+      <span class="tbtn box"><span class="dot" style="background:var(--c-prod)"></span>Production · shop</span><span class="arr">→</span><span class="tbtn box"><span class="dot" style="background:var(--c-stage)"></span>Staging · shop</span>
+      <span class="tbtn box">Structure and data ⌄</span><span class="tbtn">Ignore rules…</span><span class="flex1"></span><span class="tbtn">Export report</span><span class="tbtn">Save as changeset</span><span class="tbtn prim">Open sync script</span>
+    </div>
+    <div class="main" style="height:560px">
+      <div style="padding:10px"><div class="summary">
+        <div class="sumbox ok"><b>27</b><span>tables match</span></div>
+        <div class="sumbox warn"><b>3</b><span>tables differ in structure</span></div>
+        <div class="sumbox bad"><b>1</b><span>only in Production</span></div>
+        <div class="sumbox warn"><b>1,284</b><span>rows differ in 2 tables</span></div>
+        <div class="sumbox"><b>14 s</b><span>12.6 M rows checked, 0.4% fetched</span></div>
+      </div></div>
+      <div style="display:grid;grid-template-columns:300px 1fr;flex:1;min-height:0;border-top:1px solid var(--sep)">
+        <div class="list" style="border:0;border-right:1px solid var(--sep);border-radius:0">
+          <div class="li"><span class="chip bad" style="background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)">only left</span>gift_cards</div>
+          <div class="li on"><span class="chip tx">structure</span>orders<span class="r">1 column, 1 index</span></div>
+          <div class="li"><span class="chip tx">structure</span>customers<span class="r">collation</span></div>
+          <div class="li"><span class="chip tx">structure</span>refunds<span class="r">FK</span></div>
+          <div class="li"><span class="chip acc">data</span>products<span class="r">12 changed · 3 missing</span></div>
+          <div class="li"><span class="chip acc">data</span>coupons<span class="r">1,269 missing</span></div>
+          <div class="li" style="color:var(--label2)"><span class="chip ok">match</span>addresses</div>
+          <div class="li" style="color:var(--label2)"><span class="chip ok">match</span>order_items</div>
+        </div>
+        <div style="display:flex;flex-direction:column;min-width:0">
+          <div class="rtabs"><span class="rtab on">orders · DDL diff</span><span class="rtab">Data diff</span><span class="flex1"></span><span style="font-size:11.5px;color:var(--label3)">Ignoring AUTO_INCREMENT, DEFINER, whitespace</span></div>
+          <div class="diffcols" style="flex:1">
+<div><span style="color:var(--label3)">Production · shop.orders</span>
+<span class="kw">CREATE TABLE</span> <span class="id">`orders`</span> (
+  <span class="id">`id`</span> bigint unsigned <span class="kw">NOT NULL AUTO_INCREMENT</span>,
+  <span class="id">`customer_id`</span> int unsigned <span class="kw">NOT NULL</span>,
+  <span class="id">`status`</span> enum(...) <span class="kw">NOT NULL</span>,
+  <span class="id">`total`</span> decimal(12,2) <span class="kw">NOT NULL</span>,
+<span class="dplus">  <span class="id">`currency`</span> char(3) <span class="kw">NOT NULL DEFAULT</span> <span class="st">'EUR'</span>,</span>  <span class="id">`created_at`</span> timestamp(3) ...,
+  <span class="kw">PRIMARY KEY</span> (<span class="id">`id`</span>),
+<span class="dplus">  <span class="kw">KEY</span> <span class="id">`ix_status_created`</span> (<span class="id">`status`</span>,<span class="id">`created_at`</span>),</span>  <span class="kw">KEY</span> <span class="id">`ix_customer`</span> (<span class="id">`customer_id`</span>)
+)</div>
+<div><span style="color:var(--label3)">Staging · shop.orders</span>
+<span class="kw">CREATE TABLE</span> <span class="id">`orders`</span> (
+  <span class="id">`id`</span> bigint unsigned <span class="kw">NOT NULL AUTO_INCREMENT</span>,
+  <span class="id">`customer_id`</span> int unsigned <span class="kw">NOT NULL</span>,
+  <span class="id">`status`</span> enum(...) <span class="kw">NOT NULL</span>,
+  <span class="id">`total`</span> decimal(12,2) <span class="kw">NOT NULL</span>,
+<span class="dminus">  <span style="color:var(--label3)">(missing)</span></span>  <span class="id">`created_at`</span> timestamp(3) ...,
+  <span class="kw">PRIMARY KEY</span> (<span class="id">`id`</span>),
+<span class="dminus">  <span style="color:var(--label3)">(missing)</span></span>  <span class="kw">KEY</span> <span class="id">`ix_customer`</span> (<span class="id">`customer_id`</span>)
+)</div>
+          </div>
+          <div class="codebox" style="border-radius:0;border-width:1px 0 0"><span class="cm">-- Sync script (makes Staging match Production) · review before running</span>
+<span class="kw">ALTER TABLE</span> <span class="id">`orders`</span> <span class="kw">ADD COLUMN</span> <span class="id">`currency`</span> char(3) <span class="kw">NOT NULL DEFAULT</span> <span class="st">'EUR'</span> <span class="kw">AFTER</span> <span class="id">`total`</span>,
+  <span class="kw">ADD KEY</span> <span class="id">`ix_status_created`</span> (<span class="id">`status`</span>, <span class="id">`created_at`</span>);</div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= 9. LIQUIBASE ================= -->
+<section id="s-lb">
+  <div class="sec-head"><span class="num">Screen 9</span><h2>Liquibase changelog from a schema</h2>
+  <p class="muted">Generate a formatted-SQL changelog as structure, data or both. Objects come out one changeset each, in an order that runs cleanly (tables before foreign keys and views), with rollbacks and the delimiter settings that procedures and triggers need.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> Liquibase group</span><span class="note"><b>Lane:</b> L8</span></div>
+  <div class="stage"><div class="win" data-t="light" style="height:540px">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div><span class="tbtn box"><span class="dot" style="background:var(--c-dev)"></span>Local MariaDB 11.8 · shop</span></div>
+    <div class="dim"></div>
+    <div class="sheet" style="width:880px">
+      <h4>Generate Liquibase changelog</h4>
+      <div style="display:grid;grid-template-columns:300px 1fr;gap:14px">
+        <div class="form" style="grid-template-columns:90px 1fr;align-content:start">
+          <label>Content</label><div class="stabs" style="justify-content:flex-start"><div class="seg2"><span>DDL</span><span>DML</span><span class="on">DDL + DML</span></div></div>
+          <label>Objects</label><div class="pop-btn">31 tables, 4 views, 5 routines</div>
+          <label>Data rows</label><div class="field">products, coupons · WHERE active = 1</div>
+          <label>Author</label><div class="field">deploy</div>
+          <label>Ids</label><div class="field mono" style="font-size:11.5px">{date}-{n}-{object}</div>
+          <label>Rollback</label><div><span class="chk"><i></i>Add --rollback for DDL</span></div>
+          <label>Save to</label><div class="field">db/changelog/shop-baseline.sql</div>
+        </div>
+<div class="codebox" style="height:310px;overflow:hidden"><span class="cm">--liquibase formatted sql</span>
+
+<span class="cm">--changeset deploy:20261102-001-customers</span>
+<span class="kw">CREATE TABLE</span> <span class="id">`customers`</span> (
+  <span class="id">`id`</span> int unsigned <span class="kw">NOT NULL AUTO_INCREMENT</span>, …
+  <span class="kw">PRIMARY KEY</span> (<span class="id">`id`</span>)
+) <span class="kw">ENGINE</span>=InnoDB <span class="kw">DEFAULT CHARSET</span>=utf8mb4;
+<span class="cm">--rollback DROP TABLE `customers`;</span>
+
+<span class="cm">--changeset deploy:20261102-014-fk_orders_customer</span>
+<span class="kw">ALTER TABLE</span> <span class="id">`orders`</span> <span class="kw">ADD CONSTRAINT</span> <span class="id">`fk_orders_customer`</span> …;
+<span class="cm">--rollback ALTER TABLE `orders` DROP FOREIGN KEY `fk_orders_customer`;</span>
+
+<span class="cm">--changeset deploy:20261102-037-refund_total splitStatements:false endDelimiter:$$</span>
+<span class="kw">CREATE FUNCTION</span> <span class="id">`refund_total`</span>(p_order <span class="kw">BIGINT</span>) <span class="kw">RETURNS</span> decimal(12,2) …$$</div>
+      </div>
+      <div class="btns"><span class="help">?</span><span class="cap" style="margin-right:auto">41 changesets · 2 data changesets (6,120 rows)</span><span class="btn">Copy</span><span class="btn">Cancel</span><span class="btn def">Save Changelog</span></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= 10. TABLE EDITOR ================= -->
+<section id="s-te">
+  <div class="sec-head"><span class="num">Screen 10</span><h2>Table editor with a live ALTER preview</h2>
+  <p class="muted">Columns, indexes, foreign keys, checks and options in one tab that never blocks the window. The SQL that will run is always visible and updates as you edit; nothing changes until you apply.</p></div>
+  <div class="notes"><span class="note"><b>Scope:</b> table and object editors group</span><span class="note"><b>Lane:</b> L5</span></div>
+  <div class="stage"><div class="win" data-t="light">
+    <div class="tb"><div class="lights"><i></i><i></i><i></i></div><span class="tbtn box"><span class="dot" style="background:var(--c-dev)"></span>Local MariaDB 11.8 · shop</span><span class="tsep"></span><span class="tbtn">Data</span><span class="tbtn box">Structure</span><span class="tbtn">DDL</span><span class="flex1"></span><span class="tbtn">Discard</span><span class="tbtn prim">Apply <span class="k">⌘S</span></span></div>
+    <div class="main" style="height:520px">
+      <div class="rtabs"><span class="rtab on">Columns · 9</span><span class="rtab">Indexes · 3</span><span class="rtab">Foreign keys · 1</span><span class="rtab">Checks</span><span class="rtab">Options</span></div>
+      <div class="gridwrap">
+        <table class="g">
+          <thead><tr><th class="rn">#</th><th>Name</th><th>Type</th><th>Length / values</th><th>Unsigned</th><th>NULL</th><th>Default</th><th>Extra</th><th>Collation</th><th>Comment</th></tr></thead>
+          <tbody>
+            <tr><td class="rn">1</td><td class="pk">id</td><td>BIGINT</td><td></td><td>☑</td><td>☐</td><td class="auto">none</td><td>AUTO_INCREMENT</td><td></td><td></td></tr>
+            <tr><td class="rn">2</td><td>customer_id</td><td>INT</td><td></td><td>☑</td><td>☐</td><td class="auto">none</td><td></td><td></td><td>↗ customers.id</td></tr>
+            <tr><td class="rn">3</td><td>status</td><td>ENUM</td><td>'paid','shipped','refunded'</td><td></td><td>☐</td><td>'paid'</td><td></td><td>utf8mb4_unicode_ci</td><td></td></tr>
+            <tr><td class="rn">4</td><td>total</td><td>DECIMAL</td><td>12,2</td><td></td><td>☐</td><td class="auto">none</td><td></td><td></td><td></td></tr>
+            <tr class="ins"><td class="rn">＋</td><td>currency</td><td>CHAR</td><td>3</td><td></td><td>☐</td><td>'EUR'</td><td></td><td>utf8mb4_unicode_ci</td><td>ISO 4217</td></tr>
+            <tr><td class="rn">6</td><td>created_at</td><td>TIMESTAMP</td><td>3</td><td></td><td>☐</td><td>CURRENT_TIMESTAMP(3)</td><td></td><td></td><td></td></tr>
+            <tr><td class="rn">7</td><td class="ed">shipped_at</td><td class="ed">DATETIME</td><td></td><td></td><td>☑</td><td class="nul">NULL</td><td></td><td></td><td></td></tr>
+            <tr><td class="rn">8</td><td>meta</td><td>JSON</td><td></td><td></td><td>☑</td><td class="nul">NULL</td><td></td><td></td><td></td></tr>
+            <tr><td class="rn">9</td><td>total_with_tax</td><td>DECIMAL</td><td>12,2</td><td></td><td>☑</td><td></td><td>STORED GENERATED</td><td></td><td>total * 1.21</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="codebox" style="border-radius:0;border-width:1px 0 0"><span class="cm">-- Will run on Apply</span>
+<span class="kw">ALTER TABLE</span> <span class="id">`orders`</span>
+  <span class="kw">ADD COLUMN</span> <span class="id">`currency`</span> char(3) <span class="kw">NOT NULL DEFAULT</span> <span class="st">'EUR'</span> <span class="kw">COMMENT</span> <span class="st">'ISO 4217'</span> <span class="kw">AFTER</span> <span class="id">`total`</span>,
+  <span class="kw">CHANGE COLUMN</span> <span class="id">`shipped_on`</span> <span class="id">`shipped_at`</span> datetime <span class="kw">NULL DEFAULT NULL</span>;</div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ================= PLAN ================= -->
+<section id="plan">
+  <div class="sec-head"><span class="num">Plan</span><h2>How 1.0 gets built</h2>
+  <p class="muted">The full plan is <code>plan.md</code>. Version 2, after an adversarial review that changed the tunnels (private Unix sockets), TLS checks, the agent gate (fails closed), Apply checks and the lane order. Every lane runs as one batch: implement, verify in one pass, adversarial review, then integration by the orchestrating session. Speed comes from parallel lanes that own separate files, not from skipping checks.</p></div>
+
+  <h3>Phases and lanes</h3>
+  <div class="lanes">
+    <div class="wave"><div class="wl"><b>P0</b><span>Foundation</span></div><div class="ln">
+      <div class="lane"><b>P0-1 Repo, driver build</b><span>Package, scripts, CI, libmariadb + OpenSSL, signed dylib</span><code>first, alone</code></div>
+      <div class="lane"><b>P0-2 Driver and sessions</b><span>DBConnection, sessions, quoting, safe cancel, SQL log, TLS checked against the real host</span></div>
+      <div class="lane"><b>P0-3 Lab</b><span>9 server versions, bastion, jump, proxies, ProxySQL, latency, private CA</span></div>
+      <div class="lane"><b>P0-4 SQL text core</b><span>Lexer, splitter, read-only classifier with an attack corpus</span></div>
+      <div class="lane"><b>P0-5 App shell</b><span>Window, menus, Settings, themes, activity, safety model, SQL preview sheet, test harness</span></div>
+      <div class="lane"><b>P0-6 Grid spike</b><span>Custom grid, embedding API, accessibility, 120 Hz gate</span></div>
+      <div class="lane"><b>P0-7 Schema cache</b><span>Names first, details by threshold, schema hash</span></div>
+    </div></div>
+    <div class="wave"><div class="wl"><b>Wave 1</b><span>parallel</span></div><div class="ln">
+      <div class="lane"><b>L1 Connections and routes</b><span>Editor, every route over private sockets, jump chains, Trust</span></div>
+      <div class="lane"><b>L2 Grid view</b><span>Understand the data, Transpose, value panel, charts</span></div>
+      <div class="lane"><b>L3a Grid data</b><span>Filters, search all columns, pending changes, Apply checks, formats</span></div>
+      <div class="lane"><b>L4 Console</b><span>Completion, run and cancel, result tabs, Tx, history, EXPLAIN</span></div>
+      <div class="lane"><b>L5a Navigator</b><span>Tree, database view, table operations, process list</span></div>
+    </div></div>
+    <div class="wave"><div class="wl"><b>Wave 2</b><span>parallel</span></div><div class="ln">
+      <div class="lane"><b>L3b Grid editing</b><span>Typed editors, FK, paste, JOIN edits</span></div>
+      <div class="lane"><b>L5b Editors</b><span>Table editor, object editors, ER diagram</span></div>
+      <div class="lane"><b>L6 Client tools</b><span>Dump, restore with scanning, export, import</span></div>
+      <div class="lane"><b>L7a Agent tools</b><span>Batch MCP tools, schema, analytics, console hand-off</span></div>
+      <div class="lane"><b>L8a Recon</b><span>Structure and data diff, safe sync scripts</span></div>
+    </div></div>
+    <div class="wave"><div class="wl"><b>Wave 3</b><span>parallel</span></div><div class="ln">
+      <div class="lane"><b>L7b Agent UI and gate</b><span>UI driving, fail-closed gate, redaction</span></div>
+      <div class="lane"><b>L8b Liquibase</b><span>Changelogs, save as changeset</span></div>
+      <div class="lane"><b>Polish pass</b><span>Every screen against the mockups and the polish standard</span></div>
+    </div></div>
+    <div class="wave"><div class="wl"><b>Wave 4</b><span>Ship</span></div><div class="ln">
+      <div class="lane"><b>Docs and release</b><span>Docs site, signing, notarization, Homebrew cask, full lab run</span></div>
+    </div></div>
+  </div>
+
+  <h3>Each lane, one pass</h3>
+  <div class="flow">
+    <div class="step"><b>Implement</b><span>One agent per lane in its own worktree and branch. All its scope rows as one batch, with tests and docs.</span></div>
+    <div class="step"><b>Verify</b><span>Zero-warning build, unit tests, lab tests for the lane, app driven through each new flow with light and dark screenshots.</span></div>
+    <div class="step"><b>Review per wave</b><span>Three reviewers over the whole wave: security and data safety, UI/UX polish, correctness and simplicity. Fixes in one batch, re-checked once.</span></div>
+    <div class="step"><b>Integrate</b><span>The orchestrator rebases, runs everything, looks at the screenshots, rejects anything over-engineered, opens the pull request, waits for CI, merges.</span></div>
+  </div>
+
+  <h3>Quality gates that never bend</h3>
+  <div class="tablebox"><table class="pt">
+    <thead><tr><th>Area</th><th>Gate</th></tr></thead>
+    <tbody>
+      <tr><td>Code</td><td>Swift 5 mode, zero warnings, no third-party Swift packages, smallest change that solves the row, AirSCP patterns</td></tr>
+      <tr><td>Security</td><td>Secrets only in the Keychain; all SQL through quoting helpers with hostile-input tests; LOCAL INFILE off; TLS verification by default; agents read-only with ask-first for writes; relays on 127.0.0.1 only</td></tr>
+      <tr><td>UI</td><td>Every control and menu item has a tooltip (tested); right-click, double-click, multi-select and shortcuts everywhere; light and dark checked by screenshot</td></tr>
+      <tr><td>UX</td><td>Plain words, empty states that say what to do, errors that say how to fix them, nothing written without Apply or Run</td></tr>
+      <tr><td>Speed</td><td>Grid at 1 M rows and 300 columns at 120 Hz; launch under 1 s; idle memory under 150 MB; performance tests fail the build</td></tr>
+      <tr><td>Data safety</td><td>Grid edits in one transaction, keyed by primary or NOT NULL unique key; production previews and confirmations; recon and restore never run without review</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer><p>AirSQL mockups · 2 November 2026 · demo data uses example.com domains and invented names.</p></footer>
+</div>
+
+<script>
+const setTheme = t => {
+  document.querySelectorAll(".win:not([data-fixed])").forEach(w => w.setAttribute("data-t", t));
+  document.querySelectorAll(".toggle [data-set]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.set === t)));
+  try { localStorage.setItem("airsql-mock-theme", t); } catch (e) {}
+};
+document.querySelectorAll(".toggle [data-set]").forEach(b => b.addEventListener("click", () => setTheme(b.dataset.set)));
+let start = "light";
+try { start = localStorage.getItem("airsql-mock-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) {}
+setTheme(start);
+</script>
+</body>
+</html>
