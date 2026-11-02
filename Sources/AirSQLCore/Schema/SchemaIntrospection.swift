@@ -159,12 +159,8 @@ struct SchemaIntrospection {
         return " IN (" + (values.isEmpty ? "NULL" : values.map(literal).joined(separator: ", ")) + ")"
     }
 
-    /// A name as a string literal: quotes doubled, and backslashes doubled unless the session has NO_BACKSLASH_ESCAPES.
-    func literal(_ text: String) -> String {
-        var text = text.replacingOccurrences(of: "'", with: "''")
-        if !server.noBackslashEscapes { text = text.replacingOccurrences(of: "\\", with: "\\\\") }
-        return "'" + text + "'"
-    }
+    /// A name as a string literal, as the session's sql_mode reads it.
+    func literal(_ text: String) -> String { SQLQuote.string(text, noBackslashEscapes: server.noBackslashEscapes) }
 
     // MARK: Parsing
 

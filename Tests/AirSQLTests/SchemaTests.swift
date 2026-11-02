@@ -487,12 +487,12 @@ struct SchemaTests {
 
     @Test func quotesNamesInTheSQLItSends() {
         let plain = SchemaIntrospection(server: SchemaServer(version: "8.4.0"))
-        #expect(plain.literal("it's") == "'it''s'")
-        #expect(plain.literal(#"a\'b"#) == #"'a\\''b'"#)
+        #expect(plain.literal("it's") == #"'it\'s'"#)
+        #expect(plain.literal(#"a\'b"#) == #"'a\\\'b'"#)
         let ansi = SchemaIntrospection(server: SchemaServer(version: "8.4.0", sqlMode: "NO_BACKSLASH_ESCAPES"))
         #expect(ansi.literal(#"a\'b"#) == #"'a\''b'"#)
         #expect(plain.tablesSQL(.objects(database: "we`ird 'db'", names: ["a", "b"])).hasSuffix(
-            "WHERE TABLE_SCHEMA = 'we`ird ''db''' AND TABLE_NAME IN ('a', 'b')"))
+            #"WHERE TABLE_SCHEMA = 'we`ird \'db\'' AND TABLE_NAME IN ('a', 'b')"#))
         #expect(plain.tablesSQL(.databases([])).hasSuffix("WHERE TABLE_SCHEMA IN (NULL)"))
     }
 

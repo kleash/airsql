@@ -17,9 +17,7 @@ public final class SQLLog {
     public static let shared = SQLLog(fileURL: defaultURL)
 
     public static var defaultURL: URL {
-        if let dir = ProcessInfo.processInfo.environment["AIRSQL_SUPPORT_DIR"], !dir.isEmpty {
-            return URL(fileURLWithPath: dir, isDirectory: true).appendingPathComponent("SQL.log")
-        }
+        if Env.isThrowaway() { return Store.directory.appendingPathComponent("SQL.log") }
         return URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Logs/AirSQL/SQL.log")
     }
 
