@@ -2,7 +2,7 @@ import Foundation
 
 /// Which rows an introspection query reads: every database (`databases(nil)`), some databases, or named objects
 /// (tables, routines, triggers or events) in one database.
-enum SchemaScope: Equatable {
+enum SchemaScope {
     case databases([String]?)
     case objects(database: String, names: [String])
 }
@@ -14,7 +14,7 @@ struct TableKey: Hashable {
 }
 
 /// The details of one table, as the detail queries read them.
-struct TableDetails: Equatable {
+struct TableDetails {
     var columns: [SchemaColumn] = []
     var indexes: [SchemaIndex] = []
     var foreignKeys: [SchemaForeignKey] = []
