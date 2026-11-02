@@ -64,6 +64,7 @@ final class DataGridView: NSView {
             invalidate(oldValue)
             invalidate(selection)
             delegate?.dataGridSelectionDidChange(self)
+            selectionDidChange(from: oldValue)
         }
     }
 
@@ -89,6 +90,7 @@ final class DataGridView: NSView {
     var editor: GridEditor?
     var isDragging = false
     var hoveredCell: GridPosition?
+    var accessibilityElements = GridAccessibilityElements()
     var rowCount: Int { source?.rowCount ?? 0 }
     var columnCount: Int { columnOrder.count }
 
@@ -121,6 +123,7 @@ final class DataGridView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     private func sourceDidChange() {
+        endEditing(commit: false)
         columnOrder = Array(0..<(source?.columns.count ?? 0))
         columnWidths = []
         selection.clear()
@@ -139,6 +142,7 @@ final class DataGridView: NSView {
         if columnWidths.count != source.columns.count { columnWidths = (0..<source.columns.count).map(measure) }
         columnOrder = columnOrder.filter { $0 < source.columns.count }
         if !selection.isEmpty { selection.clamp(rows: rowCount, columns: columnCount) }
+        accessibilityElements.removeAll()
         rowNumbers.updateThickness()
         layoutColumns()
         needsDisplay = true
@@ -265,6 +269,19 @@ final class DataGridView: NSView {
             width = max(width, styles.width(of: source.cell(row, column), in: info, nullText: nullText) + 2 * GridStyles.padding)
         }
         return ceil(info.isKey ? max(60, width) : min(230, max(60, width)))
+    }
+
+    /// Whether the delegate lets this cell be edited in place.
+    func canEdit(_ position: GridPosition) -> Bool {
+        position.row < rowCount && position.column < columnCount
+            && delegate?.dataGrid(self, canEditRow: position.row, column: columnOrder[position.column]) == true
+    }
+
+    /// Hands an edit to the delegate (a pending change) and redraws the cell.
+    func commit(_ text: String, at position: GridPosition) {
+        guard position.row < rowCount, position.column < columnCount else { return }
+        delegate?.dataGrid(self, didEditRow: position.row, column: columnOrder[position.column], text: text)
+        setNeedsDisplay(cellRect(position))
     }
 
     /// Widens a key column whose value didn't fit (drawing found it): key values are never cut.

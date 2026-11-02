@@ -211,4 +211,43 @@ extension AppTests {
         #expect(grid.columnOrder.prefix(5) == [0, 2, 3, 1, 4])
         #expect(grid.selection.areas == [.columns(3...3)])
     }
+
+    @Test func gridIsAnAccessibilityTable() {
+        let (main, _, content) = gridWindow(FakeGridSource.large())
+        let grid = content.grid
+        #expect(grid.accessibilityRole() == .table)
+        #expect(grid.accessibilityRowCount() == 1_000_000 && grid.accessibilityColumnCount() == 50)
+        // Elements only for what is on screen.
+        let rows = grid.accessibilityVisibleRows() ?? []
+        #expect(rows.count == grid.rows(in: grid.shownRect).count && rows.count < 40)
+        #expect((rows.first as? GridRowElement)?.accessibilityIndex() == 0)
+        #expect(((rows.first as? GridRowElement)?.accessibilityChildren() ?? []).count == grid.columns(in: grid.shownRect).count)
+        let headers = grid.accessibilityColumnHeaderUIElements() as? [GridHeaderElement] ?? []
+        #expect(headers.first?.accessibilityLabel() == "id" && headers.count == grid.columns(in: grid.shownRect).count)
+
+        let cell = grid.accessibilityCell(forColumn: 1, row: 3) as? GridCellElement
+        #expect(cell?.accessibilityValue() as? String == "Customer 3 Dennis" && cell?.accessibilityLabel() == "name_1")
+        #expect(cell === grid.accessibilityCell(forColumn: 1, row: 3) as? GridCellElement)  // the same element each time
+        #expect((grid.accessibilityCell(forColumn: 4, row: 3) as? GridCellElement)?.accessibilityValue() as? String == "NULL")
+        #expect(cell.map { NSAccessibility.screenRect(fromView: grid, rect: grid.cellRect($0.position)) == $0.accessibilityFrame() } == true)
+
+        main.window?.makeFirstResponder(grid)
+        grid.selection.select(GridPosition(row: 3, column: 1))
+        #expect(cell?.isAccessibilitySelected() == true && cell?.isAccessibilityFocused() == true)
+        #expect(grid.accessibilityFocusedUIElement as? GridCellElement === cell)
+        #expect((grid.accessibilitySelectedCells() ?? []).count == 1)
+        #expect(headers[2].accessibilityPerformPress() && grid.selection.containsColumn(2))
+
+        // Editing: only where the delegate allows it, as a pending change.
+        let setValue = #selector(NSAccessibilityElement.setAccessibilityValue(_:))
+        #expect(cell?.isAccessibilitySelectorAllowed(setValue) == false)
+        content.editable = true
+        #expect(cell?.isAccessibilitySelectorAllowed(setValue) == true)
+        cell?.setAccessibilityValue("Grace")
+        #expect(content.edits.last.map { [String($0.row), String($0.column), $0.text] } == ["3", "1", "Grace"])
+
+        // Scrolling far keeps a bounded number of elements.
+        for row in stride(from: 0, to: 600_000, by: 100) { _ = grid.accessibilityCell(forColumn: row % 50, row: row) }
+        #expect(grid.accessibilityElements.cells.count <= 4_001)
+    }
 }

@@ -63,7 +63,7 @@ extension DataGridView {
     func beginEditing(at position: GridPosition, text: String? = nil) {
         guard editor == nil, let source, position.row < rowCount, position.column < columnCount else { return }
         let column = columnOrder[position.column]
-        guard delegate?.dataGrid(self, canEditRow: position.row, column: column) == true else { return NSSound.beep() }
+        guard canEdit(position) else { return NSSound.beep() }
         selection.select(position)
         reveal(cellRect(position))
         let editor = GridEditor(grid: self, position: position, text: text ?? source.cell(position.row, column).text,
@@ -88,10 +88,8 @@ extension DataGridView {
         editor.delegate = nil
         if refocus { window?.makeFirstResponder(self) }
         editor.removeFromSuperview()
-        if commit, editor.changed, position.row < rowCount, position.column < columnCount {
-            delegate?.dataGrid(self, didEditRow: position.row, column: columnOrder[position.column], text: text)
-        }
-        setNeedsDisplay(cellRect(position))
+        if commit, editor.changed { self.commit(text, at: position) }
+        if position.row < rowCount, position.column < columnCount { setNeedsDisplay(cellRect(position)) }
         if let move { self.move(move) }
     }
 }
