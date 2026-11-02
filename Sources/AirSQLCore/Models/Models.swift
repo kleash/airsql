@@ -75,6 +75,10 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var agentAccess = AgentAccess.off
     /// Agents may see sample rows (a separate switch from the access level).
     public var agentSampleRows = false
+    /// The mysql and mysqldump this connection uses (chosen in the Restore and Export sheets); empty: the best found
+    /// for its server, or Settings ▸ Client Tools' choice.
+    public var clientPath = ""
+    public var dumpPath = ""
 
     public init(id: UUID = UUID(), name: String = "", host: String = "", port: Int? = nil, user: String = "",
                 colour: ConnectionColour = .none, route: Route = .direct) {
@@ -110,6 +114,8 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         safety = try container.decodeIfPresent(SafetySettings.self, forKey: .safety)
         agentAccess = try value(.agentAccess, defaults.agentAccess)
         agentSampleRows = try value(.agentSampleRows, defaults.agentSampleRows)
+        clientPath = try value(.clientPath, defaults.clientPath)
+        dumpPath = try value(.dumpPath, defaults.dumpPath)
     }
 
     /// The name, else user@host:port (or the socket).
