@@ -49,6 +49,12 @@ if ! current; then
     "$docker" compose rm --force --stop --volumes secure wrongname >/dev/null 2>&1 || true
 fi
 
+# A server that stopped with an error (out of memory while seeding, say) would come back with half its seed, as a data
+# folder that isn't new is never seeded again: those start afresh.
+"$docker" compose ps --all --status exited --format '{{.Service}} {{.ExitCode}}' | while read -r service code; do
+    [[ $code == 0 ]] || "$docker" compose rm --force --volumes "$service" >/dev/null
+done
+
 # Three services at a time: a server takes memory for a minute while it seeds, and all of them at once need more than
 # Docker's VM may have.
 services=("$@")
