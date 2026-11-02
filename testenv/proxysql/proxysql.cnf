@@ -1,0 +1,26 @@
+# AirSQL lab "proxysql": ProxySQL in front of mariadb114, the hop where Cancel can't trust the thread id it sees.
+# One server, so monitoring is off. Login: airsql / airsql-pass.
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+    admin_credentials="admin:airsql-admin"
+    mysql_ifaces="127.0.0.1:6032"
+}
+
+mysql_variables=
+{
+    threads=2
+    interfaces="0.0.0.0:6033"
+    monitor_enabled=false
+}
+
+mysql_servers=
+(
+    { address="mariadb114", port=3306, hostgroup=0 }
+)
+
+mysql_users=
+(
+    { username="airsql", password="airsql-pass", default_hostgroup=0 }
+)

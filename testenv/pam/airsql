@@ -1,0 +1,4 @@
+# PAM service "airsql", for the PAM login on the lab's "secure" server (MariaDB's auth_pam, which asks through the
+# dialog plugin): testenv/pam/check takes user pam with password pam-pass.
+auth required pam_exec.so expose_authtok quiet /etc/airsql/pam-check
+account required pam_permit.so
