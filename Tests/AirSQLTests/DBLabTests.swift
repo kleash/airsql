@@ -359,6 +359,34 @@ struct DBLabTests {
         await session.close()
     }
 
+    /// Export all's way: every row in batches, none kept; a reader that gives up stops the statement on the server.
+    @Test func streamsRowsInBatches() async throws {
+        let session = try await connected(DBLab.options(try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")))
+        let thousand = "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000) "
+        var total = 0, batches = 0, largest = 0
+        try await session.stream(thousand + "SELECT a.i, b.i FROM n AS a, n AS b", batchRows: 50_000) { batch in
+            total += batch.rowCount
+            batches += 1
+            largest = max(largest, batch.rowCount)
+        }
+        #expect(total == 1_000_000 && batches == 20 && largest == 50_000)
+
+        struct Enough: Error {}
+        let start = Date()
+        var seen = 0
+        do {
+            try await session.stream(thousand + "SELECT a.i, b.i, c.i FROM n AS a, n AS b, n AS c", batchRows: 1000) { batch in
+                seen += batch.rowCount
+                if seen >= 3000 { throw Enough() }
+            }
+            Issue.record("the reader's error didn't come back")
+        } catch is Enough {
+        }
+        #expect(Date().timeIntervalSince(start) < 30)
+        #expect(try await value(session, "SELECT 1") == "1")
+        await session.close()
+    }
+
     @Test(arguments: ["mariadb", "mysql"])
     func hostileValuesAndNamesRoundTrip(_ flavor: String) async throws {
         let server = try #require(flavor == "mariadb" ? DBLab.mariadb : DBLab.mysql, "AIRSQL_LAB_\(flavor.uppercased())")

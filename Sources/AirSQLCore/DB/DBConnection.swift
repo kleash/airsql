@@ -184,6 +184,19 @@ public final class DBConnection: @unchecked Sendable {
         try await worker.perform { [self] in try queryHere(sql, rowCap: rowCap) }
     }
 
+    /// Runs a statement and hands its rows over in batches as they arrive, keeping none: Export all's way, for results
+    /// of any size. `batch` runs on the session's thread with each batch (`batchRows` rows, or fewer past 16 MB);
+    /// throwing from it stops the statement on the server, as Cancel does, and the error comes back here.
+    public func stream(_ sql: String, batchRows: Int = 10_000, batch: @escaping (ResultStore) throws -> Void) async throws {
+        try await worker.perform { [self] in
+            let mysql = try current()
+            guard let server = state.locked({ _server }) else { throw AirSQLError.disconnected }
+            _ = try noticingDrops(mysql) {
+                try run(mysql, sql, flavor: server.flavor, rowCap: .max, batch: (max(1, batchRows), batch))
+            }
+        }
+    }
+
     /// Stops the running statement: through a short side connection that checks it reaches the same server and that
     /// the session's thread still runs this statement (by its tag), then KILL QUERY (MariaDB: KILL QUERY ID).
     public func cancel() async throws -> CancelResult {
@@ -331,9 +344,17 @@ public final class DBConnection: @unchecked Sendable {
         var set = "SET NAMES utf8mb4"
         if let zone = options.timeZone { set += ", time_zone = " + SQLQuote.string(zone) }
         _ = try run(mysql, set, flavor: server.flavor)
-        let lock = role == .cancel ? nil : "airsql:" + UUID().uuidString.lowercased()
-        let identity = try run(mysql, "SELECT CONNECTION_ID()" + (lock.map { ", GET_LOCK(\(SQLQuote.string($0)), 0)" } ?? ""),
-                               flavor: server.flavor)
+        // The lock lets Cancel and Reconnect tell this session's thread from every other, on the same server. A server
+        // that refuses user locks (MariaDB Galera) leaves the session without one: Cancel then offers Disconnect.
+        var lock = role == .cancel ? nil : "airsql:" + UUID().uuidString.lowercased()
+        var identity: [StatementResult]
+        if let name = lock, let rows = try? run(mysql, "SELECT CONNECTION_ID(), GET_LOCK(\(SQLQuote.string(name)), 0)",
+                                                flavor: server.flavor) {
+            identity = rows
+        } else {
+            lock = nil
+            identity = try run(mysql, "SELECT CONNECTION_ID()", flavor: server.flavor)
+        }
         if let rows = identity.first?.rows, rows.rowCount == 1, let id = rows.string(0, 0).flatMap(UInt64.init) {
             server.threadID = id
         }
@@ -455,7 +476,8 @@ public final class DBConnection: @unchecked Sendable {
     /// Sends one statement and reads its results: the heart of the session. Logged first (unless it is startup SQL),
     /// tagged, and never sent while a Cancel for the statement before is still under way.
     private func run(_ mysql: UnsafeMutablePointer<MYSQL>, _ sql: String, flavor: ServerInfo.Flavor, rowCap: Int = 1000,
-                     logged: Bool = true) throws -> [StatementResult] {
+                     logged: Bool = true, batch: (rows: Int, deliver: (ResultStore) throws -> Void)? = nil) throws
+        -> [StatementResult] {
         number += 1
         let tag = "/* airsql:\(role.rawValue):\(number) */"
         let noBackslashEscapes = state.locked {
@@ -477,8 +499,21 @@ public final class DBConnection: @unchecked Sendable {
                 if stopped {
                     mysql_free_result(result)
                 } else {
-                    let store = ResultStore(columns: columns(result))
+                    var store = ResultStore(columns: columns(result))
+                    var delivered = false, refused: Error?  // what `batch` threw
                     while let row = mysql_fetch_row(result) {
+                        if let batch, store.rowCount == batch.rows || store.storedBytes > 16 << 20 {
+                            store.finish()
+                            do {
+                                try batch.deliver(store)
+                            } catch {
+                                refused = error
+                                stopped = true
+                                break
+                            }
+                            delivered = true
+                            store = ResultStore(columns: store.columns)
+                        }
                         guard store.rowCount < rowCap, store.append(row, lengths: mysql_fetch_lengths(result)) else {
                             store.capped = true
                             stopped = true
@@ -500,9 +535,14 @@ public final class DBConnection: @unchecked Sendable {
                         mysql_free_result(result)
                     }
                     store.finish()
-                    results.append(StatementResult(rows: store, affectedRows: 0, insertID: 0,
-                                                   warnings: Int(mysql_warning_count(mysql)), info: nil,
-                                                   duration: Date().timeIntervalSince(start)))
+                    if let refused { throw refused }
+                    if let batch {
+                        if store.rowCount > 0 || !delivered { try batch.deliver(store) }
+                    } else {
+                        results.append(StatementResult(rows: store, affectedRows: 0, insertID: 0,
+                                                       warnings: Int(mysql_warning_count(mysql)), info: nil,
+                                                       duration: Date().timeIntervalSince(start)))
+                    }
                 }
             } else if !stopped {
                 results.append(StatementResult(rows: nil, affectedRows: mysql_affected_rows(mysql), insertID: mysql_insert_id(mysql),
