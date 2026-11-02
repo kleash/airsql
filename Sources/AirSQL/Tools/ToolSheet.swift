@@ -65,14 +65,15 @@ class ToolSheet: NSWindowController {
 
     // MARK: Showing
 
-    func show(on parent: NSWindow) {
+    /// Shows the sheet on `parent` and loads what it needs (tests fill it themselves: `loads` false).
+    func show(on parent: NSWindow, loads: Bool = true) {
         guard let window else { return }
         window.contentView = makeContent()
         window.setContentSize(window.contentView!.fittingSize)
         window.initialFirstResponder = runButton
         retained = self
         parent.beginSheet(window)
-        load()
+        if loads { load() }
     }
 
     private func makeContent() -> NSView {
@@ -90,6 +91,7 @@ class ToolSheet: NSWindowController {
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
+        spinner.isHidden = true
         spinner.translatesAutoresizingMaskIntoConstraints = false
         let progressText = NSStackView(views: [spinner, status, NSView(), timeLeft])
         progressText.alignment = .firstBaseline
@@ -120,7 +122,7 @@ class ToolSheet: NSWindowController {
     }
 
     /// A box of monospaced, selectable text (the command line, the SQL to run), `lines` lines tall at most.
-    func codeBox(id: String, tip: String, lines: CGFloat = 3) -> (NSView, NSTextView) {
+    func codeBox(id: String, tip: String, lines: CGFloat = 4) -> (NSView, NSTextView) {
         let scroll = NSTextView.scrollableTextView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.borderType = .noBorder
@@ -147,7 +149,8 @@ class ToolSheet: NSWindowController {
 
     /// Says what the sheet is doing while it loads (a spinner), or that it is ready (nil).
     func loading(_ text: String?) {
-        if let text { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
+        spinner.isHidden = text == nil
+        if text != nil { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
         status.textColor = .labelColor
         status.stringValue = text ?? ""
     }
@@ -168,6 +171,7 @@ class ToolSheet: NSWindowController {
         bar.isIndeterminate = true
         bar.startAnimation(nil)
         loading(nil)
+        timeLeft.stringValue = ""
         status.stringValue = "Starting…"
         return cancellation
     }

@@ -116,6 +116,30 @@ extension AppTests {
                 _ = await call(harness, "press", ["title": "Cancel"])
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
 
+                // The client tools (L6): Export at work, and Restore with its file chosen.
+                ToolsResponder.install(on: main)
+                let export = ExportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+                export.show(on: main.window!, loads: false)
+                export.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "export-\(suffix)")
+                _ = export.begin("Exporting shop")
+                export.progress("Writing order_items · 1.9 GB of ≈3.1 GB", done: 19, total: 31)
+                export.timeLeft.stringValue = "about 2 min left"
+                try await Task.sleep(nanoseconds: 600_000_000)  // the bar moves to its value
+                try await save(harness, "export-running-\(suffix)")
+                export.finish("Stopped.", failed: true)
+                export.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                let restore = RestoreSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: false)
+                restore.show(on: main.window!, loads: false)
+                restore.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["crm", "shop"])
+                restore.use(URL(fileURLWithPath: "/Users/Shared/Backups/shop-2026-11-03-0912.sql.gz"))
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "restore-\(suffix)")
+                restore.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+
                 // Settings, every pane.
                 let settings = SettingsWindowController(model: model)
                 keptWindows.append(settings)

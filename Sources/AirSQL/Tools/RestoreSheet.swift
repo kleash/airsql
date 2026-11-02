@@ -67,7 +67,7 @@ final class RestoreSheet: ToolSheet {
 
     override func makeCodeBox() -> NSView? {
         let (box, text) = codeBox(id: "restore.command", tip: "What runs: no password in it, the login is in a private file only you "
-                                  + "can read", lines: 2)
+                                  + "can read")
         command = text
         return box
     }
@@ -256,8 +256,7 @@ final class RestoreSheet: ToolSheet {
             request.actionTitle = builtInFirst ? "Run" : "Restore"
             request.warnings = warnings
             request.destructive = !warnings.isEmpty
-            SQLPreviewSheet.show(request, connection: connection, on: window) { [weak self] result in
-                guard let self else { return }
+            SQLPreviewSheet.show(request, connection: connection, on: window) { result in
                 if result.approved { self.start(file, database: database) } else { self.updateRunButton() }
             }
         }

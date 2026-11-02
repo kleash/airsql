@@ -78,17 +78,19 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         form.row("Tool", [toolMenu])
         form.grid.addRow(with: [NSGridCell.emptyContentView, fit]).topPadding = -4
         fit.preferredMaxLayoutWidth = 420
+        saveTo.stringValue = SettingsPaneController.shown(url)
         saveTo.toolTip = url.path
         saveTo.setAccessibilityIdentifier("export.saveTo")
+        saveTo.widthAnchor.constraint(equalToConstant: 300).isActive = true
         form.row("Save to", [saveTo, choose])
         form.row("Extra options", [extra])
         let grid = form.finish()
-        grid.column(at: 1).width = 440
+        grid.column(at: 1).width = 400
         let columns = NSStackView(views: [picker.view(height: 250), grid])
         columns.alignment = .top
         columns.spacing = 14
         columns.arrangedSubviews[0].widthAnchor.constraint(equalToConstant: 260).isActive = true
-        extra.widthAnchor.constraint(equalToConstant: 440).isActive = true
+        extra.widthAnchor.constraint(equalToConstant: 400).isActive = true
         return columns
     }
 
@@ -132,7 +134,6 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
 
     override func load() {
         loading("Reading the databases of \(connection.displayName)…")
-        saveTo.stringValue = SettingsPaneController.shown(url)
         let options = self.options, chosen = connection.dumpPath.isEmpty ? model.data.settings.dumpPath : connection.dumpPath
         Task {
             do {
@@ -215,6 +216,14 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             fit.textColor = .secondaryLabelColor
         }
         let request = makeRequest()
+        let what = request.map { $0.databases.count == 1 ? $0.databases[0] : "\($0.databases.count) databases" }
+        heading.stringValue = what.map { "Export \($0) with " + (tool?.name ?? "AirSQL") } ?? "Export from \(connection.displayName)"
+        if !running && status.textColor != .statusBad {
+            let tables = picker.databases.flatMap(\.tables).filter(\.included)
+            status.textColor = .secondaryLabelColor
+            status.stringValue = tables.isEmpty ? "" : ObjectPicker.count(tables.count, "table") + " · about "
+                + Self.bytes(tables.reduce(0) { $0 + $1.bytes }) + " of data on the server"
+        }
         if let tool, let request {
             let argv = ToolCommand(tool: tool, options: options, server: server).dump(request, optionFile: "/private")
             command?.string = ToolCommand.display(argv, optionFile: "/private")
