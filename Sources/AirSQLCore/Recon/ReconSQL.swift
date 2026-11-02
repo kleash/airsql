@@ -92,6 +92,12 @@ struct ReconTableSQL {
         "SELECT \(keyList), \(rowHash) FROM \(table)" + conditions(after: after, upTo: upTo)
     }
 
+    /// Every row's compared columns (within the person's WHERE), at most `limit` of them.
+    func all(limit: Int) -> String {
+        "SELECT " + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") + " FROM \(table)"
+            + conditions(after: nil, upTo: nil) + " LIMIT \(limit)"
+    }
+
     /// The compared columns of the rows with these keys.
     func rows(keys: [[[UInt8]]]) -> String {
         let list = columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ")

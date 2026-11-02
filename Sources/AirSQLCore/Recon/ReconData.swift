@@ -23,6 +23,8 @@ final class ReconDataCompare {
     private let source: DBConnection, target: DBConnection
     private let sourceSQL: ReconTableSQL, targetSQL: ReconTableSQL
     private let chunks: Int
+    /// The key can be walked in ranges; else the table is one chunk.
+    private let rangeable: Bool
     private let progress: (Progress) -> Void
 
     private var tally = ReconTally()
@@ -34,12 +36,13 @@ final class ReconDataCompare {
 
     /// `estimatedRows` (the source's statistics) only sizes the progress.
     init(source: DBConnection, target: DBConnection, sourceSQL: ReconTableSQL, targetSQL: ReconTableSQL,
-         estimatedRows: Int, progress: @escaping (Progress) -> Void) {
+         estimatedRows: Int, rangeable: Bool = true, progress: @escaping (Progress) -> Void) {
         self.source = source
         self.target = target
         self.sourceSQL = sourceSQL
         self.targetSQL = targetSQL
-        chunks = max(1, (estimatedRows + Self.chunkRows - 1) / Self.chunkRows)
+        chunks = rangeable ? max(1, (estimatedRows + Self.chunkRows - 1) / Self.chunkRows) : 1
+        self.rangeable = rangeable
         self.progress = progress
         data = ReconTableData(outcome: .same)
         data.key = sourceSQL.key.map(\.name)
@@ -53,7 +56,7 @@ final class ReconDataCompare {
         do {
             var after: [[UInt8]]?
             repeat {
-                let upTo = try await boundary(source, sourceSQL, after: after, upTo: nil)
+                let upTo = rangeable ? try await boundary(source, sourceSQL, after: after, upTo: nil) : nil
                 let (sourceCount, targetCount) = try await compare(after: after, upTo: upTo)
                 data.sourceRows += sourceCount
                 data.targetRows += targetCount
@@ -93,7 +96,7 @@ final class ReconDataCompare {
         let (a, b) = try await (left, right)
         checked += max(a.count, b.count)
         if a == b { return (a.count, b.count) }
-        if max(a.count, b.count) > 2 * Self.chunkRows {
+        if rangeable, max(a.count, b.count) > 2 * Self.chunkRows {
             let (session, sql) = a.count >= b.count ? (source, sourceSQL) : (target, targetSQL)
             var from = after
             while true {

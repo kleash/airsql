@@ -58,12 +58,17 @@ public struct ReconEnd: Equatable {
     public var database: String
     /// `VERSION()`, such as "8.4.13" or "11.8.9-MariaDB".
     public var version: String
+    /// The session's sql_mode has NO_BACKSLASH_ESCAPES: the script's strings double quotes instead.
+    public var noBackslashEscapes: Bool
 
-    public init(name: String, database: String, version: String) {
+    public init(name: String, database: String, version: String, noBackslashEscapes: Bool = false) {
         self.name = name
         self.database = database
         self.version = version
+        self.noBackslashEscapes = noBackslashEscapes
     }
+
+    public var isMariaDB: Bool { version.range(of: "MariaDB", options: .caseInsensitive) != nil }
 }
 
 /// What a compare found.
@@ -115,6 +120,10 @@ public struct ReconObject: Equatable {
     public var targetDDL: String?
     /// The data compare of a table on both sides, when data was compared.
     public var data: ReconTableData?
+    /// Tables of the same database this table's foreign keys point at (where it exists), for the script's order.
+    public var references: [String] = []
+    /// The target table's engine: MyISAM, Aria and MEMORY can't roll back a failed sync.
+    public var targetEngine: String?
 
     public init(kind: Kind, name: String, targetName: String? = nil, status: Status) {
         self.kind = kind
