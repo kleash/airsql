@@ -1,0 +1,8 @@
+// libmariadb, the client library scripts/build-mariadb.sh builds into vendor/out (paths are relative to this file).
+module CMariaDB [system] {
+    header "../../vendor/out/universal/include/mysql.h"
+    header "../../vendor/out/universal/include/errmsg.h"
+    header "../../vendor/out/universal/include/mysqld_error.h"
+    link "mariadb"
+    export *
+}
