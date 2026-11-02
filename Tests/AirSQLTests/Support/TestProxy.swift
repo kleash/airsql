@@ -428,6 +428,7 @@ func connectUnix(_ path: String) -> Int32 {
 /// Exactly `count` bytes from `fd`: fewer when it closes first or `timeout` passes. Never more, so what comes next
 /// (a server's greeting after a proxy's answer) stays unread.
 func receive(_ fd: Int32, count: Int, timeout: TimeInterval = 15) -> [UInt8] {
+    guard fd >= 0 else { return [] }
     var received = [UInt8](repeating: 0, count: count)
     var got = 0
     let deadline = Date().addingTimeInterval(timeout)

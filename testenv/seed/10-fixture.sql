@@ -380,7 +380,8 @@ CREATE EVENT purge_old_log ON SCHEDULE EVERY 1 DAY STARTS '2037-01-01 00:00:00' 
 CREATE EVENT recount_orders ON SCHEDULE EVERY 1 HOUR STARTS '2037-01-01 00:00:00' ENABLE
     DO UPDATE orders SET total = order_total(id) WHERE id < 0;
 
--- A million rows, made in SQL (a cross join of digits: MySQL 5.7 has no recursive CTE).
+-- A million rows, made in SQL: a cross join of digits (MySQL 5.7 has no recursive CTE), in ten transactions of
+-- 100,000 rows, so that a seeding server needs little memory.
 CREATE TABLE digits (d TINYINT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
 INSERT INTO digits VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9);
 CREATE TABLE big (
@@ -394,11 +395,22 @@ CREATE TABLE big (
     KEY created_at (created_at),
     KEY category (category)
 ) ENGINE=InnoDB;
-INSERT INTO big (id, name, amount, created_at, category, flag, note)
-    SELECT n, CONCAT('row ', n), (n * 7919 % 1000000) / 100, TIMESTAMP('2020-01-01') + INTERVAL n MINUTE, 1 + n % 5,
-           n % 2, IF(n % 10 = 0, NULL, CONCAT('note ', n))
-    FROM (SELECT 1 + a.d + 10 * b.d + 100 * c.d + 1000 * e.d + 10000 * f.d + 100000 * g.d AS n
-          FROM digits a, digits b, digits c, digits e, digits f, digits g) AS numbers;
+DELIMITER ;;
+CREATE PROCEDURE fill_big()
+BEGIN
+    DECLARE chunk INT DEFAULT 0;
+    WHILE chunk < 10 DO
+        INSERT INTO big (id, name, amount, created_at, category, flag, note)
+            SELECT n, CONCAT('row ', n), (n * 7919 % 1000000) / 100, TIMESTAMP('2020-01-01') + INTERVAL n MINUTE,
+                   1 + n % 5, n % 2, IF(n % 10 = 0, NULL, CONCAT('note ', n))
+            FROM (SELECT 1 + a.d + 10 * b.d + 100 * c.d + 1000 * e.d + 10000 * f.d + 100000 * chunk AS n
+                  FROM digits a, digits b, digits c, digits e, digits f) AS numbers;
+        SET chunk = chunk + 1;
+    END WHILE;
+END;;
+DELIMITER ;
+CALL fill_big();
+DROP PROCEDURE fill_big;
 DROP TABLE digits;
 
 -- A second database, with a name at the 64-character limit.

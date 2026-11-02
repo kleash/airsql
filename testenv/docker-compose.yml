@@ -50,13 +50,15 @@ services:
     hostname: mysql80
     ports: ["127.0.0.1:44380:3306"]
 
-  # performance_schema stays on here (MySQL's default) for the query profile; mysql_native_password, off by default
-  # since 8.4, is on for the native login.
+  # performance_schema stays on here (MySQL's default) for the query profile, with smaller connection and table caches,
+  # which it sizes its own by (about 130 MB, not 300); mysql_native_password, off by default since 8.4, is on for the
+  # native login.
   mysql84:
     <<: *mysql
     image: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
     hostname: mysql84
-    command: [--innodb-buffer-pool-size=32M, --innodb-log-buffer-size=4M, --mysql-native-password=ON]
+    command: [--innodb-buffer-pool-size=32M, --innodb-log-buffer-size=4M, --mysql-native-password=ON,
+              --max-connections=100, --table-open-cache=400, --table-definition-cache=400]
     mem_limit: 768m
     ports: ["127.0.0.1:44384:3306"]
 
