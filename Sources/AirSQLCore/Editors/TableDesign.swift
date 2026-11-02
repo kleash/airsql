@@ -17,10 +17,12 @@ public struct TableDesign: Hashable {
     public init(name: String) { self.name = name }
 
     /// What the server has: the cached table, its options, and on MariaDB the names of its column checks (a check
-    /// written in a column's definition belongs to the column there: MODIFY without it would drop it).
-    public init(_ table: SchemaTable, options: TableOptions, columnChecks: Set<String> = [], server: SchemaServer) {
+    /// written in a column's definition belongs to the column there: MODIFY without it would drop it). Without those
+    /// names, a check named after a column is that column's.
+    public init(_ table: SchemaTable, options: TableOptions, columnChecks: Set<String>? = nil, server: SchemaServer) {
         name = table.name
         self.options = options
+        let columnChecks = columnChecks ?? Set(table.columns.map(\.name))
         let ownChecks = server.flavour == .mariadb
             ? Dictionary(table.checks.filter { columnChecks.contains($0.name) }.map { ($0.name, $0.clause) }) { first, _ in first }
             : [:]
