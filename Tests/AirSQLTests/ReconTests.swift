@@ -170,4 +170,188 @@ struct ReconTests {
                 != ReconNormal.definition(other, database: "staging", rules: strict))
         #expect(ReconNormal.qualifiersMapped("from `shop`.`t`", from: "shop", to: "shop`2") == "from `shop``2`.`t`")
     }
+
+    static let mysqlCreate = """
+        CREATE TABLE `orders` (
+          `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+          `customer_id` int NOT NULL,
+          `currency` char(3) NOT NULL DEFAULT 'EUR',
+          `note``s` varchar(20) DEFAULT 'a,b',
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `ux` (`customer_id`,`currency`),
+          KEY `ix_status` (`currency`) /*!80000 INVISIBLE */,
+          CONSTRAINT `fk_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE,
+          CONSTRAINT `orders_chk_1` CHECK ((`customer_id` > 0))
+        ) ENGINE=InnoDB AUTO_INCREMENT=1284 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+        """
+
+    @Test func createTableLinesGiveTheSourcesDefinitions() throws {
+        let create = try #require(ReconCreateTable(Self.mysqlCreate))
+        #expect(create.definition(.column, "currency") == "`currency` char(3) NOT NULL DEFAULT 'EUR'")
+        #expect(create.definition(.column, "note`s") == "`note``s` varchar(20) DEFAULT 'a,b'")
+        #expect(create.definition(.index, "PRIMARY") == "PRIMARY KEY (`id`)")
+        #expect(create.definition(.index, "ix_status") == "KEY `ix_status` (`currency`) /*!80000 INVISIBLE */")
+        #expect(create.definition(.foreignKey, "fk_customer")?.hasSuffix("ON DELETE CASCADE") == true)
+        #expect(create.definition(.check, "orders_chk_1") == "CONSTRAINT `orders_chk_1` CHECK ((`customer_id` > 0))")
+        let bare = create.withoutForeignKeys
+        #expect(!bare.contains("FOREIGN KEY") && !bare.contains("AUTO_INCREMENT=") && bare.contains("AUTO_INCREMENT,"))
+        #expect(bare.contains("CHECK ((`customer_id` > 0))\n) ENGINE=InnoDB DEFAULT CHARSET"))
+        #expect(create.foreignKeys.count == 1)
+    }
+
+    /// A result with one of everything the script handles.
+    static func result(mariadb: Bool = false) -> ReconResult {
+        var options = ReconOptions()
+        options.mode = .both
+        var result = ReconResult(source: ReconEnd(name: "Production", database: "shop", version: "8.4.13"),
+                                 target: ReconEnd(name: "Staging", database: "shop_stage",
+                                                  version: mariadb ? "11.8.9-MariaDB" : "8.4.13"),
+                                 options: options)
+        var orders = ReconObject(kind: .table, name: "orders", status: .different)
+        orders.references = ["customers"]
+        orders.parts = [
+            ReconPart(kind: .column, name: "currency", change: .added, definition: "`currency` char(3) NOT NULL",
+                      after: "total"),
+            ReconPart(kind: .column, name: "legacy", change: .dropped),
+            ReconPart(kind: .column, name: "code", change: .changed, definition: "`code` varchar(5)", narrowing: true),
+            ReconPart(kind: .index, name: "ix", change: .changed, definition: "KEY `ix` (`currency`)"),
+            ReconPart(kind: .check, name: "old_check", change: .dropped),
+            ReconPart(kind: .foreignKey, name: "fk_customer", change: .changed,
+                      definition: "CONSTRAINT `fk_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)"),
+            ReconPart(kind: .options, name: "engine", change: .changed, definition: "ENGINE=InnoDB"),
+        ]
+        var customers = ReconObject(kind: .table, name: "customers", status: .same)
+        var data = ReconTableData(outcome: .different)
+        data.key = ["id"]
+        data.columns = [ReconColumn(name: "id", kind: .integer), ReconColumn(name: "name", kind: .text)]
+        data.missing = [ReconRow([Array("5".utf8), Array("it's".utf8)])]
+        data.extra = [ReconRow([Array("6".utf8), nil])]
+        data.changed = [ReconRowChange(source: ReconRow([Array("2".utf8), Array("B".utf8)]),
+                                       target: ReconRow([Array("2".utf8), Array("b".utf8)]), columns: [1])]
+        customers.data = data
+        var gifts = ReconObject(kind: .table, name: "gift_cards", status: .onlyInSource)
+        gifts.sourceDDL = "CREATE TABLE `gift_cards` (\n  `code` int NOT NULL,\n  PRIMARY KEY (`code`)\n) ENGINE=InnoDB"
+        let legacy = ReconObject(kind: .table, name: "legacy", status: .onlyInTarget)
+        var view = ReconObject(kind: .view, name: "big_orders", status: .onlyInSource)
+        view.sourceDDL = "CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`%` SQL SECURITY DEFINER VIEW `big_orders` AS select `shop`.`orders`.`id` AS `id` from `shop`.`orders`"
+        var trigger = ReconObject(kind: .trigger, name: "orders_bi", status: .different)
+        trigger.sourceDDL = "CREATE DEFINER=`root`@`%` TRIGGER `orders_bi` BEFORE INSERT ON `orders` FOR EACH ROW SET NEW.total = 0"
+        result.objects = [orders, customers, gifts, legacy, view, trigger]
+        return result
+    }
+
+    @Test func scriptRunsInDependencyOrderWithoutDestructiveSteps() {
+        let script = Self.result().script()
+        #expect(script.first == "USE `shop_stage`" && script[1] == "SET time_zone = '+00:00'")
+        func position(_ text: String) -> Int { script.firstIndex { $0.contains(text) } ?? -1 }
+        #expect(position("DROP FOREIGN KEY `fk_customer`") < position("CREATE TABLE `gift_cards`"))
+        #expect(position("DROP TRIGGER IF EXISTS `orders_bi`") < position("ALTER TABLE `orders`\n  ADD COLUMN"))
+        #expect(position("ADD COLUMN `currency` char(3) NOT NULL AFTER `total`") < position("CREATE OR REPLACE ALGORITHM"))
+        #expect(position("CREATE OR REPLACE ALGORITHM") < position("ADD CONSTRAINT `fk_customer`"))
+        #expect(position("ADD CONSTRAINT `fk_customer`") < position("CREATE TRIGGER `orders_bi`"))
+        #expect(position("START TRANSACTION") < position("UPDATE `customers` SET `name` = 'B' WHERE `id` IN (2)"))
+        #expect(position("INSERT INTO `customers` (`id`, `name`) VALUES\n(5, 'it\\'s')") < position("COMMIT"))
+        #expect(script.contains { $0.contains("DROP INDEX `ix`,\n  ADD KEY `ix` (`currency`)") })
+        // DEFINER left out (ignored by default) and the view's database qualifier mapped to the target's.
+        #expect(script.contains { $0.hasPrefix("CREATE OR REPLACE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW")
+                    && $0.contains("from `shop_stage`.`orders`") })
+        #expect(!script.contains { $0.contains("DROP COLUMN") || $0.contains("DELETE") || $0.contains("DROP TABLE")
+                    || $0.contains("MODIFY COLUMN `code`") || $0.contains("old_check") })
+    }
+
+    @Test func destructiveStepsComeOnlyWhenAskedAndAreMarked() {
+        let steps = Self.result(mariadb: true).steps(destructive: true).filter(\.destructive)
+        let sql = steps.map(\.sql)
+        #expect(sql.allSatisfy { $0.hasPrefix("-- Destructive: ") })
+        #expect(sql.contains { $0.contains("DROP COLUMN `legacy`") && $0.contains("MODIFY COLUMN `code` varchar(5)")
+                    && $0.contains("DROP CONSTRAINT `old_check`") })
+        #expect(sql.contains { $0.hasSuffix("DROP TABLE `legacy`") })
+        #expect(steps.contains { $0.sql.hasSuffix("DELETE FROM `customers` WHERE `id` IN (6)") && $0.expectedRows == 1 })
+        let script = Self.result().script(destructive: true)
+        #expect(script.firstIndex { $0.contains("DELETE FROM") }! < script.firstIndex { $0.contains("INSERT INTO") }!)
+        #expect(script.firstIndex { $0.contains("DROP TABLE `legacy`") }! > script.firstIndex { $0.contains("CREATE TRIGGER") }!)
+        var structureOnly = Self.result()
+        structureOnly.options.mode = .structure
+        #expect(!structureOnly.script().contains { $0.hasPrefix("INSERT") || $0 == "START TRANSACTION" })
+        var dataOnly = Self.result()
+        dataOnly.options.mode = .data
+        #expect(dataOnly.steps().allSatisfy { $0.kind == .data })
+    }
+
+    /// Each column's part of the encoded row: a NULL flag, then the length and a separator before the value, so
+    /// swapped values, NULLs in other columns and separator-like text can't encode alike; long types by their MD5.
+    @Test func rowHashEncodesEveryColumnWithItsNullFlagAndLength() {
+        let sql = ReconTableSQL(database: "d`b", table: "t`; --", key: [ReconColumn(name: "i`d", kind: .integer)],
+                                columns: [ReconColumn(name: "i`d", kind: .integer), ReconColumn(name: "a", kind: .text),
+                                          ReconColumn(name: "doc", kind: .json), ReconColumn(name: "img", kind: .blob),
+                                          ReconColumn(name: "flags", kind: .bit)],
+                                filter: "x > 1 -- note", noBackslashEscapes: false)
+        #expect(ReconTableSQL.part(ReconColumn(name: "a", kind: .text))
+                == "IFNULL(CONCAT('0', LENGTH(CONVERT(`a` USING utf8mb4)), ':', CONVERT(`a` USING utf8mb4)), '1')")
+        #expect(sql.rowHash.hasPrefix("CAST(CONV(LEFT(MD5(CONCAT(IFNULL(CONCAT('0', LENGTH(`i``d`), ':', `i``d`), '1'), "))
+        #expect(sql.rowHash.contains("MD5(CONVERT(`doc` USING utf8mb4))") && sql.rowHash.contains("MD5(`img`)")
+                    && sql.rowHash.contains("(`flags` + 0)"))
+        #expect(sql.rowHash.hasSuffix(")), 16), 16, 10) AS UNSIGNED)"))
+        #expect(sql.checksum(after: nil, upTo: nil).hasPrefix("SELECT COUNT(*), SUM(CAST(CONV(LEFT(MD5(CONCAT("))
+        #expect(sql.checksum(after: nil, upTo: nil).hasSuffix(" FROM `d``b`.`t``; --` WHERE (\nx > 1 -- note\n)"))
+        #expect(sql.boundary(after: [Array("10".utf8)], upTo: nil, rows: 1_000)
+                == "SELECT `i``d` FROM `d``b`.`t``; --` WHERE (\nx > 1 -- note\n) AND `i``d` > 10 ORDER BY `i``d` LIMIT 1 OFFSET 999")
+    }
+
+    @Test func compositeKeysWalkInKeyOrder() {
+        let key = [ReconColumn(name: "a", kind: .integer), ReconColumn(name: "b", kind: .text),
+                   ReconColumn(name: "c", kind: .binary)]
+        let sql = ReconTableSQL(database: "d", table: "t", key: key, columns: key, filter: "", noBackslashEscapes: false)
+        let low = [Array("1".utf8), Array("x'".utf8), [0, 255]], high = [Array("2".utf8), Array("y".utf8), [1]]
+        #expect(sql.conditions(after: low, upTo: high)
+                == " WHERE (`a` > 1 OR (`a` = 1 AND (`b` > 'x\\'' OR (`b` = 'x\\'' AND `c` > X'00FF'))))"
+                    + " AND (`a` < 2 OR (`a` = 2 AND (`b` < 'y' OR (`b` = 'y' AND `c` <= X'01'))))")
+        #expect(sql.rows(keys: [low, high]).hasSuffix(" WHERE (`a` = 1 AND `b` = 'x\\'' AND `c` = X'00FF') OR (`a` = 2 AND `b` = 'y' AND `c` = X'01')"))
+    }
+
+    @Test func literalsAreQuotedSafely() {
+        for value in Hostile.values {
+            let bytes = Array(value.utf8)
+            #expect(ReconTableSQL.literal(bytes, .text, noBackslashEscapes: false) == SQLQuote.string(value))
+            #expect(ReconTableSQL.literal(bytes, .json, noBackslashEscapes: true) == SQLQuote.string(value, noBackslashEscapes: true))
+            #expect(ReconTableSQL.literal(bytes, .integer, noBackslashEscapes: false) == SQLQuote.string(value)
+                        || ReconTableSQL.isNumber(value))
+            #expect(ReconTableSQL.literal(bytes, .blob, noBackslashEscapes: false) == SQLQuote.hex(bytes))
+        }
+        #expect(ReconTableSQL.literal(nil, .text, noBackslashEscapes: false) == "NULL")
+        #expect(ReconTableSQL.literal(Array("18446744073709551615".utf8), .integer, noBackslashEscapes: false)
+                == "18446744073709551615")
+        #expect(ReconTableSQL.literal(Array("-1.5e-3".utf8), .float, noBackslashEscapes: false) == "-1.5e-3")
+        #expect(ReconTableSQL.literal(Array("1; DROP TABLE t".utf8), .decimal, noBackslashEscapes: false)
+                == "'1; DROP TABLE t'")
+        #expect(ReconTableSQL.literal([0x01, 0x05], .bit, noBackslashEscapes: false) == "b'100000101'")
+        for text in ["1", "-1", "+2.5", ".5", "5.", "1e10", "1E-3"] { #expect(ReconTableSQL.isNumber(text), "\(text)") }
+        for text in ["", "-", ".", "e5", "1e", "0x10", "1 ", "1,5", "١"] { #expect(!ReconTableSQL.isNumber(text), "\(text)") }
+    }
+
+    @Test func valuesCompareAsValuesWhereServersWriteThemDifferently() {
+        func same(_ a: String?, _ b: String?, _ kind: ReconColumn.Kind) -> Bool {
+            ReconTableSQL.same(a.map { Array($0.utf8) }, b.map { Array($0.utf8) }, kind)
+        }
+        #expect(same("0.1", "0.10", .float) && same("1e300", "1E+300", .float) && !same("0.1", "0.2", .float))
+        #expect(same("1.50", "1.5", .decimal) && same("007", "7", .integer) && !same("1.5", "1.51", .decimal))
+        #expect(same(#"{"a": 1, "b": [true, null]}"#, #"{"b":[true,null],"a":1}"#, .json))
+        #expect(!same(#"{"a": 1}"#, #"{"a": "1"}"#, .json))
+        #expect(!same("a", "A", .text) && !same("a", "a ", .text) && !same("", nil, .text) && same(nil, nil, .text))
+        #expect(!same("2026-01-01 00:00:00", "2026-01-01 00:00:00.000", .temporal))
+    }
+
+    /// A row two servers put in different chunks (their key collations order differently) still meets its other half,
+    /// and only rows whose hashes differ are compared further.
+    @Test func tallyMatchesRowsAcrossChunks() {
+        var tally = ReconTally()
+        func key(_ text: String) -> [[UInt8]] { [Array(text.utf8)] }
+        let first = tally.add(source: [(key("a"), 1), (key("b"), 2), (key("c"), 3)], target: [(key("a"), 1), (key("b"), 9)])
+        #expect(first == [key("b")])
+        #expect(tally.sourceOnly.keys.sorted { $0[0].lexicographicallyPrecedes($1[0]) } == [key("c")])
+        let second = tally.add(source: [(key("d"), 4)], target: [(key("c"), 3), (key("e"), 5)])
+        #expect(second.isEmpty && tally.sourceOnly.keys.map { $0 } == [key("d")] && tally.targetOnly.keys.map { $0 } == [key("e")])
+        let third = tally.add(source: [(key("e"), 6)], target: [])
+        #expect(third == [key("e")] && tally.count == 1)
+    }
 }
