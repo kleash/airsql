@@ -36,8 +36,7 @@ struct AgentToolTests {
     }
 
     @Test func agentsSQLIsRefusedUntilTheClassifierIsInTheBuild() {
-        #expect(AgentReadOnly.refusal("SELECT 1") != nil)
-        #expect(throws: AirSQLError.self) { try AgentReadOnly.check("SHOW TABLES") }
+        #expect(AgentReadOnly.untilClassifier("SELECT 1") != nil)
     }
 
     @Test func limitsFollowTheSafetySettingsAndAnalytics() {

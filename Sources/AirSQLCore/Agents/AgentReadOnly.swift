@@ -6,9 +6,12 @@ import Foundation
 /// statement timeout (max_execution_time, MariaDB's max_statement_time) and a watchdog that cancels at the timeout.
 /// One agent call at a time per session, so no call's statement runs inside another's transaction.
 public enum AgentReadOnly {
-    /// Why an agent's statement may not run (nil: it may): the read-only classifier's verdict. The SQL core (P0-4)
-    /// isn't in this build yet, so nothing an agent writes may run: this fails closed until the classifier is wired.
-    public static var refusal: (String) -> String? = { _ in
+    /// Why an agent's statement may not run (nil: it may): the read-only classifier's verdict.
+    public static var refusal: (String) -> String? = untilClassifier
+
+    /// The SQL core (P0-4) isn't in this build yet, so nothing an agent writes may run: this fails closed until the
+    /// classifier is wired.
+    static let untilClassifier: (String) -> String? = { _ in
         "Refused: this AirSQL build can't yet prove a statement read-only, so it runs no SQL an agent wrote."
     }
 
