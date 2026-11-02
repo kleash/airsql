@@ -1,0 +1,85 @@
+# AirSQL: notes for Claude (and other coding agents)
+
+AirSQL is a native macOS app (Swift, AppKit; SwiftUI only for Swift Charts; macOS 13.1+) for MySQL and MariaDB:
+connections over every route (direct, SSH tunnel, jump hosts, proxies, each ending in a private Unix socket), a SQL
+console, a custom data grid with safe editing, schema tools, client tools, compare and reconcile, Liquibase, and agent
+access over MCP behind a gate that fails closed. It is in development (0.1.0). It follows AirSCP (`../porter`, Apache
+2.0, same author): ported files keep AirSCP's type names and a first line naming the AirSCP file and version.
+
+The source of truth is [docs/dev/plan.md](docs/dev/plan.md): architecture, phases and lanes, and these rules in full.
+Also `docs/dev/grid-spec.md` (the grid), `docs/dev/mockups.html` (the look: themes Porcelain and Deep Water),
+`docs/dev/scope.html` (every feature row, in its `GROUPS` array) and `docs/dev/research.md`.
+
+## Rules for every change
+
+- **Simplicity first**: the smallest change that solves the problem; no speculative abstractions, no new layers or
+  settings unless a scope row needs them. Read the surrounding code (and AirSCP's) and follow its patterns; comments
+  say why, not what.
+- **Toolchain**: Command Line Tools only (no Xcode project), Swift 5 language mode, code that compiles with Swift 5.9+,
+  deployment target macOS 13.1, universal (arm64 + x86_64), built with the macOS 26 SDK (`build.sh` picks it, as CI
+  does). No third-party Swift packages. Nothing from Homebrew in the build or the app. The one C dependency is MariaDB
+  Connector/C with OpenSSL, from `scripts/build-mariadb.sh` (pinned, checksummed).
+- **Native feel**: single click selects or shows, double click opens or edits, right click opens the item's menu, on
+  every surface (plan §2.12); ⌘/⇧ multi-select; every action in the menu bar with its shortcut; full keyboard use;
+  **no database, network or file work on the main thread**; a busy indicator for anything slow (§2.11); a polished
+  layout with no cut text (§2.13).
+- **The app explains itself**: every control and menu item has a one-line tooltip (verb first, no full stop); disabled
+  items say why; plain words before jargon; empty states say what to do next.
+- **Security defaults**: secrets only in the Keychain, never on a command line, in logs, in agent replies or the SQL
+  log; SQL built only with the quoting helpers; TLS verified against the real server name; restricted login plugins;
+  `LOCAL INFILE` off; multi-statements off; local endpoints are Unix sockets in a private folder, never TCP ports.
+- **Data safety**: nothing is written without Run or Apply; Apply checks affected rows exactly; no silent reconnect;
+  destructive steps are opt-in and marked.
+- **Docs follow the code**: the user page in `docs/`, `Resources/AgentGuide.md` for anything agents reach.
+- **Shared files** (Package.swift, the menu skeleton, the Settings window, shared UI, the docs index) belong to P0 and
+  then to the integrator: a lane lists the changes it wants in its report.
+- **Commits**: short imperative messages that say what the code now does, with the repository's own git identity and
+  no attribution trailers. Never commit build outputs or `vendor/`.
+- **The repository is public** (github.com/kleash/airsql): no secrets, real hostnames, personal paths or e-mail
+  addresses in code, tests, docs, screenshots or commit messages.
+
+## Safety (you are working on someone's own Mac and accounts)
+
+- Never read or write `~/.ssh`: tests use a throwaway SSH folder, as AirSCP's `testenv/AGENT.md` describes. Tests keep
+  passwords in an in-memory store, never the login Keychain.
+- Docker: AirSQL's lab is the Compose project `airsql-lab`. Never stop, recreate or change containers you didn't create
+  (AirSCP's `porter-lab-*`, the old `mysqlmacclient-test-*`); give your own a prefix of yours and remove them when done.
+- Never run the x86_64 slice. Don't install into `~/Applications`. Kill what you start.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `Package.swift` | Targets: `CPTY` (C, from AirSCP: run a program on a pseudo-terminal), `CMariaDB` (module map over libmariadb's headers in `vendor/out`; links it), `AirSQLCore` (no UI), `AirSQL` (the AppKit app), `AirSQLTests` (Swift Testing) |
+| `Sources/AirSQLCore/<Area>/` | Core code by area, e.g. `Driver/` (`MariaDB.swift`: the client library's version) |
+| `Sources/AirSQL/<Area>/` | The app by area; `main.swift` runs helper modes (`--version`) first, then the app |
+| `Tests/AirSQLTests/<Area>Tests.swift` | One suite file per area (`DriverTests.swift`); lab tests need `AIRSQL_LAB=1` |
+| `Resources/` | `AirSQL-Info.plist`; `Licenses/` (copied into the app with `NOTICE`) |
+| `scripts/build-mariadb.sh` | libmariadb: Connector/C 3.4 over a static OpenSSL, universal, install name `@rpath/libmariadb.3.dylib` |
+| `docs/dev/` | The plan, grid spec, mockups, scope and research |
+
+## Build and test (on a Mac)
+
+```sh
+./build.sh --native      # build/AirSQL.app for this Mac (./build.sh = universal): libmariadb in Contents/Frameworks,
+                         # everything signed ad hoc inside out, then codesign --verify --deep --strict
+swift build              # debug build: must have 0 warnings (run the app from build/AirSQL.app, where libmariadb is)
+./test.sh                # Swift Testing (needs Swift 6); extra args go to swift test: ./test.sh --filter DriverTests
+AIRSQL_LAB=1 ./test.sh   # + the lab suites (starts the lab: testenv/up.sh)
+```
+
+libmariadb comes from a vendor cache outside the repository: `scripts/build-mariadb.sh` keeps its output in
+`$AIRSQL_VENDOR_CACHE/<SHA-256 of the script>` (default `../airsql-vendor-cache`, shared by every worktree) and copies
+it into `vendor/out`; `build.sh` and `test.sh` run it when `vendor/out/stamp` isn't the script's SHA-256. A changed
+script (a version, an option) builds once more, in about two minutes.
+
+Gates for a change: `swift build` 0 warnings; `./test.sh` green; the lab suites when the change can affect them;
+`./build.sh` with its signature check; a launch of the built app in light and dark.
+
+## CI
+
+`.github/workflows/ci.yml` (macos-26, Command Line Tools with the macOS 26 SDK; the tests with Xcode 26's toolchain,
+whose Swift Testing has its macro plugin): libmariadb (cached by the script's hash), `swift build` without warnings,
+`./test.sh`, `./build.sh` (universal), then the signature and `AirSQL --version` from the bundle. `codeql.yml` scans
+the Swift and C code; `security.yml` runs gitleaks over the whole history (`.gitleaks.toml`). Follow a run with
+`gh run watch`, read a failure with `gh run view <id> --log-failed`.
