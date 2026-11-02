@@ -236,7 +236,8 @@ public final class DBConnection: @unchecked Sendable {
         try await worker.perform { [self] in try reconnectHere() }
     }
 
-    /// Closes the session. A statement still running is broken off (the server stops it and rolls back).
+    /// Closes the session for good (a new one is a new `DBConnection`). A statement still running is broken off: the
+    /// server stops it and rolls back.
     public func close() async {
         state.locked {
             if running != nil, let mysql { mariadb_cancel(mysql) }
@@ -610,8 +611,12 @@ public final class DBConnection: @unchecked Sendable {
     }
 
     private func reconnectHere() throws -> Reconnected {
+        // Kept as `lost` until the new session is up, so a failed attempt can be tried again with the same report.
         let before: (threadID: UInt64, lockName: String?, inTransaction: Bool)? = state.locked {
-            lost ?? _server.map { ($0.threadID, lockName, serverStatus & UInt32(SERVER_STATUS_IN_TRANS) != 0) }
+            if lost == nil, let server = _server, mysql != nil {
+                lost = (server.threadID, lockName, serverStatus & UInt32(SERVER_STATUS_IN_TRANS) != 0)
+            }
+            return lost
         }
         closeHere()
         let server = try connectHere()
