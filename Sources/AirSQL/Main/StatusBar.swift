@@ -151,8 +151,6 @@ final class StatusItemView: NSView {
         if on { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
     }
 
-    func setChipStyle(_ style: ChipView.Style) { chip?.style = style }
-
     override func mouseDown(with event: NSEvent) {
         guard event.clickCount == 1 else { return }
         showPopover()

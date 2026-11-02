@@ -89,8 +89,6 @@ final class SettingsWindowController: NSWindowController {
     func show(_ pane: SettingsPane) {
         tabs.selectedTabViewItemIndex = SettingsPane.allCases.firstIndex(of: pane) ?? 0
     }
-
-    var shownPane: SettingsPane { SettingsPane.allCases[max(0, tabs.selectedTabViewItemIndex)] }
 }
 
 /// A Settings pane: a form of controls bound to `model.data.settings`, 560 points wide, with its "?" button.

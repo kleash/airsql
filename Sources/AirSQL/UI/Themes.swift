@@ -259,10 +259,9 @@ final class ChipView: NSView {
     enum Style { case tinted(NSColor), accent, neutral }
 
     let label = NSTextField(labelWithString: "")
-    private let dot = DotView(diameter: 6)
     var style: Style { didSet { needsDisplay = true; updateColors() } }
 
-    init(_ text: String, style: Style, dot: NSColor? = nil) {
+    init(_ text: String, style: Style) {
         self.style = style
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
@@ -271,15 +270,11 @@ final class ChipView: NSView {
         label.lineBreakMode = .byTruncatingTail
         label.translatesAutoresizingMaskIntoConstraints = false
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        self.dot.color = dot
-        let stack = NSStackView(views: [self.dot, label])
-        stack.spacing = 5
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
+        addSubview(label)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -9),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -9),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
             heightAnchor.constraint(equalToConstant: 18),
         ])
         updateColors()
@@ -291,8 +286,6 @@ final class ChipView: NSView {
         get { label.stringValue }
         set { label.stringValue = newValue }
     }
-
-    func setDot(_ color: NSColor?) { dot.color = color }
 
     private func updateColors() {
         switch style {
