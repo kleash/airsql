@@ -76,13 +76,13 @@ final class Recorder<Item> {
 /// Polls until `condition` holds or `timeout` passes. 120 s: what holds at once on an idle Mac took tens of seconds on
 /// CI's three-core runners under the whole suite (whose main queue stalls there for a minute at times), and over a
 /// minute on a Mac with twice as many busy threads as cores. Only a failing test waits that long.
-func eventually(timeout: TimeInterval = 120, _ condition: () async -> Bool) async -> Bool {
+func eventually(timeout: TimeInterval = 120, _ condition: () async throws -> Bool) async rethrows -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
-        if await condition() { return true }
+        if try await condition() { return true }
         try? await Task.sleep(nanoseconds: 50_000_000)
     }
-    return await condition()
+    return try await condition()
 }
 
 /// A throwaway sshd on 127.0.0.1, run as this user with its own config, host key, authorized_keys and HOME (all in a

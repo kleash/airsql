@@ -3,44 +3,30 @@ import Foundation
 import Testing
 @testable import AirSQLCore
 
-/// The servers the driver's lab tests use (AIRSQL_LAB=1), each as host:port in an environment variable:
-/// - AIRSQL_LAB_MARIADB: MariaDB 11.8 with TLS (a certificate for AIRSQL_LAB_TLS_NAME, default db.airsql.test, signed
-///   by the CA in AIRSQL_LAB_CA) and the accounts airsql (mysql_native_password, all privileges), native
-///   (mysql_native_password) and ed (ed25519);
-/// - AIRSQL_LAB_MYSQL: MySQL 8.4 the same way (--mysql-native-password=ON), with airsql (caching_sha2_password, all
-///   privileges), native (mysql_native_password) and sha2 (caching_sha2_password);
-/// - AIRSQL_LAB_WRONGNAME: a server whose certificate, signed by the same CA, is for another name.
-/// The passwords are the lab's throwaway ones below. A test whose server isn't configured is skipped.
+/// The lab servers the driver's tests use (AIRSQL_LAB=1; testenv/, Support/Lab.swift): MariaDB 11.8 and MySQL 8.4 on
+/// their own ports, and through the bastion `secure` and `wrongname`, whose certificates come from the lab CA (for the
+/// names "secure" and elsewhere.invalid).
 enum DBLab {
-    static let enabled = ProcessInfo.processInfo.environment["AIRSQL_LAB"] == "1"
-    static let passwords = ["airsql": "airsql-lab", "native": "native-lab", "sha2": "sha2-lab", "ed": "ed-lab"]
+    static func server(_ flavor: String) -> Lab.Server { flavor == "mariadb" ? Lab.mariadb118 : Lab.mysql84 }
 
-    static func server(_ variable: String) -> (host: String, port: Int)? {
-        guard let value = ProcessInfo.processInfo.environment[variable], let colon = value.lastIndex(of: ":"),
-              let port = Int(value[value.index(after: colon)...]) else { return nil }
-        return (String(value[..<colon]), port)
-    }
-
-    static var mariadb: (host: String, port: Int)? { server("AIRSQL_LAB_MARIADB") }
-    static var mysql: (host: String, port: Int)? { server("AIRSQL_LAB_MYSQL") }
-    static var wrongName: (host: String, port: Int)? { server("AIRSQL_LAB_WRONGNAME") }
-    static var caFile: String? { ProcessInfo.processInfo.environment["AIRSQL_LAB_CA"] }
-    static var tlsName: String { ProcessInfo.processInfo.environment["AIRSQL_LAB_TLS_NAME"] ?? "db.airsql.test" }
-
-    static func options(_ server: (host: String, port: Int), user: String = "airsql", tls: TLSOptions = TLSOptions(mode: .off))
+    static func options(_ server: Lab.Server, _ login: Lab.Login = Lab.airsql, tls: TLSOptions = TLSOptions(mode: .off))
         -> ConnectOptions {
-        ConnectOptions(name: "Lab", host: server.host, port: server.port, user: user, password: passwords[user] ?? "", tls: tls)
+        ConnectOptions(name: "Lab", host: "127.0.0.1", port: server.port ?? 3306, user: login.user, password: login.password,
+                       tls: tls)
     }
 
-    /// Through `relay`, as through an SSH tunnel: the driver connects to its socket and checks TLS against `host`.
-    static func routed(_ relay: Relay, user: String = "airsql", host: String = tlsName, tls: TLSOptions) -> ConnectOptions {
-        ConnectOptions(name: "Lab", host: host, port: relay.port, endpoint: .route(relay.path), user: user,
-                       password: passwords[user] ?? "", tls: tls)
+    /// Through `socket` (a forward through the bastion, or a Relay), as through an SSH tunnel: the driver checks TLS
+    /// against `host`.
+    static func routed(_ socket: String, host: String, _ login: Lab.Login = Lab.airsql, tls: TLSOptions) -> ConnectOptions {
+        ConnectOptions(name: "Lab", host: host, port: 3306, endpoint: .route(socket), user: login.user,
+                       password: login.password, tls: tls)
     }
 
-    static var verified: TLSOptions { TLSOptions(mode: .verifyIdentity, caFile: caFile) }
-    /// For TCP straight to the lab's address, which isn't the name in its certificates.
-    static var encrypted: TLSOptions { TLSOptions(mode: .verifyCA, caFile: caFile) }
+    static var verified: TLSOptions { TLSOptions(mode: .verifyIdentity, caFile: Lab.caFile) }
+    /// The lab CA without a name check (wrongname's certificate is for another name).
+    static var encrypted: TLSOptions { TLSOptions(mode: .verifyCA, caFile: Lab.caFile) }
+    /// The direct servers' own self-signed certificates: encryption only.
+    static var required: TLSOptions { TLSOptions(mode: .required) }
 
     /// The numbers 0 ..< 10^power (id, and a label "row-<id>"; power 6 or 9), made as they are sent: from a recursive
     /// CTE joined with itself where the server has them, else (MySQL 5.7) from a ten-row derived table joined with
@@ -62,13 +48,13 @@ enum DBLab {
         .appendingPathComponent("airsql-lab-\(getpid())/SQL.log"))
 }
 
-/// A route's end for tests: a private Unix socket whose connections are piped to a TCP server, as an SSH tunnel's would
-/// be. `cut()` drops this Mac's side of every connection and leaves the server's side open: a network gone without a
-/// word, which the server doesn't notice. The threads own the sockets (each pair is closed by the last of its two pumps,
-/// the listener by its accept loop), so no socket number is closed under a thread that still uses it.
+/// A route's end that a test can drop (Lab.forward is a real one, through the bastion): a private Unix socket whose
+/// connections are piped to a TCP server, as an SSH tunnel's would be. `cut()` drops this Mac's side of every
+/// connection and leaves the server's side open: a network gone without a word, which the server doesn't notice. The
+/// threads own the sockets (each pair is closed by the last of its two pumps, the listener by its accept loop), so no
+/// socket number is closed under a thread that still uses it.
 final class Relay {
     let path: String
-    let port: Int
     private let dir: URL
     private let control = Control()
 
@@ -103,7 +89,6 @@ final class Relay {
     }
 
     init(to server: (host: String, port: Int)) throws {
-        port = server.port
         dir = FileManager.default.temporaryDirectory.appendingPathComponent("airsql-relay-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         path = dir.appendingPathComponent("db.sock").path
@@ -198,16 +183,6 @@ final class Relay {
     }
 }
 
-/// Waits for `condition` (polling), at most `seconds`.
-func waitUntil(_ seconds: Double = 10, _ condition: () async throws -> Bool) async rethrows -> Bool {
-    let deadline = Date().addingTimeInterval(seconds)
-    while Date() < deadline {
-        if try await condition() { return true }
-        try? await Task.sleep(nanoseconds: 50_000_000)
-    }
-    return try await condition()
-}
-
 func kind(of body: () async throws -> Any) async -> AirSQLError.Kind? {
     do {
         _ = try await body()
@@ -219,7 +194,7 @@ func kind(of body: () async throws -> Any) async -> AirSQLError.Kind? {
     }
 }
 
-@Suite(.serialized, .enabled(if: DBLab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+@Suite(.serialized, .enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
 struct DBLabTests {
     let log = DBLab.log
 
@@ -234,21 +209,22 @@ struct DBLabTests {
     }
 
     @Test func logsInWithEveryMethod() async throws {
-        let mariadb = try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB"), mysql = try #require(DBLab.mysql, "AIRSQL_LAB_MYSQL")
         // Empty caching_sha2's cache, so its logins take the full path (RSA without TLS, the password inside TLS).
-        let admin = try await connected(DBLab.options(mysql))
+        let admin = try await connected(DBLab.options(Lab.mysql84))
         _ = try await admin.query("FLUSH PRIVILEGES")
         await admin.close()
-        for (server, user) in [(mariadb, "native"), (mariadb, "ed"), (mysql, "native"), (mysql, "sha2")] {
-            let session = try await connected(DBLab.options(server, user: user))
-            #expect(try await value(session, "SELECT CURRENT_USER()") == "\(user)@%")
+        for (server, login) in [(Lab.mariadb118, Lab.native), (Lab.mariadb118, Lab.ed25519), (Lab.mysql84, Lab.native),
+                                (Lab.mysql84, Lab.sha2)] {
+            let session = try await connected(DBLab.options(server, login))
+            #expect(try await value(session, "SELECT CURRENT_USER()") == "\(login.user)@%")
             await session.close()
         }
-        let relay = try Relay(to: mysql)
-        let admin2 = try await connected(DBLab.options(mysql))
+        let forward = try await Lab.forward(to: Lab.wrongName)
+        defer { forward.close() }
+        let admin2 = try await connected(DBLab.routed(forward.socket, host: "wrongname", tls: DBLab.encrypted))
         _ = try await admin2.query("FLUSH PRIVILEGES")
         await admin2.close()
-        let overTLS = try await connected(DBLab.routed(relay, user: "sha2", tls: DBLab.verified))
+        let overTLS = try await connected(DBLab.routed(forward.socket, host: "wrongname", Lab.sha2, tls: DBLab.encrypted))
         #expect(try await value(overTLS, "SELECT CURRENT_USER()") == "sha2@%")
         #expect(overTLS.server?.tls?.hasPrefix("TLSv1.") == true)
         await overTLS.close()
@@ -257,8 +233,10 @@ struct DBLabTests {
     /// Through a route without TLS caching_sha2_password would send the password as plain text on the route's last hop:
     /// refused before any of it is sent. mysql_native_password still logs in that way.
     @Test func routesWithoutTLSRefuseCleartextLogins() async throws {
-        let relay = try Relay(to: try #require(DBLab.mysql, "AIRSQL_LAB_MYSQL"))
-        let refused = DBConnection(options: DBLab.routed(relay, user: "sha2", tls: TLSOptions(mode: .off)), role: .main, log: log)
+        let forward = try await Lab.forward(to: Lab.wrongName)
+        defer { forward.close() }
+        let refused = DBConnection(options: DBLab.routed(forward.socket, host: "wrongname", Lab.sha2, tls: TLSOptions(mode: .off)),
+                                   role: .main, log: log)
         do {
             try await refused.connect()
             Issue.record("caching_sha2_password logged in through a route without TLS")
@@ -266,21 +244,24 @@ struct DBLabTests {
             #expect(error.kind == .loginMethodNotAllowed)
             #expect(error.message.contains("Turn on TLS"))
         }
-        let native = try await connected(DBLab.routed(relay, user: "native", tls: TLSOptions(mode: .off)))
+        let native = try await connected(DBLab.routed(forward.socket, host: "wrongname", Lab.native, tls: TLSOptions(mode: .off)))
         #expect(try await value(native, "SELECT CURRENT_USER()") == "native@%")
         await native.close()
 
-        var pam = DBLab.routed(relay, user: "native", tls: TLSOptions(mode: .required))
+        var pam = DBLab.routed(forward.socket, host: "wrongname", Lab.native, tls: TLSOptions(mode: .required))
         pam.cleartextLogin = true
         #expect(await kind { try await DBConnection(options: pam, role: .main, log: log).connect() } == .loginMethodNotAllowed)
     }
 
+    /// Through the bastion, as through any tunnel, the certificate is checked against the name typed, never the
+    /// tunnel's local end.
     @Test func tlsChecksTheRealHostName() async throws {
-        let mariadb = try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")
-        let wrongName = try #require(DBLab.wrongName, "AIRSQL_LAB_WRONGNAME")
-        let relay = try Relay(to: mariadb), wrongRelay = try Relay(to: wrongName)
-
-        let right = try await connected(DBLab.routed(relay, tls: DBLab.verified))
+        let secure = try await Lab.forward(to: Lab.secure), wrongName = try await Lab.forward(to: Lab.wrongName)
+        defer {
+            secure.close()
+            wrongName.close()
+        }
+        let right = try await connected(DBLab.routed(secure.socket, host: "secure", tls: DBLab.verified))
         #expect(right.server?.certificate?.fingerprint.count == 95)
         #expect(right.server?.tls != nil)
         await right.close()
@@ -294,9 +275,9 @@ struct DBLabTests {
             }
         }
         // Another name than the certificate's, the server with the wrong-name certificate, and the address connected to.
-        for options in [DBLab.routed(relay, host: "other.airsql.test", tls: DBLab.verified),
-                        DBLab.routed(wrongRelay, tls: DBLab.verified),
-                        DBLab.options(mariadb, tls: DBLab.verified)] {
+        for options in [DBLab.routed(secure.socket, host: "other.airsql.test", tls: DBLab.verified),
+                        DBLab.routed(wrongName.socket, host: "wrongname", tls: DBLab.verified),
+                        DBLab.routed(secure.socket, host: "127.0.0.1", tls: DBLab.verified)] {
             let error = await failure(options)
             guard case .untrustedCertificate? = error?.kind else {
                 Issue.record("expected an untrusted certificate for \(options.host), got \(String(describing: error))")
@@ -305,23 +286,22 @@ struct DBLabTests {
             #expect(error?.message.contains("not for “\(options.host)”") == true, "\(String(describing: error?.message))")
         }
         // Without the CA: not trusted, and the fingerprint to pin comes with the error.
-        let untrusted = await failure(DBLab.routed(relay, tls: TLSOptions(mode: .verifyIdentity)))
+        let untrusted = await failure(DBLab.routed(secure.socket, host: "secure", tls: TLSOptions(mode: .verifyIdentity)))
         guard case .untrustedCertificate(let certificate)? = untrusted?.kind else {
             Issue.record("expected an untrusted certificate, got \(String(describing: untrusted))")
             return
         }
-        let pinned = try await connected(DBLab.options(mariadb, tls: TLSOptions(mode: .verifyIdentity,
-                                                                                pinnedFingerprint: certificate.fingerprint)))
+        let pin = TLSOptions(mode: .verifyIdentity, pinnedFingerprint: certificate.fingerprint)
+        let pinned = try await connected(DBLab.routed(secure.socket, host: "127.0.0.1", tls: pin))
         await pinned.close()
-        let changed = await failure(DBLab.routed(wrongRelay, tls: TLSOptions(mode: .verifyIdentity,
-                                                                            pinnedFingerprint: certificate.fingerprint)))
+        let changed = await failure(DBLab.routed(wrongName.socket, host: "wrongname", tls: pin))
         guard case .certificateChanged? = changed?.kind else {
             Issue.record("expected a changed certificate, got \(String(describing: changed))")
             return
         }
         // The CA but no name; encryption only.
-        for tls in [TLSOptions(mode: .verifyCA, caFile: DBLab.caFile), TLSOptions(mode: .required)] {
-            let session = try await connected(DBLab.routed(wrongRelay, tls: tls))
+        for tls in [DBLab.encrypted, DBLab.required] {
+            let session = try await connected(DBLab.routed(wrongName.socket, host: "wrongname", tls: tls))
             #expect(session.server?.tls != nil)
             await session.close()
         }
@@ -330,8 +310,8 @@ struct DBLabTests {
     /// Cancel stops this session's statement and nothing else: another session's statement on the same server runs on.
     @Test(arguments: ["mariadb", "mysql"])
     func cancelStopsOnlyItsOwnStatement(_ flavor: String) async throws {
-        let server = try #require(flavor == "mariadb" ? DBLab.mariadb : DBLab.mysql, "AIRSQL_LAB_\(flavor.uppercased())")
-        let options = flavor == "mysql" ? DBLab.options(server, user: "native") : DBLab.options(server)
+        let server = DBLab.server(flavor)
+        let options = flavor == "mysql" ? DBLab.options(server, Lab.native) : DBLab.options(server)
         let a = try await connected(options), b = try await connected(options)
         #expect(try await a.cancel() == .notRunning)
 
@@ -339,7 +319,7 @@ struct DBLabTests {
         let other = Task { try await b.query("SELECT SLEEP(3)") }
         let start = Date()
         var result = CancelResult.notRunning
-        _ = try await waitUntil(5) {
+        _ = try await eventually(timeout: 5) {
             if a.isBusy { result = try await a.cancel() }
             return result != .notRunning
         }
@@ -355,8 +335,8 @@ struct DBLabTests {
 
     @Test(arguments: ["mariadb", "mysql"])
     func readsAMillionRowsAndStopsAtTheCap(_ flavor: String) async throws {
-        let server = try #require(flavor == "mariadb" ? DBLab.mariadb : DBLab.mysql, "AIRSQL_LAB_\(flavor.uppercased())")
-        let session = try await connected(flavor == "mysql" ? DBLab.options(server, user: "native") : DBLab.options(server))
+        let server = DBLab.server(flavor)
+        let session = try await connected(flavor == "mysql" ? DBLab.options(server, Lab.native) : DBLab.options(server))
         let all = try #require(try await session.query(DBLab.numbers(6, on: session.server), rowCap: 2_000_000).first?.rows)
         #expect(all.rowCount == 1_000_000 && !all.capped)
         #expect(all.string(999_999, 1)?.hasPrefix("row-") == true)
@@ -373,7 +353,7 @@ struct DBLabTests {
 
     /// Export all's way: every row in batches, none kept; a reader that gives up stops the statement on the server.
     @Test func streamsRowsInBatches() async throws {
-        let session = try await connected(DBLab.options(try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")))
+        let session = try await connected(DBLab.options(Lab.mariadb118))
         var total = 0, batches = 0, largest = 0
         try await session.stream(DBLab.numbers(6, on: session.server), batchRows: 50_000) { batch in
             total += batch.rowCount
@@ -400,8 +380,8 @@ struct DBLabTests {
 
     @Test(arguments: ["mariadb", "mysql"])
     func hostileValuesAndNamesRoundTrip(_ flavor: String) async throws {
-        let server = try #require(flavor == "mariadb" ? DBLab.mariadb : DBLab.mysql, "AIRSQL_LAB_\(flavor.uppercased())")
-        let session = try await connected(DBLab.options(server, tls: DBLab.encrypted))
+        let server = DBLab.server(flavor)
+        let session = try await connected(DBLab.options(server, tls: DBLab.required))
         for noBackslashEscapes in [false, true] {
             if noBackslashEscapes { _ = try await session.query("SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@sql_mode, ''), 'NO_BACKSLASH_ESCAPES')") }
             #expect(session.noBackslashEscapes == noBackslashEscapes)
@@ -437,10 +417,11 @@ struct DBLabTests {
     /// transaction is gone and kills the old session the server still had.
     @Test(arguments: ["mariadb", "mysql"])
     func reconnectIsExplicitAndCleansUp(_ flavor: String) async throws {
-        let server = try #require(flavor == "mariadb" ? DBLab.mariadb : DBLab.mysql, "AIRSQL_LAB_\(flavor.uppercased())")
-        let relay = try Relay(to: server)
+        let server = DBLab.server(flavor)
+        let relay = try Relay(to: ("127.0.0.1", server.port ?? 3306))
         // MySQL's airsql logs in with caching_sha2_password: TLS through the route.
-        let session = try await connected(DBLab.routed(relay, tls: flavor == "mysql" ? DBLab.verified : TLSOptions(mode: .off)))
+        let session = try await connected(DBLab.routed(relay.path, host: "127.0.0.1",
+                                                        tls: flavor == "mysql" ? DBLab.required : TLSOptions(mode: .off)))
         let old = try #require(session.server?.threadID)
         _ = try await session.query("START TRANSACTION")
         #expect(session.inTransaction && session.transactionStarted != nil)
@@ -454,7 +435,7 @@ struct DBLabTests {
         #expect(report.rolledBack && report.killedOldSession)
         #expect(report.server.threadID != old)
         #expect(!session.inTransaction)
-        #expect(try await waitUntil {
+        #expect(try await eventually {
             try await value(session, "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID = \(old)") == "0"
         })
         await session.close()
@@ -464,7 +445,7 @@ struct DBLabTests {
     /// connect), the agent's read-only, tools sessions of their own, and Disconnect closing them all and forgetting the
     /// password.
     @Test func connectionOwnsItsSessions() async throws {
-        let connection = Connection(options: DBLab.options(try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")), log: log)
+        let connection = Connection(options: DBLab.options(Lab.mariadb118), log: log)
         let server = try await connection.connect()
         async let first = connection.session(.data)
         async let second = connection.session(.data)
@@ -486,11 +467,10 @@ struct DBLabTests {
     }
 
     @Test func logsTagsAndMasksLiveStatements() async throws {
-        let mariadb = try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("airsql-lablog-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let log = SQLLog(fileURL: dir.appendingPathComponent("SQL.log"))
-        var options = DBLab.options(mariadb)
+        var options = DBLab.options(Lab.mariadb118)
         options.startupSQL = ["SET @startup = 'do-not-log-me'"]
         options.timeZone = "+05:30"
         options.compress = true
@@ -516,8 +496,8 @@ struct DBLabTests {
     /// all their result sets, and a read-only session can't write.
     @Test(arguments: ["mariadb", "mysql"])
     func statementRules(_ flavor: String) async throws {
-        let server = try #require(flavor == "mariadb" ? DBLab.mariadb : DBLab.mysql, "AIRSQL_LAB_\(flavor.uppercased())")
-        let session = try await connected(DBLab.options(server, tls: DBLab.encrypted))
+        let server = DBLab.server(flavor)
+        let session = try await connected(DBLab.options(server, tls: DBLab.required))
         let database = SQLQuote.identifier("lane_p0_2_rules_\(flavor)")
         _ = try await session.query("DROP DATABASE IF EXISTS \(database)")
         _ = try await session.query("CREATE DATABASE \(database)")
@@ -536,7 +516,7 @@ struct DBLabTests {
         #expect(results.first?.rows?.string(0, 0) == "1" && results.dropFirst().first?.rows?.columns.count == 2)
         #expect(results.last?.rows == nil)
 
-        var readOnly = DBLab.options(server, tls: DBLab.encrypted)
+        var readOnly = DBLab.options(server, tls: DBLab.required)
         readOnly.readOnly = true
         let reader = try await connected(readOnly, role: .agent)
         #expect(await kind { try await reader.query("INSERT INTO \(database).t VALUES (4, 'no')") } == .readOnly)
