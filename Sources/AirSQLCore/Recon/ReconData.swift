@@ -1,13 +1,15 @@
 import Foundation
 
 /// Compares one table's rows on two sessions (`ReconTableSQL` explains the hashing). It walks the source's key in
-/// chunks of `chunkRows` rows; each server sums its chunk up (COUNT and SUM of row hashes) and only a chunk that
-/// differs comes over the network, first as each row's key and hash, then, for the keys whose hashes differ or that one
-/// side lacks, as whole rows, which are compared value by value here. A differing chunk much bigger on one side (rows
-/// past the source's last key, say) is split on that side's keys first.
+/// chunks of `chunkRows` rows; each server sums its chunk up (COUNT and SUM of row hashes). A chunk that differs is
+/// split into about ten smaller ones on the keys of the side with more rows there, recursively, down to `leafRows`
+/// rows; only those come over the network, first as each row's key and hash, then, for the keys whose hashes differ or
+/// that one side lacks, as whole rows, which are compared value by value here.
 final class ReconDataCompare {
     /// Rows per chunk: one index range scan of this many rows per side per chunk.
     static let chunkRows = 10_000
+    /// A differing chunk is split until it has no more rows than this on either side; then its rows' hashes are read.
+    static let leafRows = 1_000
     /// More differing rows than this and the table is reported as having too many differences to list.
     static let maxDifferences = 100_000
     /// Keys looked up per statement when fetching whole rows.
@@ -56,10 +58,12 @@ final class ReconDataCompare {
         do {
             var after: [[UInt8]]?
             repeat {
-                let upTo = rangeable ? try await boundary(source, sourceSQL, after: after, upTo: nil) : nil
+                let upTo = rangeable ? try await boundary(source, sourceSQL, after: after, upTo: nil, rows: Self.chunkRows)
+                    : nil
                 let (sourceCount, targetCount) = try await compare(after: after, upTo: upTo)
                 data.sourceRows += sourceCount
                 data.targetRows += targetCount
+                checked += max(sourceCount, targetCount)
                 chunk += 1
                 progress(Progress(chunk: chunk, chunks: max(chunks, chunk), rowsChecked: checked, rowsFetched: fetched))
                 after = upTo
@@ -94,13 +98,14 @@ final class ReconDataCompare {
         async let left = checksum(source, sourceSQL, after: after, upTo: upTo)
         async let right = checksum(target, targetSQL, after: after, upTo: upTo)
         let (a, b) = try await (left, right)
-        checked += max(a.count, b.count)
         if a == b { return (a.count, b.count) }
-        if rangeable, max(a.count, b.count) > 2 * Self.chunkRows {
+        let most = max(a.count, b.count)
+        if rangeable, most > Self.leafRows {
             let (session, sql) = a.count >= b.count ? (source, sourceSQL) : (target, targetSQL)
+            let rows = max(Self.leafRows, most / 10)
             var from = after
             while true {
-                let to = try await boundary(session, sql, after: from, upTo: upTo)
+                let to = try await boundary(session, sql, after: from, upTo: upTo, rows: rows)
                 _ = try await compare(after: from, upTo: to ?? upTo)
                 guard let to else { break }
                 from = to
@@ -154,10 +159,10 @@ final class ReconDataCompare {
         return Checksum(count: Int(store.string(0, 0) ?? "") ?? 0, sum: store.string(0, 1) ?? "")
     }
 
-    private func boundary(_ session: DBConnection, _ sql: ReconTableSQL, after: [[UInt8]]?,
-                          upTo: [[UInt8]]?) async throws -> [[UInt8]]? {
+    private func boundary(_ session: DBConnection, _ sql: ReconTableSQL, after: [[UInt8]]?, upTo: [[UInt8]]?,
+                          rows: Int) async throws -> [[UInt8]]? {
         try Task.checkCancellation()
-        let store = try await ReconQuery.store(session, sql.boundary(after: after, upTo: upTo, rows: Self.chunkRows))
+        let store = try await ReconQuery.store(session, sql.boundary(after: after, upTo: upTo, rows: rows))
         guard store.rowCount == 1 else { return nil }
         return (0..<sql.key.count).map { store.bytes(0, $0) ?? [] }
     }

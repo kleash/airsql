@@ -105,4 +105,85 @@ struct ReconLabTests {
         try await Self.run(source, ["DROP DATABASE lane_l8a_shop_src"])
         try await Self.run(target, ["DROP DATABASE lane_l8a_shop_dst"])
     }
+
+    /// Values that hash alike under a careless encoding must differ; values each server writes differently but that
+    /// are equal must not.
+    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    func hashesTellEveryDifference(_ server: Lab.Server) async throws {
+        let source = try await Self.session(server), target = try await Self.session(server)
+        defer { Task { await source.close(); await target.close() } }
+        let table = """
+            CREATE TABLE edge (id INT PRIMARY KEY, a VARCHAR(10) NULL, b VARCHAR(10) NULL,
+                c VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL, t TIMESTAMP NULL,
+                bin VARBINARY(10) NULL, bits BIT(8) NULL, j JSON NULL, f DOUBLE NULL)
+            """
+        let keys = "CREATE TABLE keys_ci (k VARCHAR(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci PRIMARY KEY, v INT)"
+        try await Self.database(source, "lane_l8a_edge_src", [table, keys, "SET time_zone = '+00:00'", """
+            INSERT INTO edge (id, a, b, c, t, bin, bits, j, f) VALUES
+                (1, 'ab', 'cd', NULL, NULL, NULL, NULL, NULL, NULL), (2, 'ab', 'c', NULL, NULL, NULL, NULL, NULL, NULL),
+                (3, NULL, 'x', NULL, NULL, NULL, NULL, NULL, NULL), (4, '', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+                (5, 'a', '1:b', NULL, NULL, NULL, NULL, NULL, NULL), (6, NULL, NULL, 'abc', NULL, NULL, NULL, NULL, NULL),
+                (7, NULL, NULL, 'a', NULL, NULL, NULL, NULL, NULL), (8, NULL, NULL, NULL, NULL, X'00', NULL, NULL, NULL),
+                (9, NULL, NULL, NULL, NULL, NULL, b'1', NULL, NULL),
+                (10, 'same', 'same', 'same', NULL, X'FF', b'101', '[1, 2]', 0.1),
+                (11, NULL, NULL, NULL, '2026-01-01 00:00:00', NULL, NULL, NULL, NULL),
+                (12, NULL, NULL, NULL, NULL, NULL, NULL, '{"a": 1, "b": [true, null]}', 1e300)
+            """, "INSERT INTO keys_ci VALUES ('a', 1), ('b', 2)"])
+        try await Self.database(target, "lane_l8a_edge_dst", [table, keys, "SET time_zone = '+02:00'", """
+            INSERT INTO edge (id, a, b, c, t, bin, bits, j, f) VALUES
+                (1, 'cd', 'ab', NULL, NULL, NULL, NULL, NULL, NULL), (2, 'a', 'bc', NULL, NULL, NULL, NULL, NULL, NULL),
+                (3, 'x', NULL, NULL, NULL, NULL, NULL, NULL, NULL), (4, NULL, '', NULL, NULL, NULL, NULL, NULL, NULL),
+                (5, 'a1', ':b', NULL, NULL, NULL, NULL, NULL, NULL), (6, NULL, NULL, 'ABC', NULL, NULL, NULL, NULL, NULL),
+                (7, NULL, NULL, 'a ', NULL, NULL, NULL, NULL, NULL), (8, NULL, NULL, NULL, NULL, X'0000', NULL, NULL, NULL),
+                (9, NULL, NULL, NULL, NULL, NULL, b'10', NULL, NULL),
+                (10, 'same', 'same', 'same', NULL, X'FF', b'101', '[1,2]', 0.1),
+                (11, NULL, NULL, NULL, '2026-01-01 02:00:00', NULL, NULL, NULL, NULL),
+                (12, NULL, NULL, NULL, NULL, NULL, NULL, '{"b":[true,null],"a":1}', 1e300)
+            """, "INSERT INTO keys_ci VALUES ('A', 1), ('b', 2)"])
+        let result = try await Self.compare(source, "lane_l8a_edge_src", target, "lane_l8a_edge_dst")
+        let edge = try #require(result.object(.table, "edge")?.data)
+        let changed = edge.changed.compactMap { $0.source.text(0, kind: .integer) }.sorted { Int($0)! < Int($1)! }
+        #expect(changed == ["1", "2", "3", "4", "5", "6", "7", "8", "9"])
+        #expect(edge.missing.isEmpty && edge.extra.isEmpty)
+        let keyed = try #require(result.object(.table, "keys_ci")?.data)
+        #expect(keyed.missing.map { $0.text(0, kind: .text) } == ["a"])
+        #expect(keyed.extra.map { $0.text(0, kind: .text) } == ["A"])
+        try await Self.run(source, ["DROP DATABASE lane_l8a_edge_src"])
+        try await Self.run(target, ["DROP DATABASE lane_l8a_edge_dst"])
+    }
+
+    /// The million-row table: the same on two servers of different flavours (checksums only), and a copy with a few
+    /// rows changed, deleted and added found by fetching a small share of it.
+    @Test func comparesAMillionRows() async throws {
+        let mariadb = try await Self.session(Lab.mariadb114), mysql = try await Self.session(Lab.mysql84)
+        let copy = try await Self.session(Lab.mariadb114)
+        defer { Task { await mariadb.close(); await mysql.close(); await copy.close() } }
+        var options = ReconOptions()
+        options.mode = .data
+        options.tables = Dictionary(uniqueKeysWithValues: ["all_types", "places", "customers", "products", "orders",
+            "order_items", "employees", "no_pk_log", "unique_no_pk", "myisam_notes", "latin1_legacy", "texts",
+            "legacy_dates", "order details", "טבלה", "x`; DROP TABLE nothing; --",
+            "this_table_name_is_sixty_four_characters_long_the_most_mysql_has"].map { ($0, ReconTableChoice(included: false)) })
+        let started = Date()
+        let same = try await Self.compare(mysql, Lab.fixture, mariadb, Lab.fixture, options: options)
+        let big = try #require(same.object(.table, "big")?.data)
+        #expect(big.outcome == .same && big.sourceRows == Lab.bigRows && big.targetRows == Lab.bigRows)
+        #expect(same.rowsFetched == 0)
+        let across = Date().timeIntervalSince(started)
+
+        try await Self.database(copy, "lane_l8a_big", ["CREATE TABLE big LIKE fixture.big",
+                                                       "INSERT INTO big SELECT * FROM fixture.big",
+                                                       "UPDATE big SET name = 'changed' WHERE id IN (17, 500000, 999999)",
+                                                       "UPDATE big SET note = NULL WHERE id = 500001",
+                                                       "DELETE FROM big WHERE id IN (250000, 250001)",
+                                                       "INSERT INTO big VALUES (1000001, 'new', 1, '2030-01-01', 'red', 1, NULL)"])
+        let differs = try await Self.compare(mariadb, Lab.fixture, copy, "lane_l8a_big", options: options)
+        let data = try #require(differs.object(.table, "big")?.data)
+        #expect(Set(data.changed.compactMap { $0.source.text(0, kind: .integer) }) == ["17", "500000", "500001", "999999"])
+        #expect(Set(data.missing.compactMap { $0.text(0, kind: .integer) }) == ["250000", "250001"])
+        #expect(data.extra.compactMap { $0.text(0, kind: .integer) } == ["1000001"])
+        #expect(differs.rowsFetched < Lab.bigRows / 50, "fetched \(differs.rowsFetched)")
+        print("Recon: 1M rows across flavours in \(across) s; with differences \(differs.duration) s, fetched \(differs.rowsFetched)")
+        try await Self.run(copy, ["DROP DATABASE lane_l8a_big"])
+    }
 }
