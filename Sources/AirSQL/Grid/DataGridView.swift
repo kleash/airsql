@@ -86,7 +86,9 @@ final class DataGridView: NSView {
     /// Each display column's left edge, and the total width last.
     private(set) var offsets: [CGFloat] = [0]
     /// The editor overlay while a cell is edited.
-    var editor: NSView?
+    var editor: GridEditor?
+    var isDragging = false
+    var hoveredCell: GridPosition?
     var rowCount: Int { source?.rowCount ?? 0 }
     var columnCount: Int { columnOrder.count }
 

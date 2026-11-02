@@ -5,6 +5,7 @@ import AppKit
 /// tabular digits. Clicking selects the row, a double click opens it in Record View.
 final class GridRowNumberView: NSRulerView {
     unowned let grid: DataGridView
+    private var dragging = false
 
     init(grid: DataGridView) {
         self.grid = grid
@@ -68,5 +69,43 @@ final class GridRowNumberView: NSRulerView {
         }
         NSColor.separatorColor.setFill()
         NSRect(x: bounds.width - pixel, y: dirtyRect.minY, width: pixel, height: dirtyRect.height).fill()
+    }
+
+    // MARK: Mouse
+
+    private func row(at event: NSEvent) -> Int? {
+        let y = grid.convert(event.locationInWindow, from: nil).y
+        return y >= 0 && Int(y / grid.rowHeight) < grid.rowCount ? Int(y / grid.rowHeight) : nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        grid.window?.makeFirstResponder(grid)
+        guard let row = row(at: event) else { return }
+        if event.clickCount == 2 {
+            dragging = false
+            grid.delegate?.dataGrid(grid, openRecord: row)
+            return
+        }
+        grid.selection.selectRow(row, extend: event.modifierFlags.contains(.shift), add: event.modifierFlags.contains(.command))
+        dragging = true
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard dragging, grid.rowCount > 0 else { return }
+        grid.autoscroll(with: event)
+        let y = grid.convert(event.locationInWindow, from: nil).y
+        grid.selection.selectRow(min(max(0, Int(y / grid.rowHeight)), grid.rowCount - 1), extend: true)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        dragging = false
+    }
+
+    /// A right click on a row that isn't selected selects it first.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let row = row(at: event) else { return nil }
+        grid.window?.makeFirstResponder(grid)
+        if !grid.selection.containsRow(row) { grid.selection.selectRow(row) }
+        return grid.delegate?.dataGrid(grid, menuFor: .row(row))
     }
 }

@@ -12,6 +12,7 @@ final class GridHeaderView: NSRulerView {
     /// Where a moved column would go (the display index it would take), while one is dragged.
     var dropIndex: Int? { didSet { if dropIndex != oldValue { needsDisplay = true } } }
     static let sortWidth: CGFloat = 18
+    private var drag: Drag?
 
     init(grid: DataGridView) {
         self.grid = grid
@@ -141,5 +142,126 @@ final class GridHeaderView: NSRulerView {
     /// Where a header's sort control is.
     func sortRect(_ rect: NSRect) -> NSRect {
         NSRect(x: rect.maxX - Self.sortWidth - 2, y: 0, width: Self.sortWidth, height: rect.height)
+    }
+
+    // MARK: Mouse
+
+    private enum Drag {
+        case resize(column: Int, startX: CGFloat, width: CGFloat)
+        case move(column: Int, startX: CGFloat)
+    }
+
+    /// The display column under a point (not the corner above the row numbers).
+    func column(at point: NSPoint) -> Int? {
+        guard point.x >= contentLeft else { return nil }
+        return grid.column(atX: grid.convert(point, from: self).x)
+    }
+
+    /// The display column whose right border is within 4 points of a point.
+    func border(at point: NSPoint) -> Int? {
+        guard point.x >= contentLeft else { return nil }
+        return grid.columns(in: grid.shownRect).first { abs(edges($0).right - point.x) <= 4 }
+    }
+
+    private func isInSortControl(_ point: NSPoint, _ column: Int) -> Bool {
+        let (left, right) = edges(column)
+        return sortRect(NSRect(x: left, y: 0, width: right - left, height: bounds.height)).contains(point)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil), flags = event.modifierFlags
+        grid.window?.makeFirstResponder(grid)
+        if let column = border(at: point) {
+            if event.clickCount == 2 {
+                grid.autoFit(column)
+            } else {
+                drag = .resize(column: column, startX: point.x, width: grid.columnWidths[grid.columnOrder[column]])
+            }
+            return
+        }
+        guard let column = column(at: point) else { return }
+        if isInSortControl(point, column) {
+            grid.delegate?.dataGrid(grid, sortBy: grid.columnOrder[column], adding: flags.contains(.option))
+            return
+        }
+        grid.selection.selectColumn(column, extend: flags.contains(.shift), add: flags.contains(.command))
+        drag = .move(column: column, startX: point.x)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        switch drag {
+        case .resize(let column, let startX, let width):
+            grid.columnWidths[grid.columnOrder[column]] = max(40, (width + point.x - startX).rounded())
+        case .move(_, let startX):
+            guard abs(point.x - startX) > 4 else { return }
+            grid.autoscroll(with: event)
+            // The border nearest the pointer is where the column would go.
+            let x = grid.convert(event.locationInWindow, from: nil).x
+            dropIndex = grid.column(atX: x).map { x - grid.offsets[$0] < (grid.offsets[$0 + 1] - grid.offsets[$0]) / 2 ? $0 : $0 + 1 }
+                ?? (x < 0 ? 0 : grid.columnCount)
+        case nil:
+            break
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer {
+            drag = nil
+            dropIndex = nil
+        }
+        switch drag {
+        case .resize:
+            grid.delegate?.dataGridColumnsDidChange(grid)
+        case .move(let column, _):
+            guard let dropIndex, dropIndex != column, dropIndex != column + 1 else { return }
+            var order = grid.columnOrder
+            let moved = order.remove(at: column), index = dropIndex > column ? dropIndex - 1 : dropIndex
+            order.insert(moved, at: index)
+            grid.columnOrder = order
+            grid.selection.selectColumn(index)
+            grid.delegate?.dataGridColumnsDidChange(grid)
+        case nil:
+            break
+        }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .cursorUpdate, .activeInKeyWindow,
+                                                               .inVisibleRect], owner: self))
+    }
+
+    /// The resize cursor on a border, the sort control on hover, and a tooltip for what is under the pointer.
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let border = border(at: point), column = border == nil ? column(at: point) : nil
+        (border != nil ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
+        hovered = column
+        if border != nil {
+            toolTip = "Drag to resize the column; double-click to fit its values"
+        } else if let column, let info = grid.source?.columns[grid.columnOrder[column]] {
+            let type = info.type.isEmpty ? "" : " (\(info.type))"
+            toolTip = isInSortControl(point, column) ? "Sort by \(info.name); ⌥-click to add it to the sort"
+                : "Select the column \(info.name)\(type); drag to move it"
+        } else {
+            toolTip = nil
+        }
+    }
+
+    override func cursorUpdate(with event: NSEvent) { mouseMoved(with: event) }
+
+    override func mouseExited(with event: NSEvent) {
+        hovered = nil
+        NSCursor.arrow.set()
+    }
+
+    /// A right click on a column that isn't selected selects it first.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let column = column(at: convert(event.locationInWindow, from: nil)) else { return nil }
+        grid.window?.makeFirstResponder(grid)
+        if !grid.selection.containsColumn(column) { grid.selection.selectColumn(column) }
+        return grid.delegate?.dataGrid(grid, menuFor: .column(grid.columnOrder[column]))
     }
 }
