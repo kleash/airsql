@@ -144,7 +144,7 @@ public enum Recon {
     private static func schema(_ side: ReconSide) async throws -> (SchemaServer, SchemaDatabase) {
         _ = try await ReconQuery.store(side.session, "SET time_zone = '+00:00'")
         let database = side.database
-        let cache = SchemaCache(source: ReconSchemaSource(session: side.session), includes: { $0 == database })
+        let cache = SchemaCache(source: side.session, includes: { $0 == database })
         try await cache.load()
         try await cache.loadDetails([database])
         try await cache.loadStatistics(database)
@@ -225,11 +225,4 @@ public enum Recon {
             return ""
         }
     }
-}
-
-/// A side's session as the schema cache's source, so a compare reads the schema as it is now.
-struct ReconSchemaSource: SchemaQuerying {
-    let session: DBConnection
-
-    func rows(_ sql: String) async throws -> [[String?]] { try await ReconQuery.strings(session, sql) }
 }
