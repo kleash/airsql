@@ -63,6 +63,12 @@ public struct SQLLexer {
     /// The text of `range`.
     func string(_ range: Range<Int>) -> String { String(decoding: text[range], as: UTF16.self) }
 
+    /// The text of `range` with ASCII letters in upper case, as MySQL matches keywords and built-in function names (so
+    /// ſum stays a name of its own rather than becoming SUM).
+    func upper(_ range: Range<Int>) -> String {
+        String(decoding: text[range].map { (0x61...0x7A).contains($0) ? $0 - 0x20 : $0 }, as: UTF16.self)
+    }
+
     /// Steps over whitespace, so `position` is where the next token starts.
     mutating func skipSpace() {
         while position < text.count, Self.isSpace(text[position]) { position += 1 }
