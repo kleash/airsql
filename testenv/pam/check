@@ -1,0 +1,4 @@
+#!/bin/sh
+# The lab's PAM password check (pam_exec gives the password on standard input): user pam, password pam-pass.
+read -r password
+[ "$PAM_USER" = pam ] && [ "$password" = pam-pass ]
