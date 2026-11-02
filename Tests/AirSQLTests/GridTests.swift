@@ -47,4 +47,64 @@ struct GridTests {
         #expect(source.cell(250, 1) != .loading)
         #expect(source.cell(300, 1) == .loading)
     }
+
+    @Test func clicksSelectCellsBlocksRowsAndColumns() {
+        var selection = GridSelection()
+        selection.select(GridPosition(row: 2, column: 1))
+        #expect(selection.contains(GridPosition(row: 2, column: 1)))
+        #expect(!selection.contains(GridPosition(row: 2, column: 2)))
+        selection.select(GridPosition(row: 4, column: 3), extend: true)  // ⇧-click: the block from the anchor
+        #expect(selection.areas == [.cells(rows: 2...4, columns: 1...3)])
+        #expect(selection.cursor == GridPosition(row: 4, column: 3) && selection.anchor == GridPosition(row: 2, column: 1))
+        selection.select(GridPosition(row: 9, column: 0), add: true)  // ⌘-click adds, and takes away again
+        #expect(selection.areas.count == 2)
+        selection.select(GridPosition(row: 9, column: 0), add: true)
+        #expect(selection.areas == [.cells(rows: 2...4, columns: 1...3)])
+
+        selection.selectRow(5)
+        selection.selectRow(7, extend: true)
+        #expect(selection.containsRow(6) && !selection.containsRow(8))
+        #expect(selection.contains(GridPosition(row: 6, column: 40)))
+        selection.selectColumn(3)
+        selection.selectColumn(1, extend: true)
+        #expect(selection.containsColumn(2) && !selection.containsColumn(0) && !selection.containsRow(6))
+        selection.selectAll()
+        #expect(selection.containsRow(999) && selection.containsColumn(49))
+    }
+
+    @Test func keysMoveTheCursorAndShiftExtends() {
+        var selection = GridSelection()
+        func move(_ move: GridSelection.Move, extend: Bool = false) {
+            selection.move(move, extend: extend, rows: 100, columns: 5, page: 20)
+        }
+        move(.down)  // nothing focused yet: starts at the first cell
+        #expect(selection.cursor == GridPosition(row: 1, column: 0))
+        move(.up); move(.up); move(.left)
+        #expect(selection.cursor == GridPosition(row: 0, column: 0))  // stops at the edges
+        move(.pageDown); move(.pageDown)
+        #expect(selection.cursor?.row == 40)
+        move(.lastColumn)
+        move(.next)  // Tab at the end of a row wraps to the next one
+        #expect(selection.cursor == GridPosition(row: 41, column: 0))
+        move(.previous)
+        #expect(selection.cursor == GridPosition(row: 40, column: 4))
+        move(.left, extend: true); move(.down, extend: true)
+        #expect(selection.areas == [.cells(rows: 40...41, columns: 3...4)])
+        move(.lastRow)
+        #expect(selection.areas == [.cells(rows: 99...99, columns: 3...3)])
+        selection.selectRow(10)
+        move(.down, extend: true)  // ⇧ on a row selection extends the rows
+        #expect(selection.areas == [.rows(10...11)])
+    }
+
+    @Test func reloadKeepsTheSelectionInside() {
+        var selection = GridSelection()
+        selection.select(GridPosition(row: 50, column: 4))
+        selection.select(GridPosition(row: 80, column: 6), extend: true)
+        selection.clamp(rows: 60, columns: 5)
+        #expect(selection.areas == [.cells(rows: 50...59, columns: 4...4)])
+        #expect(selection.cursor == GridPosition(row: 59, column: 4))
+        selection.clamp(rows: 0, columns: 5)
+        #expect(selection.isEmpty && selection.cursor == nil)
+    }
 }
