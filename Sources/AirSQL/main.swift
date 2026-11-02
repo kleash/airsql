@@ -9,6 +9,12 @@ if CommandLine.arguments.dropFirst().first == "--version" {
     exit(0)
 }
 
+// `AirSQL --mcp`: the MCP server agents start (plan §2.8). It speaks MCP on stdio and passes each call to the running
+// AirSQL through its private agent socket; it opens no window and never touches a database itself.
+if CommandLine.arguments.dropFirst().first == "--mcp" {
+    exit(AgentBridge.runMCP())
+}
+
 let delegate = AppDelegate()
 NSApplication.shared.delegate = delegate
 NSApplication.shared.setActivationPolicy(.regular)
