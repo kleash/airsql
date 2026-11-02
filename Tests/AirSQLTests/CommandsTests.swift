@@ -73,3 +73,16 @@ struct CommandsTests {
         #expect(count > 100)
     }
 }
+
+/// Each page the Help menu and the "?" buttons open is a page of docs/ (published as the site).
+struct DocsTests {
+    @Test func everyHelpPageIsInDocs() {
+        let docs = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("docs")
+        for page in HelpPage.allCases {
+            let path = page.rawValue.components(separatedBy: "#")[0]
+            let file = path.isEmpty ? "index.md" : path.replacingOccurrences(of: ".html", with: ".md")
+            #expect(FileManager.default.fileExists(atPath: docs.appendingPathComponent(file).path), "\(page): docs/\(file)")
+        }
+    }
+}

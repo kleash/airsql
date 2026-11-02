@@ -232,5 +232,14 @@ extension AppTests {
         #expect(await call(harness, "menu", ["path": "Nope > Nothing"]).error?.contains("No menu item") == true)
         #expect(await call(harness, "wait", ["until": "idle", "timeout": 5]).error == nil)
         #expect(await call(harness, "nope").error?.contains("no tool") == true)
+        // Filter Sidebar focuses the filter; typed text narrows the connections.
+        #expect(await call(harness, "menu", ["path": "View > Filter Sidebar"]).error == nil)
+        #expect(main.window?.firstResponder === main.sidebar.filter.currentEditor())
+        #expect(await call(harness, "type", ["text": "Prod"]).error == nil)
+        #expect(await eventually {
+            main.sidebar.reload()
+            return main.model.sections(filter: main.sidebar.filter.stringValue).flatMap(\.connections).map(\.name) == ["Production · shop"]
+        })
+        #expect(await call(harness, "wait", ["until": "text", "text": "Production · shop", "timeout": 5]).error == nil)
     }
 }
