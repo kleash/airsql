@@ -44,8 +44,8 @@ func showPasswordPrompt(for connection: String, user: String, retry: Bool, canRe
                         reply: @escaping (_ password: String?, _ remember: Bool) -> Void) -> NSAlert {
     let alert = NSAlert()
     alert.messageText = "Password for “\(connection)”"
-    alert.informativeText = retry ? "The server didn't accept that password for \(user). Try again."
-        : "Type the password of \(user.isEmpty ? "the database user" : user)."
+    let who = user.isEmpty ? "the database user" : "the database user “\(user)”"
+    alert.informativeText = retry ? "The server didn't accept that password for \(who). Try again." : "Type the password of \(who)."
     let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 22))
     field.placeholderString = "Password"
     field.toolTip = "Type the password: it goes to the server only, never into a log or a command line"

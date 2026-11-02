@@ -10,6 +10,7 @@ final class GeneralPane: SettingsPaneController {
                  caption: "Porcelain is the light look, Deep Water the dark one.")
         let folder = label(Self.shown(Store.directory), font: .systemFont(ofSize: NSFont.systemFontSize), truncates: true)
         folder.toolTip = Self.shown(Store.directory)
+        folder.lineBreakMode = .byTruncatingMiddle
         folder.isSelectable = true
         form.row("Settings folder", [folder, action("Show in Finder", id: "settings.showFolder",
                                                     tip: "Show the folder with AirSQL's settings and SQL log in Finder") {

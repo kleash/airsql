@@ -758,6 +758,13 @@ final class AgentServer {
                 }
             }
             Self.draw(other, at: origin)
+            // A sheet's glass background comes out in the window's colour: its edge shows where it is.
+            if other.sheetParent === window {
+                other.effectiveAppearance.performAsCurrentDrawingAppearance {
+                    NSColor.separatorColor.setStroke()
+                    NSBezierPath(rect: NSRect(origin: origin, size: other.frame.size).insetBy(dx: 0.5, dy: 0.5)).stroke()
+                }
+            }
         }
     }
 
@@ -773,6 +780,9 @@ final class AgentServer {
         func walk(_ layer: CALayer) {
             guard !layer.isHidden, layer.opacity > 0 else { return }
             for filter in layer.filters ?? [] where "\(filter)".hasPrefix("vibrantColorMatrix") {
+                // Text and symbols (leaf layers), not the glass platters behind toolbar items (containers): rendered
+                // again, a platter came out upside down in a corner.
+                guard layer.sublayers?.isEmpty ?? true else { return }
                 guard let value = (filter as AnyObject).value(forKey: "inputColorMatrix") as? NSValue else { continue }
                 var matrix = [Float](repeating: 0, count: 20)
                 value.getValue(&matrix, size: MemoryLayout<Float>.size * 20)
@@ -844,11 +854,15 @@ final class AgentServer {
         let opacities = vibrant.map(\.layer.opacity)
         vibrant.forEach { $0.layer.opacity = 0 }
         draw(view, in: NSRect(origin: origin, size: window.frame.size), opaque: true)
-        // Liquid Glass (macOS 26): the window server draws what is inside a glass container, so the cached image has
-        // only the platter. What it holds is drawn again on top, and the title bar over that.
+        // Once the window has lost the focus (to a popover or a sheet), the frame's picture of itself on macOS 26 can carry
+        // a stale, upside-down copy of a toolbar item into the content: the (opaque) content is drawn again over it.
+        if let content = window.contentView, content !== view, !content.bounds.isEmpty { place(content, opaque: true) }
+        // Liquid Glass (macOS 26): the window server draws what is inside a glass container in the content, so the
+        // cached image has only the platter. What it holds is drawn again on top, and the title bar over that. Not the
+        // toolbar's platters: the cached image has their items, and drawing them again put a mirrored copy in a corner.
         let titlebar = views(NSView.self, in: view).first { named($0) == "NSTitlebarContainerView" }
         let holders = views(NSView.self, in: view).filter { holder in
-            named(holder).hasSuffix("ContentHolderView") && !(titlebar.map { holder.isDescendant(of: $0) } ?? false)
+            named(holder).hasSuffix("ContentHolderView") && (window.contentView.map { holder.isDescendant(of: $0) } ?? false)
         }
         let contents = holders.flatMap(\.subviews).filter { !$0.isHiddenOrHasHiddenAncestor && !$0.bounds.isEmpty }
         contents.forEach { place($0, opaque: true) }

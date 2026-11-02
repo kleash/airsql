@@ -86,6 +86,7 @@ func appWindow(_ model: AppModel, size: NSSize = MainWindowController.defaultSiz
     main.window?.orderFront(nil)
     main.window?.setFrame(NSRect(origin: NSPoint(x: -20000, y: -20000), size: size), display: false)
     main.window?.layoutIfNeeded()
+    main.refresh()  // the toolbar's items exist now
     return (main, AgentServer(main: main, model: model, windows: windows))
 }
 

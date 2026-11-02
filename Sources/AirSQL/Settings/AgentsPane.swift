@@ -15,6 +15,7 @@ final class AgentsPane: SettingsPaneController {
                     + "Production starts at Off. Agents never see passwords, and every action they take is listed.")
         let folder = label(Self.shown(Self.exportFolder), truncates: true)
         folder.toolTip = Self.shown(Self.exportFolder)
+        folder.lineBreakMode = .byTruncatingMiddle
         folder.isSelectable = true
         form.row("Exports", [folder, action("Show in Finder", id: "settings.agentExports",
                                             tip: "Show the folder agents save query results in") { [weak self] in

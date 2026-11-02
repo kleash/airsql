@@ -14,6 +14,14 @@ extension AppTests {
             return folder
         }()
 
+        /// On a screen while it is photographed: until a window has been shown, AppKit hasn't made the vibrancy of its
+        /// toolbar's text (it came out black in Deep Water), and a popover is put on a screen anyway.
+        private func onScreen(_ window: NSWindow?) {
+            window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+            window?.orderFront(nil)
+            window?.displayIfNeeded()
+        }
+
         private func save(_ harness: AgentServer, _ name: String, target: String = "main") async throws {
             let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
             let image = try #require(reply.image, "\(name): \(reply.error ?? "")")
@@ -44,24 +52,30 @@ extension AppTests {
                 // The first run.
                 let (first, firstHarness) = appWindow(testModel())
                 first.window?.appearance = look
+                onScreen(first.window)
                 try await save(firstHarness, "first-run-\(suffix)")
+                first.window?.orderOut(nil)
 
                 // A connection's summary.
                 let summaryModel = testModel(Fixtures.shop)
                 let (summary, summaryHarness) = appWindow(summaryModel)
                 summary.window?.appearance = look
                 summary.sidebar.select([Fixtures.staging.id])
+                onScreen(summary.window)
                 try await save(summaryHarness, "summary-\(suffix)")
+                summary.window?.orderOut(nil)
 
                 // The main window at work, with the activity popover.
                 let model = testModel(Fixtures.shop)
                 let (main, harness) = appWindow(model)
                 main.window?.appearance = look
                 dressed(model, main)
+                onScreen(main.window)
                 try await save(harness, "main-\(suffix)")
                 let work = model.activity.start("Exporting shop with mariadb-dump", connection: Fixtures.production.id) {}
                 work.progress = 0.62
                 work.detail = "1.9 GB of 3.1 GB"
+                main.refresh()  // the status bar shows the work (it follows the list a moment later by itself)
                 main.statusBar.activity.showPopover()
                 _ = await call(harness, "wait", ["until": "popover", "timeout": 5])
                 try await save(harness, "main-activity-\(suffix)")
@@ -107,8 +121,7 @@ extension AppTests {
                 keptWindows.append(settings)
                 let window = try #require(settings.window)
                 window.appearance = look
-                window.setFrameOrigin(NSPoint(x: -21000, y: -21000))
-                window.orderFront(nil)
+                onScreen(window)
                 let settingsHarness = AgentServer(main: main, model: model, windows: { [window] })
                 for pane in SettingsPane.allCases {
                     settings.show(pane)
@@ -116,6 +129,7 @@ extension AppTests {
                     try await save(settingsHarness, "settings-\(pane.rawValue)-\(suffix)", target: "window:\(pane.title)")
                 }
                 window.orderOut(nil)
+                main.window?.orderOut(nil)
             }
         }
     }

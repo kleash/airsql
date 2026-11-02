@@ -208,6 +208,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         updateTint()
         updateStatus()
         toolbarController.update()
+        window?.toolbar?.validateVisibleItems()
         window?.title = activeConnection.map { connection in
             connection.displayName + (connection.database.isEmpty ? "" : " · " + connection.database)
         } ?? "AirSQL"
@@ -310,6 +311,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         statusBar.setAccessory(selectedTab?.tabContent?.statusAccessory)
         let canShowLog = statusBar.sqlLog.commandTarget(Commands.sqlLog.action) != nil
         statusBar.sqlLog.isEnabled = canShowLog
+        statusBar.sqlLog.attributedTitle = NSAttributedString(string: "SQL log", attributes: [
+            .foregroundColor: canShowLog ? NSColor.accent : NSColor.tertiaryLabelColor, .font: NSFont.systemFont(ofSize: 11.5)])
         statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tip + " (⌥⌘L)"
             : "Nothing has been sent yet: the SQL log lists every statement once you connect"
     }
@@ -481,6 +484,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     // MARK: Window
+
+    /// Shows the window, its toolbar's items (made as it is first shown) brought up to date.
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        refresh()
+    }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool { true }
 }
