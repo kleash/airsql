@@ -133,8 +133,9 @@ public final class DBConnection: @unchecked Sendable {
     }
 
     public let role: Role
-    /// Kept (password included) for Reconnect and Cancel's side connection, in memory only.
-    public let options: ConnectOptions
+    /// Kept (password included) for Reconnect and Cancel's side connection, in memory only; `close` forgets the password.
+    public var options: ConnectOptions { state.locked { _options } }
+    private var _options: ConnectOptions
     private let log: SQLLog
     private let worker: Worker
 
@@ -158,7 +159,7 @@ public final class DBConnection: @unchecked Sendable {
     private var number = 0
 
     public init(options: ConnectOptions, role: Role, log: SQLLog = .shared) {
-        self.options = options
+        _options = options
         self.role = role
         self.log = log
         worker = Worker(name: "AirSQL \(role.rawValue) session")
@@ -244,6 +245,7 @@ public final class DBConnection: @unchecked Sendable {
         }
         try? await worker.perform { [self] in closeHere() }
         worker.stop()
+        state.locked { _options.password = "" }
     }
 
     // MARK: State

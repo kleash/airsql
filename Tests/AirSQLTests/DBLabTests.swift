@@ -460,6 +460,31 @@ struct DBLabTests {
         await session.close()
     }
 
+    /// The session model: main, data, schema and agent sessions opened on first use (callers at the same time share one
+    /// connect), the agent's read-only, tools sessions of their own, and Disconnect closing them all and forgetting the
+    /// password.
+    @Test func connectionOwnsItsSessions() async throws {
+        let connection = Connection(options: DBLab.options(try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")), log: log)
+        let server = try await connection.connect()
+        async let first = connection.session(.data)
+        async let second = connection.session(.data)
+        let (data, sameData) = try await (first, second)
+        #expect(data === sameData)
+        let main = try await connection.session(.main), schema = try await connection.session(.schema)
+        #expect(main.server?.threadID == server.threadID)
+        #expect(Set([main, data, schema].compactMap { $0.server?.threadID }).count == 3)
+        let agent = try await connection.session(.agent)
+        #expect(agent.options.readOnly && agent.role == .agent)
+        #expect(await kind { try await agent.query("CREATE DATABASE lane_p0_2_never") } == .readOnly)
+        let tools = try await connection.toolsSession()
+        #expect(tools.role == .tools && tools.server?.threadID != main.server?.threadID)
+
+        await connection.keepAlive(transactionLimit: 15 * 60)
+        await connection.disconnect()
+        #expect(![main, data, schema, agent, tools].contains { $0.isConnected })
+        #expect(connection.options.password.isEmpty)
+    }
+
     @Test func logsTagsAndMasksLiveStatements() async throws {
         let mariadb = try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("airsql-lablog-\(UUID().uuidString)")

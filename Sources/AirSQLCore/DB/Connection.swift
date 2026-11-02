@@ -8,15 +8,16 @@ import Foundation
 /// - tools: client tools and recon each open their own (`toolsSession`);
 /// - and Cancel's short side connection, which each `DBConnection` opens itself.
 /// The options, password included, stay here in memory until `disconnect`.
-public final class Connection {
-    public private(set) var options: ConnectOptions
+public final class Connection: @unchecked Sendable {
+    public var options: ConnectOptions { lock.locked { _options } }
+    private var _options: ConnectOptions
     private let log: SQLLog
     private let lock = NSLock()
     private var opening: [DBConnection.Role: Task<DBConnection, Error>] = [:]
     private var tools: [DBConnection] = []
 
     public init(options: ConnectOptions, log: SQLLog = .shared) {
-        self.options = options
+        _options = options
         self.log = log
     }
 
@@ -34,7 +35,7 @@ public final class Connection {
         precondition(role != .tools && role != .cancel, "tools sessions come from toolsSession(); Cancel opens its own")
         let task: Task<DBConnection, Error> = lock.locked {
             if let task = opening[role] { return task }
-            var sessionOptions = options
+            var sessionOptions = _options
             if role == .agent { sessionOptions.readOnly = true }
             let log = self.log
             let task = Task {
@@ -93,7 +94,7 @@ public final class Connection {
             defer {
                 opening = [:]
                 tools = []
-                options.password = ""
+                _options.password = ""
             }
             return (Array(opening.values), tools)
         }
