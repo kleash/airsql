@@ -15,6 +15,7 @@ extension DataGridView {
         guard let source, let context = NSGraphicsContext.current?.cgContext else { return }
         let rows = rows(in: dirtyRect), columns = columns(in: dirtyRect)
         guard !rows.isEmpty, !columns.isEmpty else { return }
+        drawnCells += rows.count * columns.count
         // A screen's worth above and below, so a paged source fetches before the rows show.
         source.prefetch(self.rows(in: visibleRect.insetBy(dx: 0, dy: -visibleRect.height)))
         let scale = window?.backingScaleFactor ?? 2, pixel = 1 / scale

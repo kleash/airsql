@@ -91,6 +91,8 @@ final class DataGridView: NSView {
     var isDragging = false
     var hoveredCell: GridPosition?
     var accessibilityElements = GridAccessibilityElements()
+    /// The cells drawn so far: the spike's measure that drawing follows the area shown, not the number of rows.
+    var drawnCells = 0
     var rowCount: Int { source?.rowCount ?? 0 }
     var columnCount: Int { columnOrder.count }
 
