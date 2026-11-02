@@ -2,15 +2,6 @@ import Foundation
 import Testing
 @testable import AirSQLCore
 
-/// The schema cache's source here: the connection's schema session (the app's comes with the navigator).
-private struct SchemaSession: SchemaQuerying {
-    let connection: Connection
-    func rows(_ sql: String) async throws -> [[String?]] {
-        guard let store = try await connection.session(.schema).query(sql, rowCap: .max).first?.rows else { return [] }
-        return (0..<store.rowCount).map { row in (0..<store.columns.count).map { store.string(row, $0) } }
-    }
-}
-
 /// The agent tools against the lab (AIRSQL_LAB=1) on MariaDB and MySQL: read-only queries with caps, timeouts and files,
 /// the schema, describe, profile and explain. They only read the fixture. Serialized: one test swaps the classifier.
 @Suite(.serialized, .enabled(if: Lab.enabled))
@@ -25,7 +16,7 @@ struct AgentLabTests {
                                      tls: TLSOptions(mode: server.flavor == .mysql ? .required : .off))
         let connection = Connection(options: options)
         try await connection.connect()
-        let schema = SchemaCache(source: SchemaSession(connection: connection), includes: { $0 == Lab.fixture })
+        let schema = SchemaCache(source: try await connection.session(.schema), includes: { $0 == Lab.fixture })
         var saved = SavedConnection(name: "Lab \(server.name)", host: "127.0.0.1", user: Lab.airsql.user)
         saved.agentAccess = access
         saved.agentSampleRows = sampleRows

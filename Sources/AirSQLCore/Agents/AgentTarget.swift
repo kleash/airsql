@@ -72,7 +72,7 @@ public enum AgentReply {
         AgentBridge.failure(message(error))
     }
 
-    static func message(_ error: Error) -> String {
+    public static func message(_ error: Error) -> String {
         guard let error = error as? AirSQLError else { return error.localizedDescription }
         return error.details.isEmpty || error.message == error.details ? error.message : error.message + " " + error.details
     }

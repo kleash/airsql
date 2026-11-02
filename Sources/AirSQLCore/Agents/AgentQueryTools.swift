@@ -4,7 +4,7 @@ import Foundation
 /// run_queries and explain: agents' own SQL, read-only (`AgentReadOnly`).
 extension AgentTarget {
     /// Rows a statement returns when the call doesn't say.
-    static let defaultRows = 200
+    public static let defaultRows = 200
 
     /// Where agents' exports go: inside AirSQL's folder, so macOS asks nothing (R18). Shown in Settings ▸ Agents.
     public static var exportFolder: URL { Store.directory.appendingPathComponent("Agent Exports", isDirectory: true) }

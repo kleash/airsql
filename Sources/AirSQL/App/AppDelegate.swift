@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private(set) var model: AppModel?
     private(set) var main: MainWindowController?
     private var settings: SettingsWindowController?
+    /// Agents' socket and tools (L7), while Settings ▸ Agents allows agents.
+    private(set) var agents: AgentService?
     private var observers: [AnyCancellable] = []
 
     /// main.swift creates the delegate outside the main actor; everything is set up at launch.
@@ -42,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         observers.append(model.$data.map(\.settings.appearance).removeDuplicates().sink { NSApp.appearance = appAppearance($0) })
         let main = MainWindowController(model: model)
         self.main = main
+        agents = AgentService(model: model, main: main)
         main.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         log.log("launched with \(model.data.connections.count, privacy: .public) connection(s)")
@@ -58,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ notification: Notification) {
+        agents?.close()
         Store.flush()
         TableViewSettingsStore.shared.flush()
     }

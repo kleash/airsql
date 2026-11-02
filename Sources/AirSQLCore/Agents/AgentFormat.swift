@@ -2,9 +2,9 @@ import CMariaDB
 import Foundation
 
 /// What agents read, sized for their context: the compact schema (one line per table) and result rows as JSON or CSV.
-enum AgentFormat {
+public enum AgentFormat {
     /// Longer values are cut in replies (files keep them whole).
-    static let cellLimit = 2_000
+    public static let cellLimit = 2_000
     /// The system databases, left out of a whole-server schema.
     static let systemDatabases: Set<String> = ["information_schema", "mysql", "performance_schema", "sys"]
 
@@ -105,7 +105,7 @@ enum AgentFormat {
     }
 
     /// The rows (the first `count`) as arrays of text or null.
-    static func json(_ rows: ResultStore, count: Int? = nil, limit: Int? = cellLimit) -> [[Any]] {
+    public static func json(_ rows: ResultStore, count: Int? = nil, limit: Int? = cellLimit) -> [[Any]] {
         (0..<min(count ?? rows.rowCount, rows.rowCount)).map { row in
             (0..<rows.columns.count).map { cell(rows, row, $0, limit: limit) }
         }
