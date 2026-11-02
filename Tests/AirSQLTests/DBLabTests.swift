@@ -42,6 +42,21 @@ enum DBLab {
     /// For TCP straight to the lab's address, which isn't the name in its certificates.
     static var encrypted: TLSOptions { TLSOptions(mode: .verifyCA, caFile: caFile) }
 
+    /// The numbers 0 ..< 10^power (id, and a label "row-<id>"; power 6 or 9), made as they are sent: from a recursive
+    /// CTE joined with itself where the server has them, else (MySQL 5.7) from a ten-row derived table joined with
+    /// itself (MySQL 8's hash joins build that up before the first row).
+    static func numbers(_ power: Int, on server: ServerInfo?) -> String {
+        if let server, server.flavor == .mariadb || server.versionNumber >= 80000 {
+            let id = (0..<power / 3).map { "t\($0).i * 1\(String(repeating: "000", count: $0))" }.joined(separator: " + ")
+            return "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 999) SELECT \(id) AS id, "
+                + "CONCAT('row-', \(id)) AS label FROM " + (0..<power / 3).map { "n AS t\($0)" }.joined(separator: ", ")
+        }
+        let digits = "(" + (0...9).map { "SELECT \($0) AS d" }.joined(separator: " UNION ALL ") + ")"
+        let id = (0..<power).map { "t\($0).d * 1\(String(repeating: "0", count: $0))" }.joined(separator: " + ")
+        return "SELECT \(id) AS id, CONCAT('row-', \(id)) AS label FROM "
+            + (0..<power).map { "\(digits) AS t\($0)" }.joined(separator: ", ")
+    }
+
     /// A log of its own in a temporary folder, so the tests leave the user's SQL log alone.
     static let log = SQLLog(fileURL: FileManager.default.temporaryDirectory
         .appendingPathComponent("airsql-lab-\(getpid())/SQL.log"))
@@ -342,17 +357,14 @@ struct DBLabTests {
     func readsAMillionRowsAndStopsAtTheCap(_ flavor: String) async throws {
         let server = try #require(flavor == "mariadb" ? DBLab.mariadb : DBLab.mysql, "AIRSQL_LAB_\(flavor.uppercased())")
         let session = try await connected(flavor == "mysql" ? DBLab.options(server, user: "native") : DBLab.options(server))
-        let thousand = "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000) "
-        let all = try #require(try await session.query(thousand + "SELECT a.i * 1000 + b.i AS id, CONCAT('row-', a.i, '-', b.i) "
-                                                       + "AS label FROM n AS a, n AS b", rowCap: 2_000_000).first?.rows)
+        let all = try #require(try await session.query(DBLab.numbers(6, on: session.server), rowCap: 2_000_000).first?.rows)
         #expect(all.rowCount == 1_000_000 && !all.capped)
         #expect(all.string(999_999, 1)?.hasPrefix("row-") == true)
         #expect(all.byteCount < 48 << 20, "\(all.byteCount >> 20) MB")
 
         // A billion rows: the cap stops the statement on the server instead of reading them all.
         let start = Date()
-        let capped = try #require(try await session.query(thousand + "SELECT a.i, b.i, c.i FROM n AS a, n AS b, n AS c",
-                                                          rowCap: 1000).first?.rows)
+        let capped = try #require(try await session.query(DBLab.numbers(9, on: session.server), rowCap: 1000).first?.rows)
         #expect(capped.capped && capped.rowCount == 1000)
         #expect(Date().timeIntervalSince(start) < 30)
         #expect(try await value(session, "SELECT 1") == "1")
@@ -362,9 +374,8 @@ struct DBLabTests {
     /// Export all's way: every row in batches, none kept; a reader that gives up stops the statement on the server.
     @Test func streamsRowsInBatches() async throws {
         let session = try await connected(DBLab.options(try #require(DBLab.mariadb, "AIRSQL_LAB_MARIADB")))
-        let thousand = "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000) "
         var total = 0, batches = 0, largest = 0
-        try await session.stream(thousand + "SELECT a.i, b.i FROM n AS a, n AS b", batchRows: 50_000) { batch in
+        try await session.stream(DBLab.numbers(6, on: session.server), batchRows: 50_000) { batch in
             total += batch.rowCount
             batches += 1
             largest = max(largest, batch.rowCount)
@@ -375,7 +386,7 @@ struct DBLabTests {
         let start = Date()
         var seen = 0
         do {
-            try await session.stream(thousand + "SELECT a.i, b.i, c.i FROM n AS a, n AS b, n AS c", batchRows: 1000) { batch in
+            try await session.stream(DBLab.numbers(9, on: session.server), batchRows: 1000) { batch in
                 seen += batch.rowCount
                 if seen >= 3000 { throw Enough() }
             }
