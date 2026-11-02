@@ -206,13 +206,20 @@ final class Hairline: NSView {
     convenience init(_ color: NSColor = .separatorColor) {
         self.init(frame: .zero)
         self.color = color
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        // Placed by constraints (its frame's own would hold it at zero).
         translatesAutoresizingMaskIntoConstraints = false
     }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
 
     override var wantsUpdateLayer: Bool { true }
 
     override func updateLayer() {
-        wantsLayer = true
         effectiveAppearance.performAsCurrentDrawingAppearance { layer?.backgroundColor = color.cgColor }
     }
 

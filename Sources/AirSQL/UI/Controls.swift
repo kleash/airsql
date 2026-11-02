@@ -84,7 +84,7 @@ func textField(_ value: String, placeholder: String, id: String, tip: String, wi
 /// A form: labels right-aligned in the first column, controls (with their captions under them) in the second, as
 /// System Settings' older panes and AirSCP's forms lay them out.
 final class Form {
-    let grid = NSGridView()
+    let grid = NSGridView(numberOfColumns: 2, rows: 0)
 
     init() {
         grid.translatesAutoresizingMaskIntoConstraints = false
@@ -119,7 +119,7 @@ final class Form {
     /// A section's heading across both columns, with space above it.
     func heading(_ title: String) {
         let text = label(title, font: .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold))
-        let row = grid.addRow(with: [text])
+        let row = grid.addRow(with: [text, NSGridCell.emptyContentView])
         row.mergeCells(in: NSRange(location: 0, length: 2))
         row.cell(at: 0).xPlacement = .leading
         if grid.numberOfRows > 1 { row.topPadding = 12 }
@@ -133,6 +133,25 @@ final class Form {
 }
 
 extension NSView {
+    /// Sends a command up this view's responder chain, then to its window's delegate, the app and its delegate: what
+    /// AppKit does for the key window, whether or not this view's window is key (a double-click, a key in a list).
+    @discardableResult
+    func sendCommand(_ action: Selector) -> Bool {
+        guard let target = commandTarget(action) else { return false }
+        return NSApp.sendAction(action, to: target, from: self)
+    }
+
+    /// What `sendCommand` would send `action` to; nil: nothing here handles it.
+    func commandTarget(_ action: Selector) -> AnyObject? {
+        var responder: NSResponder? = self
+        while let current = responder {
+            if current.responds(to: action) { return current }
+            responder = current.nextResponder
+        }
+        let rest: [AnyObject?] = [window?.windowController, window?.delegate, NSApp, NSApp.delegate]
+        return rest.compactMap { $0 }.first { $0.responds(to: action) }
+    }
+
     /// Pins the view to `container`'s edges, inset by `insets`.
     func pin(to container: NSView, insets: NSEdgeInsets = NSEdgeInsetsZero) {
         translatesAutoresizingMaskIntoConstraints = false

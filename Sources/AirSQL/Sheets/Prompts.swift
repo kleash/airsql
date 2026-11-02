@@ -27,8 +27,8 @@ func showTrust(server: String, fingerprint: String, details: [String], on window
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 6
-    for view in views { (view as? NSTextField)?.preferredMaxLayoutWidth = 320 }
-    stack.frame.size = NSSize(width: 320, height: stack.fittingSize.height)
+    for view in views { (view as? NSTextField)?.preferredMaxLayoutWidth = 280 }
+    stack.frame.size = NSSize(width: 280, height: stack.fittingSize.height)
     alert.accessoryView = stack
     alert.addButton(withTitle: "Trust").toolTip = "Remember this certificate and connect"
     alert.addButton(withTitle: "Cancel").toolTip = "Don't connect"

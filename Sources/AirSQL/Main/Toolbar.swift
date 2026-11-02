@@ -23,6 +23,8 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
     let connectionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let databasePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let transactionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// The pop-ups' toolbar items (a toolbar item's tooltip is its view's).
+    private var popupItems: [NSPopUpButton: NSToolbarItem] = [:]
 
     init(model: AppModel) {
         self.model = model
@@ -54,21 +56,22 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         switch identifier {
-        case .connection: return popupItem(identifier, connectionPopup, label: "Connection", width: (150, 260))
-        case .database: return popupItem(identifier, databasePopup, label: "Database", width: (120, 200))
-        case .transactionMode: return popupItem(identifier, transactionPopup, label: "Transaction Mode", width: (120, 150))
+        case .connection: return popupItem(identifier, connectionPopup, label: "Connection", width: (140, 220))
+        case .database: return popupItem(identifier, databasePopup, label: "Database", width: (110, 170))
+        case .transactionMode: return popupItem(identifier, transactionPopup, label: "Transaction Mode", width: (110, 130))
         case .run: return CommandToolbarItem(identifier, Commands.runStatement, title: "Run", symbol: "play.fill", primary: true,
                                              reason: "Open a console tab to run SQL")
         case .runAll: return CommandToolbarItem(identifier, Commands.runAll, title: "Run All", symbol: "forward.end.fill",
-                                                reason: "Open a console tab to run SQL")
+                                                iconOnly: true, reason: "Open a console tab to run SQL")
         case .explain: return CommandToolbarItem(identifier, Commands.explain, title: "Explain", symbol: "list.bullet.indent",
-                                                 reason: "Open a console tab to explain a statement")
-        case .commit: return CommandToolbarItem(identifier, Commands.commit, title: "Commit", symbol: nil,
-                                                reason: "No transaction is open in this tab")
-        case .rollback: return CommandToolbarItem(identifier, Commands.rollback, title: "Rollback", symbol: nil,
+                                                 iconOnly: true, reason: "Open a console tab to explain a statement")
+        case .commit: return CommandToolbarItem(identifier, Commands.commit, title: "Commit", symbol: "checkmark.circle",
+                                                iconOnly: true, reason: "No transaction is open in this tab")
+        case .rollback: return CommandToolbarItem(identifier, Commands.rollback, title: "Rollback",
+                                                  symbol: "arrow.uturn.backward.circle", iconOnly: true,
                                                   reason: "No transaction is open in this tab")
         case .cancel: return CommandToolbarItem(identifier, Commands.cancelQuery, title: "Cancel", symbol: "stop.fill",
-                                                reason: "Nothing is running in this tab")
+                                                iconOnly: true, reason: "Nothing is running in this tab")
         default: return nil
         }
     }
@@ -80,6 +83,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         item.label = label
         item.paletteLabel = label
         item.owner = self
+        popupItems[popup] = item
         popup.translatesAutoresizingMaskIntoConstraints = false
         popup.widthAnchor.constraint(greaterThanOrEqualToConstant: width.0).isActive = true
         popup.widthAnchor.constraint(lessThanOrEqualToConstant: width.1).isActive = true
@@ -112,6 +116,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         databasePopup.isEnabled = false
         databasePopup.toolTip = active == nil ? "Choose a connection first" : "Connect to choose the database the console uses"
         validateResponders()
+        for (popup, item) in popupItems { item.toolTip = popup.toolTip }
     }
 
     /// What depends on where the focus is (the toolbar validates as it changes): the transaction mode.
@@ -119,6 +124,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         let canSetMode = NSApp.target(forAction: Commands.autoCommit.action, to: nil, from: transactionPopup) != nil
         transactionPopup.isEnabled = canSetMode
         transactionPopup.toolTip = canSetMode ? Commands.autoCommit.tip : "Open a console tab to choose how it commits"
+        popupItems[transactionPopup]?.toolTip = transactionPopup.toolTip
     }
 
     @objc private func connectionChosen(_ sender: NSPopUpButton) {
@@ -145,17 +151,18 @@ final class CommandToolbarItem: NSToolbarItem {
     private let button: NSButton
 
     init(_ identifier: NSToolbarItem.Identifier, _ command: Command, title: String, symbol: String?, primary: Bool = false,
-         reason: String) {
+         iconOnly: Bool = false, reason: String) {
         self.command = command
         self.reason = reason
         button = NSButton(title: title, target: nil, action: command.action)
         super.init(itemIdentifier: identifier)
         button.bezelStyle = .texturedRounded
         if let symbol {
-            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
-            button.imagePosition = .imageLeading
+            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)?
+                .withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
+            button.imagePosition = iconOnly ? .imageOnly : .imageLeading
         }
+        button.setAccessibilityLabel(title)
         if primary { button.bezelColor = .accent }
         button.setAccessibilityIdentifier("toolbar." + identifier.rawValue)
         button.tag = command.tag

@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false  // one main window: no tab items in the Window and View menus
-        NSApp.mainMenu = MainMenu.build(delegate: nil)
+        NSApp.mainMenu = MainMenu.build()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -42,7 +42,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         observers.append(model.$data.map(\.settings.appearance).removeDuplicates().sink { NSApp.appearance = appAppearance($0) })
         let main = MainWindowController(model: model)
         self.main = main
-        NSApp.mainMenu = MainMenu.build(delegate: main)
         main.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         log.log("launched with \(model.data.connections.count, privacy: .public) connection(s)")

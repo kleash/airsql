@@ -31,31 +31,34 @@ final class StatusBarView: NSView {
         sqlLog.attributedTitle = NSAttributedString(string: "SQL log", attributes: [.foregroundColor: NSColor.accent,
                                                                                     .font: NSFont.systemFont(ofSize: 11.5)])
         sqlLog.setAccessibilityIdentifier("status.sqlLog")
+        let logMenu = NSMenu(title: "SQL log")
+        logMenu.add([Commands.sqlLog, Commands.clearSQLLog])
+        sqlLog.menu = logMenu
         sqlLog.translatesAutoresizingMaskIntoConstraints = false
         sqlLog.setContentCompressionResistancePriority(.required, for: .horizontal)
         accessory.spacing = 10
         accessory.translatesAutoresizingMaskIntoConstraints = false
-        accessory.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
-        let left = NSStackView(views: [route, server, transaction, activity])
-        left.spacing = 12
-        left.translatesAutoresizingMaskIntoConstraints = false
-        left.setHuggingPriority(.defaultLow, for: .horizontal)
-        // Narrow windows drop the less important items first (they stay in the popovers and the snapshot).
-        left.setVisibilityPriority(.detachOnlyIfNecessary, for: server)
-        let right = NSStackView(views: [accessory, agent, sqlLog])
-        right.spacing = 12
-        right.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(left)
-        addSubview(right)
+        // One row: the route, server, transaction and work on the left, the tab's own items, the agents and the SQL log on
+        // the right. Items keep their text (or a good part of it); when the window is too narrow for all of them, the
+        // less important ones step out (they stay in the popovers and the snapshot) rather than squeeze to nothing.
+        let row = NSStackView()
+        row.setViews([route, server, transaction, activity], in: .leading)
+        row.setViews([accessory, agent, sqlLog], in: .trailing)
+        row.spacing = 12
+        row.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+        row.setClippingResistancePriority(.defaultLow, for: .horizontal)
+        let priorities: [(NSView, Float)] = [(sqlLog, 1000), (transaction, 950), (activity, 900), (agent, 800), (accessory, 700),
+                                             (route, 600), (server, 500)]
+        for (view, priority) in priorities { row.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: priority), for: view) }
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: Self.height),
             line.topAnchor.constraint(equalTo: topAnchor), line.heightAnchor.constraint(equalToConstant: 1),
             line.leadingAnchor.constraint(equalTo: leadingAnchor), line.trailingAnchor.constraint(equalTo: trailingAnchor),
-            left.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            left.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0.5),
-            right.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            right.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0.5),
-            right.leadingAnchor.constraint(greaterThanOrEqualTo: left.trailingAnchor, constant: 12),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor),
+            row.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0.5),
         ])
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
@@ -80,6 +83,8 @@ final class StatusItemView: NSView {
     private var chip: ChipView?
     private let image = NSImageView()
     private let spinner = NSProgressIndicator()
+    /// The text's narrowest: all of a short one, 110 points of a long one (its tooltip has all of it).
+    private var minimumWidth: NSLayoutConstraint!
     /// What a click shows, under the item.
     var popover: (() -> NSViewController?)?
     /// What a right-click opens (Copy is added first).
@@ -124,17 +129,20 @@ final class StatusItemView: NSView {
         addSubview(stack)
         stack.pin(to: self)
         heightAnchor.constraint(equalToConstant: 18).isActive = true
+        minimumWidth = (chip?.label ?? text).widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
+        minimumWidth.isActive = true
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    /// The item's text ("" hides it) and tooltip.
+    /// The item's text ("" hides it); its tooltip is the whole text (the item may be cut short) and what a click does.
     func show(_ value: String, tip: String) {
         if let chip { chip.text = value } else { text.stringValue = value }
+        minimumWidth.constant = min((chip?.label ?? text).intrinsicContentSize.width, 110)
         isHidden = value.isEmpty
-        toolTip = tip
+        toolTip = value + " · " + tip
         setAccessibilityLabel(value)
-        setAccessibilityHelp(tip)
+        setAccessibilityHelp(toolTip)
     }
 
     var value: String { chip?.text ?? text.stringValue }
@@ -169,7 +177,6 @@ final class StatusItemView: NSView {
         let menu = NSMenu(title: "Status")
         let copy = Commands.copy.item()
         copy.target = self
-        copy.action = #selector(copyValue(_:))
         copy.toolTip = "Copy what this item says"
         menu.addItem(copy)
         let items = menuItems?() ?? []
@@ -178,12 +185,15 @@ final class StatusItemView: NSView {
         return menu
     }
 
-    @objc func copyValue(_ sender: Any?) {
+    /// Edit ▸ Copy's command, for this item (its menu's Copy targets it).
+    @objc func copy(_ sender: Any?) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
     }
 
     override func accessibilityPerformPress() -> Bool { showPopover() }
+
+    override func isAccessibilityEnabled() -> Bool { true }
 }
 
 /// A popover's content: a heading, lines of text, and buttons, inset by the popover's radius.
@@ -276,7 +286,7 @@ final class ActivityPopover: NSViewController {
         stack.pin(to: root, insets: .all(Spacing.double))
         root.widthAnchor.constraint(equalToConstant: 360).isActive = true
         view = root
-        observer = center.$running.sink { [weak self] _ in DispatchQueue.main.async { self?.rebuild() } }
+        observer = center.$running.sink { [weak self] _ in DispatchQueue.main.async { self?.tick() } }
         rebuild()
     }
 
@@ -291,21 +301,44 @@ final class ActivityPopover: NSViewController {
         timer = nil
     }
 
-    @objc private func tick() { rebuild() }
+    /// Once a second: the elapsed times (and progress) of the work listed.
+    @objc private func tick() {
+        guard center.running.map(\.id) == shownIDs else { return rebuild() }
+        for (activity, info, bar) in rows {
+            info.stringValue = detail(activity)
+            info.toolTip = info.stringValue
+            bar?.doubleValue = (activity.progress ?? 0) * 100
+        }
+    }
 
     @objc private func cancelClicked(_ sender: NSButton) {
         cancels[ObjectIdentifier(sender)]?.cancel()
-        rebuild()
+        tick()
     }
 
     @objc private func cancelAllClicked(_ sender: Any?) {
         center.cancelAll()
-        rebuild()
+        tick()
     }
 
+    /// The work listed now, and each row's changing parts.
+    private var shownIDs: [UUID] = []
+    private var rows: [(Activity, NSTextField, NSProgressIndicator?)] = []
+
+    private func detail(_ activity: Activity) -> String {
+        var detail = ActivityPopover.elapsed(activity.elapsed(at: center.now()))
+        if let name = names(activity.connection) { detail = name + " · " + detail }
+        if let more = activity.detail { detail += " · " + more }
+        if activity.cancelling { detail += " · cancelling" }
+        return detail
+    }
+
+    /// Lists the work running now (when what runs changes).
     private func rebuild() {
         list.arrangedSubviews.forEach { $0.removeFromSuperview() }
         cancels = [:]
+        rows = []
+        shownIDs = center.running.map(\.id)
         if center.running.isEmpty {
             list.addArrangedSubview(label("Nothing is running.", font: .systemFont(ofSize: 12), color: .secondaryLabelColor))
             return
@@ -313,24 +346,23 @@ final class ActivityPopover: NSViewController {
         for activity in center.running {
             let title = label(activity.title, font: .systemFont(ofSize: 12), truncates: true)
             title.toolTip = activity.title
-            var detail = ActivityPopover.elapsed(activity.elapsed(at: center.now()))
-            if let name = names(activity.connection) { detail = name + " · " + detail }
-            if let more = activity.detail { detail += " · " + more }
-            let info = label(detail, font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
-            info.toolTip = detail
+            let info = label(detail(activity), font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
+            info.toolTip = info.stringValue
             let texts = NSStackView(views: [title, info])
             texts.orientation = .vertical
             texts.alignment = .leading
             texts.spacing = 2
+            var bar: NSProgressIndicator?
             if let progress = activity.progress {
-                let bar = NSProgressIndicator()
-                bar.isIndeterminate = false
-                bar.doubleValue = progress * 100
-                bar.controlSize = .small
-                bar.widthAnchor.constraint(equalToConstant: 200).isActive = true
-                texts.addArrangedSubview(bar)
+                let indicator = NSProgressIndicator()
+                indicator.isIndeterminate = false
+                indicator.doubleValue = progress * 100
+                indicator.controlSize = .small
+                indicator.widthAnchor.constraint(equalToConstant: 200).isActive = true
+                texts.addArrangedSubview(indicator)
+                bar = indicator
             }
-            let cancel = button(activity.cancelling ? "Cancelling…" : "Cancel", id: "activity.cancel",
+            let cancel = button("Cancel", id: "activity.cancel",
                                 tip: activity.canCancel ? "Stop “\(activity.title)”" : "This work can't be stopped part-way",
                                 target: self, action: #selector(cancelClicked(_:)))
             cancels[ObjectIdentifier(cancel)] = activity
@@ -342,6 +374,7 @@ final class ActivityPopover: NSViewController {
             texts.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             list.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: list.widthAnchor).isActive = true
+            rows.append((activity, info, bar))
         }
     }
 

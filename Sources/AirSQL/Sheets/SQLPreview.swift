@@ -154,12 +154,22 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         text.textContainerInset = NSSize(width: 6, height: 6)
         text.setAccessibilityIdentifier("preview.sql")
         text.toolTip = "The statements that will run, in this order"
-        let lines = CGFloat(max(3, min(16, request.change.text.components(separatedBy: "\n").count)))
+        // As tall as the statements laid out at the sheet's width (long ones wrap), from 3 to 16 lines.
+        let width = 720 - 2 * 20 - 2 * Radius.control
+        text.frame = NSRect(x: 0, y: 0, width: width, height: 100)
+        text.textContainer?.containerSize = NSSize(width: width - 2 * text.textContainerInset.width, height: .greatestFiniteMagnitude)
+        let line = text.layoutManager?.defaultLineHeight(for: text.font!) ?? 15
+        var used = line * 3
+        if let layout = text.layoutManager, let container = text.textContainer {
+            layout.ensureLayout(for: container)
+            used = layout.usedRect(for: container).height
+        }
+        let height = min(max(used, line * 3), line * 16) + 2 * text.textContainerInset.height
         let box = SurfaceView(.content, radius: Radius.control, border: .separatorColor)
         box.translatesAutoresizingMaskIntoConstraints = false
         box.addSubview(scroll)
         scroll.pin(to: box, insets: .all(Radius.control))
-        box.heightAnchor.constraint(equalToConstant: lines * 17 + 2 * 6 + 2 * Radius.control).isActive = true
+        box.heightAnchor.constraint(equalToConstant: ceil(height) + 2 * Radius.control).isActive = true
         return box
     }
 
@@ -172,6 +182,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         row.alignment = .firstBaseline
         row.spacing = Spacing.unit
         let box = SurfaceView(color.withAlphaComponent(0.12), radius: Radius.control)
+        box.setAccessibilityElement(true)
+        box.setAccessibilityRole(.group)
+        box.setAccessibilityLabel(text)
         box.setAccessibilityIdentifier(id)
         box.translatesAutoresizingMaskIntoConstraints = false
         box.addSubview(row)
@@ -191,6 +204,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         runButton.action = #selector(run(_:))
         runButton.keyEquivalent = "\r"
         runButton.hasDestructiveAction = request.destructive
+        if !request.destructive { runButton.bezelColor = .accent }
         runButton.toolTip = request.typeToConfirm.map { "Type “\($0)” first" }
             ?? "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : "")
         runButton.isEnabled = request.typeToConfirm == nil

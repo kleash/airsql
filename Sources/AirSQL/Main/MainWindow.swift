@@ -8,7 +8,7 @@ import Combine
 /// (the selected tab, a connection's summary, or the first-run screen) and the status bar. Lanes open their tabs with
 /// `open(_:title:connection:)`; commands reach the focused content through the responder chain.
 @MainActor
-final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation, NSMenuDelegate {
+final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     let model: AppModel
     let sidebar: SidebarController
     let tabBar = TabBarView()
@@ -18,14 +18,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private var tintHeight: NSLayoutConstraint!
     private let contentHolder = NSView()
     private let split = MainSplitViewController()
+    /// Holds the split view controller (in the responder chain after its view); the window's content view is its view.
+    private var root: NSViewController?
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
     /// What the content area shows now: "firstRun", "summary", "select" or "tab" (tests and the snapshot read it).
     private(set) var contentKind = ""
     private var shownContent: NSView?
     private var observers: [AnyCancellable] = []
-    static let minimumSize = NSSize(width: 900, height: 560)
-    static let defaultSize = NSSize(width: 1180, height: 720)
+    nonisolated static let minimumSize = NSSize(width: 900, height: 560)
+    nonisolated static let defaultSize = NSSize(width: 1180, height: 720)
 
     init(model: AppModel) {
         self.model = model
@@ -46,13 +48,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         toolbarController.main = self
         tabBar.controller = self
         window.delegate = self
-        window.contentViewController = makeRoot()
+        // The content view, not a content view controller: a window with one is sized to its view's smallest fitting
+        // size at every layout.
+        let root = makeRoot()
+        self.root = root
+        window.contentView = root.view
         let toolbar = NSToolbar(identifier: "Main")
         toolbar.delegate = toolbarController
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         window.toolbar = toolbar
         window.open(size: Self.defaultSize, autosave: layoutName("Main"))
+        if split.splitView.autosaveName == nil || UserDefaults.standard.object(forKey: "NSSplitView Subview Frames Sidebar") == nil {
+            window.layoutIfNeeded()
+            split.splitView.setPosition(236, ofDividerAt: 0)
+        }
         sidebar.onSelect = { [weak self] in self?.sidebarSelectionChanged() }
         observers.append(model.$data.sink { [weak self] _ in DispatchQueue.main.async { self?.refresh() } })
         observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.refresh() } })
@@ -68,7 +78,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     private func makeRoot() -> NSViewController {
         let sidebarItem = NSSplitViewItem(viewController: sidebar)
-        sidebarItem.minimumThickness = 190
+        sidebarItem.minimumThickness = 210
         sidebarItem.maximumThickness = 420
         sidebarItem.canCollapse = true
         sidebarItem.holdingPriority = NSLayoutConstraint.Priority(260)
@@ -94,7 +104,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         split.splitViewItems = [sidebarItem, columnItem]
         split.splitView.dividerStyle = .thin
         split.splitView.autosaveName = layoutName("Sidebar")
-        sidebarItem.viewController.view.widthAnchor.constraint(equalToConstant: 236).priority = .defaultLow
 
         let root = NSViewController()
         let rootView = NSView()
@@ -284,22 +293,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     func updateStatus() {
         let connection = activeConnection
-        statusBar.route.show(connection.map(routeText) ?? "", tip: "The route to the server: click for details, right-click to copy")
+        statusBar.route.show(connection.map(routeText) ?? "", tip: "the route to the server: click for details, right-click to copy")
         let state = connection.flatMap { model.states[$0.id] }
         var server = ""
         if connection != nil {
             if case .connected(let name)? = state { server = name } else { server = stateText(state) }
         }
-        statusBar.server.show(server, tip: "The server's software and version once connected: click for details")
+        statusBar.server.show(server, tip: "the server's software and version once connected: click for details")
         let badge = selectedTab?.tabContent?.transactionBadge ?? ""
-        statusBar.transaction.show(badge, tip: "This tab's transaction: click to commit or roll back")
+        statusBar.transaction.show(badge, tip: "this tab's transaction: click to commit or roll back")
         let running = model.activity.running
         statusBar.activity.show(running.isEmpty ? "" : running.count == 1 ? running[0].title : "\(running.count) tasks running",
-                                tip: "Work running now: click to see it and cancel it")
+                                tip: "work running now: click to see it and cancel it")
         statusBar.activity.setSpinning(!running.isEmpty)
-        statusBar.agent.show(model.agentStatus ?? "", tip: "What agents are doing: click for more, or to turn them off")
+        statusBar.agent.show(model.agentStatus ?? "", tip: "what agents are doing: click for more, or to turn them off")
         statusBar.setAccessory(selectedTab?.tabContent?.statusAccessory)
-        let canShowLog = NSApp.target(forAction: Commands.sqlLog.action, to: nil, from: statusBar.sqlLog) != nil
+        let canShowLog = statusBar.sqlLog.commandTarget(Commands.sqlLog.action) != nil
         statusBar.sqlLog.isEnabled = canShowLog
         statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tip + " (⌥⌘L)"
             : "Nothing has been sent yet: the SQL log lists every statement once you connect"
@@ -459,7 +468,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     /// Window ▸ the tabs (⌘1…⌘9) named after them; the others hidden, their shortcuts kept.
-    func menuNeedsUpdate(_ menu: NSMenu) {
+    func updateWindowMenu(_ menu: NSMenu) {
         for item in menu.items where item.action == Commands.tab(1).action {
             let index = item.tag - 1
             item.title = index < tabs.count ? tabs[index].title : ""

@@ -272,6 +272,8 @@ enum Commands {
     static let copy = Command("Copy", #selector(NSText.copy(_:)), "c", tip: "Copy the selection: text, cells or names")
     static let copyWithHeaders = Command("Copy with Headers", #selector(AirSQLActions.copyWithHeaders(_:)), "c", [.command, .option],
                                          tip: "Copy the selected cells with their column names as the first line")
+    static let copyAs = Command("Copy As", #selector(AirSQLActions.copyAs(_:)),
+                                tip: "Copy the selected cells in this format; it becomes ⌘C's format")
     static let copySummary = Command("Copy Selection Summary", #selector(AirSQLActions.copySummary(_:)), "C",
                                      tip: "Copy the selection's count, sum, average, minimum and maximum")
     static let paste = Command("Paste", #selector(NSText.paste(_:)), "v", tip: "Paste text, or cells into the grid as pending edits")
@@ -546,7 +548,7 @@ enum Commands {
         about, settings, hide, hideOthers, showAll, quit,
         newConnection, newQuery, open, closeTab, closeOtherTabs, closeWindow, save, saveAs, duplicateTab, renameTab, revealInFinder,
         runSQLFile, importCSV, importSSHConfig,
-        undo, redo, cut, copy, copyWithHeaders, copySummary, paste, delete, selectAll, copyName, copyColumnName, copyCreate,
+        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, filterSidebar, valuePanel, recordView, transpose, viewAs, chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,

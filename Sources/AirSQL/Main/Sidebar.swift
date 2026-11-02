@@ -217,7 +217,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             if outline.isItemExpanded(node) { outline.animator().collapseItem(node) } else { outline.animator().expandItem(node) }
         case .connection:
             // Connect (or show it when connected): whatever connects implements it.
-            NSApp.sendAction(Commands.connect.action, to: nil, from: outline)
+            outline.sendCommand(Commands.connect.action)
         }
     }
 
@@ -229,7 +229,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         if nodes.allSatisfy({ $0.connectionID != nil }) {
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
                       Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compare, nil])
-            menu.addItem(ConnectionMenus.colourMenu(delegate: main))
+            menu.addItem(ConnectionMenus.colourMenu())
             menu.add([nil, Commands.deleteConnection])
         } else {
             menu.add([Commands.newConnection])
@@ -302,7 +302,7 @@ final class SidebarOutlineView: NSOutlineView {
         case 36, 76:  // Return, Enter: as a double-click
             if let action = doubleAction { NSApp.sendAction(action, to: target, from: self) }
         case 51, 117:  // Delete, Forward Delete
-            if !sidebar!.selectedConnectionIDs.isEmpty { NSApp.sendAction(Commands.deleteConnection.action, to: nil, from: self) }
+            if sidebar?.selectedConnectionIDs.isEmpty == false { sendCommand(Commands.deleteConnection.action) }
         default:
             super.keyDown(with: event)
         }

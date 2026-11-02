@@ -339,4 +339,6 @@ final class TabButton: NSView, NSTextFieldDelegate {
         bar?.clicked(self, count: 1)
         return true
     }
+
+    override func isAccessibilityEnabled() -> Bool { true }
 }

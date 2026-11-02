@@ -34,8 +34,8 @@ enum MainMenu {
         return item
     }
 
-    /// The menu bar. `delegate` fills the menus that change as they open (Window's tabs, Colour's check mark).
-    static func build(delegate: NSMenuDelegate? = nil) -> NSMenu {
+    /// The menu bar.
+    static func build() -> NSMenu {
         let menus = Menus()
         let services = submenu("Services", [])
         NSApp.servicesMenu = services.submenu
@@ -56,16 +56,17 @@ enum MainMenu {
 
         menus.query.add([Commands.runStatement, Commands.runAll, Commands.runAllF9, Commands.runStatementF9, Commands.explain,
                          Commands.cancelQuery, nil, Commands.commit, Commands.rollback])
-        menus.query.addItem(submenu("Transaction Mode", [Commands.autoCommit.item(), Commands.manualCommit.item()], delegate: delegate))
+        menus.query.addItem(submenu("Transaction Mode", [Commands.autoCommit.item(), Commands.manualCommit.item()]))
         menus.query.add([nil, Commands.changeConnection])
 
-        let colours = ConnectionMenus.colourMenu(delegate: delegate)
+        let colours = ConnectionMenus.colourMenu()
         menus.connection.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection])
         menus.connection.addItem(colours)
         menus.connection.add([Commands.deleteConnection])
 
         menus.tools.add([Commands.openInTerminal, Commands.export, Commands.restore, nil, Commands.compare, nil])
-        menus.tools.addItem(submenu("Agents", [Commands.setUpAgents.item(), Commands.turnAgentsOff.item()]))
+        menus.tools.addItem(submenu("Agents", [Commands.setUpAgents.item(), Commands.agentActivity.item(),
+                                               Commands.turnAgentsOff.item()]))
 
         menus.window.add([Commands.minimize, Commands.zoom, nil, Commands.previousTab, Commands.nextTab, nil])
         for number in 1...9 {
@@ -75,7 +76,7 @@ enum MainMenu {
             menus.window.addItem(item)
         }
         menus.window.add([nil, Commands.mainWindow, Commands.bringAllToFront])
-        menus.window.delegate = delegate
+        menus.window.delegate = WindowMenu.shared
         NSApp.windowsMenu = menus.window
 
         // No ⌘?: macOS keeps it for the Help menu's search field.
@@ -112,10 +113,22 @@ extension NSMenu {
     }
 }
 
+/// The Window menu's tabs (⌘1…⌘9), named after the tabs of the frontmost main window as the menu opens.
+@MainActor
+final class WindowMenu: NSObject, NSMenuDelegate {
+    static let shared = WindowMenu()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let windows = [NSApp.keyWindow, NSApp.mainWindow].compactMap { $0 } + NSApp.orderedWindows
+        let main = windows.lazy.compactMap { $0.windowController as? MainWindowController }.first
+        main?.updateWindowMenu(menu)
+    }
+}
+
 /// The Colour menu of a connection (the menu bar's and the sidebar's): None, then each colour with its dot.
 @MainActor
 enum ConnectionMenus {
-    static func colourMenu(delegate: NSMenuDelegate?) -> NSMenuItem {
+    static func colourMenu() -> NSMenuItem {
         let items = ConnectionColour.allCases.map { colour -> NSMenuItem in
             let item = Commands.colour.item()
             item.title = colour.title
@@ -123,7 +136,7 @@ enum ConnectionMenus {
             item.image = colour.color.map { dotImage($0) }
             return item
         }
-        return MainMenu.submenu("Colour", items, delegate: delegate)
+        return MainMenu.submenu("Colour", items)
     }
 
     /// An 8 pt dot of `color` for a menu item.
