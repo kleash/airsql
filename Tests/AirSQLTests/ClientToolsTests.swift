@@ -1,0 +1,201 @@
+import Darwin
+import Foundation
+import Testing
+@testable import AirSQLCore
+
+// The client tools (plan §2.9): finding them and reading their versions, which suits which server, their command lines
+// (the login in a private option file, never on the command line), and the runner's pipelines.
+struct ClientToolsTests {
+    static func server(_ flavor: ServerInfo.Flavor, _ number: Int) -> ServerInfo {
+        ServerInfo(flavor: flavor, version: "\(number)", versionNumber: number, threadID: 1, tls: nil, certificate: nil)
+    }
+
+    static func tool(_ name: String, _ family: ToolVersion.Family, _ numbers: [Int]) -> ClientTool {
+        ClientTool(path: "/opt/homebrew/bin/" + name, version: ToolVersion(family: family, numbers: numbers))
+    }
+
+    @Test func versionsAreReadFromEveryKindOfVersionLine() {
+        let lines: [(String, ToolVersion?)] = [
+            ("mysql  Ver 8.4.3 for macos14.7 on arm64 (Homebrew)", ToolVersion(family: .mysql, numbers: [8, 4, 3])),
+            ("mysqldump  Ver 9.6.0 for macos26.2 on arm64 (Homebrew)", ToolVersion(family: .mysql, numbers: [9, 6, 0])),
+            ("mysql  Ver 14.14 Distrib 5.7.44, for osx10.19 (x86_64) using  EditLine wrapper",
+             ToolVersion(family: .mysql, numbers: [5, 7, 44])),
+            ("mysqldump  Ver 10.19 Distrib 10.5.23-MariaDB, for osx10.19 (arm64)", ToolVersion(family: .mariadb, numbers: [10, 5, 23])),
+            ("mariadb from 11.8.3-MariaDB, client 15.2 for osx10.20 (arm64) using  EditLine wrapper",
+             ToolVersion(family: .mariadb, numbers: [11, 8, 3])),
+            ("mariadb-dump from 11.4.2-MariaDB, client 10.19 for osx10.19 (arm64)\nsecond line",
+             ToolVersion(family: .mariadb, numbers: [11, 4, 2])),
+            ("mysql  Ver 8.0.35-27 for Linux on x86_64 (Percona Server (GPL), Release 27)", ToolVersion(family: .mysql, numbers: [8, 0, 35])),
+            ("zsh: command not found: mysql", nil),
+            ("", nil),
+        ]
+        for (line, version) in lines { #expect(ToolVersion.parse(line) == version, "\(line)") }
+    }
+
+    @Test func toolsAreFoundInHomebrewMAMPAndPathEachOnce() async throws {
+        let root = try scratch()
+        func make(_ path: String, _ version: String) throws {
+            try FileManager.default.createDirectory(atPath: root + (path as NSString).deletingLastPathComponent,
+                                                    withIntermediateDirectories: true)
+            try "#!/bin/sh\necho '\(version)'\n".write(toFile: root + path, atomically: true, encoding: .utf8)
+            chmod(root + path, 0o755)
+        }
+        try make("/opt/homebrew/opt/mysql-client/bin/mysqldump", "mysqldump  Ver 9.6.0 for macos26.2 on arm64 (Homebrew)")
+        try make("/opt/homebrew/opt/mariadb@10.11/bin/mariadb-dump", "mariadb-dump from 10.11.9-MariaDB, client 10.19 for osx10.19")
+        try make("/opt/homebrew/opt/openssl@3/bin/mysqldump", "not a dump tool")
+        try make("/Applications/MAMP/Library/bin/mysql80/bin/mysqldump", "mysqldump  Ver 8.0.35 for osx10.12 on x86_64 (MySQL)")
+        try make("/elsewhere/mysqldump", "mysqldump  Ver 14.14 Distrib 5.6.51, for osx10.13 (x86_64)")
+        // Homebrew's bin links to the formula's: one program.
+        try FileManager.default.createDirectory(atPath: root + "/opt/homebrew/bin", withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: root + "/opt/homebrew/bin/mysqldump",
+                                                   withDestinationPath: root + "/opt/homebrew/opt/mysql-client/bin/mysqldump")
+        let folders = ClientTools.searchFolders(environment: ["PATH": "/elsewhere:/usr/bin"], root: root)
+        #expect(!folders.contains(root + "/opt/homebrew/opt/openssl@3/bin"))
+        let tools = await ClientTools.find(.dump, folders: folders)
+        #expect(tools.map(\.title) == ["mariadb-dump 10.11.9", "mysqldump 9.6.0", "mysqldump 8.0.35", "mysqldump 5.6.51"])
+        // The chosen one comes first; a chosen one that isn't there says so.
+        let chosen = await ClientTools.find(.dump, chosen: root + "/elsewhere/mysqldump", folders: folders)
+        #expect(chosen.first?.path == root + "/elsewhere/mysqldump" && chosen.count == 4)
+        let missing = try #require(await ClientTools.find(.dump, chosen: root + "/nowhere/mysqldump", folders: []).first)
+        #expect(!missing.found && ClientTools.fit(missing, server: nil).message.contains("isn't there"))
+        // The best for each server: its family's, closest at or above its release.
+        #expect(ClientTools.best(tools, for: Self.server(.mysql, 80036))?.title == "mysqldump 8.0.35")
+        #expect(ClientTools.best(tools, for: Self.server(.mysql, 90100))?.title == "mysqldump 9.6.0")
+        #expect(ClientTools.best(tools, for: Self.server(.mariadb, 101106))?.title == "mariadb-dump 10.11.9")
+        #expect(ClientTools.best(tools, for: Self.server(.mariadb, 110809))?.title == "mariadb-dump 10.11.9")
+    }
+
+    @Test func eachToolSaysHowWellItSuitsTheServer() {
+        let mysql84 = Self.server(.mysql, 80413), maria118 = Self.server(.mariadb, 110809)
+        #expect(ClientTools.fit(Self.tool("mysqldump", .mysql, [8, 4, 3]), server: mysql84) == .good("✓ suits the server (MySQL 8.4)"))
+        #expect(ClientTools.fit(Self.tool("mysqldump", .mysql, [9, 6, 0]), server: mysql84).isUsable)
+        guard case .warning(let older) = ClientTools.fit(Self.tool("mysqldump", .mysql, [8, 0, 36]), server: mysql84) else {
+            Issue.record("an older tool should warn")
+            return
+        }
+        #expect(older.contains("older than the server"))
+        guard case .warning(let family) = ClientTools.fit(Self.tool("mysqldump", .mysql, [9, 6, 0]), server: maria118) else {
+            Issue.record("another family's tool should warn")
+            return
+        }
+        #expect(family.contains("MariaDB"))
+        #expect(!ClientTools.fit(Self.tool("mysqldump", .mysql, [5, 6, 51]), server: mysql84).isUsable)
+        #expect(!ClientTools.fit(Self.tool("mysqldump", .mariadb, [10, 1, 48]), server: maria118).isUsable)
+        #expect(!ClientTools.fit(ClientTool(path: "/bin/sh", version: nil), server: nil).isUsable)
+    }
+
+    @Test func theLoginGoesInAPrivateOptionFileTheToolsReadBackExactly() throws {
+        let folder = URL(fileURLWithPath: try scratch() + "/ClientTools")
+        let password = #"p#ss "w\o'rd ; x"# + "\ttab "
+        let url = try OptionFile.write(user: "app user", password: password, in: folder)
+        let file = try FileManager.default.attributesOfItem(atPath: url.path)
+        let dir = try FileManager.default.attributesOfItem(atPath: folder.path)
+        #expect(file[.posixPermissions] as? Int == 0o600 && dir[.posixPermissions] as? Int == 0o700)
+        // MySQL's own reader, when this Mac has it, reads the same user and password back.
+        let reader = "/opt/homebrew/opt/mysql-client/bin/my_print_defaults"
+        if FileManager.default.isExecutableFile(atPath: reader) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: reader)
+            process.arguments = ["--defaults-file=" + url.path, "-s", "client"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            try process.run()
+            process.waitUntilExit()
+            let lines = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                .split(separator: "\n").map(String.init)
+            #expect(lines == ["--user=app user", "--password=" + password])
+        }
+        OptionFile.removeLeftovers(in: folder)
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
+    }
+
+    @Test func commandLinesConnectAsTheConnectionDoesAndNeverHoldTheSecret() throws {
+        var options = ConnectOptions(name: "Shop", host: "db.example.com", port: 3307, user: "app", password: "s3cret",
+                                     tls: TLSOptions(mode: .verifyIdentity, caFile: "/certs/ca.pem"))
+        let mysql = ToolCommand(tool: Self.tool("mysqldump", .mysql, [8, 4, 3]), options: options, server: Self.server(.mysql, 80413))
+        var request = DumpRequest(databases: ["shop"], tables: ["customers", "orders"])
+        request.extra = try ToolCommand.words(#"--skip-comments --where="id > 5""#)
+        let dump = mysql.dump(request, optionFile: "/private/f.cnf")
+        #expect(dump == ["/opt/homebrew/bin/mysqldump", "--defaults-file=/private/f.cnf", "--protocol=TCP", "--host=db.example.com",
+                         "--port=3307", "--ssl-mode=VERIFY_IDENTITY", "--ssl-ca=/certs/ca.pem", "--default-character-set=utf8mb4",
+                         "--single-transaction", "--hex-blob", "--routines", "--events", "--triggers", "--skip-add-drop-table",
+                         "--skip-comments", "--where=id > 5", "shop", "customers", "orders"])
+        #expect(!dump.joined().contains("s3cret") && !dump.contains("app"))
+        #expect(ToolCommand.display(dump, optionFile: "/private/f.cnf")
+            .hasPrefix("/opt/homebrew/bin/mysqldump --defaults-file=‹private temporary file› --protocol=TCP"))
+        #expect(ToolCommand.display(dump, optionFile: "/private/f.cnf").hasSuffix("'--where=id > 5' shop customers orders"))
+        #expect(mysql.tlsProblem == nil)
+
+        // MariaDB's tools, several databases, through a route; MySQL 8's tool for MariaDB skips column statistics.
+        options.endpoint = .route("/private/tunnels/1.sock")
+        let maria = ToolCommand(tool: Self.tool("mariadb-dump", .mariadb, [11, 8, 3]), options: options,
+                                server: Self.server(.mariadb, 110809))
+        var both = DumpRequest(databases: ["shop", "crm"])
+        both.content = .data
+        let routed = maria.dump(both, optionFile: "/f")
+        #expect(routed.contains("--protocol=SOCKET") && routed.contains("--socket=/private/tunnels/1.sock") && !routed.contains("--host=db.example.com"))
+        #expect(routed.contains("--ssl") && routed.contains("--ssl-verify-server-cert") && routed.contains("--no-create-info"))
+        #expect(routed.contains("--skip-triggers") && Array(routed.suffix(3)) == ["--databases", "shop", "crm"])
+        let crossed = ToolCommand(tool: Self.tool("mysqldump", .mysql, [9, 6, 0]), options: options, server: Self.server(.mariadb, 110809))
+        #expect(crossed.dump(both, optionFile: "/f").contains("--loose-column-statistics=0"))
+        #expect(crossed.dump(both, optionFile: "/f").contains("--ssl-mode=VERIFY_CA"))  // no name check through a socket
+
+        // Restore and Terminal; the server's own socket needs no TLS.
+        options.endpoint = .socket("/tmp/mysql.sock")
+        let client = ToolCommand(tool: Self.tool("mysql", .mysql, [8, 4, 3]), options: options, server: nil)
+        #expect(client.restore(into: "shop", continueOnError: true, optionFile: "/f")
+            == ["/opt/homebrew/bin/mysql", "--defaults-file=/f", "--protocol=SOCKET", "--socket=/tmp/mysql.sock",
+                "--default-character-set=utf8mb4", "--batch", "--force", "shop"])
+        #expect(client.terminal(database: "", optionFile: "/f").last == "--default-character-set=utf8mb4")
+    }
+
+    @Test func toolsThatCantCheckTheCertificateAsAirSQLDoesSaySo() {
+        var options = ConnectOptions(host: "db.example.com", user: "app", tls: TLSOptions(mode: .verifyIdentity))
+        let mysql = Self.tool("mysqldump", .mysql, [8, 4, 3]), maria = Self.tool("mariadb-dump", .mariadb, [11, 4, 2])
+        #expect(ToolCommand(tool: mysql, options: options, server: nil).tlsProblem?.contains("CA file") == true)
+        #expect(ToolCommand(tool: maria, options: options, server: nil).tlsProblem == nil)
+        options.tls.pinnedFingerprint = "AB:CD"
+        #expect(ToolCommand(tool: maria, options: options, server: nil).tlsProblem?.contains("pinned") == true)
+        options.tls.mode = .off
+        #expect(ToolCommand(tool: mysql, options: options, server: nil).tlsProblem == nil)
+    }
+
+    @Test func extraOptionsSplitLikeAShellAndKeepSecretsOff() throws {
+        #expect(try ToolCommand.words(#"  --a 'b c' "d \"e\"" f\ g "#) == ["--a", "b c", #"d "e""#, "f g"])
+        for refused in ["--password=x", "-px", "--defaults-extra-file=/x", "--no-defaults", "-r out.sql", "--result-file=x", "'open"] {
+            #expect(throws: AirSQLError.self, "\(refused)") { try ToolCommand.words(refused) }
+        }
+        #expect(ToolCommand.shellWord("plain-word_1.sql") == "plain-word_1.sql")
+        #expect(ToolCommand.shellWord("it's") == #"'it'\''s'"#)
+    }
+
+    @Test func pipelinesCountWhatTheyCopyAndCancelStopsThem() async throws {
+        let dir = try scratch()
+        // A tool's output through gzip into a file, counted on its way.
+        let out = open(dir + "/out.gz", O_WRONLY | O_CREAT | O_TRUNC, 0o600)
+        var seen = 0
+        let piped = await Runner.output(of: ["/bin/sh", "-c", "yes 'INSERT INTO t VALUES (1);' | head -n 20000"], to: out,
+                                        through: ["/usr/bin/gzip", "-c"], cancellation: Cancellation(), chunk: { seen += $0.count })
+        close(out)
+        #expect(piped.tool.status == 0 && piped.filter?.status == 0 && piped.bytes == 20000 * 26 && seen == 20000 * 26)
+        // The file back into a tool through gzip -dc, counted by what was read from the file.
+        let size = try FileManager.default.attributesOfItem(atPath: dir + "/out.gz")[.size] as? Int64 ?? 0
+        let input = open(dir + "/out.gz", O_RDONLY)
+        var begun = false
+        let fed = await Runner.input(of: ["/bin/sh", "-c", "wc -l > '\(dir)/lines'"], from: input, through: ["/usr/bin/gzip", "-dc"],
+                                     cancellation: Cancellation(), begun: { begun = true }) { _ in }
+        close(input)
+        #expect(fed.tool.status == 0 && fed.bytes == size && begun)
+        #expect((try String(contentsOfFile: dir + "/lines")).trimmingCharacters(in: .whitespacesAndNewlines) == "20000")
+        // Cancel ends the tool (SIGTERM to its process group).
+        let cancellation = Cancellation()
+        let devNull = open("/dev/null", O_WRONLY)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { cancellation.cancel() }
+        let stopped = await Runner.output(of: ["/bin/sleep", "30"], to: devNull, cancellation: cancellation)
+        close(devNull)
+        #expect(stopped.tool.status == 128 + SIGTERM)
+        // A tool that isn't there.
+        #expect(await Runner.run(["/nowhere/mysqldump", "--version"]).status == 127)
+        #expect(Runner.childEnvironment(["MYSQL_PWD": "x", "MYSQL_HOST": "h", "PATH": "/bin"], [:]).keys.sorted() == ["LC_CTYPE", "PATH"])
+    }
+}
