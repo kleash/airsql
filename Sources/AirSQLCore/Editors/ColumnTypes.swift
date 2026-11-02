@@ -111,6 +111,7 @@ public struct TypeSpec: Hashable {
             var end = index + 1, quoted = false
             while end < scalars.count, quoted || scalars[end] != ")" {
                 if scalars[end] == "'" { quoted.toggle() }
+                if quoted, scalars[end] == "\\" { end += 1 }
                 end += 1
             }
             length = String(String.UnicodeScalarView(scalars[(index + 1)..<min(end, scalars.count)]))

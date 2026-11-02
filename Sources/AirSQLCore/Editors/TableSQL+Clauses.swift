@@ -154,9 +154,17 @@ extension TableSQL {
         try name(table.name, "The table")
         guard !table.columns.isEmpty else { throw DesignError("Add a column first: a table needs at least one") }
         var seen = Set<String>()
+        try keepable([table.options.comment] + table.indexes.flatMap { [$0.name, $0.comment] }
+                     + table.foreignKeys.map(\.name) + table.checks.map(\.name))
         for column in table.columns {
             try name(column.name, "A column")
             guard seen.insert(column.name.lowercased()).inserted else { throw DesignError("Two columns are named \(column.name)") }
+            var texts = [column.comment]
+            if case .value(let value) = column.defaultValue { texts.append(value) }
+            if column.columnType?.length == .values {
+                texts += (try? TypeSpec.values(column.type.length, noBackslashEscapes: server.noBackslashEscapes)) ?? []
+            }
+            try keepable(texts)
             if column.autoIncrement && !(column.columnType?.integer ?? false) {
                 throw DesignError("Only whole-number columns can count up by themselves (AUTO_INCREMENT): \(column.name)")
             }
@@ -190,7 +198,17 @@ extension TableSQL {
     /// A name the server takes: not empty, at most 64 characters, not ending in a space.
     func name(_ name: String, _ what: String) throws {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { throw DesignError("\(what) needs a name") }
+        try keepable([name])
         guard name.count <= 64 else { throw DesignError("“\(name.prefix(20))…” is longer than the 64 characters a name may have") }
         guard !name.hasSuffix(" ") else { throw DesignError("“\(name)” ends with a space, which names may not") }
+    }
+
+    /// Refuses text a table's definition can't keep: names, comments, ENUM values and defaults are stored as utf8mb3 on
+    /// both servers, so an emoji (or anything else past U+FFFF) would quietly become "?".
+    func keepable(_ texts: [String]) throws {
+        for text in texts where text.unicodeScalars.contains(where: { $0.value > 0xFFFF }) {
+            throw DesignError("“\(text.prefix(30))” has an emoji or another character the server would keep as ?; names, "
+                              + "comments, values and defaults can't hold those")
+        }
     }
 }

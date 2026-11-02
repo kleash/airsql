@@ -284,6 +284,8 @@ struct TableEditorTests {
             { $0.columns[1].name = "ID" }, { $0.columns = [] }, { $0.columns[3].autoIncrement = true },
             { $0.indexes[1].parts = [] }, { $0.indexes[1].parts = [.init(column: "nope")] }, { $0.indexes[1].name = "PRIMARY"; $0.indexes[1].kind = .primary },
             { $0.foreignKeys[0].referencedColumns = [] }, { $0.checks[0].clause = " " }, { $0.columns[2].collation = "x'y" },
+            { $0.columns[0].name = "id 😀" }, { $0.columns[0].comment = "🐬" }, { $0.options.comment = "🐬" },
+            { $0.columns[2].type.length = "'😀'" }, { $0.columns[2].defaultValue = .value("😀") }, { $0.indexes[1].name = "🐬" },
         ]
         for change in cases {
             #expect(throws: DesignError.self) { try alter(change) }
@@ -291,7 +293,7 @@ struct TableEditorTests {
     }
 
     @Test func quotesHostileNamesAndValuesEverywhere() throws {
-        for name in Hostile.names where !name.trimmingCharacters(in: .whitespaces).isEmpty {
+        for name in Hostile.names where !name.trimmingCharacters(in: .whitespaces).isEmpty && !name.unicodeScalars.contains(where: { $0.value > 0xFFFF }) {
             var table = TableDesign(name: name)
             var column = ColumnDesign(name: name, type: TypeSpec(name: "enum", length: SQLQuote.string(name)))
             column.comment = name
