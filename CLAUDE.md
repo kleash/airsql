@@ -51,9 +51,10 @@ Also `docs/dev/grid-spec.md` (the grid), `docs/dev/mockups.html` (the look: them
 | Path | What |
 |---|---|
 | `Package.swift` | Targets: `CPTY` (C, from AirSCP: run a program on a pseudo-terminal), `CMariaDB` (module map over libmariadb's headers in `vendor/out`; links it), `AirSQLCore` (no UI), `AirSQL` (the AppKit app), `AirSQLTests` (Swift Testing) |
-| `Sources/AirSQLCore/<Area>/` | Core code by area, e.g. `Driver/` (`MariaDB.swift`: the client library's version) |
-| `Sources/AirSQL/<Area>/` | The app by area; `main.swift` runs helper modes (`--version`) first, then the app |
-| `Tests/AirSQLTests/<Area>Tests.swift` | One suite file per area (`DriverTests.swift`); lab tests need `AIRSQL_LAB=1` |
+| `Sources/AirSQLCore/<Area>/` | Core code by area: `Driver/` (`MariaDB.swift`: the client library's version), `DB/` (the driver and sessions: `DBConnection`, `Connection`, `ResultStore`, `SQLQuote`, `SQLLog`, `ErrorMapping`, `TLSCheck`), `Schema/` (the schema cache), `Models/` (saved connections, settings, `Store`, `Keychain`), `Activity/` (slow work and its Cancel) |
+| `Sources/AirSQL/<Area>/` | The app by area; `main.swift` runs helper modes (`--version`) first, then the app. `Menus/Commands.swift` is the one table of commands, shortcuts and tooltips (`Menus+<Lane>.swift`: the lanes' slots); `Settings/` has one file per pane; `Harness/` drives the UI (tests only until L7) |
+| `Tests/AirSQLTests/<Area>Tests.swift` | One suite file per area (`DriverTests.swift`); lab tests need `AIRSQL_LAB=1`. `Support/`: isolation, polling and a throwaway sshd (`Support.swift`), the lab's endpoints (`Lab.swift`), fake proxies (`TestProxy.swift`), the app tests' window and harness (`App.swift`; UI tests go in `extension AppTests`, which runs serialized) |
+| `testenv/` | The Docker lab (Compose project `airsql-lab`): `docker-compose.yml`, `up.sh [service...]`, `down.sh`, `seed/` (the fixture and logins), `AGENT.md` (how to use it, the throwaway credentials) |
 | `Resources/` | `AirSQL-Info.plist`; `Licenses/` (copied into the app with `NOTICE`) |
 | `scripts/build-mariadb.sh` | libmariadb: Connector/C 3.4 over a static OpenSSL, universal, install name `@rpath/libmariadb.3.dylib` |
 | `docs/dev/` | The plan, grid spec, mockups, scope and research |
@@ -66,7 +67,11 @@ Also `docs/dev/grid-spec.md` (the grid), `docs/dev/mockups.html` (the look: them
 swift build              # debug build: must have 0 warnings (run the app from build/AirSQL.app, where libmariadb is)
 ./test.sh                # Swift Testing (needs Swift 6); extra args go to swift test: ./test.sh --filter DriverTests
 AIRSQL_LAB=1 ./test.sh   # + the lab suites (starts the lab: testenv/up.sh)
+AIRSQL_SCREENSHOTS=1 ./test.sh --filter ScreenshotTests   # light and dark pictures of each screen, in build/screenshots
 ```
+
+UI tests drive the app in-process through `Sources/AirSQL/Harness` (`appWindow` and `call` in
+`Tests/AirSQLTests/Support/App.swift`).
 
 libmariadb comes from a vendor cache outside the repository: `scripts/build-mariadb.sh` keeps its output in
 `$AIRSQL_VENDOR_CACHE/<SHA-256 of the script>` (default `../airsql-vendor-cache`, shared by every worktree) and copies
