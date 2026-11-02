@@ -1,0 +1,137 @@
+import AirSQLCore
+import AppKit
+
+/// The menu bar (plan §2.4): the menus in their fixed order, P0's own items, then each lane's items from its
+/// `Menus+<Lane>.swift`. Items come from `Commands`, so the shortcut, tooltip and action are the same wherever a command
+/// appears. A menu that no lane has filled yet is hidden.
+@MainActor
+enum MainMenu {
+    /// The menus, for the lanes' slot functions to add their items to.
+    struct Menus {
+        let app = NSMenu(title: "AirSQL")
+        let file = NSMenu(title: "File")
+        let edit = NSMenu(title: "Edit")
+        let view = NSMenu(title: "View")
+        let query = NSMenu(title: "Query")
+        let data = NSMenu(title: "Data")
+        let database = NSMenu(title: "Database")
+        let connection = NSMenu(title: "Connection")
+        let tools = NSMenu(title: "Tools")
+        let window = NSMenu(title: "Window")
+        let help = NSMenu(title: "Help")
+
+        var inOrder: [NSMenu] { [app, file, edit, view, query, data, database, connection, tools, window, help] }
+    }
+
+    /// A submenu item: `title`'s tip from `Commands.submenus`, the items given.
+    static func submenu(_ title: String, _ items: [NSMenuItem], delegate: NSMenuDelegate? = nil) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: title)
+        items.forEach(menu.addItem)
+        menu.delegate = delegate
+        item.submenu = menu
+        item.toolTip = Commands.submenus[title]
+        return item
+    }
+
+    /// The menu bar. `delegate` fills the menus that change as they open (Window's tabs, Colour's check mark).
+    static func build(delegate: NSMenuDelegate? = nil) -> NSMenu {
+        let menus = Menus()
+        let services = submenu("Services", [])
+        NSApp.servicesMenu = services.submenu
+        menus.app.add([Commands.about, nil, Commands.settings, nil])
+        menus.app.addItem(services)
+        menus.app.add([nil, Commands.hide, Commands.hideOthers, Commands.showAll, nil, Commands.quit])
+
+        menus.file.add([Commands.newConnection, Commands.newQuery, nil, Commands.closeTab, Commands.closeOtherTabs,
+                        Commands.closeWindow, nil, Commands.duplicateTab, Commands.renameTab, Commands.revealInFinder])
+
+        menus.edit.add([Commands.undo, Commands.redo, nil, Commands.cut, Commands.copy, Commands.paste, Commands.delete,
+                        Commands.selectAll, nil])
+        menus.edit.addItem(submenu("Find", [Commands.find, Commands.findAndReplace, Commands.findNext, Commands.findPrevious,
+                                            Commands.useSelectionForFind].map { $0.item() }))
+
+        menus.view.add([Commands.toggleSidebar, Commands.filterSidebar, nil, Commands.sqlLog, Commands.clearSQLLog,
+                        Commands.activity, Commands.cancelAll, nil, Commands.refresh])
+
+        menus.query.add([Commands.runStatement, Commands.runAll, Commands.runAllF9, Commands.runStatementF9, Commands.explain,
+                         Commands.cancelQuery, nil, Commands.commit, Commands.rollback])
+        menus.query.addItem(submenu("Transaction Mode", [Commands.autoCommit.item(), Commands.manualCommit.item()], delegate: delegate))
+        menus.query.add([nil, Commands.changeConnection])
+
+        let colours = ConnectionMenus.colourMenu(delegate: delegate)
+        menus.connection.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection])
+        menus.connection.addItem(colours)
+        menus.connection.add([Commands.deleteConnection])
+
+        menus.tools.add([Commands.openInTerminal, Commands.export, Commands.restore, nil, Commands.compare, nil])
+        menus.tools.addItem(submenu("Agents", [Commands.setUpAgents.item(), Commands.turnAgentsOff.item()]))
+
+        menus.window.add([Commands.minimize, Commands.zoom, nil, Commands.previousTab, Commands.nextTab, nil])
+        for number in 1...9 {
+            let item = Commands.tab(number).item()
+            item.isHidden = true  // shown with the tab's title while there is such a tab (`menuNeedsUpdate`)
+            item.allowsKeyEquivalentWhenHidden = true
+            menus.window.addItem(item)
+        }
+        menus.window.add([nil, Commands.mainWindow, Commands.bringAllToFront])
+        menus.window.delegate = delegate
+        NSApp.windowsMenu = menus.window
+
+        // No ⌘?: macOS keeps it for the Help menu's search field.
+        menus.help.add([Commands.help, Commands.gettingStarted, nil, Commands.reportProblem, Commands.copyDiagnostics])
+        NSApp.helpMenu = menus.help
+
+        // The lanes' items (plan §2.4: each lane adds its own in its Menus+<Lane>.swift).
+        addConnectionItems(menus)
+        addGridItems(menus)
+        addConsoleItems(menus)
+        addNavigatorItems(menus)
+        addToolItems(menus)
+        addAgentItems(menus)
+        addReconItems(menus)
+
+        // Last in View, as on every Mac.
+        menus.view.add([nil, Commands.fullScreen])
+
+        let bar = NSMenu()
+        for menu in menus.inOrder {
+            let item = NSMenuItem(title: menu.title, action: nil, keyEquivalent: "")
+            item.submenu = menu
+            item.isHidden = menu.items.isEmpty
+            bar.addItem(item)
+        }
+        return bar
+    }
+}
+
+extension NSMenu {
+    /// Adds the commands' items in order; nil is a separator.
+    func add(_ commands: [Command?]) {
+        for command in commands { addItem(command?.item() ?? .separator()) }
+    }
+}
+
+/// The Colour menu of a connection (the menu bar's and the sidebar's): None, then each colour with its dot.
+@MainActor
+enum ConnectionMenus {
+    static func colourMenu(delegate: NSMenuDelegate?) -> NSMenuItem {
+        let items = ConnectionColour.allCases.map { colour -> NSMenuItem in
+            let item = Commands.colour.item()
+            item.title = colour.title
+            item.representedObject = colour.rawValue
+            item.image = colour.color.map { dotImage($0) }
+            return item
+        }
+        return MainMenu.submenu("Colour", items, delegate: delegate)
+    }
+
+    /// An 8 pt dot of `color` for a menu item.
+    static func dotImage(_ color: NSColor) -> NSImage {
+        NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            return true
+        }
+    }
+}
