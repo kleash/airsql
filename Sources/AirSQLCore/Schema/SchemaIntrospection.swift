@@ -28,7 +28,8 @@ struct TableDetails: Equatable {
 /// Open_full_table): table statistics, CARDINALITY, foreign keys and checks. So the names-first queries use only
 /// columns that don't open tables, CARDINALITY is never read, and statistics are read for one database at a time. A
 /// query that names one database (`= 'db'`), or one database and some tables, reads only those on MariaDB; a query
-/// that joins two such tables reads the second one in full, so foreign keys and their rules are two queries.
+/// that joins two such tables reads the second one in full, so foreign keys and their rules are two queries, joined
+/// here (as MySQL's checks and their tables are: joining those views is slow on MySQL 8).
 struct SchemaIntrospection {
     let server: SchemaServer
 
@@ -113,8 +114,8 @@ struct SchemaIntrospection {
             if case .objects(let name, _) = scope { database = .databases([name]) }
             return ["SELECT CONSTRAINT_SCHEMA, CONSTRAINT_NAME, CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS"
                         + filter(database, schema: "CONSTRAINT_SCHEMA", name: "CONSTRAINT_NAME"),
-                    "SELECT TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ENFORCED FROM information_schema.TABLE_CONSTRAINTS "
-                        + "WHERE CONSTRAINT_TYPE = 'CHECK'"
+                    "SELECT TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ENFORCED "
+                        + "FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_TYPE = 'CHECK'"
                         + filter(scope, schema: "TABLE_SCHEMA", name: "TABLE_NAME", joiner: "AND")]
         case .mariadb:
             return ["SELECT CONSTRAINT_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, CHECK_CLAUSE, 'YES' "
