@@ -1,0 +1,4 @@
+# gitleaks (security.yml scans the whole git history) with its default rules. Only verified false positives are
+# allowed here, each with the reason.
+[extend]
+useDefault = true

@@ -1,0 +1,93 @@
+# CodeQL code scanning of AirSQL's own code, Swift and C (Sources/CPTY), with the security-extended queries: on pushes to
+# main, pull requests and by hand. CodeQL analyses what is built while it watches, so libmariadb (vendor/, from the
+# cache or scripts/build-mariadb.sh) is built before it starts and only `swift build` is analysed. The results go to the
+# Security tab while the repository is public (code scanning is free there); every run also keeps them as the
+# codeql-sarif artifact.
+name: CodeQL
+
+# Pull requests and merges into main (which also keep the Security tab current), and by hand; no schedule.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to a pull request replaces its run. Every other run has a group of its own and finishes: a cancelled
+# run (even one still waiting for an earlier one) shows as "failing" on the README's badge.
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      actions: read            # CodeQL reads its own run's details (needed on a private repository)
+      contents: read
+      security-events: write   # to upload the results to the Security tab
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # CodeQL's tracer runs xcrun as x86_64, and the runner's newest Command Line Tools (macOS 27) are Apple silicon
+      # only: it builds with the newest Xcode 26, which still has both.
+      - name: Use the newest Xcode 26
+        run: |
+          xcode=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)
+          [ -n "$xcode" ] || { echo "::error::No Xcode 26 on this runner"; exit 1; }
+          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $xcode"
+
+      - name: Restore libmariadb
+        id: mariadb
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vendor/out
+          key: mariadb-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build-mariadb.sh') }}
+
+      - name: Build libmariadb (only when the cache missed)
+        if: steps.mariadb.outputs.cache-hit != 'true'
+        run: scripts/build-mariadb.sh
+
+      - name: Save libmariadb
+        if: steps.mariadb.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vendor/out
+          key: mariadb-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build-mariadb.sh') }}
+
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: swift, c-cpp
+          build-mode: manual
+          queries: security-extended
+
+      - name: swift build
+        run: swift build
+
+      # Results go to the Security tab only while the repository is public: ask the API whether it is.
+      - name: Is the repository public?
+        id: repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "public=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private == false')" >> "$GITHUB_OUTPUT"
+
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          output: build/codeql-sarif
+          upload: ${{ steps.repository.outputs.public == 'true' && 'always' || 'never' }}
+
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codeql-sarif
+          path: build/codeql-sarif
+          if-no-files-found: ignore
+          retention-days: 30
