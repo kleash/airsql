@@ -3,6 +3,7 @@ module CMariaDB [system] {
     header "../../vendor/out/universal/include/mysql.h"
     header "../../vendor/out/universal/include/errmsg.h"
     header "../../vendor/out/universal/include/mysqld_error.h"
+    header "airsql_openssl.h"
     link "mariadb"
     export *
 }
