@@ -36,11 +36,16 @@ enum ReconNormal {
     static func onUpdate(_ text: String?) -> String? { text.map(expression) }
 
     /// An expression (default, generated column, check) without spelling noise: whitespace, case outside quotes,
-    /// character set introducers (MySQL writes _utf8mb4'a'), outer parentheses, now() and current_timestamp().
+    /// character set introducers (MySQL writes _utf8mb4'a'), outer parentheses, MySQL's -(1) for -1, MariaDB's ucase
+    /// and lcase for upper and lower, now() and current_timestamp().
     static func expression(_ text: String) -> String {
         var text = compact(text, lowercase: true)
         for introducer in ["_utf8mb4'", "_utf8mb3'", "_utf8'", "_latin1'", "_binary'", "_ascii'"] {
             text = text.replacingOccurrences(of: introducer, with: "'")
+        }
+        text = text.replacingOccurrences(of: #"-\((\d+(\.\d+)?)\)"#, with: "-$1", options: .regularExpression)
+        for (from, to) in [("ucase(", "upper("), ("lcase(", "lower(")] {
+            text = text.replacingOccurrences(of: from, with: to)
         }
         while text.hasPrefix("("), text.hasSuffix(")"), balanced(text.dropFirst().dropLast()) {
             text = String(text.dropFirst().dropLast())
