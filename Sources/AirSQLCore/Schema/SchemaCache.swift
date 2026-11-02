@@ -74,11 +74,11 @@ public final class SchemaCache {
     /// statistics that were loaded before.
     public func load() async throws {
         try await serially { [self] old, publish in
-            guard let server = SchemaIntrospection.server(try await source.rows(SchemaIntrospection.serverSQL)) else {
+            guard let server = SchemaIntrospection.server(try await rows(SchemaIntrospection.serverSQL)) else {
                 throw SchemaError()
             }
             let introspection = SchemaIntrospection(server: server)
-            let all = SchemaIntrospection.databases(try await source.rows(introspection.databasesSQL(nil)))
+            let all = SchemaIntrospection.databases(try await rows(introspection.databasesSQL(nil)))
             let allowed = all.filter { includes($0.name) }.sorted(by: Self.byName)
             let allowedNames = allowed.map(\.name)
             var snapshot = SchemaSnapshot()
@@ -180,15 +180,21 @@ public final class SchemaCache {
 
     // MARK: Reading
 
+    /// One statement on the schema session; a cancelled operation (Cancel in the activity list) sends no more.
+    private func rows(_ sql: String) async throws -> [[String?]] {
+        try Task.checkCancellation()
+        return try await source.rows(sql)
+    }
+
     /// The databases with their tables, routines, triggers and events: one query per kind for these databases (nil:
     /// every database).
     private func names(_ introspection: SchemaIntrospection, _ names: [String]?,
                        into databases: [SchemaDatabase]) async throws -> [SchemaDatabase] {
         let scope = SchemaScope.databases(names)
-        let tables = SchemaIntrospection.tables(try await source.rows(introspection.tablesSQL(scope)))
-        let routines = SchemaIntrospection.routines(try await source.rows(introspection.routinesSQL(scope)))
-        let triggers = SchemaIntrospection.triggers(try await source.rows(introspection.triggersSQL(scope)))
-        let events = SchemaIntrospection.events(try await source.rows(introspection.eventsSQL(scope)))
+        let tables = SchemaIntrospection.tables(try await rows(introspection.tablesSQL(scope)))
+        let routines = SchemaIntrospection.routines(try await rows(introspection.routinesSQL(scope)))
+        let triggers = SchemaIntrospection.triggers(try await rows(introspection.triggersSQL(scope)))
+        let events = SchemaIntrospection.events(try await rows(introspection.eventsSQL(scope)))
         return databases.map { database in
             var database = database
             database.tables = (tables[database.name] ?? []).sorted(by: Self.byName)
@@ -201,25 +207,25 @@ public final class SchemaCache {
 
     private func details(_ introspection: SchemaIntrospection,
                          _ scope: SchemaScope) async throws -> [TableKey: TableDetails] {
-        let columns = try await source.rows(introspection.columnsSQL(scope))
-        let indexes = try await source.rows(introspection.indexesSQL(scope))
-        let foreignKeys = try await source.rows(introspection.foreignKeysSQL(scope))
-        let rules = try await source.rows(introspection.foreignKeyRulesSQL(scope))
-        var checks: [[String?]] = []
-        if let sql = introspection.checksSQL(scope) {
-            checks = try await source.rows(sql)
+        let columns = try await rows(introspection.columnsSQL(scope))
+        let indexes = try await rows(introspection.indexesSQL(scope))
+        let foreignKeys = try await rows(introspection.foreignKeysSQL(scope))
+        let rules = try await rows(introspection.foreignKeyRulesSQL(scope))
+        var checks: [[[String?]]] = []
+        for sql in introspection.checksSQL(scope) {
+            checks.append(try await rows(sql))
         }
         return introspection.details(columns: columns, indexes: indexes, foreignKeys: foreignKeys,
-                                     foreignKeyRules: rules, checks: checks)
+                                     foreignKeyRules: rules, checks: SchemaIntrospection.checks(checks))
     }
 
     private func statistics(_ introspection: SchemaIntrospection, _ database: String,
                             tables: [String]? = nil) async throws -> [String: TableStatistics] {
         if let setup = introspection.statisticsSetupSQL {
-            _ = try await source.rows(setup)
+            _ = try await rows(setup)
         }
-        let rows = try await source.rows(introspection.statisticsSQL(database, tables: tables))
-        return SchemaIntrospection.statistics(rows, database: database)
+        let found = try await rows(introspection.statisticsSQL(database, tables: tables))
+        return SchemaIntrospection.statistics(found, database: database)
     }
 
     // MARK: Refreshing
@@ -229,10 +235,10 @@ public final class SchemaCache {
     private func refreshDatabase(_ name: String, _ introspection: SchemaIntrospection,
                                  in snapshot: inout SchemaSnapshot) async throws -> Set<String> {
         let server = introspection.server
-        let rows = SchemaIntrospection.databases(try await source.rows(introspection.databasesSQL([name])))
+        let databases = SchemaIntrospection.databases(try await rows(introspection.databasesSQL([name])))
         let previous = snapshot.database(name)
         snapshot.databases.removeAll { server.same($0.name, name) }
-        guard let found = rows.first(where: { server.same($0.name, name) }), includes(found.name) else {
+        guard let found = databases.first(where: { server.same($0.name, name) }), includes(found.name) else {
             return previous.map { [$0.name] } ?? []
         }
         var database = try await names(introspection, [found.name], into: [found])[0]
@@ -258,7 +264,7 @@ public final class SchemaCache {
         var changed: Set<String> = [database.name]
         /// What a query returned for this database.
         func read<T>(_ sql: String, _ parse: ([[String?]]) -> [String: [T]]) async throws -> [T] {
-            parse(try await source.rows(sql))[database.name] ?? []
+            parse(try await rows(sql))[database.name] ?? []
         }
         var tables: [String] = [], routines: [String] = [], triggers: [String] = [], events: [String] = []
         for object in objects {

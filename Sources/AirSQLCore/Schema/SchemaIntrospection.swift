@@ -101,21 +101,25 @@ struct SchemaIntrospection {
             + filter(scope, schema: "CONSTRAINT_SCHEMA", name: "TABLE_NAME")
     }
 
-    /// nil where the server has no checks: MySQL before 8.0.16 parses CHECK and ignores it. MySQL's check view has no
-    /// table name (its names are unique per database), so it is joined with TABLE_CONSTRAINTS, which has one.
-    func checksSQL(_ scope: SchemaScope) -> String? {
+    /// The statements that read check constraints (`checks(_:)` reads what they return): none on MySQL before 8.0.16,
+    /// which parses CHECK and ignores it. MySQL's check view has no table name (check names are unique per database),
+    /// so the tables come from TABLE_CONSTRAINTS, read on its own: joining the two views rebuilds TABLE_CONSTRAINTS for
+    /// every row, which took 30 s to 2 min on MySQL 8.4 for a database of 4,400 checks.
+    func checksSQL(_ scope: SchemaScope) -> [String] {
         switch server.flavour {
         case .mysql:
-            guard server.atLeast(8, 0, 16) else { return nil }
-            return "SELECT t.TABLE_SCHEMA, t.TABLE_NAME, t.CONSTRAINT_NAME, c.CHECK_CLAUSE, t.ENFORCED "
-                + "FROM information_schema.TABLE_CONSTRAINTS t JOIN information_schema.CHECK_CONSTRAINTS c "
-                + "ON c.CONSTRAINT_SCHEMA = t.CONSTRAINT_SCHEMA AND c.CONSTRAINT_NAME = t.CONSTRAINT_NAME "
-                + "WHERE t.CONSTRAINT_TYPE = 'CHECK'"
-                + filter(scope, schema: "t.TABLE_SCHEMA", name: "t.TABLE_NAME", joiner: "AND")
+            guard server.atLeast(8, 0, 16) else { return [] }
+            var database = scope
+            if case .objects(let name, _) = scope { database = .databases([name]) }
+            return ["SELECT CONSTRAINT_SCHEMA, CONSTRAINT_NAME, CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS"
+                        + filter(database, schema: "CONSTRAINT_SCHEMA", name: "CONSTRAINT_NAME"),
+                    "SELECT TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ENFORCED FROM information_schema.TABLE_CONSTRAINTS "
+                        + "WHERE CONSTRAINT_TYPE = 'CHECK'"
+                        + filter(scope, schema: "TABLE_SCHEMA", name: "TABLE_NAME", joiner: "AND")]
         case .mariadb:
-            return "SELECT CONSTRAINT_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, CHECK_CLAUSE, 'YES' "
-                + "FROM information_schema.CHECK_CONSTRAINTS"
-                + filter(scope, schema: "CONSTRAINT_SCHEMA", name: "TABLE_NAME")
+            return ["SELECT CONSTRAINT_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, CHECK_CLAUSE, 'YES' "
+                        + "FROM information_schema.CHECK_CONSTRAINTS"
+                        + filter(scope, schema: "CONSTRAINT_SCHEMA", name: "TABLE_NAME")]
         }
     }
 
@@ -228,6 +232,21 @@ struct SchemaIntrospection {
                 SchemaEvent(name: name, status: row.at(2) ?? "", comment: row.at(3) ?? ""))
         }
         return result
+    }
+
+    /// Check rows (database, table, name, clause, enforced) from what the `checksSQL` statements returned.
+    static func checks(_ results: [[[String?]]]) -> [[String?]] {
+        guard results.count == 2 else { return results.first ?? [] } // MariaDB's has them all
+        var clauses: [String: String?] = [:]
+        for row in results[0] {
+            if let database = row.at(0), let name = row.at(1) { clauses[database + "\u{0}" + name] = row.at(2) }
+        }
+        return results[1].compactMap { row in
+            guard let database = row.at(0), let name = row.at(2), let clause = clauses[database + "\u{0}" + name] else {
+                return nil
+            }
+            return [database, row.at(1), name, clause, row.at(3)]
+        }
     }
 
     /// Details by table from the rows of the column, index, foreign key, foreign key rule and check queries.

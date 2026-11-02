@@ -11,8 +11,14 @@ final class ReplaySource: SchemaQuerying {
         results = Self.parse(recording)
     }
 
+    /// The kind of statement during which the operation is cancelled, as Cancel in the activity list would.
+    var cancelAt: String?
+
     func rows(_ sql: String) async throws -> [[String?]] {
         sent.append(sql)
+        if let cancelAt, Self.kind(of: sql) == cancelAt {
+            withUnsafeCurrentTask { $0?.cancel() }
+        }
         return results[Self.kind(of: sql)] ?? []
     }
 
@@ -20,6 +26,7 @@ final class ReplaySource: SchemaQuerying {
     static func kind(of sql: String) -> String {
         let kinds = [("VERSION()", "server"), ("SET SESSION", "setup"), ("TABLE_ROWS", "statistics"),
                      ("information_schema.SCHEMATA", "databases"), ("information_schema.CHECK_CONSTRAINTS", "checks"),
+                     ("information_schema.TABLE_CONSTRAINTS", "checkTables"),
                      ("information_schema.KEY_COLUMN_USAGE", "foreignKeys"),
                      ("information_schema.REFERENTIAL_CONSTRAINTS", "foreignKeyRules"),
                      ("information_schema.COLUMNS", "columns"), ("information_schema.STATISTICS", "indexes"),
@@ -229,7 +236,8 @@ struct SchemaTests {
     func readsNamesFirstWithOneQueryPerKindAndNoTableStatistics(_ recording: Recording) async throws {
         let (_, source) = try await Self.loaded(recording.text)
         let kinds = source.sent.map(ReplaySource.kind(of:))
-        let checks = kinds.contains("checks") ? ["checks"] : []
+        let server = try #require(SchemaIntrospection.server(ReplaySource(recording.text).results["server"] ?? []))
+        let checks = server.flavour == .mariadb ? ["checks"] : server.atLeast(8) ? ["checks", "checkTables"] : []
         #expect(kinds == ["server", "databases", "tables", "routines", "triggers", "events", "columns", "indexes",
                           "foreignKeys", "foreignKeyRules"] + checks)
         // Each of these makes MariaDB and MySQL 5.7 open every table (EXPLAIN: Open_full_table).
@@ -393,6 +401,18 @@ struct SchemaTests {
         #expect(cache.snapshot.database("airsql_fixture")?.table("log") == nil)
     }
 
+    @Test func cancellingALoadStopsItsQueriesAndPublishesNothing() async throws {
+        let source = ReplaySource(SchemaFixtures.mariadb118)
+        source.cancelAt = "routines" // Cancel pressed while the routines query runs
+        let cache = SchemaCache(source: source, includes: { Self.fixtureDatabases.contains($0) })
+        await #expect(throws: CancellationError.self) { try await cache.load() }
+        #expect(source.sent.map(ReplaySource.kind(of:)) == ["server", "databases", "tables", "routines"])
+        #expect(cache.snapshot == SchemaSnapshot())
+        source.cancelAt = nil
+        try await cache.load() // the next operation runs as usual
+        #expect(cache.snapshot.tableCount == 9)
+    }
+
     @Test func clearForgetsEverythingAndALoadStartsAgain() async throws {
         let (cache, _) = try await Self.loaded(SchemaFixtures.mysql57)
         try await cache.loadStatistics("airsql_fixture")
@@ -478,10 +498,13 @@ struct SchemaTests {
 
     @Test func choosesQueriesByServerVersion() {
         let sql = { (version: String) in SchemaIntrospection(server: SchemaServer(version: version)) }
-        #expect(sql("5.7.44").checksSQL(.databases(nil)) == nil)
-        #expect(sql("8.0.15").checksSQL(.databases(nil)) == nil)
-        #expect(sql("8.0.16").checksSQL(.databases(nil))?.contains("TABLE_CONSTRAINTS") == true)
-        #expect(sql("10.5.29-MariaDB").checksSQL(.databases(nil))?.contains("TABLE_CONSTRAINTS") == false)
+        #expect(sql("5.7.44").checksSQL(.databases(nil)).isEmpty && sql("8.0.15").checksSQL(.databases(nil)).isEmpty)
+        #expect(sql("8.0.16").checksSQL(.objects(database: "d", names: ["t"])) == [
+            "SELECT CONSTRAINT_SCHEMA, CONSTRAINT_NAME, CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS "
+                + "WHERE CONSTRAINT_SCHEMA = 'd'",
+            "SELECT TABLE_SCHEMA, TABLE_NAME, CONSTRAINT_NAME, ENFORCED FROM information_schema.TABLE_CONSTRAINTS "
+                + "WHERE CONSTRAINT_TYPE = 'CHECK' AND TABLE_SCHEMA = 'd' AND TABLE_NAME = 't'"])
+        #expect(sql("10.5.29-MariaDB").checksSQL(.databases(nil)).count == 1)
         #expect(sql("10.5.29-MariaDB").indexesSQL(.databases(nil)).contains("'YES', NULL FROM"))
         #expect(sql("10.6.1-MariaDB").indexesSQL(.databases(nil)).contains("IGNORED"))
         #expect(sql("8.0.12").indexesSQL(.databases(nil)).contains("IS_VISIBLE, NULL FROM"))

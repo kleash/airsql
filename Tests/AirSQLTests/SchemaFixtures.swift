@@ -262,66 +262,66 @@ enum SchemaFixtures {
         airsql_fixture|orders|BASE TABLE|InnoDB|
         airsql_fixture|we`ird 'name' ✓|BASE TABLE|InnoDB|
         == routines
-        airsql_fixture|order_count|FUNCTION|int|
         airsql_fixture|add_customer|PROCEDURE|\N|Adds one
+        airsql_fixture|order_count|FUNCTION|int|
         == triggers
         airsql_fixture|orders_bi|orders|BEFORE|INSERT|1
         airsql_fixture|orders_au|orders|AFTER|UPDATE|1
         == events
         airsql_fixture|purge_log|DISABLED|Clears the log
         == columns
-        airsql other|refs|customer_id|2|int|int unsigned|YES|\N|||\N|\N|
-        airsql other|refs|id|1|int|int|NO|\N|||\N|\N|
-        airsql_fixture|customer_emails|email|2|varchar|varchar(255)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customer_emails|id|1|int|int unsigned|NO|0|||\N|\N|
+        airsql_fixture|customers|id|1|int|int unsigned|NO|\N|auto_increment||\N|\N|
+        airsql_fixture|customers|email|2|varchar|varchar(255)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customers|name|3|varchar|varchar(100)|NO|it's|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customers|note|4|text|text|YES|\N|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customers|status|5|enum|enum('new','active','gone')|NO|new|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customers|flags|6|set|set('a','b')|YES|\N|||utf8mb4|utf8mb4_unicode_ci|
         airsql_fixture|customers|balance|7|decimal|decimal(10,2)|NO|0.00|||\N|\N|
         airsql_fixture|customers|bits|8|bit|bit(3)|NO|b'101'|||\N|\N|
         airsql_fixture|customers|created|9|timestamp|timestamp|NO|CURRENT_TIMESTAMP|DEFAULT_GENERATED||\N|\N|
-        airsql_fixture|customers|email|2|varchar|varchar(255)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|email_domain|16|varchar|varchar(255)|YES|\N|VIRTUAL GENERATED|substring_index(`email`,_utf8mb4\\'@\\',-(1))|utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|flags|6|set|set('a','b')|YES|\N|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|id|1|int|int unsigned|NO|\N|auto_increment||\N|\N|
-        airsql_fixture|customers|name|3|varchar|varchar(100)|NO|it's|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|name_upper|17|varchar|varchar(100)|YES|\N|STORED GENERATED|upper(`name`)|utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|note|4|text|text|YES|\N|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|path|12|varchar|varchar(20)|YES|C:\\tmp|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|prefs|11|json|json|YES|\N|||\N|\N|
-        airsql_fixture|customers|secret|15|int|int|YES|\N|INVISIBLE||\N|\N|
-        airsql_fixture|customers|status|5|enum|enum('new','active','gone')|NO|new|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|customers|token|13|char|char(36)|NO|uuid()|DEFAULT_GENERATED||utf8mb4|utf8mb4_unicode_ci|
         airsql_fixture|customers|updated|10|datetime|datetime(3)|YES|CURRENT_TIMESTAMP(3)|DEFAULT_GENERATED on update CURRENT_TIMESTAMP(3)||\N|\N|
+        airsql_fixture|customers|prefs|11|json|json|YES|\N|||\N|\N|
+        airsql_fixture|customers|path|12|varchar|varchar(20)|YES|C:\\tmp|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customers|token|13|char|char(36)|NO|uuid()|DEFAULT_GENERATED||utf8mb4|utf8mb4_unicode_ci|
         airsql_fixture|customers|word|14|varchar|varchar(10)|NO|NULL|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customers|secret|15|int|int|YES|\N|INVISIBLE||\N|\N|
+        airsql_fixture|customers|email_domain|16|varchar|varchar(255)|YES|\N|VIRTUAL GENERATED|substring_index(`email`,_utf8mb4\\'@\\',-(1))|utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customers|name_upper|17|varchar|varchar(100)|YES|\N|STORED GENERATED|upper(`name`)|utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|orders|id|1|bigint|bigint|NO|\N|auto_increment||\N|\N|
+        airsql_fixture|orders|customer_id|2|int|int unsigned|YES|\N|||\N|\N|
+        airsql_fixture|orders|region|3|char|char(2)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|orders|number|4|int|int|NO|\N|||\N|\N|
+        airsql_fixture|orders|total|5|decimal|decimal(12,2)|NO|\N|||\N|\N|
+        airsql_fixture|orders|parent_id|6|bigint|bigint|YES|\N|||\N|\N|
+        airsql_fixture|order_lines|region|1|char|char(2)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|order_lines|number|2|int|int|NO|\N|||\N|\N|
+        airsql_fixture|order_lines|line|3|smallint|smallint|NO|\N|||\N|\N|
+        airsql_fixture|order_lines|qty|4|int|int|NO|1|||\N|\N|
         airsql_fixture|log|at|1|datetime|datetime|NO|\N|||\N|\N|
         airsql_fixture|log|message|2|varchar|varchar(200)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|order_lines|line|3|smallint|smallint|NO|\N|||\N|\N|
-        airsql_fixture|order_lines|number|2|int|int|NO|\N|||\N|\N|
-        airsql_fixture|order_lines|qty|4|int|int|NO|1|||\N|\N|
-        airsql_fixture|order_lines|region|1|char|char(2)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|orders|customer_id|2|int|int unsigned|YES|\N|||\N|\N|
-        airsql_fixture|orders|id|1|bigint|bigint|NO|\N|auto_increment||\N|\N|
-        airsql_fixture|orders|number|4|int|int|NO|\N|||\N|\N|
-        airsql_fixture|orders|parent_id|6|bigint|bigint|YES|\N|||\N|\N|
-        airsql_fixture|orders|region|3|char|char(2)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
-        airsql_fixture|orders|total|5|decimal|decimal(12,2)|NO|\N|||\N|\N|
         airsql_fixture|we`ird 'name' ✓|col `1|1|int|int|YES|\N|||\N|\N|
         airsql_fixture|we`ird 'name' ✓|naïve "x"|2|varchar|varchar(5)|YES|a'b|||utf8mb4|utf8mb4_unicode_ci|
+        airsql_fixture|customer_emails|id|1|int|int unsigned|NO|0|||\N|\N|
+        airsql_fixture|customer_emails|email|2|varchar|varchar(255)|NO|\N|||utf8mb4|utf8mb4_unicode_ci|
+        airsql other|refs|id|1|int|int|NO|\N|||\N|\N|
+        airsql other|refs|customer_id|2|int|int unsigned|YES|\N|||\N|\N|
         == indexes
-        airsql other|refs|customer_id|1|1|customer_id|\N|A|BTREE||YES|\N
-        airsql other|refs|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
-        airsql_fixture|customers|created_desc|1|1|created|\N|D|BTREE||NO|\N
-        airsql_fixture|customers|email|0|1|email|\N|A|BTREE||YES|\N
-        airsql_fixture|customers|email_lower|1|1|\N|\N|A|BTREE||YES|lower(`email`)
-        airsql_fixture|customers|name_prefix|1|1|name|10|A|BTREE||YES|\N
-        airsql_fixture|customers|note_text|1|1|note|\N|\N|FULLTEXT||YES|\N
         airsql_fixture|customers|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
-        airsql_fixture|order_lines|PRIMARY|0|1|region|\N|A|BTREE||YES|\N
-        airsql_fixture|order_lines|PRIMARY|0|2|number|\N|A|BTREE||YES|\N
-        airsql_fixture|order_lines|PRIMARY|0|3|line|\N|A|BTREE||YES|\N
-        airsql_fixture|orders|customer|1|1|customer_id|\N|A|BTREE||YES|\N
-        airsql_fixture|orders|orders_parent|1|1|parent_id|\N|A|BTREE||YES|\N
+        airsql_fixture|customers|email|0|1|email|\N|A|BTREE||YES|\N
+        airsql_fixture|customers|name_prefix|1|1|name|10|A|BTREE||YES|\N
+        airsql_fixture|customers|created_desc|1|1|created|\N|D|BTREE||NO|\N
+        airsql_fixture|customers|email_lower|1|1|\N|\N|A|BTREE||YES|lower(`email`)
+        airsql_fixture|customers|note_text|1|1|note|\N|\N|FULLTEXT||YES|\N
         airsql_fixture|orders|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
         airsql_fixture|orders|region_number|0|1|region|\N|A|BTREE||YES|\N
         airsql_fixture|orders|region_number|0|2|number|\N|A|BTREE||YES|\N
+        airsql_fixture|orders|customer|1|1|customer_id|\N|A|BTREE||YES|\N
+        airsql_fixture|orders|orders_parent|1|1|parent_id|\N|A|BTREE||YES|\N
+        airsql_fixture|order_lines|PRIMARY|0|1|region|\N|A|BTREE||YES|\N
+        airsql_fixture|order_lines|PRIMARY|0|2|number|\N|A|BTREE||YES|\N
+        airsql_fixture|order_lines|PRIMARY|0|3|line|\N|A|BTREE||YES|\N
+        airsql other|refs|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
+        airsql other|refs|customer_id|1|1|customer_id|\N|A|BTREE||YES|\N
         == foreignKeys
         airsql other|refs|refs_ibfk_1|customer_id|1|airsql_fixture|customers|id
         airsql_fixture|order_lines|lines_order|region|1|airsql_fixture|orders|region
@@ -329,13 +329,16 @@ enum SchemaFixtures {
         airsql_fixture|orders|orders_customer|customer_id|1|airsql_fixture|customers|id
         airsql_fixture|orders|orders_parent|parent_id|1|airsql_fixture|orders|id
         == foreignKeyRules
+        airsql other|refs|refs_ibfk_1|NO ACTION|NO ACTION
+        airsql_fixture|order_lines|lines_order|NO ACTION|NO ACTION
         airsql_fixture|orders|orders_customer|CASCADE|SET NULL
         airsql_fixture|orders|orders_parent|NO ACTION|CASCADE
-        airsql_fixture|order_lines|lines_order|NO ACTION|NO ACTION
-        airsql other|refs|refs_ibfk_1|NO ACTION|NO ACTION
         == checks
-        airsql_fixture|orders|orders_chk_1|(`total` >= 0)|YES
-        airsql_fixture|orders|total_small|(`total` < 1000000)|NO
+        airsql_fixture|orders_chk_1|(`total` >= 0)
+        airsql_fixture|total_small|(`total` < 1000000)
+        == checkTables
+        airsql_fixture|orders|orders_chk_1|YES
+        airsql_fixture|orders|total_small|NO
         == setup
         == statistics
         airsql_fixture|customer_emails|\N|\N|\N|\N|\N|2026-11-02 18:15:04|\N|\N|\N|\N
@@ -366,8 +369,8 @@ enum SchemaFixtures {
         airsql_fixture|orders|BASE TABLE|InnoDB|
         airsql_fixture|we`ird 'name' ✓|BASE TABLE|InnoDB|
         == routines
-        airsql_fixture|add_customer|PROCEDURE|\N|Adds one
         airsql_fixture|order_count|FUNCTION|int|
+        airsql_fixture|add_customer|PROCEDURE|\N|Adds one
         == triggers
         airsql_fixture|orders_bi|orders|BEFORE|INSERT|1
         airsql_fixture|orders_au|orders|AFTER|UPDATE|1
@@ -410,36 +413,39 @@ enum SchemaFixtures {
         airsql other|refs|customer_id|2|int|int unsigned|YES|\N|||\N|\N|
         airsql other|refs|id|1|int|int|NO|\N|||\N|\N|
         == indexes
-        airsql_fixture|customers|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
-        airsql_fixture|customers|email|0|1|email|\N|A|BTREE||YES|\N
-        airsql_fixture|customers|name_prefix|1|1|name|10|A|BTREE||YES|\N
+        airsql other|refs|customer_id|1|1|customer_id|\N|A|BTREE||YES|\N
+        airsql other|refs|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
         airsql_fixture|customers|created_desc|1|1|created|\N|D|BTREE||NO|\N
+        airsql_fixture|customers|email|0|1|email|\N|A|BTREE||YES|\N
         airsql_fixture|customers|email_lower|1|1|\N|\N|A|BTREE||YES|lower(`email`)
+        airsql_fixture|customers|name_prefix|1|1|name|10|A|BTREE||YES|\N
         airsql_fixture|customers|note_text|1|1|note|\N|\N|FULLTEXT||YES|\N
+        airsql_fixture|customers|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
+        airsql_fixture|orders|customer|1|1|customer_id|\N|A|BTREE||YES|\N
+        airsql_fixture|orders|orders_parent|1|1|parent_id|\N|A|BTREE||YES|\N
         airsql_fixture|orders|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
         airsql_fixture|orders|region_number|0|1|region|\N|A|BTREE||YES|\N
         airsql_fixture|orders|region_number|0|2|number|\N|A|BTREE||YES|\N
-        airsql_fixture|orders|customer|1|1|customer_id|\N|A|BTREE||YES|\N
-        airsql_fixture|orders|orders_parent|1|1|parent_id|\N|A|BTREE||YES|\N
         airsql_fixture|order_lines|PRIMARY|0|1|region|\N|A|BTREE||YES|\N
         airsql_fixture|order_lines|PRIMARY|0|2|number|\N|A|BTREE||YES|\N
         airsql_fixture|order_lines|PRIMARY|0|3|line|\N|A|BTREE||YES|\N
-        airsql other|refs|PRIMARY|0|1|id|\N|A|BTREE||YES|\N
-        airsql other|refs|customer_id|1|1|customer_id|\N|A|BTREE||YES|\N
         == foreignKeys
-        airsql other|refs|refs_ibfk_1|customer_id|1|airsql_fixture|customers|id
-        airsql_fixture|order_lines|lines_order|region|1|airsql_fixture|orders|region
-        airsql_fixture|order_lines|lines_order|number|2|airsql_fixture|orders|number
         airsql_fixture|orders|orders_customer|customer_id|1|airsql_fixture|customers|id
         airsql_fixture|orders|orders_parent|parent_id|1|airsql_fixture|orders|id
+        airsql_fixture|order_lines|lines_order|region|1|airsql_fixture|orders|region
+        airsql_fixture|order_lines|lines_order|number|2|airsql_fixture|orders|number
+        airsql other|refs|refs_ibfk_1|customer_id|1|airsql_fixture|customers|id
         == foreignKeyRules
         airsql_fixture|orders|orders_customer|CASCADE|SET NULL
         airsql_fixture|orders|orders_parent|NO ACTION|CASCADE
         airsql_fixture|order_lines|lines_order|NO ACTION|NO ACTION
         airsql other|refs|refs_ibfk_1|NO ACTION|NO ACTION
         == checks
-        airsql_fixture|orders|orders_chk_1|(`total` >= 0)|YES
-        airsql_fixture|orders|total_small|(`total` < 1000000)|NO
+        airsql_fixture|orders_chk_1|(`total` >= 0)
+        airsql_fixture|total_small|(`total` < 1000000)
+        == checkTables
+        airsql_fixture|orders|orders_chk_1|YES
+        airsql_fixture|orders|total_small|NO
         == setup
         == statistics
         airsql_fixture|customer_emails|\N|\N|\N|\N|\N|2026-11-02 17:53:22|\N|\N|\N|\N
