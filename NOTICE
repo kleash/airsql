@@ -1,0 +1,35 @@
+AirSQL
+Copyright 2026 kleash
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Some files come from AirSCP (https://github.com/kleash/airscp), by the same author under the same licence. Each one
+names the AirSCP file and version it comes from in its first line (Sources/CPTY).
+
+The app includes two libraries by others, as one dynamic library, AirSQL.app/Contents/Frameworks/libmariadb.3.dylib,
+which scripts/build-mariadb.sh builds from pinned, checksummed source releases (the versions are named there):
+
+- MariaDB Connector/C (https://github.com/mariadb-corporation/mariadb-connector-c), the MySQL and MariaDB client
+  library. Copyright MySQL AB, Monty Program AB, MariaDB Corporation AB and the other authors named in its source.
+  Licensed under the GNU Lesser General Public License, version 2.1 or (at your option) any later version.
+- OpenSSL (https://www.openssl.org), linked into it statically for TLS and cryptography. Copyright The OpenSSL Project
+  Authors. Licensed under the Apache License, Version 2.0.
+
+How the licences fit together: libmariadb as shipped contains OpenSSL, and the Apache License 2.0 is compatible with
+version 3 of the LGPL but not with version 2.1, so AirSQL uses Connector/C under the LGPL version 3, as its "any later
+version" allows. AirSQL's own code links to that library dynamically, which the LGPL allows for a program under other
+terms; AirSQL's licence allows changing AirSQL and reverse engineering it to debug such changes.
+
+The library's source: every AirSQL release attaches the exact Connector/C source it was built from
+(mariadb-connector-c-<version>-src.tar.gz) with scripts/build-mariadb.sh, which holds every build option and any patch.
+The same tarball is at https://archive.mariadb.org/connector-c-<version>/.
+
+To use a changed libmariadb: build it (scripts/build-mariadb.sh, pointed at your source, or your own build with the
+install name @rpath/libmariadb.3.dylib), put it in place of AirSQL.app/Contents/Frameworks/libmariadb.3.dylib, and sign
+the library, then the app, again, for example ad hoc:
+    codesign --force --sign - AirSQL.app/Contents/Frameworks/libmariadb.3.dylib
+    codesign --force --sign - AirSQL.app
+
+The licence texts ship in the app (AirSQL.app/Contents/Resources/Licenses) and are in this repository under
+Resources/Licenses: MariaDB-Connector-C-LICENSE.txt (Connector/C's COPYING.LIB, the LGPL version 2.1), LGPL-3.0.txt and
+GPL-3.0.txt (the LGPL version 3 and the GPL it builds on), and OpenSSL-LICENSE.txt.
