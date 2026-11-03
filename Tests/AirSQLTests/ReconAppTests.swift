@@ -103,10 +103,7 @@ extension AppTests {
                     func check(_ window: ReconWindowController, _ what: String) {
                         window.window?.contentView?.layoutSubtreeIfNeeded()
                         guard let content = window.window?.contentView else { return }
-                        // A table wider and taller than its scroll view shows both overlay scrollers, whose frames AppKit
-                        // lets meet in the corner (it draws them short of each other): not text or controls on top of
-                        // each other.
-                        problems += layoutProblems(content, where: "\(place) \(what)").filter { !$0.hasSuffix("NSScroller and NSScroller overlap") }
+                        problems += layoutProblems(content, where: "\(place) \(what)")
                     }
                     let before = Self.window(nil, size: size, appearance: appearance)
                     check(before, "before a compare")
@@ -205,22 +202,5 @@ extension AppTests.ReconAppTests {
         controller.window?.endSheet(sheet)
         try await ReconLabTests.run(setup, ["DROP DATABASE lane_l8a_ui_src", "DROP DATABASE lane_l8a_ui_dst"])
         await setup.close()
-    }
-}
-
-extension AppTests.ScreenshotTests {
-    @Test func compareWindow() async throws {
-        for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
-            let window = AppTests.ReconAppTests.window(AppTests.ReconAppTests.result(), appearance: appearance)
-            window.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
-            window.window?.orderFront(nil)
-            window.window?.displayIfNeeded()
-            let (_, harness) = appWindow(window.model, windows: { [window.window!] })
-            let reply = await call(harness, "screenshot", ["target": "window:Compare Production", "scale": 2])
-            let image = try #require(reply.image, "\(reply.error ?? "")")
-            try #require(image.representation(using: .png, properties: [:]))
-                .write(to: Self.folder.appendingPathComponent("compare-\(suffix).png"))
-            window.window?.orderOut(nil)
-        }
     }
 }

@@ -243,8 +243,6 @@ extension AppTests {
                     check("ER diagram")
                 }
             }
-            // Overlay scroll bars cross at their corner by AppKit's design.
-            problems.removeAll { $0.hasSuffix("NSScroller and NSScroller overlap") }
             #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
             #expect(missing.isEmpty, "\(missing.joined(separator: "\n"))")
         }

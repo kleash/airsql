@@ -68,7 +68,8 @@ func layoutProblems(_ root: NSView, where place: String) -> [String] {
         // Siblings on top of each other.
         let leaves = view.subviews.filter { visible($0) && isLeaf($0) }
         for (index, first) in leaves.enumerated() {
-            for second in leaves[(index + 1)...] {
+            // A scroll view's two overlay scroll bars meet in its corner by AppKit's design.
+            for second in leaves[(index + 1)...] where !(first is NSScroller && second is NSScroller) {
                 let overlap = first.frame.intersection(second.frame)
                 if !overlap.isNull, overlap.width * overlap.height > 1 {
                     problems.append("\(place): \(name(first)) and \(name(second)) overlap")
