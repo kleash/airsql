@@ -45,7 +45,9 @@ final class ChangesetSheet: NSWindowController {
         window.setContentSize(window.contentView!.fittingSize)
         window.initialFirstResponder = saveButton
         window.autorecalculatesKeyViewLoop = true
-        status.stringValue = "Choose the changelog to add to, or start a new one."
+        file.stringValue = "None chosen yet"
+        file.textColor = .secondaryLabelColor
+        prepare(nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -126,7 +128,8 @@ final class ChangesetSheet: NSWindowController {
         url = chosen
         startsNew = new
         file.stringValue = SettingsPaneController.shown(chosen)
-        file.toolTip = chosen.path
+        file.textColor = .labelColor
+        file.toolTip = file.stringValue
         saveButton.isEnabled = false
         status.textColor = .secondaryLabelColor
         status.stringValue = "Reading \(chosen.lastPathComponent)…"
@@ -159,6 +162,10 @@ final class ChangesetSheet: NSWindowController {
         }
         show(text)
         status.textColor = .secondaryLabelColor
+        guard url != nil else {
+            status.stringValue = "Choose the changelog to add to, or New… to start one: the ids then carry on its numbering."
+            return
+        }
         status.stringValue = changelog.map { "Added after its \(ObjectPicker.count($0.changesets.count, "changeset"))." }
             ?? "A new changelog, starting with the line \(LiquibaseChangelog.header)."
         saveButton.isEnabled = true

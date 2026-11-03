@@ -37,11 +37,15 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     private let preview = NSTextView.scrollableTextView()
     private var schema: LiquibaseSchema?
     private var items: [Item] = []
+    /// Where the changelog goes: a file, or a folder in the folder layout (Save to).
     private var url: URL
+    /// Whether the person chose `url` (else it follows the database and the layout).
+    private var chosen = false
     private var reading: Task<Void, Never>?
 
     init(model: AppModel, connection: SavedConnection, options: ConnectOptions) {
-        url = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
+        url = (FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory()))
+            .appendingPathComponent("changelog.sql")
         super.init(model: model, connection: connection, options: options, width: 960, action: "Save Changelog",
                    actionTip: "Write the changelog to the place chosen in Save to")
         heading.stringValue = "Generate a Liquibase changelog"
@@ -100,10 +104,12 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
 
     /// The objects with a box each to include them, and for tables whether their rows go too and a WHERE for them.
     private func makeList() -> NSView {
-        for (id, title, width) in [("object", "Object", 230.0), ("rows", "Rows", 44.0), ("where", "WHERE", 118.0)] {
+        for (id, title, width) in [("object", "Object", 180.0), ("rows", "Rows", 40.0), ("where", "WHERE", 110.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
+            column.minWidth = id == "object" ? 120 : width
+            column.resizingMask = id == "object" ? .autoresizingMask : []
             column.headerToolTip = ["object": "Tick the objects whose structure the changelog creates",
                                     "rows": "Tick the tables whose rows the changelog inserts",
                                     "where": "Only the rows that match this condition (double-click to type one)"][id]
@@ -231,15 +237,15 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     /// Lists `read`'s objects (tables first, then views, routines, triggers, events), each ticked.
     func show(_ read: LiquibaseSchema) {
         schema = read
+        heading.stringValue = "Generate a Liquibase changelog of \(read.database)"
+        if databaseMenu.item(withTitle: read.database) == nil { databaseMenu.addItem(withTitle: read.database) }
+        databaseMenu.selectItem(withTitle: read.database)
         let order = LiquibaseSchema.Object.Kind.allCases
         items = read.objects.sorted { ($0.kind == .sequence ? 9 : order.firstIndex(of: $0.kind) ?? 0, $0.name)
             < ($1.kind == .sequence ? 9 : order.firstIndex(of: $1.kind) ?? 0, $1.name) }.map(Item.init)
         for item in items where item.object.create.isEmpty { item.included = false }
         loading(nil)
-        if url.hasDirectoryPath || url.lastPathComponent.isEmpty || !url.lastPathComponent.contains(read.database) {
-            url = url.deletingLastPathComponent().appendingPathComponent(defaultName(read.database))
-            if url.pathComponents.count < 2 { url = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(defaultName(read.database)) }
-        }
+        if !chosen { url = url.deletingLastPathComponent().appendingPathComponent(defaultName(read.database)) }
         showLocation()
         list.reloadData()
         refresh()
@@ -255,7 +261,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         let layout: LiquibaseSettings.Layout = layoutMenu.indexOfSelectedItem == 1 ? .folder : .oneFile
         if layout != model.data.settings.liquibase.layout {
             model.data.settings.liquibase.layout = layout
-            if let schema { url = url.deletingLastPathComponent().appendingPathComponent(defaultName(schema.database)) }
+            if let schema, !chosen { url = url.deletingLastPathComponent().appendingPathComponent(defaultName(schema.database)) }
             showLocation()
         }
         // Rows want something to write: ticking DML with none chosen takes every included table's.
@@ -297,8 +303,11 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     /// The preview, the summary under it and the Save button, from the form.
     private func refresh() {
         let showsRows = contentChoice != .structure
-        list.tableColumns[1].isHidden = !showsRows
-        list.tableColumns[2].isHidden = !showsRows
+        if list.tableColumns[1].isHidden == showsRows {
+            list.tableColumns[1].isHidden = !showsRows
+            list.tableColumns[2].isHidden = !showsRows
+            list.sizeToFit()  // the object column takes the room the others leave
+        }
         let (pieces, _, tables, rows) = plan()
         let shown = 150
         var text = schema.map { $0.preview(Array(pieces.prefix(shown)), settings: model.data.settings.liquibase) } ?? ""
@@ -335,7 +344,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
 
     private func showLocation() {
         saveTo.stringValue = SettingsPaneController.shown(url) + (model.data.settings.liquibase.layout == .folder ? "/" : "")
-        saveTo.toolTip = url.path
+        saveTo.toolTip = saveTo.stringValue
     }
 
     @objc private func chooseLocation(_ sender: Any?) {
@@ -356,8 +365,9 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         }
         panel.directoryURL = url.deletingLastPathComponent()
         panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let self, let chosen = panel.url else { return }
-            self.url = chosen
+            guard response == .OK, let self, let picked = panel.url else { return }
+            self.url = picked
+            self.chosen = true
             self.showLocation()
         }
     }
@@ -424,7 +434,15 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
             field.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
             field.isEnabled = enabled && item.rows
             field.delegate = self
-            return field
+            // Centred in the row, as the names beside it are.
+            let cell = NSTableCellView()
+            cell.addSubview(field)
+            NSLayoutConstraint.activate([
+                field.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+                field.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+                field.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            ])
+            return cell
         default:
             let cell = tableView.makeView(withIdentifier: PickerCell.id, owner: nil) as? PickerCell ?? PickerCell()
             let readable = !item.object.create.isEmpty
