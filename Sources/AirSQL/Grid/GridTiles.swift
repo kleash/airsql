@@ -7,10 +7,9 @@ import AppKit
 /// lets clicks through to it.
 final class GridTiles: NSView {
     unowned let grid: DataGridView
-    /// A tile's side in points (4 MB of pixels at 2×): smaller tiles drew more cells twice, across their edges, and
-    /// missed more refreshes (measured with 128, 256 and 512).
-    static let size = NSSize(width: Double(ProcessInfo.processInfo.environment["AIRSQL_GRID_TILE_W"] ?? "") ?? 512,
-                             height: Double(ProcessInfo.processInfo.environment["AIRSQL_GRID_TILE_H"] ?? "") ?? 512)
+    /// A tile's size in points (1 MB of pixels at 2×), measured against 128 to 512 on a side: a short tile draws few
+    /// rows when a row of tiles comes into view, a wide one draws few cells twice, across its edges.
+    static let size = NSSize(width: 512, height: 128)
     private var tiles: [Index: CALayer] = [:]
     /// The frozen columns' tiles, by row of tiles (x is always 0).
     private var frozen: [Int: CALayer] = [:]

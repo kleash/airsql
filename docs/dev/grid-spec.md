@@ -116,6 +116,25 @@ Measured on the development Mac (M1 Pro, 120 Hz ProMotion) before each merge:
 - First page of a 10-million-row table on screen within 300 ms of the query returning.
 - Typing in a cell or the WHERE bar never waits on the network.
 
+Measured on that Mac (1728 × 1117 pt display at 120 Hz, the grid 1420 × 935 pt in the main window, release build,
+`AIRSQL_GRID_FPS=1 ./test.sh -c release -Xswiftc -enable-testing --filter GridFrameRateTests`, 3 s a run, load 4 to 8;
+time from the display's tick to the frame committed, p50 / p95, and refreshes missed out of about 360):
+
+| Run | P0-6: one view AppKit draws | Tiles (GridTiles, 512 × 128 pt) |
+|---|---|---|
+| 1,000,000 × 50, down at 2,400 pt/s | 5.8 / 6.5 ms, 2 missed | 2.3 / 6.5 ms, 2 missed |
+| 1,000,000 × 50, down at 7,000 pt/s | 5.0 / 5.6 ms, 0 missed | 2.3 / 5.6 ms, 0 missed |
+| 10,000 × 300, down at 2,400 pt/s | 5.8 / 6.5 ms, 0 missed | 2.2 / 5.2 ms, 0 missed |
+| 10,000 × 300, across at 2,400 pt/s | 11.3 / 13.6 ms, 95 missed | 1.8 / 5.7 ms, 0 missed |
+| First screen of 10,000,000 × 50 | 81 ms | 92 ms |
+
+Why: since macOS 14 AppKit renders the visible part of a scrolled view again on every step, from the display lists of
+every strip drawn so far; across 300 columns those strips overlap many times (each holds whole cells). Tiles are
+Core Animation layers drawn once (asynchronously, on the GPU) and moved as the grid scrolls; only a frame that brings a
+row or column of tiles into view draws, which is what the p95 shows. Measured and dropped: a line cache (no gain on its
+own), drawing only the glyphs inside each strip (7 % faster), redrawing the whole visible area each frame with a line
+cache (7 ms a frame both ways), tiles drawn on the main thread, and other tile sizes (128 to 512 points a side).
+
 Gated in CI with deterministic numbers (no timing on shared runners):
 - cells drawn per scroll step stay proportional to the visible area;
 - page build time within 5× of the reference;
