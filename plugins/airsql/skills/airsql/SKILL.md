@@ -1,0 +1,19 @@
+---
+name: airsql
+description: Use AirSQL's MCP tools to answer questions about the person's MySQL or MariaDB databases (schemas, tables, data, query plans) and to propose SQL for them to run. Use when the person mentions their database, a table, a query or AirSQL.
+---
+
+# Working with AirSQL
+
+AirSQL is the person's Mac app for MySQL and MariaDB. Its tools reach only the connections the person allows, at the
+access level they chose, and never change anything.
+
+1. Call `context` first. It lists the connections you may use, their access level and whether they're connected.
+2. Read the schema with `get_schema` (one call per connection; keep the `hash` and pass it as `if_changed_from` next
+   time), then `describe` the tables you need.
+3. Answer with `run_queries` (several statements per call, small `max_rows`), `explain` and `profile`.
+4. Never try to write. To change data or structure, write the SQL and call `open_in_console` with a clear title, tell
+   the person what it does, and after they run it, `read_console`.
+
+If a tool says a level is needed, or a connection isn't connected, tell the person what to change in AirSQL rather than
+working around it. `guide` has the details.

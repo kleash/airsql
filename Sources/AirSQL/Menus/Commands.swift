@@ -153,6 +153,7 @@ import AppKit
     @objc optional func setUpAgents(_ sender: Any?)
     @objc optional func showAgentActivity(_ sender: Any?)
     @objc optional func turnAgentsOff(_ sender: Any?)
+    @objc optional func showAgentGuide(_ sender: Any?)
 
     // Window
     @objc optional func showNextTab(_ sender: Any?)
@@ -542,6 +543,8 @@ enum Commands {
                                        tip: "Tell AirSQL's makers about a problem: a form on GitHub with your versions filled in")
     static let copyDiagnostics = Command("Copy Diagnostics", #selector(AirSQLActions.copyDiagnostics(_:)),
                                          tip: "Copy the versions of AirSQL, macOS and its client library, for a problem report")
+    static let agentGuide = Command("AI Agents", #selector(AirSQLActions.showAgentGuide(_:)),
+                                    tip: "Open the page of AirSQL Help about letting Claude Code or Gemini CLI use AirSQL")
 
     /// Every command above, for the checks (the tab commands once).
     static let all: [Command] = [
@@ -565,7 +568,7 @@ enum Commands {
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal,
         export, restore, copyToServer, compare, generateLiquibase, setUpAgents, agentActivity, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
-        help, gettingStarted, reportProblem, copyDiagnostics,
+        help, gettingStarted, reportProblem, copyDiagnostics, agentGuide,
     ]
 
     /// The command with this action (and tag, for the actions several commands share).
