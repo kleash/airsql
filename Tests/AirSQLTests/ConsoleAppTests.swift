@@ -230,6 +230,17 @@ extension AppTests {
             #expect(console.transactionBadge == "Transaction open · 2 changes", "\(console.messagesView.messages.map(\.text))")
             #expect(main.statusBar.transaction.value == "Transaction open · 2 changes")
 
+            // Profile: the statement's result, then where the server spent its time.
+            console.editor.setSelectedRange(NSRange(location: 20, length: 0))
+            #expect(await call(harness, "menu", ["path": "Query > Profile"]).error == nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.resultTabs.last?.title == "Profile", "\(console.resultTabs.map(\.title))")
+
+            // Explain: the plan in a tab of its own.
+            #expect(await call(harness, "menu", ["path": "Query > Explain"]).error == nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.selectedResult?.title == "Plan")
+
             // Closing the connection's last console asks about the transaction, then about the unsaved text.
             main.closeTab(nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])

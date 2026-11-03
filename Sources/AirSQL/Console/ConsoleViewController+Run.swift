@@ -154,7 +154,12 @@ extension ConsoleViewController {
             }
         }
         if run.kind == .profile {
-            if let profile = await runQuery("SHOW PROFILE", on: session), let rows = profile.first?.rows {
+            // The statement's own profile: the last one profiled that isn't AirSQL's SHOW WARNINGS after it.
+            let list = await runQuery("SHOW PROFILES", on: session)?.first?.rows
+            let id = list.flatMap { rows in
+                (0..<rows.rowCount).last { !(rows.string($0, 2) ?? "").contains("SHOW WARNINGS") }.flatMap { rows.string($0, 0) }
+            }.flatMap { Int($0) }
+            if let id, let profile = await runQuery("SHOW PROFILE FOR QUERY \(id)", on: session), let rows = profile.first?.rows {
                 addResult(rows, title: "Profile", summary: "Where the server spent the time")
             } else {
                 note(.info, "This server keeps no profile of the statement (SHOW PROFILE isn't available).")
