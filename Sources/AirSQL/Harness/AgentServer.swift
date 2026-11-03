@@ -806,7 +806,9 @@ final class AgentServer {
         }
         let scale = NSGraphicsContext.current?.cgContext.ctm.a ?? 1
         let width = Int((layer.bounds.width * scale).rounded(.up)), height = Int((layer.bounds.height * scale).rounded(.up))
-        guard !rect.isEmpty, width > 0, height > 0, width * height < 4_000_000,
+        // A layer the window took out while it drew itself (SwiftUI replaces the toolbar's) has no place any more: drawn
+        // at its own origin, it put an upside-down copy over the window's bottom left corner.
+        guard ancestor === root, !rect.isEmpty, width > 0, height > 0, width * height < 4_000_000,
               let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
