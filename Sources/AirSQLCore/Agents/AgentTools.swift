@@ -34,6 +34,16 @@ public enum AgentTools {
              required: ["connection", "objects"],
              output: ["connection": string("The connection"), "objects": arrayOf("One per object found"),
                       "missing": strings("Names not found")], outputRequired: ["connection", "objects"]),
+        tool("search_columns", "Finds columns by name in every database (or those named), from AirSQL's schema cache: no "
+             + "query runs. pattern: part of a column's name, or a whole name with * and ? (case doesn't matter). type: "
+             + "only columns of this data type (varchar, json; *text for every text type). Each match: database, table, "
+             + "column, type, nullable, primaryKey, kind (view, sequence). Needs Schema access.",
+             ["connection": connection, "pattern": string("Part of a column's name, or a name with * and ?"),
+              "type": string("A data type, such as varchar or *text"),
+              "databases": strings("Databases (default: all but the system ones)")], required: ["connection", "pattern"],
+             output: ["connection": string("The connection"), "columns": arrayOf("One per matching column"),
+                      "capped": boolean("More columns match than the reply lists"), "note": string("")],
+             outputRequired: ["connection", "columns", "capped"]),
         tool("run_queries", "Runs several read-only statements in one call (SELECT, WITH … SELECT, SHOW, DESCRIBE, EXPLAIN), "
              + "each on its own, in a read-only transaction on AirSQL's read-only agent session, within the connection's row "
              + "cap and timeout. Anything that could change data is refused. format json (default: rows as arrays of text "

@@ -219,7 +219,8 @@ Goal: few round trips, and agents that can never change anything without the per
   token is readable by processes of the same user, as in AirSCP; documented (R18).
 - **Tools (batch-first):** `context` (connections, flavour/version, colour, agent access, active connection and
   database, schema hashes, open console tabs, applicable safety settings); `get_schema {connection, databases?,
-  format: compact | ddl, if_changed_from?}`; `describe {connection, objects: [...]}`; `run_queries {connection,
+  format: compact | ddl, if_changed_from?}`; `describe {connection, objects: [...]}`; `search_columns {connection,
+  pattern, type?, databases?}` (from the schema cache, no SQL); `run_queries {connection,
   queries: [{sql, max_rows?}], format: csv | json, to_file?}`; `profile {connection, table, columns?, where?}` (one
   call, several server-side queries: counts, NULLs, distinct, min, max, average, top values for the chosen columns,
   R15); `explain`; `open_in_console {sql, title}`; `read_console {tab}`; `guide`. UI driving (`snapshot`,

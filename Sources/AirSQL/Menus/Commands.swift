@@ -168,6 +168,8 @@ import AppKit
     @objc optional func generateLiquibase(_ sender: Any?)
     @objc optional func setUpAgents(_ sender: Any?)
     @objc optional func showAgentActivity(_ sender: Any?)
+    @objc optional func showAgentResults(_ sender: Any?)
+    @objc optional func openInNewConsole(_ sender: Any?)
     @objc optional func turnAgentsOff(_ sender: Any?)
     @objc optional func showAgentGuide(_ sender: Any?)
 
@@ -571,6 +573,10 @@ enum Commands {
                                      tip: "Let Claude Code, Gemini CLI or another MCP client use AirSQL, at the access you choose")
     static let agentActivity = Command("Agent Activity", #selector(AirSQLActions.showAgentActivity(_:)),
                                        tip: "Show what agents asked AirSQL to do, newest last")
+    static let agentResults = Command("Agent Results", #selector(AirSQLActions.showAgentResults(_:)),
+                                      tip: "Show the queries agents ran on this connection and the rows they got")
+    static let openInNewConsole = Command("Open in New Console", #selector(AirSQLActions.openInNewConsole(_:)),
+                                          tip: "Open the selected statements in a new console tab, to edit and run yourself")
     static let turnAgentsOff = Command("Turn Agents Off", #selector(AirSQLActions.turnAgentsOff(_:)),
                                        tip: "Stop every agent from using AirSQL until you turn agents on again")
 
@@ -625,7 +631,7 @@ enum Commands {
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder,
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
-        setUpAgents, agentActivity, turnAgentsOff,
+        setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
         help, gettingStarted, reportProblem, copyDiagnostics, agentGuide,
     ]
