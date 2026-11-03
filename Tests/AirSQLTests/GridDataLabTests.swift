@@ -67,10 +67,13 @@ struct GridDataLabTests {
         return source
     }
 
+    /// As the table tab applies them, on the data session (UPDATE counts the rows it matched: CLIENT_FOUND_ROWS).
     func apply(_ source: TableDataSource, on session: DBConnection) async throws {
         try await PendingChanges.apply(try source.changes.statements(database: Self.database, table: source.table.name,
                                                                   columns: source.columns,
-                                                                  noBackslashEscapes: session.noBackslashEscapes), on: session)
+                                                                  noBackslashEscapes: session.noBackslashEscapes)) { sql in
+            try await session.query(sql, rowCap: 1).last?.affectedRows ?? 0
+        }
     }
 
     func rows(_ sql: String, on session: DBConnection) async throws -> [[String?]] {

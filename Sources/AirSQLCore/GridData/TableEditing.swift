@@ -119,11 +119,6 @@ extension PendingChanges {
             throw error
         }
     }
-
-    /// Apply on a session (the connection's data session): UPDATE counts the rows it matched (CLIENT_FOUND_ROWS).
-    public static func apply(_ statements: [Statement], on session: DBConnection) async throws {
-        try await apply(statements) { sql in try await session.query(sql).last?.affectedRows ?? 0 }
-    }
 }
 
 /// Pending changes kept on disk while they wait (pending.json next to airsql.json), so a crash or a quit doesn't lose
