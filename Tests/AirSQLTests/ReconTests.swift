@@ -345,6 +345,27 @@ struct ReconTests {
         #expect(!same("2026-01-01 00:00:00", "2026-01-01 00:00:00.000", .temporal))
     }
 
+    /// A unique NOT NULL key on a generated column can't be the matching key: the data compare drops generated columns,
+    /// so the key would end up a different, non-unique column. Such a table falls back to the no-key checksum.
+    @Test func matchingKeyIgnoresAKeyOnAGeneratedColumn() {
+        func col(_ name: String, generated: Bool = false) -> SchemaColumn {
+            SchemaColumn(name: name, dataType: "int", columnType: "int", nullable: false, defaultValue: .null,
+                         autoIncrement: false, onUpdate: nil,
+                         generated: generated ? .init(expression: "(`a` * 100)", stored: true) : nil,
+                         invisible: false, isJSON: false, charset: nil, collation: nil, comment: "")
+        }
+        func part(_ column: String) -> SchemaIndex.Part {
+            .init(column: column, expression: nil, prefixLength: nil, descending: false)
+        }
+        var table = SchemaTable(name: "t", kind: .table, engine: "InnoDB")
+        table.columns = [col("a"), col("b"), col("code", generated: true)]
+        table.indexes = [SchemaIndex(name: "uk", unique: true, type: "BTREE", parts: [part("code")], visible: true, comment: "")]
+        #expect(Recon.matchingKey(table, table) == nil)
+        // A unique NOT NULL key on a plain column is still chosen.
+        table.indexes.append(SchemaIndex(name: "uk2", unique: true, type: "BTREE", parts: [part("a")], visible: true, comment: ""))
+        #expect(Recon.matchingKey(table, table) == ["a"])
+    }
+
     /// A row two servers put in different chunks (their key collations order differently) still meets its other half,
     /// and only rows whose hashes differ are compared further.
     @Test func tallyMatchesRowsAcrossChunks() {
