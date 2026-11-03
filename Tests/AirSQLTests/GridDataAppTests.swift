@@ -326,12 +326,40 @@ extension AppTests {
 
         @Test func whereBarCompletesColumnNames() async throws {
             let (_, _, tab) = try await Self.tab()
-            let text = NSTextView()
-            text.string = "region = 'EU' AND cu"
+            tab.bar.filterText = "region = 'EU' AND cu"
             var index = 0
-            let words = tab.bar.control(tab.bar.whereField, textView: text, completions: [],
-                                        forPartialWordRange: NSRange(location: 18, length: 2), indexOfSelectedItem: &index)
+            let words = tab.bar.textView(tab.bar.whereField, completions: [], forPartialWordRange: NSRange(location: 18, length: 2),
+                                         indexOfSelectedItem: &index)
             #expect(words == ["customer_id", "CURDATE()"])
+        }
+
+        /// The condition is coloured as SQL, grows a line at a time up to eight (then scrolls), and Return applies it.
+        @Test func whereBarColoursItsSQLAndGrowsToEightLines() async throws {
+            let session = FakeTableSession()
+            let (main, _, tab) = try await Self.tab(session: session)
+            let field = tab.bar.whereField
+            main.window?.makeFirstResponder(field)
+            field.insertText("region IN ('EU')", replacementRange: field.selectedRange())
+            let storage = try #require(field.textStorage)
+            #expect(storage.attribute(.foregroundColor, at: 7, effectiveRange: nil) as? NSColor == .sqlKeyword)
+            #expect(storage.attribute(.foregroundColor, at: 11, effectiveRange: nil) as? NSColor == .sqlString)
+            main.window?.layoutIfNeeded()
+            let one = field.box.frame.height
+            field.insertNewlineIgnoringFieldEditor(nil)
+            field.insertText("OR total > 100", replacementRange: field.selectedRange())
+            main.window?.layoutIfNeeded()
+            let two = field.box.frame.height
+            #expect(two > one + 10 && field.text == "region IN ('EU')\nOR total > 100")
+            for _ in 0..<12 { field.insertNewlineIgnoringFieldEditor(nil) }
+            main.window?.layoutIfNeeded()
+            #expect(field.box.frame.height < one * 9 && field.box.frame.height > two * 3, "\(one) \(two) \(field.box.frame.height)")
+            // Return applies it; the bar shrinks back with it.
+            field.text = "region = 'EU'"
+            main.window?.layoutIfNeeded()
+            #expect(field.box.frame.height == one)
+            field.insertNewline(nil)
+            await ready { tab.loading != nil }
+            #expect(session.statements.last?.contains(" WHERE (region = 'EU'\n) ORDER BY") == true)
         }
 
         @Test func consoleResultsCopyInTheGridsFormat() async throws {
@@ -424,8 +452,7 @@ extension AppTests.ScreenshotTests {
             main.window?.appearance = NSAppearance(named: appearance)
             main.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
             main.window?.orderFront(nil)
-            tab.bar.filterText = "total > 100"
-            tab.applyFilter("total > 100")
+            tab.applyFilter("region IN ('EU', 'US') AND total > 100")
             await ready { tab.loading != nil }
             tab.source?.set(.text("1999.90"), row: 1, column: 4)
             tab.source?.set(.text("APAC"), row: 3, column: 2)
@@ -451,6 +478,8 @@ extension AppTests.ScreenshotTests {
             small.window?.orderFront(nil)
             smallTab.source?.set(.text("APAC"), row: 3, column: 2)
             smallTab.changesDidChange()
+            // A long condition wraps: the bar grows a line at a time, up to eight.
+            smallTab.bar.filterText = "region IN ('EU', 'US') AND total > 100 AND created_at >= NOW() - INTERVAL 90 DAY -- this quarter"
             smallTab.performTextFinderAction(nil)
             smallTab.findBar.findField.stringValue = "EU"
             smallTab.findChanged()
