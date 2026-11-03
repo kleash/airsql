@@ -804,6 +804,10 @@ final class AgentServer {
             if current.masksToBounds { rect = rect.intersection(current.convert(current.bounds, to: root)) }
             ancestor = current.superlayer
         }
+        // A toolbar control hosted by SwiftUI (macOS 26) makes new layers when the frame is drawn: an old one is no longer
+        // under `root`, and drawn at its own coordinates it came out upside down in the window's bottom-left corner. The
+        // frame's picture has the new one.
+        guard ancestor === root else { return }
         let scale = NSGraphicsContext.current?.cgContext.ctm.a ?? 1
         let width = Int((layer.bounds.width * scale).rounded(.up)), height = Int((layer.bounds.height * scale).rounded(.up))
         guard !rect.isEmpty, width > 0, height > 0, width * height < 4_000_000,
