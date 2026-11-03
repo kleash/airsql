@@ -114,3 +114,32 @@ struct RoutesTests {
         #expect(ErrorMapping.ssh("", status: 255).kind == .other)
     }
 }
+
+extension RoutesTests {
+    @Test func sshConfigImportListsNamedHostsOnly() {
+        let text = """
+            # Work
+            Host bastion bastion-alias
+              HostName bastion.example.com
+              User deploy
+              Port 2222
+            Host db-gw
+              HostName=10.20.0.5
+              ProxyJump bastion
+            Host *.internal !secret
+              User nobody
+            Match host foo
+              User ignored
+            Host *
+              ServerAliveInterval 30
+            Host "quoted"
+              hostname quoted.example.com
+            """
+        let hosts = SSHConfigImport.hosts(in: text)
+        #expect(hosts.map(\.alias) == ["bastion", "bastion-alias", "db-gw", "quoted"])
+        #expect(hosts[0] == SSHConfigImport.Host(alias: "bastion", hostName: "bastion.example.com", user: "deploy", port: 2222))
+        #expect(hosts[2].summary == "10.20.0.5 via bastion" && hosts[3].hostName == "quoted.example.com")
+        let made = SSHConfigImport.connection(for: hosts[2], folder: nil)
+        #expect(made.route == .ssh && made.sshHost.host == "db-gw" && made.host == "127.0.0.1" && SSHConfig.problem(with: made) == nil)
+    }
+}

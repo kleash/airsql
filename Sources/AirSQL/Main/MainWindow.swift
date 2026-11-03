@@ -140,7 +140,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     var selectedConnections: [SavedConnection] { sidebar.selectedConnectionIDs.compactMap { model.connection($0) } }
 
     /// The connections a command acts on: the sidebar's selection, else the selected tab's connection.
-    private var targetConnections: [SavedConnection] {
+    var targetConnections: [SavedConnection] {
         let selected = selectedConnections
         if !selected.isEmpty { return selected }
         return activeConnection.map { [$0] } ?? []
@@ -190,7 +190,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     // MARK: Showing
 
-    private func sidebarSelectionChanged() {
+    func sidebarSelectionChanged() {
         let selected = sidebar.selectedConnectionIDs
         // A connection with tabs shows its latest tab; one without shows its summary.
         if selected.count == 1, let tab = tabs.last(where: { $0.connectionID == selected[0] }) {
@@ -319,15 +319,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     // MARK: Commands
 
-    /// shortcut: saves a connection with the defaults and selects it; the connection editor (L1) replaces this with its
-    /// sheet.
+    /// Opens the connection editor on a new connection (saved only when the person saves it).
     @objc func newConnection(_ sender: Any?) {
         guard window?.attachedSheet == nil else { return }
-        let connection = SavedConnection(name: "New Connection", host: "127.0.0.1", user: "root")
-        model.save(connection)
-        sidebar.reload()
-        sidebar.select([connection.id])
-        sidebarSelectionChanged()
+        var connection = SavedConnection(host: "127.0.0.1", user: "root")
+        connection.folderID = sidebar.selectedFolderID
+        edit(connection, isNew: true)
     }
 
     @objc func duplicateConnection(_ sender: Any?) {
@@ -464,7 +461,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = model.data.settings.agentsAllowed
             reason = "Agents are off already"
         default:
-            break
+            if let verdict = validateConnectionItem(item) { (enabled, reason) = verdict }
         }
         item.explain(enabled: enabled, reason: enabled ? nil : reason)
         return enabled

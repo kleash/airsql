@@ -14,7 +14,12 @@ extension AppTests {
         let ids = (snapshot["elements"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
         #expect(ids.contains("firstRun.addConnection") && ids.contains("firstRun.setUpAgents"))
         #expect(await call(harness, "press", ["id": "firstRun.addConnection"]).error == nil)
-        #expect(model.data.connections.map(\.name) == ["New Connection"])
+        // The connection editor; Save keeps the connection and shows it.
+        #expect(await call(harness, "wait", ["until": "sheet", "timeout": 10]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.host", "value": "db.example.com"]).error == nil)
+        #expect(await call(harness, "press", ["id": "editor.save"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(model.data.connections.map(\.host) == ["db.example.com"])
         #expect(await eventually { main.contentKind == "summary" })
         #expect(main.sidebar.selectedConnectionIDs == model.data.connections.map(\.id))
     }

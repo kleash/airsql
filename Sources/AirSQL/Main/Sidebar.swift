@@ -142,7 +142,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
 
     /// Rebuilds the rows from the model and the filter, keeping the selection.
     func reload() {
-        let selected = selectedConnectionIDs
+        let selected = selectedNodes.map(\.kind)
         var expandedFolders = Set(folders.compactMap { id, node in outline.isItemExpanded(node) ? id : nil })
         let firstLoad = folders.isEmpty && connections.isEmpty
         header.children = []
@@ -169,7 +169,16 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         outline.reloadData()
         outline.expandItem(header)
         for (id, node) in folders where expandedFolders.contains(id) { outline.expandItem(node) }
-        select(selected.filter { connections[$0] != nil })
+        // The same rows stay selected, folders too.
+        let rows = selected.compactMap { kind -> SidebarNode? in
+            switch kind {
+            case .connection(let id): return connections[id]
+            case .folder(let id): return folders[id]
+            case .header: return nil
+            }
+        }.map { outline.row(forItem: $0) }.filter { $0 >= 0 }
+        outline.selectRowIndexes(IndexSet(rows), byExtendingSelection: false)
+        if let first = rows.first { outline.scrollRowToVisible(first) }
         reloading = false
     }
 
@@ -232,7 +241,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             menu.addItem(ConnectionMenus.colourMenu())
             menu.add([nil, Commands.deleteConnection])
         } else {
-            menu.add([Commands.newConnection])
+            menu.add([Commands.newConnection, Commands.newFolder, nil, Commands.renameFolder, Commands.deleteFolder])
         }
         return menu
     }
