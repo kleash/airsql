@@ -30,7 +30,7 @@ struct NavigatorLabTests {
         #expect(try await value(session, "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = "
                                 + SQLQuote.string(db)) == "utf8mb4_bin")
 
-        let name = "it's `odd` 😀"
+        let name = "it's `odd` ✓"  // MariaDB's names hold no emoji
         let table = DatabaseObject(.table, db, name)
         _ = try await session.query("CREATE TABLE \(table.quoted) (id INT PRIMARY KEY, note VARCHAR(40), twice INT AS (id * 2))")
         _ = try await session.query("INSERT INTO \(table.quoted) (id, note) VALUES (1, '50%_off!'), (2, 'plain'), (3, NULL)")
@@ -52,7 +52,7 @@ struct NavigatorLabTests {
         #expect(try await found("%_o") == "1")
         #expect(try await found("%") == "1")
         #expect(try await found("!") == "1")
-        #expect(try await found("PLAIN") == "1")
+        #expect(try await found("PLAIN") == "0")  // the column's collation decides: utf8mb4_bin tells case apart
         for text in Hostile.values where !text.isEmpty && !"50%_off!plain".contains(text) {
             #expect(try await found(text) == "0", "\(text.debugDescription)")
         }
@@ -76,12 +76,11 @@ struct NavigatorLabTests {
         #expect(try await count(DatabaseObject(.table, other, "renamed")) == "0")
 
         // Drop every kind at once: triggers go before their tables.
-        let q = SQLQuote.identifier
-        _ = try await session.query("CREATE VIEW \(q(other, "v")) AS SELECT id FROM \(copy.quoted)")
-        _ = try await session.query("CREATE TRIGGER \(q(other, "t")) BEFORE INSERT ON \(copy.quoted) FOR EACH ROW SET NEW.id = NEW.id")
-        _ = try await session.query("CREATE PROCEDURE \(q(other, "p"))() SELECT 1")
-        _ = try await session.query("CREATE FUNCTION \(q(other, "f"))() RETURNS INT DETERMINISTIC RETURN 1")
-        _ = try await session.query("CREATE EVENT \(q(other, "e")) ON SCHEDULE EVERY 1 DAY DO SELECT 1")
+        _ = try await session.query("CREATE VIEW \(SQLQuote.identifier(other, "v")) AS SELECT id FROM \(copy.quoted)")
+        _ = try await session.query("CREATE TRIGGER \(SQLQuote.identifier(other, "t")) BEFORE INSERT ON \(copy.quoted) FOR EACH ROW SET NEW.id = NEW.id")
+        _ = try await session.query("CREATE PROCEDURE \(SQLQuote.identifier(other, "p"))() SELECT 1")
+        _ = try await session.query("CREATE FUNCTION \(SQLQuote.identifier(other, "f"))() RETURNS INT DETERMINISTIC RETURN 1")
+        _ = try await session.query("CREATE EVENT \(SQLQuote.identifier(other, "e")) ON SCHEDULE EVERY 1 DAY DO SELECT 1")
         let objects = [copy, DatabaseObject(.view, other, "v"), DatabaseObject(.trigger, other, "t"),
                        DatabaseObject(.procedure, other, "p"), DatabaseObject(.function, other, "f"),
                        DatabaseObject(.event, other, "e"), DatabaseObject(.table, other, "renamed")]
@@ -112,8 +111,11 @@ struct NavigatorLabTests {
         let check = NavigatorSQL.stillRunning(process, noBackslashEscapes: watcher.noBackslashEscapes)
         #expect(try await value(watcher, check) == "1")
         _ = try await watcher.query(NavigatorSQL.killQuery(process))
-        let slept = try await sleeping.value.first?.rows?.string(0, 0)
-        #expect(slept == "1")  // SLEEP says it was interrupted; the connection stays
+        // MySQL's SLEEP says it was interrupted; MariaDB reports the statement interrupted. The connection stays.
+        switch await sleeping.result {
+        case .success(let results): #expect(results.first?.rows?.string(0, 0) == "1")
+        case .failure(let error): #expect((error as? AirSQLError)?.kind == .cancelled)
+        }
         #expect(try await value(victim, "SELECT 2") == "2")
         #expect(try await value(watcher, check) == "0")  // it ended: Kill Query would refuse now
 
