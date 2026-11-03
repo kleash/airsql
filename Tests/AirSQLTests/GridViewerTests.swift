@@ -102,6 +102,20 @@ extension AppTests {
         #expect(status.position.stringValue == "r4 : c2 · 1 column")
     }
 
+    @Test func settingsReachOpenGridsAndAZoomedGridKeepsItsSize() async throws {
+        let (main, _, content) = viewerWindow(FakeGridSource(rows: 20, columns: 4))
+        let zoomed = ViewerContent(FakeGridSource(rows: 20, columns: 4))
+        main.open(zoomed, title: "orders", connection: Fixtures.production.id)
+        zoomed.viewer.zoomIn(nil)
+        #expect(content.viewer.grid.fontSize == 12 && zoomed.viewer.grid.fontSize == 13)
+        main.model.data.settings.nullText = "∅"
+        main.model.data.settings.gridFontSize = 15
+        #expect(content.viewer.grid.nullText == "∅" && content.viewer.grid.fontSize == 15)
+        #expect(zoomed.viewer.grid.nullText == "∅" && zoomed.viewer.grid.fontSize == 13)
+        main.model.data.settings = AppSettings()
+        #expect(content.viewer.grid.nullText == "NULL" && content.viewer.grid.fontSize == 12)
+    }
+
     @Test func goToRowTakesANumberOrAColumnAndARow() async throws {
         let (main, harness, content) = viewerWindow(FakeGridSource(rows: 5_000, columns: 12))
         let grid = content.viewer.grid

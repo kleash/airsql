@@ -28,7 +28,8 @@ With cells selected, the status bar shows the focused cell (**r3 : c5**, row and
 selected, and one figure for them: their sum, or their count when they aren't numbers. Click the figure to see them
 all (count, sum, average, smallest, largest, median, distinct values) and choose the one shown. Sums of decimals are
 exact. **Edit ▸ Copy Selection Summary** (⇧⌘C) copies every figure. Selections of more than 100,000 cells aren't added
-up.
+up. In a narrow window the figure, then the focused cell, make way for the rest; a table's row count and its **Count
+Exactly**, **Load More** and **Load All** stay.
 
 ## Move around
 

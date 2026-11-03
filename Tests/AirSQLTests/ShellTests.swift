@@ -24,6 +24,23 @@ extension AppTests {
         #expect(main.sidebar.selectedConnectionIDs == model.data.connections.map(\.id))
     }
 
+    @Test func theSummaryOffersWhatTheConnectionsStateCallsFor() async throws {
+        let model = testModel(Fixtures.shop)
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Production · shop"]])
+        let window = try #require(main.window)
+        func button(_ id: String) -> NSButton? { find(NSButton.self, id: id, in: window.contentView!) }
+        #expect(button("summary.connect")?.keyEquivalent == "\r" && button("summary.disconnect") == nil)
+        model.states[Fixtures.production.id] = .connecting(step: "Opening the SSH tunnel")
+        #expect(await eventually(timeout: 10) { button("summary.disconnect")?.toolTip == "Stop connecting (⇧⌘K)" })
+        model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3")
+        #expect(await eventually(timeout: 10) { button("summary.disconnect")?.toolTip == Commands.disconnect.tip + " (⇧⌘K)" })
+        #expect(button("summary.connect") == nil && button("summary.newQuery")?.keyEquivalent == "\r")
+        // Disconnect there: Connect again.
+        #expect(await call(harness, "press", ["id": "summary.disconnect"]).error == nil)
+        #expect(await eventually(timeout: 10) { button("summary.connect") != nil && model.states[Fixtures.production.id] == nil })
+    }
+
     @Test func duplicateColourAndDeleteFromTheConnectionMenu() async throws {
         let model = testModel(Fixtures.shop)
         model.setSavedPassword(Fixtures.production.id.uuidString, "secret")

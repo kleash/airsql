@@ -226,9 +226,11 @@ public enum ToolRun {
         return last?.name.replacingOccurrences(of: "``", with: "`")
     }
 
-    /// A tool that ended badly, in its own words: its error output's last lines.
-    private static func failure(_ name: String, _ result: CommandResult) -> AirSQLError {
-        let lines = result.stderr.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.contains("[Warning]") }
+    /// A tool that ended badly, in its own words: its error output's last lines, without the tools' warnings (MySQL's
+    /// "[Warning] …", MariaDB's "Warning: …", such as "unknown variable 'loose-init-command=…'").
+    static func failure(_ name: String, _ result: CommandResult) -> AirSQLError {
+        let lines = result.stderr.split(whereSeparator: \.isNewline).map(String.init)
+            .filter { !$0.contains("[Warning]") && !$0.hasPrefix("Warning: ") }
         let said = lines.last(where: { $0.contains("ERROR") || $0.contains("error") }) ?? lines.last
         let message = result.status == 127 ? "Can't start \(name)." : "\(name) stopped: " + (said ?? "it ended with status \(result.status).")
         return AirSQLError(.other, message, details: lines.suffix(20).joined(separator: "\n"))

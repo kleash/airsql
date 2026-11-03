@@ -92,7 +92,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         if source is ResultEditSource {
             editState.setAccessibilityIdentifier("result.editState")
             editState.isHidden = true
-            viewer.status.insertView(editState, at: 0, in: .leading)
+            viewer.status.insertView(editState, at: 0, in: .trailing)
         }
         NSLayoutConstraint.activate([
             bars.topAnchor.constraint(equalTo: top, constant: legend == nil ? 0 : 5),
