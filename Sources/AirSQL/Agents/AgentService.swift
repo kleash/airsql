@@ -29,7 +29,7 @@ final class AgentService {
     private var running: [Activity] = []
     static let eventLimit = 200
 
-    /// The console (L4), which isn't in this build yet: until it is, open_in_console says so.
+    /// Where open_in_console puts SQL: the main window's console tabs.
     var consoles: AgentConsoles?
     /// Carries out the UI tools on the person's windows.
     lazy var harness = AgentServer(main: main, model: model)

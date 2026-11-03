@@ -10,12 +10,36 @@ extension AppTests {
         /// A window with the shop's connections and a new console on Production.
         static func console(_ given: AppModel? = nil, on connection: UUID = Fixtures.production.id) async throws
             -> (MainWindowController, AgentServer, ConsoleViewController) {
-            let (main, harness) = appWindow(given ?? testModel(Fixtures.shop))
+            let model = given ?? testModel(Fixtures.shop)
+            // Shown as connected, so New Query doesn't start a connect: the fixtures lead nowhere.
+            if model.states[connection] == nil { model.states[connection] = .connected(server: "MariaDB 11.8.3") }
+            let (main, harness) = appWindow(model)
             main.sidebar.select([connection])
             let reply = await call(harness, "menu", ["path": "File > New Query"])
             #expect(reply.error == nil, "\(reply.error ?? "")")
             let console = try #require(main.selectedTab?.content as? ConsoleViewController)
             return (main, harness, console)
+        }
+
+        /// A closed session (Disconnect) takes its last USE with it: the console's database is the connection's again.
+        @Test func aClosedSessionsDatabaseIsForgotten() async throws {
+            let (_, _, console) = try await Self.console()
+            let closed = DBConnection(options: ConnectOptions(host: "127.0.0.1", user: "app"), role: .main)
+            ConsoleViewController.shared[Fixtures.production.id] = .init(database: "old", session: closed)
+            defer { ConsoleViewController.shared[Fixtures.production.id] = nil }
+            #expect(console.database == "shop")
+        }
+
+        @Test func newQueryStartsConnectingADisconnectedConnection() async throws {
+            let closed = SavedConnection(name: "Closed port", host: "127.0.0.1", port: 1, user: "nobody")
+            let model = testModel([closed])
+            let (main, harness) = appWindow(model)
+            main.sidebar.select([closed.id])
+            #expect(await call(harness, "menu", ["path": "File > New Query"]).error == nil)
+            // Connecting, or already failed (nothing listens on port 1): either way New Query started it.
+            #expect(model.states[closed.id] != nil && main.selectedTab?.connectionID == closed.id, "\(String(describing: model.states[closed.id]))")
+            model.connector.cancel(closed.id)
+            if let sheet = main.window?.attachedSheet { main.window?.endSheet(sheet) }
         }
 
         @Test func newQueryOpensAConsoleOnTheSelectedConnection() async throws {
