@@ -20,8 +20,9 @@ final class AgentActivityPopover: NSViewController {
     override func loadView() {
         let allowed = service.model.data.settings.agentsAllowed
         let title = label("Agents", font: .systemFont(ofSize: 12, weight: .semibold))
-        let state = ChipView(allowed ? (service.isListening ? "On" : "Can't start") : "Off",
-                             style: allowed && service.isListening ? .accent : .tinted(.statusWarning))
+        let failed = allowed && service.problem != nil
+        let state = ChipView(failed ? "Can't start" : allowed ? "On" : "Off", style: allowed && !failed ? .accent : .tinted(.statusWarning))
+        state.toolTip = service.problem.map { "Agents can't start: " + $0 }
         let action = allowed
             ? button("Turn Agents Off", id: "agents.turnOff", tip: Commands.turnAgentsOff.tip, target: nil,
                      action: Commands.turnAgentsOff.action)

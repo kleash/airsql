@@ -65,13 +65,14 @@ final class AgentsPane: SettingsPaneController {
         table.dataSource = accessTable
         table.delegate = accessTable
         accessTable.model = model
-        for (id, title, width) in [("name", "Connection", 180.0), ("access", "Access", 190.0), ("samples", "Sample rows", 90.0)] {
+        for (id, title, width) in [("name", "Connection", 160.0), ("access", "Access", 150.0), ("samples", "Sample rows", 76.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
             table.addTableColumn(column)
         }
-        table.rowHeight = 24
+        table.rowHeight = 28
+        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.usesAlternatingRowBackgroundColors = true
         table.allowsColumnReordering = false
         table.setAccessibilityIdentifier("settings.agentAccessList")
@@ -82,8 +83,8 @@ final class AgentsPane: SettingsPaneController {
         scroll.translatesAutoresizingMaskIntoConstraints = false
         let rows = CGFloat(min(model.data.connections.count, 6))
         NSLayoutConstraint.activate([
-            scroll.widthAnchor.constraint(equalToConstant: 400),
-            scroll.heightAnchor.constraint(equalToConstant: rows * 26 + 28),
+            scroll.widthAnchor.constraint(equalToConstant: 410),
+            scroll.heightAnchor.constraint(equalToConstant: rows * 30 + 28),
         ])
         return scroll
     }
@@ -108,23 +109,35 @@ final class AgentsPane: SettingsPaneController {
             case "name":
                 let name = label(connection.displayName, truncates: true)
                 name.toolTip = connection.displayName
-                return name
+                return centred(name)
             case "access":
                 let level = popup(AgentAccess.allCases.map(\.title),
                                   selected: AgentAccess.allCases.firstIndex(of: connection.agentAccess) ?? 0,
                                   id: "settings.agentAccess", tip: "Choose what agents may do with \(connection.displayName)",
                                   target: self, action: #selector(changed(_:)))
-                level.controlSize = .small
                 level.tag = row
-                return level
+                return centred(level)
             default:
                 let samples = checkbox("", id: "settings.agentSampleRows",
                                        tip: "Let describe show agents a few rows of \(connection.displayName)'s tables",
                                        on: connection.agentSampleRows, target: self, action: #selector(changed(_:)))
                 samples.isEnabled = connection.agentAccess != .off
                 samples.tag = row
-                return samples
+                return centred(samples)
             }
+        }
+
+        /// A cell's control, centred in its row.
+        private func centred(_ view: NSView) -> NSView {
+            let cell = NSView()
+            view.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(view)
+            NSLayoutConstraint.activate([
+                view.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                view.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                view.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -2),
+            ])
+            return cell
         }
 
         /// A row's pop-up or checkbox changed: saves that connection.
