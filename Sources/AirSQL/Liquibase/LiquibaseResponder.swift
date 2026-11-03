@@ -21,12 +21,12 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
         responder.nextResponder = after.nextResponder
         after.nextResponder = responder
         objc_setAssociatedObject(main, &key, responder, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        let model = main.model
-        // A change has run and the person ticked "Save as Liquibase changeset": shown on the window it ran from.
-        SQLPreviewSheet.changesetWriter = { change in
-            guard let window = NSApp.keyWindow ?? NSApp.mainWindow else { return }
-            ChangesetSheet.show([Liquibase.changeset(change, rollback: model.data.settings.liquibase.rollback)],
-                                heading: "Save “\(change.title)” as a changeset", model: model, on: window)
+        // A change has run and the person ticked "Save as Liquibase changeset": the editors and the tree that run them are
+        // in the main window.
+        SQLPreviewSheet.changesetWriter = { [weak main] change in
+            guard let main, let window = main.window else { return }
+            ChangesetSheet.show([Liquibase.changeset(change, rollback: main.model.data.settings.liquibase.rollback)],
+                                heading: "Save “\(change.title)” as a changeset", model: main.model, on: window)
         }
     }
 
