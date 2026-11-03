@@ -41,7 +41,8 @@ public struct PasteFailure: Equatable, Sendable {
 /// the column it lands in, converted from the way people write numbers and dates where they live.
 public enum Paste {
     /// The rows of pasted text, each padded to the widest: cells in double quotes may hold separators, quotes (written
-    /// twice) and line breaks; a line break at the very end adds no row.
+    /// twice) and line breaks; a line break at the very end adds no row. A single line with no separator is one cell,
+    /// as it is.
     public static func cells(_ text: String, separator: PasteFormat.Separator = .auto) -> [[String]] {
         let mark: Unicode.Scalar?
         switch separator {
@@ -49,6 +50,10 @@ public enum Paste {
         case .comma: mark = ","
         case .semicolon: mark = ";"
         }
+        // One line without a separator is one value, quotes and all.
+        var line = Substring(text)
+        if line.last?.isNewline == true { line = line.dropLast() }
+        if mark == nil, !line.isEmpty, !line.contains(where: \.isNewline) { return [[String(line)]] }
         var rows: [[String]] = [], row: [String] = [], cell = String.UnicodeScalarView()
         var quoted = false, cellStart = true
         var scalars = text.unicodeScalars[...]

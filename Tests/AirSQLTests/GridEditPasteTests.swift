@@ -32,7 +32,12 @@ struct GridEditPasteTests {
         #expect(Paste.cells("a\t\tc\nd") == [["a", "", "c"], ["d", "", ""]])
         #expect(Paste.cells("a\t") == [["a", ""]])
         #expect(Paste.cells("5\" pipe\tx") == [["5\" pipe", "x"]])
-        #expect(Paste.cells("\"unclosed") == [["unclosed"]])
+        #expect(Paste.cells("\"unclosed\n") == [["\"unclosed"]])
+        #expect(Paste.cells("\"x\"\r\n\"y\"\"z\"") == [["x"], ["y\"z"]])
+        // A single value keeps its quotes: a JSON string, a quoted word.
+        #expect(Paste.cells("\"abc\"") == [["\"abc\""]])
+        #expect(Paste.cells("say \"hi\"\n") == [["say \"hi\""]])
+        #expect(Paste.cells("\"abc\"\r\n") == [["\"abc\""]])
         #expect(Paste.cells("") == [])
         #expect(Paste.cells("\n") == [[""]])
         // Without a tab, auto never splits: a lone 1,234.56 stays one cell.
