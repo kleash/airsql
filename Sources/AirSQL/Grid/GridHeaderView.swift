@@ -124,7 +124,7 @@ final class GridHeaderView: NSView {
 
     /// A symbol in a colour, made once per look and size.
     private func symbol(_ name: String, size: CGFloat, color: NSColor) -> NSImage? {
-        let key = "\(name) \(size) \(effectiveAppearance.isDark)"
+        let key = "\(name) \(size) \(effectiveAppearance.isDark) \(color.hash)"
         if let image = symbols[key] { return image }
         let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: size, weight: .semibold).applying(.init(paletteColors: [color])))

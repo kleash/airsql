@@ -216,6 +216,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         let order = layout?.order ?? grid.columnOrder
         record = row
         grid.source = TransposedSource(displayed ?? source, order: order, rows: [row])
+        // The values get the width the names leave.
+        let room = floor(grid.scrollView.contentSize.width - (grid.columnWidths.first ?? 0))
+        if grid.columnWidths.count == 2, room > grid.columnWidths[1] { grid.columnWidths[1] = room }
         focusCell(GridPosition(row: min(field, max(0, order.count - 1)), column: 1))
         updateRecordBar()
         status.update()

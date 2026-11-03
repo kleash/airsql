@@ -19,7 +19,7 @@ final class GridValuePanel: NSView {
     private let outlineScroll = JSONTreeView()
     var outline: NSOutlineView { outlineScroll.outline }
     private let image = NSImageView()
-    let footer = label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor, wraps: true)
+    let footer = label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
     private let wrap = checkbox("Wrap", id: "valuePanel.wrap", tip: "Wrap long lines to the panel's width", on: true, target: nil,
                                 action: nil)
     private(set) var mode = Mode.text
@@ -51,10 +51,15 @@ final class GridValuePanel: NSView {
         outline.setAccessibilityIdentifier("valuePanel.tree")
         image.imageScaling = .scaleProportionallyDown
         image.setAccessibilityIdentifier("valuePanel.image")
-        let top = NSStackView(views: [title, NSView(), modes])
+        let top = NSStackView()
+        top.setViews([title], in: .leading)
+        top.setViews([modes], in: .trailing)
         top.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
-        let bottom = NSStackView(views: [footer, NSView(), wrap])
+        let bottom = NSStackView()
+        bottom.setViews([footer], in: .leading)
+        bottom.setViews([wrap], in: .trailing)
         bottom.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 6, right: 8)
+        for bar in [top, bottom] { bar.setHuggingPriority(.defaultHigh, for: .vertical) }
         for view in [top, textScroll, outlineScroll, image, bottom] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
@@ -92,6 +97,7 @@ final class GridValuePanel: NSView {
         if let picked, fits[picked] == true { mode = picked } else { mode = picture != nil ? .image : tree != nil ? .json : .text }
         modes.selectedSegment = value == nil ? -1 : mode.rawValue
         footer.stringValue = column == nil ? "Select a cell to see its whole value here" : value == nil ? "NULL" : describe()
+        footer.toolTip = footer.stringValue
         refresh()
     }
 

@@ -61,6 +61,7 @@ final class JSONTreeView: NSScrollView, NSOutlineViewDataSource, NSOutlineViewDe
                           font: .monospacedSystemFont(ofSize: 11.5, weight: .regular),
                           color: isKey ? .labelColor : colours[node.kind] ?? .secondaryLabelColor, truncates: true)
         field.toolTip = isKey ? nil : node.value
+        field.translatesAutoresizingMaskIntoConstraints = true  // the outline sets its frame
         return field
     }
 }

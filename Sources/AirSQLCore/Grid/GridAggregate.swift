@@ -94,8 +94,9 @@ public struct GridAggregate: Equatable {
         formatter.locale = locale
         formatter.numberStyle = .decimal
         formatter.usesGroupingSeparator = locale.identifier != "en_US_POSIX"
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = min(digits, 20)
+        // As many decimals as the values have (a sum of prices keeps its cents), more for an average or median.
+        formatter.minimumFractionDigits = min(scale, 20)
+        formatter.maximumFractionDigits = min(max(digits, scale), 20)
         return formatter.string(from: number as NSDecimalNumber) ?? "\(number)"
     }
 }

@@ -40,7 +40,11 @@ final class GridChartView: NSView {
             popup.target = self
             popup.action = #selector(changed(_:))
             popup.controlSize = .small
+            popup.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+            popup.widthAnchor.constraint(lessThanOrEqualToConstant: 280).isActive = true
         }
+        // The chart fills the room it has, whatever SwiftUI would like.
+        hosting.sizingOptions = []
         let save = button("Save as PNG…", id: "chart.save", tip: "Save a picture of the chart as a PNG file", target: self,
                           action: #selector(saveImage(_:)))
         save.controlSize = .small
@@ -105,7 +109,8 @@ final class GridChartView: NSView {
         case .bar, .pie:
             let names: [String?] = x.map { column in (0..<ys.count).map { source.value($0, column) } }
                 ?? (0..<ys.count).map { String($0 + 1) }
-            points = GridChart.totals(labels: names, values: ys, limit: chosen == .pie ? GridChart.sliceLimit : 100)
+            points = chosen == .pie ? GridChart.totals(labels: names, values: ys, limit: GridChart.sliceLimit)
+                : GridChart.totals(labels: names, values: ys, limit: GridChart.barLimit, other: false)
         case .line, .area, .scatter:
             let xs = x.flatMap { source.columns[$0].kind == .number ? viewer.numbers($0) : nil }
             points = GridChart.series(xs: xs, ys: ys)
@@ -169,37 +174,53 @@ struct GridChartBody: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(hovered.map { "\($0.label): \($0.y.formatted())" } ?? " ")
+            Text(hovered.map { "\($0.label): \($0.y.formatted())" } ?? caption)
                 .font(.system(size: 11.5).monospacedDigit()).foregroundColor(.secondary)
-            chart
+            chart.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// What the chart leaves out, when it does.
+    private var caption: String {
+        spec.kind == .bar && spec.points.count == GridChart.barLimit ? "The first \(GridChart.barLimit) labels; point at a bar for its value"
+            : "Point at the chart for a value"
     }
 
     @ViewBuilder private var chart: some View {
         switch spec.kind {
-        case .bar, .histogram:
+        case .bar:
+            // Labels written upwards, so long ones fit under their bars.
             Chart(spec.points) { point in
                 BarMark(x: .value(spec.x, point.label), y: .value(spec.y, point.y)).foregroundStyle(Self.series).cornerRadius(4)
             }
-            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, byLabel: true, hovered: $hovered))
+            .chartXAxis { AxisMarks { _ in AxisValueLabel(orientation: .vertical) } }
+            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y)
+            .modifier(Hover(points: spec.points, axis: .label, hovered: $hovered))
+        case .histogram:
+            Chart(spec.points) { point in
+                BarMark(xStart: .value(spec.x, point.x), xEnd: .value(spec.x, point.x + point.width), y: .value(spec.y, point.y))
+                    .foregroundStyle(Self.series).cornerRadius(4)
+            }
+            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, axis: .bin, hovered: $hovered))
         case .line:
             Chart(spec.points) { point in
                 LineMark(x: .value(spec.x, point.x), y: .value(spec.y, point.y)).foregroundStyle(Self.series)
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
-            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, byLabel: false, hovered: $hovered))
+            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, axis: .number, hovered: $hovered))
         case .area:
             Chart(spec.points) { point in
                 AreaMark(x: .value(spec.x, point.x), y: .value(spec.y, point.y)).foregroundStyle(Self.series.opacity(0.35))
                 LineMark(x: .value(spec.x, point.x), y: .value(spec.y, point.y)).foregroundStyle(Self.series)
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
-            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, byLabel: false, hovered: $hovered))
+            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, axis: .number, hovered: $hovered))
         case .scatter:
             Chart(spec.points) { point in
                 PointMark(x: .value(spec.x, point.x), y: .value(spec.y, point.y)).foregroundStyle(Self.series).symbolSize(64)
             }
-            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, byLabel: false, hovered: $hovered))
+            .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, axis: .number, hovered: $hovered))
         case .pie:
             if #available(macOS 14, *) {
                 Chart(spec.points) { point in
@@ -215,21 +236,28 @@ struct GridChartBody: View {
     }
 }
 
-/// The point under the pointer, by its label (bars) or its nearest x (lines, areas, points).
+/// The point under the pointer: by its label (bars), its bin, or its nearest x (lines, areas, points).
 private struct Hover: ViewModifier {
+    enum Axis { case label, bin, number }
+
     let points: [GridChart.Point]
-    let byLabel: Bool
+    let axis: Axis
     @Binding var hovered: GridChart.Point?
 
     func body(content: Content) -> some View {
         content.chartOverlay { proxy in
             Color.clear.contentShape(Rectangle()).onContinuousHover { phase in
                 guard case .active(let location) = phase else { return hovered = nil }
-                if byLabel {
+                switch axis {
+                case .label:
                     let label: String? = proxy.value(atX: location.x)
                     hovered = points.first { $0.label == label }
-                } else if let x: Double = proxy.value(atX: location.x) {
-                    hovered = points.min { abs($0.x - x) < abs($1.x - x) }
+                case .bin:
+                    let x: Double? = proxy.value(atX: location.x)
+                    hovered = x.flatMap { x in points.first { x >= $0.x && x < $0.x + $0.width } }
+                case .number:
+                    let x: Double? = proxy.value(atX: location.x)
+                    hovered = x.flatMap { x in points.min { abs($0.x - x) < abs($1.x - x) } }
                 }
             }
         }

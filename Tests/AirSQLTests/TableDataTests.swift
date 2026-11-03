@@ -86,7 +86,7 @@ struct GridReadingTests {
         #expect(figures.text(.sum, locale: posix) == "6,563.95")
         #expect(figures.text(.average, locale: posix) == "2,187.9833")
         #expect(figures.text(.median, locale: posix) == "2,118.75")
-        #expect(figures.text(.minimum, locale: posix) == "540" && figures.text(.maximum, locale: posix) == "3,905.2")
+        #expect(figures.text(.minimum, locale: posix) == "540.00" && figures.text(.maximum, locale: posix) == "3,905.20")
         #expect(figures.copyText(.sum) == "6563.95" && figures.copyText(.count) == "3")
         // 0.1 + 0.2 is 0.3 here, not 0.30000000000000004.
         #expect(GridAggregate(["0.1", "0.2"]).copyText(.sum) == "0.3")

@@ -16,21 +16,27 @@ public enum GridChart {
         public var label: String
         public var x: Double
         public var y: Double
+        /// A histogram bin's width (it runs from x to x + width).
+        public var width: Double
 
-        public init(id: Int, label: String, x: Double, y: Double) {
+        public init(id: Int, label: String, x: Double, y: Double, width: Double = 0) {
             self.id = id
             self.label = label
             self.x = x
             self.y = y
+            self.width = width
         }
     }
 
     /// The pie's most slices before the rest fold into "Other" (the palette's eight hues).
     public static let sliceLimit = 8
+    /// The most bars a bar chart shows (the first labels); more would be too thin to read.
+    public static let barLimit = 30
 
     /// A number per label, summed over its rows, in the order labels first appear; past `limit` labels, the rest add up
-    /// to one "Other". Rows without a number are left out; NULL labels show as "NULL".
-    public static func totals(labels: [String?], values: [Double?], limit: Int) -> [Point] {
+    /// to one "Other" (a pie), or are left out (`other` false: bars). Rows without a number are left out; NULL labels
+    /// show as "NULL".
+    public static func totals(labels: [String?], values: [Double?], limit: Int, other: Bool = true) -> [Point] {
         var order: [String] = [], sums: [String: Double] = [:]
         for (label, value) in zip(labels, values) {
             guard let value else { continue }
@@ -39,7 +45,7 @@ public enum GridChart {
             sums[key, default: 0] += value
         }
         var points = order.prefix(limit).enumerated().map { Point(id: $0, label: $1, x: Double($0), y: sums[$1]!) }
-        if order.count > limit {
+        if other, order.count > limit {
             let rest = order.dropFirst(limit).reduce(0) { $0 + sums[$1]! }
             points.append(Point(id: limit, label: "Other", x: Double(limit), y: rest))
         }
@@ -63,7 +69,7 @@ public enum GridChart {
         for number in numbers { counts[min(counts.count - 1, Int((number - low) / width))] += 1 }
         return counts.enumerated().map { index, count in
             let start = low + Double(index) * width
-            return Point(id: index, label: "\(start.formatted()) – \((start + width).formatted())", x: start, y: Double(count))
+            return Point(id: index, label: "\(start.formatted()) – \((start + width).formatted())", x: start, y: Double(count), width: width)
         }
     }
 }
