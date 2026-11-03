@@ -107,6 +107,8 @@ final class ReconDetailView: NSObject {
     func show(_ object: ReconObject?, result: ReconResult, data: Bool? = nil) {
         self.object = object
         self.result = result
+        rows?.removeFromSuperview()
+        rows = nil
         if let data { tabs.selectedSegment = data ? 1 : 0 }
         update()
     }
@@ -206,20 +208,22 @@ final class ReconDetailView: NSObject {
 
     /// The rows that differ in the grid: those only in the source, only in the target, then those changed, with the cells
     /// that differ marked. The sides go by their connections' names, or their databases' when the connection is the same.
+    /// Made once per object shown, so its selection, sort and scrolling stay while the window updates.
     private func showRows(_ object: ReconObject) {
         guard let data = object.data, let result else { return }
-        rows?.removeFromSuperview()
-        let names = result.source.name == result.target.name ? (result.source.database, result.target.database)
-            : (result.source.name, result.target.name)
-        let diff = DiffSource(data, names: names)
-        let settings = window?.model.data.settings ?? AppSettings()
-        let grid = ResultGridView(source: diff, table: (result.source.database, object.name), legend: diff.legend,
-                                  nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize))
-        grid.grid.setAccessibilityIdentifier("recon.rows")
-        grid.grid.setAccessibilityLabel("Rows that differ")
-        rowsHolder.addSubview(grid)
-        grid.pin(to: rowsHolder)
-        rows = grid
+        if rows == nil {
+            let names = result.source.name == result.target.name ? (result.source.database, result.target.database)
+                : (result.source.name, result.target.name)
+            let diff = DiffSource(data, names: names)
+            let settings = window?.model.data.settings ?? AppSettings()
+            let grid = ResultGridView(source: diff, table: (result.source.database, object.name), legend: diff.legend,
+                                      nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize))
+            grid.grid.setAccessibilityIdentifier("recon.rows")
+            grid.grid.setAccessibilityLabel("Rows that differ")
+            rowsHolder.addSubview(grid)
+            grid.pin(to: rowsHolder)
+            rows = grid
+        }
         switch data.outcome {
         case .differentWithoutKey, .tooManyDifferences, .notCompared:
             message.stringValue = ReconReport.lines(object, result).last?.detail.capitalizedFirst ?? ""

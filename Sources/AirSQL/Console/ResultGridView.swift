@@ -134,8 +134,8 @@ extension DiffSource {
                                            attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
         }
         let key = data.key.isEmpty ? "every column" : data.key.joined(separator: ", ")
-        let tip = "Rows only in \(names.first) are green; rows only in \(names.second) are red and struck through; cells that "
-            + "differ are amber: hold the pointer over one to see both values. Rows are matched on \(key)."
+        let tip = text.string + "\nRows only in \(names.first) are green; rows only in \(names.second) are red and struck through; "
+            + "cells that differ are amber: hold the pointer over one to see both values. Rows are matched on \(key)."
         return (text, tip)
     }
 }

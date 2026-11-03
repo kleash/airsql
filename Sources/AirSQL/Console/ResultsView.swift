@@ -22,6 +22,8 @@ final class ResultTab {
     var title: String
     var pinned = false
     let content: Content
+    /// A comparison with another connection's result: agents see its rows only if they may read that connection's too.
+    var otherConnection: UUID?
     /// What the bar's right end says while it is shown: "38 ms · 200 rows".
     var summary: String
     /// Made once, kept while the tab is open.

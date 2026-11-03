@@ -7,18 +7,21 @@ import AppKit
 extension ConsoleViewController {
     /// What a result can be compared with.
     enum CompareTarget {
-        /// Another result tab with rows, and its name here ("Result 1", or "Console 2 › Result 1" from another tab).
-        case result(ResultTab, name: String)
+        /// Another result tab with rows, its name here ("Result 1", or "Query 2 › Result 1" from another tab) and its
+        /// console's connection.
+        case result(ResultTab, name: String, connection: UUID?)
         case table(database: String, name: String)
     }
 
     /// Every result tab with rows in this window but `tab` (this console's nearest first), then the tables of the
     /// console's database, the result's own table first when it is in another.
     func compareTargets(for tab: ResultTab) -> [CompareTarget] {
-        var targets = resultTabs.reversed().filter { $0 !== tab && $0.content.store != nil }.map { CompareTarget.result($0, name: $0.title) }
+        var targets = resultTabs.reversed().filter { $0 !== tab && $0.content.store != nil }
+            .map { CompareTarget.result($0, name: $0.title, connection: connectionID) }
         for other in (view.window?.windowController as? MainWindowController)?.tabs ?? [] {
             guard let console = other.content as? ConsoleViewController, console !== self else { continue }
-            targets += console.resultTabs.filter { $0.content.store != nil }.map { .result($0, name: "\(other.title) › \($0.title)") }
+            targets += console.resultTabs.filter { $0.content.store != nil }
+                .map { .result($0, name: "\(other.title) › \($0.title)", connection: console.connectionID) }
         }
         let snapshot = model.openConnection(connectionID)?.snapshot
         if let store = tab.content.store, case let (database?, table) = ResultGridView.table(of: store.columns), database != self.database,
@@ -53,7 +56,7 @@ extension ConsoleViewController {
         for (index, target) in targets.enumerated() {
             let item: NSMenuItem
             switch target {
-            case .result(let other, let name):
+            case .result(let other, let name, _):
                 if index == 0 { heading("Results", "The result tabs with rows in this window") }
                 item = NSMenuItem(title: name + other.label.dropFirst(other.title.count), action: nil, keyEquivalent: "")
                 item.toolTip = "Compare with the rows of \(name)"
@@ -99,10 +102,12 @@ extension ConsoleViewController {
     /// Compares off the main thread (reading the table on the data session), listed in the activity with Cancel.
     private func compare(_ tab: ResultTab, _ store: ResultStore, with target: CompareTarget, key: [String]) {
         let other: String, work: Task<ReconTableData, Error>
+        var otherConnection: UUID?
         switch target {
-        case .result(let result, let name):
+        case .result(let result, let name, let connection):
             guard let second = result.content.store else { return }
             other = name
+            otherConnection = connection == connectionID ? nil : connection
             work = Task.detached {
                 try Task.checkCancellation()
                 return ReconTableData.compare(store, second, key: key)
@@ -118,11 +123,12 @@ extension ConsoleViewController {
         Task { [weak self] in
             let outcome = await work.result
             activity.end()
-            self?.showComparison(outcome, of: tab, store, with: other)
+            self?.showComparison(outcome, of: tab, store, with: other, on: otherConnection)
         }
     }
 
-    private func showComparison(_ outcome: Result<ReconTableData, Error>, of tab: ResultTab, _ store: ResultStore, with other: String) {
+    private func showComparison(_ outcome: Result<ReconTableData, Error>, of tab: ResultTab, _ store: ResultStore, with other: String,
+                                on otherConnection: UUID?) {
         guard let window = view.window else { return }
         let title = "Can't compare \(tab.title) with \(other)"
         let data: ReconTableData
@@ -150,6 +156,7 @@ extension ConsoleViewController {
         // Named after the other side: it opens next to the result compared.
         let comparison = ResultTab(title: "vs \(other)", content: .diff(diff),
                                    summary: "\(same.formatted()) row\(same == 1 ? "" : "s") the same · matched on \(key)")
+        comparison.otherConnection = otherConnection
         let settings = model.data.settings, table = ResultGridView.table(of: store.columns)
         comparison.makeView = {
             ResultGridView(source: diff, table: table, legend: diff.legend, nullText: settings.nullText,
