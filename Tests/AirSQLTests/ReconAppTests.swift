@@ -220,6 +220,16 @@ extension AppTests {
             #expect(window.results.detail.tabs.selectedSegment == 0)
             window.results.detail.show(window.results.objects[products], result: window.result!, data: true)
             #expect(window.results.detail.rows.numberOfRows == 15)
+            // The rows that differ copy as tab-separated text under their columns' names, from their menu and with ⌘C.
+            let rows = window.results.detail.rows
+            let rowMenu = try #require(rows.menu)
+            rowMenu.delegate?.menuNeedsUpdate?(rowMenu)
+            #expect(rowMenu.items.map(\.title) == ["Copy"])
+            rows.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            window.window?.makeFirstResponder(rows)
+            window.copy(nil)
+            let copied = NSPasteboard.general.string(forType: .string)?.components(separatedBy: "\n") ?? []
+            #expect(copied.count == 2 && copied.first?.hasPrefix("Row\t") == true, "\(copied)")
             let menu = try #require(list.menu)
             menu.delegate?.menuNeedsUpdate?(menu)
             #expect(menu.items.map(\.title) == ["Copy", "Copy Sync Script", "Leave Out of Next Compare"])

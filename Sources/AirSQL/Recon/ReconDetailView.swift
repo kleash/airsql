@@ -4,7 +4,7 @@ import AppKit
 /// The selected object's details: its two definitions side by side with the lines that differ marked, or its rows that
 /// differ; and its part of the sync script.
 @MainActor
-final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
     weak var window: ReconWindowController?
     let view = NSView()
     let tabs = NSSegmentedControl(labels: ["Structure", "Data"], trackingMode: .selectOne, target: nil, action: nil)
@@ -64,6 +64,8 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         rows.columnAutoresizingStyle = .noColumnAutoresizing
         rows.setAccessibilityIdentifier("recon.rows")
         rows.setAccessibilityLabel("Rows that differ")
+        rows.menu = NSMenu()
+        rows.menu?.delegate = self
         rowsScroll.documentView = rows
         rowsScroll.hasVerticalScroller = true
         rowsScroll.hasHorizontalScroller = true
@@ -271,6 +273,28 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
             field.toolTip = value.map { String($0.prefix(300)) }
         }
         return field
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        // Right-clicking a row outside the selection selects it first.
+        if rows.clickedRow >= 0, !rows.selectedRowIndexes.contains(rows.clickedRow) {
+            rows.selectRowIndexes(IndexSet(integer: rows.clickedRow), byExtendingSelection: false)
+        }
+        menu.removeAllItems()
+        let copy = Commands.copy.item()
+        copy.target = self
+        menu.addItem(copy)
+    }
+
+    /// The selected rows (else every row shown) as tab-separated text under the columns' names, NULL as NULL.
+    @objc func copy(_ sender: Any?) {
+        guard let data = object?.data else { return }
+        let picked = rows.selectedRowIndexes.isEmpty ? IndexSet(shown.indices) : rows.selectedRowIndexes
+        let lines = [["Row"] + data.columns.map(\.name)] + picked.map { index in
+            [shown[index].kind] + data.columns.indices.map { shown[index].row.text($0, kind: data.columns[$0].kind) ?? "NULL" }
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(lines.map { $0.joined(separator: "\t") }.joined(separator: "\n"), forType: .string)
     }
 
     @objc private func tabChosen(_ sender: Any?) { update() }
