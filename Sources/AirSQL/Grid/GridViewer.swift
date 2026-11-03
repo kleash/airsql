@@ -21,13 +21,22 @@ final class GridViewer: NSView, DataGridViewDelegate {
     /// Where the columns are kept; nil: nowhere.
     var viewKey: ViewKey?
     private var settings = TableViewSettings()
+    /// The grid (or what View As shows) on the left, the value panel on the right when it is open.
+    private let split = NSSplitView()
+    let content = NSView()
+    private(set) var valuePanel: GridValuePanel?
 
     init(source: GridSource?) {
         grid = DataGridView(source: source)
         super.init(frame: .zero)
         grid.delegate = self
-        addSubview(grid.containerView)
-        grid.containerView.pin(to: self)
+        split.isVertical = true
+        split.dividerStyle = .thin
+        split.addArrangedSubview(content)
+        addSubview(split)
+        split.pin(to: self)
+        content.addSubview(grid.containerView)
+        grid.containerView.pin(to: content)
         status.viewer = self
         status.update()
     }
@@ -41,6 +50,35 @@ final class GridViewer: NSView, DataGridViewDelegate {
         grid.source = source
         restoreColumns()
         status.update()
+        updateValuePanel()
+    }
+
+    // MARK: Value panel
+
+    /// Value Panel (⇧↩): the focused cell's whole value beside the grid.
+    @objc func toggleValuePanel(_ sender: Any?) {
+        if let valuePanel {
+            valuePanel.removeFromSuperview()
+            self.valuePanel = nil
+        } else {
+            let panel = GridValuePanel()
+            split.addArrangedSubview(panel)
+            split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
+            split.layoutSubtreeIfNeeded()
+            split.setPosition(max(240, split.bounds.width - 320), ofDividerAt: 0)
+            valuePanel = panel
+            updateValuePanel()
+        }
+    }
+
+    private func updateValuePanel() {
+        guard let valuePanel else { return }
+        guard let source, let cursor = grid.selection.cursor, cursor.row < grid.rowCount, cursor.column < grid.columnCount else {
+            return valuePanel.show(column: nil, value: nil, bytes: nil)
+        }
+        let column = grid.sourceColumn(cursor.column)
+        valuePanel.show(column: source.columns[column], value: source.value(cursor.row, column),
+                        bytes: (source as? GridBytes)?.bytes(cursor.row, column))
     }
 
     // MARK: Columns kept
@@ -164,6 +202,9 @@ final class GridViewer: NSView, DataGridViewDelegate {
             return status.aggregate != nil
         case #selector(goToRow(_:)): return grid.rowCount > 0
         case #selector(showColumnList(_:)): return source != nil
+        case #selector(toggleValuePanel(_:)):
+            item.state = valuePanel == nil ? .off : .on
+            return true
         case #selector(hideColumn(_:)):
             let enabled = grid.columnCount > 1 && grid.selection.cursor != nil
             item.explain(enabled: enabled, reason: grid.columnCount > 1 ? "Select a column first" : "One column stays shown")
@@ -176,6 +217,7 @@ final class GridViewer: NSView, DataGridViewDelegate {
 
     func dataGridSelectionDidChange(_ grid: DataGridView) {
         status.update()
+        updateValuePanel()
         host?.dataGridSelectionDidChange(grid)
     }
 
@@ -204,4 +246,15 @@ final class GridViewer: NSView, DataGridViewDelegate {
         saveColumns()
         host?.dataGridColumnsDidChange(grid)
     }
+}
+
+/// A source that keeps the bytes the server sent: the value panel's hex and image.
+protocol GridBytes {
+    func bytes(_ row: Int, _ column: Int) -> [UInt8]?
+}
+
+extension TableDataSource: GridBytes {}
+
+extension ResultSetSource: GridBytes {
+    func bytes(_ row: Int, _ column: Int) -> [UInt8]? { store.bytes(row, column) }
 }

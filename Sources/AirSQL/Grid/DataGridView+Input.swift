@@ -60,7 +60,12 @@ extension DataGridView {
     }
 
     override func keyDown(with event: NSEvent) {
-        interpretKeyEvents([event])
+        // ⇧↩ is Value Panel's shortcut (menus take only ⌘ and ⌃ keys).
+        if [36, 76].contains(event.keyCode), event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .shift {
+            sendCommand(Commands.valuePanel.action)
+        } else {
+            interpretKeyEvents([event])
+        }
     }
 
     override func becomeFirstResponder() -> Bool {

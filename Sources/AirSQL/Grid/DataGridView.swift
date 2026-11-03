@@ -179,8 +179,9 @@ final class DataGridView: NSView {
                width: offsets[position.column + 1] - offsets[position.column], height: rowHeight)
     }
 
-    /// The rows a rect crosses.
+    /// The rows a rect crosses (none for the null rect a dirty rect outside a view intersects to).
     func rows(in rect: NSRect) -> Range<Int> {
+        guard !rect.isNull, !rect.isEmpty else { return 0..<0 }
         let first = max(0, Int(floor(rect.minY / rowHeight))), last = min(rowCount, Int(ceil(rect.maxY / rowHeight)))
         return first..<max(first, last)
     }

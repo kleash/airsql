@@ -132,3 +132,43 @@ extension AppTests {
         #expect(other.viewer.grid.columnOrder == Array(0..<8))
     }
 }
+
+extension AppTests {
+    @Test func valuePanelFollowsTheCursorWithTextJSONAndHex() async throws {
+        let source = FakeGridSource(rows: 40, columns: 9)
+        let (_, harness, content) = viewerWindow(source)
+        let viewer = content.viewer, grid = viewer.grid
+        grid.selection.select(GridPosition(row: 0, column: 7))
+        #expect(await call(harness, "key", ["combo": "shift+return"]).error == nil)
+        let panel = try #require(viewer.valuePanel)
+        #expect(panel.mode == .json && panel.outline.numberOfRows > 1)
+        #expect(panel.footer.stringValue.hasPrefix("Valid JSON · "))
+        // Text: the whole value; NULL says so.
+        grid.selection.select(GridPosition(row: 1, column: 6))
+        #expect(panel.mode == .text && panel.text.string == source.value(1, 6))
+        grid.selection.select(GridPosition(row: 3, column: 4))
+        #expect(source.cell(3, 4) == .null && panel.footer.stringValue == "NULL")
+        // Hex on request, kept while it fits.
+        grid.selection.select(GridPosition(row: 2, column: 1))
+        panel.modes.selectedSegment = GridValuePanel.Mode.hex.rawValue
+        _ = panel.modes.sendAction(panel.modes.action, to: panel.modes.target)
+        #expect(panel.mode == .hex && panel.text.string.hasPrefix("00000000  43 75 73"))
+        grid.selection.select(GridPosition(row: 5, column: 1))
+        #expect(panel.mode == .hex)
+        // ⇧↩ again closes it.
+        #expect(await call(harness, "key", ["combo": "shift+return"]).error == nil)
+        #expect(viewer.valuePanel == nil)
+    }
+
+    @Test func jsonTreeKeepsKeyOrder() {
+        let tree = try? #require(JSONNode.parse(#"{"z": 1, "a": [true, null, "x\"y"], "m": {"k": -1.5e3}}"#))
+        #expect(tree?.children.map(\.key) == ["z", "a", "m"])
+        #expect(tree?.value == "{3 keys}" && tree?.children[1].value == "[3 items]")
+        #expect(tree?.children[1].children.map(\.value) == ["true", "null", #""x\"y""#])
+        #expect(tree?.pretty == "{\n  \"z\": 1,\n  \"a\": [\n    true,\n    null,\n    \"x\\\"y\"\n  ],\n  \"m\": {\n    \"k\": -1.5e3\n  }\n}")
+        for bad in ["", "{", "[1,]", "{\"a\" 1}", "01", "tru", "[1] x", String(repeating: "[", count: 600) + String(repeating: "]", count: 600)] {
+            #expect(JSONNode.parse(bad) == nil, "\(bad.prefix(20))")
+        }
+        #expect(GridValuePanel.hexDump(Array("AirSQL".utf8)) == "00000000  41 69 72 53 51 4C" + String(repeating: " ", count: 30) + "  AirSQL")
+    }
+}
