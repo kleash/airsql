@@ -73,7 +73,9 @@ enum DateTimeText {
         if negative { rest = rest.dropFirst() }
         var days = 0
         if allowDays, let space = rest.firstIndex(of: " ") {
-            guard let value = number(rest[..<space]), value <= 34 else { throw EditError("Type the time as hh:mm:ss, such as 14:05:00") }
+            guard let value = number(rest[..<space]), value <= 34 else {
+                throw EditError("Type the time as hh:mm:ss, such as 14:05:00")
+            }
             days = value
             rest = rest[rest.index(after: space)...]
         }

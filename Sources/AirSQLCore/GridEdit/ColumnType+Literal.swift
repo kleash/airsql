@@ -109,7 +109,8 @@ extension ColumnType {
             throw EditError("\(definition) keeps \(scale) digit\(scale == 1 ? "" : "s") after the point; round \(text) first")
         }
         guard number.whole.count <= precision - scale || number.whole == "0" else {
-            throw EditError("\(definition) holds at most \(precision - scale) digits before the point; \(text) has \(number.whole.count)")
+            throw EditError("\(definition) holds at most \(precision - scale) digits before the point; "
+                + "\(text) has \(number.whole.count)")
         }
         let zero = number.whole == "0" && fraction.allSatisfy { $0 == "0" }
         guard !(unsigned && number.negative && !zero) else { throw EditError("\(definition) holds no negative numbers") }
@@ -132,7 +133,7 @@ extension ColumnType {
         }
         if digits > 0, index < characters.count, characters[index] | 0x20 == UInt8(ascii: "e") {
             index += 1
-            if index < characters.count, characters[index] == UInt8(ascii: "-") || characters[index] == UInt8(ascii: "+") { index += 1 }
+            if index < characters.count, [UInt8(ascii: "-"), UInt8(ascii: "+")].contains(characters[index]) { index += 1 }
             let exponentStart = index
             while index < characters.count, digit(characters[index]) { index += 1 }
             if index == exponentStart { digits = 0 }
@@ -218,7 +219,8 @@ extension ColumnType {
         default: unfit = nil
         }
         if let unfit {
-            throw EditError("The column's character set (\(charset)) has no \(String(unfit)) (U+\(String(format: "%04X", unfit.value)))")
+            let code = String(format: "U+%04X", unfit.value)
+            throw EditError("The column's character set (\(charset)) has no \(String(unfit)) (\(code))")
         }
         if let bytes {
             let size: Int

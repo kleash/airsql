@@ -75,7 +75,9 @@ public enum JSONText {
             while true {
                 newline()
                 if members {
-                    guard index < bytes.count, bytes[index] == UInt8(ascii: "\"") else { throw problem("Expected a key in double quotes") }
+                    guard index < bytes.count, bytes[index] == UInt8(ascii: "\"") else {
+                        throw problem("Expected a key in double quotes")
+                    }
                     try string()
                     skipSpace()
                     guard index < bytes.count, bytes[index] == UInt8(ascii: ":") else { throw problem("Expected : after the key") }
@@ -113,12 +115,15 @@ public enum JSONText {
                     emit(bytes[start..<index])
                     return
                 }
-                guard byte >= 0x20 else { throw problem("A string can't hold a raw line break or control character; write \\n or \\t") }
+                guard byte >= 0x20 else {
+                    throw problem("A string can't hold a raw line break or control character; write \\n or \\t")
+                }
                 if byte == UInt8(ascii: "\\") {
                     index += 1
                     guard index < bytes.count else { break }
                     if bytes[index] == UInt8(ascii: "u") {
-                        guard index + 4 < bytes.count, bytes[index + 1...index + 4].allSatisfy({ Character(Unicode.Scalar($0)).isHexDigit })
+                        let hex = Array("0123456789abcdefABCDEF".utf8)
+                        guard index + 4 < bytes.count, bytes[index + 1...index + 4].allSatisfy(hex.contains)
                         else { throw problem("\\u needs four hex digits") }
                         index += 4
                     } else if !Array(#""\/bfnrt"#.utf8).contains(bytes[index]) {

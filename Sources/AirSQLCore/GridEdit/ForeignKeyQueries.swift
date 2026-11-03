@@ -59,7 +59,9 @@ public enum ForeignKeyQueries {
             if conditions.isEmpty { conditions.append(keyNames[0] + " LIKE " + pattern) }
             sql += " WHERE " + conditions.joined(separator: " OR ")
         }
-        let labelIndexed = label.map { name in referenced.indexes.contains { $0.type == "BTREE" && $0.parts.first?.column == name } } ?? false
+        let labelIndexed = label.map { name in
+            referenced.indexes.contains { $0.type == "BTREE" && $0.parts.first?.column == name }
+        } ?? false
         sql += " ORDER BY " + (labelIndexed ? labelName.map { [$0] } ?? keyNames : keyNames).joined(separator: ", ")
         return sql + " LIMIT \(max(1, limit))"
     }
