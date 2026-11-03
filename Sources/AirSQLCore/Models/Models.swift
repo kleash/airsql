@@ -207,6 +207,8 @@ public struct AppSettings: Codable, Equatable {
     public var dumpPath = ""
     /// Settings ▸ Liquibase: how changesets and changelogs are written.
     public var liquibase = LiquibaseSettings()
+    /// Settings ▸ Grid: Load All asks first when a table has more rows than this.
+    public var loadAllAsksAbove = 100_000
 
     public init() {}
 
@@ -228,6 +230,7 @@ public struct AppSettings: Codable, Equatable {
         clientPath = try value(.clientPath, defaults.clientPath)
         dumpPath = try value(.dumpPath, defaults.dumpPath)
         liquibase = try value(.liquibase, defaults.liquibase)
+        loadAllAsksAbove = try value(.loadAllAsksAbove, defaults.loadAllAsksAbove)
     }
 }
 

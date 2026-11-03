@@ -204,9 +204,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     @objc func openData(_ sender: Any?) {
         guard let main = view.window?.windowController as? MainWindowController else { return }
-        for object in selectedObjects {
-            main.open(NavigatorHooks.tableData(open, object, nil), title: object.name, connection: open.id)
-        }
+        for object in selectedObjects { main.openTableData(object, of: open) }
     }
 
     @objc func openStructure(_ sender: Any?) {

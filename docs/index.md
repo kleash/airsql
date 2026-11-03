@@ -18,6 +18,7 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
 - [The SQL console](console.md): write and run SQL, results, transactions, history and the SQL log.
 - [Connections and routes](connections.md): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](navigator.md): the tree, the database view, table commands, find text and the process list.
+- [A table's rows](table-data.md): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, and the ER
   diagram.
 - [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy
