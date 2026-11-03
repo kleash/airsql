@@ -8,7 +8,8 @@ extension TableDataController {
     /// The condition the server gets: the WHERE bar's, and the search's when it runs on the server.
     var serverFilter: String {
         let typed = GridFilter.condition(bar.filterText)
-        let search = bar.loadedOnly.state == .on ? nil : source.flatMap { GridFilter.search(bar.searchField.stringValue, in: $0.columns) }
+        // A search of the loaded rows only (a local filter) stays here.
+        let search = source.flatMap { $0.localFilter == nil ? GridFilter.search(bar.searchField.stringValue, in: $0.columns) : nil }
         guard let search else { return typed }
         return typed.isEmpty ? search : "(\(typed)) AND (\(search))"
     }
