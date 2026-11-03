@@ -123,6 +123,64 @@ extension AppTests {
             #expect(!popup.isShown)
         }
 
+        @Test func helpersFollowTheStatementAndInsert() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let (_, harness, console) = try await Self.console(testModel([saved]), on: saved.id)
+            _ = await call(harness, "type", ["text": "SELECT  FROM orders o"])
+            console.editor.setSelectedRange(NSRange(location: 7, length: 0))
+            #expect(await call(harness, "menu", ["path": "View > Query Helpers"]).error == nil)
+            #expect(console.helpersShown)
+            let panel = console.helpers
+            #expect(panel.table.numberOfRows > 2)
+            #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "orders o")
+            panel.table.selectRowIndexes([2], byExtendingSelection: false)
+            panel.insertSelected(nil)
+            #expect(console.text.hasPrefix("SELECT customer_id FROM") || console.text.hasPrefix("SELECT id FROM"), "\(console.text)")
+            panel.choice.selectedSegment = 1
+            panel.reload()
+            #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "Aggregate")
+            #expect(await call(harness, "menu", ["path": "View > Query Helpers"]).error == nil)
+            #expect(!console.helpersShown)
+        }
+
+        @Test func filesOpenSaveAndTabsComeBackAfterRelaunch() async throws {
+            let folder = try scratch()
+            ConsoleDocuments.shared.fileURL = URL(fileURLWithPath: folder + "/Consoles.json")
+            let file = URL(fileURLWithPath: folder + "/top customers.sql")
+            try "SELECT 1;".write(to: file, atomically: true, encoding: .utf8)
+            let (main, harness, untitled) = try await Self.console()
+            _ = await call(harness, "type", ["text": "SELECT 'unsaved';"])
+            main.openFiles([file])
+            #expect(try await eventually(timeout: 5) { main.tabs.count == 2 })
+            let opened = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(main.selectedTab?.title == "top customers.sql" && opened.text == "SELECT 1;" && !opened.isEdited && !opened.canRename)
+            _ = await call(harness, "type", ["text": "\nSELECT 2;"])
+            #expect(opened.isEdited)
+            opened.saveQuery(nil)
+            #expect(try await eventually(timeout: 5) { !opened.isEdited })
+            #expect(try String(contentsOf: file, encoding: .utf8) == "SELECT 1;\nSELECT 2;")
+            main.openFiles([file])
+            #expect(main.tabs.count == 2, "a file already open shows its tab")
+
+            // Quit and launch again: both come back, in order, with their text and connection.
+            _ = await call(harness, "type", ["text": "\n-- not saved yet"])
+            ConsoleDocuments.shared.main = main
+            ConsoleDocuments.shared.saveNow()
+            let (relaunched, _) = appWindow(testModel(Fixtures.shop))
+            ConsoleDocuments.shared.restore(into: relaunched)
+            #expect(try await eventually(timeout: 5) { relaunched.tabs.count == 2 })
+            let restored = relaunched.tabs.compactMap { $0.content as? ConsoleViewController }
+            #expect(relaunched.tabs.map(\.title) == ["Query 1", "top customers.sql"])
+            #expect(restored.first?.text == untitled.text && restored.first?.connectionID == Fixtures.production.id)
+            #expect(restored.last?.text == "SELECT 1;\nSELECT 2;\n-- not saved yet" && restored.last?.isEdited == true)
+            #expect(restored.last?.fileURL == file)
+            ConsoleDocuments.shared.fileURL = ConsoleTabStore.fileURL
+        }
+
         @Test func runSaysToConnectFirst() async throws {
             let (_, harness, console) = try await Self.console()
             _ = await call(harness, "type", ["text": "SELECT 1"])

@@ -64,7 +64,10 @@ enum ConsoleClosing {
     }
 
     private static func finish(_ console: ConsoleViewController, answer: (Bool) -> Void, _ close: Bool) {
-        if close { ConsoleDocuments.shared.closed(console) }
+        if close {
+            console.closing = true
+            ConsoleDocuments.shared.closed(console)
+        }
         answer(close)
     }
 

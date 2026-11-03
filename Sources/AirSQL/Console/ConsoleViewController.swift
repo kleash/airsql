@@ -1,5 +1,6 @@
 import AirSQLCore
 import AppKit
+import Combine
 
 extension Notification.Name {
     /// Posted (object: the connection's id) when a connection's shared console state changes: a run starts or ends,
@@ -54,6 +55,9 @@ final class ConsoleViewController: NSViewController, TabContent {
     var resultTabs: [ResultTab] = []
     var selectedResult: ResultTab?
     let split = NSSplitView()
+    /// The editor and results, and the helpers panel beside them when shown.
+    let outer = NSSplitView()
+    lazy var helpers: HelpersPanel = makeHelpers()
     private let initialText: String
     /// The run under way, if any.
     var running: ConsoleRun?
@@ -61,6 +65,13 @@ final class ConsoleViewController: NSViewController, TabContent {
     var resultNumber = 0
     /// The editor's font size while zoomed (⌘+, ⌘−); nil: Settings ▸ Editor's.
     var zoomedSize: CGFloat?
+    /// How the last statement run ended (agents' read_console reads it).
+    var lastOutcome: ConsoleOutcome?
+    /// It said yes to closing: it isn't kept for the next launch.
+    var closing = false
+    private var observers: [AnyCancellable] = []
+    /// Brings the Tx badge's minutes up to date while a transaction is open.
+    private var badgeTimer: Timer?
 
     init(model: AppModel, connection: UUID?, text: String = "", fileURL: URL? = nil, documentID: UUID = UUID()) {
         self.model = model
@@ -82,6 +93,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         editorScroll = scroll
         editor.setText(initialText)
         editor.onChange = { [weak self] in self?.textChanged() }
+        editor.onDropFiles = { [weak self] urls in self?.mainWindow?.openFiles(urls) }
         editor.completions = { [weak self] text, caret in
             guard let self else { return (caret..<caret, []) }
             let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }
@@ -103,8 +115,11 @@ final class ConsoleViewController: NSViewController, TabContent {
         split.addArrangedSubview(results)
         split.setHoldingPriority(.defaultLow - 1, forSubviewAt: 0)
         split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
-        root.addSubview(split)
-        split.pin(to: root)
+        outer.isVertical = true
+        outer.dividerStyle = .thin
+        outer.addArrangedSubview(split)
+        root.addSubview(outer)
+        outer.pin(to: root)
         NSLayoutConstraint.activate([
             scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
             results.heightAnchor.constraint(greaterThanOrEqualToConstant: ResultsView.barHeight + 90),
@@ -118,6 +133,12 @@ final class ConsoleViewController: NSViewController, TabContent {
         messagesView.onOpen = { [weak self] message in self?.reveal(message) }
         view = root
         showResults()
+        // Connecting or disconnecting changes what the results say; Settings ▸ Editor the text size.
+        observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.showResults() } })
+        observers.append(model.$data.map(\.settings.editorFontSize).removeDuplicates().dropFirst().sink { [weak self] size in
+            guard let self, self.zoomedSize == nil else { return }
+            self.editor.setFontSize(CGFloat(size))
+        })
     }
 
     override func viewDidAppear() {
@@ -171,6 +192,18 @@ final class ConsoleViewController: NSViewController, TabContent {
     func contentChanged() {
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
         syncToolbar()
+        if session?.inTransaction == true, badgeTimer == nil {
+            badgeTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] timer in
+                MainActor.assumeIsolated {
+                    guard let self, self.session?.inTransaction == true else {
+                        timer.invalidate()
+                        self?.badgeTimer = nil
+                        return
+                    }
+                    NotificationCenter.default.post(name: .tabContentDidChange, object: self)
+                }
+            }
+        }
     }
 
     private func textChanged() {

@@ -82,6 +82,16 @@ public enum SQLCompletion {
         return (start..<caret, rank(items, prefix))
     }
 
+    /// The tables the statement at `caret` names, each (by its alias when it has one) with its columns, as the schema
+    /// cache has them: what the helpers panel lists.
+    public static func columns(text: String, caret: Int, snapshot: SchemaSnapshot?, database: String?,
+                               noBackslashEscapes: Bool = false) -> [(table: String, columns: [SchemaColumn])] {
+        guard let statement = SQLSplitter.statement(at: caret, in: text, noBackslashEscapes: noBackslashEscapes) else { return [] }
+        return tableRefs(StatementCheck.codeWords(statement.sql, noBackslashEscapes: noBackslashEscapes)).compactMap { ref in
+            table(ref, snapshot, database).map { (ref.alias.map { "\(ref.table) \($0)" } ?? ref.table, $0.columns) }
+        }
+    }
+
     /// Those that start with what was typed, best kind first (the schema's in its order; functions and keywords
     /// together, shortest first: FROM before FROM_UNIXTIME); at most 200, no repeats.
     static func rank(_ items: [CompletionItem], _ prefix: String) -> [CompletionItem] {
@@ -187,7 +197,7 @@ public enum SQLCompletion {
     }
 
     /// A name as it can be typed: bare when it is a plain word that isn't reserved, else in backticks.
-    static func quote(_ name: String) -> String {
+    public static func quote(_ name: String) -> String {
         let plain = !name.isEmpty && name.utf16.allSatisfy(isWordChar) && !(name.first?.isNumber ?? true)
             && !SQLWords.reserved.contains(name.uppercased())
         return plain ? name : SQLQuote.identifier(name)
@@ -204,7 +214,7 @@ public enum SQLCompletion {
     }
 
     /// Keywords offered: the reserved words and the common others.
-    static let keywords: [String] = (SQLWords.reserved.union(["OFFSET", "COMMIT", "ROLLBACK", "BEGIN", "TRANSACTION", "TEMPORARY",
+    public static let keywords: [String] = (SQLWords.reserved.union(["OFFSET", "COMMIT", "ROLLBACK", "BEGIN", "TRANSACTION", "TEMPORARY",
                                                               "ENGINE", "AUTO_INCREMENT", "COMMENT", "TABLES", "COLUMNS",
                                                               "PROCESSLIST", "VARIABLES", "STATUS", "VIEW", "TRUNCATE",
                                                               "DUPLICATE", "IFNULL", "COALESCE", "ESCAPE"])).sorted()

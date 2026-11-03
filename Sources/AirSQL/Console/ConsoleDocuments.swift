@@ -2,19 +2,18 @@ import AirSQLCore
 import AppKit
 
 /// Keeps the open console tabs for the next launch (plan §2.6): after each change, a moment later, Consoles.json is
-/// written off the main thread with every console's title, connection, file and unsaved text; at quit it is written at
-/// once. `restore(into:)` opens them again.
+/// written off the main thread with every console tab's title, connection, file and unsaved text; at quit it is
+/// written at once. `restore(into:)` opens them again (AppDelegate calls it once the main window is up).
 @MainActor
 final class ConsoleDocuments {
     static let shared = ConsoleDocuments()
 
     /// Where they are kept; tests use their own.
     var fileURL = ConsoleTabStore.fileURL
-    private var consoles: [Weak] = []
+    /// The window whose console tabs are kept: the one they were restored into, else the first a console is shown in.
+    weak var main: MainWindowController?
     private var pending: DispatchWorkItem?
     private let queue = DispatchQueue(label: "com.kleash.airsql.consoles")
-
-    private struct Weak { weak var console: ConsoleViewController? }
 
     private init() {
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
@@ -22,18 +21,13 @@ final class ConsoleDocuments {
         }
     }
 
-    /// A console changed (its text, file, connection or name): saved a moment later.
+    /// A console changed (its text, file, connection or name), or closed: saved a moment later.
     func changed(_ console: ConsoleViewController) {
-        consoles.removeAll { $0.console == nil }
-        if !consoles.contains(where: { $0.console === console }) { consoles.append(Weak(console: console)) }
+        if main == nil { main = console.mainWindow }
         schedule()
     }
 
-    /// A console closed: it doesn't come back.
-    func closed(_ console: ConsoleViewController) {
-        consoles.removeAll { $0.console == nil || $0.console === console }
-        schedule()
-    }
+    func closed(_ console: ConsoleViewController) { schedule() }
 
     private func schedule() {
         pending?.cancel()
@@ -42,18 +36,14 @@ final class ConsoleDocuments {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
 
-    /// What is open now, in the tabs' order.
+    /// The window's console tabs now, in their order (a console being closed, and an empty one without a file, left
+    /// out).
     var snapshot: [SavedConsole] {
-        let open = consoles.compactMap(\.console)
-        let ordered = open.sorted { a, b in
-            let tabs = a.mainWindow?.tabs ?? []
-            return (tabs.firstIndex { $0.content === a } ?? .max) < (tabs.firstIndex { $0.content === b } ?? .max)
-        }
-        return ordered.compactMap { console in
+        (main?.tabs ?? []).compactMap { tab in
+            guard let console = tab.content as? ConsoleViewController, !console.closing else { return nil }
             let text = console.text
-            // An empty console without a file isn't worth bringing back.
             guard console.fileURL != nil || !text.isEmpty else { return nil }
-            return SavedConsole(id: console.documentID, title: console.tab?.title ?? "Query", connection: console.connectionID,
+            return SavedConsole(id: console.documentID, title: tab.title, connection: console.connectionID,
                                 path: console.fileURL?.path, text: console.isEdited || console.fileURL == nil ? text : nil,
                                 caret: console.isViewLoaded ? console.editor.selectedRange().location : 0)
         }
@@ -75,6 +65,7 @@ final class ConsoleDocuments {
 
     /// Opens the consoles of the last session in `main`, reading them (and their files) off the main thread.
     func restore(into main: MainWindowController) {
+        self.main = main
         let url = fileURL
         Task {
             // Each console's text, and the text of its file (what was last saved).

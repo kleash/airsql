@@ -117,6 +117,9 @@ extension ConsoleViewController: NSMenuItemValidation {
         case #selector(changeConnection(_:)):
             if let reason = busy { return (false, reason) }
             return (model.data.connections.count > 1 || connectionID == nil, "There is no other connection to choose")
+        case #selector(toggleHelpers(_:)):
+            item.state = helpersShown ? .on : .off
+            return (true, "")
         case #selector(showHistory(_:)):
             return (connectionID != nil, "Choose a connection for this console first")
         default:

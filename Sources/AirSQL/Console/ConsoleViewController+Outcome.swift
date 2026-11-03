@@ -8,6 +8,7 @@ extension ConsoleViewController {
     func show(_ outcome: ConsoleOutcome, title: String?, run: ConsoleRun, session: DBConnection) {
         let statement = outcome.statement
         let time = milliseconds(outcome.duration)
+        if !statement.range.isEmpty { lastOutcome = outcome }
         if let error = outcome.error {
             var text = run.cancelled && error.kind == .cancelled ? "Cancelled · \(time)" : error.message
             if !error.details.isEmpty, error.kind != .cancelled { text += " " + error.details }

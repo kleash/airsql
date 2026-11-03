@@ -98,6 +98,30 @@ extension SQLEditorView {
         insertText("\n" + indent, replacementRange: selectedRange())
     }
 
+    // MARK: Drag and drop
+
+    /// .sql files dropped on the editor open in console tabs of their own; names and text dropped from elsewhere (the
+    /// tree, other apps) go in where they are dropped, as text.
+    private func droppedFiles(_ info: NSDraggingInfo) -> [URL] {
+        let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
+        return (urls ?? []).filter { ["sql", "txt"].contains($0.pathExtension.lowercased()) }
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedFiles(sender).isEmpty || onDropFiles == nil ? super.draggingEntered(sender) : .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedFiles(sender).isEmpty || onDropFiles == nil ? super.draggingUpdated(sender) : .copy
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let files = droppedFiles(sender)
+        guard !files.isEmpty, let onDropFiles else { return super.performDragOperation(sender) }
+        onDropFiles(files)
+        return true
+    }
+
     /// The editor's menu (plan §2.12): Run Statement, Run Selection, Explain, Format SQL, Comment Lines, Cut, Copy,
     /// Paste. A right-click outside the selection moves the cursor there first, as a click would.
     override func menu(for event: NSEvent) -> NSMenu? {

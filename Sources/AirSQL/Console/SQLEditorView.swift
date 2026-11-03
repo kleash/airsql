@@ -17,6 +17,8 @@ final class SQLEditorView: NSTextView {
     var completions: ((String, Int) -> (Range<Int>, [CompletionItem]))?
     /// The completion list, once it has been shown.
     var completionPopup: CompletionPopup?
+    /// .sql files dropped on the editor: the console opens them.
+    var onDropFiles: (([URL]) -> Void)?
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
     static let indentUnit = "    "
@@ -72,6 +74,7 @@ final class SQLEditorView: NSTextView {
         textContainerInset = NSSize(width: 4, height: 8)
         layoutManager?.allowsNonContiguousLayout = true
         setFontSize(fontSize)
+        registerForDraggedTypes(readablePasteboardTypes + [.fileURL])
         setAccessibilityIdentifier("console.editor")
         setAccessibilityLabel("SQL editor")
         toolTip = nil
