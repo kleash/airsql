@@ -35,6 +35,10 @@ public final class TableDataSource: GridSource {
     /// New rows Apply wrote, read back from the server with what it filled in (the AUTO_INCREMENT key, defaults):
     /// shown after the loaded rows, where they were added, until a page brings them. Load More's offset leaves them out.
     public private(set) var saved: [ResultStore] = []
+    /// Loaded rows Apply changed, as read back (a read-back result and its row), and those it deleted: kept until the
+    /// rows load again, so an Apply with every row loaded doesn't load them all again.
+    private var replaced: [Int: (store: ResultStore, row: Int)] = [:]
+    private var removed: Set<Int> = []
 
     public init(database: String, table: SchemaTable) {
         self.database = database
@@ -109,6 +113,8 @@ public final class TableDataSource: GridSource {
     /// read back after Apply.
     public func reset(keepingSaved: Bool = false) {
         if !keepingSaved { saved = [] }
+        replaced = [:]
+        removed = []
         pages = []
         pageStarts = []
         loadedRows = 0
@@ -148,9 +154,49 @@ public final class TableDataSource: GridSource {
         hasMore = false
     }
 
+    /// The SELECTs that read loaded rows back by their keys after Apply, every column, up to `deleteBatch` keys each.
+    public func readBackSQL(_ keys: [PendingChanges.Key], noBackslashEscapes: Bool) -> [String] {
+        guard let key, !keys.isEmpty else { return [] }
+        let names = key.map { SQLQuote.identifier(columns[$0].name) }
+        func literals(_ values: PendingChanges.Key) -> [String] {
+            zip(key, values).map { columns[$0].literal($1, noBackslashEscapes: noBackslashEscapes) }
+        }
+        return stride(from: 0, to: keys.count, by: PendingChanges.deleteBatch).map { start in
+            let batch = keys[start..<min(start + PendingChanges.deleteBatch, keys.count)]
+            let condition = names.count == 1 ? names[0] + " IN (" + batch.map { literals($0)[0] }.joined(separator: ", ") + ")"
+                : "(" + names.joined(separator: ", ") + ") IN (" + batch.map { "(" + literals($0).joined(separator: ", ") + ")" }
+                    .joined(separator: ", ") + ")"
+            return "SELECT " + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") + " FROM "
+                + SQLQuote.identifier(database, table.name) + " WHERE " + condition
+        }
+    }
+
+    /// Shows what Apply wrote without loading the rows again: the loaded rows in `rows` (read back by key, the table's
+    /// columns in order) take those values, and the rows with `deleted` keys go. False, changing nothing, when a row
+    /// read back isn't among the loaded ones: load them again then.
+    public func patch(_ rows: [ResultStore], deleted: Set<PendingChanges.Key>) -> Bool {
+        guard let key else { return false }
+        var loaded: [PendingChanges.Key: Int] = [:]
+        for row in 0..<loadedRows where !removed.contains(row) { loaded[key.map { value(loaded: row, $0) ?? "" }] = row }
+        var found: [Int: (store: ResultStore, row: Int)] = [:]
+        for store in rows where store.columns.count == columns.count {
+            for row in 0..<store.rowCount {
+                guard let index = loaded[key.map { Self.text(store, row, $0) ?? "" }] else { return false }
+                found[index] = (store, row)
+            }
+        }
+        replaced.merge(found) { _, new in new }
+        removed.formUnion(deleted.compactMap { loaded[$0] })
+        applyLocalFilter()
+        return true
+    }
+
+    /// The loaded rows less those an Apply deleted.
+    public var keptRows: Int { loadedRows - removed.count }
+
     private func applyLocalFilter() {
-        guard localFilter != nil || !localSort.isEmpty else { return shown = nil }
-        var rows = Array(0..<loadedRows)
+        guard localFilter != nil || !localSort.isEmpty || !removed.isEmpty else { return shown = nil }
+        var rows = removed.isEmpty ? Array(0..<loadedRows) : (0..<loadedRows).filter { !removed.contains($0) }
         if let localFilter { rows = rows.filter { row in localFilter(columns.indices.map { value(loaded: row, $0) }) } }
         shown = GridSorting.sorted(rows, by: localSort, columns: columns) { value(loaded: $0, $1) }
     }
@@ -192,6 +238,7 @@ public final class TableDataSource: GridSource {
 
     private func page(_ row: Int) -> (ResultStore, Int) {
         if row >= loadedRows { return (saved[row - loadedRows], 0) }
+        if let patched = replaced[row] { return patched }
         var low = 0, high = pageStarts.count - 1
         while low < high {
             let middle = (low + high + 1) / 2

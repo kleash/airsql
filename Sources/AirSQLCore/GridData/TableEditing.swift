@@ -45,6 +45,8 @@ public struct ApplyFailure: LocalizedError {
     /// The rows it changed instead, when it ran.
     public var changed: UInt64?
     public var error: Error?
+    /// The column whose value was refused before anything ran (`PendingChanges.statements`' `typed` check).
+    public var column: String?
 
     public var errorDescription: String? {
         if let changed {
@@ -54,6 +56,41 @@ public struct ApplyFailure: LocalizedError {
         }
         let message = (error as? AirSQLError)?.message ?? error?.localizedDescription ?? "The server refused a statement."
         return message + " Nothing was applied."
+    }
+}
+
+extension ApplyFailure {
+    /// The column of `table` the failure is about, for the grid to focus its cell: the one a value was refused for,
+    /// else one the server's error names ("Data too long for column 'note'", "Column 'name' cannot be null", "Field
+    /// 'id' doesn't have a default value", "… FOREIGN KEY (`owner`) …"), or the first column of the unique key a
+    /// duplicate value broke. Nil when it names none of the table's columns.
+    public func column(in table: SchemaTable) -> String? {
+        if let column { return column }
+        guard let error = error as? AirSQLError else { return nil }
+        return Self.column(named: error.details.isEmpty ? error.message : error.details, in: table)
+    }
+
+    static func column(named text: String, in table: SchemaTable) -> String? {
+        // The quoted name after `word`; of `db`.`table`.`column` (MariaDB's), the last part.
+        func name(after word: String) -> String? {
+            guard let start = text.range(of: word)?.upperBound else { return nil }
+            var rest = text[start...], last: String?
+            while let quote = rest.first, quote == "'" || quote == "`" || quote == "\"" {
+                guard let end = rest.dropFirst().firstIndex(of: quote) else { break }
+                last = String(rest[rest.index(after: rest.startIndex)..<end])
+                rest = rest[rest.index(after: end)...]
+                guard rest.first == "." else { break }
+                rest = rest.dropFirst()
+            }
+            return last
+        }
+        for word in ["for column ", "Column ", "Field ", "generated column ", "Unknown column ", "FOREIGN KEY ("] {
+            if let found = name(after: word), let column = table.column(found) { return column.name }
+        }
+        // MySQL 8 names the key with its table: 'orders.email'.
+        guard let key = name(after: "for key ").map({ $0.split(separator: ".").last.map(String.init) ?? $0 }),
+              let index = table.indexes.first(where: { $0.name.caseInsensitiveCompare(key) == .orderedSame }) else { return nil }
+        return index.parts.first?.column.flatMap { table.column($0)?.name }
     }
 }
 

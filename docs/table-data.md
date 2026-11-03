@@ -111,15 +111,20 @@ says why; so are views. Generated columns can't be edited.
 - **Data ▸ Apply Changes** (⌘S) writes every pending change in one transaction on the data session: deletes first (in
   batches of 500), then edits, then new rows. Each statement must change exactly its rows. If one changes another
   number (someone else changed or deleted the row since it was loaded) or the server refuses one, everything is rolled
-  back, nothing is applied, and the grid selects the row. Reload it, then apply again.
+  back, nothing is applied, and the grid selects the row; when the server's error names a column ("Data too long for
+  column 'note'", "Column 'name' cannot be null", a duplicate value of a unique key), it selects that cell. Reload the
+  row, or fix the value, then apply again.
 - **Preview SQL…** shows the statements first, in the [SQL preview](sql-preview.md). The preview also comes first on
   connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection),
   and whenever there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes
   that also change other tables through `ON DELETE CASCADE` or `SET NULL`.
 - Values are checked again as Apply writes them; one that no longer fits (sql_mode changed, or it came from a find
-  and replace) stops Apply before anything runs, and the grid selects its row.
-- After Apply, new rows stay where they were and show what the server filled in, their AUTO_INCREMENT key and defaults
-  included: each is read back by its key. The rest of the loaded rows load again.
+  and replace) stops Apply before anything runs, and the grid selects its cell.
+- After Apply, new rows stay where they were and show what the server filled in, their AUTO_INCREMENT key (the insert
+  ID) and defaults included: each is read back by its key. When every row of the table (or of the filter) is loaded,
+  the edited rows are read back by their keys and the deleted ones go, so nothing else loads again; otherwise the
+  loaded rows load again. A new row's untouched cell shows **auto**, **default** or **generated**, in the value panel
+  too, until Apply.
 
 ## Copy and export
 

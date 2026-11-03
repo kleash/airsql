@@ -92,6 +92,13 @@ extension AppTests {
             let new = 2
             #expect(tab.source?.cell(new, 0) == .placeholder("auto") && tab.source?.cell(new, 8) == .placeholder("default"))
             #expect(tab.source?.cell(new, 15) == .placeholder("generated") && tab.source?.cell(new, 3) == .null)
+            // The value panel says what the server puts there, not NULL.
+            tab.viewer.toggleValuePanel(nil)
+            tab.grid.selection.select(GridPosition(row: new, column: 0))
+            #expect(tab.viewer.valuePanel?.footer.stringValue == "auto · the server sets it when you apply")
+            tab.grid.selection.select(GridPosition(row: new, column: 3))
+            #expect(tab.viewer.valuePanel?.footer.stringValue == "NULL")
+            tab.viewer.toggleValuePanel(nil)
             tab.grid.selection.select(GridPosition(row: new, column: 1))
             tab.grid.insertText("cy@example.net")
             #expect(tab.grid.endEditing(commit: true))

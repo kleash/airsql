@@ -318,7 +318,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         } else {
             valuePanel.keep = nil
         }
-        valuePanel.show(column: source.columns[column], value: source.value(row, column), bytes: (source as? GridBytes)?.bytes(row, column))
+        var placeholder: String?
+        if case .placeholder(let words) = source.cell(row, column) { placeholder = words }
+        valuePanel.show(column: source.columns[column], value: placeholder == nil ? source.value(row, column) : nil,
+                        bytes: (source as? GridBytes)?.bytes(row, column), placeholder: placeholder)
     }
 
     /// Edits the focused cell's value in the value panel, opening it first (a long or multi-line value).

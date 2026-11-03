@@ -33,7 +33,7 @@ Legend: **H** from HeidiSQL, **D** from DataGrip, **A** AirSQL's own or a fix of
 | Jump to column: searchable column list | D | ⌘J | Space toggles visibility inside the list |
 | Status bar: `r12 : c3`, selection size, loaded / total rows | H | | |
 | Tooltip with the full value (first 1 KB) | H | hover | |
-| ⌥-scroll moves by row; ⇧-scroll horizontal; ⌘+/⌘− zoom grid font | H | | |
+| ⌥-scroll five times as far; ⇧-scroll horizontal; ⌘+/⌘− zoom grid font (⌘0: Settings' size) | H | | |
 | Down on the last row does nothing on read-only grids; on editable ones it does **not** insert (⌘I does) | A | | Fixes HeidiSQL #2596 |
 
 ## 3. Understanding the data
@@ -41,7 +41,7 @@ Legend: **H** from HeidiSQL, **D** from DataGrip, **A** AirSQL's own or a fix of
 | Feature | Src | Notes |
 |---|---|---|
 | Headers: name, type, key icons (PK bold, FK, unique, index), auto-increment / default / generated marks, comment as tooltip, sort arrows with position ¹²³ | H+D | |
-| Row-number gutter; frozen key column (optional) | H+A | |
+| Row-number gutter; frozen key column (optional): Freeze keeps the columns up to the focused one in view | H+A | |
 | Colours by type group; NULL as `NULL` in a pale tint with optional background; numbers right-aligned | H | Light/dark from system colours |
 | Highlight cells equal to the focused cell's value | H | Off by default |
 | Heatmap colouring for a column or table (sequential, diverging, boolean) | D | |

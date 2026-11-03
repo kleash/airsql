@@ -43,9 +43,10 @@ final class GridTiles: NSView {
         grid.drawCells(dirtyRect)
     }
 
-    /// Makes the tiles the shown part of the grid needs and drops the others.
+    /// Makes the tiles the shown part of the grid needs and drops the others (all of them out of a window: a tab
+    /// that isn't shown keeps none).
     func update() {
-        let shown = grid.visibleRect.intersection(bounds), size = Self.size
+        let shown = window == nil ? .zero : grid.visibleRect.intersection(bounds), size = Self.size
         var wanted = Set<Index>()
         if !shown.isEmpty {
             for x in Int(shown.minX / size.width)...Int((shown.maxX - 0.5) / size.width) {

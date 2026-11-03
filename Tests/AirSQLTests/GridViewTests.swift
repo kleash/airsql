@@ -182,6 +182,27 @@ extension AppTests {
         #expect(grid.selection.areas == [.rows(0...0)])
     }
 
+    @Test func gridTilesCoverWhatIsShownOnly() {
+        let (main, _, content) = gridWindow(FakeGridSource.wide())
+        let grid = content.grid, clip = grid.scrollView.contentView
+        func tiles() -> [CALayer] { (grid.tiles.layer?.sublayers ?? []).filter { $0.delegate != nil } }
+        func covered() -> Bool {
+            let shown = grid.visibleRect
+            let area = tiles().reduce(0) { $0 + $1.frame.intersection(shown).width * $1.frame.intersection(shown).height }
+            return abs(area - shown.width * shown.height) < 1
+        }
+        #expect(!tiles().isEmpty && covered())
+        // Far down and across: new tiles for what is shown, none kept for what was.
+        clip.scroll(to: NSPoint(x: grid.offsets[150], y: 100_000))
+        grid.scrollView.reflectScrolledClipView(clip)
+        let shown = grid.visibleRect, size = GridTiles.size
+        #expect(covered() && tiles().count <= (Int(shown.width / size.width) + 2) * (Int(shown.height / size.height) + 2))
+        // A tab that isn't shown keeps none.
+        content.view.removeFromSuperview()
+        #expect(tiles().isEmpty)
+        main.window?.orderOut(nil)
+    }
+
     @Test func gridScrollsAcrossWithShiftAndFasterWithOption() {
         func scroll(_ flags: CGEventFlags, down: Int32 = -40, across: Int32 = 0) -> NSPoint {
             let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: down, wheel2: across, wheel3: 0)!
