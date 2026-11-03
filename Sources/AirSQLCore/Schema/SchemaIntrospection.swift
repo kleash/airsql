@@ -394,7 +394,7 @@ struct SchemaIntrospection {
     /// MariaDB's JSON is LONGTEXT with a `json_valid(`column`)` check (the column's own check, possibly with more).
     private func markJSON(_ columns: inout [SchemaColumn], checks: [SchemaCheck]) {
         for index in columns.indices where columns[index].dataType.lowercased() == "longtext" {
-            let call = "json_valid(`" + columns[index].name.replacingOccurrences(of: "`", with: "``") + "`)"
+            let call = "json_valid(" + SQLQuote.identifier(columns[index].name) + ")"
             columns[index].isJSON = checks.contains { $0.clause.range(of: call, options: .caseInsensitive) != nil }
         }
     }
