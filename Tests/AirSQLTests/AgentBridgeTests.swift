@@ -76,8 +76,8 @@ func result(_ messages: [[String: Any]], _ id: Int) -> [String: Any]? {
         let names = tools.compactMap { $0["name"] as? String }
         let ui = ["snapshot", "screenshot", "menu", "press", "set", "select", "key", "type", "click", "double_click",
                   "right_click", "wait"]
-        #expect(names == ["context", "get_schema", "describe", "run_queries", "profile", "explain", "open_in_console",
-                          "read_console", "guide"] + ui)
+        #expect(names == ["context", "get_schema", "describe", "search_columns", "run_queries", "profile", "explain",
+                          "open_in_console", "read_console", "guide"] + ui)
         for tool in tools {
             let name = tool["name"] as? String ?? ""
             let annotations = try #require(tool["annotations"] as? [String: Any])

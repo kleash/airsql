@@ -219,17 +219,25 @@ extension AppTests {
             list.selectRowIndexes(IndexSet(integer: products), byExtendingSelection: false)
             #expect(window.results.detail.tabs.selectedSegment == 0)
             window.results.detail.show(window.results.objects[products], result: window.result!, data: true)
-            #expect(window.results.detail.rows.numberOfRows == 15)
-            // The rows that differ copy as tab-separated text under their columns' names, from their menu and with ⌘C.
-            let rows = window.results.detail.rows
-            let rowMenu = try #require(rows.menu)
-            rowMenu.delegate?.menuNeedsUpdate?(rowMenu)
-            #expect(rowMenu.items.map(\.title) == ["Copy"])
-            rows.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-            window.window?.makeFirstResponder(rows)
-            window.copy(nil)
+            // The rows that differ in the grid: the 3 only in the source (added), then the 12 changed, their price marked
+            // with both values in its tooltip.
+            let rows = try #require(window.results.detail.rows)
+            let diff = try #require(rows.source as? DiffSource)
+            #expect(rows.grid.rowCount == 15 && rows.grid.accessibilityIdentifier() == "recon.rows")
+            #expect((0..<15).map { diff.mark($0, 0) } == Array(repeating: .inserted, count: 3) + Array(repeating: .none, count: 12))
+            #expect(diff.mark(3, 2) == .edited && diff.note(3, 2) == "Staging has 17.50; Production has 19.90" && diff.note(3, 1) == nil)
+            #expect(diff.columns.map(\.isKey) == [true, false, false, false])
+            // Its menu is the grid's (copy formats, Export Rows…, the viewer's), every item in the menu bar; the
+            // selected rows copy under their columns' names.
+            let rowMenu = try #require(rows.viewer.dataGrid(rows.grid, menuFor: .row(0)))
+            #expect(["Copy", "Copy with Headers", "Export Rows…", "Record View"].allSatisfy(rowMenu.items.map(\.title).contains),
+                    "\(rowMenu.items.map(\.title))")
+            rows.grid.selection.selectRow(0)
+            window.window?.makeFirstResponder(rows.grid)
+            rows.viewer.copyWithHeaders(nil)
             let copied = NSPasteboard.general.string(forType: .string)?.components(separatedBy: "\n") ?? []
-            #expect(copied.count == 2 && copied.first?.hasPrefix("Row\t") == true, "\(copied)")
+            #expect(copied == ["id\tname\tprice\tcolour", "13\t" + String(repeating: "Long name ", count: 25) + "\t5.00\tred", ""],
+                    "\(copied)")
             let menu = try #require(list.menu)
             menu.delegate?.menuNeedsUpdate?(menu)
             #expect(menu.items.map(\.title) == ["Copy", "Copy Sync Script", "Leave Out of Next Compare"])
@@ -306,6 +314,11 @@ extension AppTests.ReconAppTests {
         #expect(model.activity.isIdle)
         #expect(controller.results.objects.first?.name == "gift_cards")
         #expect(result.object(.table, "customers")?.data?.differenceCount == 4)
+        // The table's rows that differ, in the grid.
+        let customers = try #require(controller.results.objects.firstIndex { $0.name == "customers" })
+        controller.results.list.selectRowIndexes(IndexSet(integer: customers), byExtendingSelection: false)
+        controller.results.detail.show(controller.results.objects[customers], result: result, data: true)
+        #expect(controller.results.detail.rows?.grid.rowCount == 4)
         let (main, _) = appWindow(model)
         controller.main = main
         controller.showSyncScript(nil)
@@ -317,6 +330,86 @@ extension AppTests.ReconAppTests {
         let sheet = try #require(controller.window?.attachedSheet)
         controller.window?.endSheet(sheet)
         try await ReconLabTests.run(setup, ["DROP DATABASE lane_l8a_ui_src", "DROP DATABASE lane_l8a_ui_dst"])
+        await setup.close()
+    }
+}
+
+extension AppTests.ReconAppTests {
+    /// Compare With… on a console result: the sheet offers the other results (the nearest first) with the result's key
+    /// to match rows on; the rows that differ open next to the result in a tab of their own, in the grid, which can be
+    /// exported but not compared again.
+    @Test func aResultComparesWithAnotherInATabOfItsOwn() async throws {
+        let (main, harness, console) = try await AppTests.ConsoleAppTests.console()
+        let columns = [("id", ReconResultsTests.ints), ("name", ReconResultsTests.text)]
+        console.addResult(ReconResultsTests.store(columns, [["1", "pen"], ["2", "ink"], ["3", "cap"]]), title: "Before", summary: "")
+        console.addResult(ReconResultsTests.store(columns, [["1", "pen"], ["2", "INK"], ["4", "pad"]]), title: "After", summary: "")
+        console.selectResult(console.resultTabs[1])
+        let compare = Commands.compareResult.item()
+        #expect(console.validateMenuItem(compare))
+        let menu = console.resultMenu()
+        #expect(menu.items.first { $0.action == compare.action }?.target === console)
+        console.compareResult(nil)
+        let sheet = try #require(main.window?.attachedSheet?.contentView)
+        let with = try #require(find(NSPopUpButton.self, id: "compare.with", in: sheet))
+        let keys = try #require(find(NSPopUpButton.self, id: "compare.key", in: sheet))
+        #expect(with.itemTitles == ["Results", "Before · 3 × 2"] && with.titleOfSelectedItem == "Before · 3 × 2")
+        #expect(keys.itemTitles == ["id (the key)", "id", "name", "Every column"] && keys.indexOfSelectedItem == 0)
+        let missing = unexplained([try #require(main.window?.attachedSheet)], where: "compare with")
+            + unexplained(try #require(with.menu), path: ["with"]) + unexplained(try #require(keys.menu), path: ["key"])
+        #expect(missing.isEmpty, "\(missing)")
+        #expect(await call(harness, "press", ["title": "Compare"]).error == nil)
+        #expect(await eventually(timeout: 10) { console.resultTabs.count == 3 })
+        let tab = try #require(console.selectedResult)
+        #expect(console.resultTabs.map(\.title) == ["Before", "After", "vs Before"] && tab.label == "vs Before · 3 × 2")
+        #expect(tab.summary == "1 row the same · matched on id")
+        guard case .diff(let diff) = tab.content else {
+            Issue.record("not a diff: \(tab.content)")
+            return
+        }
+        #expect((0..<3).map { diff.mark($0, 1) } == [.inserted, .deleted, .edited] && diff.note(2, 1) == "Before has ink; After has INK")
+        let grid = try #require(tab.view as? ResultGridView)
+        #expect(find(NSTextField.self, id: "grid.legend", in: grid)?.stringValue == "● 1 only in After    ● 1 only in Before    ● 1 changed")
+        #expect(!console.validateMenuItem(compare) && compare.toolTip == "This tab is a comparison already: show one of the results to compare it")
+        #expect(console.validateMenuItem(Commands.exportResult.item()) && console.statusAccessory === grid.viewer.status)
+    }
+}
+
+
+extension AppTests.ReconAppTests {
+    /// Compare With… a table through its sheet on the lab (MariaDB 11.8): the console's database's tables are offered,
+    /// the chosen one is read on the data session (listed in the activity meanwhile), and its rows that differ from the
+    /// result open in a tab of their own.
+    @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests")) func aResultComparesWithATableThroughTheSheet() async throws {
+        let setup = try await ReconLabTests.session(Lab.mariadb118)
+        try await ReconLabTests.database(setup, "lane_gridcompare_ui", ReconResultsLabTests.items + ReconResultsLabTests.copy)
+        let saved = SavedConnection(name: "Lab MariaDB 11.8", host: "127.0.0.1", port: Lab.mariadb118.port, user: Lab.airsql.user)
+        let model = testModel([saved])
+        model.states[saved.id] = .connected(server: "MariaDB " + Lab.mariadb118.version)
+        let (main, harness) = appWindow(model)
+        let connection = Connection(options: DBLab.options(Lab.mariadb118), log: DBLab.log)
+        try await connection.connect()
+        let open = model.attach(connection, to: saved.id) { $0 == "lane_gridcompare_ui" }
+        defer { model.detach(open.id) }
+        #expect(await eventually(timeout: 60) { open.snapshot.database("lane_gridcompare_ui")?.tables.count == 2 && open.loading.isEmpty })
+        open.currentDatabase = "lane_gridcompare_ui"
+        main.openConsole(text: "SELECT * FROM items", title: nil, connection: saved.id)
+        let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+        console.addResult(try await ReconResultsLabTests.rows(setup, "SELECT * FROM lane_gridcompare_ui.items"), title: "Items", summary: "")
+        console.compareResult(nil)
+        let sheet = try #require(main.window?.attachedSheet?.contentView)
+        let with = try #require(find(NSPopUpButton.self, id: "compare.with", in: sheet))
+        #expect(with.itemTitles == ["Tables", "items", "items_copy"] && with.titleOfSelectedItem == "items")
+        with.selectItem(withTitle: "items_copy")
+        #expect(await call(harness, "press", ["title": "Compare"]).error == nil)
+        #expect(await eventually(timeout: 30) { console.resultTabs.count == 2 })
+        let tab = try #require(console.selectedResult)
+        guard case .diff(let diff) = tab.content else {
+            Issue.record("not a diff: \(tab.content)")
+            return
+        }
+        #expect(tab.title == "vs items_copy" && diff.rowCount == 3 && model.activity.isIdle)
+        #expect((0..<3).map { diff.mark($0, 1) } == [.inserted, .deleted, .edited] && diff.note(2, 2) == "items_copy has 4.10; Items has 4.00")
+        try await ReconLabTests.run(setup, ["DROP DATABASE lane_gridcompare_ui"])
         await setup.close()
     }
 }

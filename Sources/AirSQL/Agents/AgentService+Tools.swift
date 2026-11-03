@@ -165,6 +165,8 @@ extension AgentService {
             let queries = (arguments["queries"] as? [Any] ?? []).compactMap { ($0 as? [String: Any])?["sql"] as? String ?? $0 as? String }
             return "run_queries · " + short(queries.first ?? "") + (queries.count > 1 ? " (+\(queries.count - 1))" : "")
         case "describe": return "describe · " + (arguments["objects"] as? [String] ?? []).joined(separator: ", ")
+        case "search_columns":
+            return "search_columns · " + (arguments["pattern"] as? String ?? "") + ((arguments["type"] as? String).map { " · " + $0 } ?? "")
         case "profile": return "profile · " + (arguments["table"] as? String ?? "")
         case "explain": return "explain · " + short(arguments["sql"] as? String ?? "")
         case "open_in_console": return "open_in_console · “\(arguments["title"] as? String ?? "From an agent")”"
@@ -193,7 +195,7 @@ extension AgentService {
         case "get_schema":
             return reply["unchanged"] as? Bool == true ? "unchanged" : "\((reply["databases"] as? [Any])?.count ?? 0) databases"
         case "describe": return "\((reply["objects"] as? [Any])?.count ?? 0) objects"
-        case "profile": return "\((reply["columns"] as? [Any])?.count ?? 0) columns"
+        case "profile", "search_columns": return "\((reply["columns"] as? [Any])?.count ?? 0) columns"
         case "context": return "\((reply["connections"] as? [Any])?.count ?? 0) connections"
         default: return "done"
         }

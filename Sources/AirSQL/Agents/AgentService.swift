@@ -4,6 +4,7 @@ import Combine
 
 /// One thing an agent asked, as the activity list shows it.
 struct AgentEvent {
+    let id = UUID()
     let time: Date
     let client: String
     let summary: String
@@ -23,6 +24,9 @@ final class AgentService {
     private let directory: URL
     private var listener: AgentListener?
     private(set) var events: [AgentEvent] = []
+    /// The statements agents ran with run_queries and the rows they got, for the Agent tabs: the latest `runLimit`.
+    private(set) var runs: [AgentRun] = []
+    static let runLimit = 100
     /// Why the socket couldn't start, for Settings ▸ Agents.
     private(set) var problem: String?
     private var observers: [AnyCancellable] = []
@@ -42,6 +46,7 @@ final class AgentService {
             DispatchQueue.main.async { self?.update(allowed: allowed) }
         })
         main?.statusBar.agent.popover = { [weak self] in self.map { AgentActivityPopover(service: $0) } }
+        main?.agents = self
     }
 
     /// Opens or closes the socket as the setting says; turning agents off also stops their calls under way.
@@ -88,39 +93,44 @@ final class AgentService {
             return tool.hasPrefix("resources/") ? ["error": AgentBridge.offMessage] : AgentBridge.failure(AgentBridge.offMessage)
         }
         if tool == "resources/list" { return ["resources": resources()] }
-        let index = record(client, summary(tool, arguments))
+        let call = record(client, summary(tool, arguments))
         do {
             let structured: [String: Any]
             switch tool {
             case "context": structured = context()
-            case "get_schema", "describe", "run_queries", "profile", "explain":
-                structured = try await reading(tool, try target(arguments), progress: progress) { target, progress in
+            case "get_schema", "describe", "search_columns", "run_queries", "profile", "explain":
+                // The rows run_queries got, by statement, kept for the Agent tab (filled on the call's task, read after it).
+                final class Kept: @unchecked Sendable { var rows: [Int: ResultStore] = [:] }
+                let kept = Kept(), target = try self.target(arguments)
+                structured = try await reading(tool, target, progress: progress) { target, progress in
                     switch tool {
                     case "get_schema": return try await target.getSchema(arguments, progress: progress)
                     case "describe": return try await target.describe(arguments)
-                    case "run_queries": return try await target.runQueries(arguments, progress: progress)
+                    case "search_columns": return try await target.searchColumns(arguments)
+                    case "run_queries": return try await target.runQueries(arguments, progress: progress) { kept.rows[$0] = $1 }
                     case "profile": return try await target.profile(arguments, progress: progress)
                     default: return try await target.explain(arguments)
                     }
                 }
+                if tool == "run_queries" { keep(structured, kept.rows, call: call, client: client, connection: target.saved.id) }
             case "open_in_console": structured = try openInConsole(arguments)
             case "read_console": structured = try readConsole(arguments)
             case _ where Self.uiTools.contains(tool):
                 let reply = await drive(tool, arguments, client: client)
                 let failure = reply["isError"] as? Bool == true
                 let text = ((reply["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
-                finish(index, failure ? String(text.prefix(80)) : "done", failed: failure)
+                finish(call, failure ? String(text.prefix(80)) : "done", failed: failure)
                 return reply
             case "resources/read":
                 let text = try await resource(arguments["uri"] as? String ?? "")
-                finish(index, "read")
+                finish(call, "read")
                 return ["contents": [["uri": arguments["uri"] ?? "", "mimeType": "text/plain", "text": text]]]
             default: throw AirSQLError(.other, "AirSQL has no tool “\(tool)”.")
             }
-            finish(index, Self.outcome(tool, structured))
+            finish(call, Self.outcome(tool, structured))
             return await Self.reply(structured)
         } catch {
-            finish(index, AgentReply.message(error), failed: true)
+            finish(call, AgentReply.message(error), failed: true)
             return tool == "resources/read" ? ["error": AgentReply.message(error)] : AgentReply.failure(error)
         }
     }
@@ -192,15 +202,17 @@ final class AgentService {
 
     // MARK: The activity list
 
-    func record(_ client: String, _ summary: String) -> Int {
-        events.append(AgentEvent(time: Date(), client: client, summary: summary))
+    /// Lists a call; its id is for `finish`.
+    func record(_ client: String, _ summary: String) -> UUID {
+        let event = AgentEvent(time: Date(), client: client, summary: summary)
+        events.append(event)
         if events.count > Self.eventLimit { events.removeFirst(events.count - Self.eventLimit) }
         updateStatus()
-        return events.count - 1
+        return event.id
     }
 
-    func finish(_ index: Int, _ outcome: String, failed: Bool = false) {
-        guard events.indices.contains(index) else { return }
+    func finish(_ id: UUID, _ outcome: String, failed: Bool = false) {
+        guard let index = events.lastIndex(where: { $0.id == id }) else { return }
         events[index].outcome = outcome
         events[index].failed = failed
         updateStatus()
@@ -208,6 +220,14 @@ final class AgentService {
     }
 
     static let didChange = Notification.Name("AirSQLAgentActivityDidChange")
+
+    /// A run_queries call's statements, each with the rows the agent got, for the connection's Agent tab.
+    func keep(_ reply: [String: Any], _ rows: [Int: ResultStore], call: UUID, client: String, connection: UUID) {
+        for (index, result) in (reply["results"] as? [[String: Any]] ?? []).enumerated() {
+            runs.append(AgentRun(call: call, client: client, connection: connection, result: result, rows: rows[index]))
+        }
+        if runs.count > Self.runLimit { runs.removeFirst(runs.count - Self.runLimit) }
+    }
 
     /// The status bar's chip: what agents do now or did last; "Agents on" before the first call.
     private func updateStatus() {

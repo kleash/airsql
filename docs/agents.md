@@ -28,7 +28,7 @@ The connection must be connected in AirSQL for an agent to read it.
 | Level | Agents may |
 |---|---|
 | Off | not see the connection at all |
-| Schema | read databases, tables, columns, keys and indexes; put SQL into a console tab |
+| Schema | read databases, tables, columns, keys and indexes, and find columns by name; put SQL into a console tab |
 | Schema + read | also run read-only queries and see query plans, within the row cap and time limit of Settings ▸ Safety |
 | Schema + read + analytics | also profile tables, get ten times the rows and four times the time, and save results to files |
 
@@ -67,6 +67,12 @@ asking off; what is yours alone stays yours.
 The agents' item in the status bar says what they're doing. Click it (or choose **Tools ▸ Agents ▸ Agent Activity**)
 for every call since AirSQL opened, with how it ended. A call that reads a database also shows in Activity, where
 **Cancel** stops it. **Turn Agents Off** in that popover (or in Tools ▸ Agents) stops them at once.
+
+**View ▸ Agent Results** opens the connection's Agent tab: every statement agents ran on it with `run_queries`, newest
+last, and under the list the rows the selected one got, read-only and no more than the agent got. Double-click a
+`run_queries` call in Agent Activity to open the tab at its statements. Double-click a statement (or choose **Query ▸
+Open in New Console**) to put it in a new console tab, where you can change it and run it yourself. The tab keeps the
+last 100 statements since AirSQL opened.
 
 ## Files agents save
 

@@ -22,6 +22,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private var root: NSViewController?
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
+    /// The agents' service (it sets itself), for View ▸ Agent Results.
+    weak var agents: AgentService?
     /// What the content area shows now: "firstRun", "summary", "select" or "tab" (tests and the snapshot read it).
     private(set) var contentKind = ""
     private var shownContent: NSView?
@@ -477,6 +479,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.turnAgentsOff.action?:
             enabled = model.data.settings.agentsAllowed
             reason = "Agents are off already"
+        case Commands.agentResults.action?:
+            enabled = activeConnection != nil
+            reason = "Select one connection in the sidebar first"
         default:
             if let check = validateEditorItem(item) ?? validateConnectionItem(item) { (enabled, reason) = check }
         }
