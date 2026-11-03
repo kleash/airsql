@@ -72,7 +72,7 @@ extension LiquibaseSchema {
 
     private static func showCreate(_ session: DBConnection, _ kind: Object.Kind, _ name: String, column: Int) async throws -> String {
         do {
-            let rows = try await SQLExport.rows(session, "SHOW CREATE \(kind.rawValue.uppercased()) " + SQLQuote.identifier(name))
+            let rows = try await session.rows("SHOW CREATE \(kind.rawValue.uppercased()) " + SQLQuote.identifier(name))
             return rows.first.flatMap { $0.count > column ? $0[column] : nil } ?? ""
         } catch let error as AirSQLError where error.kind != .cancelled && error.kind != .disconnected {
             return ""  // this login may not read it (a routine of another definer): left out

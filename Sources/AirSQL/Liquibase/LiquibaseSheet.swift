@@ -187,7 +187,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
             do {
                 let session = DBConnection(options: options, role: .tools)
                 _ = try await session.connect()
-                let names = try await SQLExport.rows(session, PickerNode.databasesSQL).compactMap { $0[0] }
+                let names = try await session.rows(PickerNode.databasesSQL).compactMap { $0[0] }
                 await session.close()
                 databaseMenu.removeAllItems()
                 databaseMenu.addItems(withTitles: names)
