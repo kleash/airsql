@@ -5,7 +5,8 @@ import CMariaDB
 /// column's), their whole text kept in the store for copying.
 public final class ResultSetSource: GridSource {
     public let store: ResultStore
-    public let columns: [GridColumn]
+    /// From the result's metadata; a table tab adds what its schema says (`GridColumn.describe`).
+    public var columns: [GridColumn]
     /// The most characters a cell shows.
     static let shownLimit = 1_000
 
@@ -21,7 +22,8 @@ public final class ResultSetSource: GridSource {
             } else {
                 kind = .text
             }
-            return GridColumn(name: column.name, type: column.typeName, kind: kind, isKey: column.flags & UInt32(PRI_KEY_FLAG) != 0)
+            return GridColumn(name: column.name, type: column.typeName, kind: kind, isKey: column.flags & UInt32(PRI_KEY_FLAG) != 0,
+                              marks: column.marks)
         }
     }
 
@@ -56,6 +58,17 @@ extension ResultStore.Column {
         ]
         let name = names[type] ?? ""
         return isNumeric && flags & UInt32(UNSIGNED_FLAG) != 0 ? name + " unsigned" : name
+    }
+
+    /// The header's marks the server's column flags give: keys, auto-increment, NULL allowed. Only for a table's column
+    /// (an expression's flags say nothing about a table).
+    var marks: GridColumn.Marks {
+        guard !originalTable.isEmpty else { return [] }
+        let pairs: [(Int32, GridColumn.Marks)] = [(PRI_KEY_FLAG, .primary), (UNIQUE_KEY_FLAG, .unique), (MULTIPLE_KEY_FLAG, .indexed),
+                                                  (AUTO_INCREMENT_FLAG, .autoIncrement)]
+        var marks: GridColumn.Marks = flags & UInt32(NOT_NULL_FLAG) == 0 ? .nullable : []
+        for (flag, mark) in pairs where flags & UInt32(flag) != 0 { marks.insert(mark) }
+        return marks
     }
 
     /// A number column, right-aligned: DECIMAL, the integers, FLOAT, DOUBLE.

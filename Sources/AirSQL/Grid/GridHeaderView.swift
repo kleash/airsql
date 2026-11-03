@@ -39,10 +39,10 @@ final class GridHeaderView: NSView {
     /// How far the cells are scrolled across: column x in the grid minus this is x here.
     private var scrolled: CGFloat { grid.scrollView.contentView.bounds.minX }
 
-    /// The width a column needs for its header: the key mark, the longer of name and type, the sort control.
+    /// The width a column needs for its header: the key marks, the longer of name and type, the sort control.
     func width(for column: GridColumn) -> CGFloat {
-        let name = (column.name as NSString).size(withAttributes: [.font: nameFont]).width + (column.isKey ? 13 : 0)
-        let type = (column.type as NSString).size(withAttributes: [.font: typeFont]).width
+        let name = (column.name as NSString).size(withAttributes: [.font: nameFont]).width + CGFloat(icons(column).count) * 13
+        let type = (column.typeLine as NSString).size(withAttributes: [.font: typeFont]).width
         return ceil(max(name, type)) + 8 + 4 + Self.sortWidth
     }
 
@@ -86,9 +86,10 @@ final class GridHeaderView: NSView {
         var x = rect.minX + 8
         let room = rect.maxX - Self.sortWidth - 4
         let nameHeight = ceil(nameFont.ascender - nameFont.descender)
-        if info.isKey, let key = symbol("key.fill", size: grid.fontSize - 3, color: .statusWarning) {
-            let size = key.size
-            key.draw(in: NSRect(x: x, y: 4 + (nameHeight - size.height) / 2, width: size.width, height: size.height))
+        for (name, color) in icons(info) {
+            guard let image = symbol(name, size: grid.fontSize - 3, color: color) else { continue }
+            let size = image.size
+            image.draw(in: NSRect(x: x, y: 4 + (nameHeight - size.height) / 2, width: size.width, height: size.height))
             x += size.width + 3
         }
         func draw(_ text: String, _ font: NSFont, _ color: NSColor, x: CGFloat, baseline: CGFloat) {
@@ -103,7 +104,22 @@ final class GridHeaderView: NSView {
             CTLineDraw(line, context)
         }
         draw(info.name, nameFont, .labelColor, x: x, baseline: 4 + nameFont.ascender)
-        draw(info.type, typeFont, .tertiaryLabelColor, x: rect.minX + 8, baseline: 4 + nameHeight + typeFont.ascender)
+        draw(info.typeLine, typeFont, .tertiaryLabelColor, x: rect.minX + 8, baseline: 4 + nameHeight + typeFont.ascender)
+    }
+
+    /// The symbols before a column's name: a gold key for the key that addresses rows (the primary key), a grey one
+    /// for another unique key, an outline for an index, and an accent arrow for a foreign key.
+    private func icons(_ column: GridColumn) -> [(String, NSColor)] {
+        var icons: [(String, NSColor)] = []
+        if column.isKey || column.marks.contains(.primary) {
+            icons.append(("key.fill", .statusWarning))
+        } else if column.marks.contains(.unique) {
+            icons.append(("key.fill", .secondaryLabelColor))
+        } else if column.marks.contains(.indexed) {
+            icons.append(("key", .tertiaryLabelColor))
+        }
+        if column.marks.contains(.foreign) { icons.append(("arrow.up.right", .accent)) }
+        return icons
     }
 
     /// A symbol in a colour, made once per look and size.
@@ -240,9 +256,8 @@ final class GridHeaderView: NSView {
         if border != nil {
             toolTip = "Drag to resize the column; double-click to fit its values"
         } else if let column, let info = grid.source?.columns[grid.columnOrder[column]] {
-            let type = info.type.isEmpty ? "" : " (\(info.type))"
             toolTip = isInSortControl(point, column) ? "Sort by \(info.name); ⌥-click to add it to the sort"
-                : "Select the column \(info.name)\(type); drag to move it"
+                : "Select the column; drag to move it\n" + info.details
         } else {
             toolTip = nil
         }

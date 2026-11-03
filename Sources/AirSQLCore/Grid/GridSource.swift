@@ -48,12 +48,33 @@ public struct GridColumn: Equatable, Sendable {
     public var kind: Kind
     /// Part of the key that addresses a row: its values are never shortened, and the grid never cuts them on screen.
     public var isKey: Bool
+    /// What the header marks besides the name and type: from the result's column flags, or the table's schema.
+    public var marks: Marks
+    /// The column's comment (from the schema), shown in the header's tooltip.
+    public var comment: String
 
-    public init(name: String, type: String = "", kind: Kind = .text, isKey: Bool = false) {
+    /// The header's marks: key icons for the first four, words after the type for the rest.
+    public struct Marks: OptionSet, Sendable {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+
+        public static let primary = Marks(rawValue: 1 << 0)
+        public static let foreign = Marks(rawValue: 1 << 1)
+        public static let unique = Marks(rawValue: 1 << 2)
+        public static let indexed = Marks(rawValue: 1 << 3)
+        public static let autoIncrement = Marks(rawValue: 1 << 4)
+        public static let hasDefault = Marks(rawValue: 1 << 5)
+        public static let generated = Marks(rawValue: 1 << 6)
+        public static let nullable = Marks(rawValue: 1 << 7)
+    }
+
+    public init(name: String, type: String = "", kind: Kind = .text, isKey: Bool = false, marks: Marks = [], comment: String = "") {
         self.name = name
         self.type = type
         self.kind = kind
         self.isKey = isKey
+        self.marks = marks
+        self.comment = comment
     }
 }
 
