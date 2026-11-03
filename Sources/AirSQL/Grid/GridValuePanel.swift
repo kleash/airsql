@@ -31,6 +31,8 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     private var tree: JSONNode?
     private var bytes: [UInt8]?
     private var value: String?
+    /// What the server puts in the cell at Apply ("auto", "default", "ƒ NOW()"), shown instead of NULL.
+    private var placeholder: String?
     private var column: GridColumn?
     /// Keeps the text as the cell's pending value, or says why it can't (nil: the cell can't be edited here).
     var keep: ((String) -> String?)? { didSet { text.isEditable = keep != nil && mode == .text } }
@@ -112,11 +114,13 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    /// Shows a cell: `value` nil for NULL (or no cell when `column` is nil); `bytes` as the server sent them.
-    func show(column: GridColumn?, value: String?, bytes: [UInt8]?) {
+    /// Shows a cell: `value` nil for NULL (or no cell when `column` is nil); `bytes` as the server sent them;
+    /// `placeholder` what the server will put there at Apply.
+    func show(column: GridColumn?, value: String?, bytes: [UInt8]?, placeholder: String? = nil) {
         edited = false
         self.column = column
         self.value = value
+        self.placeholder = placeholder
         self.bytes = bytes ?? value.map { Array($0.utf8) }
         title.stringValue = column.map { "Value · \($0.name)" } ?? "Value"
         title.toolTip = title.stringValue
@@ -128,10 +132,16 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         for item in Mode.allCases { modes.setEnabled(fits[item] == true, forSegment: item.rawValue) }
         if let picked, fits[picked] == true { mode = picked } else { mode = picture != nil ? .image : tree != nil ? .json : .text }
         modes.selectedSegment = value == nil ? -1 : mode.rawValue
-        footer.stringValue = column == nil ? "Select a cell to see its whole value here" : value == nil ? "NULL" : describe()
+        footer.stringValue = column == nil ? "Select a cell to see its whole value here" : summary
         footer.toolTip = footer.stringValue
         footer.textColor = .secondaryLabelColor
         refresh()
+    }
+
+    /// The footer's words for the cell shown.
+    private var summary: String {
+        if let placeholder { return placeholder + " · the server sets it when you apply" }
+        return value == nil ? "NULL" : describe()
     }
 
     private func describe() -> String {
@@ -188,7 +198,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         guard let chosen = Mode(rawValue: sender.selectedSegment) else { return }
         picked = chosen
         mode = chosen
-        footer.stringValue = value == nil ? "NULL" : describe()
+        footer.stringValue = summary
         refresh()
     }
 

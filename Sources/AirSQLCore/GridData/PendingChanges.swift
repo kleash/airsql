@@ -184,7 +184,7 @@ public struct PendingChanges: Equatable {
                 } catch {
                     let reason = (error as? LocalizedError)?.errorDescription ?? "\(error)"
                     throw ApplyFailure(statement: Statement(sql: "", expectedRows: 1, target: target), changed: nil,
-                                       error: EditError("\(name): \(reason)."))
+                                       error: EditError("\(name): \(reason)."), column: name)
                 }
             }
         }

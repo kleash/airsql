@@ -197,7 +197,7 @@ extension TableDataController: DataGridViewDelegate {
                     return try type.literal(text, values)
                 }
             } catch {
-                if let failure = error as? ApplyFailure { point(at: failure.statement.target) }
+                if let failure = error as? ApplyFailure { point(at: failure) }
                 return showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
                                  title: "Nothing was applied to \(tableName)", on: view.window)
             }
@@ -250,6 +250,8 @@ extension TableDataController: DataGridViewDelegate {
                 // New rows stay where they were, with what the server filled in (their AUTO_INCREMENT key, defaults);
                 // rows read back by an earlier Apply are read again (this one may have changed them) or dropped (deleted).
                 let readBack = savedQueries(deleted: source.changes.state.deletes) + readBackQueries(statements, insertIDs: insertIDs)
+                let patch = patchQueries(source.changes, noBackslashEscapes: session.noBackslashEscapes)
+                let deleted = source.changes.state.deletes
                 source.changes = PendingChanges(keyColumns: source.changes.keyColumns)
                 changesDidChange()
                 if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
@@ -258,14 +260,28 @@ extension TableDataController: DataGridViewDelegate {
                     if let row = try? await session.query(sql, rowCap: 1).first?.rows, row.rowCount == 1 { saved.append(row) }
                 }
                 source.setSaved(saved)
+                // With every row loaded, the edited rows are read back by key and the deleted ones go; otherwise (or if a
+                // row isn't found again) the loaded rows load again.
+                var patched = patch != nil
+                var edited: [ResultStore] = []
+                for sql in patch ?? [] {
+                    guard let rows = try? await session.query(sql, rowCap: PendingChanges.deleteBatch).first?.rows else { patched = false; break }
+                    edited.append(rows)
+                }
                 activity.end()
                 loading = nil
-                loadRows(more: false, through: source.loadedRows, keepingSaved: true)
+                if patched, source.patch(edited, deleted: deleted) {
+                    viewer.reloadData()
+                    updateBars()
+                    bar.busy = false
+                } else {
+                    loadRows(more: false, through: source.loadedRows, keepingSaved: true)
+                }
             } catch {
                 activity.end()
                 loading = nil
                 bar.busy = false
-                if let failure = error as? ApplyFailure { point(at: failure.statement.target) }
+                if let failure = error as? ApplyFailure { point(at: failure) }
                 showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
                           title: "Nothing was applied to \(tableName)", on: view.window)
             }
@@ -293,6 +309,16 @@ extension TableDataController: DataGridViewDelegate {
         }
     }
 
+    /// The SELECTs that read the edited rows back after Apply, when every row is loaded (so no page's offset depends on
+    /// where rows are) and no key changed; nil to load the rows again instead.
+    private func patchQueries(_ changes: PendingChanges, noBackslashEscapes: Bool) -> [String]? {
+        guard let source, !source.hasMore else { return nil }
+        let keys = changes.state.edits.keys.filter { !changes.isDeleted($0) }
+        let keyColumns = Set(changes.keyColumns)
+        guard keys.count <= 5_000, !changes.state.edits.values.contains(where: { !keyColumns.isDisjoint(with: $0.keys) }) else { return nil }
+        return source.readBackSQL(keys.sorted { $0.lexicographicallyPrecedes($1) }, noBackslashEscapes: noBackslashEscapes)
+    }
+
     /// The SELECTs that read the rows an earlier Apply read back again, by their key, but not the ones deleted.
     private func savedQueries(deleted: Set<PendingChanges.Key>) -> [String] {
         guard let source, let keyColumns = source.table.editingKey else { return [] }
@@ -308,18 +334,25 @@ extension TableDataController: DataGridViewDelegate {
     /// The connections whose data session is running an Apply.
     static var applying: Set<UUID> = []
 
-    /// Selects the row a failed statement was for.
-    private func point(at target: PendingChanges.Statement.Target) {
+    /// Selects the row a failed statement was for: the cell, when the failure names its column.
+    private func point(at failure: ApplyFailure) {
         guard let source else { return }
         let row: Int?
-        switch target {
+        switch failure.statement.target {
         case .update(let key): row = source.index(of: key)
         case .delete(let keys): row = keys.lazy.compactMap(source.index(of:)).first
         case .insert(let id): row = source.index(of: id)
         }
         guard let row else { return }
         viewer.backToGrid(nil)
-        grid.selection.selectRow(row)
-        grid.reveal(grid.rowRect(row))
+        let name = failure.column(in: source.table)
+        guard let column = source.columns.firstIndex(where: { $0.name == name }), let shown = grid.columnOrder.firstIndex(of: column) else {
+            grid.selection.selectRow(row)
+            return grid.reveal(grid.rowRect(row))
+        }
+        let cell = GridPosition(row: row, column: shown)
+        grid.selection.select(cell)
+        grid.reveal(grid.cellRect(cell))
+        view.window?.makeFirstResponder(grid)
     }
 }
