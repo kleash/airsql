@@ -256,13 +256,12 @@ extension AppTests {
         let fingerprint = ConnectionsScreens.certificateFingerprint
         let field = fingerprintField(fingerprint)
         #expect(field.stringValue == fingerprint && field.isSelectable && field.lineBreakMode == .byCharWrapping)
-        let attributes: [NSAttributedString.Key: Any] = [.font: field.font as Any]
-        let width = field.preferredMaxLayoutWidth - 4
-        let line = String(fingerprint.prefix(48))  // "9F:" … 16 pairs and their colons
-        #expect((line as NSString).size(withAttributes: attributes).width <= width)
-        #expect((String(fingerprint.prefix(49)) as NSString).size(withAttributes: attributes).width > width)
-        let lineHeight = NSLayoutManager().defaultLineHeight(for: field.font ?? .systemFont(ofSize: 10))
-        #expect(abs(field.fittingSize.height - 2 * lineHeight) < lineHeight / 2, "\(field.fittingSize)")
+        // Two lines as wide as 48 characters (16 pairs and their colons), and the label's 2 pt a side: the 49th went on.
+        let font = field.font ?? .systemFont(ofSize: 10)
+        let advance = ("0" as NSString).size(withAttributes: [.font: font]).width, size = field.fittingSize
+        let lineHeight = NSLayoutManager().defaultLineHeight(for: font)
+        #expect(abs(size.height - 2 * lineHeight) < lineHeight / 2, "\(size)")
+        #expect(size.width >= 48 * advance + 4 && size.width < 49 * advance + 4, "\(size) \(advance)")
     }
 
     @Test func trustAndPasswordSheetsAnswer() async throws {

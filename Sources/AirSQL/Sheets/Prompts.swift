@@ -75,10 +75,12 @@ func fingerprintField(_ fingerprint: String) -> NSTextField {
     field.lineBreakMode = .byCharWrapping
     field.isSelectable = true
     field.setAccessibilityIdentifier("trust.fingerprint")
+    // Lines of 48 characters ("AB:" 16 times): AppKit wraps the label within this width as it sizes it, then draws it
+    // in the size that gave, so half a character more than 48 keeps the 49th on the next line.
     let pairs = fingerprint.split(separator: ":").allSatisfy { $0.count == 2 }
-    let characters = pairs ? 48 : min(max(48, fingerprint.count), 60)  // "AB:" 16 times
+    let characters = CGFloat(pairs ? 48 : min(max(48, fingerprint.count), 60))
     let advance = ("0" as NSString).size(withAttributes: [.font: font]).width
-    field.preferredMaxLayoutWidth = ((CGFloat(characters) + 0.5) * advance).rounded(.up) + 4  // the cell's 2 pt a side
+    field.preferredMaxLayoutWidth = ((characters + 0.5) * advance).rounded(.down)
     return field
 }
 
