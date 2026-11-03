@@ -215,5 +215,59 @@ extension AppTests {
             tab.revertAllChanges(nil)
             _ = try await schemaSession.query("DROP DATABASE \(database)")
         }
+
+        /// Data ▸ Quick Filter's conditions, Type a Value… and Sort by Columns… run on the server.
+        @Test(arguments: GridDataLabTests.servers)
+        func filtersAndSortsFromTheDataMenu(_ lab: Lab.Server) async throws {
+            let connection = Connection(options: DBLab.options(lab), log: DBLab.log)
+            defer { Task { await connection.disconnect() } }
+            let schemaSession = try await connection.session(.schema)
+            let name = "lane_r2_find_app", database = SQLQuote.identifier(name)
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)",
+                        "CREATE TABLE \(database).items (id INT PRIMARY KEY, name VARCHAR(20), price DECIMAL(8,2) NOT NULL)",
+                        "INSERT INTO \(database).items VALUES (1, 'Ann', 1.50), (2, 'Bob', 2.00), (3, 'Cy', 3.00), (4, 'Anna', 4.00), "
+                            + "(5, 'Dee', 2.00)"] {
+                _ = try await schemaSession.query(sql)
+            }
+            let schema = SchemaCache(source: schemaSession, includes: { $0 == name })
+            try await schema.load()
+            let saved = SavedConnection(name: "Lab \(lab)", host: "127.0.0.1", user: "airsql")
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let tab = TableDataController(model: model, context: EditorContext(connection: saved, sessions: connection, schema: schema),
+                                          database: name, table: "items")
+            main.select(main.open(tab, title: "items", connection: saved.id))
+            await ready { tab.loading != nil || tab.source == nil }
+            func ids() async -> [String] {
+                await ready { tab.loading != nil }
+                return (0..<tab.grid.rowCount).compactMap { tab.source?.value($0, 0) }
+            }
+            main.window?.makeFirstResponder(tab.grid)
+            tab.grid.selection.select(GridPosition(row: 0, column: 1))
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Starts with Selection"]).error == nil)
+            #expect(await ids() == ["1", "4"], "\(lab)")
+            tab.grid.selection.select(GridPosition(row: 1, column: 2))
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Type a Value…"]).error == nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "set", ["id": "quickFilter.operator", "value": "Less than (<)"])
+            _ = await call(harness, "set", ["id": "quickFilter.add", "value": true])
+            _ = await call(harness, "press", ["title": "Filter", "in": "sheet"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(await ids() == ["1"] && tab.bar.filterText == "(`name` LIKE 'Ann%') AND `price` < 4.00", "\(lab)")
+            tab.clearFilter(nil)
+            _ = await ids()
+            #expect(await call(harness, "menu", ["path": "Data > Sort by Columns…"]).error == nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "set", ["id": "sort.column.0", "value": "price"])
+            _ = await call(harness, "set", ["id": "sort.direction.0", "value": "Descending"])
+            _ = await call(harness, "press", ["id": "sort.add"])
+            _ = await call(harness, "set", ["id": "sort.column.1", "value": "name"])
+            _ = await call(harness, "press", ["id": "sort.ok"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(await ids() == ["4", "3", "2", "5", "1"], "\(lab)")
+            tab.clearSort(nil)
+            _ = await ids()
+            _ = try await schemaSession.query("DROP DATABASE \(database)")
+        }
     }
 }
