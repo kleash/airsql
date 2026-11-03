@@ -4,7 +4,8 @@ import AppKit
 /// A result tab's rows in the data grid (plan §2.5's embedding API: a `ResultSetSource` over the statement's
 /// `ResultStore`, or a `DiffSource` for a compared result), read-only, in a `GridViewer` (the status bar's figures, the
 /// value panel, Record View, the grids' copy formats, columns kept per query). The headers' sort controls sort the rows
-/// here (⌥ adds a column), asking first above 100,000 rows; Export Rows… saves them.
+/// here (⌥ adds a column), asking first above 100,000 rows; the filter bar's conditions and search filter them here too
+/// (`ResultFilterBar`); Export Rows… saves them.
 @MainActor
 final class ResultGridView: NSView, DataGridViewDelegate {
     let viewer: GridViewer
@@ -14,6 +15,9 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     let rows: ReorderedSource
     /// The table the rows come from, for the SQL formats and the export's name.
     private let table: (database: String?, name: String)
+    /// The bar over the rows, and its conditions on the source's columns (ANDed).
+    let filterBar = ResultFilterBar()
+    var conditions: [(column: Int, condition: GridCondition)] = []
 
     /// `viewKey`: where its columns are kept (the statement, on its connection).
     /// `transposed`: shown on its side (a result with one row).
@@ -39,23 +43,40 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         // ⌘C with nothing selected copies the whole result.
         viewer.copiesEverything = true
         viewer.show(rows, transposed: transposed)
-        grid.setAccessibilityLabel("Result rows")
-        addSubview(viewer)
-        guard let legend else {
-            viewer.pin(to: self)
-            return
+        viewer.filterByValue = { [weak self] column, value in
+            guard let self else { return }
+            self.filter(column, by: GridCondition(self.source.columns[column], .equals, [value]), adding: true)
         }
-        let line = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
-        line.attributedStringValue = legend.text
-        line.toolTip = legend.tip
-        line.setAccessibilityIdentifier("grid.legend")
-        addSubview(line)
+        grid.setAccessibilityLabel("Result rows")
+        filterBar.owner = self
+        filterBar.show([], shown: source.rowCount, of: source.rowCount)
+        // The filter bar shows while a filter or a search is on (⇧⌘E opens it); hidden, it takes no room.
+        let bars = NSStackView(views: [filterBar])
+        bars.orientation = .vertical
+        bars.translatesAutoresizingMaskIntoConstraints = false
+        filterBar.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true
+        filterBar.isHidden = true
+        addSubview(bars)
+        addSubview(viewer)
         viewer.translatesAutoresizingMaskIntoConstraints = false
+        var top = topAnchor
+        if let legend {
+            let line = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
+            line.attributedStringValue = legend.text
+            line.toolTip = legend.tip
+            line.setAccessibilityIdentifier("grid.legend")
+            addSubview(line)
+            NSLayoutConstraint.activate([
+                line.topAnchor.constraint(equalTo: topAnchor, constant: 5),
+                line.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
+                line.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
+            ])
+            top = line.bottomAnchor
+        }
         NSLayoutConstraint.activate([
-            line.topAnchor.constraint(equalTo: topAnchor, constant: 5),
-            line.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
-            line.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
-            viewer.topAnchor.constraint(equalTo: line.bottomAnchor, constant: 5),
+            bars.topAnchor.constraint(equalTo: top, constant: legend == nil ? 0 : 5),
+            bars.leadingAnchor.constraint(equalTo: leadingAnchor), bars.trailingAnchor.constraint(equalTo: trailingAnchor),
+            viewer.topAnchor.constraint(equalTo: bars.bottomAnchor),
             viewer.leadingAnchor.constraint(equalTo: leadingAnchor), viewer.trailingAnchor.constraint(equalTo: trailingAnchor),
             viewer.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
@@ -64,10 +85,18 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
-        if case .column = target { return nil }
         let menu = NSMenu(title: "Result")
-        menu.add([Commands.exportRows])
-        menu.items.forEach { $0.target = self }
+        switch target {
+        case .column:
+            menu.add([Commands.sortAscending, Commands.sortDescending, Commands.sortColumns, Commands.clearSort, nil,
+                      Commands.filterByValues, Commands.clearFilter])
+        case .cells:
+            menu.addItem(quickFilterItem())
+            menu.add([Commands.clearFilter, nil, Commands.exportRows])
+        case .row:
+            menu.add([Commands.exportRows])
+        }
+        for item in menu.items + menu.items.compactMap(\.submenu).flatMap(\.items) where item.target == nil { item.target = self }
         return menu
     }
 
@@ -89,12 +118,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         } else {
             keys = (adding ? keys : []) + [DataGridView.Sort(column: column, ascending: true)]
         }
-        let sort = { [self] in
-            rows.order = keys.isEmpty ? nil : GridSorting.sorted(Array(0..<source.rowCount), by: keys.map { ($0.column, $0.ascending) },
-                                                                 columns: source.columns) { source.value($0, $1) }
-            grid.sortOrder = keys
-            viewer.reloadData()
-        }
+        let sort = { [self] in sortRows(keys) }
         guard source.rowCount > 100_000, let window else { return sort() }
         let alert = NSAlert()
         alert.messageText = "Sort \(source.rowCount.formatted()) rows here?"
@@ -104,6 +128,12 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         alert.beginSheetModal(for: window) { response in
             if response == .alertFirstButtonReturn { sort() }
         }
+    }
+
+    /// Shows the rows sorted by `keys` (none: as they came), filtered as they are.
+    func sortRows(_ keys: [DataGridView.Sort]) {
+        grid.sortOrder = keys
+        reorder()
     }
 
     /// Export Rows… (and the result tab's Export Result…): the selected rows or every row of the result.

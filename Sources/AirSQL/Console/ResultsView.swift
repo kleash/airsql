@@ -58,6 +58,8 @@ final class ResultsView: NSView, NSTextFieldDelegate {
     private let spinner = NSProgressIndicator()
     let cancelButton = AirSQL.button("Cancel", id: "console.cancel", tip: Commands.cancelQuery.tip + " (⌘.)", target: nil,
                                      action: Commands.cancelQuery.action)
+    /// The Data Grid page of the help, while a result's rows are shown.
+    let help = helpButton(.dataGrid)
     private let holder = NSView()
     private var shown: NSView?
     private(set) var buttons: [ResultTabButton] = []
@@ -89,7 +91,8 @@ final class ResultsView: NSView, NSTextFieldDelegate {
         summary.setAccessibilityIdentifier("console.summary")
         holder.translatesAutoresizingMaskIntoConstraints = false
         for view in [bar, topLine, line, holder] { addSubview(view) }
-        for view in [tabsScroll, spinner, summary, cancelButton] { bar.addSubview(view) }
+        help.controlSize = .small
+        for view in [tabsScroll, spinner, summary, help, cancelButton] { bar.addSubview(view) }
         NSLayoutConstraint.activate([
             topLine.topAnchor.constraint(equalTo: topAnchor), topLine.heightAnchor.constraint(equalToConstant: 1),
             topLine.leadingAnchor.constraint(equalTo: leadingAnchor), topLine.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -107,7 +110,9 @@ final class ResultsView: NSView, NSTextFieldDelegate {
             spinner.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             summary.leadingAnchor.constraint(equalTo: spinner.trailingAnchor, constant: Spacing.half),
             summary.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            cancelButton.leadingAnchor.constraint(equalTo: summary.trailingAnchor, constant: Spacing.unit),
+            help.leadingAnchor.constraint(equalTo: summary.trailingAnchor, constant: Spacing.unit),
+            help.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            cancelButton.leadingAnchor.constraint(equalTo: help.trailingAnchor, constant: Spacing.unit),
             cancelButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -Spacing.unit),
             cancelButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
         ])
@@ -141,6 +146,7 @@ final class ResultsView: NSView, NSTextFieldDelegate {
             strip.scrollToVisible(button.frame)
         }
         let view = selected?.view ?? empty
+        help.isHidden = !(view is ResultGridView)
         if view !== shown {
             shown?.removeFromSuperview()
             holder.addSubview(view)

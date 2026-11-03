@@ -187,7 +187,10 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `valuePanel.image`, `valuePanel.actions`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
   edit, Esc puts it back; Load from File… and Save to File… are the person's); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
   `grid.chart` (`chart.kind`, `chart.x`, `chart.y`); Column List `columnList.search`, `columnList.table`; Column
-  Summary `columnSummary` (in a table tab, a `columnSummary.value` filters by it); Go to Row `goToRow.text`.
+  Summary `columnSummary` (a `columnSummary.value` filters by it); Go to Row `goToRow.text`. A console result filters
+  its own rows (Data ▸ Quick Filter, Filter by Values…, Sort by Columns…, Search All Columns): its bar
+  `result.filterBar`, shown while a filter or search is on, has `result.scope`, `result.filter` (the conditions as SQL),
+  `result.clearFilter` and `result.search` (Return searches).
 - **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
   preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition:
   set it, then key `return` applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
