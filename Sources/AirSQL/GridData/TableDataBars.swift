@@ -35,7 +35,7 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
         let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .tertiaryLabelColor)
         whereField.placeholderString = "for example status = 'paid'"
         whereField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        whereField.toolTip = "Type a WHERE condition and press Return to filter every row on the server"
+        whereField.toolTip = "Type a WHERE condition and press Return to filter every row on the server (⌥⎋ completes column names)"
         whereField.setAccessibilityIdentifier("tableData.where")
         whereField.setAccessibilityLabel("WHERE condition")
         whereField.delegate = self
@@ -149,6 +149,20 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
 
     func controlTextDidChange(_ obj: Notification) {
         clearButton.isHidden = whereField.stringValue.isEmpty
+    }
+
+    /// Completion in the condition (⌥⎋ or F5): the table's columns (quoted when they need it) and the words conditions use.
+    func control(_ control: NSControl, textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
+                 indexOfSelectedItem index: UnsafeMutablePointer<Int>) -> [String] {
+        let partial = (textView.string as NSString).substring(with: charRange).lowercased()
+        let names = (owner?.source?.columns ?? []).map { column -> String in
+            let plain = column.name.first.map { $0.isLetter || $0 == "_" } == true
+                && column.name.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }
+            return plain ? column.name : SQLQuote.identifier(column.name)
+        }
+        let keywords = ["AND", "OR", "NOT", "IS NULL", "IS NOT NULL", "LIKE", "IN", "BETWEEN", "NOW()", "CURDATE()"]
+        index.pointee = -1
+        return (names + keywords).filter { $0.lowercased().hasPrefix(partial) || $0.lowercased().hasPrefix("`" + partial) }
     }
 }
 

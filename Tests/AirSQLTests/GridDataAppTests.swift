@@ -232,6 +232,16 @@ extension AppTests {
             #expect(tab.findBar.isHidden && tab.grid.rowCount == 3)
         }
 
+        @Test func whereBarCompletesColumnNames() async throws {
+            let (_, _, tab) = try await Self.tab()
+            let text = NSTextView()
+            text.string = "region = 'EU' AND cu"
+            var index = 0
+            let words = tab.bar.control(tab.bar.whereField, textView: text, completions: [],
+                                        forPartialWordRange: NSRange(location: 18, length: 2), indexOfSelectedItem: &index)
+            #expect(words == ["customer_id", "CURDATE()"])
+        }
+
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
             let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
             #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. Views are read-only"))
