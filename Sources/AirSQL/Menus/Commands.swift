@@ -102,11 +102,13 @@ import AppKit
     @objc optional func quickFilter(_ sender: Any?)
     @objc optional func quickFilterEquals(_ sender: Any?)
     @objc optional func quickFilterNotEquals(_ sender: Any?)
+    @objc optional func quickFilterPrompt(_ sender: Any?)
     @objc optional func filterByValues(_ sender: Any?)
     @objc optional func clearFilter(_ sender: Any?)
     @objc optional func sortAscending(_ sender: Any?)
     @objc optional func sortDescending(_ sender: Any?)
     @objc optional func clearSort(_ sender: Any?)
+    @objc optional func sortColumns(_ sender: Any?)
     @objc optional func goToRow(_ sender: Any?)
     @objc optional func showRelatedRows(_ sender: Any?)
     @objc optional func showColumnSummary(_ sender: Any?)
@@ -465,6 +467,27 @@ enum Commands {
                                       tip: "Show only rows with the selected value in this column")
     static let filterNotEquals = Command("Not Equal to Selection", #selector(AirSQLActions.quickFilterNotEquals(_:)), "2",
                                          [.command, .control], tip: "Hide rows with the selected value in this column")
+    // Quick Filter ▸ in the menu bar has the cell menu's operators too: the tag is the `GridCondition.Operator`'s index.
+    static let filterLess = Command("Less Than Selection", #selector(AirSQLActions.quickFilter(_:)), tag: 2,
+                                    tip: "Show only rows with a smaller value than the selected one in this column")
+    static let filterGreater = Command("Greater Than Selection", #selector(AirSQLActions.quickFilter(_:)), tag: 3,
+                                       tip: "Show only rows with a larger value than the selected one in this column")
+    static let filterStartsWith = Command("Starts with Selection", #selector(AirSQLActions.quickFilter(_:)), tag: 4,
+                                          tip: "Show only rows whose value in this column starts with the selected text (LIKE)")
+    static let filterEndsWith = Command("Ends with Selection", #selector(AirSQLActions.quickFilter(_:)), tag: 5,
+                                        tip: "Show only rows whose value in this column ends with the selected text (LIKE)")
+    static let filterContains = Command("Contains Selection", #selector(AirSQLActions.quickFilter(_:)), tag: 6,
+                                        tip: "Show only rows whose value in this column contains the selected text (LIKE)")
+    static let filterIn = Command("In Selected Values", #selector(AirSQLActions.quickFilter(_:)), tag: 7,
+                                  tip: "Show only rows with one of the values selected in this column (IN)")
+    static let filterNotIn = Command("Not in Selected Values", #selector(AirSQLActions.quickFilter(_:)), tag: 8,
+                                     tip: "Hide rows with any of the values selected in this column (NOT IN)")
+    static let filterNull = Command("Is NULL", #selector(AirSQLActions.quickFilter(_:)), tag: 9,
+                                    tip: "Show only rows where this column is NULL")
+    static let filterNotNull = Command("Is Not NULL", #selector(AirSQLActions.quickFilter(_:)), tag: 10,
+                                       tip: "Show only rows where this column has a value")
+    static let filterPrompt = Command("Type a Value…", #selector(AirSQLActions.quickFilterPrompt(_:)),
+                                      tip: "Filter this column by a value you type: equal, not equal, less, greater or LIKE")
     static let filterByValues = Command("Filter by Values…", #selector(AirSQLActions.filterByValues(_:)),
                                         tip: "Tick the values to show in this column, as in a spreadsheet")
     static let clearFilter = Command("Clear Filter", #selector(AirSQLActions.clearFilter(_:)), tip: "Show every row again")
@@ -473,6 +496,8 @@ enum Commands {
     static let sortDescending = Command("Sort Descending", #selector(AirSQLActions.sortDescending(_:)),
                                         tip: "Sort by this column, largest first")
     static let clearSort = Command("Clear Sort", #selector(AirSQLActions.clearSort(_:)), tip: "Show rows in the table's own order again")
+    static let sortColumns = Command("Sort by Columns…", #selector(AirSQLActions.sortColumns(_:)),
+                                     tip: "Sort by several columns, each ascending or descending, in the order you set")
     static let goToRow = Command("Go to Row…", #selector(AirSQLActions.goToRow(_:)), "l", tip: "Go to a row by its number, or to column:row")
     static let chooseReferencedRow = Command("Choose Referenced Row…", #selector(AirSQLActions.chooseReferencedRow(_:)),
                                              tip: "Pick the row this foreign key points to by its label; its key goes in the cell")
@@ -643,8 +668,9 @@ enum Commands {
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
-        filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterByValues, clearFilter, sortAscending,
-        sortDescending, clearSort, goToRow, chooseReferencedRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
+        filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
+        filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
+        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,

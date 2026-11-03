@@ -46,65 +46,47 @@ extension TableDataController {
     /// Quick Filter ▸ for the focused cell (and every selected value of its column, for IN): each item shows its SQL;
     /// with ⌥ it is added to the current filter instead.
     func quickFilterItem() -> NSMenuItem {
-        var items: [NSMenuItem] = []
-        if let (column, value, values) = focusedValues() {
-            // Binary values compare whole (LIKE would read their hex as text).
-            var ops: [GridCondition.Operator] = value == nil ? [.isNull, .isNotNull] : column.kind == .binary
-                ? [.equals, .notEquals, .isNull, .isNotNull]
-                : [.equals, .notEquals, .less, .greater, .startsWith, .endsWith, .contains, .isNull, .isNotNull]
-            if values.count > 1 { ops.insert(contentsOf: [.isIn, .notIn], at: value == nil ? 0 : 2) }
-            for op in ops {
-                let condition = GridCondition(column, op, op == .isIn || op == .notIn ? values : [value])
-                items += quickFilterItems(condition)
-            }
-            if let clipboard = NSPasteboard.general.string(forType: .string), !clipboard.isEmpty, !clipboard.contains(where: \.isNewline),
-               clipboard.count <= 1_000 {
-                items.append(.separator())
-                for op in [GridCondition.Operator.equals, .notEquals, .contains] {
-                    items += quickFilterItems(GridCondition(column, op, [clipboard]), clipboard: true)
-                }
-            }
-        }
-        let item = MainMenu.submenu("Quick Filter", items)
-        item.isEnabled = !items.isEmpty
-        return item
-    }
-
-    private func quickFilterItems(_ condition: GridCondition, clipboard: Bool = false) -> [NSMenuItem] {
-        let sql = condition.sql(noBackslashEscapes: noBackslashEscapes)
-        let shown = sql.count > 70 ? String(sql.prefix(70)) + "…" : sql
-        func item(_ title: String, adding: Bool) -> NSMenuItem {
-            let item = NSMenuItem(title: title, action: #selector(applyQuickFilter(_:)), keyEquivalent: "")
-            item.representedObject = sql
-            item.tag = adding ? 1 : 0
-            item.target = self
-            item.toolTip = (adding ? "Add this condition to the current filter: " : "Filter every row by ") + shown
-            return item
-        }
-        let plain = item((clipboard ? "Clipboard: " : "") + shown, adding: false)
-        let adding = item("AND " + shown, adding: true)
-        adding.isAlternate = true
-        adding.keyEquivalentModifierMask = .option
-        return [plain, adding]
+        QuickFilter.menuItem(focusedValues(), noBackslashEscapes: noBackslashEscapes, target: self,
+                             action: #selector(applyQuickFilter(_:)))
     }
 
     @objc func applyQuickFilter(_ sender: NSMenuItem) {
-        guard let sql = sender.representedObject as? String else { return }
-        applyFilter(sender.tag == 1 ? GridFilter.adding(sql, to: bar.filterText) : sql)
+        guard let condition = sender.representedObject as? GridCondition else { return }
+        filter(by: condition, adding: sender.tag == 1)
+    }
+
+    /// The rows meeting `condition`, alone or added to the current filter.
+    func filter(by condition: GridCondition, adding: Bool) {
+        let sql = condition.sql(noBackslashEscapes: noBackslashEscapes)
+        applyFilter(adding ? GridFilter.adding(sql, to: bar.filterText) : sql)
     }
 
     /// ⌃⌘1 and ⌃⌘2: the focused cell's column equal or not equal to its value.
     @objc func quickFilterEquals(_ sender: Any?) { quickFilter(.equals) }
     @objc func quickFilterNotEquals(_ sender: Any?) { quickFilter(.notEquals) }
 
+    /// Data ▸ Quick Filter ▸'s other operators (the item's tag is the operator's index).
+    @objc func quickFilter(_ sender: Any?) {
+        guard let tag = (sender as? NSMenuItem)?.tag, GridCondition.Operator.allCases.indices.contains(tag) else { return }
+        quickFilter(GridCondition.Operator.allCases[tag])
+    }
+
     private func quickFilter(_ op: GridCondition.Operator) {
-        guard let (column, value, _) = focusedValues() else { return NSSound.beep() }
-        applyFilter(GridCondition(column, op, [value]).sql(noBackslashEscapes: noBackslashEscapes))
+        guard let focus = focusedValues(), QuickFilter.reason(op, focus) == nil else { return NSSound.beep() }
+        filter(by: QuickFilter.condition(op, focus), adding: false)
+    }
+
+    /// Type a Value…: a condition on the focused cell's column with a value typed in.
+    @objc func quickFilterPrompt(_ sender: Any?) {
+        guard let focus = focusedValues(), let window = view.window else { return NSSound.beep() }
+        QuickFilter.ask(focus, canAdd: !bar.filterText.isEmpty, on: window) { [weak self] condition, adding in
+            self?.filter(by: condition, adding: adding)
+        }
     }
 
     /// The focused cell's column and value, and the distinct values selected in that column (at most 1,000 cells looked
     /// at, as a menu opens with them).
-    func focusedValues() -> (GridColumn, String?, [String?])? {
+    func focusedValues() -> QuickFilter.Focus? {
         guard let source, let (row, column) = viewer.focusedCell else { return nil }
         var values: [String?] = []
         for cell in viewer.selectedCells(limit: 1_000) where cell.column == column {
@@ -172,6 +154,11 @@ extension TableDataController {
         } else {
             keys = (adding ? keys : []) + [(column: column, ascending: true)]
         }
+        setLocalSort(keys)
+    }
+
+    private func setLocalSort(_ keys: [(column: Int, ascending: Bool)]) {
+        guard let source else { return }
         let apply = { [weak self] in
             source.localSort = keys
             self?.grid.sortOrder = keys.map { DataGridView.Sort(column: $0.column, ascending: $0.ascending) }
@@ -191,7 +178,23 @@ extension TableDataController {
 
     @objc func sortAscending(_ sender: Any?) { sortFocused(ascending: true) }
     @objc func sortDescending(_ sender: Any?) { sortFocused(ascending: false) }
-    @objc func clearSort(_ sender: Any?) { setSort([]) }
+    @objc func clearSort(_ sender: Any?) {
+        if source?.localSort.isEmpty == false { setLocalSort([]) } else { setSort([]) }
+    }
+
+    /// Sort by Columns…: the columns, their directions and their order in a sheet; on the server, or with "Loaded rows
+    /// only" here.
+    @objc func sortColumns(_ sender: Any?) {
+        guard let source, let window = view.window else { return NSSound.beep() }
+        let local = bar.loadedOnly.state == .on
+        let keys = local ? source.localSort : source.sort.compactMap { key in
+            source.columns.firstIndex { $0.name == key.column }.map { (column: $0, ascending: key.ascending) }
+        }
+        SortSheet.show(columns: source.columns, keys: keys, title: tableName, on: window) { [weak self] keys in
+            if local { return self?.setLocalSort(keys) ?? () }
+            self?.setSort(keys.map { TableViewSettings.SortKey(column: source.columns[$0.column].name, ascending: $0.ascending) })
+        }
+    }
 
     private func sortFocused(ascending: Bool) {
         guard let source, let column = focusedColumn() else { return NSSound.beep() }

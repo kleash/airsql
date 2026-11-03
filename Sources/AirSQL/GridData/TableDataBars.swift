@@ -1,13 +1,14 @@
 import AirSQLCore
 import AppKit
 
-/// The table tab's grid bar (grid-spec §4): a chip saying where filtering runs, the WHERE condition (Return applies it,
-/// ⌥↓ or the clock lists the table's recent filters), Search All Columns and its "Loaded rows only" switch.
+/// The table tab's grid bar (grid-spec §4): a chip saying where filtering runs, the WHERE condition (coloured, growing to
+/// eight lines; Return applies it, ⌥↓ or the clock lists the table's recent filters), Search All Columns and its "Loaded
+/// rows only" switch.
 @MainActor
-final class TableDataBar: NSView, NSTextFieldDelegate {
+final class TableDataBar: NSView, NSTextViewDelegate {
     weak var owner: TableDataController?
     let scope = ChipView("On server · all rows", style: .accent)
-    let whereField = NSTextField()
+    let whereField = ConditionView.make()
     let recentButton = NSButton()
     let clearButton = NSButton()
     let searchField = NSSearchField()
@@ -16,9 +17,9 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
     private let spinner = NSProgressIndicator()
 
     var filterText: String {
-        get { whereField.stringValue }
+        get { whereField.text }
         set {
-            whereField.stringValue = newValue
+            whereField.text = newValue
             clearButton.isHidden = GridFilter.condition(newValue).isEmpty
         }
     }
@@ -33,18 +34,16 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
         scope.setAccessibilityIdentifier("tableData.scope")
         scope.toolTip = "Where the filter and the sort run: on the server for every row, or here on the loaded rows"
         let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .tertiaryLabelColor)
-        whereField.placeholderString = "for example status = 'paid'"
-        whereField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        whereField.toolTip = "Type a WHERE condition and press Return to filter every row on the server (⌥⎋ completes column names)"
+        whereField.placeholder = "for example status = 'paid'"
+        whereField.toolTip = "Type a WHERE condition and press Return to filter every row on the server (⌥↩ starts a new line, "
+            + "⌥⎋ completes column names)"
         whereField.setAccessibilityIdentifier("tableData.where")
         whereField.setAccessibilityLabel("WHERE condition")
         whereField.delegate = self
-        whereField.target = self
-        whereField.action = #selector(filterEntered(_:))
-        whereField.lineBreakMode = .byTruncatingTail
-        whereField.cell?.isScrollable = true
-        whereField.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        whereField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        whereField.onReturn = { [weak self] in self?.filterEntered(nil) }
+        whereField.onRecent = { [weak self] in self?.showRecent(nil) }
+        whereField.box.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        whereField.box.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         configure(recentButton, symbol: "clock.arrow.circlepath", id: "tableData.recentFilters",
                   tip: "Use one of this table's recent filters (⌥↓ in the condition)", action: #selector(showRecent(_:)))
         configure(clearButton, symbol: "xmark.circle.fill", id: "tableData.clearFilter", tip: "Show every row again",
@@ -63,11 +62,11 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityIdentifier("tableData.busy")
         spinner.toolTip = "Rows are loading from the server"
-        let row = NSStackView(views: [scope, whereLabel, whereField, clearButton, recentButton, searchField, loadedOnly, spinner])
+        let row = NSStackView(views: [scope, whereLabel, whereField.box, clearButton, recentButton, searchField, loadedOnly, spinner])
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.setCustomSpacing(Spacing.half, after: whereLabel)
-        row.setCustomSpacing(Spacing.half, after: whereField)
+        row.setCustomSpacing(Spacing.half, after: whereField.box)
         row.setCustomSpacing(Spacing.half, after: clearButton)
         row.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.unit)
         let hairline = Hairline(.softSeparator)
@@ -80,7 +79,10 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
             row.topAnchor.constraint(equalTo: topAnchor), row.bottomAnchor.constraint(equalTo: hairline.topAnchor),
             hairline.leadingAnchor.constraint(equalTo: leadingAnchor), hairline.trailingAnchor.constraint(equalTo: trailingAnchor),
             hairline.bottomAnchor.constraint(equalTo: bottomAnchor), hairline.heightAnchor.constraint(equalToConstant: 1),
-            whereField.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            whereField.box.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            // The bar grows with the condition's lines, keeping a margin round it.
+            whereField.box.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor, constant: 4),
+            row.bottomAnchor.constraint(greaterThanOrEqualTo: whereField.box.bottomAnchor, constant: 4),
             searchField.widthAnchor.constraint(equalToConstant: 190),
         ])
     }
@@ -104,7 +106,7 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
     }
 
     @objc private func filterEntered(_ sender: Any?) {
-        owner?.applyFilter(whereField.stringValue)
+        owner?.applyFilter(whereField.text)
     }
 
     @objc func clearFilter(_ sender: Any?) {
@@ -125,14 +127,15 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
             menu.addItem(item)
         }
         for filter in recent {
-            let item = NSMenuItem(title: filter.count > 80 ? String(filter.prefix(80)) + "…" : filter,
+            let line = filter.split(whereSeparator: \.isNewline).joined(separator: " ")
+            let item = NSMenuItem(title: line.count > 80 ? String(line.prefix(80)) + "…" : line,
                                   action: #selector(recentChosen(_:)), keyEquivalent: "")
             item.representedObject = filter
             item.target = self
             item.toolTip = "Filter by \(filter)"
             menu.addItem(item)
         }
-        menu.popUp(positioning: nil, at: NSPoint(x: whereField.frame.minX, y: whereField.frame.minY - 4), in: whereField.superview)
+        menu.popUp(positioning: nil, at: NSPoint(x: whereField.box.frame.minX, y: whereField.box.frame.minY - 4), in: whereField.box.superview)
     }
 
     @objc private func recentChosen(_ item: NSMenuItem) {
@@ -141,20 +144,13 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
         owner?.applyFilter(filter)
     }
 
-    /// ⌥↓ in the condition lists the recent filters.
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        guard selector == #selector(NSResponder.moveToEndOfParagraph(_:)) else { return false }
-        showRecent(nil)
-        return true
-    }
-
-    func controlTextDidChange(_ obj: Notification) {
-        clearButton.isHidden = whereField.stringValue.isEmpty
+    func textDidChange(_ notification: Notification) {
+        clearButton.isHidden = whereField.text.isEmpty
     }
 
     /// Completion in the condition (⌥⎋ or F5): the table's columns (quoted when they need it) and the words conditions use.
-    func control(_ control: NSControl, textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
-                 indexOfSelectedItem index: UnsafeMutablePointer<Int>) -> [String] {
+    func textView(_ textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
+                  indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String] {
         let partial = (textView.string as NSString).substring(with: charRange).lowercased()
         let names = (owner?.source?.columns ?? []).map { column -> String in
             let plain = column.name.first.map { $0.isLetter || $0 == "_" } == true
@@ -162,7 +158,7 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
             return plain ? column.name : SQLQuote.identifier(column.name)
         }
         let keywords = ["AND", "OR", "NOT", "IS NULL", "IS NOT NULL", "LIKE", "IN", "BETWEEN", "NOW()", "CURDATE()"]
-        index.pointee = -1
+        index?.pointee = -1
         return (names + keywords).filter { $0.lowercased().hasPrefix(partial) || $0.lowercased().hasPrefix("`" + partial) }
     }
 }

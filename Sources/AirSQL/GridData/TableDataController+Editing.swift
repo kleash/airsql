@@ -39,8 +39,8 @@ extension TableDataController: DataGridViewDelegate {
         let menu = NSMenu(title: tableName)
         switch target {
         case .column:
-            menu.add([Commands.sortAscending, Commands.sortDescending, Commands.clearSort, nil, Commands.filterByValues,
-                      Commands.clearFilter])
+            menu.add([Commands.sortAscending, Commands.sortDescending, Commands.sortColumns, Commands.clearSort, nil,
+                      Commands.filterByValues, Commands.clearFilter])
         case .row:
             menu.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, Commands.revert])
         case .cells:
