@@ -39,6 +39,9 @@ final class Connector {
 
     unowned let model: AppModel
     private(set) var open: [UUID: Open] = [:]
+    /// Connections that dropped, kept so the next Connect can reconnect through the same route and clear the thread the
+    /// server may still have (plan §2.2, R8). Closed on Disconnect, on a reconnect, or when the app quits.
+    private var droppedOpens: [UUID: Open] = [:]
     private var connecting: [UUID: (task: Task<Void, Never>, activity: Activity)] = [:]
     private var askpass: AskpassServer?
     /// Answers the person asked to remember, saved once the connect has worked (a wrong one is never kept).
@@ -66,11 +69,29 @@ final class Connector {
         }
         model.states[id] = .connecting(step: "Starting")
         promptWindow = window
+        let dropped = droppedOpens.removeValue(forKey: id)
         let task = Task { [weak self] in
             guard let self else { return }
-            await self.run(saved, on: window, activity: activity)
+            if let dropped {
+                await self.reconnect(saved, dropped: dropped, on: window, activity: activity)
+            } else {
+                await self.run(saved, on: window, activity: activity)
+            }
         }
         connecting[id] = (task, activity)
+    }
+
+    /// The connection's sessions, for another window (the compare window): connects it first, its prompts on `window`,
+    /// unless it is connected, and waits for the connect to end. Throws why it didn't connect (shown on `window` too).
+    func connection(_ id: UUID, on window: NSWindow?) async throws -> Connection {
+        if let connected = open[id] { return connected.connection }
+        connect(id, on: window)
+        for await states in model.$states.values {
+            if case .connected? = states[id], let connected = open[id] { return connected.connection }
+            if case .failed(let message)? = states[id] { throw AirSQLError(.other, message) }
+            if states[id] == nil { throw AirSQLError(.cancelled, "Not connected.") }
+        }
+        throw AirSQLError.disconnected
     }
 
     /// Stops a connect under way: ssh ends, prompts close, the state goes back to idle.
@@ -95,6 +116,7 @@ final class Connector {
         cancel(id)
         model.states[id] = nil
         model.detach(id)
+        if let dropped = droppedOpens.removeValue(forKey: id) { Task { await dropped.close() } }
         guard let connected = open.removeValue(forKey: id) else { return }
         Task { await connected.close() }
     }
@@ -102,6 +124,8 @@ final class Connector {
     /// Quitting: every route and session goes, now.
     private func closeEverything() {
         for id in Array(connecting.keys) { cancel(id) }
+        for dropped in droppedOpens.values { dropped.route.close() }
+        droppedOpens = [:]
         for connected in open.values { connected.route.close() }
         open = [:]
         askpass?.close()
@@ -149,9 +173,43 @@ final class Connector {
         }
     }
 
+    /// Reconnects a connection that dropped, through the same route (plan §2.2, R8): the kept session is set up again
+    /// and the thread the server may still have is killed, freeing its locks. If the route is gone too, the kept one is
+    /// thrown away and a fresh connect runs. When a transaction was open at the drop, the person is told it's gone.
+    private func reconnect(_ saved: SavedConnection, dropped: Open, on window: NSWindow?, activity: Activity) async {
+        let id = saved.id
+        do {
+            activity.detail = "Reconnecting"
+            model.states[id] = .connecting(step: "Reconnecting")
+            let report = try await dropped.connection.reconnect()
+            guard connecting[id]?.activity === activity else { await dropped.close(); return }  // cancelled meanwhile
+            connecting[id] = nil
+            activity.end()
+            let connected = Open(connection: dropped.connection, server: report.server, route: dropped.route)
+            open[id] = connected
+            model.states[id] = .connected(server: Self.serverName(report.server))
+            model.attach(dropped.connection, to: id, includes: saved.showsDatabase)
+            watch(connected, id: id)
+            if report.rolledBack { reportRolledBack(id) }
+        } catch {
+            // The route dropped too (the tunnel or relay is gone): throw the kept one away and connect from scratch.
+            await dropped.close()
+            guard connecting[id]?.activity === activity else { return }
+            await run(saved, on: window, activity: activity)
+        }
+    }
+
+    /// Tells the person, in the connection's console tabs, that the transaction open when it dropped is now rolled back.
+    private func reportRolledBack(_ id: UUID) {
+        let text = "The connection dropped and was reconnected, so the transaction that was open is rolled back."
+        for tab in ConsoleDocuments.shared.main?.tabs ?? [] where tab.connectionID == id {
+            (tab.content as? ConsoleViewController)?.note(.warning, text)
+        }
+    }
+
     /// "MariaDB 11.8.3": the server's name and version as the sidebar and status bar show it.
     static func serverName(_ server: ServerInfo) -> String {
-        (server.flavor == .mariadb ? "MariaDB " : "MySQL ") + (server.version.components(separatedBy: "-").first ?? server.version)
+        server.flavor.title + " " + (server.version.components(separatedBy: "-").first ?? server.version)
     }
 
     /// Opens the route and logs in for `saved` (its prompts on `window`), telling each step: what Connect and the
@@ -258,12 +316,14 @@ final class Connector {
         }
     }
 
-    /// `connected` dropped (if it is still the one open): it is reported, and its sessions and route close.
+    /// `connected` dropped (if it is still the one open): it is reported, and kept so the next Connect can reconnect it
+    /// through the same route and clear the thread the server may still have (plan §2.2, R8). Its keep-alive stops.
     private func dropped(_ id: UUID, _ connected: Open?, _ message: String) {
         guard let connected, open[id] === connected else { return }
         open[id] = nil
         model.detach(id)
         model.states[id] = .failed(message)
-        Task { await connected.close() }
+        connected.keepAlive?.invalidate()
+        if let previous = droppedOpens.updateValue(connected, forKey: id) { Task { await previous.close() } }
     }
 }

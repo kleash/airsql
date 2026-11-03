@@ -31,7 +31,7 @@ final class ConsoleDocuments {
 
     private func schedule() {
         pending?.cancel()
-        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.saveNow() } }
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.save(wait: false) } }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
@@ -51,18 +51,23 @@ final class ConsoleDocuments {
         }
     }
 
-    /// Writes now (and waits: quitting).
-    func saveNow() {
+    /// Writes now and waits until it's on disk: quitting, so the last text isn't lost.
+    func saveNow() { save(wait: true) }
+
+    /// Takes the snapshot on the main thread, then writes it off it. `wait` blocks until the write is done (quit);
+    /// otherwise, from the debounced path, the write runs on the queue without holding up the main thread.
+    private func save(wait: Bool) {
         pending?.cancel()
         pending = nil
         let consoles = snapshot, url = fileURL
-        queue.sync {
+        let write: @Sendable () -> Void = {
             do {
                 try ConsoleTabStore.save(consoles, to: url)
             } catch {
                 log.error("can't save the console tabs: \(error.localizedDescription, privacy: .public)")
             }
         }
+        if wait { queue.sync(execute: write) } else { queue.async(execute: write) }
     }
 
     /// Opens the consoles of the last session in `main`, reading them (and their files) off the main thread.

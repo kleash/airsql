@@ -6,8 +6,14 @@ import UniformTypeIdentifiers
 /// with SQL in it (the navigator's Generate SELECT, agents' open_in_console). The console's own commands reach the
 /// console shown even while the sidebar has the focus.
 extension MainWindowController: AgentConsoles {
-    /// A new console on the active connection, which starts connecting if it isn't connected.
+    /// A new console on the active connection, which starts connecting if it isn't connected. From the navigator (a
+    /// database's menu, or while the tree has the focus) it starts in the selected rows' database, made current.
     @objc func newQuery(_ sender: Any?) {
+        if let (open, database) = sidebar.focusedDatabase {
+            open.currentDatabase = database
+            openConsole(text: "", title: nil, connection: open.id)
+            return
+        }
         guard let connection = activeConnection else { return NSSound.beep() }
         if !isConnected(connection.id) { model.connector.connect(connection.id, on: window) }
         openConsole(text: "", title: nil, connection: connection.id)

@@ -94,10 +94,11 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         loading?.cancel()
         guard let saved = connection, let connect = ReconWindowController.connect else { return }
         spinner.startAnimation(nil)
+        let window = popup.window
         loading = Task { [weak self] in
             var names: [String] = [], failure: String?
             do {
-                let session = try await connect(saved).toolsSession()
+                let session = try await connect(saved, window).toolsSession()
                 do {
                     names = try await session.rows("SHOW DATABASES").compactMap { $0.first ?? nil }
                         .filter { !["information_schema", "performance_schema"].contains($0.lowercased()) }
@@ -227,8 +228,7 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         set(tables, window.result == nil ? "Compare once to list the tables, then choose which to compare" : nil,
             "Choose the tables to compare, columns to leave out, a WHERE per table and renamed tables")
         set(export, noResult, Commands.exportReport.tip)
-        set(changeset, noResult ?? (SQLPreviewSheet.changesetWriter == nil ? "This build of AirSQL can't write Liquibase changesets yet" : nil),
-            "Save the sync script as a Liquibase changeset")
+        set(changeset, noResult, "Save the sync script as a Liquibase changeset")
         set(sync, noResult, Commands.syncScript.tip)
         for control in [mode, ignore] as [NSControl] { control.isEnabled = !window.isRunning }
     }

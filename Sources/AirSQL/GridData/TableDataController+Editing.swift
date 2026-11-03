@@ -206,6 +206,7 @@ extension TableDataController: DataGridViewDelegate {
             request.warnings = warnings
             request.destructive = !source.changes.state.deletes.isEmpty
             request.noBackslashEscapes = session.noBackslashEscapes
+            request.offersChangeset = true
             SQLPreviewSheet.show(request, connection: context.connection, on: window) { result in
                 guard result.approved else { return }
                 self.run(statements, on: session, change: change, saveAsChangeset: result.saveAsChangeset)

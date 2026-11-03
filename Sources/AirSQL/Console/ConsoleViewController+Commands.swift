@@ -26,7 +26,9 @@ extension ConsoleViewController: NSMenuItemValidation {
     }
 
     @objc func setIsolationLevel(_ sender: Any?) {
-        guard let item = sender as? NSMenuItem, IsolationLevel.allCases.indices.contains(item.tag) else { return }
+        // The menu bar's item, or the toolbar's Tx pop-up with its item chosen.
+        guard let item = sender as? NSMenuItem ?? (sender as? NSPopUpButton)?.selectedItem,
+              IsolationLevel.allCases.indices.contains(item.tag) else { return }
         let level = IsolationLevel.allCases[item.tag]
         runCommand([level.sql]) { [weak self] in
             guard let self, self.messagesView.messages.last?.level != .error else { return }
@@ -37,10 +39,9 @@ extension ConsoleViewController: NSMenuItemValidation {
     @objc func commit(_ sender: Any?) { runCommand(["COMMIT"]) }
     @objc func rollback(_ sender: Any?) { runCommand(["ROLLBACK"]) }
 
-    /// Shows this console's mode in the toolbar's Tx pop-up, when it is the tab shown.
+    /// Shows this console's state in the toolbar (its buttons and Tx pop-up ask it), when it is the tab shown.
     func syncToolbar() {
         guard let main = mainWindow, main.selectedTab?.content === self else { return }
-        main.toolbarController.transactionPopup.selectItem(withTag: autocommit ? 0 : 1)
         main.window?.toolbar?.validateVisibleItems()
     }
 
@@ -85,10 +86,12 @@ extension ConsoleViewController: NSMenuItemValidation {
             : shared.runner != nil && shared.runner != documentID ? "Another console tab of this connection is running a statement"
             : nil
         let offline = isConnected ? nil : "Connect first: double-click “\(connection?.displayName ?? "the connection")” in the sidebar"
+        // The toolbar asks at every event: the first character that isn't a space answers.
+        let hasText = text.contains { !$0.isWhitespace }
         switch item.action {
         case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(explain(_:)), #selector(profileQuery(_:)):
             if let reason = offline ?? busy { return (false, reason) }
-            return (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Type a statement first")
+            return (hasText, "Type a statement first")
         case #selector(runSelection(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (editor.selectedRange().length > 0, "Select the SQL to run first")
@@ -107,7 +110,7 @@ extension ConsoleViewController: NSMenuItemValidation {
             if let reason = offline ?? busy { return (false, reason) }
             return (true, "")
         case #selector(formatSQL(_:)):
-            return (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "Type some SQL first")
+            return (hasText, "Type some SQL first")
         case #selector(pinResult(_:)), #selector(renameResult(_:)), #selector(closeResult(_:)), #selector(closeOtherResults(_:)):
             if item.action == #selector(pinResult(_:)) { item.title = currentResult?.pinned == true ? "Unpin Result" : "Pin Result" }
             if item.action == #selector(closeOtherResults(_:)), currentResult != nil, resultTabs.count < 2 {

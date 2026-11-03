@@ -15,6 +15,7 @@ extension ObjectEditorController {
                                         caption: "It takes effect as soon as this runs; the database is chosen first, and the "
                                             + "\(kind.rawValue)'s own settings set, so it behaves as before.")
         request.actionTitle = name == nil ? "Create" : "Apply"
+        request.offersChangeset = true
         if ObjectCode.dropsFirst(kind, server: server), name != nil {
             request.warnings.append("MySQL can't replace a \(kind.rawValue) in one step: it is dropped first, so if the new code fails "
                                     + "it is gone. Your code stays here to fix and apply again, and Revert puts the old code back.")

@@ -9,7 +9,7 @@ import Foundation
 
 /// The server a schema was read from: MySQL and MariaDB, and their versions, show information_schema differently.
 public struct SchemaServer: Hashable {
-    public enum Flavour: String { case mysql, mariadb }
+    public typealias Flavour = ServerInfo.Flavor
 
     public var flavour: Flavour
     /// Major, minor and patch, such as [11, 8, 9].

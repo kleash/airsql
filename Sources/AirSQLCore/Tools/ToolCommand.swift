@@ -124,7 +124,7 @@ public struct ToolCommand: Sendable {
         args.append(request.addDropTable ? "--add-drop-table" : "--skip-add-drop-table")
         // MySQL 8's tools read column statistics only MySQL 8 has (written loose-: only MySQL's tools know it).
         if family == .mysql, (tool.version?.majorMinor ?? 0) >= 800,
-           let server, server.flavor == .mariadb || server.versionNumber < 80000 {
+           let server, server.flavor == .mariadb || !server.atLeast(8) {
             args.append("--loose-column-statistics=0")
         }
         args += request.extra

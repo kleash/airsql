@@ -111,8 +111,7 @@ extension AppTests {
             request.typeToConfirm = "orders"
             request.agent = "Claude Code"
             request.warnings = ["Deleting from orders also deletes rows in payments (ON DELETE CASCADE)."]
-            SQLPreviewSheet.changesetWriter = { _ in }
-            defer { SQLPreviewSheet.changesetWriter = nil }
+            request.offersChangeset = true
             SQLPreviewSheet.show(request, connection: Fixtures.production, on: window) { _ in }
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             missing += unexplained(harness.openSheets(), where: "SQL preview")

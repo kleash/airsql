@@ -26,6 +26,7 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
 - [Compare two databases](compare.md): structure and data, side by side, and a sync script you review first.
 - [AI agents](agents.md): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
+- [Liquibase changelogs](liquibase.md): a database as formatted SQL changesets, and any change saved as one.
 - [Keyboard shortcuts](shortcuts.md): every command's shortcut.
 - [Privacy and security](privacy-security.md): what AirSQL connects to, where passwords are kept, what agents may do.
 - [Troubleshooting](troubleshooting.md): when a connection fails, and how to report a problem.

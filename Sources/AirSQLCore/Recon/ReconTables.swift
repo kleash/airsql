@@ -2,13 +2,16 @@ import Foundation
 
 extension Recon {
     /// The columns both tables can match rows on: the source's primary key, else one of its unique keys, made of whole
-    /// NOT NULL columns, with a unique key on the same columns in the target; nil when there is none.
+    /// NOT NULL columns that aren't generated, with a unique key on the same columns in the target; nil when there is
+    /// none. A generated column is left out because `comparedColumns` drops generated columns, so it can't be the key
+    /// the data compare and the sync script's WHERE use (plan §2.9); such tables fall back to the no-key checksum.
     static func matchingKey(_ left: SchemaTable, _ right: SchemaTable) -> [String]? {
         func usable(_ table: SchemaTable) -> [[String]] {
             table.indexes.sorted { $0.isPrimary && !$1.isPrimary }.compactMap { index in
                 guard index.unique, index.parts.allSatisfy({ $0.column != nil && $0.prefixLength == nil }) else { return nil }
                 let columns = index.parts.compactMap(\.column)
-                return columns.allSatisfy({ table.column($0)?.nullable == false }) ? columns : nil
+                return columns.allSatisfy({ table.column($0).map { $0.nullable == false && $0.generated == nil } ?? false })
+                    ? columns : nil
             }
         }
         let theirs = usable(right).map { Set($0.map { $0.lowercased() }) }

@@ -32,7 +32,7 @@ enum DBLab {
     /// CTE joined with itself where the server has them, else (MySQL 5.7) from a ten-row derived table joined with
     /// itself (MySQL 8's hash joins build that up before the first row).
     static func numbers(_ power: Int, on server: ServerInfo?) -> String {
-        if let server, server.flavor == .mariadb || server.versionNumber >= 80000 {
+        if let server, server.flavor == .mariadb || server.atLeast(8) {
             let id = (0..<power / 3).map { "t\($0).i * 1\(String(repeating: "000", count: $0))" }.joined(separator: " + ")
             return "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 999) SELECT \(id) AS id, "
                 + "CONCAT('row-', \(id)) AS label FROM " + (0..<power / 3).map { "n AS t\($0)" }.joined(separator: ", ")
@@ -333,6 +333,33 @@ struct DBLabTests {
         await b.close()
     }
 
+    /// Cancel stops a running procedure (plan P0-2): while a CALL runs, the process list shows the statement inside the
+    /// procedure, not the tagged CALL, so Cancel must still target this session's own thread. Before the fix cancel()
+    /// returned .notRunning and the CALL ran to the end of its SLEEP.
+    @Test(arguments: ["mariadb", "mysql"])
+    func cancelStopsARunningProcedure(_ flavor: String) async throws {
+        let server = DBLab.server(flavor)
+        let session = try await connected(DBLab.options(server, tls: DBLab.required))
+        let database = SQLQuote.identifier("lane_p0_2_call_\(flavor)")
+        _ = try await session.query("DROP DATABASE IF EXISTS \(database)")
+        _ = try await session.query("CREATE DATABASE \(database)")
+        _ = try await session.query("CREATE PROCEDURE \(database).slow() BEGIN DO SLEEP(30); SELECT 1; END")
+
+        let start = Date()
+        let call = Task { try await session.query("CALL \(database).slow()") }
+        var result = CancelResult.notRunning
+        _ = try await eventually(timeout: 5) {
+            if session.isBusy { result = try await session.cancel() }
+            return result != .notRunning
+        }
+        #expect(result == .cancelled)
+        _ = await kind { try await call.value }  // the CALL ends (its SLEEP was interrupted), long before 30 s
+        #expect(Date().timeIntervalSince(start) < 15)
+        #expect(try await value(session, "SELECT 1") == "1")  // the session is still usable
+        _ = try await session.query("DROP DATABASE \(database)")
+        await session.close()
+    }
+
     @Test(arguments: ["mariadb", "mysql"])
     func readsAMillionRowsAndStopsAtTheCap(_ flavor: String) async throws {
         let server = DBLab.server(flavor)
@@ -439,6 +466,34 @@ struct DBLabTests {
             try await value(session, "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID = \(old)") == "0"
         })
         await session.close()
+    }
+
+    /// The multi-session Connection reconnects after a drop (plan §2.2, R8): the main session comes back and the
+    /// thread the server still had is killed, while the other sessions are forgotten and open again, fresh, on next
+    /// use. Connect wires this; without it a drop closed everything and the old thread kept its locks.
+    @Test(arguments: ["mariadb", "mysql"])
+    func theConnectionReconnectsMainAndReopensItsOtherSessions(_ flavor: String) async throws {
+        let server = DBLab.server(flavor)
+        let relay = try Relay(to: ("127.0.0.1", server.port ?? 3306))
+        let options = DBLab.routed(relay.path, host: "127.0.0.1", tls: flavor == "mysql" ? DBLab.required : TLSOptions(mode: .off))
+        let connection = Connection(options: options, log: log)
+        _ = try await connection.connect()
+        let main = try await connection.session(.main)
+        let schema = try await connection.session(.schema)
+        let old = try #require(main.server?.threadID)
+        _ = try await main.query("START TRANSACTION")
+        #expect(main.inTransaction)
+
+        relay.cut()
+        #expect(await kind { try await main.query("SELECT 1") } == .disconnected)
+
+        let report = try await connection.reconnect()
+        #expect(report.rolledBack && report.killedOldSession && report.server.threadID != old)
+        #expect(try await value(main, "SELECT 1") == "1" && !main.inTransaction)
+        // The schema session was forgotten: asking again opens a new, connected one.
+        let schemaAgain = try await connection.session(.schema)
+        #expect(schemaAgain !== schema && schemaAgain.isConnected)
+        await connection.disconnect()
     }
 
     /// The session model: main, data, schema and agent sessions opened on first use (callers at the same time share one

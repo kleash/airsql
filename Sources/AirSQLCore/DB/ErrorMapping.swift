@@ -45,7 +45,7 @@ public struct AirSQLError: Error, LocalizedError, Equatable {
     public var errorDescription: String? { message }
 
     public static let cancelled = AirSQLError(.cancelled, "The statement was cancelled.")
-    public static let disconnected = AirSQLError(.disconnected, "The connection to the server was lost. Reconnect to go on.")
+    public static let disconnected = AirSQLError(.disconnected, "The connection to the server was lost. Connect again to go on.")
 }
 
 /// Plain words for MySQL's and MariaDB's errors. The number decides (MySQL and MariaDB number some errors above 1900
@@ -119,7 +119,7 @@ public enum ErrorMapping {
         case 2006, 2013, 2055, 1053, 1927, Int(CR_ERR_NET_READ), Int(CR_ERR_NET_WRITE), 1159, 1161:
             return error(.disconnected, AirSQLError.disconnected.message)
         case 4031 where !mariaDB:
-            return error(.disconnected, "The server closed the connection because it was idle too long. Reconnect to go on.")
+            return error(.disconnected, "The server closed the connection because it was idle too long. Connect again to go on.")
         case 2026:
             if text.contains("does not support it") {
                 return error(.tls, "The server doesn't offer TLS. Turn TLS off for this connection only if you trust every "
