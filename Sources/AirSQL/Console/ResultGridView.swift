@@ -160,6 +160,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
 
     /// Shows the rows sorted by `keys` (none: as they came), filtered as they are.
     func sortRows(_ keys: [DataGridView.Sort]) {
+        viewer.backToGrid(nil)  // the sort is the grid's own: Record View and Transpose keep it aside
         grid.sortOrder = keys
         reorder()
     }

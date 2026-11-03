@@ -152,6 +152,63 @@ extension AppTests {
             #expect(view.editState.stringValue == "Read-only" && view.editState.toolTip?.hasPrefix("This connection is read-only") == true)
             #expect(!view.dataGrid(view.grid, canEditRow: 0, column: 0) && view.whyReadOnly(0, 0)?.hasPrefix("This connection is read-only") == true)
         }
+
+        /// Record View's row deleted by Apply: the grid again, with the rows left (it read past them), sorted as before.
+        @Test func applyingTheDeleteOfRecordViewsRowShowsTheGrid() async throws {
+            let session = FakeTableSession()
+            session.columns = [.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING)]
+            let c = { Self.column("customers", "customers", $0, $1) }
+            let (_, harness, view) = try await Self.result("SELECT id, email FROM customers",
+                                                           [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING)],
+                                                           rows: [["1", "a@example.com"], ["2", "b@example.org"], ["3", "c@example.net"]],
+                                                           session: session)
+            func deleteInRecordView(row: Int) async {
+                view.grid.selection.select(GridPosition(row: row, column: 1))
+                view.viewer.showRecordView(nil)
+                #expect(view.viewer.record == row)
+                view.deleteRows(nil)
+                view.applyChanges(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                _ = await call(harness, "press", ["title": "Apply"])
+                await ready { view.edits?.isEmpty == false }
+            }
+            await deleteInRecordView(row: 2)
+            #expect(session.statements.contains("DELETE FROM `airsql_fixture`.`customers` WHERE `id` IN (3)"))
+            #expect(view.viewer.record == nil && view.grid.source === view.rows && view.grid.rowCount == 2)
+            // Sorted, the rows' order is worked out again before the grid shows them.
+            let descending = [DataGridView.Sort(column: 0, ascending: false)]
+            view.sortRows(descending)
+            await deleteInRecordView(row: 0)
+            #expect(session.statements.contains("DELETE FROM `airsql_fixture`.`customers` WHERE `id` IN (2)"))
+            #expect(view.viewer.record == nil && view.grid.sortOrder == descending && view.rows.order == [0] && view.grid.rowCount == 1)
+        }
+
+        /// A filter or a sort from Record View shows the grid, filtered and sorted, rather than another row (or a row
+        /// past the end); the sort set before Record View stays.
+        @Test func aFilterOrSortFromRecordViewShowsTheGrid() async throws {
+            let (main, _) = appWindow(testModel())
+            let store = ResultStore(columns: [ResultStore.Column(name: "id", type: MYSQL_TYPE_LONG),
+                                              ResultStore.Column(name: "name", type: MYSQL_TYPE_VAR_STRING)])
+            for row in 0..<5 { store.append([Array("\(row)".utf8), Array("n\(row % 2)".utf8)]) }
+            let view = ResultGridView(store: store, nullText: "NULL", fontSize: 12)
+            main.window?.contentView = view
+            main.window?.layoutIfNeeded()
+            view.grid.selection.select(GridPosition(row: 4, column: 1))
+            view.viewer.showRecordView(nil)
+            view.quickFilterEquals(nil)
+            #expect(view.viewer.record == nil && view.rows.order == [0, 2, 4] && view.grid.rowCount == 3)
+            view.clearFilter(nil)
+            let descending = [DataGridView.Sort(column: 0, ascending: false)]
+            view.sortRows(descending)
+            view.grid.selection.select(GridPosition(row: 0, column: 1))
+            view.viewer.showRecordView(nil)
+            #expect(view.viewer.record == 0 && view.grid.source?.cell(0, 1) == .text("4"))
+            view.quickFilterEquals(nil)
+            #expect(view.viewer.record == nil && view.grid.sortOrder == descending && view.rows.order == [4, 2, 0])
+            view.viewer.showRecordView(nil)
+            view.sortAscending(nil)
+            #expect(view.viewer.record == nil && view.grid.sortOrder == [DataGridView.Sort(column: 1, ascending: true)])
+        }
     }
 }
 

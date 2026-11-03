@@ -192,13 +192,15 @@ extension ResultGridView {
                     && (search.isEmpty || GridFilter.matches(search, columns.map { source.value(row, $0) }))
             }
         }
-        let keys = grid.sortOrder
+        let keys = viewer.sortOrder
         if !keys.isEmpty {
             shown = GridSorting.sorted(shown ?? Array(0..<source.rowCount), by: keys.map { ($0.column, $0.ascending) },
                                        columns: source.columns) { source.value($0, $1) }
         }
         let reordered = rows
         reordered.order = shown
+        // In the grid: Record View's row and Transpose's columns would be other rows now.
+        viewer.backToGrid(nil)
         viewer.highlight = search.isEmpty ? nil : { row, column in GridFilter.matches(search, [reordered.value(row, column)]) }
         viewer.reloadData()
         filterBar.show(conditions.map(\.condition), shown: reordered.rowCount, of: source.rowCount)
