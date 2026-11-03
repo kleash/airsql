@@ -1164,8 +1164,9 @@ A refused statement comes back with `ok: false` and the reason; the other statem
   database too big for the reply comes as names only: name it, or describe its tables.
 - `describe {connection, objects: ["table" or "db.table"], database?}`: names in backquotes may contain dots.
 - `run_queries {connection, database?, queries: [{sql, max_rows?}], format?: json | csv, to_file?}`: 200 rows per
-  statement unless `max_rows` says more (up to the row cap); `capped: true` means there were more. Values are text
-  (binary as 0x… hex), NULL is null in JSON and an empty field in CSV, long values are cut at 2,000 characters.
+  statement unless `max_rows` says more (up to the row cap); `capped: true` means there were more. `types` names each
+  column's type as AirSQL's grid does (`bigint unsigned`, `varchar`, `datetime`). Values are text (binary as 0x…
+  hex), NULL is null in JSON and an empty field in CSV, long values are cut at 2,000 characters.
   `to_file: true` (analytics) writes each result to a CSV or JSON file in AirSQL's agent export folder and answers with
   its path, rows and size instead of the rows.
 - `profile {connection, table, database?, columns?, where?}`: row count, and per column NULLs, distinct values, min,
