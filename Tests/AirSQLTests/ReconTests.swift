@@ -395,6 +395,7 @@ struct ReconTests {
         let markdown = ReconReport.text(result, format: .markdown)
         #expect(markdown.contains("<b>\\|") && markdown.contains("## Table orders: different structure"))
         #expect(ReconReport.summary(result).first { $0.label == "only in Staging" }?.value == "1")
+        #expect(ReconReport.summary(result).map(\.label).prefix(2) == ["tables match", "table differs in structure"])
     }
 
     @Test func linesAlignSideBySide() {

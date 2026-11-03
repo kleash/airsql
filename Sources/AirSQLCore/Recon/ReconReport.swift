@@ -29,12 +29,14 @@ public enum ReconReport {
         let tables = result.objects.filter { $0.kind == .table }
         let others = result.objects.filter { $0.kind != .table }
         let rows = tables.filter { $0.status == .same || $0.status == .different }.compactMap(\.data).filter(\.differs)
-        return [("tables match", tables.filter { !$0.differs }.count.formatted()),
-                ("tables differ in structure", tables.filter { $0.status == .different }.count.formatted()),
+        let matching = tables.filter { !$0.differs }.count, different = tables.filter { $0.status == .different }.count
+        let changed = rows.reduce(0) { $0 + $1.differenceCount }
+        return [(matching == 1 ? "table matches" : "tables match", matching.formatted()),
+                (different == 1 ? "table differs in structure" : "tables differ in structure", different.formatted()),
                 ("only in \(result.source.name)", result.objects.filter { $0.status == .onlyInSource }.count.formatted()),
                 ("only in \(result.target.name)", result.objects.filter { $0.status == .onlyInTarget }.count.formatted()),
-                ("rows differ in \(rows.count) \(rows.count == 1 ? "table" : "tables")",
-                 rows.reduce(0) { $0 + $1.differenceCount }.formatted()),
+                ("\(changed == 1 ? "row differs" : "rows differ") in \(rows.count) \(rows.count == 1 ? "table" : "tables")",
+                 changed.formatted()),
                 ("views, routines, triggers and events differ", others.filter { $0.status == .different }.count.formatted())]
     }
 
