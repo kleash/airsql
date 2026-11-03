@@ -131,11 +131,22 @@ extension ConnectionEditor {
             ("Show the SQL before the grid's Apply", \.safety!.previewBeforeApply, "previewApply"),
             ("Ask before DROP or TRUNCATE", \.safety!.askBeforeDrop, "drop"),
             ("Type a table's name to drop or empty it", \.safety!.typeNameForTables, "typeTableName"),
+            ("Ask before restoring into a database that has tables", \.safety!.askBeforeRiskyRestore, "restore"),
+            ("Ask before sorting a large table by a column without an index", \.safety!.askBeforeUnindexedSort, "unindexedSort"),
+            ("Warn when closing with an open transaction or pending edits", \.safety!.warnOnClose, "warnOnClose"),
             ("Ask before agents change anything", \.safety!.askBeforeAgentChanges, "agentChanges"),
         ]
         for (title, path, id) in toggles {
             form.row("", [toggle(title, path, id: "editor.safety." + id, tip: "Turn this check on or off for this connection")])
         }
+        form.row("Agents' queries", [label("At most", color: .secondaryLabelColor),
+                                     count(\.safety!.agentRowCap, id: "editor.safety.agentRowCap",
+                                           tip: "Type the most rows an agent's query returns on this connection",
+                                           range: 1...1_000_000, width: 90),
+                                     label("rows and", color: .secondaryLabelColor),
+                                     count(\.safety!.agentTimeout, id: "editor.safety.agentTimeout",
+                                           tip: "Type how many seconds an agent's query may run on this connection", range: 1...3_600),
+                                     label("seconds", color: .secondaryLabelColor)])
         form.row("Open transaction", [label("Warn after", color: .secondaryLabelColor),
                                       count(\.safety!.openTransactionMinutes, id: "editor.safety.openTransaction",
                                             tip: "Warn when a transaction stays open this long; keep-alive stops for it then",
@@ -144,8 +155,9 @@ extension ConnectionEditor {
     }
 
     /// A whole number between `range`'s ends.
-    private func count(_ path: WritableKeyPath<SavedConnection, Int>, id: String, tip: String, range: ClosedRange<Int>) -> NSTextField {
-        let field = textField(String(draft[keyPath: path]), placeholder: String(range.lowerBound), id: id, tip: tip, width: 64)
+    private func count(_ path: WritableKeyPath<SavedConnection, Int>, id: String, tip: String, range: ClosedRange<Int>,
+                       width: CGFloat = 64) -> NSTextField {
+        let field = textField(String(draft[keyPath: path]), placeholder: String(range.lowerBound), id: id, tip: tip, width: width)
         field.alignment = .right
         bind(field) { [weak self] in
             guard let self else { return }
