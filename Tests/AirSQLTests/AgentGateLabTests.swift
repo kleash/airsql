@@ -4,13 +4,13 @@ import Testing
 @testable import AirSQL
 @testable import AirSQLCore
 
-/// The gate against a real server (MariaDB 11.8): an agent's console write runs only once the person approves it in the
+/// The gate against a real server (MariaDB 11.8 and MySQL 8.4): an agent's console write runs only once the person approves it in the
 /// SQL preview, and the statements an agent's clicks send on the person's session (the transaction mode, Commit) wait
 /// in it too; a declined Commit leaves the transaction open.
 extension AppTests.AgentGateUITests {
-    @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
-    func agentsChangeNothingOnTheServerWithoutThePerson() async throws {
-        let connection = Connection(options: DBLab.options(DBLab.server("mariadb"), tls: DBLab.required), log: DBLab.log)
+    @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"), arguments: ["mariadb", "mysql"])
+    func agentsChangeNothingOnTheServerWithoutThePerson(flavor: String) async throws {
+        let connection = Connection(options: DBLab.options(DBLab.server(flavor), tls: DBLab.required), log: DBLab.log)
         try await connection.connect()
         let database = "lane_l7b_gate"
         let setup = try await connection.toolsSession()
