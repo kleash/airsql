@@ -1,0 +1,469 @@
+# AirSQL Help (all pages)
+
+> AirSQL is a free, open-source Mac app (macOS 13.1 or later, Apple silicon and Intel) for MySQL and MariaDB: connections direct or through SSH tunnels, jump hosts and proxies, a SQL console, a data grid with safe editing, schema tools, client tools (mysql, mysqldump), compare and reconcile, and access for AI agents over MCP at the level the person at the Mac sets for each connection. Nothing is written to a server without the person's Run, Apply or approval, and agents never see saved passwords.
+
+- Install: `brew install --cask kleash/tap/airsql` (or the zip from https://github.com/kleash/airsql/releases).
+
+Every page of AirSQL Help (https://kleash.github.io/airsql/).
+
+
+---
+
+Source: https://kleash.github.io/airsql/
+
+# AirSQL Help
+
+AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages grow with it.
+
+- [Install AirSQL](https://kleash.github.io/airsql/install.html): with Homebrew or from the download.
+- [Getting started](https://kleash.github.io/airsql/getting-started.html): add a connection, find your way around the window.
+- [Settings](https://kleash.github.io/airsql/settings.html): the look, the editor and grid, safety checks, agents and client tools.
+- [Check SQL before it runs](https://kleash.github.io/airsql/sql-preview.html): the sheet that shows every change first.
+- [Trust a server](https://kleash.github.io/airsql/trust-a-server.html): servers whose certificate macOS doesn't know.
+- [The SQL log](https://kleash.github.io/airsql/sql-log.html): every statement AirSQL sends, with passwords masked.
+- [Read-only queries](https://kleash.github.io/airsql/read-only-queries.html): what an agent's query may do, and why one is refused.
+- [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): every command's shortcut.
+- [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): what AirSQL connects to, where passwords are kept, what agents may do.
+- [Troubleshooting](https://kleash.github.io/airsql/troubleshooting.html): when a connection fails, and how to report a problem.
+
+Every button and menu command says what it does when you hold the pointer over it.
+
+
+---
+
+Source: https://kleash.github.io/airsql/install.html
+
+# Install AirSQL
+
+AirSQL needs macOS 13.1 or later, on Apple silicon or Intel. It is free, and it needs no account.
+
+## With Homebrew
+
+```sh
+brew install --cask kleash/tap/airsql
+```
+
+Later, `brew upgrade --cask airsql` updates it.
+
+## From the download
+
+1. Download **AirSQL-X.Y.Z.zip** from the [latest release](https://github.com/kleash/airsql/releases/latest).
+2. Open the zip, then drag **AirSQL** to your **Applications** folder.
+3. Open AirSQL. Apple has checked it (it is notarized), so it opens like any app.
+
+To check the download first, see [Check a download](https://kleash.github.io/airsql/privacy-security.html#check-a-download).
+
+## Remove AirSQL
+
+Drag AirSQL from Applications to the Bin (with Homebrew: `brew uninstall --cask airsql`). Your connections and settings
+stay in `~/Library/Application Support/AirSQL`, and saved passwords in your Keychain (the item named
+`com.kleash.airsql` in Keychain Access), until you delete them. `brew uninstall --zap --cask airsql` deletes the
+settings too.
+
+
+---
+
+Source: https://kleash.github.io/airsql/getting-started.html
+
+# Getting started
+
+## Add your first connection
+
+Choose **File ▸ New Connection…** (⌘N), or **Add Connection…** on the first screen: the connection appears in the
+sidebar, and its summary shows where it goes and how it logs in.
+
+Passwords stay in your Keychain. A connection coloured **Production** starts with stricter safety checks
+([Settings](https://kleash.github.io/airsql/settings.html#safety)).
+
+## The window
+
+- **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
+  everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
+- **The tabs** hold your queries and tables. Double-click a tab to rename it; right-click it to close others or
+  duplicate it.
+- **The toolbar** shows the connection and database a tab works on, Run (⌘↩), Run All (⇧⌘↩), Explain, and the
+  transaction buttons.
+- **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to
+  cancel), what agents are doing, and the SQL log. Click an item for details; right-click it to copy it.
+
+## Tips
+
+- Nothing is written to a database until you press Run or Apply.
+- ⌘1 to ⌘9 show your tabs; ⇧⌘[ and ⇧⌘] step through them.
+- **Help ▸ Report a Problem** opens a form with your versions filled in.
+
+
+---
+
+Source: https://kleash.github.io/airsql/settings.html
+
+# Settings
+
+Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
+
+## General
+
+- **Appearance**: follow the Mac's light or dark mode (System), or always use Porcelain (light) or Deep Water (dark).
+- **Settings folder**: where your connections and settings are kept. Passwords are in your Keychain, never there.
+
+## Editor and Grid
+
+- The text size of the SQL editor and of the grid.
+- **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
+- **NULL shown as**: how empty values look in the grid.
+
+## Connections
+
+- **Load details up to … tables**: on a server with more tables than this, a database's columns, indexes and keys load
+  when you open it, so connecting stays quick.
+
+## Safety
+
+What asks first before data changes. These are the defaults; a connection can have its own, and a connection
+coloured Production starts with a strict preset.
+
+| Setting | Default | Production |
+|---|---|---|
+| Ask before UPDATE or DELETE without WHERE | on | on |
+| Ask before any write from the console | off | on |
+| Show the SQL before the grid's Apply | off | on |
+| Ask before DROP or TRUNCATE (a database's name is always typed) | on | on, table names typed too |
+| Ask before restoring into a database that has tables | on | on |
+| Leave DROP and DELETE out of sync scripts unless ticked | always | always |
+| Ask before agents change anything | on | on |
+| Agents' rows per query and time limit | 10,000 and 30 s | 1,000 and 15 s |
+| Warn when a transaction stays open | 15 minutes | 5 minutes |
+| Ask before sorting a large table by a column without an index | on | on |
+| Warn when closing with an open transaction or pending edits | on | on |
+
+**Restore Defaults** puts every switch back. Read-only is a switch of each connection. Agents can read these settings
+but never change them.
+
+## Agents
+
+- **Allow AI agents to use AirSQL**: off until you turn it on. Each connection's access is set in the connection itself;
+  Production starts at Off. Agents never see passwords.
+- **Exports**: the only folder agents save files in.
+
+## Client Tools
+
+The `mysql` (or `mariadb`) and `mysqldump` (or `mariadb-dump`) programs AirSQL runs. Leave them empty to let AirSQL
+find them.
+
+
+---
+
+Source: https://kleash.github.io/airsql/sql-preview.html
+
+# Check SQL before it runs
+
+Some changes show their SQL in a sheet before anything runs: applying edits in a table, changing a table's structure,
+dropping or renaming, restoring a dump, and sync scripts.
+
+- **Warnings** say what else will happen, such as rows deleted in other tables (ON DELETE CASCADE), or a table whose
+  engine can't roll back.
+- A change on a **Production** connection says so in red.
+- To drop a database (and, on Production, a table), type its name first.
+- When an **agent** asked for the change, the sheet names it. Nothing runs until you approve it; **Decline** refuses it.
+- **Copy SQL** copies the statements. **Cancel** changes nothing.
+
+
+---
+
+Source: https://kleash.github.io/airsql/trust-a-server.html
+
+# Trust a server
+
+When a server's certificate isn't one macOS trusts (it is self-signed, or from your company's own certificate
+authority), AirSQL shows its SHA-256 fingerprint and asks before connecting.
+
+1. Compare the fingerprint with the one the server's administrator gave you.
+2. If they match, choose **Trust**. AirSQL remembers the certificate and warns you if it ever changes.
+3. If they don't, choose **Cancel**: you may not be talking to the server you think.
+
+
+---
+
+Source: https://kleash.github.io/airsql/sql-log.html
+
+# The SQL log
+
+AirSQL writes every statement it sends to a server into one file on your Mac, just before the statement goes out.
+Use it to see exactly what AirSQL did: what the console ran, what a table edit applied, what the navigator asked the
+server for.
+
+## Where it is
+
+`~/Library/Logs/AirSQL/SQL.log`. Only you can read it (file mode 0600). At 10 MB it becomes `SQL.1.log`, replacing the
+one before, and a new file starts. It stays on your Mac: AirSQL sends it nowhere.
+
+## What a line says
+
+```
+2026-11-03 14:03:12.345 [Shop production main:12] SELECT * FROM orders WHERE id = 7
+```
+
+- the time;
+- the connection's name;
+- the session: **main** (console tabs), **data** (table tabs and their edits), **schema** (the navigator), **agent**
+  (AI agents), **tools** (client tools and compare), **cancel** (the short connection that stops a running statement);
+- the statement's number in that session. The server sees the same number in a comment at the start of the statement,
+  `/* airsql:main:12 */`, so you can find it in the server's process list.
+
+Lines that start with `--` are AirSQL's own notes: connected (server version, thread, TLS), disconnected, connection
+lost, reconnected (and whether an open transaction was rolled back), the number of a statement's error, and
+"startup SQL (2 statements)".
+
+## What is never in it
+
+- **Passwords you log in with**: they go to the server only during the login, never as SQL.
+- **Passwords and keys inside statements**: replaced with `<secret>`, as MySQL hides them in its own logs: the value
+  after `IDENTIFIED BY`, `SET PASSWORD … =`, `MASTER_PASSWORD` or `SOURCE_PASSWORD`, `PASSWORD '…'` in `CREATE SERVER`,
+  everything inside `PASSWORD(…)`, and the key of `AES_ENCRYPT`, `AES_DECRYPT`, `DES_ENCRYPT`, `DES_DECRYPT`, `ENCODE`,
+  `DECODE` and `ENCRYPT`. A value set for a column named like `password` is hidden too.
+- **A connection's startup SQL**: only how many statements it had, since it may hold secrets.
+- **Error messages**: only their numbers, because a syntax error quotes the statement it failed on.
+- **Results**: rows never go into the log.
+
+Very long statements (an import's big `INSERT`) are cut after 60,000 bytes.
+
+
+---
+
+Source: https://kleash.github.io/airsql/read-only-queries.html
+
+# Read-only queries
+
+Where only reading is allowed, such as a query from an AI agent, AirSQL first checks that the statement can only
+read. The check is strict on purpose: when in doubt it refuses, and it says why in one line.
+
+## What passes
+
+One statement at a time (a `;` at the end is fine):
+
+- `SELECT`, with `UNION`, subqueries and `WITH … SELECT`;
+- `SHOW …`;
+- `DESCRIBE`, `DESC` or `EXPLAIN` of a table; `EXPLAIN` of a `SELECT` (`FORMAT=JSON` and `FORMAT=TREE` too);
+  `EXPLAIN FOR CONNECTION` and a connection number.
+
+## What is refused, wherever it appears
+
+- More than one statement, and every other kind of statement: `UPDATE`, `INSERT`, `SET`, `CALL`, `DO`, `CREATE` and
+  the rest, and `WITH …` followed by anything but `SELECT`.
+- `EXPLAIN ANALYZE`, which runs the statement, and `EXPLAIN` of `INSERT`, `UPDATE`, `DELETE` or `REPLACE`.
+- `INTO` (a file or variables), `FOR UPDATE`, `FOR SHARE` and `LOCK IN SHARE MODE`.
+- Optimizer hints, `/*+ … */`: they can lift the server's time limit (`MAX_EXECUTION_TIME`).
+- Temporary tables: they can be written even in a read-only transaction.
+- Setting a variable with `:=`, and moving a sequence on (`NEXT VALUE FOR`, `NEXTVAL`, `SETVAL`).
+- Any function other than the built-in ones that only compute. So `SLEEP`, `BENCHMARK`, `GET_LOCK` and the other
+  locks, `LOAD_FILE`, `LAST_INSERT_ID` and the waits for replication are refused, and so are user-defined functions,
+  stored functions (`shop.bonus(…)`, or any name AirSQL doesn't know) and function names in quotes.
+
+The text inside executable comments, `/*! … */` and `/*M! … */`, counts as code, whatever server version it names.
+
+## Backslashes and double quotes
+
+The check reads a backslash in a string as the server does: as an escape, unless the session's sql_mode has
+`NO_BACKSLASH_ESCAPES`. Double-quoted text with a backslash in it is refused either way: with `ANSI_QUOTES` it is a
+name, where a backslash escapes nothing, so the server could end it somewhere else. Write strings in single quotes.
+
+## A safeguard, not the only one
+
+For a hard guarantee, connect agents with a database user that can only read.
+
+
+---
+
+Source: https://kleash.github.io/airsql/shortcuts.html
+
+# Keyboard shortcuts
+
+Every command is in the menu bar, with its shortcut next to it, and right-click menus show the same commands. Hold
+the pointer over a menu item to see what it does. A greyed-out item says why it is off.
+
+The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delete.
+
+| Command | Shortcut |
+|---|---|
+| Settings… | ⌘, |
+| Hide AirSQL | ⌘H |
+| Hide Others | ⌥⌘H |
+| Quit AirSQL | ⌘Q |
+| New Connection… | ⌘N |
+| New Query | ⌘T |
+| Open… | ⌘O |
+| Close Tab | ⌘W |
+| Close Other Tabs | ⌥⌘W |
+| Close Window | ⇧⌘W |
+| Save | ⌘S |
+| Save As… | ⇧⌘S |
+| Undo | ⌘Z |
+| Redo | ⇧⌘Z |
+| Cut | ⌘X |
+| Copy | ⌘C |
+| Copy with Headers | ⌥⌘C |
+| Copy Selection Summary | ⇧⌘C |
+| Paste | ⌘V |
+| Select All | ⌘A |
+| Find… | ⌘F |
+| Find and Replace… | ⌥⌘F |
+| Find Next | ⌘G |
+| Find Previous | ⇧⌘G |
+| Use Selection for Find | ⌘E |
+| Hide Sidebar | ⌃⌘S |
+| Filter Sidebar | ⌥⌘J |
+| Value Panel | ⇧↩ |
+| Record View | ⌥⌘R |
+| Transpose | ⌥⌘T |
+| Column List… | ⌘J |
+| SQL Log | ⌥⌘L |
+| Bigger | ⌘+ |
+| Smaller | ⌘- |
+| Actual Size | ⌘0 |
+| Refresh | ⌘R |
+| Enter Full Screen | ⌃⌘F |
+| Run Statement | ⌘↩ |
+| Run All | ⇧⌘↩ |
+| Run All | F9 |
+| Run Statement | ⌃F9 |
+| Explain | ⌥⌘E |
+| Cancel | ⌘. |
+| Format SQL | ⌥⇧⌘F |
+| Query History | ⌘Y |
+| Add Row | ⌘I |
+| Duplicate Row | ⌘D |
+| Duplicate Row Without Keys | ⇧⌘D |
+| Delete Rows… | ⌘⌫ |
+| Set NULL | ⌥⌘N |
+| Apply Changes | ⌘S |
+| Revert | ⌥⌘Z |
+| Filter… | ⇧⌘F |
+| Search All Columns | ⇧⌘E |
+| Equal to Selection | ⌃⌘1 |
+| Not Equal to Selection | ⌃⌘2 |
+| Go to Row… | ⌘L |
+| Related Rows | ⌃⌘↓ |
+| Load More | ⌥⌘↓ |
+| Load All | ⌥⇧⌘↓ |
+| Process List | ⌥⌘P |
+| Connect | ⌘K |
+| Disconnect | ⇧⌘K |
+| Minimize | ⌘M |
+| Show Previous Tab | ⌘{ |
+| Show Next Tab | ⌘} |
+| Tab 1 | ⌘1 |
+
+⌘S saves a console's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
+HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Rollback have no shortcut,
+so a slip of the fingers never commits.
+
+
+---
+
+Source: https://kleash.github.io/airsql/privacy-security.html
+
+# Privacy and security
+
+AirSQL holds the keys to your databases, so it is careful by default: it talks only to the servers you set up, your
+passwords stay in your Keychain, and nothing changes on a server until you say so.
+
+## What AirSQL connects to
+
+Only the database servers, SSH hosts and proxies you add. It has no account, no ads and no analytics, and it doesn't
+check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The Help menu opens pages in your browser.
+
+## Your passwords
+
+- They are kept in your Keychain, never in AirSQL's settings file, in its logs, in the [SQL log](https://kleash.github.io/airsql/sql-log.html) or in
+  what AI agents see.
+- A PAM or LDAP login sends the password as plain text, so AirSQL uses one only when you turn it on for the connection,
+  and only over TLS that proves the server is the right one.
+
+## Your connections
+
+- TLS is checked against the server's real name, also through an SSH tunnel. A certificate macOS doesn't know is shown
+  with its fingerprint for you to [trust](https://kleash.github.io/airsql/trust-a-server.html), and AirSQL warns you if it ever changes.
+- Tunnels and proxies end in a private socket on your Mac, never in a network port that other apps or computers could
+  use.
+- A server can't make AirSQL read files on your Mac (`LOAD DATA LOCAL INFILE` is off), and AirSQL sends one statement
+  at a time.
+- A lost connection is reported, never quietly reconnected: that would lose an open transaction without a word.
+
+## Your data
+
+- Nothing is written until you choose Run or Apply. Changes show their SQL first
+  ([Check SQL before it runs](https://kleash.github.io/airsql/sql-preview.html)), and Apply checks that each change touched exactly the rows it should.
+- A connection coloured **Production** starts with stricter safety checks ([Settings](https://kleash.github.io/airsql/settings.html#safety)).
+
+## AI agents
+
+Agents can't use AirSQL until you allow them. Then each connection has its own access level, an agent's queries must
+pass the [read-only check](https://kleash.github.io/airsql/read-only-queries.html), and a change it asks for waits for your approval. Agents never see
+saved passwords.
+
+## The app itself
+
+AirSQL is signed by its developer, uses macOS's hardened runtime and is notarized by Apple. Its one library, MariaDB
+Connector/C with OpenSSL, is built from pinned, checked sources, and every release includes that source and a list of
+what is inside (an SBOM). Every change is scanned for known vulnerabilities, leaked secrets and security bugs. More in
+[SECURITY.md](https://github.com/kleash/airsql/blob/main/SECURITY.md).
+
+## Check a download
+
+Every release lists the zip's SHA-256. In Terminal, in the folder where the download is:
+
+```sh
+shasum -a 256 -c AirSQL-X.Y.Z.zip.sha256
+```
+
+Once AirSQL is in Applications, `spctl -a -vvv -t exec /Applications/AirSQL.app` says
+`source=Notarized Developer ID`.
+
+
+---
+
+Source: https://kleash.github.io/airsql/troubleshooting.html
+
+# Troubleshooting
+
+AirSQL says what went wrong in plain words, with the server's own error under **Details**. Here is what to do about
+the common problems.
+
+## A connection fails
+
+| AirSQL says | What to do |
+|---|---|
+| Can't find the server | Check the host name, and that you are on the right network or VPN. |
+| The server refused the connection | Check the port, and that the database server is running. |
+| The server didn't answer in time | Check the host name and the port: a firewall may be dropping the connection. |
+| The server can't be reached from this network | Turn on the VPN, or connect through an SSH host that can reach the server. |
+| The server didn't accept the user name or password | Check both. Through an SSH host, the server sees the SSH host's address, and the account must allow that host. |
+| This user may not log in from this computer's address | An administrator can allow it (the account's host part). |
+| The server only accepts encrypted connections | Turn on TLS for the connection. |
+| The server asked for a login method AirSQL doesn't allow on this connection | A PAM or LDAP account: turn on its plain-text login for the connection, with TLS that proves the server. |
+| The server blocked this computer after too many failed connections | An administrator can unblock it (`FLUSH HOSTS`). |
+
+## AirSQL asks about the server's certificate
+
+See [Trust a server](https://kleash.github.io/airsql/trust-a-server.html). If AirSQL warns that a certificate has changed and nobody told you it would,
+choose **Cancel** and ask the server's administrator.
+
+## "The connection to the server was lost"
+
+AirSQL doesn't reconnect by itself, because a quiet reconnect would lose an open transaction without telling you.
+Reconnect when you are ready. Changes you hadn't committed were rolled back by the server.
+
+## macOS asks about the local network
+
+To reach a server on your local network, choose **Allow** when macOS asks whether AirSQL may find and connect to
+devices on it. If you chose **Don't Allow**: System Settings ▸ Privacy & Security ▸ Local Network, then turn on AirSQL.
+
+## AirSQL doesn't open
+
+It needs macOS 13.1 or later. Downloads from the releases page and Homebrew are notarized and open normally.
+
+## Report a problem
+
+**Help ▸ Report a Problem** opens a form on GitHub with your AirSQL and macOS versions filled in. **Help ▸ Copy
+Diagnostics** copies those versions and the client library's (no names, hosts or paths). The [SQL log](https://kleash.github.io/airsql/sql-log.html)
+shows exactly what AirSQL sent: read it before you share any of it, because it holds your queries.

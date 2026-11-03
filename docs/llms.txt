@@ -1,0 +1,26 @@
+# AirSQL
+
+> AirSQL is a free, open-source Mac app (macOS 13.1 or later, Apple silicon and Intel) for MySQL and MariaDB: connections direct or through SSH tunnels, jump hosts and proxies, a SQL console, a data grid with safe editing, schema tools, client tools (mysql, mysqldump), compare and reconcile, and access for AI agents over MCP at the level the person at the Mac sets for each connection. Nothing is written to a server without the person's Run, Apply or approval, and agents never see saved passwords.
+
+- Install: `brew install --cask kleash/tap/airsql` (or the zip from https://github.com/kleash/airsql/releases).
+
+## AirSQL Help
+- [Home](https://kleash.github.io/airsql/): AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages grow with it.
+- [Install AirSQL](https://kleash.github.io/airsql/install.html): AirSQL needs macOS 13.1 or later, on Apple silicon or Intel. It is free, and it needs no account.
+- [Getting started](https://kleash.github.io/airsql/getting-started.html)
+- [Settings](https://kleash.github.io/airsql/settings.html): Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
+- [Check SQL before it runs](https://kleash.github.io/airsql/sql-preview.html): Some changes show their SQL in a sheet before anything runs: applying edits in a table, changing a table's structure, dropping or renaming, restoring a dump, and sync scripts.
+- [Trust a server](https://kleash.github.io/airsql/trust-a-server.html): When a server's certificate isn't one macOS trusts (it is self-signed, or from your company's own certificate authority), AirSQL shows its SHA-256 fingerprint and asks before connecting.
+- [SQL log](https://kleash.github.io/airsql/sql-log.html): AirSQL writes every statement it sends to a server into one file on your Mac, just before the statement goes out. Use it to see exactly what AirSQL did: what the console ran, what a table edit applied, what the navigator asked the server for.
+- [Read-only queries](https://kleash.github.io/airsql/read-only-queries.html): Where only reading is allowed, such as a query from an AI agent, AirSQL first checks that the statement can only read. The check is strict on purpose: when in doubt it refuses, and it says why in one line.
+- [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): Every command is in the menu bar, with its shortcut next to it, and right-click menus show the same commands. Hold the pointer over a menu item to see what it does. A greyed-out item says why it is off.
+- [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): AirSQL holds the keys to your databases, so it is careful by default: it talks only to the servers you set up, your passwords stay in your Keychain, and nothing changes on a server until you say so.
+- [Troubleshooting](https://kleash.github.io/airsql/troubleshooting.html): AirSQL says what went wrong in plain words, with the server's own error under **Details**. Here is what to do about the common problems.
+
+## For agents
+- [AGENTS.md](https://github.com/kleash/airsql/blob/main/AGENTS.md): AirSQL for AI agents, and for coding agents working on it
+- [All of the help in one file](https://kleash.github.io/airsql/llms-full.txt)
+
+## Optional
+- [Source code](https://github.com/kleash/airsql): Swift, Apache 2.0
+- [Report a problem](https://github.com/kleash/airsql/issues/new)

@@ -50,6 +50,12 @@ jobs:
           [ -n "$xcode" ] || { echo "::error::No Xcode 26 on this runner"; exit 1; }
           echo "XCODE26=$xcode/Contents/Developer" >> "$GITHUB_ENV"
 
+      - name: Agent-readable docs are up to date
+        run: |
+          scripts/llms.sh
+          git diff --exit-code -- docs/llms.txt docs/llms-full.txt \
+            || { echo "::error::docs/llms.txt or llms-full.txt is out of date: run scripts/llms.sh and commit them"; exit 1; }
+
       # Saved right after it is built, so that a run failing later doesn't build it again next time.
       - name: Restore libmariadb
         id: mariadb
