@@ -52,9 +52,10 @@ Whatever that would change waits for you:
 - Anything that would run on a server (Run in a console, Apply, a compare's sync, Restore, Copy, CSV import, Commit)
   first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
   can only decline. Statements that AirSQL proves only read run without asking.
-- Agents can't change Settings, agent access, a connection's colour, read-only switch, server, login or safety
-  settings, nor save files, start an export, save a password or paste from your clipboard. Text an agent types into a
-  console of a Production connection is shown to you first.
+- Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,
+  startup SQL or safety settings, nor save files, start an export, save a password, trust a certificate, paste from
+  your clipboard, quit AirSQL or press a button marked destructive (Don't Save, Disconnect with a transaction open).
+  Text an agent types into a console of a Production connection is shown to you first.
 - On connections whose agent access doesn't include reading, grids and results are hidden from the agent's snapshots
   and screenshots.
 

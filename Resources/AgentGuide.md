@@ -119,12 +119,16 @@ its own:
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
   whether agents are allowed, and the client tools AirSQL runs. Other saved data (names, folders, settings) is refused
   too while Settings ▸ Safety ▸ Ask before agents change anything is on. The Settings window is to look at.
-- **Files and the clipboard:** you can't save a console's file, start an export, save a password, or paste (the
-  clipboard is the person's); use `type` or `set` for text, and run_queries `to_file` for results.
+- **Files, the clipboard, trust:** you can't save a console's file, start an export, save or remember a password,
+  trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or `set` for text, and
+  run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a transaction open,
+  Delete, Clear) is the person's call, and so is Quit. The connection editor opens for you, but its Save keeps nothing
+  that is the person's.
 - **A production console's text:** `type` or `set` into the editor of a console on a connection coloured Production
   shows the person the text first; single keys that would change it are refused.
-- **Data you may not read is hidden:** on connections below Schema + read, grids, query results and a compare's rows
-  and sync script are covered in screenshots ("Hidden from agents") and left out of snapshots (`hidden`).
+- **Data you may not read is hidden:** on connections below Schema + read, grids, query results, the process list and
+  a compare's rows and sync script are covered in screenshots ("Hidden from agents") and left out of snapshots
+  (`hidden`).
 
 The person can turn the asking off for a connection or for all (Settings ▸ Safety); person-only things stay theirs.
 
@@ -138,6 +142,17 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `sidebar.processes`. With nothing open: `firstRun.addConnection`, `firstRun.setUpAgents`; a connection's summary:
   `summary.connect`, `summary.newQuery`, `summary.edit`.
 - **Tabs**: `tabs`, `tabs.new`, each `tab` with `tab.close` (select with `select pane=tabs`), `tab.rename`.
+- **Navigator** (a connection's tree in the sidebar; double-click opens): a database `database.tables`; text views
+  `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
+  processes `processes.list`, `processes.refresh`, `processes.interval`, `processes.killQuery`,
+  `processes.killConnection`; sheets `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
+  `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
+- **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
+  `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
+  the person's `editor.colour`, `editor.host`, `editor.port`, `editor.socket`, `editor.user`, `editor.password`,
+  `editor.askPassword`, `editor.route`, `editor.ssh`, `editor.addJump`, `editor.proxyKind`, `editor.proxyHost`,
+  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.ownSafety`, `editor.agentAccess`,
+  `editor.sampleRows`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
 - **Status bar**: `status.route`, `status.server`, `status.transaction`, `status.activity`, `status.agent`,
   `status.sqlLog`; popovers `popover.route`, `popover.server`, `popover.transaction` (`popover.commit`,
   `popover.rollback`), `popover.agent` (`agents.setUp`, `agents.turnOff`), `activity.popover` (`activity.cancel`,
@@ -169,7 +184,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
-- **Prompts**: `password.field`, `password.remember` (saving is the person's), `trust.fingerprint`, `help`.
+- **Prompts**: `password.field`, `password.remember`, `login.user`, `login.password`, `prompt.answer`,
+  `prompt.remember` (remembering is the person's), `trust.fingerprint` (Trust is the person's), `help`.
 - **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`;
   Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.nullText`; Connections
   `settings.detailsTableThreshold`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,
