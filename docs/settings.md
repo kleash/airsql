@@ -53,7 +53,8 @@ but never change them.
 
 - **Allow AI agents to use AirSQL**: off until you turn it on. Agents never see passwords.
 - **Connections**: what agents may do with each connection: Off (where every connection starts), Schema, Schema + read,
-  or Schema + read + analytics; and **Sample rows**, which lets them see a few rows of each table.
+  or Schema + read + analytics; and **Sample rows**, which lets them see a few rows of each table. Right-click a
+  connection for the same choices; double-click it to open its settings at the Agents tab.
 - **Exports**: the only folder agents save files in.
 - **Add to Claude Code…** and **Add to Gemini CLI…**: show the change to that program's settings that adds AirSQL, and
   make it when you click Add. **Copy** gives the command other MCP clients start.

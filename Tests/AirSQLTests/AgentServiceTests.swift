@@ -217,4 +217,41 @@ extension AppTests {
     }
 
     static func views(in view: NSView) -> [NSView] { [view] + view.subviews.flatMap { views(in: $0) } }
+
+    /// Settings ▸ Agents' list (plan §2.12): a double-click opens the connection's settings at its Agents tab; a right-click
+    /// opens its menu, whose levels and Sample Rows save it as the row's controls do.
+    @Test func settingsAgentListOpensAndOffersEachConnection() async throws {
+        let model = testModel(Self.agentConnections())
+        let (main, _) = appWindow(model)
+        let settings = SettingsWindowController(model: model)
+        keptWindows.append(settings)
+        let window = try #require(settings.window)
+        window.setFrameOrigin(NSPoint(x: -21000, y: -21000))
+        window.orderFront(nil)
+        settings.show(.agents)
+        let pane = try #require(settings.tabs.tabViewItems.lazy.compactMap { $0.viewController as? AgentsPane }.first)
+        pane.main = { main }
+        let table = try #require(find(AgentsPane.AccessTableView.self, in: pane.view))
+        let reports = model.data.connections[2]
+        table.selectRowIndexes([1], byExtendingSelection: false)  // by name: Production, Reports, Staging
+        let menu = try #require(table.owner?.menu(for: table))
+        #expect(menu.items.map(\.title) == ["Edit…", "", "Off", "Schema", "Schema + read", "Schema + read + analytics", "",
+                                            "Sample Rows"])
+        #expect(menu.items[4].state == .on && menu.items.allSatisfy { $0.isSeparatorItem || $0.toolTip?.isEmpty == false })
+        let analytics = menu.items[5]
+        NSApp.sendAction(try #require(analytics.action), to: analytics.target, from: analytics)
+        #expect(model.connection(reports.id)?.agentAccess == .schemaReadAnalytics)
+        let samples = try #require(table.owner?.menu(for: table)?.items.last)
+        NSApp.sendAction(try #require(samples.action), to: samples.target, from: samples)
+        #expect(model.connection(reports.id)?.agentSampleRows == true)
+
+        table.owner?.editClicked(table)
+        #expect(await eventually(timeout: 5) { window.attachedSheet != nil })
+        let editor = try #require(window.attachedSheet?.windowController as? ConnectionEditor)
+        #expect(editor.tab == .agents && editor.draft.id == reports.id)
+        let sheet = try #require(editor.window?.contentView)
+        let cancel = try #require(find(NSButton.self, id: "editor.cancel", in: sheet))
+        NSApp.sendAction(try #require(cancel.action), to: cancel.target, from: cancel)
+        #expect(await eventually(timeout: 5) { window.attachedSheet == nil })
+    }
 }

@@ -250,6 +250,21 @@ extension AppTests {
         #expect(colour("FROM", in: "SELECT 'C:\\' FROM t'", noBackslashEscapes: false) == .sqlString)
     }
 
+    /// A SHA-256 fingerprint shows as two lines of 16 pairs, broken by the field's width alone: the text copied is the
+    /// fingerprint as it is.
+    @Test func fingerprintsShowAsTwoLinesOfSixteenPairs() {
+        let fingerprint = ConnectionsScreens.certificateFingerprint
+        let field = fingerprintField(fingerprint)
+        #expect(field.stringValue == fingerprint && field.isSelectable && field.lineBreakMode == .byCharWrapping)
+        let attributes: [NSAttributedString.Key: Any] = [.font: field.font as Any]
+        let width = field.preferredMaxLayoutWidth - 4
+        let line = String(fingerprint.prefix(48))  // "9F:" … 16 pairs and their colons
+        #expect((line as NSString).size(withAttributes: attributes).width <= width)
+        #expect((String(fingerprint.prefix(49)) as NSString).size(withAttributes: attributes).width > width)
+        let lineHeight = NSLayoutManager().defaultLineHeight(for: field.font ?? .systemFont(ofSize: 10))
+        #expect(abs(field.fittingSize.height - 2 * lineHeight) < lineHeight / 2, "\(field.fittingSize)")
+    }
+
     @Test func trustAndPasswordSheetsAnswer() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)

@@ -74,6 +74,27 @@ extension AppTests {
         #expect(model.connection(Fixtures.staging.id)?.clientPath == "/nonexistent/bin/mysql")
     }
 
+    /// The editor's tallest tab (Options with the connection's own safety checks) scrolls within what an 800 pt high
+    /// screen leaves, so the sheet fits there; on a taller screen it shows all of it.
+    @Test func editorFitsAnEightHundredPointScreen() async throws {
+        var connection = Fixtures.routed(long: true)
+        connection.safety = connection.safety(defaults: SafetySettings())
+        let model = testModel([connection])
+        let (main, harness) = appWindow(model)
+        let editor = ConnectionEditor.show(connection, isNew: false, model: model, on: try #require(main.window)) { _, _ in }
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        editor.show(.options)
+        let window = try #require(editor.window)
+        let tab = try #require(editor.tabHeight).constant
+        // 775 pt under the menu bar, the main window's 52 pt title bar and toolbar above the sheet.
+        #expect(window.frame.height - tab + ConnectionEditor.tabLimit(screen: 775) <= 775 - 52, "\(window.frame.height) \(tab)")
+        let shown = (NSScreen.main?.visibleFrame.height).map(ConnectionEditor.tabLimit) ?? 0
+        let sheet = try #require(window.contentView)
+        #expect(tab <= shown && find(NSTextField.self, id: "editor.safety.openTransaction", in: sheet) != nil)
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
     @Test func editorSaysWhatIsMissingAndNewConnectionsGoInTheSelectedFolder() async throws {
         let folder = ConnectionFolder(name: "Clients")
         var local = Fixtures.local

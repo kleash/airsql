@@ -144,14 +144,44 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         case .options: content = optionsTab()
         case .agents: content = agentsTab()
         }
-        holder.addSubview(content)
-        content.pin(to: holder)
+        // In a scroll view, for a tab taller than a small screen leaves room for (the Options tab with its own checks).
+        let document = FlippedView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(content)
+        content.pin(to: document)
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = document
+        holder.addSubview(scroll)
+        scroll.pin(to: holder)
+        let height = scroll.heightAnchor.constraint(equalToConstant: 0)
+        NSLayoutConstraint.activate([
+            document.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            document.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            document.topAnchor.constraint(equalTo: scroll.contentView.topAnchor), height,
+        ])
+        tabContent = content
+        tabHeight = height
         fitWindow()
     }
+
+    /// What the tab shows, and its height: all of it, or `tabLimit` of the screen.
+    private weak var tabContent: NSView?
+    private(set) var tabHeight: NSLayoutConstraint?
+
+    /// The most of a screen `height` points high (under the menu bar) a tab may take: its window's toolbar and the
+    /// sheet's own rows take about 280 pt, so the sheet fits an 800 pt high screen.
+    static func tabLimit(screen height: CGFloat) -> CGFloat { max(300, height - 280) }
 
     /// The sheet as tall as what the tab shows now.
     func fitWindow() {
         guard let window, let root = window.contentView else { return }
+        if let tabContent, let tabHeight {
+            let screen = (window.sheetParent?.screen ?? NSScreen.main)?.visibleFrame.height ?? 775
+            tabHeight.constant = min(tabContent.fittingSize.height, Self.tabLimit(screen: screen))
+        }
         root.layoutSubtreeIfNeeded()
         let size = root.fittingSize
         var frame = window.frame

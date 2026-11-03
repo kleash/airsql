@@ -1,5 +1,6 @@
 import AirSQLCore
 import AppKit
+import Combine
 
 /// Settings ▸ Agents: whether AI agents may use AirSQL, each connection's access, the folder their exports go to, and
 /// adding AirSQL to Claude Code or Gemini CLI (plan §2.8). Only the person changes these: agents can't.
@@ -12,6 +13,9 @@ final class AgentsPane: SettingsPaneController {
     static var supportDir: String? { Env.value("SUPPORT_DIR").flatMap { $0.isEmpty ? nil : $0 } }
     /// Where Claude Code's and Gemini CLI's settings are; tests use a scratch folder.
     var home = FileManager.default.homeDirectoryForCurrentUser
+    /// The main window, whose connection editor a double-click in the access list opens; tests give their own.
+    var main: () -> MainWindowController? = { (NSApp.delegate as? AppDelegate)?.main }
+    private var observers: [AnyCancellable] = []
 
     override func build() {
         form.row("", [toggle("Allow AI agents to use AirSQL", id: "settings.agentsAllowed",
@@ -57,14 +61,25 @@ final class AgentsPane: SettingsPaneController {
     // MARK: Access per connection
 
     /// The connections, by name, each with its access level and sample rows switch: a table, so a thousand stay quick.
+    /// A double-click opens the connection's settings at its Agents tab; a right-click offers that and the levels.
     private func accessList() -> NSView {
         guard !model.data.connections.isEmpty else {
             return caption("No connections yet: add one, then choose here what agents may do with it.")
         }
-        let table = NSTableView()
+        let table = AccessTableView()
         table.dataSource = accessTable
         table.delegate = accessTable
+        table.target = accessTable
+        table.doubleAction = #selector(AccessTable.editClicked(_:))
+        table.owner = accessTable
         accessTable.model = model
+        accessTable.edit = { [weak self, weak table] connection in
+            self?.main()?.edit(connection, isNew: false, on: table?.window, tab: .agents)
+        }
+        // A level changed elsewhere (the connection's Agents tab) shows here too.
+        observers.append(model.$data.map(\.connections).removeDuplicates().dropFirst().sink { [weak table] _ in
+            DispatchQueue.main.async { table?.reloadData() }
+        })
         for (id, title, width) in [("name", "Connection", 150.0), ("access", "Access", 140.0), ("samples", "Sample rows", 96.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
@@ -101,7 +116,56 @@ final class AgentsPane: SettingsPaneController {
             }
         }
 
+        /// Opens a connection's settings at its Agents tab.
+        var edit: ((SavedConnection) -> Void)?
+
         func numberOfRows(in tableView: NSTableView) -> Int { connections.count }
+
+        /// A double-click, or Edit… in a row's menu.
+        @objc func editClicked(_ sender: Any?) {
+            guard let table = sender as? NSTableView ?? menuTable else { return }
+            let row = table.clickedRow >= 0 ? table.clickedRow : table.selectedRow
+            if connections.indices.contains(row) { edit?(connections[row]) }
+        }
+
+        /// A row's menu: its settings, then its access level and sample rows, as its controls set them.
+        func menu(for table: NSTableView) -> NSMenu? {
+            guard connections.indices.contains(table.selectedRow) else { return nil }
+            let connection = connections[table.selectedRow]
+            let menu = NSMenu(title: "Agent Access")
+            let edit = menu.addItem(withTitle: Commands.editConnection.title, action: #selector(editClicked(_:)), keyEquivalent: "")
+            edit.toolTip = "Open \(connection.displayName)'s settings at its Agents tab"
+            menu.addItem(.separator())
+            for (index, level) in AgentAccess.allCases.enumerated() {
+                let item = menu.addItem(withTitle: level.title, action: #selector(chose(_:)), keyEquivalent: "")
+                item.tag = index
+                item.state = connection.agentAccess == level ? .on : .off
+                item.toolTip = "Let agents have \(level.title) access to \(connection.displayName)"
+            }
+            menu.addItem(.separator())
+            let samples = menu.addItem(withTitle: "Sample Rows", action: connection.agentAccess == .off ? nil : #selector(chose(_:)),
+                                       keyEquivalent: "")
+            samples.tag = -1
+            samples.state = connection.agentSampleRows ? .on : .off
+            samples.toolTip = connection.agentAccess == .off ? "Choose an access other than Off first: agents see nothing of "
+                + connection.displayName : "Let describe show agents a few rows of \(connection.displayName)'s tables"
+            menu.items.forEach { if $0.action != nil { $0.target = self } }
+            menu.autoenablesItems = false
+            samples.isEnabled = connection.agentAccess != .off
+            self.menuTable = table
+            return menu
+        }
+
+        private weak var menuTable: NSTableView?
+
+        /// A level or Sample Rows chosen from a row's menu: saves that connection.
+        @objc func chose(_ item: NSMenuItem) {
+            guard let model, let table = menuTable, connections.indices.contains(table.selectedRow) else { return }
+            var saved = connections[table.selectedRow]
+            if item.tag < 0 { saved.agentSampleRows.toggle() } else { saved.agentAccess = AgentAccess.allCases[item.tag] }
+            model.save(saved)
+            table.reloadData(forRowIndexes: [table.selectedRow], columnIndexes: [1, 2])
+        }
 
         func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
             let connection = connections[row]
@@ -156,6 +220,13 @@ final class AgentsPane: SettingsPaneController {
             (sender.enclosingScrollView?.documentView as? NSTableView)?
                 .reloadData(forRowIndexes: [sender.tag], columnIndexes: [2])
         }
+    }
+
+    /// The access list: a right-click selects the row under the pointer first and opens its menu.
+    final class AccessTableView: NSTableView {
+        weak var owner: AccessTable?
+
+        override func menu(for event: NSEvent) -> NSMenu? { selectsRow(for: event) ? owner?.menu(for: self) : nil }
     }
 
     // MARK: Setup

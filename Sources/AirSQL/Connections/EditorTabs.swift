@@ -162,10 +162,7 @@ extension ConnectionEditor {
                                      tip: "Choose your client certificate (PEM), for a server that asks for one"))
         form.row("Key", file(\.tls.keyFile, placeholder: "none", id: "editor.keyFile",
                              tip: "Choose the client certificate's key (PEM)"))
-        let pinned = label(draft.tls.pinnedFingerprint ?? "None", font: .monospacedSystemFont(ofSize: 10.5, weight: .regular),
-                           color: draft.tls.pinnedFingerprint == nil ? .secondaryLabelColor : .labelColor, wraps: true)
-        pinned.preferredMaxLayoutWidth = 380
-        pinned.isSelectable = true
+        let pinned = draft.tls.pinnedFingerprint.map(fingerprintField) ?? label("None", color: .secondaryLabelColor)
         pinned.setAccessibilityIdentifier("editor.pinned")
         var views: [NSView] = [pinned]
         if draft.tls.pinnedFingerprint != nil {
