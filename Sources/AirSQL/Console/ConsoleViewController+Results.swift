@@ -29,7 +29,7 @@ extension ConsoleViewController {
         resultNumber += 1
         let tab = ResultTab(title: title ?? "Result \(resultNumber)", content: .rows(store), summary: summary)
         let settings = model.data.settings
-        tab.makeView = { ResultTableView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize)) }
+        tab.makeView = { ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize)) }
         resultTabs.append(tab)
         if selectedResult == nil || selectedResult === messagesTab { selectedResult = tab }
     }

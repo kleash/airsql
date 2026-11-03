@@ -138,7 +138,7 @@ final class PlanView: NSView {
     private let tree: NSView
 
     init(table: ResultStore?, tree: String, nullText: String, fontSize: CGFloat) {
-        self.table = table.map { ResultTableView(store: $0, nullText: nullText, fontSize: fontSize) }
+        self.table = table.map { ResultGridView(store: $0, nullText: nullText, fontSize: fontSize) }
             ?? label("The server gave no plan table.", color: .secondaryLabelColor)
         let scroll = NSTextView.scrollableTextView()
         let text = scroll.documentView as! NSTextView

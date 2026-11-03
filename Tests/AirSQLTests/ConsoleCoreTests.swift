@@ -1,3 +1,4 @@
+import CMariaDB
 import Foundation
 import Testing
 @testable import AirSQLCore
@@ -163,5 +164,24 @@ struct ExplainPlanTests {
             """)
         #expect(ExplainPlan.tree(fromJSON: "not json") == "not json")
         #expect(ExplainPlan.treeSQL("SELECT 1", server: nil).json)
+    }
+}
+
+struct ResultSetSourceTests {
+    @Test func columnsKindsNullsAndLongValues() {
+        let store = ResultStore(columns: [
+            ResultStore.Column(name: "id", type: MYSQL_TYPE_LONG, flags: UInt32(PRI_KEY_FLAG)),
+            ResultStore.Column(name: "note", table: "t", type: MYSQL_TYPE_BLOB, charset: 45),
+            ResultStore.Column(name: "at", type: MYSQL_TYPE_DATETIME), ResultStore.Column(name: "doc", type: MYSQL_TYPE_JSON),
+            ResultStore.Column(name: "raw", type: MYSQL_TYPE_BLOB, charset: 63),
+        ])
+        let long = String(repeating: "x", count: 5_000)
+        store.append([Array("7".utf8), Array(long.utf8), nil, Array("{}".utf8), [0x01]])
+        let source = ResultSetSource(store)
+        #expect(source.columns.map(\.kind) == [.number, .text, .date, .json, .binary])
+        #expect(source.columns[0].isKey && source.columns[1].type == "from t")
+        #expect(source.rowCount == 1 && source.cell(0, 0) == .text("7") && source.cell(0, 2) == .null)
+        #expect(source.cell(0, 1).text.count == ResultSetSource.shownLimit + 1 && source.cell(0, 1).text.hasSuffix("…"))
+        #expect(source.value(0, 1) == long && source.value(0, 2) == nil)
     }
 }
