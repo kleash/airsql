@@ -7,6 +7,14 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# One lab serves every checkout of the repository, and only the main checkout (git's first worktree) starts it: up.sh in
+# another worktree would make a new key and CA there and point the lab's containers at that worktree's files.
+if common=$(git rev-parse --git-common-dir 2>/dev/null) && [[ ! $common/.. -ef .. ]]; then
+    echo "Only the main checkout starts the lab: $(cd "$common/.." && pwd)/testenv/up.sh" >&2
+    echo "Here, AIRSQL_LAB=1 ./test.sh uses it while all of it runs, with the main checkout's key and CA (testenv/AGENT.md)." >&2
+    exit 1
+fi
+
 # Docker Desktop's own command line tool, else the one on PATH.
 docker=/Applications/Docker.app/Contents/Resources/bin/docker
 [[ -x $docker ]] || docker=docker

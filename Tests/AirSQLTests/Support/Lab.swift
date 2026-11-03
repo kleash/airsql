@@ -3,9 +3,9 @@
 import Foundation
 @testable import AirSQLCore
 
-/// The lab as testenv/docker-compose.yml and testenv/seed set it up; test.sh starts it (testenv/up.sh) when
-/// AIRSQL_LAB=1. Everything published listens on 127.0.0.1. Lab tests only read the shared databases (`fixture` and
-/// `many_tables`): they write in databases of their own, named lane_<x>_*.
+/// The lab as testenv/docker-compose.yml and testenv/seed set it up; with AIRSQL_LAB=1, test.sh in the main checkout
+/// starts it (testenv/up.sh) unless it runs. Everything published listens on 127.0.0.1. Lab tests only read the shared
+/// databases (`fixture` and `many_tables`): they write in databases of their own, named lane_<x>_*.
 enum Lab {
     /// AIRSQL_LAB=1: the lab tests run.
     static let enabled = ProcessInfo.processInfo.environment["AIRSQL_LAB"] == "1"
@@ -109,9 +109,18 @@ enum Lab {
     static let fixture = "fixture"
     static let bigRows = 1_000_000
 
-    /// testenv/, where up.sh keeps the lab key and the certificates.
-    static let testenv = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("testenv").path
+    /// The main checkout's testenv/, where up.sh keeps the lab key and the certificates: one lab serves every checkout,
+    /// and a worktree's .git is a file naming its folder in the main checkout's .git/worktrees.
+    static let testenv: String = {
+        var checkout = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let git = (try? String(contentsOf: checkout.appendingPathComponent(".git"), encoding: .utf8)) ?? ""
+        if git.hasPrefix("gitdir: ") {  // <main checkout>/.git/worktrees/<name>
+            checkout = URL(fileURLWithPath: git.dropFirst(8).trimmingCharacters(in: .whitespacesAndNewlines), relativeTo: checkout)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        }
+        return checkout.appendingPathComponent("testenv").path
+    }()
     static var key: String { testenv + "/.keys/id_lab" }
     static var caFile: String { testenv + "/.certs/ca.pem" }
     static var clientCertificate: String { testenv + "/.certs/client.pem" }

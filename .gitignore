@@ -4,7 +4,7 @@ vendor/
 .swiftpm/
 *.xcodeproj/
 .DS_Store
-testenv/.keys/
-testenv/.certs/
+testenv/.keys
+testenv/.certs
 .claude/settings.json
 .claude/settings.local.json
