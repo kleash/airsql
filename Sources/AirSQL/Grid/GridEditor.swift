@@ -16,9 +16,9 @@ final class GridEditor: NSTextField, NSTextFieldDelegate {
         super.init(frame: .zero)
         stringValue = text
         self.font = font
+        // Clear, so the cell's focus colour and ring show around the text, where the cell's own text was.
         isBordered = false
-        drawsBackground = true
-        backgroundColor = .content
+        drawsBackground = false
         textColor = .labelColor
         focusRingType = .exterior
         usesSingleLineMode = false

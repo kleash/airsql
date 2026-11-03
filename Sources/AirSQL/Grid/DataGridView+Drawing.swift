@@ -63,6 +63,7 @@ extension DataGridView {
                     NSRect(x: rect.minX, y: rect.minY, width: 3, height: rect.height).fill()
                 }
 
+                if editor?.position == position { continue }  // the editor shows the text
                 let cell = source.cell(row, sourceColumn)
                 let available = rect.width - 2 * GridStyles.padding
                 if cell == .loading {
