@@ -80,6 +80,7 @@ public enum AgentReadOnly {
                 return result
             } catch var error as AirSQLError {
                 if written { _ = try? await session.query("ROLLBACK") }
+                if Task.isCancelled { throw CancellationError() }  // the person's Cancel stopped it
                 // MySQL's max_execution_time (3024), MariaDB's max_statement_time (1969), or the watchdog's KILL QUERY.
                 if [3024, 1969, 1317].contains(error.code) || error.kind == .cancelled {
                     error.message = "Stopped at the agent timeout (\(timeout) s)."

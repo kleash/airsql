@@ -94,7 +94,12 @@ extension AgentTarget {
                     throw Full()
                 }
             })
-        } catch is Full {}
+        } catch is Full {
+        } catch {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: url)  // no half-written files
+            throw error
+        }
         if state.columns == nil { try start([]) }
         if !csv { try handle.write(contentsOf: Data("\n]}\n".utf8)) }
         let size = (try? handle.offset()) ?? 0

@@ -78,7 +78,9 @@ final class AgentService {
 
     func handle(_ tool: String, _ arguments: [String: Any], client: String,
                 progress: @escaping AgentProgress = { _, _, _ in }) async -> [String: Any] {
-        guard model.data.settings.agentsAllowed else { return AgentBridge.failure(AgentBridge.offMessage) }
+        guard model.data.settings.agentsAllowed else {  // a call that came in as agents were turned off
+            return tool.hasPrefix("resources/") ? ["error": AgentBridge.offMessage] : AgentBridge.failure(AgentBridge.offMessage)
+        }
         if tool == "resources/list" { return ["resources": resources()] }
         let index = record(client, summary(tool, arguments))
         do {
