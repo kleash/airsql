@@ -19,13 +19,20 @@ func rim(x: CGFloat, y: CGFloat, rx: CGFloat, ry: CGFloat) -> CGPath {
     return path
 }
 
+/// A shadow below what is drawn next. CG draws shadows in pixels whatever the scale: scaled with the icon, a small size's
+/// stays inside its margin instead of greying the whole square.
+func shadow(_ cg: CGContext, offset: CGFloat, blur: CGFloat, color: CGColor) {
+    let scale = cg.ctm.a
+    cg.setShadow(offset: CGSize(width: 0, height: -offset * scale), blur: blur * scale, color: color)
+}
+
 /// Draws the icon on a 1024×1024 canvas (y up).
 func draw(_ cg: CGContext) {
     // Background: Apple's macOS icon grid, an 824-point rounded square with a soft drop shadow, as AirSCP's. macOS 26
     // shows it in its own rounder shape, which this square covers, so it isn't put on a grey tile.
     let body = CGPath(roundedRect: CGRect(x: 100, y: 100, width: 824, height: 824), cornerWidth: 185, cornerHeight: 185, transform: nil)
     cg.saveGState()
-    cg.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: color(0, 0, 0, 0.35))
+    shadow(cg, offset: 10, blur: 24, color: color(0, 0, 0, 0.35))
     cg.addPath(body)
     cg.setFillColor(color(23, 58, 122))
     cg.fillPath()
@@ -41,7 +48,7 @@ func draw(_ cg: CGContext) {
     // A dark window with a title bar, as AirSCP's.
     let window = color(18, 28, 36)
     cg.saveGState()
-    cg.setShadow(offset: CGSize(width: 0, height: -14), blur: 30, color: color(0, 14, 40, 0.45))
+    shadow(cg, offset: 14, blur: 30, color: color(0, 14, 40, 0.45))
     cg.addPath(CGPath(roundedRect: CGRect(x: 196, y: 250, width: 632, height: 520), cornerWidth: 56, cornerHeight: 56, transform: nil))
     cg.setFillColor(window)
     cg.fillPath()

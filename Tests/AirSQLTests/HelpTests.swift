@@ -183,7 +183,8 @@ extension AppTests {
 struct AboutTests {
     @Test func aboutGivesTheVersionsTheLicenceAndWhereToReadMore() throws {
         #expect(AppDelegate().responds(to: Commands.about.action))
-        let credits = HelpPage.credits
+        let credits = try #require(HelpPage.about[.credits] as? NSAttributedString)
+        #expect(HelpPage.about[.version] as? String == "")
         #expect(credits.string == "MariaDB Connector/C \(MariaDB.clientVersion)\nLicensed under the Apache License 2.0\nWebsite · Licences")
         var links: [String: URL] = [:]
         credits.enumerateAttribute(.link, in: NSRange(location: 0, length: credits.length)) { value, range, _ in

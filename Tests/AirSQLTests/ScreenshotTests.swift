@@ -201,6 +201,32 @@ extension AppTests {
             }
         }
 
+        /// About AirSQL as the app shows it: the tests aren't AirSQL's app, so the panel is given the name, icon, version
+        /// and copyright that the app's Info.plist, VERSION and icon give it.
+        @Test func about() throws {
+            let root = Self.folder.deletingLastPathComponent().deletingLastPathComponent()
+            let info = try #require(NSDictionary(contentsOf: root.appendingPathComponent("Resources/AirSQL-Info.plist")))
+            let version = try String(contentsOf: root.appendingPathComponent("VERSION"), encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let icon = try #require(NSImage(contentsOf: root.appendingPathComponent("Resources/AppIcon.icns")))
+            let (_, harness) = appWindow(testModel())
+            func views(_ view: NSView?) -> [NSView] { view.map { [$0] + $0.subviews.flatMap(views) } ?? [] }
+            let credits = try #require(HelpPage.about[.credits] as? NSAttributedString).string
+            for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+                NSApp.orderFrontStandardAboutPanel(options: HelpPage.about.merging(
+                    [.applicationName: "AirSQL", .applicationIcon: icon, .applicationVersion: version,
+                     .init(rawValue: "Copyright"): info["NSHumanReadableCopyright"] ?? ""]) { $1 })
+                let panel = try #require(NSApp.windows.first { window in
+                    window.isVisible && views(window.contentView).contains { ($0 as? NSTextView)?.string == credits }
+                })
+                panel.appearance = NSAppearance(named: appearance)
+                panel.displayIfNeeded()
+                let image = try #require(harness.composite(panel, scale: 2))
+                try #require(AgentServer.png(image)).write(to: Self.folder.appendingPathComponent("about-\(suffix).png"))
+                panel.orderOut(nil)
+            }
+        }
+
         /// The editors (lane L5b) on the recorded fixture, for docs/dev/mockups.html screen 10.
         @Test func editors() async throws {
             for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
