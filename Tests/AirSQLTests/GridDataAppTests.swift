@@ -419,7 +419,7 @@ extension AppTests {
             let viewer = try #require(resultViewer(main))
             let result = try #require(viewer.superview as? ResultGridView)
             let window = try #require(main.window)
-            try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the console's editor took the focus
+            #expect(await consoleTookTheFocus(main))
             window.makeFirstResponder(viewer.grid)
             // The bar shows only while a filter or a search is on; the results bar's ? opens the Data Grid page.
             #expect(result.filterBar.isHidden && result.filterBar.scope.text == "Local · every row")
@@ -470,7 +470,7 @@ extension AppTests {
             let (main, harness) = appWindow(testModel(Fixtures.shop))
             let viewer = try #require(resultViewer(main))
             let result = try #require(viewer.superview as? ResultGridView)
-            try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the console's editor took the focus
+            #expect(await consoleTookTheFocus(main))
             main.window?.makeFirstResponder(viewer.grid)
             viewer.grid.selection.select(GridPosition(row: 1, column: 1))
             viewer.showRecordView(nil)
@@ -493,6 +493,7 @@ extension AppTests {
             #expect(tab.grid.editor != nil && tab.grid.editor?.position == GridPosition(row: 1, column: 2))
             tab.grid.endEditing(commit: false)
             let viewer = try #require(resultViewer(main))
+            #expect(await consoleTookTheFocus(main))  // else it could take it back from the grid, and F2 would rename the tab
             window.makeFirstResponder(viewer.grid)
             viewer.grid.selection.select(GridPosition(row: 0, column: 1))
             #expect(await call(harness, "key", ["combo": "f2"]).error == nil)

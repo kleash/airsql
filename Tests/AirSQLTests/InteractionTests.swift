@@ -77,6 +77,14 @@ func resultViewer(_ main: MainWindowController) -> GridViewer? {
 @MainActor
 func resultGrid(_ main: MainWindowController) -> DataGridView { resultViewer(main)!.grid }
 
+/// Whether the console shown has put the keyboard in its editor, as it does once it has appeared (a turn of the run
+/// loop after it opens): a test's own focus set after that stays.
+@MainActor
+func consoleTookTheFocus(_ main: MainWindowController) async -> Bool {
+    guard let console = main.selectedTab?.content as? ConsoleViewController else { return false }
+    return await eventually(timeout: 10) { main.window?.firstResponder === console.editor }
+}
+
 @MainActor
 func statusItem(_ item: StatusItemView) -> (Double, Double)? {
     item.isHidden ? nil : windowPoint(item.bounds, in: item)
