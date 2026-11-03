@@ -6,6 +6,11 @@ import os
 
 let log = Logger(subsystem: "com.kleash.airsql", category: "app")
 
+extension Notification.Name {
+    /// Settings ▸ Grid's NULL text or text size changed (the old settings are the user info's "old"): open grids follow.
+    static let gridSettingsDidChange = Notification.Name("AirSQLGridSettingsDidChange")
+}
+
 /// What the windows share: the saved connections, folders and settings (airsql.json, written on every change, off the
 /// main thread), where each connection is (`states`), the work running now (`activity`) and the agents' chip.
 @MainActor
@@ -22,6 +27,9 @@ final class AppModel: ObservableObject {
                 return
             }
             store(data)
+            if data.settings.nullText != oldValue.settings.nullText || data.settings.gridFontSize != oldValue.settings.gridFontSize {
+                NotificationCenter.default.post(name: .gridSettingsDidChange, object: self, userInfo: ["old": oldValue.settings])
+            }
         }
     }
     private var reverting = false
