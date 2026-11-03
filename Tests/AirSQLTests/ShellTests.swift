@@ -189,6 +189,23 @@ extension AppTests {
         #expect(result?.approved == false)
     }
 
+    @Test func sqlPreviewColoursTheSQL() {
+        let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        func colour(_ part: String, in sql: String, noBackslashEscapes: Bool = false) -> NSColor? {
+            let text = SQLPreviewSheet.coloured(sql, font: font, noBackslashEscapes: noBackslashEscapes)
+            return text.attribute(.foregroundColor, at: (sql as NSString).range(of: part).location, effectiveRange: nil) as? NSColor
+        }
+        let sql = "UPDATE `t` SET a = CONCAT(b, 'x\\'y'), n = 1.5 -- why\nWHERE id IN (2) /*!50000 AND c */"
+        #expect(colour("UPDATE", in: sql) == .sqlKeyword && colour("`t`", in: sql) == .sqlIdentifier)
+        #expect(colour("CONCAT", in: sql) == .sqlFunction && colour("b,", in: sql) == .sqlIdentifier)
+        #expect(colour("'x", in: sql) == .sqlString && colour("1.5", in: sql) == .sqlNumber && colour("=", in: sql) == .labelColor)
+        #expect(colour("-- why", in: sql) == .sqlComment && colour("/*!50000", in: sql) == .sqlComment)
+        #expect(colour("AND", in: sql) == .sqlKeyword)
+        // The string ends where the session's server will end it.
+        #expect(colour("FROM", in: "SELECT 'C:\\' FROM t", noBackslashEscapes: true) == .sqlKeyword)
+        #expect(colour("FROM", in: "SELECT 'C:\\' FROM t'", noBackslashEscapes: false) == .sqlString)
+    }
+
     @Test func trustAndPasswordSheetsAnswer() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)
