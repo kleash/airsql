@@ -75,6 +75,22 @@ final class ReconDataCompare {
             tooMany.columns = data.columns
             return tooMany
         }
+        // In key order (numbers as numbers), whichever chunk each row turned up in.
+        let width = sourceSQL.key.count, kinds = sourceSQL.key.map(\.kind)
+        func before(_ a: [[UInt8]?], _ b: [[UInt8]?]) -> Bool {
+            for index in 0..<width where a[index] != b[index] {
+                let x = a[index] ?? [], y = b[index] ?? []
+                if [.integer, .decimal, .float].contains(kinds[index]),
+                   let p = Double(String(decoding: x, as: UTF8.self)), let q = Double(String(decoding: y, as: UTF8.self)), p != q {
+                    return p < q
+                }
+                return x.lexicographicallyPrecedes(y)
+            }
+            return false
+        }
+        data.missing.sort { before($0.values, $1.values) }
+        data.extra.sort { before($0.values, $1.values) }
+        data.changed.sort { before($0.source.values, $1.source.values) }
         data.outcome = data.differenceCount == 0 ? .same : .different
         return data
     }
