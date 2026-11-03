@@ -42,6 +42,10 @@ extension ConsoleViewController {
             shared.changes = session.inTransaction ? shared.changes + (writes ? changed : 0) : 0
             if let database { shared.database = database }
         }
+        // The navigator's bold database and the toolbar's follow a USE.
+        if let database, let open = model.openConnection(connectionID), open.currentDatabase != database {
+            open.currentDatabase = database
+        }
         if !statement.range.isEmpty, let id = connectionID {
             let rows = outcome.results.compactMap(\.rows).first?.rowCount
             QueryHistory.shared.add(HistoryEntry(sql: statement.sql, connection: id, database: shared.database,

@@ -140,6 +140,14 @@ extension ConsoleViewController {
     }
 
     private func perform(_ run: ConsoleRun, on session: DBConnection, connection id: UUID) async {
+        // The database made current in the navigator or the toolbar since the session's last USE: used first, so the
+        // statements run where the window says (and a run under way is never switched midway). If it fails, nothing runs.
+        if run.statements.contains(where: { !$0.range.isEmpty }), let wanted = model.openConnection(id)?.currentDatabase,
+           wanted != shared.database ?? session.options.database {
+            let use = await ConsoleRunner.run(SQLStatement(sql: "USE " + SQLQuote.identifier(wanted)), in: run.text, on: session)
+            show(use, title: nil, run: run, session: session)
+            guard use.error == nil else { return }
+        }
         switch run.kind {
         case .explain: return await explain(run, on: session)
         case .profile:  // profiling's switch is AirSQL's, not an agent's: the agents' gate doesn't ask about it

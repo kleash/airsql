@@ -214,6 +214,14 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         for object in selectedObjects { main.openEditor(object, of: open) }
     }
 
+    @objc func generateSelect(_ sender: Any?) { generate(.select) }
+    @objc func generateInsert(_ sender: Any?) { generate(.insert) }
+    @objc func generateUpdate(_ sender: Any?) { generate(.update) }
+
+    private func generate(_ kind: NavigatorActions.Generated) {
+        NavigatorActions.generate(kind, selectedObjects, on: open, main: view.window?.windowController as? MainWindowController)
+    }
+
     @objc func copyName(_ sender: Any?) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(selectedObjects.map { SQLQuote.identifier($0.name) }.joined(separator: ", "), forType: .string)

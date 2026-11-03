@@ -30,6 +30,31 @@ extension AppTests {
             #expect(console.database == "shop")
         }
 
+        /// The toolbar's buttons and Tx pop-up ask the console, as its menu items do: off, saying why, until it can act.
+        @Test func theToolbarAsksTheConsole() async throws {
+            let (main, _, console) = try await Self.console()
+            let toolbar = try #require(main.window?.toolbar)
+            func button(_ id: NSToolbarItem.Identifier) -> NSControl? {
+                toolbar.items.first { $0.itemIdentifier == id }?.view as? NSControl
+            }
+            let tx = main.toolbarController.transactionPopup
+            toolbar.validateVisibleItems()
+            #expect(button(.run)?.isEnabled == false && button(.run)?.toolTip?.hasPrefix("Connect first: double-click") == true)
+            #expect(button(.commit)?.isEnabled == false && button(.commit)?.toolTip == "No transaction is open in this tab")
+            #expect(button(.cancel)?.isEnabled == false && button(.cancel)?.toolTip == "Nothing is running in this tab")
+            #expect(!tx.isEnabled && tx.toolTip?.hasPrefix("Connect first: double-click") == true)
+            #expect(tx.itemTitles == ["Tx: Auto-commit", "Tx: Manual", "", "Isolation Level", "Read Uncommitted", "Read Committed",
+                                      "Repeatable Read", "Serializable"])
+            // Connected, with a statement typed: Run can run and says what it does; there is still nothing to commit.
+            let connection = Connection(options: ConnectOptions(host: "127.0.0.1", port: 1, user: "nobody"))
+            ConsoleViewController.openConnection = { $0 == Fixtures.production.id ? connection : nil }
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            console.editor.setText("SELECT 1")
+            toolbar.validateVisibleItems()
+            #expect(button(.run)?.isEnabled == true && button(.run)?.toolTip == Commands.runStatement.tip + " (⌘↩)")
+            #expect(button(.commit)?.isEnabled == false && tx.isEnabled && tx.title == "Tx: Auto-commit")
+        }
+
         @Test func newQueryStartsConnectingADisconnectedConnection() async throws {
             let closed = SavedConnection(name: "Closed port", host: "127.0.0.1", port: 1, user: "nobody")
             let model = testModel([closed])

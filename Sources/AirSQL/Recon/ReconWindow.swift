@@ -6,9 +6,10 @@ import AppKit
 /// preview, and run only when the person says so, on a session of its own.
 @MainActor
 final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
-    /// Reaches a saved connection's sessions: the connected connection's (`AppDelegate` sets it; tests reach the lab).
-    /// Each compare and each sync opens tools sessions of its own on it and closes them when done.
-    static var connect: ((SavedConnection) async throws -> Connection)?
+    /// Reaches a saved connection's sessions, connecting it first when it isn't, its prompts on the window given
+    /// (`AppDelegate` sets it; tests reach the lab). Each compare and each sync opens tools sessions of its own on it and
+    /// closes them when done.
+    static var connect: ((SavedConnection, NSWindow?) async throws -> Connection)?
 
     nonisolated static let minimumSize = NSSize(width: 960, height: 600)
     nonisolated static let defaultSize = NSSize(width: 1240, height: 780)
@@ -168,13 +169,14 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         progressBar.doubleValue = 0
         progressLabel.stringValue = "Connecting…"
         progressStrip.isHidden = false
+        let window = self.window
         task = Task { [weak self] in
             var sessions: [DBConnection] = []
             let outcome: Result<ReconResult, Error>
             do {
-                let a = try await connect(left).toolsSession()
+                let a = try await connect(left, window).toolsSession()
                 sessions.append(a)
-                let b = try await connect(right).toolsSession()
+                let b = try await connect(right, window).toolsSession()
                 sessions.append(b)
                 outcome = .success(try await Recon.run(
                     source: ReconSide(name: left.displayName, database: leftDatabase, session: a),
