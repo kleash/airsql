@@ -28,14 +28,14 @@ public enum ReconReport {
     public static func summary(_ result: ReconResult) -> [(label: String, value: String)] {
         let tables = result.objects.filter { $0.kind == .table }
         let others = result.objects.filter { $0.kind != .table }
-        let rows = tables.compactMap(\.data).filter(\.differs)
-        return [("tables match", "\(tables.filter { !$0.differs }.count)"),
-                ("tables differ in structure", "\(tables.filter { $0.status == .different }.count)"),
-                ("only in \(result.source.name)", "\(result.objects.filter { $0.status == .onlyInSource }.count)"),
-                ("only in \(result.target.name)", "\(result.objects.filter { $0.status == .onlyInTarget }.count)"),
-                ("rows differ in \(rows.count) tables", "\(rows.reduce(0) { $0 + $1.differenceCount })"),
-                ("views, routines, triggers and events differ",
-                 "\(others.filter { $0.status == .different }.count)")]
+        let rows = tables.filter { $0.status == .same || $0.status == .different }.compactMap(\.data).filter(\.differs)
+        return [("tables match", tables.filter { !$0.differs }.count.formatted()),
+                ("tables differ in structure", tables.filter { $0.status == .different }.count.formatted()),
+                ("only in \(result.source.name)", result.objects.filter { $0.status == .onlyInSource }.count.formatted()),
+                ("only in \(result.target.name)", result.objects.filter { $0.status == .onlyInTarget }.count.formatted()),
+                ("rows differ in \(rows.count) \(rows.count == 1 ? "table" : "tables")",
+                 rows.reduce(0) { $0 + $1.differenceCount }.formatted()),
+                ("views, routines, triggers and events differ", others.filter { $0.status == .different }.count.formatted())]
     }
 
     /// How an object compares, in plain words: "different structure and data", "only in Production".

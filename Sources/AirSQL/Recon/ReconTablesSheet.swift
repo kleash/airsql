@@ -83,6 +83,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         stack.spacing = Spacing.unit + 4
         for view in [scroll, buttons] { view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true }
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        root.addSubview(stack)
         stack.pin(to: root)
         return root
     }

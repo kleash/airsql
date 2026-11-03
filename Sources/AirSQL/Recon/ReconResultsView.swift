@@ -18,6 +18,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         super.init()
         summary.spacing = Spacing.unit
         summary.distribution = .fillEqually
+        summary.alignment = .height
         summary.edgeInsets = NSEdgeInsets(top: Spacing.unit + 2, left: Spacing.double - 6, bottom: Spacing.unit + 2,
                                           right: Spacing.double - 6)
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("object"))
@@ -25,7 +26,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         list.addTableColumn(column)
         list.headerView = nil
         list.rowHeight = 26
-        list.style = .sourceList
+        list.style = .plain
         list.allowsMultipleSelection = true
         list.dataSource = self
         list.delegate = self
@@ -38,7 +39,6 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         let scroll = NSScrollView()
         scroll.documentView = list
         scroll.hasVerticalScroller = true
-        scroll.drawsBackground = false
         split.isVertical = true
         split.dividerStyle = .thin
         split.autosaveName = "Compare split"
@@ -47,10 +47,13 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         scroll.widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
         detail.view.widthAnchor.constraint(greaterThanOrEqualToConstant: 520).isActive = true
         split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 0)
-        let stack = NSStackView(views: [summary, Hairline(), split])
+        let stack = NSStackView(views: [summary, ReconWindowController.line(), split])
         stack.orientation = .vertical
+        stack.distribution = .fill
         stack.spacing = 0
+        summary.setHuggingPriority(.defaultHigh, for: .vertical)  // the list and details take the rest
         for view in stack.arrangedSubviews { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
+        view.addSubview(stack)
         stack.pin(to: view)
         view.addSubview(empty)
         empty.preferredMaxLayoutWidth = 520
@@ -70,10 +73,10 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         empty.isHidden = result != nil
         guard let result else { return }
         objects = result.objects.sorted { Self.rank($0) < Self.rank($1) }
-        summary.setViews(ReconReport.summary(result).enumerated().map { index, item in
-            Self.box(item.value, item.label, tint: [NSColor.statusOK, .statusWarning, .statusBad, .statusBad, .statusWarning,
-                                                    .statusWarning][index], zero: item.value == "0")
-        } + [Self.box(Self.duration(result.duration), "\(result.rowsChecked.formatted()) rows checked, "
+        // Only on the target, and views and the like that differ, when there are any (the mockup's five boxes otherwise).
+        let tints = [NSColor.statusOK, .statusWarning, .statusBad, .statusBad, .statusWarning, .statusWarning]
+        summary.setViews(ReconReport.summary(result).enumerated().filter { $0.offset < 3 || $0.offset == 4 || $0.element.value != "0" }
+            .map { index, item in Self.box(item.value, item.label, tint: tints[index], zero: item.value == "0") } + [Self.box(Self.duration(result.duration), "\(result.rowsChecked.formatted()) rows checked, "
                       + Self.share(result.rowsFetched, of: result.rowsChecked) + " fetched", tint: .labelColor, zero: false)],
                          in: .leading)
         list.reloadData()
@@ -117,6 +120,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 2
+        box.addSubview(stack)
         stack.pin(to: box, insets: NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12))
         box.heightAnchor.constraint(greaterThanOrEqualToConstant: 58).isActive = true
         box.setAccessibilityElement(true)
@@ -171,8 +175,13 @@ final class ReconObjectCell: NSTableCellView {
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
         what.alignment = .right
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        chip.setContentCompressionResistancePriority(.required, for: .horizontal)
+        // What differs keeps its words up to 45% of the row; a long name gives way first (its tooltip has it whole).
+        what.setContentCompressionResistancePriority(.defaultLow + 10, for: .horizontal)
+        name.widthAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
+        chip.label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        addSubview(stack)
         stack.pin(to: self, insets: NSEdgeInsets(top: 0, left: 2, bottom: 0, right: 6))
+        what.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.45).isActive = true
         textField = name
     }
 
@@ -183,10 +192,10 @@ final class ReconObjectCell: NSTableCellView {
         chip.text = text
         chip.style = style
         name.stringValue = object.kind == .table ? object.name : "\(object.name) (\(object.kind.rawValue))"
-        name.toolTip = object.targetName == object.name ? object.name : "\(object.name) → \(object.targetName)"
+        name.toolTip = name.stringValue + (object.targetName == object.name ? "" : " → \(object.targetName)")
         name.textColor = object.differs ? .labelColor : .secondaryLabelColor
         what.stringValue = Self.what(object)
-        what.toolTip = ReconReport.status(object, result)
+        what.toolTip = [what.stringValue, ReconReport.status(object, result)].filter { !$0.isEmpty }.joined(separator: ": ")
         setAccessibilityLabel("\(object.kind.rawValue) \(object.name), \(ReconReport.status(object, result))")
     }
 

@@ -51,8 +51,12 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         }
         structure.isVertical = true
         structure.dividerStyle = .thin
-        structure.addArrangedSubview(column(leftTitle, left))
-        structure.addArrangedSubview(column(rightTitle, right))
+        let (leftColumn, rightColumn) = (column(leftTitle, left), column(rightTitle, right))
+        structure.addArrangedSubview(leftColumn)
+        structure.addArrangedSubview(rightColumn)
+        let halves = leftColumn.widthAnchor.constraint(equalTo: rightColumn.widthAnchor)
+        halves.priority = .defaultLow  // halves to start with; dragging the divider wins
+        halves.isActive = true
         rows.usesAlternatingRowBackgroundColors = true
         rows.dataSource = self
         rows.delegate = self
@@ -63,24 +67,31 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         rowsScroll.documentView = rows
         rowsScroll.hasVerticalScroller = true
         rowsScroll.hasHorizontalScroller = true
+        rowsScroll.autohidesScrollers = true
         message.alignment = .center
         let scriptHeader = NSStackView(views: [scriptTitle, destructive])
         scriptHeader.spacing = Spacing.double
         scriptHeader.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 4, right: Spacing.double)
         script.heightAnchor.constraint(equalToConstant: 150).isActive = true
         let content = NSView()
-        for view in [structure, rowsScroll] as [NSView] { view.pin(to: content) }
+        for view in [structure, rowsScroll] as [NSView] {
+            content.addSubview(view)
+            view.pin(to: content)
+        }
         content.addSubview(message)
         NSLayoutConstraint.activate([
             message.centerXAnchor.constraint(equalTo: content.centerXAnchor),
             message.centerYAnchor.constraint(equalTo: content.centerYAnchor),
             message.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor, constant: -48),
         ])
-        let stack = NSStackView(views: [header, Hairline(), content, Hairline(), scriptHeader, script])
+        let stack = NSStackView(views: [header, ReconWindowController.line(), content, ReconWindowController.line(), scriptHeader, script])
         stack.orientation = .vertical
+        stack.distribution = .fill
         stack.spacing = 0
         for view in stack.arrangedSubviews { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
-        content.setContentHuggingPriority(.defaultLow, for: .vertical)
+        for view in [header, scriptHeader] { view.setHuggingPriority(.defaultHigh, for: .vertical) }
+        content.heightAnchor.constraint(greaterThanOrEqualToConstant: 160).isActive = true
+        view.addSubview(stack)
         stack.pin(to: view)
         view.translatesAutoresizingMaskIntoConstraints = false
     }
@@ -145,17 +156,28 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
     private func showStructure(_ object: ReconObject, _ result: ReconResult) {
         leftTitle.stringValue = "\(result.source.name) · \(result.source.database).\(object.name)"
         rightTitle.stringValue = "\(result.target.name) · \(result.target.database).\(object.targetName)"
+        leftTitle.toolTip = leftTitle.stringValue
+        rightTitle.toolTip = rightTitle.stringValue
         if object.status == .same, object.sourceDDL == nil {
             message.stringValue = "\(object.name) has the same structure on both sides."
             message.isHidden = false
             structure.isHidden = true
             return
         }
-        let missing = NSAttributedString(string: "(missing)", attributes: [.foregroundColor: NSColor.tertiaryLabelColor,
-                                                                            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)])
-        let (a, b) = (NSMutableAttributedString(), NSMutableAttributedString())
         let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        let rows = ReconLines.aligned(object.sourceDDL ?? "", object.targetDDL ?? "")
+        let plain: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+        let absent: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
+        guard let sourceDDL = object.sourceDDL, let targetDDL = object.targetDDL else {
+            // On one side only: its definition as it is, the other side says so.
+            text(left).textStorage?.setAttributedString(NSAttributedString(
+                string: object.sourceDDL ?? "Not in \(result.source.name)", attributes: object.sourceDDL == nil ? absent : plain))
+            text(right).textStorage?.setAttributedString(NSAttributedString(
+                string: object.targetDDL ?? "Not in \(result.target.name)", attributes: object.targetDDL == nil ? absent : plain))
+            return
+        }
+        let missing = NSAttributedString(string: "(missing)", attributes: [.foregroundColor: NSColor.tertiaryLabelColor, .font: font])
+        let (a, b) = (NSMutableAttributedString(), NSMutableAttributedString())
+        let rows = ReconLines.aligned(sourceDDL, targetDDL)
         for (index, row) in rows.enumerated() {
             let end = index == rows.count - 1 ? "" : "\n"
             for (side, line, mark) in [(a, row.left, NSColor.statusOK), (b, row.right, NSColor.statusBad)] {
@@ -169,8 +191,6 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
                 }
             }
         }
-        if object.sourceDDL == nil { a.setAttributedString(NSAttributedString(string: "Not in \(result.source.name)", attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor])) }
-        if object.targetDDL == nil { b.setAttributedString(NSAttributedString(string: "Not in \(result.target.name)", attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor])) }
         text(left).textStorage?.setAttributedString(a)
         text(right).textStorage?.setAttributedString(b)
     }

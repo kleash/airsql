@@ -41,7 +41,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
     init(model: AppModel) {
         self.model = model
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: Self.defaultSize),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
         window.minSize = Self.minimumSize
         window.isReleasedWhenClosed = false
@@ -57,6 +57,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         toolbar.allowsUserCustomization = false
         window.toolbar = toolbar
         window.contentView = makeContent()
+        window.initialFirstResponder = source.popup
         for picker in [source, target] {
             picker.connections = model.data.connections.sorted {
                 $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
@@ -82,6 +83,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         setup.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         setup.setHuggingPriority(.defaultLow, for: .horizontal)
         let bar = SurfaceView(.bar)
+        bar.addSubview(setup)
         setup.pin(to: bar)
         progressBar.isIndeterminate = false
         progressBar.minValue = 0
@@ -96,10 +98,14 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         progressStrip.spacing = Spacing.unit
         progressStrip.edgeInsets = NSEdgeInsets(top: Spacing.half, left: Spacing.double, bottom: Spacing.half, right: Spacing.double)
         progressStrip.isHidden = true
-        let line = Hairline()
+        let line = ReconWindowController.line()
         let stack = NSStackView(views: [bar, line, progressStrip, results.view])
         stack.orientation = .vertical
+        stack.distribution = .fill
         stack.spacing = 0
+        // The setup and progress keep their height; the results take the rest.
+        setup.setHuggingPriority(.defaultHigh, for: .vertical)
+        progressStrip.setHuggingPriority(.defaultHigh, for: .vertical)
         stack.alignment = .leading
         for view in [bar, line, progressStrip, results.view] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
@@ -109,10 +115,17 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: root.safeAreaLayoutGuide.topAnchor),
+            stack.topAnchor.constraint(equalTo: root.topAnchor),
             stack.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
         return root
+    }
+
+    /// A separator line between bars: one point high (a hairline has no height of its own).
+    static func line() -> Hairline {
+        let line = Hairline()
+        line.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        return line
     }
 
     var isRunning: Bool { task != nil }
