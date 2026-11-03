@@ -37,8 +37,8 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         regex.toolTip = "Read what to find as a regular expression (ICU, as NSRegularExpression)"
         matchCase.setAccessibilityIdentifier("find.matchCase")
         regex.setAccessibilityIdentifier("find.regex")
-        let previous = icon("chevron.left", "Show the previous match (⇧⌘G)", #selector(previousMatch(_:)), "find.previous")
-        let next = icon("chevron.right", "Show the next match (⌘G)", #selector(nextMatch(_:)), "find.next")
+        let previous = icon("chevron.left", "Previous Match", "Show the previous match (⇧⌘G)", #selector(previousMatch(_:)), "find.previous")
+        let next = icon("chevron.right", "Next Match", "Show the next match (⌘G)", #selector(nextMatch(_:)), "find.next")
         let done = button("Done", id: "find.done", tip: "Close find and replace (Escape)", target: self, action: #selector(close(_:)))
         done.controlSize = .small
         let replace = button("Replace", id: "find.replaceOne", tip: "Replace the selected match, then show the next",
@@ -78,8 +78,8 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    private func icon(_ symbol: String, _ tip: String, _ action: Selector, _ id: String) -> NSButton {
-        let button = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: tip) ?? NSImage(), target: self,
+    private func icon(_ symbol: String, _ name: String, _ tip: String, _ action: Selector, _ id: String) -> NSButton {
+        let button = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: name) ?? NSImage(), target: self,
                               action: action)
         button.bezelStyle = .texturedRounded
         button.controlSize = .small
