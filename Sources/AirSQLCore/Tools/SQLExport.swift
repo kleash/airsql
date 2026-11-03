@@ -103,7 +103,7 @@ public enum SQLExport {
             _ = try await source.query("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")
             _ = try await source.query("START TRANSACTION WITH CONSISTENT SNAPSHOT")
         }
-        let server = source.server.map { ($0.flavor == .mysql ? "MySQL " : "MariaDB ") + $0.version } ?? "the server"
+        let server = source.server.map { $0.flavor.title + " " + $0.version } ?? "the server"
         try await sink.write(.comment("AirSQL export of \(request.databases.joined(separator: ", ")) from \(server)"))
         for statement in ["SET NAMES utf8mb4", "SET TIME_ZONE = '+00:00'", "SET FOREIGN_KEY_CHECKS = 0", "SET UNIQUE_CHECKS = 0",
                           "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO'"] {

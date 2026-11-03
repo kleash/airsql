@@ -175,6 +175,14 @@ struct ExplainPlanTests {
             """)
         #expect(ExplainPlan.tree(fromJSON: "not json") == "not json")
         #expect(ExplainPlan.treeSQL("SELECT 1", server: nil).json)
+        func server(_ flavor: ServerInfo.Flavor, _ number: Int) -> ServerInfo {
+            ServerInfo(flavor: flavor, version: "", versionNumber: number, threadID: 1, tls: nil, certificate: nil)
+        }
+        #expect(!ExplainPlan.treeSQL("SELECT 1", server: server(.mysql, 80016)).json)
+        #expect(ExplainPlan.treeSQL("SELECT 1", server: server(.mysql, 80015)).json)
+        #expect(ExplainPlan.treeSQL("SELECT 1", server: server(.mariadb, 110809)).json)
+        #expect(server(.mariadb, 110100).atLeast(11, 1) && !server(.mariadb, 110099).atLeast(11, 1))
+        #expect(server(.mysql, 50720).atLeast(5, 7, 20) && !server(.mysql, 50719).atLeast(5, 7, 20) && !server(.mysql, 79999).atLeast(8))
     }
 }
 

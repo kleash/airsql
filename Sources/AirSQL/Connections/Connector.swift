@@ -209,7 +209,7 @@ final class Connector {
 
     /// "MariaDB 11.8.3": the server's name and version as the sidebar and status bar show it.
     static func serverName(_ server: ServerInfo) -> String {
-        (server.flavor == .mariadb ? "MariaDB " : "MySQL ") + (server.version.components(separatedBy: "-").first ?? server.version)
+        server.flavor.title + " " + (server.version.components(separatedBy: "-").first ?? server.version)
     }
 
     /// Opens the route and logs in for `saved` (its prompts on `window`), telling each step: what Connect and the
