@@ -314,6 +314,11 @@ extension AppTests.ReconAppTests {
         #expect(model.activity.isIdle)
         #expect(controller.results.objects.first?.name == "gift_cards")
         #expect(result.object(.table, "customers")?.data?.differenceCount == 4)
+        // The table's rows that differ, in the grid.
+        let customers = try #require(controller.results.objects.firstIndex { $0.name == "customers" })
+        controller.results.list.selectRowIndexes(IndexSet(integer: customers), byExtendingSelection: false)
+        controller.results.detail.show(controller.results.objects[customers], result: result, data: true)
+        #expect(controller.results.detail.rows?.grid.rowCount == 4)
         let (main, _) = appWindow(model)
         controller.main = main
         controller.showSyncScript(nil)
@@ -355,7 +360,7 @@ extension AppTests.ReconAppTests {
         #expect(await call(harness, "press", ["title": "Compare"]).error == nil)
         #expect(await eventually(timeout: 10) { console.resultTabs.count == 3 })
         let tab = try #require(console.selectedResult)
-        #expect(console.resultTabs.map(\.title) == ["Before", "After", "After ↔ Before"] && tab.label == "After ↔ Before · 3 × 2")
+        #expect(console.resultTabs.map(\.title) == ["Before", "After", "vs Before"] && tab.label == "vs Before · 3 × 2")
         #expect(tab.summary == "1 row the same · matched on id")
         guard case .diff(let diff) = tab.content else {
             Issue.record("not a diff: \(tab.content)")
@@ -366,5 +371,45 @@ extension AppTests.ReconAppTests {
         #expect(find(NSTextField.self, id: "grid.legend", in: grid)?.stringValue == "● 1 only in After    ● 1 only in Before    ● 1 changed")
         #expect(!console.validateMenuItem(compare) && compare.toolTip == "This tab is a comparison already: show one of the results to compare it")
         #expect(console.validateMenuItem(Commands.exportResult.item()) && console.statusAccessory === grid.viewer.status)
+    }
+}
+
+
+extension AppTests.ReconAppTests {
+    /// Compare With… a table through its sheet on the lab (MariaDB 11.8): the console's database's tables are offered,
+    /// the chosen one is read on the data session (listed in the activity meanwhile), and its rows that differ from the
+    /// result open in a tab of their own.
+    @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests")) func aResultComparesWithATableThroughTheSheet() async throws {
+        let setup = try await ReconLabTests.session(Lab.mariadb118)
+        try await ReconLabTests.database(setup, "lane_gridcompare_ui", ReconResultsLabTests.items + ReconResultsLabTests.copy)
+        let saved = SavedConnection(name: "Lab MariaDB 11.8", host: "127.0.0.1", port: Lab.mariadb118.port, user: Lab.airsql.user)
+        let model = testModel([saved])
+        model.states[saved.id] = .connected(server: "MariaDB " + Lab.mariadb118.version)
+        let (main, harness) = appWindow(model)
+        let connection = Connection(options: DBLab.options(Lab.mariadb118), log: DBLab.log)
+        try await connection.connect()
+        let open = model.attach(connection, to: saved.id) { $0 == "lane_gridcompare_ui" }
+        defer { model.detach(open.id) }
+        #expect(await eventually(timeout: 60) { open.snapshot.database("lane_gridcompare_ui")?.tables.count == 2 && open.loading.isEmpty })
+        open.currentDatabase = "lane_gridcompare_ui"
+        main.openConsole(text: "SELECT * FROM items", title: nil, connection: saved.id)
+        let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+        console.addResult(try await ReconResultsLabTests.rows(setup, "SELECT * FROM lane_gridcompare_ui.items"), title: "Items", summary: "")
+        console.compareResult(nil)
+        let sheet = try #require(main.window?.attachedSheet?.contentView)
+        let with = try #require(find(NSPopUpButton.self, id: "compare.with", in: sheet))
+        #expect(with.itemTitles == ["Tables", "items", "items_copy"] && with.titleOfSelectedItem == "items")
+        with.selectItem(withTitle: "items_copy")
+        #expect(await call(harness, "press", ["title": "Compare"]).error == nil)
+        #expect(await eventually(timeout: 30) { console.resultTabs.count == 2 })
+        let tab = try #require(console.selectedResult)
+        guard case .diff(let diff) = tab.content else {
+            Issue.record("not a diff: \(tab.content)")
+            return
+        }
+        #expect(tab.title == "vs items_copy" && diff.rowCount == 3 && model.activity.isIdle)
+        #expect((0..<3).map { diff.mark($0, 1) } == [.inserted, .deleted, .edited] && diff.note(2, 2) == "items_copy has 4.10; Items has 4.00")
+        try await ReconLabTests.run(setup, ["DROP DATABASE lane_gridcompare_ui"])
+        await setup.close()
     }
 }

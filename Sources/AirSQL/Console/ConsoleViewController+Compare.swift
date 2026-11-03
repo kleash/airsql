@@ -39,8 +39,8 @@ extension ConsoleViewController {
         guard !targets.isEmpty else { return NSSound.beep() }
         let alert = NSAlert()
         alert.messageText = "Compare “\(tab.title)” with"
-        alert.informativeText = "The rows that differ open in a result tab of their own: those only in \(tab.title) in green, those "
-            + "only in the other in red, and the cells that changed in amber."
+        alert.informativeText = "The rows that differ open in a tab of their own: those only in this result in green, those only in "
+            + "the other in red, and the cells that changed in amber."
         let with = popup([], selected: 0, id: "compare.with", tip: "Choose the result or the table to compare this result with",
                          target: nil, action: nil)
         with.autoenablesItems = false
@@ -147,7 +147,8 @@ extension ConsoleViewController {
             store.columns.first { $0.name == column.name }?.gridColumn ?? GridColumn(name: column.name)
         })
         let same = data.sourceRows - data.missing.count - data.changed.count
-        let comparison = ResultTab(title: "\(tab.title) ↔ \(other)", content: .diff(diff),
+        // Named after the other side: it opens next to the result compared.
+        let comparison = ResultTab(title: "vs \(other)", content: .diff(diff),
                                    summary: "\(same.formatted()) row\(same == 1 ? "" : "s") the same · matched on \(key)")
         let settings = model.data.settings, table = ResultGridView.table(of: store.columns)
         comparison.makeView = {

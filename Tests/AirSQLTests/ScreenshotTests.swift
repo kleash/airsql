@@ -254,6 +254,12 @@ extension AppTests {
                 onScreen(window.window)
                 let (_, harness) = appWindow(window.model, windows: { [window.window!] })
                 try await save(harness, "compare-\(suffix)", target: "window:Compare Production")
+                // A table's rows that differ, in the grid.
+                let products = try #require(window.results.objects.firstIndex { $0.name == "products" })
+                window.results.list.selectRowIndexes(IndexSet(integer: products), byExtendingSelection: false)
+                window.results.detail.show(window.results.objects[products], result: try #require(window.result), data: true)
+                window.window?.displayIfNeeded()
+                try await save(harness, "compare-data-\(suffix)", target: "window:Compare Production")
                 window.window?.orderOut(nil)
             }
         }
