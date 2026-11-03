@@ -109,6 +109,9 @@ final class GridEditor: NSTextField, NSTextFieldDelegate {
 func popover(around content: NSView, behavior: NSPopover.Behavior) -> NSPopover {
     let controller = NSViewController()
     controller.view = NSView()
+    // The popover's id is its content's (what the harness's wait reports).
+    controller.view.setAccessibilityIdentifier(content.accessibilityIdentifier())
+    content.setAccessibilityIdentifier(nil)
     content.translatesAutoresizingMaskIntoConstraints = false
     controller.view.addSubview(content)
     NSLayoutConstraint.activate([

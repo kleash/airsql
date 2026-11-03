@@ -168,6 +168,7 @@ final class TableDataController: NSViewController, TabContent {
         if let changes, source.key != nil {
             source.changes = changes
             restored = true
+            NotificationCenter.default.post(name: .tabContentDidChange, object: self)  // the tab's dot
         }
         self.source = source
         grid.sortOrder = source.sort.compactMap { key in
