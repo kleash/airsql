@@ -1,3 +1,8 @@
+---
+title: Connections and routes
+nav_order: 10
+---
+
 # Connections and routes
 
 A connection is a MySQL or MariaDB server AirSQL remembers: its address, the login, how to reach it (its route) and

@@ -1,3 +1,8 @@
+---
+title: Browse a server
+nav_order: 11
+---
+
 # Browse a server
 
 Once a connection is connected, the sidebar shows its databases under it. Each database groups its objects by kind:
@@ -8,7 +13,9 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - **Click** a database to see its tables in the database view: rows, the space their data and indexes take, engine,
   collation, when they last changed and their comment. Click a column's title to sort by it.
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
-- **Click** a routine, trigger or event to see its definition; **double-click** to open it.
+- **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
+- **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](editors.md));
+  **Create Table…** and **New…** make a table or object in the database you right-clicked.
 - **Double-click** a database to make it the current one (it shows in bold) and open it.
 - **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.

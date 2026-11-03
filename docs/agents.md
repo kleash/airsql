@@ -1,5 +1,6 @@
 ---
 title: AI agents
+nav_order: 15
 ---
 
 # AI agents

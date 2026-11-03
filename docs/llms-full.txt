@@ -4,7 +4,7 @@
 
 - Install: `brew install --cask kleash/tap/airsql` (or the zip from https://github.com/kleash/airsql/releases).
 
-Every page of AirSQL Help (https://kleash.github.io/airsql/).
+Every page of AirSQL Help (https://kleash.github.io/airsql/), then the agent guide.
 
 
 ---
@@ -22,6 +22,15 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
 - [Trust a server](https://kleash.github.io/airsql/trust-a-server.html): servers whose certificate macOS doesn't know.
 - [The SQL log](https://kleash.github.io/airsql/sql-log.html): every statement AirSQL sends, with passwords masked.
 - [Read-only queries](https://kleash.github.io/airsql/read-only-queries.html): what an agent's query may do, and why one is refused.
+- [Connections and routes](https://kleash.github.io/airsql/connections.html): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
+- [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, table commands, find text and the process list.
+- [Change tables, views and routines](https://kleash.github.io/airsql/editors.html): the table editor, views and routines as CREATE code, and the ER
+  diagram.
+- [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
+  to another server; CSV import.
+- [Compare two databases](https://kleash.github.io/airsql/compare.html): structure and data, side by side, and a sync script you review first.
+- [AI agents](https://kleash.github.io/airsql/agents.html): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
+  the access you choose.
 - [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): every command's shortcut.
 - [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): what AirSQL connects to, where passwords are kept, what agents may do.
 - [Troubleshooting](https://kleash.github.io/airsql/troubleshooting.html): when a connection fails, and how to report a problem.
@@ -141,14 +150,22 @@ but never change them.
 
 ## Agents
 
-- **Allow AI agents to use AirSQL**: off until you turn it on. Each connection's access is set in the connection itself;
-  Production starts at Off. Agents never see passwords.
+- **Allow AI agents to use AirSQL**: off until you turn it on. Agents never see passwords.
+- **Connections**: what agents may do with each connection: Off (where every connection starts), Schema, Schema + read,
+  or Schema + read + analytics; and **Sample rows**, which lets them see a few rows of each table.
 - **Exports**: the only folder agents save files in.
+- **Add to Claude Code…** and **Add to Gemini CLI…**: show the change to that program's settings that adds AirSQL, and
+  make it when you click Add. **Copy** gives the command other MCP clients start.
+
+More in [AI agents](https://kleash.github.io/airsql/agents.html).
 
 ## Client Tools
 
 The `mysql` (or `mariadb`) and `mysqldump` (or `mariadb-dump`) programs AirSQL runs. Leave them empty to let AirSQL
-find them.
+find them: it looks in Homebrew's folders, `/usr/local/mysql/bin`, MAMP and your `PATH`, and picks for each server the
+tools of its family and version. Under each field the pane says which program and version it found, or why there is
+none or it can't be used; **Found** lists every tool on this Mac, and **Find Again** looks again after you install or
+update some. See [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html).
 
 
 ---
@@ -178,8 +195,18 @@ When a server's certificate isn't one macOS trusts (it is self-signed, or from y
 authority), AirSQL shows its SHA-256 fingerprint and asks before connecting.
 
 1. Compare the fingerprint with the one the server's administrator gave you.
-2. If they match, choose **Trust**. AirSQL remembers the certificate and warns you if it ever changes.
+2. If they match, choose **Trust**. AirSQL remembers the certificate for this connection (the editor's TLS tab shows
+   it, with **Forget**) and refuses any other.
 3. If they don't, choose **Cancel**: you may not be talking to the server you think.
+
+If a trusted server later shows another certificate, AirSQL says so and doesn't connect unless you choose **Trust the
+New Certificate**. Do that only when the administrator told you the certificate changed.
+
+## SSH hosts
+
+The first time a connection goes through an SSH host, AirSQL shows the host's key fingerprint the same way. **Trust**
+lets ssh remember the key in `~/.ssh/known_hosts`. If the key ever changes, ssh refuses to connect and AirSQL says
+which host it was: ask its administrator before removing the old key from `known_hosts`.
 
 
 ---
@@ -270,6 +297,488 @@ name, where a backslash escapes nothing, so the server could end it somewhere el
 ## A safeguard, not the only one
 
 For a hard guarantee, connect agents with a database user that can only read.
+
+
+---
+
+Source: https://kleash.github.io/airsql/connections.html
+
+# Connections and routes
+
+A connection is a MySQL or MariaDB server AirSQL remembers: its address, the login, how to reach it (its route) and
+a few options. Passwords go in your Keychain, never in AirSQL's files.
+
+## Add or edit a connection
+
+Choose **File ▸ New Connection…** (⌘N), or select a connection and choose **Connection ▸ Edit…**. The editor has five
+tabs:
+
+- **General**: a name, the sidebar folder, a colour (Production also turns on the strict safety checks), the host and
+  port, or for a server on this Mac its socket file, the user and password, and the database to open. Tick **Ask at
+  each connect** to type the user and password each time; they are kept until you disconnect and never saved.
+- **TLS**: how the connection is encrypted. **Check the authority and host name** is the safe choice: the server must
+  show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
+  shows its fingerprint when you connect (see [Trust a server](https://kleash.github.io/airsql/trust-a-server.html)). Add an authority file for a
+  private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
+  login** allows the plain-text login such accounts need, only over TLS that proves the server.
+- **SSH and Proxy**: the route (below).
+- **Options**: read-only (writes from the console, the grid and agents are refused), the compressed protocol, a query
+  timeout, the databases shown (names or patterns such as `shop, reports_*`), startup SQL that runs after each login
+  (for example `SET time_zone = '+00:00';`), and safety checks of the connection's own.
+- **Agents**: what AI agents may do with this connection.
+
+**Test Connection** connects with what the editor shows, reports each hop with its time, and disconnects. **Save and
+Connect** saves and connects; **Save** only saves.
+
+## Routes
+
+Every route but Direct ends in a private socket on this Mac, in a folder only you can open. AirSQL, the client tools
+and Terminal all connect through it, so the route works the same for each.
+
+| Route | What it does |
+|---|---|
+| Direct | TCP to the host and port, or the server's own socket on this Mac. |
+| SSH tunnel | ssh to the SSH host, which connects to the database host. |
+| SSH through jump hosts | ssh through each jump host in order, then the SSH host. |
+| SSH through a proxy | The first SSH host is reached through an HTTP CONNECT or SOCKS5 proxy (jump hosts optional). |
+| Proxy, no SSH | The proxy connects to the database host itself. |
+
+The database host is the name as the last SSH host or the proxy reaches it: often `127.0.0.1` or a private address.
+
+SSH hosts log in with your ssh-agent and keys in `~/.ssh`, a key file, or a password. Whatever the server asks for
+besides (a key's passphrase, a password, a code from your phone) appears as a question when you connect; tick
+**Remember in Keychain** to save a password or passphrase once the connection works. The first time you reach an SSH
+host, AirSQL shows its key fingerprint to trust; ssh remembers it in `~/.ssh/known_hosts`.
+
+Your `~/.ssh/config` still applies: type one of its `Host` names as an SSH host and its settings (user, port, key,
+its own proxy) are used, after what the editor sets.
+
+## Import hosts from ~/.ssh/config
+
+**File ▸ Import from ~/.ssh/config…** asks you to pick the file (it opens on `~/.ssh/config`), lists its hosts, and
+makes a connection for each one you tick: an SSH tunnel through that host to a database on `127.0.0.1:3306`, which
+you can then edit.
+
+## Connect and disconnect
+
+Double-click a connection, or select it and choose **Connection ▸ Connect** (⌘K). The status bar shows each step, hop
+by hop, with Cancel. A connection that drops (the network goes away, the server restarts) is marked in the sidebar;
+AirSQL never reconnects behind your back. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
+transaction or edits that aren't applied.
+
+Connected connections are kept alive with a ping every minute, except a session whose transaction has been open longer
+than the safety setting allows.
+
+## Folders
+
+Folders group connections in the sidebar. **Connection ▸ New Folder…** makes one (the selected connections move into
+it); right-click a folder to rename or delete it (its connections stay). The editor's **Folder** menu moves a
+connection.
+
+
+---
+
+Source: https://kleash.github.io/airsql/navigator.html
+
+# Browse a server
+
+Once a connection is connected, the sidebar shows its databases under it. Each database groups its objects by kind:
+tables, views, sequences (MariaDB), procedures, functions, triggers and events, with how many there are.
+
+## Find your way
+
+- **Click** a database to see its tables in the database view: rows, the space their data and indexes take, engine,
+  collation, when they last changed and their comment. Click a column's title to sort by it.
+- **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
+- **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
+- **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](https://kleash.github.io/airsql/editors.html));
+  **Create Table…** and **New…** make a table or object in the database you right-clicked.
+- **Double-click** a database to make it the current one (it shows in bold) and open it.
+- **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
+- Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
+- Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
+  filter, a connected connection whose name doesn't match shows the objects that do, opened.
+- Drag a table or database into the SQL editor to insert its name, quoted for SQL.
+- **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
+
+On a server with more than 3,000 tables, AirSQL reads only the names when it connects; a database's columns, indexes and
+keys load when you open it (a spinner shows on its row meanwhile). Change the number in Settings ▸ Connections.
+
+## Change databases and tables
+
+Every change shows its SQL first ([Check SQL before it runs](https://kleash.github.io/airsql/sql-preview.html)); nothing runs until you choose to.
+
+- **New Database…** asks for a name, a character set and a collation (the server's own are chosen at first).
+- **Drop…** deletes the selected databases or objects. Dropping a database always asks you to type its name; on a
+  Production connection, so does dropping or emptying a table.
+- **Truncate…** deletes every row of the selected tables. It can't be rolled back.
+- **Rename…** gives a table or view a new name. Views and routines that use the old name aren't changed.
+- **Copy Table…** copies a table into the same or another database, with its rows or without, or only the rows where a
+  condition you type holds (for example `created_at >= '2026-01-01'`). Indexes come along; foreign keys don't.
+- **Bulk Table Editor…** moves the selected tables to another database, or changes their engine, or converts them and
+  their text columns to another character set and collation.
+- **Maintenance** ▸ Analyze, Check, Optimize, Repair or Checksum runs on the selected tables and shows what the server
+  said in a tab. Analyze, Optimize and Repair show their SQL first: Optimize rebuilds a table and locks it meanwhile.
+
+A read-only connection offers none of these.
+
+## Find text on the server
+
+**Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
+tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
+bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list to see its matching rows.
+Upper and lower case match as the column's collation says (most ignore case).
+
+## See what the server is running
+
+**Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
+running, refreshed every 5 seconds (choose another interval, or Off). Double-click a row to read its whole statement.
+
+- **Kill Query…** stops a statement; its connection stays.
+- **Kill Connection…** ends a connection, rolling back its open transaction.
+
+Both ask first. Right before it stops anything, AirSQL checks that the process is still running what the list showed
+(on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so.
+
+
+---
+
+Source: https://kleash.github.io/airsql/editors.html
+
+# Change tables, views and routines
+
+AirSQL edits a table's structure in a form, and views, procedures, functions, triggers and events as the CREATE
+statement that makes them. Nothing changes on the server until you apply, and the SQL that will run is always shown
+first.
+
+## The table editor
+
+Open it from a table's **Open Structure**, or make a new table with **Database ▸ Create Table…**. A table editor has five
+parts, chosen at the top:
+
+- **Columns**: name, type (the types your server has), length or ENUM values, unsigned, NULL, default, extra (counts up
+  by itself, follows updates, or is generated from an expression), collation and comment. Drag rows to reorder the
+  columns.
+- **Indexes**: primary key, unique, plain, full-text and spatial indexes. Write their columns separated by commas:
+  `email(10)` indexes the first 10 characters, `created_at DESC` sorts down.
+- **Foreign keys**: this table's columns, the table they point at and its columns, and what happens on update and on
+  delete.
+- **Checks**: conditions every row must satisfy. On MariaDB, a check written with a column belongs to that column and
+  stays with it when the column changes.
+- **Options**: the table's name, engine, default collation, row format, next AUTO_INCREMENT number and comment.
+
+**+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
+green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Discard** takes back all of them.
+
+Under the lists, the SQL that Apply would run updates as you type. When something can't work yet (a VARCHAR without a
+length, two columns of one name, an emoji in a name, which the server would keep as `?`), it says what to fix instead.
+
+## Apply
+
+**Apply** (⌘S) shows the statements in the [SQL preview](https://kleash.github.io/airsql/sql-preview.html) first. Then they run one at a time on a
+connection of their own, and the editor reads the table back from the server.
+
+- MySQL and MariaDB can't roll table changes back: each statement takes effect as it runs. When there are several, the
+  preview says so; if one fails, the ones before it stay done, and the editor shows what is left to do.
+- A changed foreign key is dropped in a statement of its own first: neither server takes a drop and an add of the same
+  key in one statement.
+- Dropping a column deletes its values, and changing a column's type converts them: the preview warns about both.
+- A large table may be copied while it changes, and writes to it wait until that is done.
+
+## Views, procedures, functions, triggers and events
+
+Open one from the tree, or start a new one from **Database ▸ New Object**. The editor shows its CREATE statement, as the
+server keeps it, to edit as text.
+
+- **Runs as** chooses its DEFINER: the account it was created with, or you. Keeping another account's DEFINER needs the
+  SET_USER_ID privilege on MySQL, or SET USER on MariaDB.
+- Apply runs it in its database, under the sql_mode it was created with (and an event under its time zone), so it
+  behaves as before. The footer shows those settings.
+- MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
+  function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
+  apply again, and **Revert** puts the old code back.
+- Renaming it in the code makes the new one and then drops the old one.
+
+## The ER diagram
+
+**Database ▸ ER Diagram** draws a database's tables with their keys. Tables that point at nothing come first on the left,
+and each table sits right of the tables its foreign keys point at; lines go from a key's column to the table it points
+at. Tables with no keys come last.
+
+Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
+right-click it for **Open Structure** and **Copy Name**. **Export Image…** saves the diagram as a PNG, and **Export
+Mermaid…** as Mermaid text, which many docs sites and wikis draw.
+
+
+---
+
+Source: https://kleash.github.io/airsql/client-tools.html
+
+# Export, restore, copy and import
+
+AirSQL backs up and moves data with your own `mysqldump` and `mysql` (or MariaDB's `mariadb-dump` and `mariadb`)
+when you have them, and with its own code when you don't. Every command here is in the **Tools** and **File** menus
+and in a connection's right-click menu in the sidebar.
+
+## Which programs AirSQL uses
+
+**Settings ▸ Client Tools** shows the programs AirSQL found and their versions. It looks in Homebrew's folders
+(`/opt/homebrew/opt/mysql-client/bin` and the like, on Apple silicon and Intel), `/usr/local/mysql/bin` (MySQL's
+installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
+(MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
+
+Each sheet says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
+older version than the server), or why it can't be used (not there, too old: AirSQL needs MySQL 5.7 or MariaDB 10.3
+tools or newer). The tool you pick in a sheet is remembered for that connection.
+
+No tools at all? Install MySQL's or MariaDB's client tools (for example `brew install mysql-client`), then choose
+**Find Again**. Until then, Export and Run SQL File use AirSQL's own code.
+
+## Export a database
+
+**Tools ▸ Export…** (or right-click a connection ▸ Export…).
+
+1. Tick the databases or tables to export. Space ticks the selected rows; right-click for Include All, Include None and
+   Include Only These. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
+   databases export whole, each with its own name.
+2. Choose the content (structure and data, structure only, data only) and the options: one consistent snapshot
+   (`--single-transaction`), binary as hex, gzip, `DROP TABLE` before each table, and views, routines, triggers and
+   events.
+3. Pick the tool, where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
+4. The box under the form shows the exact command line. **Copy Command** copies it.
+5. **Export**. The sheet shows the table being written, the bytes so far and the time left. **Stop** ends it.
+
+The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
+or failed export never leaves half a file.
+
+**AirSQL (built in)** in the Tool menu writes the SQL itself, through a connection of its own: the tables' `CREATE`
+statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
+consistent snapshot. Its files restore with `mysql` or with Run SQL File.
+
+## Restore a dump, or run a .sql file
+
+**Tools ▸ Restore…** runs a `.sql` or `.sql.gz` file with your `mysql` or `mariadb`; **File ▸ Run SQL File…** opens the
+same sheet with AirSQL's own runner, which splits the file into statements as `mysql` does (`DELIMITER` included) and
+runs them one at a time. Compressed files are read through `/usr/bin/gzip`.
+
+1. Choose the file and the database it runs in.
+2. Choose what happens on an error: stop at the first one (what ran before it stays), or go on and count them
+   (`--force`).
+3. **Restore** (or **Run**).
+
+Before anything runs, AirSQL reads the whole file for the statements that decide where it writes: `USE`,
+`CREATE DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED`. When the file switches to another database than the one you
+chose, drops a database, or sets GTID_PURGED, or when the database it writes to has tables already, the SQL preview
+sheet says so and asks first (Settings ▸ Safety ▸ *Ask before Restore…*). On a production connection it always asks.
+Progress is the share of the file read, so it is real for compressed files too.
+
+## Copy to another server
+
+**Tools ▸ Copy to Another Server…** copies databases or tables straight from one connection to another, through a
+session on each: no file in between.
+
+- **To** and **Database**: the connection and the database the copy goes into (made if it isn't there). One database
+  can take another name; views and routines follow the new name.
+- **Replace tables that are there** drops the other server's tables of the same name first. It is off unless you tick
+  it, and the SQL preview asks before it runs. Copies to a production connection always ask.
+- If a statement fails, the copy stops; what was copied before it stays.
+
+## Import a CSV file
+
+**File ▸ Import CSV…**
+
+1. Choose the file. AirSQL guesses the separator (comma, semicolon, tab or bar) and shows each field's first value.
+2. Choose the table. Each column takes a field of the file, matched by name when the first row names the columns, by
+   position when it doesn't, or **Leave out** to take its default.
+3. **Import**. The rows go in one transaction: if one fails (a duplicate key, a value the column refuses), none of the
+   file stays, and the message says which records.
+
+Empty fields become NULL unless you untick it. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+
+## Open the mysql command line in Terminal
+
+**Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database.
+
+## Your password stays private
+
+The client tools get the login from a temporary option file that only you can read (file mode 0600, in a private
+folder in AirSQL's Application Support folder), passed as `--defaults-file`, so `~/.my.cnf` and `/etc/my.cnf` don't
+change where they connect. The password is never on the command line, in the environment, or in the command shown.
+AirSQL removes the file as soon as the tool has read it: once a dump has started writing, once a restore is reading
+its input, ten seconds after Terminal starts `mysql`; and anything left behind at the next launch.
+
+Over TCP the tools check TLS the way the connection asks: MySQL's with `--ssl-mode`, MariaDB's with `--ssl` and
+`--ssl-verify-server-cert`. MySQL's tools check certificates only against a CA file; for a connection without one, or
+with a pinned certificate, the sheet says so and AirSQL's own export and runner (which check it as AirSQL does) remain.
+
+Client tools reach SSH and proxy routes through the connection's private socket once AirSQL is connected through them.
+
+
+---
+
+Source: https://kleash.github.io/airsql/compare.html
+
+# Compare two databases
+
+**Tools ▸ Compare…** (or **Compare…** in a connection's or a database's menu, which starts from it) opens a window
+that compares two databases, on the same server or on two different connections, such as production against staging
+or MySQL 8 against MariaDB. Connect both connections first: each side then works through its own route, on a session of
+its own. The compare only reads; nothing changes until you run the sync script yourself.
+
+## Run a compare
+
+1. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
+   type its name). The sync script makes the target like the source; **Swap** turns them around.
+2. Choose what to compare: **Structure and Data**, **Structure** or **Data**.
+3. Click **Compare** (⌘R). The bar under the setup shows the table and chunk being checked, and **Cancel** (⌘.)
+   stops the compare; the statement running on each server is stopped too. The work is also listed in the main
+   window's activity list.
+
+The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
+much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
+for objects on one side, **structure**, **data**, then **match**. Click an object to see it; double-click it to see
+its rows when they differ.
+
+## What is compared
+
+- **Structure:** tables (columns, indexes, foreign keys, checks, engine, comment), views, procedures, functions,
+  triggers, events and sequences. The **Structure** tab shows both definitions side by side, the lines only one
+  side has marked.
+- **Data:** the rows of every table both sides have, matched on the primary key, or on a unique key whose columns
+  are all NOT NULL. The **Data** tab lists rows **missing** from the target, **extra** in it, and **changed** rows,
+  with the cells that differ marked (hold the pointer over one to see the target's value). Tables without such a key
+  are still checked as a whole, but their rows can't be matched or synced. Generated columns are left out: their
+  values follow from the others.
+
+MySQL and MariaDB write the same thing differently, and the compare reads them alike: `int(11)` and `int`, MariaDB's
+JSON (a LONGTEXT with a check) and MySQL's, `CURRENT_TIMESTAMP` and `current_timestamp()`, `NO ACTION` and
+`RESTRICT`, check constraints the two servers name differently. Each flavour writes a view's body its own way,
+though, so the same view on MySQL and on MariaDB can still show as different.
+
+### Ignore rules
+
+**Ignore Rules** chooses differences the compare doesn't count. All four are on at first:
+
+- **AUTO_INCREMENT Values**: tables' next AUTO_INCREMENT values.
+- **DEFINER**: who views, routines, triggers and events run as. The script then leaves DEFINER out, so they run as
+  whoever runs the script.
+- **Collations and Character Sets** of tables and columns (MySQL 8 and MariaDB have different defaults).
+- **Whitespace in Definitions**: spaces and line breaks in bodies, outside quoted text.
+
+### Tables…
+
+After a first compare, **Tables…** lists the source's tables. Untick a table to leave it out, give the target table
+it should be compared with when it was renamed there, list columns whose values shouldn't count (such as
+`updated_at`), or add a WHERE condition for its rows on both sides. **Leave Out of Next Compare** in an object's
+menu unticks it too.
+
+## How the data compare stays fast
+
+Each server sums up the rows of a chunk of the table (10,000 rows by key order) as a row count and a total of 64-bit
+row hashes, computed from MD5. Only a chunk whose sums differ is looked at more closely: it is split into smaller
+chunks, and for the small ones that still differ each row's key and hash come over, then only the rows that differ.
+A million identical rows are checked without fetching any.
+
+The hashes tell apart values that careless checksums mix up: a NULL and an empty string, values moved from one column
+to another, `'a'` and `'A'` or `'a '` under a case-insensitive collation, the same text in latin1 and utf8mb4 (which
+counts as the same). Both sessions use time zone `+00:00`, so TIMESTAMP values compare by the moment they stand for.
+Floats, decimals written with another scale and JSON with other spacing or key order are compared as values.
+
+## The sync script
+
+The **Sync script** box shows the statements for the selected object; **Copy Sync Script** copies them. **Sync
+Script…** shows the whole script in the [SQL preview](https://kleash.github.io/airsql/sql-preview.html), where you can copy it, run it on the target,
+or cancel. It runs:
+
+1. `USE` the target database and `SET time_zone = '+00:00'`;
+2. the structure changes, in order: foreign keys and objects that go or change are dropped first, then new tables,
+   `ALTER TABLE`, views (after the views they use), foreign keys, routines, triggers and events. MySQL and MariaDB
+   commit each structure change on its own: they can't be rolled back;
+3. the row changes in one transaction: DELETE (children before parents), then UPDATE and INSERT (parents first). Each
+   statement must change exactly the rows it names; if one doesn't, because the target changed since the compare,
+   everything in the transaction is rolled back. Tables on MyISAM, Aria or MEMORY can't roll back, and the preview
+   warns about them.
+
+**Destructive steps are left out** unless you tick **Include destructive steps**: dropping tables, columns, indexes,
+checks, foreign keys and other objects only the target has, deleting rows only the target has, and column changes
+that could cut or refuse values (a shorter type, NOT NULL). Each destructive statement is marked with a
+`-- Destructive:` comment, and the preview's button turns red.
+
+Rows of tables only in the source come with their `CREATE TABLE`. New columns of existing tables get their default
+values: after running the script, compare again to copy their values. After a sync, AirSQL offers to compare again.
+
+## Export the report
+
+**Export Report…** saves what the compare found as **HTML** (to read or send), **CSV** (every difference on its own
+line, for a spreadsheet) or **Markdown** (for a ticket). HTML and Markdown list up to 1,000 rows per table.
+
+## Limits
+
+- More than 100,000 differing rows in one table are reported as too many to list, without sync statements for that
+  table: narrow the compare with a WHERE, or copy the table instead.
+- Partitioning, row formats and system versioning aren't compared.
+
+
+---
+
+Source: https://kleash.github.io/airsql/agents.html
+
+# AI agents
+
+Claude Code, Gemini CLI, Claude Desktop and other MCP clients can use AirSQL to read your schemas, run read-only
+queries, profile tables and propose SQL for you to run. They work through AirSQL on your Mac, so they see only what you
+allow, never your passwords, and can't change data.
+
+## Turn agents on
+
+1. **AirSQL ▸ Settings ▸ Agents**: tick **Allow AI agents to use AirSQL**.
+2. Under **Connections**, choose what agents may do with each connection. Every connection starts at **Off**.
+3. Add AirSQL to your agent:
+   - **Add to Claude Code…** or **Add to Gemini CLI…**: AirSQL shows the exact change to that program's settings
+     (`~/.claude.json` or `~/.gemini/settings.json`), and makes it only when you click **Add**, keeping the old file as
+     `.airsql-backup`. Restart the program afterwards.
+   - Claude Code's plugin: `claude plugin marketplace add kleash/airsql`, then `claude plugin install airsql@airsql`.
+   - Claude Desktop: open `airsql.mcpb` from AirSQL's release.
+   - Another client: **Copy** gives the command, `/Applications/AirSQL.app/Contents/MacOS/AirSQL --mcp`.
+
+The connection must be connected in AirSQL for an agent to read it.
+
+## Access levels
+
+| Level | Agents may |
+|---|---|
+| Off | not see the connection at all |
+| Schema | read databases, tables, columns, keys and indexes; put SQL into a console tab |
+| Schema + read | also run read-only queries and see query plans, within the row cap and time limit of Settings ▸ Safety |
+| Schema + read + analytics | also profile tables, get ten times the rows and four times the time, and save results to files |
+
+**Sample rows** (a separate switch) lets agents see a few rows of each table they describe. Only you can change these:
+no agent can, whatever it asks.
+
+## What keeps your data safe
+
+- An agent's statement runs only if AirSQL can prove it reads and nothing more: one SELECT, SHOW, DESCRIBE or
+  EXPLAIN, without locking clauses, `INTO`, hints or functions such as `SLEEP` ([what passes](https://kleash.github.io/airsql/read-only-queries.html)).
+- It then runs on a session of its own that the server keeps read-only, inside a read-only transaction that is rolled
+  back, with a time limit. Even a statement that slipped past the check can't write.
+- To change something, an agent puts the SQL into a console tab. Nothing runs until you press Run.
+- For more safety still, connect with a database user that can only read.
+
+## See what agents did
+
+The agents' item in the status bar says what they're doing. Click it (or choose **Tools ▸ Agents ▸ Agent Activity**)
+for every call since AirSQL opened, with how it ended. A call that reads a database also shows in Activity, where
+**Cancel** stops it. **Turn Agents Off** in that popover (or in Tools ▸ Agents) stops them at once.
+
+## Files agents save
+
+With analytics, agents can save query results as CSV or JSON files. They go only to the **Agent Exports** folder in
+AirSQL's settings folder (Settings ▸ Agents ▸ Exports ▸ Show in Finder), readable by you alone.
+
+## The fine print
+
+Agents reach AirSQL through a socket in AirSQL's settings folder that only you can open, with a key that changes each
+time AirSQL starts. Other programs running as you could read that key too, as with any app of yours.
 
 
 ---
@@ -467,3 +976,98 @@ It needs macOS 13.1 or later. Downloads from the releases page and Homebrew are 
 **Help ▸ Report a Problem** opens a form on GitHub with your AirSQL and macOS versions filled in. **Help ▸ Copy
 Diagnostics** copies those versions and the client library's (no names, hosts or paths). The [SQL log](https://kleash.github.io/airsql/sql-log.html)
 shows exactly what AirSQL sent: read it before you share any of it, because it holds your queries.
+
+
+---
+
+Source: https://github.com/kleash/airsql/blob/main/Resources/AgentGuide.md
+
+# AirSQL agent guide
+
+AirSQL is a Mac app for MySQL and MariaDB. Through its MCP server you can read the schemas of the connections the
+person at the Mac allows, run read-only queries, profile tables, and propose SQL in a console tab for the person to
+edit and run. You never see passwords, and you can't change data, connections or settings: each connection's access
+level is the person's choice alone.
+
+## overview
+
+1. `context` first: the connections you may use (name, id, access level, MySQL or MariaDB and its version, current
+   database, schema hash, row cap and timeout), the person's active connection and the open console tabs. A connection
+   whose access is Off isn't listed; `hiddenConnections` counts them.
+2. `get_schema` once per connection: every database's tables in one compact reply. Keep its `hash` and pass it back as
+   `if_changed_from` later: an unchanged schema answers `{unchanged: true}` and costs nothing.
+3. `describe` the tables you'll query (columns, keys both ways, indexes, CREATE statement, row estimates).
+4. `run_queries` with several statements at once; `explain` a slow one; `profile` a table you don't know yet.
+5. To change anything, write the SQL and call `open_in_console`: the person reads it, edits it, runs it. Then
+   `read_console` shows what they ran and the result or error.
+
+Connections must be connected in AirSQL (by the person) before the database tools work on them.
+
+## access
+
+Each connection has one level, set by the person in Settings ▸ Agents (or the connection's Agents tab):
+
+- **Off** (the default; Production connections start here): invisible to agents.
+- **Schema**: `get_schema`, `describe`, the schema resource, `open_in_console`; `read_console` without result rows.
+- **Schema + read**: also `run_queries` and `explain`, within the connection's row cap and timeout (Settings ▸ Safety:
+  10,000 rows and 30 s by default, 1,000 and 15 s on Production).
+- **Schema + read + analytics**: also `profile`, `to_file`, ten times the rows and four times the timeout.
+
+Sample rows are a separate switch: when on, `describe` shows a few rows of each table. A call beyond the level is refused
+with the level it needs. Ask the person to change a level; you can't.
+
+## read-only
+
+Statements you write run only when AirSQL's classifier proves them read-only: one statement, `SELECT`,
+`WITH … SELECT`, `SHOW`, `DESCRIBE` or `EXPLAIN` (not `EXPLAIN ANALYZE`). It refuses `INTO`, `FOR UPDATE`,
+`LOCK IN SHARE MODE`, optimizer hints, temporary tables, and functions such as `SLEEP`, `BENCHMARK`, `GET_LOCK`,
+`LOAD_FILE` and stored functions. Each statement then runs on AirSQL's own agent session, which is read-only, inside
+`START TRANSACTION READ ONLY` … `ROLLBACK`, with the server's statement timeout and a watchdog. Both guards always apply.
+A refused statement comes back with `ok: false` and the reason; the other statements of the call still run.
+
+## tools
+
+- `context {}`: start here.
+- `get_schema {connection, databases?, format?: compact | ddl, if_changed_from?}`: compact lines look like
+  `orders: id bigint PK AI, customer_id int NULL → customers.id, total decimal(12,2) ='0.00'; KEY(customer_id)`:
+  PK primary key, AI auto-increment, NULL nullable, `=` default, `→` foreign key, then composite keys and indexes, and
+  `-- comment`. Views start with `view`, sequences with `sequence`. System databases are left out unless named. A
+  database too big for the reply comes as names only: name it, or describe its tables.
+- `describe {connection, objects: ["table" or "db.table"], database?}`: names in backquotes may contain dots.
+- `run_queries {connection, database?, queries: [{sql, max_rows?}], format?: json | csv, to_file?}`: 200 rows per
+  statement unless `max_rows` says more (up to the row cap); `capped: true` means there were more. Values are text
+  (binary as 0x… hex), NULL is null in JSON and an empty field in CSV, long values are cut at 2,000 characters.
+  `to_file: true` (analytics) writes each result to a CSV or JSON file in AirSQL's agent export folder and answers with
+  its path, rows and size instead of the rows.
+- `profile {connection, table, database?, columns?, where?}`: row count, and per column NULLs, distinct values, min,
+  max, average (numbers) and the five most common values, computed on the server.
+- `explain {connection, sql, database?, format?: traditional | json}`.
+- `open_in_console {sql, title?, connection?}`: never runs anything.
+- `read_console {tab?}`: by id or title from `context`; default the active console tab.
+- `guide {topic?}`: this guide.
+
+Long calls send progress notifications when your client asks for them (`_meta.progressToken`).
+
+## resources
+
+Each connected connection you may read has its compact schema as a resource, `airsql://<connection name>/schema`
+(percent-encoded), the same text as `get_schema`. `resources/list` lists them.
+
+## recipes
+
+- **Answer a question about the data**: `context` → `get_schema` → `describe` the tables involved → `run_queries`
+  with a `COUNT(*)` first, then the query, with `max_rows` small.
+- **Analyse a big result**: with analytics, `run_queries` with `to_file: true`, then read the file with your own tools.
+- **Change data or structure**: write the statements, then `open_in_console` with a clear title; tell the person what
+  they do. After they run them, `read_console`.
+- **Check a query's cost**: `explain` it, look for full scans (`type: ALL`) on big tables, `describe` for indexes.
+
+## troubleshooting
+
+- "isn't running, or agents are off": open AirSQL and turn on Settings ▸ Agents ▸ Allow AI agents to use AirSQL.
+- "No connection … is open to agents": use a name or id from `context`; the person may have set it to Off.
+- "isn't connected": ask the person to connect it in AirSQL.
+- "needs Schema + read" (or analytics): the person can raise the level in Settings ▸ Agents.
+- "Refused": the statement isn't provably read-only; rewrite it as one plain SELECT, or propose it with
+  `open_in_console`.
+- "Stopped at the agent timeout": narrow the query (WHERE, LIMIT), or ask for the analytics level.

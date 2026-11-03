@@ -1,9 +1,14 @@
+---
+title: Compare two databases
+nav_order: 14
+---
+
 # Compare two databases
 
-**Tools ▸ Compare…** (or **Compare…** in a connection's menu) opens a window that compares two databases, on the
-same server or on two different connections, such as production against staging or MySQL 8 against MariaDB. Each
-side connects through its own route, on a session of its own. The compare only reads; nothing changes until you run
-the sync script yourself.
+**Tools ▸ Compare…** (or **Compare…** in a connection's or a database's menu, which starts from it) opens a window
+that compares two databases, on the same server or on two different connections, such as production against staging
+or MySQL 8 against MariaDB. Connect both connections first: each side then works through its own route, on a session of
+its own. The compare only reads; nothing changes until you run the sync script yourself.
 
 ## Run a compare
 
