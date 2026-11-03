@@ -241,7 +241,7 @@ extension AppTests {
             let restore = RestoreSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: true)
             restore.show(on: window, loads: false)
             restore.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["this_database_name_is_sixty_four_characters_long_the_most_it_has"])
-            restore.use(URL(fileURLWithPath: "/Users/Shared/" + String(repeating: "very long folder name/", count: 6) + "dump.sql"))
+            restore.use(URL(fileURLWithPath: "/Volumes/Backups/" + String(repeating: "very long folder name/", count: 6) + "dump.sql"))
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             if let sheet = window.attachedSheet { check(sheet, "Run SQL File") }
             restore.close()

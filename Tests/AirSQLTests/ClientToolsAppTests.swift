@@ -130,10 +130,10 @@ extension AppTests {
             sheet.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["crm", "shop"])
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the file to run first")
-            sheet.use(URL(fileURLWithPath: "/Users/Shared/shop-2026-11-03.sql.gz"))
+            sheet.use(URL(fileURLWithPath: "/Volumes/Backups/shop-2026-11-03.sql.gz"))
             #expect(sheet.runButton.isEnabled)
             let command = await Self.text(harness, "restore.command")
-            #expect(command == "/usr/bin/gzip -dc /Users/Shared/shop-2026-11-03.sql.gz | /opt/homebrew/opt/mariadb/bin/mariadb "
+            #expect(command == "/usr/bin/gzip -dc /Volumes/Backups/shop-2026-11-03.sql.gz | /opt/homebrew/opt/mariadb/bin/mariadb "
                 + "--defaults-file=‹private temporary file› --protocol=SOCKET --socket=/tmp/mysql.sock "
                 + "--default-character-set=utf8mb4 --batch shop", "\(command)")
         }

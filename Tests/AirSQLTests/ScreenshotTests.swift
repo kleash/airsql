@@ -151,7 +151,7 @@ extension AppTests {
                 let restore = RestoreSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: false)
                 restore.show(on: main.window!, loads: false)
                 restore.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["crm", "shop"])
-                restore.use(URL(fileURLWithPath: "/Users/Shared/Backups/shop-2026-11-03-0912.sql.gz"))
+                restore.use(URL(fileURLWithPath: "/Volumes/Backups/shop-2026-11-03-0912.sql.gz"))
                 _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
                 try await save(harness, "restore-\(suffix)")
                 restore.close()
