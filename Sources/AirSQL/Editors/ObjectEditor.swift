@@ -58,6 +58,8 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         code.isAutomaticSpellingCorrectionEnabled = false
         code.isContinuousSpellCheckingEnabled = false
         code.allowsUndo = true
+        code.usesFindBar = true
+        code.isIncrementalSearchingEnabled = true
         code.font = .monospacedSystemFont(ofSize: 12.5, weight: .regular)
         code.textContainerInset = NSSize(width: Spacing.unit, height: Spacing.unit)
         code.isVerticallyResizable = true
@@ -187,6 +189,9 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
 
     var applyReason: String? {
         if isBusy { return "Wait until the server has answered" }
+        if context.connection.readOnly {
+            return "“\(context.connection.displayName)” is read-only: turn that off in its connection settings to change anything"
+        }
         if name != nil, code.string == original { return "Nothing to apply yet" }
         if case .failure(let error) = statements { return "Fix this first: " + error.message }
         return nil

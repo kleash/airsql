@@ -184,6 +184,9 @@ extension TableEditorController {
     /// Why Apply can't run now (nil: it can).
     var applyReason: String? {
         if isBusy { return "Wait until the server has answered" }
+        if context.connection.readOnly {
+            return "“\(context.connection.displayName)” is read-only: turn that off in its connection settings to change anything"
+        }
         switch statements {
         case .failure(let error): return "Fix this first: " + error.message
         case .success(let statements): return statements.isEmpty ? "Nothing to apply yet" : nil

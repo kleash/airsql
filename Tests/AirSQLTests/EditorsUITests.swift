@@ -137,6 +137,24 @@ extension AppTests {
             #expect(main.selectedTab?.title == "New table" && editor.isEdited)
             #expect(editor.sqlText.string.contains("CREATE TABLE `airsql_fixture`.`new_table` (\n  `id` int unsigned NOT NULL AUTO_INCREMENT,"))
             #expect(editor.applyButton.isEnabled)
+            // Return edits the selected row's name.
+            editor.list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            main.window?.makeFirstResponder(editor.list)
+            editor.list.keyDown(with: try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                                    windowNumber: main.window?.windowNumber ?? 0, context: nil,
+                                                                    characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+                                                                    keyCode: 36)))
+            #expect(main.window?.firstResponder is NSTextView)
+        }
+
+        @Test func aReadOnlyConnectionCantApply() async throws {
+            var connection = Fixtures.local
+            connection.readOnly = true
+            let (main, _) = appWindow(testModel([connection]))
+            main.openTableEditor(nil, database: database, context: try await recordedEditorContext(connection))
+            let editor = try #require(main.selectedTab?.content as? TableEditorController)
+            await ready { editor.isBusy || !editor.overlay.isHidden }
+            #expect(!editor.applyButton.isEnabled && editor.applyButton.toolTip?.contains("is read-only") == true)
         }
 
         @Test func theObjectEditorShowsTheCodeAndWhoItRunsAs() async throws {

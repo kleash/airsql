@@ -11,6 +11,8 @@ final class EditorList: NSTableView {
     override func keyDown(with event: NSEvent) {
         if event.charactersIgnoringModifiers == "\u{7f}" || event.specialKey == .deleteForward, !selectedRowIndexes.isEmpty {
             sendCommand(Commands.deleteRows.action)
+        } else if event.specialKey == .carriageReturn || event.specialKey == .enter, selectedRow >= 0, let action = doubleAction {
+            NSApp.sendAction(action, to: target, from: self)  // Return edits the row, as a double-click does
         } else {
             super.keyDown(with: event)
         }
