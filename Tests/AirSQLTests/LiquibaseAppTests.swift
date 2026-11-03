@@ -131,15 +131,14 @@ extension AppTests {
         }
 
         @Test func theConsoleSavesItsSelectionAndASyncScriptGoesBackToItsCompare() async throws {
-            let (main, harness) = ClientToolsAppTests.window()
+            let (main, harness, console) = try await ConsoleAppTests.console()
             let file = URL(fileURLWithPath: try scratch()).appendingPathComponent("changelog.sql")
-            try "--liquibase formatted sql\n".write(to: file, atomically: true, encoding: .utf8)
             main.model.data.settings.liquibase.changelog = file.path
             let sql = "USE `shop`;\nCREATE TABLE `shop`.`notes` (`id` int PRIMARY KEY);\nSELECT 1;"
-            let console = try #require(main.openConsole(text: sql, title: "Notes", connection: nil).content as? ConsoleViewController)
+            console.editor.setText(sql)
             console.editor.setSelectedRange(NSRange(location: 0, length: (sql as NSString).range(of: "SELECT").location))
-            let responder = try Self.responder(of: main)
-            responder.saveAsChangeset(nil)
+            let menu = await call(harness, "menu", ["path": "Query > Save as Changeset…"])
+            #expect(menu.error == nil, "\(menu.error ?? "")")
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             let root = try #require(main.window?.attachedSheet?.contentView)
             let save = try #require(descendants(of: root).compactMap { $0 as? NSButton }.first { $0.title == "Save" })
@@ -152,7 +151,7 @@ extension AppTests {
             // A compare's sync script: its compare saves it, a changeset per step, as Run hands it to the compare.
             var handed = false
             console.syncChangesets = { handed = true; return true }
-            responder.saveAsChangeset(nil)
+            _ = await call(harness, "menu", ["path": "Query > Save as Changeset…"])
             #expect(handed && main.window?.attachedSheet == nil)
         }
 
