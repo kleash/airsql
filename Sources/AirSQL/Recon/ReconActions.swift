@@ -21,15 +21,7 @@ extension ReconWindowController {
     @objc func showSyncScript(_ sender: Any?) {
         guard let result, let window, let saved = target.connection, let main else { return }
         let destructive = results.detail.includeDestructive
-        guard !result.steps(destructive: destructive).isEmpty else {
-            let why = !result.objects.contains(where: \.differs) ? "The two databases match."
-                : !destructive && !result.steps(destructive: true).isEmpty
-                ? "What differs only goes away with destructive steps (DROP, DELETE): tick “Include destructive steps” to put "
-                    + "them in the script."
-                : "The script can't change what differs (rows of tables without a key, or too many rows to list)."
-            showError(why, title: "Nothing to sync", on: window)
-            return
-        }
+        if let why = nothingToSync(result, destructive: destructive) { return showError(why, title: "Nothing to sync", on: window) }
         let script = result.script(destructive: destructive).map { $0 + ";" }.joined(separator: "\n\n")
         guard let console = main.openConsole(text: script, title: "Sync script · \(result.target.database)",
                                              connection: saved.id).content as? ConsoleViewController else { return }
@@ -39,6 +31,16 @@ extension ReconWindowController {
         console.note(.info, "The compare's sync script, to review: it can't be edited here. Run shows it in the SQL preview "
                      + "in the compare window first; nothing runs on its own.")
         main.showWindow(nil)
+    }
+
+    /// Why the sync script is empty; nil when it has steps.
+    private func nothingToSync(_ result: ReconResult, destructive: Bool) -> String? {
+        guard result.steps(destructive: destructive).isEmpty else { return nil }
+        return !result.objects.contains(where: \.differs) ? "The two databases match."
+            : !destructive && !result.steps(destructive: true).isEmpty
+            ? "What differs only goes away with destructive steps (DROP, DELETE): tick “Include destructive steps” to put "
+                + "them in the script."
+            : "The script can't change what differs (rows of tables without a key, or too many rows to list)."
     }
 
     /// The sync script in the SQL preview; run on a session of the target's own only when the person approves.
@@ -136,6 +138,7 @@ extension ReconWindowController {
     private func saveLiquibase(_ result: ReconResult, destructive: Bool) {
         guard let window else { return }
         window.makeKeyAndOrderFront(nil)
+        if let why = nothingToSync(result, destructive: destructive) { return showError(why, title: "Nothing to save", on: window) }
         ChangesetSheet.show(Liquibase.changesets(result, destructive: destructive, rollback: model.data.settings.liquibase.rollback),
                             heading: "Save the sync script for \(result.target.name) · \(result.target.database) as changesets",
                             model: model, on: window)
