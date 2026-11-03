@@ -91,8 +91,9 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
 - **The tabs** hold your queries and tables. Double-click a tab to rename it; right-click it to close others or
   duplicate it.
-- **The toolbar** shows the connection and database a tab works on, Run (⌘↩), Run All (⇧⌘↩), Explain, and the
-  transaction buttons.
+- **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
+  All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
+  now is dimmed, and its tooltip says why.
 - **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to
   cancel), what agents are doing, and the SQL log. Click an item for details; right-click it to copy it.
 
@@ -312,7 +313,8 @@ own session, which every console tab of that connection shares.
 ## Open a console
 
 - **File ▸ New Query** (⌘T), the **+** at the end of the tabs, or **New Query** on a connection's menu opens an empty
-  console on the selected connection.
+  console on the selected connection. **New Query** on a database's menu (or ⌘T while a database is selected in the
+  sidebar) makes that database the current one first.
 - **File ▸ Open…** (⌘O) opens .sql files, each in a console of its own. You can also drop .sql files on the editor.
 - **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
@@ -358,6 +360,14 @@ connection can have a query timeout: a statement that runs longer is stopped the
 
 Console tabs of one connection share its session, so while one runs a statement the others wait.
 
+### The current database
+
+Statements run in the connection's current database, which the toolbar's database pop-up shows and the sidebar shows in
+bold. Choose another in the pop-up, double-click one in the sidebar, or type `USE`: all three change the same one, for
+every console tab of the connection. A database chosen in the pop-up or the sidebar is made current with `USE` just
+before the next statement runs (Messages shows it), so a run under way is never switched midway; if that `USE` fails,
+nothing runs.
+
 ## Results and Messages
 
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
@@ -371,11 +381,14 @@ Console tabs of one connection share its session, so while one runs a statement 
 
 ## Transactions
 
-- **Tx: Auto-commit** (the toolbar, or Query ▸ Transaction Mode) commits each statement by itself. In **Manual**, your
-  changes wait in a transaction until you press **Commit**, or **Rollback** to undo them. Leaving Manual with changes
-  waiting asks first whether to commit them or roll them back.
-- **Query ▸ Isolation Level** sets how the console's transactions see others' changes. Until you choose one, the
-  server's own applies (usually Repeatable Read).
+- **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
+  **Manual**, your changes wait in a transaction until you press **Commit**, or **Rollback** to undo them. Leaving
+  Manual with changes waiting asks first whether to commit them or roll them back.
+- The **isolation level** (in the Tx pop-up, or Query ▸ Isolation Level) sets how the console's transactions see
+  others' changes: Read Uncommitted, Read Committed, Repeatable Read or Serializable, set on the console's session with
+  `SET SESSION TRANSACTION ISOLATION LEVEL`. Until you choose one, the server's own applies (usually Repeatable Read).
+- The toolbar's Run, Commit, Rollback and Cancel are on only when the console can do them now; when one is off, its
+  tooltip says why (not connected, no transaction open, nothing running).
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
 - Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
@@ -496,7 +509,8 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](https://kleash.github.io/airsql/editors.html));
   **Create Table…** and **New…** make a table or object in the database you right-clicked.
-- **Double-click** a database to make it the current one (it shows in bold) and open it.
+- **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
+  open it. The console's statements run in the current database ([The SQL console](https://kleash.github.io/airsql/console.html)).
 - **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
@@ -524,6 +538,18 @@ Every change shows its SQL first ([Check SQL before it runs](https://kleash.gith
   said in a tab. Analyze, Optimize and Repair show their SQL first: Optimize rebuilds a table and locks it meanwhile.
 
 A read-only connection offers none of these.
+
+## Write SQL from the tree
+
+These open a console tab with the SQL in it, built from the names AirSQL read; nothing runs until you press Run.
+
+- **Generate SELECT**, **Generate INSERT** and **Generate UPDATE** on a table's or view's menu (in the sidebar or the
+  database view) write a statement with its columns. A `?` marks each value for you to fill in: INSERT leaves out the
+  columns the server fills itself (auto-increment and generated ones), and UPDATE finds the row by its primary key (or a
+  unique key whose columns can't be NULL; without one, you write the condition).
+- **Run…** on a procedure's menu writes its `CALL`, with a `?` and the name and type of each value it takes; OUT and
+  INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
+- **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
 
 ## Find text on the server
 
@@ -725,8 +751,9 @@ Source: https://kleash.github.io/airsql/compare.html
 
 **Tools ▸ Compare…** (or **Compare…** in a connection's or a database's menu, which starts from it) opens a window
 that compares two databases, on the same server or on two different connections, such as production against staging
-or MySQL 8 against MariaDB. Connect both connections first: each side then works through its own route, on a session of
-its own. The compare only reads; nothing changes until you run the sync script yourself.
+or MySQL 8 against MariaDB. A connection that isn't connected connects when you choose it, asking for a password or
+to trust a certificate on the compare window as the main window would; each side then works through its own route, on
+a session of its own. The compare only reads; nothing changes until you run the sync script yourself.
 
 ## Run a compare
 

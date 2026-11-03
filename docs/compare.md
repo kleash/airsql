@@ -7,8 +7,9 @@ nav_order: 14
 
 **Tools ▸ Compare…** (or **Compare…** in a connection's or a database's menu, which starts from it) opens a window
 that compares two databases, on the same server or on two different connections, such as production against staging
-or MySQL 8 against MariaDB. Connect both connections first: each side then works through its own route, on a session of
-its own. The compare only reads; nothing changes until you run the sync script yourself.
+or MySQL 8 against MariaDB. A connection that isn't connected connects when you choose it, asking for a password or
+to trust a certificate on the compare window as the main window would; each side then works through its own route, on
+a session of its own. The compare only reads; nothing changes until you run the sync script yourself.
 
 ## Run a compare
 
