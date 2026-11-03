@@ -144,7 +144,8 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         case .options: content = optionsTab()
         case .agents: content = agentsTab()
         }
-        // In a scroll view, for a tab taller than a small screen leaves room for (the Options tab with its own checks).
+        // In a scroll view: a tab can be taller than a small screen leaves room for (Options, with the connection's own
+        // safety checks).
         let document = FlippedView()
         document.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(content)

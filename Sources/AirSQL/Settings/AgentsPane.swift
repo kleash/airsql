@@ -143,28 +143,26 @@ final class AgentsPane: SettingsPaneController {
                 item.toolTip = "Let agents have \(level.title) access to \(connection.displayName)"
             }
             menu.addItem(.separator())
-            let samples = menu.addItem(withTitle: "Sample Rows", action: connection.agentAccess == .off ? nil : #selector(chose(_:)),
-                                       keyEquivalent: "")
+            let samples = menu.addItem(withTitle: "Sample Rows", action: #selector(chose(_:)), keyEquivalent: "")
             samples.tag = -1
             samples.state = connection.agentSampleRows ? .on : .off
             samples.toolTip = connection.agentAccess == .off ? "Choose an access other than Off first: agents see nothing of "
                 + connection.displayName : "Let describe show agents a few rows of \(connection.displayName)'s tables"
-            menu.items.forEach { if $0.action != nil { $0.target = self } }
+            menu.items.forEach { $0.target = self }
             menu.autoenablesItems = false
             samples.isEnabled = connection.agentAccess != .off
-            self.menuTable = table
+            menuTable = table
             return menu
         }
 
         private weak var menuTable: NSTableView?
 
-        /// A level or Sample Rows chosen from a row's menu: saves that connection.
+        /// A level or Sample Rows chosen from a row's menu: saves that connection (the list follows the model).
         @objc func chose(_ item: NSMenuItem) {
-            guard let model, let table = menuTable, connections.indices.contains(table.selectedRow) else { return }
-            var saved = connections[table.selectedRow]
+            guard let model, let row = menuTable?.selectedRow, connections.indices.contains(row) else { return }
+            var saved = connections[row]
             if item.tag < 0 { saved.agentSampleRows.toggle() } else { saved.agentAccess = AgentAccess.allCases[item.tag] }
             model.save(saved)
-            table.reloadData(forRowIndexes: [table.selectedRow], columnIndexes: [1, 2])
         }
 
         func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
