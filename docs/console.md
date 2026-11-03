@@ -116,7 +116,7 @@ shows in a sheet, with what it will do:
   server's table, or as a tree (MySQL's own tree; MariaDB's plan made into one).
 - **Query ▸ Profile** runs the statement and shows where the server spent its time. On MySQL 8 and later it reads
   performance_schema: the statement's stages where the server records them, else its own figures (time, lock time,
-  rows examined and sent, temporary tables, sorts and full scans). Elsewhere, and where performance_schema is off or
-  your login can't read it, it shows SHOW PROFILE's steps, with a note saying why.
+  rows examined and sent, temporary tables, sorts and full scans). Elsewhere it shows SHOW PROFILE's steps, as it does
+  on MySQL 8 when performance_schema is off or your login can't read it, with a note saying so.
 - **Query ▸ Save as Changeset…** saves the selected statements (or the one at the cursor) as a Liquibase changeset in a
   changelog you choose. See [Liquibase changelogs](liquibase.md).
