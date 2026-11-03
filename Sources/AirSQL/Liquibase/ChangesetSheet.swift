@@ -258,11 +258,13 @@ final class ChangesetSheet: NSWindowController {
         }
     }
 
-    /// Adds `text` at the end of the changelog at `url`, or writes a new one from its header.
+    /// Adds `text` at the end of the changelog at `url`, or writes a new one from its header (`new`, or no file there).
+    /// A changelog that can't be opened for writing (read-only) throws: it is never written over.
     nonisolated static func append(_ text: String, to url: URL, new: Bool) throws {
-        guard !new, let handle = try? FileHandle(forUpdating: url) else {
+        guard !new, FileManager.default.fileExists(atPath: url.path) else {
             return try (LiquibaseChangelog.header + "\n\n" + text).write(to: url, atomically: true, encoding: .utf8)
         }
+        let handle = try FileHandle(forUpdating: url)
         defer { try? handle.close() }
         let end = try handle.seekToEnd()
         var ending = ""

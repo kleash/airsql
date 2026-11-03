@@ -130,6 +130,22 @@ extension AppTests {
             #expect(read[2].rollbackStatements == ["ALTER TABLE `orders` DROP COLUMN `paid`"])
         }
 
+        /// A changelog that can't be written (read-only, as a Perforce checkout leaves it) says so and keeps its
+        /// changesets; a missing one starts from the header.
+        @Test func aReadOnlyChangelogIsNeverWrittenOver() throws {
+            let folder = URL(fileURLWithPath: try scratch())
+            let file = folder.appendingPathComponent("changelog.sql")
+            let text = "--liquibase formatted sql\n\n--changeset ann:1\nSELECT 1;\n\n--changeset ann:2\nSELECT 2;\n"
+            try text.write(to: file, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: file.path)
+            defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path) }
+            #expect(throws: (any Error).self) { try ChangesetSheet.append("--changeset ann:3\nSELECT 3;", to: file, new: false) }
+            #expect(try String(contentsOf: file, encoding: .utf8) == text)
+            let missing = folder.appendingPathComponent("new.sql")
+            try ChangesetSheet.append("--changeset ann:1\nSELECT 1;", to: missing, new: false)
+            #expect(try String(contentsOf: missing, encoding: .utf8) == LiquibaseChangelog.header + "\n\n--changeset ann:1\nSELECT 1;")
+        }
+
         @Test func theConsoleSavesItsSelectionAndASyncScriptGoesBackToItsCompare() async throws {
             let (main, harness, console) = try await ConsoleAppTests.console()
             let file = URL(fileURLWithPath: try scratch()).appendingPathComponent("changelog.sql")
