@@ -253,7 +253,7 @@ public struct SQLLexer {
     static func isDigit(_ c: UInt16) -> Bool { (0x30...0x39).contains(c) }
     static func isHexDigit(_ c: UInt16) -> Bool { isDigit(c) || (0x41...0x46).contains(c) || (0x61...0x66).contains(c) }
     /// Letters, digits, _ and $, and anything beyond ASCII (MySQL reads every multibyte character as part of a name).
-    static func isNameChar(_ c: UInt16) -> Bool {
+    public static func isNameChar(_ c: UInt16) -> Bool {
         c >= 0x80 || c == 0x5F || c == 0x24 || isDigit(c) || (0x41...0x5A).contains(c) || (0x61...0x7A).contains(c)
     }
 }

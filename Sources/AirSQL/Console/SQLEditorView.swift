@@ -151,31 +151,9 @@ final class SQLEditorView: NSTextView {
         let end = suffix > 0 ? new[new.count - suffix].range.lowerBound : highlightedLength
         guard start <= end else { return }
         let range = NSRange(location: start, length: end - start)
-        let semibold = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
-        let italic = NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(.italic), size: font.pointSize) ?? font
-        let utf16 = Array(text.utf16)
         storage.beginEditing()
         storage.setAttributes([.font: font, .foregroundColor: NSColor.labelColor], range: range)
-        for index in prefix..<(new.count - suffix) {
-            let token = new[index]
-            var color = NSColor.sqlIdentifier, style: NSFont?
-            switch token.kind {
-            case .comment, .hint, .codeStart, .codeEnd: (color, style) = (.sqlComment, italic)
-            case .string: color = .sqlString
-            case .number: color = .sqlNumber
-            case .quotedName: break
-            case .variable, .symbol: continue
-            case .word:
-                let word = String(decoding: utf16[token.range], as: UTF16.self).uppercased()
-                if SQLWords.reserved.contains(word) {
-                    (color, style) = (.sqlKeyword, semibold)
-                } else if index + 1 < new.count, new[index + 1].kind == .symbol, utf16[new[index + 1].range.lowerBound] == 0x28 {
-                    color = .sqlFunction
-                }
-            }
-            storage.addAttribute(.foregroundColor, value: color, range: NSRange(token.range))
-            if let style { storage.addAttribute(.font, value: style, range: NSRange(token.range)) }
-        }
+        SQLPreviewSheet.colour(storage, tokens: new, prefix..<(new.count - suffix), text: Array(text.utf16), font: font)
         storage.endEditing()
     }
 

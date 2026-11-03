@@ -189,10 +189,18 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     /// in italic. Words that aren't reserved count as names, since only reserved words can't be one.
     static func coloured(_ sql: String, font: NSFont, noBackslashEscapes: Bool) -> NSAttributedString {
         let result = NSMutableAttributedString(string: sql, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        let tokens = SQLLexer.tokens(sql, noBackslashEscapes: noBackslashEscapes)
+        colour(result, tokens: tokens, tokens.indices, text: Array(sql.utf16), font: font)
+        return result
+    }
+
+    /// Colours `tokens[indices]` of `text` in `string` as `coloured` does: the console's editor colours what changed.
+    static func colour(_ string: NSMutableAttributedString, tokens: [SQLToken], _ indices: Range<Int>, text: [UInt16],
+                       font: NSFont) {
         let semibold = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
         let italic = NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(.italic), size: font.pointSize) ?? font
-        let text = Array(sql.utf16), tokens = SQLLexer.tokens(sql, noBackslashEscapes: noBackslashEscapes)
-        for (k, token) in tokens.enumerated() {
+        for k in indices {
+            let token = tokens[k]
             var color = NSColor.sqlIdentifier, style: NSFont?
             switch token.kind {
             case .comment, .hint, .codeStart, .codeEnd: (color, style) = (.sqlComment, italic)
@@ -208,10 +216,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
                     color = .sqlFunction
                 }
             }
-            result.addAttribute(.foregroundColor, value: color, range: NSRange(token.range))
-            if let style { result.addAttribute(.font, value: style, range: NSRange(token.range)) }
+            string.addAttribute(.foregroundColor, value: color, range: NSRange(token.range))
+            if let style { string.addAttribute(.font, value: style, range: NSRange(token.range)) }
         }
-        return result
     }
 
     private func banner(_ text: String, symbol: String, color: NSColor, id: String) -> NSView {

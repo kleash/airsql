@@ -75,6 +75,14 @@ extension AppTests {
             #expect(!ConsoleViewController.changesSchema("SELECT 'CREATE'") && !ConsoleViewController.changesSchema("INSERT INTO t VALUES (1)"))
         }
 
+        /// What a DROP or TRUNCATE asks to be typed: the names without their backticks, dots and commas inside them kept.
+        @Test func typedNamesLoseOnlyTheirBackticks() {
+            #expect(ConsoleSafety.unquoted("`shop`.`my orders`") == "shop.my orders")
+            #expect(ConsoleSafety.unquoted("`my.db`") == "my.db")
+            #expect(ConsoleSafety.unquoted("`a`, shop.`b``c`") == "a, shop.b`c")
+            #expect(ConsoleSafety.unquoted("plain") == "plain")
+        }
+
         @Test func typingColoursTheSQLAndTheEditorsCommandsChangeIt() async throws {
             let (main, harness, console) = try await Self.console()
             _ = await call(harness, "type", ["text": "select a, `from` from t where x = 'from' -- note"])
