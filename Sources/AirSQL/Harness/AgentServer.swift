@@ -320,7 +320,7 @@ final class AgentServer {
             throw Failure("set needs an id or a title (a label, title or placeholder).")
         }
         for window in try scopes(arguments["in"] as? String) where !(window is NSSavePanel) {
-            guard let node = field(query, in: nodes(window)) else { continue }
+            guard let node = field(query, in: nodes(window)) ?? viewField(query, in: window) else { continue }
             guard node.enabled else { throw Failure("“\(query)” is disabled now" + (node.help.map { ": " + $0 } ?? ".")) }
             try checkAgentMayAct(in: window)
             if let text = value as? String { try await checkPersonAllows(text, into: node.view) }
@@ -340,6 +340,14 @@ final class AgentServer {
         }
         if ["password", "passphrase"].contains(wanted) { return fields.first(where: \.isSecure) }
         return nil
+    }
+
+    /// A text view or field the accessibility tree doesn't list (the console's editor), by its id among the views.
+    private func viewField(_ id: String, in window: NSWindow) -> AXNode? {
+        Self.views(NSView.self, in: window.contentView).first { view in
+            (view is NSTextView || view is NSTextField) && view.accessibilityIdentifier() == id && !view.isHiddenOrHasHiddenAncestor
+                && !hidesData(view)
+        }.map { AXNode(object: $0) }
     }
 
     private func set(_ node: AXNode, to value: Any) throws {
