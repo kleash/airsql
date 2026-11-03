@@ -74,14 +74,21 @@ func result(_ messages: [[String: Any]], _ id: Int) -> [String: Any]? {
         #expect((initialized["instructions"] as? String)?.contains("context") == true)
         let tools = try #require(result(messages, 2)?["tools"] as? [[String: Any]])
         let names = tools.compactMap { $0["name"] as? String }
+        let ui = ["snapshot", "screenshot", "menu", "press", "set", "select", "key", "type", "click", "double_click",
+                  "right_click", "wait"]
         #expect(names == ["context", "get_schema", "describe", "run_queries", "profile", "explain", "open_in_console",
-                          "read_console", "guide"])
-        for tool in tools where tool["name"] as? String != "guide" {
-            let output = try #require(tool["outputSchema"] as? [String: Any], "\(tool["name"]!) has an output schema")
-            #expect(output["type"] as? String == "object")
+                          "read_console", "guide"] + ui)
+        for tool in tools {
+            let name = tool["name"] as? String ?? ""
             let annotations = try #require(tool["annotations"] as? [String: Any])
             #expect(annotations["destructiveHint"] as? Bool == false)
-            #expect(annotations["readOnlyHint"] as? Bool == (tool["name"] as? String != "open_in_console"))
+            let reads = !["open_in_console", "menu", "press", "set", "select", "key", "type", "click", "double_click",
+                          "right_click"].contains(name)
+            #expect(annotations["readOnlyHint"] as? Bool == reads, "\(name)")
+            // UI tools answer with JSON as text (screenshot: an image), as AirSCP's do.
+            guard name != "guide", !ui.contains(name) else { continue }
+            let output = try #require(tool["outputSchema"] as? [String: Any], "\(name) has an output schema")
+            #expect(output["type"] as? String == "object")
         }
         let templates = try #require(result(messages, 3)?["resourceTemplates"] as? [[String: Any]])
         #expect(templates.first?["uriTemplate"] as? String == "airsql://{connection}/schema")
