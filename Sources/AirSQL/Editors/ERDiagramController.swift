@@ -83,7 +83,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
             do {
                 if context.schema.snapshot.server == nil { try await context.schema.load() }
                 let names = context.schema.snapshot.databases.map(\.name)
-                let database = self.database ?? context.schema.snapshot.databases.first { !$0.tables.isEmpty }?.name ?? names.first
+                let database = self.database ?? context.firstDatabase(withTables: true)
                 guard let database else { throw DesignError("The server has no database to draw") }
                 try await context.schema.loadDetails([database])
                 guard let schema = context.schema.snapshot.database(database) else { throw DesignError("\(database) isn't on the server any more") }

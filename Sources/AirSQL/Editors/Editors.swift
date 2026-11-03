@@ -3,7 +3,9 @@ import AppKit
 
 /// What the editors work on (the table editor, the object editors, the ER diagram): a connected connection, its
 /// sessions (the editors read and run on a tools session of their own, opened for each piece of work) and its schema
-/// cache (refreshed after each change, so the tree and completion see it).
+/// cache (refreshed after each change, so the tree and completion see it). On the main actor: the statements run on
+/// their session's own thread, so nothing waits here.
+@MainActor
 struct EditorContext {
     let connection: SavedConnection
     let sessions: Connection
@@ -32,6 +34,14 @@ struct EditorContext {
 
     /// The server, once the schema cache has read it.
     var server: SchemaServer? { schema.snapshot.server }
+
+    /// Where a new table or object goes, and what a diagram first draws, when nothing says: the first database that
+    /// isn't the server's own (with tables, if `withTables`).
+    func firstDatabase(withTables: Bool = false) -> String? {
+        let own: Set<String> = ["information_schema", "performance_schema", "mysql", "sys"]
+        let databases = schema.snapshot.databases.filter { !own.contains($0.name.lowercased()) }
+        return (withTables ? databases.first { !$0.tables.isEmpty } : nil)?.name ?? databases.first?.name
+    }
 }
 
 /// The editors' way in for the rest of the app. Whatever connects a connection (L1) sets `open`, which gives a
@@ -107,7 +117,7 @@ extension MainWindowController {
         guard let (context, database) = editorTarget,
               let kind = (item?.representedObject as? String).flatMap(ObjectKind.init(rawValue:))
                 ?? item.flatMap({ ObjectKind.allCases.indices.contains($0.tag - 1) ? ObjectKind.allCases[$0.tag - 1] : nil }),
-              let database = database ?? context.schema.snapshot.databases.first?.name else { return }
+              let database = database ?? context.firstDatabase() else { return }
         openObjectEditor(kind, name: nil, database: database, context: context)
     }
 

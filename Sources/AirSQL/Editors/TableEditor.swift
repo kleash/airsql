@@ -148,7 +148,7 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
             before = try await readTable(database, table)
             design = before!
         } else {
-            if self.database == nil { self.database = context.schema.snapshot.databases.first?.name }
+            if self.database == nil { self.database = context.firstDatabase() }
             var id = ColumnDesign(name: "id", type: TypeSpec(name: "int", unsigned: true))
             id.nullable = false
             id.autoIncrement = true
