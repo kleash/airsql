@@ -48,7 +48,6 @@ extension ResultGridView {
     /// Why a cell (the viewer's row) can't be edited; nil when it can.
     func whyReadOnly(_ row: Int, _ column: Int) -> String? {
         guard let edits else { return nil }
-        if editingContext == nil { return "Connect to the connection to edit its rows" }
         return editingOff ?? edits.reason(column) ?? (edits.canEdit(rows.baseRow(row), column) ? nil : "The row is marked for deletion")
     }
 
