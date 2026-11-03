@@ -126,7 +126,7 @@ public struct ResultEditing: Equatable {
 
     /// Why no column of the statement's result can be edited, from its words: nil for a plain SELECT, inner joins
     /// included.
-    static func statementRefusal(_ sql: String, noBackslashEscapes: Bool) -> String? {
+    public static func statementRefusal(_ sql: String, noBackslashEscapes: Bool) -> String? {
         let units = Array(sql.utf16)
         let code = SQLLexer.tokens(sql, noBackslashEscapes: noBackslashEscapes)
             .filter { ![.comment, .codeStart, .codeEnd, .hint].contains($0.kind) }

@@ -42,9 +42,20 @@ extension ConsoleViewController {
         let tab = ResultTab(title: title ?? "Result \(resultNumber)", content: .rows(store), summary: summary)
         let settings = model.data.settings
         let key = connectionID.flatMap { id in query.map { GridViewer.ViewKey(connection: id, database: database ?? "", table: $0) } }
-        tab.makeView = {
-            ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize), viewKey: key,
-                           transposed: settings.transposeSingleRow && store.rowCount == 1 && store.columns.count > 1)
+        // A query's rows may be edited (ResultGridView+Editing) on the connection it ran on.
+        let context = query == nil ? nil : Editors.context(connection, in: model)
+        let (database, noBackslashEscapes) = (database, editor.noBackslashEscapes)
+        tab.makeView = { [weak self] in
+            let view = ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize), viewKey: key,
+                                      transposed: settings.transposeSingleRow && store.rowCount == 1 && store.columns.count > 1,
+                                      editable: query != nil)
+            if let query, let self {
+                view.editingContext = context
+                view.model = model
+                view.transactionOpen = { [weak self] in self?.session?.inTransaction == true }
+                view.prepareEditing(sql: query, database: database, noBackslashEscapes: noBackslashEscapes)
+            }
+            return view
         }
         resultTabs.append(tab)
         if selectedResult == nil || selectedResult === messagesTab { selectedResult = tab }

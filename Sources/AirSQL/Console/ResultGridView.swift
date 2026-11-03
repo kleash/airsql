@@ -2,9 +2,10 @@ import AirSQLCore
 import AppKit
 
 /// A result tab's rows in the data grid (plan §2.5's embedding API: a `ResultSetSource` over the statement's
-/// `ResultStore`, or a `DiffSource` for a compared result), read-only, in a `GridViewer` (the status bar's figures, the
-/// value panel, Record View, the grids' copy formats, columns kept per query). The headers' sort controls sort the rows
-/// here (⌥ adds a column), asking first above 100,000 rows; Export Rows… saves them.
+/// `ResultStore`, or a `DiffSource` for a compared result), in a `GridViewer` (the status bar's figures, the value panel,
+/// Record View, the grids' copy formats, columns kept per query). The headers' sort controls sort the rows here (⌥ adds
+/// a column), asking first above 100,000 rows; Export Rows… saves them. A console's result of a SELECT is a
+/// `ResultEditSource`, editable when its tables' keys are in it (`ResultGridView+Editing`); the rest are read-only.
 @MainActor
 final class ResultGridView: NSView, DataGridViewDelegate {
     let viewer: GridViewer
@@ -14,13 +15,25 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     let rows: ReorderedSource
     /// The table the rows come from, for the SQL formats and the export's name.
     private let table: (database: String?, name: String)
+    /// Editing a console result: the connection it was run on (nil: not connected), the app (for Settings ▸ Safety),
+    /// whether the console has a transaction open, and the data session's sql_mode and time zone once read.
+    var editingContext: EditorContext?
+    /// The data session, where Apply runs (the tests give their own); set by `prepareEditing` when nil.
+    var openSession: (() async throws -> TableSession)?
+    weak var model: AppModel?
+    var transactionOpen: () -> Bool = { false }
+    var editContext: EditContext?
+    /// The pending changes' bar over the rows, and "Editable" or "Read-only" in the status bar.
+    let notice = TableDataNotice()
+    let editState = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
 
     /// `viewKey`: where its columns are kept (the statement, on its connection).
     /// `transposed`: shown on its side (a result with one row).
+    /// `editable`: a console's result, whose cells may be edited (`prepareEditing`).
     convenience init(store: ResultStore, nullText: String, fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil,
-                     transposed: Bool = false) {
-        self.init(source: ResultSetSource(store), table: Self.table(of: store.columns), nullText: nullText, fontSize: fontSize,
-                  viewKey: viewKey, transposed: transposed)
+                     transposed: Bool = false, editable: Bool = false) {
+        self.init(source: editable ? ResultEditSource(store) : ResultSetSource(store), table: Self.table(of: store.columns),
+                  nullText: nullText, fontSize: fontSize, viewKey: viewKey, transposed: transposed)
     }
 
     /// `legend`: a line above the rows saying what their colours mean (a diff's), and its tooltip.
@@ -41,21 +54,40 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         viewer.show(rows, transposed: transposed)
         grid.setAccessibilityLabel("Result rows")
         addSubview(viewer)
-        guard let legend else {
-            viewer.pin(to: self)
-            return
-        }
-        let line = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
-        line.attributedStringValue = legend.text
-        line.toolTip = legend.tip
-        line.setAccessibilityIdentifier("grid.legend")
-        addSubview(line)
         viewer.translatesAutoresizingMaskIntoConstraints = false
+        var top = topAnchor, gap: CGFloat = 0
+        if let legend {
+            let line = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
+            line.attributedStringValue = legend.text
+            line.toolTip = legend.tip
+            line.setAccessibilityIdentifier("grid.legend")
+            addSubview(line)
+            NSLayoutConstraint.activate([
+                line.topAnchor.constraint(equalTo: topAnchor, constant: 5),
+                line.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
+                line.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
+            ])
+            (top, gap) = (line.bottomAnchor, 5)
+        }
+        if source is ResultEditSource {
+            // The notice takes no room while hidden (a stack leaves hidden views out).
+            let bars = NSStackView(views: [notice])
+            bars.orientation = .vertical
+            bars.translatesAutoresizingMaskIntoConstraints = false
+            notice.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true
+            notice.owner = self
+            addSubview(bars)
+            NSLayoutConstraint.activate([
+                bars.topAnchor.constraint(equalTo: top, constant: gap), bars.leadingAnchor.constraint(equalTo: leadingAnchor),
+                bars.trailingAnchor.constraint(equalTo: trailingAnchor),
+            ])
+            (top, gap) = (bars.bottomAnchor, 0)
+            editState.setAccessibilityIdentifier("result.editState")
+            editState.isHidden = true
+            viewer.status.insertView(editState, at: 0, in: .leading)
+        }
         NSLayoutConstraint.activate([
-            line.topAnchor.constraint(equalTo: topAnchor, constant: 5),
-            line.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
-            line.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
-            viewer.topAnchor.constraint(equalTo: line.bottomAnchor, constant: 5),
+            viewer.topAnchor.constraint(equalTo: top, constant: gap),
             viewer.leadingAnchor.constraint(equalTo: leadingAnchor), viewer.trailingAnchor.constraint(equalTo: trailingAnchor),
             viewer.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
@@ -66,6 +98,10 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
         if case .column = target { return nil }
         let menu = NSMenu(title: "Result")
+        if edits?.editing?.isEditable == true {
+            menu.add([Commands.setNull, nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
+                     Commands.previewChanges, Commands.apply, nil])
+        }
         menu.add([Commands.exportRows])
         menu.items.forEach { $0.target = self }
         return menu
@@ -89,12 +125,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         } else {
             keys = (adding ? keys : []) + [DataGridView.Sort(column: column, ascending: true)]
         }
-        let sort = { [self] in
-            rows.order = keys.isEmpty ? nil : GridSorting.sorted(Array(0..<source.rowCount), by: keys.map { ($0.column, $0.ascending) },
-                                                                 columns: source.columns) { source.value($0, $1) }
-            grid.sortOrder = keys
-            viewer.reloadData()
-        }
+        let sort = { [self] in sortRows(keys) }
         guard source.rowCount > 100_000, let window else { return sort() }
         let alert = NSAlert()
         alert.messageText = "Sort \(source.rowCount.formatted()) rows here?"
@@ -104,6 +135,14 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         alert.beginSheetModal(for: window) { response in
             if response == .alertFirstButtonReturn { sort() }
         }
+    }
+
+    /// Shows the rows sorted by `keys` (none: as they came).
+    func sortRows(_ keys: [DataGridView.Sort]) {
+        rows.order = keys.isEmpty ? nil : GridSorting.sorted(Array(0..<source.rowCount), by: keys.map { ($0.column, $0.ascending) },
+                                                             columns: source.columns) { source.value($0, $1) }
+        grid.sortOrder = keys
+        viewer.reloadData()
     }
 
     /// Export Rows… (and the result tab's Export Result…): the selected rows or every row of the result.

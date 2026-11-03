@@ -173,14 +173,14 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
 final class TableDataNotice: NSView {
     enum Kind { case pending, readOnly, problem }
 
-    /// Its buttons act on the tab even while the focus is elsewhere.
-    weak var owner: TableDataController? {
+    /// Its buttons act on the tab (or the console result) even while the focus is elsewhere.
+    weak var owner: AnyObject? {
         didSet { for control in [preview, revert, apply] { control.target = owner } }
     }
     let text = label("", font: .systemFont(ofSize: 12), wraps: true)
     lazy var preview = button("Preview SQL…", id: "tableData.preview", tip: Commands.previewChanges.tip, target: nil,
                               action: Commands.previewChanges.action)
-    lazy var revert = button("Revert All", id: "tableData.revert", tip: "Throw away every pending change of this table",
+    lazy var revert = button("Revert All", id: "tableData.revert", tip: "Throw away every pending change",
                              target: nil, action: #selector(TableDataController.revertAllChanges(_:)))
     lazy var apply = button("Apply", id: "tableData.apply", tip: Commands.apply.tip, target: nil, action: Commands.apply.action)
     private var kind = Kind.readOnly
