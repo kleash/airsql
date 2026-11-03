@@ -100,6 +100,31 @@ extension AppTests {
         #expect(safety.askBeforeUnboundedWrite && safety.openTransactionMinutes == 15, "the others as Settings ▸ Safety has them")
     }
 
+    /// Unticking the connection's own checks while a limit is still being typed (a click on a checkbox leaves the
+    /// keyboard in the field without full keyboard access) keeps the editor open, back on Settings ▸ Safety's checks.
+    @Test func ownSafetyChecksCanBeTurnedOffWhileALimitIsTyped() async throws {
+        let model = testModel(Fixtures.shop)
+        let (main, harness) = appWindow(model)
+        let editor = ConnectionEditor.show(Fixtures.local, isNew: false, model: model, on: try #require(main.window)) { _, _ in }
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        editor.show(.safety)
+        let sheet = try #require(editor.window)
+        let content = try #require(sheet.contentView)
+        let own = try #require(find(NSButton.self, id: "editor.ownSafety", in: content))
+        own.state = .on
+        own.sendAction(own.action, to: own.target)
+        let field = try #require(find(NSTextField.self, id: "editor.safety.agentRowCap", in: content))
+        #expect(sheet.makeFirstResponder(field))
+        field.currentEditor()?.selectAll(nil)
+        field.currentEditor()?.insertText("500")
+        let off = try #require(find(NSButton.self, id: "editor.ownSafety", in: content))
+        off.state = .off
+        off.sendAction(off.action, to: off.target)
+        #expect(editor.draft.safety == nil && find(NSTextField.self, id: "editor.safety.agentRowCap", in: content) == nil)
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
     /// The editor's tallest tab (Safety, with the connection's own checks) scrolls within what an 800 pt high screen
     /// leaves, so the sheet fits there; on a taller screen it shows all of it.
     @Test func editorFitsAnEightHundredPointScreen() async throws {
