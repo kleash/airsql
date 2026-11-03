@@ -147,7 +147,7 @@ enum HelpPage: String, CaseIterable {
     static var reportProblem: URL {
         let system = ProcessInfo.processInfo.operatingSystemVersion
         var form = URLComponents(string: "https://github.com/kleash/airsql/issues/new")!
-        form.queryItems = [URLQueryItem(name: "version", value: version),
+        form.queryItems = [URLQueryItem(name: "template", value: "bug_report.yml"), URLQueryItem(name: "version", value: version),
                            URLQueryItem(name: "macos", value: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")]
         return form.url!
     }
