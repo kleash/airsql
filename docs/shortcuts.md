@@ -8,6 +8,9 @@ nav_order: 90
 Every command is in the menu bar, with its shortcut next to it, and right-click menus show the same commands. Hold
 the pointer over a menu item to see what it does. A greyed-out item says why it is off.
 
+⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
+Tab indents, ⌃⇥ moves on.
+
 The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delete.
 
 | Command | Shortcut |
