@@ -186,4 +186,56 @@ struct ReconLabTests {
         print("Recon: 1M rows across flavours in \(across) s; with differences \(differs.duration) s, fetched \(differs.rowsFetched)")
         try await Self.run(copy, ["DROP DATABASE lane_l8a_big"])
     }
+
+    /// Tables… choices: a renamed table mapped, a column left out, a WHERE, a table left out.
+    @Test func followsTheTableChoices() async throws {
+        let source = try await Self.session(Lab.mariadb114), target = try await Self.session(Lab.mariadb114)
+        defer { Task { await source.close(); await target.close() } }
+        try await Self.database(source, "lane_l8a_opt_src", [
+            "CREATE TABLE items (id INT PRIMARY KEY, name VARCHAR(20), touched INT)", "CREATE TABLE skipped (id INT PRIMARY KEY)",
+            "INSERT INTO items VALUES (1, 'a', 1), (2, 'b', 2), (3, 'c', 3), (10, 'x', 1)"])
+        try await Self.database(target, "lane_l8a_opt_dst", [
+            "CREATE TABLE items_v2 (id INT PRIMARY KEY, name VARCHAR(20), touched INT)",
+            "INSERT INTO items_v2 VALUES (1, 'a', 9), (2, 'B', 2), (3, 'c', 3), (10, 'y', 1)"])
+        var options = ReconOptions()
+        options.tables["items"] = ReconTableChoice(target: "items_v2", excludedColumns: ["touched"], filter: "id < 10 -- small ones")
+        options.tables["skipped"] = ReconTableChoice(included: false)
+        let result = try await Self.compare(source, "lane_l8a_opt_src", target, "lane_l8a_opt_dst", options: options)
+        let items = try #require(result.object(.table, "items"))
+        #expect(items.targetName == "items_v2" && items.status == .same)
+        #expect(items.data?.changed.map { $0.source.text(0, kind: .integer) } == ["2"])
+        #expect(items.data?.columns.map(\.name) == ["id", "name"])
+        #expect(result.object(.table, "skipped") == nil)
+        #expect(result.script().contains("UPDATE `items_v2` SET `name` = 'b' WHERE `id` IN (2)"))
+        try await Self.run(source, ["DROP DATABASE lane_l8a_opt_src"])
+        try await Self.run(target, ["DROP DATABASE lane_l8a_opt_dst"])
+    }
+
+    /// Hostile names and values go through every statement a compare and a sync write, on a target whose sql_mode has
+    /// NO_BACKSLASH_ESCAPES, and come out the same.
+    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    func hostileNamesAndValuesSurviveASync(_ server: Lab.Server) async throws {
+        let source = try await Self.session(server), target = try await Self.session(server)
+        defer { Task { await source.close(); await target.close() } }
+        let table = "x`; DROP TABLE nothing; --", columns = ["it's", "a\"b", "`"]
+        let names = columns.map(SQLQuote.identifier).joined(separator: ", ")
+        let create = "CREATE TABLE \(SQLQuote.identifier(table)) (id INT PRIMARY KEY, "
+            + columns.map { SQLQuote.identifier($0) + " TEXT" }.joined(separator: ", ") + ")"
+        let values = Hostile.values.enumerated().map { index, value in
+            "(\(index), " + [value, String(value.reversed()), "x"].map { SQLQuote.string($0) }.joined(separator: ", ") + ")"
+        }
+        try await Self.database(source, "lane_l8a_hostile_src", [create,
+            "INSERT INTO \(SQLQuote.identifier(table)) (id, \(names)) VALUES " + values.joined(separator: ", ")])
+        try await Self.database(target, "lane_l8a_hostile_dst", [create,
+            "INSERT INTO \(SQLQuote.identifier(table)) (id, \(names)) VALUES (0, 'stale', NULL, NULL), (999, 'gone', NULL, NULL)",
+            "SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_BACKSLASH_ESCAPES')"])
+        let result = try await Self.compare(source, "lane_l8a_hostile_src", target, "lane_l8a_hostile_dst")
+        #expect(result.target.noBackslashEscapes)
+        #expect(result.object(.table, table)?.data?.differenceCount == Hostile.values.count + 1)
+        try await result.apply(destructive: true, on: target) { _ in }
+        let again = try await Self.compare(source, "lane_l8a_hostile_src", target, "lane_l8a_hostile_dst")
+        #expect(again.object(.table, table)?.data?.outcome == .same)
+        try await Self.run(source, ["DROP DATABASE lane_l8a_hostile_src"])
+        try await Self.run(target, ["DROP DATABASE lane_l8a_hostile_dst"])
+    }
 }
