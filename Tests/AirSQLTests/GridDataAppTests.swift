@@ -54,9 +54,10 @@ final class FakeTableSession: TableSession {
 extension AppTests {
     @MainActor @Suite struct GridDataAppTests {
         /// A window with a table tab on `table` of the recorded fixture, its rows from a fake session.
-        static func tab(_ table: String = "orders", session: FakeTableSession = FakeTableSession(), size: NSSize = MainWindowController.defaultSize)
-            async throws -> (MainWindowController, AgentServer, TableDataController) {
-            let connection = SavedConnection(name: "Local", host: "127.0.0.1", user: "app")
+        static func tab(_ table: String = "orders", session: FakeTableSession = FakeTableSession(), size: NSSize = MainWindowController.defaultSize,
+                        readOnly: Bool = false) async throws -> (MainWindowController, AgentServer, TableDataController) {
+            var connection = SavedConnection(name: "Local", host: "127.0.0.1", user: "app")
+            connection.readOnly = readOnly
             let (main, harness) = appWindow(testModel([connection]), size: size)
             return (main, harness, try await open(table, in: main, connection: connection, session: session))
         }
@@ -265,6 +266,22 @@ extension AppTests {
             #expect(view.grid.sortOrder.isEmpty && view.rows.cell(0, 0) == .text("10482"))
             let menu = try #require(view.dataGrid(view.grid, menuFor: .cells))
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) == ["Copy", "Copy with Headers", "Copy As", "Export Rows…"])
+        }
+
+        @Test func readOnlyConnectionsAndLongValuesAreNotEditedInPlace() async throws {
+            let (_, _, readOnly) = try await Self.tab(readOnly: true)
+            #expect(readOnly.notice.text.stringValue.hasPrefix("Read-only. This connection is read-only"))
+            #expect(!readOnly.dataGrid(readOnly.grid, canEditRow: 0, column: 2))
+            let item = Commands.addRow.item()
+            #expect(!readOnly.validateMenuItem(item) && item.toolTip?.hasPrefix("This connection is read-only") == true)
+            let session = FakeTableSession()
+            session.rows[0][2] = String(repeating: "x", count: 1_200)
+            let (_, _, tab) = try await Self.tab(session: session)
+            #expect(!tab.dataGrid(tab.grid, canEditRow: 0, column: 2) && tab.dataGrid(tab.grid, canEditRow: 1, column: 2))
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            tab.setCellNull(nil)  // the whole value is replaced, so that's fine
+            #expect(tab.source?.cell(0, 2) == .null)
+            tab.revertAllChanges(nil)
         }
 
         @Test func viewsAreReadOnlyAndSayWhy() async throws {

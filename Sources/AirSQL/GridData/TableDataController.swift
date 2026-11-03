@@ -266,6 +266,7 @@ final class TableDataController: NSViewController, TabContent {
 
     /// Refresh (⌘R): the rows loaded so far again, from the server.
     @objc func refresh(_ sender: Any?) {
+        guard loading == nil else { return }
         guard let source else { return open() }
         total = nil
         loadRows(more: false, through: source.loadedRows)

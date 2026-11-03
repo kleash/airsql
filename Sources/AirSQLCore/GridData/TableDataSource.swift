@@ -21,7 +21,7 @@ public final class TableDataSource: GridSource {
     /// The loaded rows sorted here, by columns in order, instead of on the server.
     public var localSort: [(column: Int, ascending: Bool)] = [] { didSet { applyLocalFilter() } }
     /// The most characters a cell shows (key columns: all of them).
-    static let shownLimit = 1_000
+    public static let shownLimit = 1_000
 
     private var pages: [ResultStore] = []
     /// Each page's first row.

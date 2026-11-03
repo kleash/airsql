@@ -29,7 +29,7 @@ extension TableDataController: NSMenuItemValidation {
         } else if !source.changes.isEmpty {
             notice.show(.pending, (restored ? "Left from before AirSQL quit: " : "") + pendingSummary(source.changes))
         } else {
-            notice.show(.readOnly, source.readOnlyReason.map { "Read-only. " + $0 })
+            notice.show(.readOnly, editingOff.map { "Read-only. " + $0 })
         }
         let loaded = source.loadedRows.formatted()
         if !source.hasMore {
@@ -65,20 +65,21 @@ extension TableDataController: NSMenuItemValidation {
     /// Whether a command can run now, and why not.
     private func state(of action: Selector?) -> (Bool, String?) {
         guard let source else { return (false, "The table is still loading") }
-        let readOnly = source.readOnlyReason ?? "This table can't be edited"
+        let readOnly = editingOff ?? "This table can't be edited"
+        let editable = editingOff == nil
         let hasSelection = !GridCopy.covered(grid).rows.isEmpty
         let pending = !source.changes.isEmpty
         switch action {
-        case Commands.addRow.action: return (source.key != nil, readOnly)
+        case Commands.addRow.action: return (editable, readOnly)
         case Commands.duplicateRow.action, Commands.duplicateRowWithoutKeys.action, Commands.deleteRows.action:
-            return source.key == nil ? (false, readOnly) : (hasSelection, "Select the rows first")
+            return !editable ? (false, readOnly) : (hasSelection, "Select the rows first")
         case Commands.setNull.action:
             let cells = selectedCells().filter { source.canEdit($0.row, $0.column) }
-            if source.key == nil { return (false, readOnly) }
+            if !editable { return (false, readOnly) }
             if cells.isEmpty { return (false, "Select cells you can edit first") }
             return (cells.contains { source.table.columns[$0.column].nullable }, "These columns can't be NULL")
         case Commands.setDefault.action:
-            if source.key == nil { return (false, readOnly) }
+            if !editable { return (false, readOnly) }
             return (selectedCells().contains { source.canEdit($0.row, $0.column) }, "Select cells you can edit first")
         case Commands.apply.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
             return (pending && loading == nil, pending ? "Wait until the rows have loaded" : "No changes are pending")

@@ -5,8 +5,19 @@ import AppKit
 // until Apply runs them in one transaction on the data session; Preview SQL shows them first; Revert and undo take
 // them back. Typing over several selected cells sets them all.
 extension TableDataController: DataGridViewDelegate {
+    /// In place: not on a read-only connection, and not a value longer than the cell shows (the editor would start
+    /// from the shortened text).
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool {
-        source?.canEdit(row, column) == true
+        guard let source, editingOff == nil, source.canEdit(row, column) else { return false }
+        return (source.value(row, column)?.count ?? 0) <= TableDataSource.shownLimit
+    }
+
+    /// Why nothing can be edited here, if so: a read-only connection, or a table without a key.
+    var editingOff: String? {
+        if context.connection.readOnly {
+            return "This connection is read-only: turn that off in Edit Connection… ▸ Options to change rows."
+        }
+        return source?.readOnlyReason
     }
 
     func dataGrid(_ grid: DataGridView, didEditRow row: Int, column: Int, text: String) {
@@ -79,7 +90,7 @@ extension TableDataController: DataGridViewDelegate {
     // MARK: Commands
 
     @objc func addRow(_ sender: Any?) {
-        guard let source, source.key != nil else { return NSSound.beep() }
+        guard let source, editingOff == nil else { return NSSound.beep() }
         let id = source.changes.addRow()
         changesDidChange()
         focus(row: source.index(of: id))
@@ -91,7 +102,7 @@ extension TableDataController: DataGridViewDelegate {
     /// Adds a copy of each selected row; without keys, the key and AUTO_INCREMENT columns are left to the server.
     /// Generated columns are always left out.
     private func duplicate(keepingKeys: Bool) {
-        guard let source, source.key != nil else { return NSSound.beep() }
+        guard let source, editingOff == nil else { return NSSound.beep() }
         var last: UUID?
         for row in GridCopy.covered(grid).rows {
             var values: [String: PendingChanges.Value] = [:]
@@ -106,7 +117,7 @@ extension TableDataController: DataGridViewDelegate {
     }
 
     @objc func deleteRows(_ sender: Any?) {
-        guard let source, source.key != nil else { return NSSound.beep() }
+        guard let source, editingOff == nil else { return NSSound.beep() }
         let (keys, inserts) = selectedRows()
         source.changes.delete(keys, inserts: inserts)
         changesDidChange()
@@ -116,7 +127,7 @@ extension TableDataController: DataGridViewDelegate {
     @objc func setCellDefault(_ sender: Any?) { setSelected(.default) }
 
     private func setSelected(_ value: PendingChanges.Value) {
-        guard let source else { return }
+        guard let source, editingOff == nil else { return NSSound.beep() }
         for cell in selectedCells() where source.canEdit(cell.row, cell.column) {
             source.set(value, row: cell.row, column: cell.column)
         }
@@ -190,8 +201,10 @@ extension TableDataController: DataGridViewDelegate {
             let warnings = TableEditing.warnings(source.table, database: database, deleting: !source.changes.state.deletes.isEmpty,
                                                  in: context.schema.snapshot)
             let change = ChangeSQL(title: "Apply changes to \(tableName)", statements: statements.map(\.sql), connection: context.connection.id)
-            guard preview || model.data.safety(for: context.connection).previewBeforeApply || !warnings.isEmpty,
-                  let window = view.window else { return run(statements, on: session, change: change, saveAsChangeset: false) }
+            guard preview || model.data.safety(for: context.connection).previewBeforeApply || !warnings.isEmpty else {
+                return run(statements, on: session, change: change, saveAsChangeset: false)
+            }
+            guard let window = view.window else { return }
             let rows = source.changes.rowCount
             var request = SQLPreviewRequest(change: change, heading: "Apply \(rows) \(rows == 1 ? "change" : "changes") to \(database).\(tableName)?",
                                             caption: "They run in one transaction. If a row was changed or deleted by someone else "

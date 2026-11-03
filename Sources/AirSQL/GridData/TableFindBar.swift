@@ -193,7 +193,7 @@ extension TableDataController {
 
     /// Replaces the match in the focused cell (then shows the next), or in every loaded cell: pending edits.
     func replaceMatch(all: Bool) {
-        guard let source else { return }
+        guard let source, editingOff == nil else { return NSSound.beep() }
         let find = findBar.find, replacement = findBar.replaceField.stringValue
         guard let expression = find.expression else { return NSSound.beep() }
         let targets = all ? matches() : grid.selection.cursor.map { [$0] } ?? []
