@@ -41,7 +41,7 @@ extension AppTests {
             #expect(view.rows.count >= Lab.manyTables)
         }
 
-        @Test(arguments: [Lab.mysql84, Lab.mariadb114, Lab.mariadb105])
+        @Test(arguments: NavigatorLabTests.servers)
         func tableCommandsRunAfterThePreviewAndTheTreeFollows(_ server: Lab.Server) async throws {
             let setup = DBConnection(options: DBLab.options(server), role: .tools, log: DBLab.log)
             try await setup.connect()
