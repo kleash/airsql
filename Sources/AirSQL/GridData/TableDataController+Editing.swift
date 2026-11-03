@@ -210,9 +210,17 @@ extension TableDataController: DataGridViewDelegate {
     /// the grid shows the row.
     private func run(_ statements: [PendingChanges.Statement], on session: TableSession, change: ChangeSQL, saveAsChangeset: Bool) {
         guard let source, loading == nil else { return }
+        // One Apply at a time on a connection's data session: a second START TRANSACTION would commit the first's work.
+        let connection = context.connection.id
+        guard !Self.applying.contains(connection) else {
+            return showError("Another tab is applying its changes on this connection. Apply again once it has finished.",
+                             title: "Nothing was applied to \(tableName)", on: view.window)
+        }
+        Self.applying.insert(connection)
         bar.busy = true
-        let activity = model.activity.start("Applying changes to \(tableName)", connection: context.connection.id)
+        let activity = model.activity.start("Applying changes to \(tableName)", connection: connection)
         loading = Task {
+            defer { Self.applying.remove(connection) }
             do {
                 try await PendingChanges.apply(statements) { sql in try await session.query(sql, rowCap: 1).last?.affectedRows ?? 0 }
                 source.changes = PendingChanges(keyColumns: source.changes.keyColumns)
@@ -231,6 +239,9 @@ extension TableDataController: DataGridViewDelegate {
             }
         }
     }
+
+    /// The connections whose data session is running an Apply.
+    static var applying: Set<UUID> = []
 
     /// Selects the row a failed statement was for.
     private func point(at target: PendingChanges.Statement.Target) {

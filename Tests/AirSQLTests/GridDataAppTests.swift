@@ -242,6 +242,25 @@ extension AppTests {
             #expect(words == ["customer_id", "CURDATE()"])
         }
 
+        @Test func consoleResultsCopyInTheGridsFormat() async throws {
+            let view = ResultGridView(store: ConsoleFixtures.customers(rows: 2), nullText: "NULL", fontSize: 12)
+            view.copy(nil)  // nothing selected: every row, in TSV
+            #expect(NSPasteboard.general.string(forType: .string)
+                    == "10482\tHarbor Supply Co.\tcustomer0@mail.example\t318\t184220.50\n"
+                    + "10475\tNordlicht GmbH\tcustomer1@mail.example\t317\t183889.25\n")
+            view.grid.selection.select(GridPosition(row: 1, column: 0))
+            view.grid.selection.select(GridPosition(row: 1, column: 1), extend: true)
+            let item = NSMenuItem()
+            item.representedObject = CopyFormat.insert.rawValue
+            view.copyAs(item)
+            #expect(NSPasteboard.general.string(forType: .string) == "INSERT INTO `table` (`id`, `name`) VALUES (10475, 'Nordlicht GmbH');\n")
+            view.copyWithHeaders(nil)
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("INSERT INTO") == true)
+            GridCopy.format = .tsv
+            let menu = try #require(view.dataGrid(view.grid, menuFor: .cells))
+            #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) == ["Copy", "Copy with Headers", "Copy As", "Export Rows…"])
+        }
+
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
             let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
             #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. Views are read-only"))

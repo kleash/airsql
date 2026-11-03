@@ -13,6 +13,7 @@ extension MainMenu {
         let copy = menus.edit.items.firstIndex { $0.action == Commands.copy.action } ?? menus.edit.items.count - 1
         menus.edit.insertItem(Commands.copyWithHeaders.item(), at: copy + 1)
         menus.edit.insertItem(GridCopy.copyAsItem(), at: copy + 2)
+        menus.edit.insertItem(Commands.copyColumnName.item(), at: copy + 3)
         menus.data.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, nil,
                         Commands.setNull, Commands.setDefault, nil, Commands.apply, Commands.previewChanges, Commands.revert, nil,
                         Commands.filter, Commands.searchAllColumns])

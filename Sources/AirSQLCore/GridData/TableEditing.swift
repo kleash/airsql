@@ -6,8 +6,10 @@ public enum TableEditing {
     /// The columns that tell the table's rows apart: the primary key, else the first unique key whose columns are all
     /// NOT NULL. Nil with the reason the grid shows when there is none: then the table is read-only.
     public static func key(of table: SchemaTable) -> (columns: [String]?, reason: String?) {
-        if table.kind != .table {
-            return (nil, "Views are read-only in the grid: open the table the view reads from to edit its rows.")
+        switch table.kind {
+        case .table: break
+        case .view: return (nil, "Views are read-only in the grid: open the table the view reads from to edit its rows.")
+        case .sequence: return (nil, "Sequences are read-only in the grid: change one with ALTER SEQUENCE in a console.")
         }
         let candidates = (table.primaryKey.map { [$0] } ?? []) + table.indexes.filter { $0.unique && !$0.isPrimary }
         for index in candidates {
