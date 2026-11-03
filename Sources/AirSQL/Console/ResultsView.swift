@@ -7,7 +7,15 @@ final class ResultTab {
     enum Content {
         case rows(ResultStore)
         case plan(table: ResultStore?, tree: String)
+        /// A result compared with another result or a table (Compare With…): the rows that differ.
+        case diff(DiffSource)
         case messages
+
+        /// A result's rows, which can be compared.
+        var store: ResultStore? {
+            if case .rows(let store) = self { return store }
+            return nil
+        }
     }
 
     let id = UUID()
@@ -28,10 +36,11 @@ final class ResultTab {
 
     /// The label on its button: its name and, for rows, their size ("Result 1 · 200 × 5").
     var label: String {
-        if case .rows(let store) = content {
-            return title + " · \(store.rowCount.formatted())\(store.capped ? "+" : "") × \(store.columns.count)"
+        switch content {
+        case .rows(let store): return title + " · \(store.rowCount.formatted())\(store.capped ? "+" : "") × \(store.columns.count)"
+        case .diff(let diff): return title + " · \(diff.rowCount.formatted()) × \(diff.columns.count)"
+        case .plan, .messages: return title
         }
-        return title
     }
 }
 

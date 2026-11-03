@@ -328,3 +328,43 @@ extension AppTests.ReconAppTests {
         await setup.close()
     }
 }
+
+extension AppTests.ReconAppTests {
+    /// Compare With… on a console result: the sheet offers the other results (the nearest first) with the result's key
+    /// to match rows on; the rows that differ open next to the result in a tab of their own, in the grid, which can be
+    /// exported but not compared again.
+    @Test func aResultComparesWithAnotherInATabOfItsOwn() async throws {
+        let (main, harness, console) = try await AppTests.ConsoleAppTests.console()
+        let columns = [("id", ReconResultsTests.ints), ("name", ReconResultsTests.text)]
+        console.addResult(ReconResultsTests.store(columns, [["1", "pen"], ["2", "ink"], ["3", "cap"]]), title: "Before", summary: "")
+        console.addResult(ReconResultsTests.store(columns, [["1", "pen"], ["2", "INK"], ["4", "pad"]]), title: "After", summary: "")
+        console.selectResult(console.resultTabs[1])
+        let compare = Commands.compareResult.item()
+        #expect(console.validateMenuItem(compare))
+        let menu = console.resultMenu()
+        #expect(menu.items.first { $0.action == compare.action }?.target === console)
+        console.compareResult(nil)
+        let sheet = try #require(main.window?.attachedSheet?.contentView)
+        let with = try #require(find(NSPopUpButton.self, id: "compare.with", in: sheet))
+        let keys = try #require(find(NSPopUpButton.self, id: "compare.key", in: sheet))
+        #expect(with.itemTitles == ["Results", "Before · 3 × 2"] && with.titleOfSelectedItem == "Before · 3 × 2")
+        #expect(keys.itemTitles == ["id (the key)", "id", "name", "Every column"] && keys.indexOfSelectedItem == 0)
+        let missing = unexplained([try #require(main.window?.attachedSheet)], where: "compare with")
+            + unexplained(try #require(with.menu), path: ["with"]) + unexplained(try #require(keys.menu), path: ["key"])
+        #expect(missing.isEmpty, "\(missing)")
+        #expect(await call(harness, "press", ["title": "Compare"]).error == nil)
+        #expect(await eventually(timeout: 10) { console.resultTabs.count == 3 })
+        let tab = try #require(console.selectedResult)
+        #expect(console.resultTabs.map(\.title) == ["Before", "After", "After ↔ Before"] && tab.label == "After ↔ Before · 3 × 2")
+        #expect(tab.summary == "1 row the same · matched on id")
+        guard case .diff(let diff) = tab.content else {
+            Issue.record("not a diff: \(tab.content)")
+            return
+        }
+        #expect((0..<3).map { diff.mark($0, 1) } == [.inserted, .deleted, .edited] && diff.note(2, 1) == "Before has ink; After has INK")
+        let grid = try #require(tab.view as? ResultGridView)
+        #expect(find(NSTextField.self, id: "grid.legend", in: grid)?.stringValue == "● 1 only in After    ● 1 only in Before    ● 1 changed")
+        #expect(!console.validateMenuItem(compare) && compare.toolTip == "This tab is a comparison already: show one of the results to compare it")
+        #expect(console.validateMenuItem(Commands.exportResult.item()) && console.statusAccessory === grid.viewer.status)
+    }
+}

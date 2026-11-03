@@ -118,8 +118,13 @@ extension ConsoleViewController: NSMenuItemValidation {
             }
             return (currentResult != nil, "Run a query first: there is no result tab yet")
         case #selector(exportResult(_:)):
-            if case .rows = currentResult?.content { return (true, "") }
+            if currentResult?.view is ResultGridView { return (true, "") }
             return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This result has no rows to export")
+        case #selector(compareResult(_:)):
+            guard let tab = currentResult else { return (false, "Run a query first: there is no result tab yet") }
+            if case .diff = tab.content { return (false, "This tab is a comparison already: show one of the results to compare it") }
+            guard tab.content.store != nil else { return (false, "An EXPLAIN's plan can't be compared: show a result with rows") }
+            return (!compareTargets(for: tab).isEmpty, "Run another query first, or connect: there is no other result or table to compare with")
         case #selector(changeConnection(_:)):
             if let reason = busy { return (false, reason) }
             return (model.data.connections.count > 1 || connectionID == nil, "There is no other connection to choose")
