@@ -8,5 +8,12 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
 - [Trust a server](trust-a-server.md): servers whose certificate macOS doesn't know.
 - [The SQL log](sql-log.md): every statement AirSQL sends, with passwords masked.
 - [Read-only queries](read-only-queries.md): what an agent's query may do, and why one is refused.
+- [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy
+  to another server; CSV import.
+- [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, and the ER
+  diagram.
+- [Compare two databases](compare.md): structure and data, side by side, and a sync script you review first.
+- [AI agents](agents.md): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
+  the access you choose.
 
 Every button and menu command says what it does when you hold the pointer over it.
