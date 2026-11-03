@@ -1,8 +1,8 @@
 import Foundation
 
 /// What a dump file does besides filling tables (plan §2.9, restore safety): the databases it switches to, creates or
-/// drops, whether it sets GTID_PURGED, and how many tables it drops first. The restore sheet says which database the
-/// file will really write to before anything runs.
+/// drops, and whether it sets GTID_PURGED. The restore sheet says which database the file will really write to before
+/// anything runs.
 public struct DumpScan: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
         case use, createDatabase, dropDatabase, gtidPurged
@@ -16,8 +16,6 @@ public struct DumpScan: Equatable, Sendable {
     }
 
     public var findings: [Finding] = []
-    /// Tables the file drops (DROP TABLE, as mysqldump writes before each CREATE TABLE).
-    public var droppedTables = 0
 
     public init() {}
 
@@ -42,8 +40,6 @@ public struct DumpScan: Equatable, Sendable {
         case "DROP":
             if upper.count > 1, upper[1] == "DATABASE" || upper[1] == "SCHEMA", let database = name(after: 2) {
                 findings.append(Finding(kind: .dropDatabase, database: database, line: line))
-            } else if upper.count > 1, upper[1] == "TABLE" || (upper[1] == "TEMPORARY" && upper.count > 2) {
-                droppedTables += 1 + upper.filter { $0 == "," }.count
             }
         case "SET":
             if upper.contains(where: { $0.contains("GTID_PURGED") || $0.contains("GTID_SLAVE_POS") }) {

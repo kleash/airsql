@@ -218,7 +218,7 @@ struct ClientToolsTests {
         scan.add(words: ["SET", "@@GLOBAL.GTID_PURGED", "=", "'+'", "'3E11FA47-71CA-11E1-9E33-C80AA9429562:1-5'"], line: 50)
         scan.add(words: ["USE", "crm"], line: 60)
         scan.add(words: ["INSERT", "INTO", "t", "VALUES", "(", "1", ")"], line: 70)
-        #expect(scan.droppedTables == 3 && scan.target(picked: "shop") == "crm")
+        #expect(scan.target(picked: "shop") == "crm")
         let warnings = scan.warnings(picked: "shop")
         #expect(warnings.count == 4, "\(warnings)")
         #expect(warnings[0].contains("drops the database “crm” (line 18)") && warnings[2].contains("switches to the database “crm”"))
