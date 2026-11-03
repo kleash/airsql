@@ -51,6 +51,14 @@ enum NavigatorActions {
             return objects.isEmpty && databases.isEmpty ? "Select a database or object first" : nil
         case Commands.copyCreate.action?:
             return objects.count == 1 ? nil : "Select one object first"
+        case Commands.generateSelect.action?:
+            return tableLike.isEmpty || tableLike.count != objects.count ? "Select tables or views first" : nil
+        case Commands.generateInsert.action?, Commands.generateUpdate.action?:
+            let rows = objects.filter { $0.kind == .table || $0.kind == .view }
+            return rows.isEmpty || rows.count != objects.count ? "Select tables or views first (a sequence has no rows to write)" : nil
+        case Commands.runRoutine.action?:
+            return objects.count == 1 && [.procedure, .function].contains(objects[0].kind) ? nil
+                : "Select one procedure or function first"
         case Commands.copyTable.action?:
             return tables.count == 1 && objects.count == 1 ? writable(open) : "Select one table first (a view can't be copied)"
         case Commands.maintenance.action?:
@@ -182,6 +190,53 @@ enum NavigatorActions {
             } catch {
                 showError((error as? AirSQLError)?.message ?? error.localizedDescription, title: "Couldn't read the definition",
                           on: window)
+            }
+        }
+    }
+
+    enum Generated { case select, insert, update }
+
+    /// Generate SELECT, INSERT or UPDATE: the statement of each table or view, built from the schema cache (their
+    /// columns read first where they aren't yet), in a new console tab. Nothing runs until the person presses Run.
+    static func generate(_ kind: Generated, _ objects: [DatabaseObject], on open: OpenConnection, main: MainWindowController?) {
+        let tables = objects.filter { $0.kind.isTableLike }
+        guard let main, !tables.isEmpty else { return }
+        Task {
+            try? await open.schema.loadDetails(Array(Set(tables.map(\.database))))
+            var statements: [String] = []
+            for table in tables {
+                let schema = open.schema.snapshot.table(table.database, table.name)
+                guard kind == .select || schema?.columns.isEmpty == false, let schema else {
+                    return showError("AirSQL couldn't read the columns of \(table.name). Refresh and try again.",
+                                     title: "Couldn't write the statement", on: main.window)
+                }
+                switch kind {
+                case .select: statements.append(NavigatorSQL.select(table, schema.columns))
+                case .insert: statements.append(NavigatorSQL.insert(table, schema.columns))
+                case .update: statements.append(NavigatorSQL.update(table, schema))
+                }
+            }
+            let console = main.openConsole(text: statements.joined(separator: "\n\n") + "\n", title: nil, connection: open.id)
+                .content as? ConsoleViewController
+            if kind != .select { console?.note(.info, "Put a value in place of each ?, then press Run: nothing runs until you do.") }
+        }
+    }
+
+    /// Run…: a CALL of the procedure (or a SELECT of the function) in a new console tab, `?` for each value it takes
+    /// (its parameters read through the schema session). Nothing runs until the person presses Run.
+    static func runRoutine(_ routine: DatabaseObject, on open: OpenConnection, main: MainWindowController?) {
+        guard let main else { return }
+        Task {
+            do {
+                let parameters = try await open.parameters(routine)
+                let console = main.openConsole(text: NavigatorSQL.run(routine, parameters) + "\n", title: nil, connection: open.id)
+                    .content as? ConsoleViewController
+                if parameters.contains(where: { $0.mode == "IN" || $0.mode == "INOUT" }) {
+                    console?.note(.info, "Put a value in place of each ?, then press Run: nothing runs until you do.")
+                }
+            } catch {
+                showError((error as? AirSQLError)?.message ?? error.localizedDescription,
+                          title: "Couldn't read the parameters of \(routine.name)", on: main.window)
             }
         }
     }

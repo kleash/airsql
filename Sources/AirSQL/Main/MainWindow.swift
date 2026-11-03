@@ -443,7 +443,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = window?.attachedSheet == nil
             reason = "A sheet is open: answer it first"
         case Commands.newQuery.action?:
-            enabled = activeConnection != nil
+            enabled = activeConnection != nil || sidebar.focusedDatabase != nil
             reason = "Select one connection in the sidebar first"
         case Commands.closeTab.action?, Commands.renameTab.action?:
             enabled = selectedTab != nil

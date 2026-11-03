@@ -73,6 +73,19 @@ final class Connector {
         connecting[id] = (task, activity)
     }
 
+    /// The connection's sessions, for another window (the compare window): connects it first, its prompts on `window`,
+    /// unless it is connected, and waits for the connect to end. Throws why it didn't connect (shown on `window` too).
+    func connection(_ id: UUID, on window: NSWindow?) async throws -> Connection {
+        if let connected = open[id] { return connected.connection }
+        connect(id, on: window)
+        for await states in model.$states.values {
+            if case .connected? = states[id], let connected = open[id] { return connected.connection }
+            if case .failed(let message)? = states[id] { throw AirSQLError(.other, message) }
+            if states[id] == nil { throw AirSQLError(.cancelled, "Not connected.") }
+        }
+        throw AirSQLError.disconnected
+    }
+
     /// Stops a connect under way: ssh ends, prompts close, the state goes back to idle.
     func cancel(_ id: UUID) {
         guard let pending = connecting.removeValue(forKey: id) else { return }

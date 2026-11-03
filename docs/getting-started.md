@@ -19,8 +19,9 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
 - **The tabs** hold your queries and tables. Double-click a tab to rename it; right-click it to close others or
   duplicate it.
-- **The toolbar** shows the connection and database a tab works on, Run (⌘↩), Run All (⇧⌘↩), Explain, and the
-  transaction buttons.
+- **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
+  All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
+  now is dimmed, and its tooltip says why.
 - **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to
   cancel), what agents are doing, and the SQL log. Click an item for details; right-click it to copy it.
 

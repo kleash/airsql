@@ -11,7 +11,8 @@ own session, which every console tab of that connection shares.
 ## Open a console
 
 - **File ▸ New Query** (⌘T), the **+** at the end of the tabs, or **New Query** on a connection's menu opens an empty
-  console on the selected connection.
+  console on the selected connection. **New Query** on a database's menu (or ⌘T while a database is selected in the
+  sidebar) makes that database the current one first.
 - **File ▸ Open…** (⌘O) opens .sql files, each in a console of its own. You can also drop .sql files on the editor.
 - **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
@@ -57,6 +58,14 @@ connection can have a query timeout: a statement that runs longer is stopped the
 
 Console tabs of one connection share its session, so while one runs a statement the others wait.
 
+### The current database
+
+Statements run in the connection's current database, which the toolbar's database pop-up shows and the sidebar shows in
+bold. Choose another in the pop-up, double-click one in the sidebar, or type `USE`: all three change the same one, for
+every console tab of the connection. A database chosen in the pop-up or the sidebar is made current with `USE` just
+before the next statement runs (Messages shows it), so a run under way is never switched midway; if that `USE` fails,
+nothing runs.
+
 ## Results and Messages
 
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
@@ -70,11 +79,14 @@ Console tabs of one connection share its session, so while one runs a statement 
 
 ## Transactions
 
-- **Tx: Auto-commit** (the toolbar, or Query ▸ Transaction Mode) commits each statement by itself. In **Manual**, your
-  changes wait in a transaction until you press **Commit**, or **Rollback** to undo them. Leaving Manual with changes
-  waiting asks first whether to commit them or roll them back.
-- **Query ▸ Isolation Level** sets how the console's transactions see others' changes. Until you choose one, the
-  server's own applies (usually Repeatable Read).
+- **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
+  **Manual**, your changes wait in a transaction until you press **Commit**, or **Rollback** to undo them. Leaving
+  Manual with changes waiting asks first whether to commit them or roll them back.
+- The **isolation level** (in the Tx pop-up, or Query ▸ Isolation Level) sets how the console's transactions see
+  others' changes: Read Uncommitted, Read Committed, Repeatable Read or Serializable, set on the console's session with
+  `SET SESSION TRANSACTION ISOLATION LEVEL`. Until you choose one, the server's own applies (usually Repeatable Read).
+- The toolbar's Run, Commit, Rollback and Cancel are on only when the console can do them now; when one is off, its
+  tooltip says why (not connected, no transaction open, nothing running).
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
 - Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
