@@ -41,9 +41,6 @@ Statements you write run only when AirSQL's classifier proves them read-only: on
 `START TRANSACTION READ ONLY` … `ROLLBACK`, with the server's statement timeout and a watchdog. Both guards always apply.
 A refused statement comes back with `ok: false` and the reason; the other statements of the call still run.
 
-This AirSQL build doesn't have the classifier yet, so it refuses every statement you write (run_queries, explain,
-profile with `where`) until it does. The schema tools, describe and profile without `where` work.
-
 ## tools
 
 - `context {}`: start here.

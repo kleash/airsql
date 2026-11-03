@@ -37,8 +37,7 @@ no agent can, whatever it asks.
 ## What keeps your data safe
 
 - An agent's statement runs only if AirSQL can prove it reads and nothing more: one SELECT, SHOW, DESCRIBE or
-  EXPLAIN, without locking clauses, `INTO`, hints or functions such as `SLEEP`. This version of AirSQL can't check
-  that yet, so it refuses every statement an agent writes; schema reading works.
+  EXPLAIN, without locking clauses, `INTO`, hints or functions such as `SLEEP` ([what passes](read-only-queries.md)).
 - It then runs on a session of its own that the server keeps read-only, inside a read-only transaction that is rolled
   back, with a time limit. Even a statement that slipped past the check can't write.
 - To change something, an agent puts the SQL into a console tab. Nothing runs until you press Run.

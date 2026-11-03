@@ -3,7 +3,8 @@ import Testing
 @testable import AirSQLCore
 
 /// The agent tools against the lab (AIRSQL_LAB=1) on MariaDB and MySQL: read-only queries with caps, timeouts and files,
-/// the schema, describe, profile and explain. They only read the fixture. Serialized: one test swaps the classifier.
+/// the schema, describe, profile and explain. They only read the fixture. Serialized: one test turns the classifier off
+/// for a moment, to show the session's own guards.
 @Suite(.serialized, .enabled(if: Lab.enabled))
 struct AgentLabTests {
     static let servers = [Lab.mariadb114, Lab.mysql84]
@@ -23,28 +24,23 @@ struct AgentLabTests {
         return AgentTarget(saved: saved, safety: safety, connection: connection, schema: schema, database: Lab.fixture)
     }
 
-    /// Accepts what the classifier will accept, roughly: enough to test everything after it.
-    static let testClassifier: (String, Bool) -> String? = { sql, _ in
-        let word = sql.trimmingCharacters(in: .whitespaces).split(separator: " ").first?.uppercased() ?? ""
-        return ["SELECT", "WITH", "SHOW", "EXPLAIN", "DESCRIBE"].contains(word) ? nil : "not read-only"
-    }
-
     static func results(_ reply: [String: Any]) -> [[String: Any]] { reply["results"] as? [[String: Any]] ?? [] }
 
     @Test(arguments: servers)
-    func agentsSQLIsRefusedUntilTheClassifierIsInTheBuild(_ server: Lab.Server) async throws {
+    func onlyProvablyReadOnlyStatementsReachTheServer(_ server: Lab.Server) async throws {
         let target = try await Self.target(server, .schemaRead)
         defer { Task { await target.connection?.disconnect() } }
-        let reply = try await target.runQueries(["queries": [["sql": "SELECT 1"]]])
-        #expect(Self.results(reply).first?["ok"] as? Bool == false)
-        #expect((Self.results(reply).first?["error"] as? String)?.hasPrefix("Refused") == true)
-        await #expect(throws: AirSQLError.self) { try await target.explain(["sql": "SELECT 1"]) }
+        let reply = try await target.runQueries(["queries": ["SELECT 1 AS one", "UPDATE customers SET name = name",
+                                                             "SELECT SLEEP(1)", "SELECT 2; DELETE FROM customers"]])
+        let results = Self.results(reply)
+        #expect(results.map { $0["ok"] as? Bool } == [true, false, false, false])
+        #expect(results.dropFirst().allSatisfy { ($0["error"] as? String)?.hasPrefix("Refused: ") == true }, "\(results)")
+        await #expect(throws: AirSQLError.self) { try await target.explain(["sql": "DELETE FROM customers"]) }
     }
 
     @Test(arguments: servers)
     func queriesRunReadOnlyWithinTheirCapsTimeoutsAndFiles(_ server: Lab.Server) async throws {
-        AgentReadOnly.refusal = Self.testClassifier
-        defer { AgentReadOnly.refusal = AgentReadOnly.untilClassifier }
+        defer { AgentReadOnly.refusal = AgentReadOnly.classifier }
         var safety = SafetySettings()
         safety.agentRowCap = 2
         safety.agentTimeout = 1
@@ -70,7 +66,7 @@ struct AgentLabTests {
         let writes = Self.results(try await target.runQueries(["queries": ["UPDATE customers SET id = id WHERE 1 = 0",
                                                                            "DELETE FROM customers WHERE 1 = 0"]]))
         #expect(writes.allSatisfy { $0["ok"] as? Bool == false }, "\(writes)")
-        AgentReadOnly.refusal = Self.testClassifier
+        AgentReadOnly.refusal = AgentReadOnly.classifier
 
         let slow = Self.results(try await target.runQueries(["queries": [
             "SELECT COUNT(*) FROM big a JOIN big b ON a.amount + b.amount < 0"]]))

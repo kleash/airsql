@@ -6,14 +6,16 @@ import Foundation
 /// statement timeout (max_execution_time, MariaDB's max_statement_time) and a watchdog that cancels at the timeout.
 /// One agent call at a time per session, so no call's statement runs inside another's transaction.
 public enum AgentReadOnly {
-    /// Why an agent's statement may not run (nil: it may): the read-only classifier's verdict, for a session whose
-    /// sql_mode has NO_BACKSLASH_ESCAPES or not (it decides where strings end).
-    public static var refusal: (_ sql: String, _ noBackslashEscapes: Bool) -> String? = untilClassifier
+    /// Why an agent's statement may not run (nil: it may), for a session whose sql_mode has NO_BACKSLASH_ESCAPES or
+    /// not (it decides where strings end). Tests swap it to show the session's own guards.
+    public static var refusal: (_ sql: String, _ noBackslashEscapes: Bool) -> String? = classifier
 
-    /// The SQL core (P0-4) isn't in this build yet, so nothing an agent writes may run: this fails closed until the
-    /// classifier is wired.
-    static let untilClassifier: (String, Bool) -> String? = { _, _ in
-        "Refused: this AirSQL build can't yet prove a statement read-only, so it runs no SQL an agent wrote."
+    /// The read-only classifier's verdict.
+    static let classifier: (String, Bool) -> String? = { sql, noBackslashEscapes in
+        guard case .refused(let reason) = ReadOnlyClassifier.classify(sql, noBackslashEscapes: noBackslashEscapes) else {
+            return nil
+        }
+        return "Refused: " + reason
     }
 
     /// The refusal of a statement an agent's SQL ended up in, as an error.

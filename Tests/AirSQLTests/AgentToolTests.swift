@@ -35,8 +35,14 @@ struct AgentToolTests {
         #expect(await Self.refusal { try await read.runQueries(query) }?.contains("isn't connected") == true)
     }
 
-    @Test func agentsSQLIsRefusedUntilTheClassifierIsInTheBuild() {
-        #expect(AgentReadOnly.untilClassifier("SELECT 1", false) != nil)
+    @Test func agentsSQLMustBeProvablyReadOnly() {
+        for sql in ["SELECT 1", "WITH t AS (SELECT 1 AS a) SELECT a FROM t", "SHOW TABLES", "EXPLAIN SELECT * FROM t"] {
+            #expect(AgentReadOnly.classifier(sql, false) == nil, "\(sql)")
+        }
+        for sql in ["UPDATE t SET a = 1", "SELECT SLEEP(1)", "SELECT 1; DROP TABLE t", "SELECT * FROM t FOR UPDATE",
+                    "EXPLAIN ANALYZE SELECT 1", "SELECT a INTO @x FROM t"] {
+            #expect(AgentReadOnly.classifier(sql, false)?.hasPrefix("Refused: ") == true, "\(sql)")
+        }
     }
 
     @Test func limitsFollowTheSafetySettingsAndAnalytics() {

@@ -94,7 +94,8 @@ public enum AgentBridge {
 
     // MARK: MCP
 
-    /// `AirSQL --mcp`: answers until stdin ends. Requests run in parallel (a long query doesn't hold up a ping).
+    /// `AirSQL --mcp`: answers until stdin ends. Requests after initialize run in parallel (a long query doesn't hold up
+    /// a ping).
     public static func runMCP(input: FileHandle = .standardInput, output: FileHandle = .standardOutput) -> Int32 {
         let lock = NSLock(), group = DispatchGroup()
         let send: ([String: Any]) -> Void = { message in
@@ -117,6 +118,11 @@ public enum AgentBridge {
                 }
                 guard let message = json as? [String: Any] else {  // a batch: MCP has none since 2025-06-18
                     send(["jsonrpc": "2.0", "id": NSNull(), "error": ["code": -32600, "message": "Invalid Request"]])
+                    continue
+                }
+                // initialize first, before what follows it: it names the client the calls after it come from.
+                if message["method"] as? String == "initialize" {
+                    if let reply = answer(message, send: send) { send(reply) }
                     continue
                 }
                 group.enter()
