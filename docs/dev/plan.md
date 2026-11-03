@@ -223,7 +223,8 @@ Goal: few round trips, and agents that can never change anything without the per
   queries: [{sql, max_rows?}], format: csv | json, to_file?}`; `profile {connection, table, columns?, where?}` (one
   call, several server-side queries: counts, NULLs, distinct, min, max, average, top values for the chosen columns,
   R15); `explain`; `open_in_console {sql, title}`; `read_console {tab}`; `guide`. UI driving (`snapshot`,
-  `screenshot`, `menu`, `press`, `set`, `select`, `key`, `type`, `click`, `wait` incl. "idle") arrives in L7b.
+  `screenshot`, `menu`, `press`, `set`, `select`, `key`, `type`, `click`, `double_click`, `right_click`, `wait` incl.
+  "idle") works the windows as the person does, behind the gate (L7b).
 - **Access levels per connection:** Off / Schema / Schema + read / Schema + read + analytics (larger row cap, longer
   timeout, `to_file`); sample rows a separate switch. Production starts Off. Agent export folder: Application
   Support/AirSQL/Agent Exports (no privacy prompts, R18), shown in Settings with Reveal in Finder.
@@ -237,12 +238,17 @@ Goal: few round trips, and agents that can never change anything without the per
   functions). Executable comments are lexed as code. A read-only database user is still recommended in the guide.
 - **The gate fails closed (R3):** while an agent call is in progress, `DBConnection` refuses any statement on a
   non-agent session that the classifier cannot prove read-only unless the person at the Mac approves it in a sheet
-  showing the SQL; the same for file writes, Restore, Kill, Commit, Apply, Drop, sync scripts, and edits to
-  connections or settings. Person-only (an agent can never change them, even with approval): agent access levels,
-  connection colour, read-only, routes, credentials, and every safety setting. The WHERE bar and console text typed
-  by an agent count as SQL and pass the same check. Paste into a field during an agent call needs approval (the
-  clipboard is the person's). Snapshots and screenshots redact grid cells, value panels and result text for
-  connections below "read + sample rows".
+  showing the SQL (with nobody to ask, it is refused); the same sheet comes first for Restore, Copy, CSV import,
+  Kill, Commit, Apply, Drop and sync scripts, and agents can't press its Run. File writes (exports, saving a console,
+  clearing the SQL log or the history) and edits to settings are refused rather than approved: the person does them.
+  Saved connections' names, folders and comments change only while Ask before agents change anything is off.
+  Person-only (an agent can never change them, even with approval): agent access levels, connection colour,
+  read-only, routes, credentials (an agent can't save a password), client tools, and every safety setting. Agents
+  can't press a button marked destructive, Trust a certificate or host key, Quit, or paste (the clipboard is the
+  person's). The WHERE bar and console text typed by an agent count as SQL and pass the same check; text an agent
+  puts into a production console's editor waits for the person's OK. Snapshots and screenshots redact grids, the
+  compare's rows and sync script, and the process list for connections below Schema + read (or whose connection
+  can't be told).
 - Agents never receive passwords; every agent action is in the activity list and the history.
 
 ### 2.9 Client tools, recon, Liquibase

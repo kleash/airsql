@@ -33,7 +33,10 @@ func showTrust(server: String, fingerprint: String, details: [String], on window
     alert.addButton(withTitle: "Trust").toolTip = "Remember this certificate and connect"
     alert.addButton(withTitle: "Cancel").toolTip = "Don't connect"
     addHelp(to: alert, .trust)
-    alert.beginSheetModal(for: window) { response in reply(response == .alertFirstButtonReturn) }
+    // Trust is the person's (the agents' gate, plan §2.8): an agent's Trust is a Cancel.
+    alert.beginSheetModal(for: window) { response in
+        reply(response == .alertFirstButtonReturn && !AgentGuard.refuses("Only the person at the Mac can trust a certificate or host key: nothing was trusted."))
+    }
     return alert
 }
 
@@ -65,7 +68,8 @@ func showPasswordPrompt(for connection: String, user: String, retry: Bool, canRe
     alert.addButton(withTitle: "Cancel").toolTip = "Don't connect"
     alert.window.initialFirstResponder = field
     alert.beginSheetModal(for: window) { response in
-        reply(response == .alertFirstButtonReturn ? field.stringValue : nil, canRemember && remember.state == .on)
+        reply(response == .alertFirstButtonReturn ? field.stringValue : nil,
+              canRemember && remember.state == .on && !AgentGuard.refuses("Only the person at the Mac can save a password: it was used for this login only."))
     }
     return alert
 }

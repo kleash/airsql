@@ -869,6 +869,24 @@ no agent can, whatever it asks.
 - To change something, an agent puts the SQL into a console tab. Nothing runs until you press Run.
 - For more safety still, connect with a database user that can only read.
 
+## Agents in AirSQL's windows
+
+Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
+Whatever that would change waits for you:
+
+- Anything that would run on a server (Run in a console, Apply, a compare's sync, Restore, Copy, CSV import, Commit)
+  first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
+  can only decline. Statements that AirSQL proves only read run without asking.
+- Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,
+  startup SQL or safety settings, nor save files, start an export, save a password, trust a certificate, paste from
+  your clipboard, quit AirSQL or press a button marked destructive (Don't Save, Disconnect with a transaction open).
+  Text an agent types into a console of a Production connection is shown to you first.
+- On connections whose agent access doesn't include reading, grids and results are hidden from the agent's snapshots
+  and screenshots.
+
+**Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Options tab) turns the
+asking off; what is yours alone stays yours.
+
 ## See what agents did
 
 The agents' item in the status bar says what they're doing. Click it (or choose **Tools ▸ Agents ▸ Agent Activity**)
@@ -1093,9 +1111,10 @@ Source: https://github.com/kleash/airsql/blob/main/Resources/AgentGuide.md
 # AirSQL agent guide
 
 AirSQL is a Mac app for MySQL and MariaDB. Through its MCP server you can read the schemas of the connections the
-person at the Mac allows, run read-only queries, profile tables, and propose SQL in a console tab for the person to
-edit and run. You never see passwords, and you can't change data, connections or settings: each connection's access
-level is the person's choice alone.
+person at the Mac allows, run read-only queries, profile tables, propose SQL in a console tab for the person to edit
+and run, and drive AirSQL's windows as they do. You never see passwords, and you can't change data, connections or
+settings on your own: whatever would change something waits for the person at the Mac (see gate), and each
+connection's access level is their choice alone.
 
 ## overview
 
@@ -1108,6 +1127,8 @@ level is the person's choice alone.
 4. `run_queries` with several statements at once; `explain` a slow one; `profile` a table you don't know yet.
 5. To change anything, write the SQL and call `open_in_console`: the person reads it, edits it, runs it. Then
    `read_console` shows what they ran and the result or error.
+6. To work in AirSQL's windows (open a table, use a menu, fill a sheet), `snapshot` first, then `menu`, `press`, `set`,
+   `type`, `key` and the clicks, and `wait` for what they start (see ui and screens).
 
 Connections must be connected in AirSQL (by the person) before the database tools work on them.
 
@@ -1170,6 +1191,117 @@ Each connected connection you may read has its compact schema as a resource, `ai
   they do. After they run them, `read_console`.
 - **Check a query's cost**: `explain` it, look for full scans (`type: ALL`) on big tables, `describe` for indexes.
 
+## ui
+
+The UI tools act in AirSQL's windows as the person would; replies are JSON as text (`screenshot`: a PNG), `isError` on
+failure, and every reply after an action carries the sheet it opened, if any.
+
+- `snapshot {include?, in?}`: windows, sidebar, tabs, status bar, activity and open sheets by default; `menus` lists
+  every menu-bar command with its shortcut and, when off, why; `elements` the accessibility tree (id, role, title,
+  value, frame in points from the window's top left); `settings` the saved settings.
+- `screenshot {target?: main | sheet | window:<title> | element:<id>, scale?: 1 | 2}`: drawn by AirSQL itself.
+- `menu {path}`: "Query > Run Statement"; after a right-click, "context > Copy".
+- `press {id | title, in?}`: buttons, checkboxes, segments, links. A pop-up is chosen with `set`.
+- `set {id | title, value, in?}`: text fields, checkboxes (true or false), pop-ups and segments (the option's title),
+  and the console's editor (`console.editor`: the whole text).
+- `select {pane: sidebar | tabs, names}` selects connections or a tab by name; without pane, rows of a list in the
+  frontmost sheet or window.
+- `type {text}` types where the cursor is; `key {combo}` presses keys as the keyboard does ("cmd+return", "escape").
+- `click {x, y, count?, button?, modifiers?, in?}`, `double_click {x, y}` (opens or edits), `right_click {x, y}`
+  (answers with the menu it opens). Points come from `snapshot` frames or a scale-1 screenshot.
+- `wait {until: sheet | no_sheet | popover | idle | text, text?, timeout?}`: idle means nothing runs.
+
+Open and Save panels can't be driven: press Cancel, or leave them to the person.
+
+## gate
+
+AirSQL's agents' gate fails closed. While it carries out your request, nothing that could change something runs on
+its own:
+
+- **The SQL preview sheet is the person's.** Run in a console, Apply in the grid and the editors, a compare's sync,
+  Restore, Copy and CSV import show what will run in the SQL preview sheet, marked "Asked by <your client>". Only the
+  person can press its Run (or Return, or click it): you get "Only the person at the Mac can approve…". You may press
+  Decline (`preview.cancel`), and `wait {until: no_sheet}` for their answer. A console run of statements that are all
+  proven read-only (see read-only) runs without asking.
+- **Statements on the person's sessions** that what you did sends, and that aren't proven read-only (a Commit, a
+  Rollback, the transaction mode, a Kill), wait in the same sheet, one by one.
+- **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
+  read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
+  whether agents are allowed, and the client tools AirSQL runs. Other saved data (names, folders, settings) is refused
+  too while Settings ▸ Safety ▸ Ask before agents change anything is on. The Settings window is to look at.
+- **Files, the clipboard, trust:** you can't save a console's file, start an export, save or remember a password,
+  trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or `set` for text, and
+  run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a transaction open,
+  Delete, Clear) is the person's call, and so is Quit. The connection editor opens for you, but its Save keeps nothing
+  that is the person's.
+- **A production console's text:** `type` or `set` into the editor of a console on a connection coloured Production
+  shows the person the text first; single keys that would change it are refused.
+- **Data you may not read is hidden:** on connections below Schema + read, grids, query results, the process list and
+  a compare's rows and sync script are covered in screenshots ("Hidden from agents") and left out of snapshots
+  (`hidden`).
+
+The person can turn the asking off for a connection or for all (Settings ▸ Safety); person-only things stay theirs.
+
+## screens
+
+Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements` lists what is on screen now.
+
+- **Main window toolbar**: `toolbar.connection`, `toolbar.database`, `toolbar.run`, `toolbar.runAll`,
+  `toolbar.explain`, `toolbar.transactionMode`, `toolbar.commit`, `toolbar.rollback`, `toolbar.cancel`.
+- **Sidebar**: `sidebar.filter`, `sidebar.connections` (select with `select pane=sidebar`), `sidebar.newConnection`,
+  `sidebar.processes`. With nothing open: `firstRun.addConnection`, `firstRun.setUpAgents`; a connection's summary:
+  `summary.connect`, `summary.newQuery`, `summary.edit`.
+- **Tabs**: `tabs`, `tabs.new`, each `tab` with `tab.close` (select with `select pane=tabs`), `tab.rename`.
+- **Navigator** (a connection's tree in the sidebar; double-click opens): a database `database.tables`; text views
+  `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
+  processes `processes.list`, `processes.refresh`, `processes.interval`, `processes.killQuery`,
+  `processes.killConnection`; sheets `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
+  `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
+- **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
+  `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
+  the person's `editor.colour`, `editor.host`, `editor.port`, `editor.socket`, `editor.user`, `editor.password`,
+  `editor.askPassword`, `editor.route`, `editor.ssh`, `editor.addJump`, `editor.proxyKind`, `editor.proxyHost`,
+  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.ownSafety`, `editor.agentAccess`,
+  `editor.sampleRows`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
+- **Status bar**: `status.route`, `status.server`, `status.transaction`, `status.activity`, `status.agent`,
+  `status.sqlLog`; popovers `popover.route`, `popover.server`, `popover.transaction` (`popover.commit`,
+  `popover.rollback`), `popover.agent` (`agents.setUp`, `agents.turnOff`), `activity.popover` (`activity.cancel`,
+  `activity.cancelAll`).
+- **Console**: `console.editor`, `console.cancel`, `console.summary`, `console.resultTab` (`console.resultRename`),
+  `console.messages`, `console.planChoice`, `console.planTree`, `console.empty`, `console.connectionChoice`; find bar
+  `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
+  helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
+  history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
+- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor`.
+- **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
+- **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
+  `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.cancel`, `preview.run` (the person's).
+- **Table editor**: `tableEditor.sections`, `tableEditor.list`, `tableEditor.options` (`.name`, `.database`, `.engine`,
+  `.collation`, `.rowFormat`, `.autoIncrement`, `.comment`), `tableEditor.sql`, `tableEditor.apply`,
+  `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
+  `objectEditor.definer`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
+  `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
+- **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
+  `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
+  `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows`, `recon.script`, `recon.destructive`,
+  `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
+  sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
+- **Client tools sheets**: `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
+  `tools.timeLeft`, `tools.cancel`, `tools.run` (Export: the person's). Export `export.content`,
+  `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
+  `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`; Restore `restore.file`,
+  `restore.choose`, `restore.database`, `restore.tool`, `restore.stopOnError`, `restore.continue`, `restore.command`,
+  `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
+  `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
+  `csv.emptyIsNull`, `csv.mapping`.
+- **Prompts**: `password.field`, `password.remember`, `login.user`, `login.password`, `prompt.answer`,
+  `prompt.remember` (remembering is the person's), `trust.fingerprint` (Trust is the person's), `help`.
+- **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`;
+  Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.nullText`; Connections
+  `settings.detailsTableThreshold`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,
+  `settings.agentAccessList`, `settings.agentExports`, `settings.copyMCPCommand`; Client Tools `settings.findTools`,
+  `settings.toolsFound`.
+
 ## troubleshooting
 
 - "isn't running, or agents are off": open AirSQL and turn on Settings ▸ Agents ▸ Allow AI agents to use AirSQL.
@@ -1179,3 +1311,7 @@ Each connected connection you may read has its compact schema as a resource, `ai
 - "Refused": the statement isn't provably read-only; rewrite it as one plain SELECT, or propose it with
   `open_in_console`.
 - "Stopped at the agent timeout": narrow the query (WHERE, LIMIT), or ask for the analytics level.
+- "Only the person at the Mac can approve…" or "…can change…": that is the gate; tell the person what waits for them.
+- "The person at the Mac declined": nothing ran; ask what they want instead.
+- "Settings are the person's", "The clipboard is the person's": use `snapshot include settings` to read settings, and
+  `type` or `set` instead of pasting.

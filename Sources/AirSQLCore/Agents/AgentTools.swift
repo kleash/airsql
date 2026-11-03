@@ -78,7 +78,65 @@ public enum AgentTools {
         tool("guide", "How to use AirSQL as an agent: the tools, access levels, read-only rules and recipes. topic: a section "
              + "(none: the overview and the list). Works even when AirSQL isn't running.",
              ["topic": string("A topic")]),
-    ]
+    ] + ui
+
+    /// Driving AirSQL's windows as the person does (plan §2.8). Whatever would change data, structure, files or settings
+    /// waits for the person at the Mac, or is theirs alone. Replies are JSON as text (screenshot: a PNG), isError on
+    /// failure; no output schema.
+    static let ui: [[String: Any]] = {
+        let within = string("Where: \"sheet\", \"popover\" or \"window:<title>\" (default: the frontmost sheet, then the windows)")
+        let point: [String: Any] = ["x": number("Points from the left of the main window (or of in), as a screenshot at scale 1"),
+                                    "y": number("Points from the top"), "in": within,
+                                    "modifiers": string("\"cmd\", \"shift\", \"option\", \"control\", joined by +")]
+        return [
+            tool("snapshot", "What AirSQL's windows show now: the windows, sidebar, tabs, status bar, activity and open sheets "
+                 + "(buttons with why a disabled one is off). include adds menus (every menu-bar command, enabled or why not), "
+                 + "elements (the accessibility tree: id, role, title, value, frame) and settings. Data of connections whose "
+                 + "agent access doesn't include reading is left out.",
+                 ["include": ["type": "array", "items": ["type": "string", "enum": ["sidebar", "tabs", "status", "activity",
+                                                                                 "sheets", "menus", "elements", "settings"]],
+                              "description": "Sections (default: sidebar, tabs, status, activity, sheets)"], "in": within]),
+            tool("screenshot", "A PNG of a window as the person sees it, drawn by AirSQL (no screen recording). Grids and "
+                 + "results of connections whose agent access doesn't include reading are covered.",
+                 ["target": string("main (default), sheet, window:<title> or element:<id>"),
+                  "scale": number("1 (default, points) or 2 (pixels)")]),
+            tool("menu", "Chooses a menu-bar command by its path, as validated now: a disabled one says why. "
+                 + "\"context > <item>\" chooses from the menu the last right-click opened.",
+                 ["path": string("For example \"Query > Run Statement\" or \"context > Copy\""), "in": within],
+                 required: ["path"], readOnly: false),
+            tool("press", "Presses a button, checkbox, segment or link by its accessibility id (snapshot elements) or title.",
+                 ["id": string("Accessibility id"), "title": string("Title"), "in": within], readOnly: false),
+            tool("set", "Sets a field: text, a checkbox (true or false), a pop-up or segment (the option's title), the "
+                 + "console's editor. By id, title, placeholder or \"password\".",
+                 ["id": string("Accessibility id"), "title": string("Label, title or placeholder"),
+                  "value": ["description": "The text, true or false, or the option's title"], "in": within],
+                 required: ["value"], readOnly: false),
+            tool("select", "Selects by name as a click does: connections in the sidebar (pane sidebar), a tab (pane tabs), "
+                 + "or the rows of a list in a sheet or window that show these names.",
+                 ["pane": choice(["sidebar", "tabs"], "sidebar or tabs (default: a list in the frontmost sheet or window)"),
+                  "names": strings("Names, as shown"), "none": boolean("Select nothing"), "in": within], readOnly: false),
+            tool("key", "Presses a key combination in the frontmost sheet or the key window, as the keyboard does: menu "
+                 + "shortcuts, Return for the default button, Escape, arrows. For example \"cmd+return\" or \"escape\".",
+                 ["combo": string("For example cmd+shift+n, return, escape, down, f5, a"), "in": within],
+                 required: ["combo"], readOnly: false),
+            tool("type", "Types text where the cursor is (the focused field or the console's editor).",
+                 ["text": string("The text"), "in": within], required: ["text"], readOnly: false),
+            tool("click", "Clicks at a point: lists select rows, buttons press, a right-click (button right) answers with the "
+                 + "menu it opens. count 2 double-clicks.",
+                 point.merging(["count": integer("1 (default), 2 or 3"),
+                                "button": choice(["left", "right"], "left (default) or right")]) { $1 },
+                 required: ["x", "y"], readOnly: false),
+            tool("double_click", "Double-clicks at a point: opens or edits what it is on (a connection, a table, a cell).",
+                 point, required: ["x", "y"], readOnly: false),
+            tool("right_click", "Right-clicks at a point and answers with the menu it opens; choose from it with menu "
+                 + "\"context > <item>\".", point, required: ["x", "y"], readOnly: false),
+            tool("wait", "Waits until a sheet is open (with text in it), no sheet is, a popover is shown, nothing runs "
+                 + "(idle), or text shows anywhere; at most timeout seconds (default 30).",
+                 ["until": choice(["sheet", "no_sheet", "popover", "idle", "text"], "What to wait for"),
+                  "text": string("Text to find"), "timeout": number("Seconds (default 30, at most 600)")],
+                 required: ["until"]),
+        ]
+    }()
 
     /// The schema resources: `airsql://<connection>/schema`, the compact schema as get_schema gives it.
     public static let schemaTemplate: [String: Any] = [
@@ -105,6 +163,7 @@ public enum AgentTools {
 
     private static func string(_ text: String) -> [String: Any] { ["type": "string", "description": text] }
     private static func integer(_ text: String) -> [String: Any] { ["type": "integer", "description": text] }
+    private static func number(_ text: String) -> [String: Any] { ["type": "number", "description": text] }
     private static func boolean(_ text: String) -> [String: Any] { ["type": "boolean", "description": text] }
     private static func object(_ text: String) -> [String: Any] { ["type": "object", "description": text] }
     private static func arrayOf(_ text: String) -> [String: Any] { ["type": "array", "description": text] }
