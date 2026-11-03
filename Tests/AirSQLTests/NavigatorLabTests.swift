@@ -123,7 +123,8 @@ struct NavigatorLabTests {
         #expect(try await value(watcher, connected) == "1")
         _ = try await watcher.query(NavigatorSQL.killConnection(process))
         await #expect(throws: AirSQLError.self) { _ = try await victim.query("SELECT 3") }
-        #expect(try await value(watcher, connected) == "0")
+        // The server can still list the killed thread for a moment while it shuts the connection down.
+        #expect(try await eventually(timeout: 5) { try await value(watcher, connected) == "0" })
         await victim.close()
         await watcher.close()
     }
