@@ -261,12 +261,13 @@ final class DataGridView: NSView {
         if frame.size != size { setFrameSize(size) }
     }
 
-    /// A column's width from its header and its first rows: 60 to 230 points, except that a key column is never cut.
+    /// A column's width from its header, its first rows and its last: 60 to 230 points, except that a key column is never
+    /// cut. A sample, so a new result shows at once.
     private func measure(_ column: Int) -> CGFloat {
         guard let source else { return 100 }
         let info = source.columns[column]
         var width = header.width(for: info)
-        let sample = Array(0..<min(source.rowCount, 200)) + (source.rowCount > 200 ? [source.rowCount - 1] : [])
+        let sample = Array(0..<min(source.rowCount, 50)) + (source.rowCount > 50 ? [source.rowCount - 1] : [])
         for row in sample {
             width = max(width, styles.width(of: source.cell(row, column), in: info, nullText: nullText) + 2 * GridStyles.padding)
         }
