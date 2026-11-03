@@ -41,7 +41,13 @@ extension GridViewer {
             let scroll = NSTextView.scrollableTextView()
             let text = scroll.documentView as! NSTextView
             text.isEditable = false
-            text.font = .monospacedSystemFont(ofSize: grid.fontSize, weight: .regular)
+            let font = NSFont.monospacedSystemFont(ofSize: grid.fontSize, weight: .regular)
+            text.font = font
+            // Tabs (TSV) every eight characters, however many: past the last of the default stops a tab breaks the line.
+            let tabs = NSMutableParagraphStyle()
+            tabs.tabStops = []
+            tabs.defaultTabInterval = 8 * ("0" as NSString).size(withAttributes: [.font: font]).width
+            text.defaultParagraphStyle = tabs
             text.textContainerInset = NSSize(width: 8, height: 8)
             text.isHorizontallyResizable = true
             text.textContainer?.widthTracksTextView = false
