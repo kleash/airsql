@@ -108,50 +108,7 @@ extension SavedConnection {
         return ConnectOptions(name: displayName, host: host, port: port ?? 3306, endpoint: endpoint, user: user,
                               password: password, database: database.isEmpty ? nil : database, tls: tls,
                               cleartextLogin: cleartextLogin, compress: compress,
-                              startupSQL: Self.statements(startupSQL), readOnly: readOnly)
-    }
-
-    /// The statements of `text`: split at semicolons outside quotes and comments, comments left out.
-    /// shortcut: the console's SQLSplitter (P0-4) replaces this once it is on main.
-    static func statements(_ text: String) -> [String] {
-        var statements: [String] = [], current = "", quote: Character?
-        let characters = Array(text)
-        var index = 0
-        func flush() {
-            let statement = current.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !statement.isEmpty { statements.append(statement) }
-            current = ""
-        }
-        while index < characters.count {
-            let character = characters[index], next = index + 1 < characters.count ? characters[index + 1] : nil
-            if let open = quote {
-                current.append(character)
-                if character == "\\", open != "`", let next {
-                    current.append(next)
-                    index += 1
-                } else if character == open {
-                    quote = nil
-                }
-            } else if character == "'" || character == "\"" || character == "`" {
-                quote = character
-                current.append(character)
-            } else if character == "#" || (character == "-" && next == "-") {
-                while index < characters.count, !characters[index].isNewline { index += 1 }
-                current.append("\n")
-            } else if character == "/", next == "*", index + 2 >= characters.count || characters[index + 2] != "!" {
-                index += 2
-                while index + 1 < characters.count, !(characters[index] == "*" && characters[index + 1] == "/") { index += 1 }
-                index += 1
-                current.append(" ")
-            } else if character == ";" {
-                flush()
-            } else {
-                current.append(character)
-            }
-            index += 1
-        }
-        flush()
-        return statements
+                              startupSQL: SQLSplitter.statements(in: startupSQL).map(\.sql), readOnly: readOnly)
     }
 }
 

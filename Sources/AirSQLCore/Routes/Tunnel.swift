@@ -40,6 +40,8 @@ public final class Tunnel: @unchecked Sendable {
     public static func open(_ connection: SavedConnection, askpass: AskpassServer, proxySocket: String? = nil,
                             progress: @escaping (String) -> Void) async throws -> Tunnel {
         if let problem = SSHConfig.problem(with: connection) { throw AirSQLError(.other, problem) }
+        let hops = connection.sshHops
+        guard !hops.isEmpty else { throw AirSQLError(.other, "This connection's route has no SSH host.") }
         try RouteFolder.prepare()
         let base = RouteFolder.base(for: connection.id)
         let tunnel = Tunnel(socket: base + ".sock", configPath: base + ".ssh_config")
@@ -47,7 +49,6 @@ public final class Tunnel: @unchecked Sendable {
                                                                             encoding: .utf8)
         chmod(tunnel.configPath, 0o600)
         unlink(tunnel.socket)
-        let hops = connection.sshHops
         let database = connection.host.contains(":") ? "[\(connection.host)]" : connection.host
         let argv = ["/usr/bin/ssh", "-F", tunnel.configPath, "-N", "-L", "\(tunnel.socket):\(database):\(connection.port ?? 3306)",
                     "--", hops[hops.count - 1].host]

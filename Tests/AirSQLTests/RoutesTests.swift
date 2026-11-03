@@ -9,7 +9,7 @@ struct RoutesTests {
     private func connection(_ route: Route, hops: Int = 1) -> SavedConnection {
         var connection = SavedConnection(name: "Shop", host: "db.internal", port: 3307, user: "app", route: route)
         connection.sshHost = SSHHop(host: "db-gw.example.com", port: 2222, user: "deploy", login: .keyFile,
-                                    keyFile: "/Users/someone/keys dir/id 100%")
+                                    keyFile: "~/keys dir/id 100%")
         connection.jumpHosts = (0..<max(0, hops - 1)).map { SSHHop(host: "jump\($0).example.com", user: "j\($0)") }
         return connection
     }
@@ -21,7 +21,7 @@ struct RoutesTests {
         #expect(text.contains("Host jump0.example.com\n  User j0\nHost jump1.example.com\n  User j1\n"
                               + "  PreferredAuthentications keyboard-interactive,password\n  ProxyJump jump0.example.com\n"
                               + "Host db-gw.example.com\n  Port 2222\n  User deploy\n"
-                              + "  IdentityFile \"/Users/someone/keys dir/id 100%%\"\n  IdentitiesOnly yes\n"
+                              + "  IdentityFile \"~/keys dir/id 100%%\"\n  IdentitiesOnly yes\n"
                               + "  ProxyJump jump1.example.com\n"), "\(text)")
         #expect(text.contains("  ControlMaster no\n") && text.contains("  ExitOnForwardFailure yes\n")
                 && text.contains("  StreamLocalBindUnlink yes\n") && text.contains("  LogLevel VERBOSE\n"))
@@ -49,19 +49,12 @@ struct RoutesTests {
         #expect(SSHConfig.problem(with: noKey) != nil)
     }
 
-    @Test func startupSQLSplitsAtSemicolonsOutsideQuotesAndComments() {
-        let text = """
-            SET sql_mode = 'ANSI;STRICT';  -- the mode; with a comment
-            # a whole-line comment; still one
-            SET @a = "x;y", @b = `odd;name`; /* block; comment */ SET time_zone = '+00:00';
-            /*!50700 SET SESSION max_execution_time = 1000 */;
-            SET @c = 'it\\'s; fine';
-            """
-        #expect(SavedConnection.statements(text) == [
-            "SET sql_mode = 'ANSI;STRICT'", "SET @a = \"x;y\", @b = `odd;name`", "SET time_zone = '+00:00'",
-            "/*!50700 SET SESSION max_execution_time = 1000 */", "SET @c = 'it\\'s; fine'",
-        ])
-        #expect(SavedConnection.statements("  ;; -- nothing\n").isEmpty)
+    @Test func startupSQLIsSentAStatementAtATime() {
+        var connection = SavedConnection(host: "db", user: "app")
+        connection.startupSQL = "SET sql_mode = 'ANSI;STRICT';  -- the mode; with a comment\n# another; still one\n"
+            + "SET time_zone = '+00:00'"
+        #expect(connection.connectOptions(password: "", routeSocket: nil).startupSQL
+                == ["SET sql_mode = 'ANSI;STRICT'", "SET time_zone = '+00:00'"])
     }
 
     @Test func databaseFilterTakesNamesAndPatterns() {
