@@ -18,5 +18,12 @@ extension MainMenu {
         menus.data.add([nil, Commands.loadMore, Commands.countRows])
         menus.view.add([nil, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,
                         Commands.transpose, Commands.columnList, nil, Commands.heatmap, Commands.highlightEqual])
+        menus.view.addItem(submenu("View As", ["Table", "Text", "Tree"].enumerated().map { index, title in
+            let item = Commands.viewAs.item()
+            item.title = title
+            item.tag = index
+            return item
+        }))
+        menus.view.add([Commands.chart])
     }
 }

@@ -72,11 +72,15 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// Heatmaps by the source's column, and whether equal values are tinted (`GridViewer+Colours`).
     var heat: [Int: HeatScale] = [:]
     var highlightsEqual = false
+    /// View As or Chart (`GridViewer+Views`): what the body shows, and the view shown in place of the grid.
+    var presentation = Presentation.table
+    var presented: NSView?
     /// The source as the grid shows it untransposed: with its display types.
-    private var displayed: GridSource?
+    private(set) var displayed: GridSource?
 
     /// Shows `source` with the columns as they were left under `viewKey`; `transposed` turns it on its side.
     func show(_ source: GridSource?, transposed: Bool = false) {
+        if presentation != .table { present(.table) }
         self.source = source
         record = nil
         self.transposed = false
@@ -162,6 +166,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     func reloadData() {
         (grid.source as? TransposedSource)?.refresh()
         rescaleHeat()
+        if presentation != .table { present(presentation) }
         grid.reloadData()
         updateRecordBar()
         status.update()
@@ -173,6 +178,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// Transpose (⌥⌘T): rows become columns, the column names down the left; again to turn back.
     @objc func transposeGrid(_ sender: Any?) {
         guard let source else { return }
+        if presentation != .table { present(.table) }
         if transposed || record != nil {
             let focus = (grid.source as? TransposedSource).flatMap { shown in grid.selection.cursor.flatMap { shown.base($0.row, grid.sourceColumn($0.column)) } }
             transposed = false
@@ -198,6 +204,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     /// Record View (⌥⌘R): the focused row as a form, one line per column; ⌥↑ ⌥↓ show the row before or after.
     @objc func showRecordView(_ sender: Any?) {
+        if presentation != .table { present(.table) }
         if record != nil { return transposeGrid(nil) }
         guard let source, source.rowCount > 0 else { return NSSound.beep() }
         if transposed { transposeGrid(nil) }
@@ -386,6 +393,12 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             return status.aggregate != nil
         case #selector(goToRow(_:)): return grid.rowCount > 0
         case #selector(showColumnList(_:)): return source != nil
+        case #selector(viewAs(_:)):
+            item.state = item.tag == presentation.rawValue ? .on : .off
+            return source != nil
+        case #selector(showChart(_:)):
+            item.state = presentation == .chart ? .on : .off
+            return source != nil
         case #selector(toggleHeatmap(_:)):
             let all = grid.selection.areas.contains(.all)
             let columns = ((all ? source.map { Array($0.columns.indices) } : nil) ?? focusedColumns)

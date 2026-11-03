@@ -280,3 +280,57 @@ extension AppTests {
         if let other { #expect(grid.cellTint?(other, 5) == nil) }
     }
 }
+
+extension AppTests {
+    @Test func viewAsTextTreeAndChartShowTheRowsAnotherWay() async throws {
+        let source = FakeGridSource(rows: 25, columns: 10)
+        let (_, harness, content) = viewerWindow(source)
+        let viewer = content.viewer
+        #expect(await call(harness, "menu", ["path": "View > View As > Text"]).error == nil)
+        let text = try #require((viewer.presented as? NSScrollView)?.documentView as? NSTextView)
+        #expect(viewer.presentation == .text && viewer.grid.containerView.isHidden)
+        #expect(text.string.hasPrefix("+----") && text.string.contains("| id ") && text.string.contains("| 25 |"))
+        #expect(await call(harness, "menu", ["path": "View > View As > Tree"]).error == nil)
+        let tree = try #require(viewer.presented as? JSONTreeView)
+        #expect(tree.tree?.children.count == 25 && tree.tree?.children[0].children[0].kind == .number)
+        // Chart: a bar of the first number column that isn't the key, by the first text column.
+        #expect(await call(harness, "menu", ["path": "View > Chart"]).error == nil)
+        let chart = try #require(viewer.presented as? GridChartView)
+        #expect(chart.spec.kind == .bar && chart.spec.y == "amount_2" && chart.spec.x == "name_1" && !chart.spec.points.isEmpty)
+        chart.kind.selectItem(at: GridChart.Kind.histogram.rawValue)
+        chart.update()
+        #expect(chart.spec.kind == .histogram && chart.spec.points.map(\.y).reduce(0, +) == 25)
+        chart.kind.selectItem(at: GridChart.Kind.scatter.rawValue)
+        chart.update()
+        #expect(chart.spec.points.count == 25)
+        let png = try #require(chart.pngData())
+        #expect(png.starts(with: [0x89, 0x50, 0x4E, 0x47]) && NSImage(data: png) != nil)
+        // Chart again: back to the grid.
+        #expect(await call(harness, "menu", ["path": "View > Chart"]).error == nil)
+        #expect(viewer.presentation == .table && viewer.presented == nil && !viewer.grid.containerView.isHidden)
+    }
+
+    @Test func chartPointsAndTextTables() {
+        let totals = GridChart.totals(labels: ["a", "b", "a", nil, "c"], values: [1, 2, 3, 4, nil], limit: 2)
+        #expect(totals.map(\.label) == ["a", "b", "Other"] && totals.map(\.y) == [4, 2, 4])
+        let series = GridChart.series(xs: [1, nil, 3], ys: [10, 20, nil])
+        #expect(series.map(\.x) == [1] && GridChart.series(xs: nil, ys: [5, 6]).map(\.x) == [1, 2])
+        let bins = GridChart.histogram([0, 1, 2, 3, 10, nil], bins: 5)
+        #expect(bins.count == 5 && bins.map(\.y) == [2, 2, 0, 0, 1])
+        #expect(GridChart.histogram([7, 7], bins: 5).map(\.y) == [2] && GridChart.histogram([nil], bins: 5).isEmpty)
+        let table = GridText.table(["id", "name"], [["1", "Ada"], ["22", nil], ["3", "line\nbreak"]], rightAligned: [true, false])
+        #expect(table == """
+            +----+------------+
+            | id | name       |
+            +----+------------+
+            |  1 | Ada        |
+            | 22 | NULL       |
+            |  3 | line↵break |
+            +----+------------+
+            """)
+        let rows = JSONNode.rows([GridColumn(name: "n", kind: .number), GridColumn(name: "j", kind: .json), GridColumn(name: "s")],
+                                 [["1.5", "{\"a\": 1}", "x\"y"], [nil, "not json", nil]])
+        #expect(rows.children[0].children.map(\.value) == ["1.5", "{1 key}", #""x\"y""#])
+        #expect(rows.children[1].children.map(\.kind) == [.null, .string, .null])
+    }
+}

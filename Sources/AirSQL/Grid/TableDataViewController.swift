@@ -87,12 +87,7 @@ final class TableDataViewController: NSViewController, TabContent, NSMenuItemVal
             let source = TableDataSource(page, table: schema, pageSize: pageSize)
             self.source = source
             total = estimate.map { ($0, false) }
-            if first {
-                viewer.show(source)
-            } else {
-                viewer.grid.source = source
-                viewer.restoreColumns()
-            }
+            viewer.show(source)
             showMessage(source.rowCount == 0 ? "\(query.table) has no rows\(filtered ? " that match the filter" : "")." : nil)
         }
     }

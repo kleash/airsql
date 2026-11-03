@@ -5,7 +5,7 @@ import AppKit
 /// text, a JSON tree, hex or an image, with its size under it. It follows the cursor; it picks the view that fits the
 /// value, and the one chosen stays while it fits.
 @MainActor
-final class GridValuePanel: NSView, NSOutlineViewDataSource, NSOutlineViewDelegate {
+final class GridValuePanel: NSView {
     enum Mode: Int, CaseIterable {
         case text, json, hex, image
 
@@ -16,8 +16,8 @@ final class GridValuePanel: NSView, NSOutlineViewDataSource, NSOutlineViewDelega
     let modes = NSSegmentedControl(labels: Mode.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     let text = NSTextView()
     private let textScroll = NSScrollView()
-    let outline = NSOutlineView()
-    private let outlineScroll = NSScrollView()
+    private let outlineScroll = JSONTreeView()
+    var outline: NSOutlineView { outlineScroll.outline }
     private let image = NSImageView()
     let footer = label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor, wraps: true)
     private let wrap = checkbox("Wrap", id: "valuePanel.wrap", tip: "Wrap long lines to the panel's width", on: true, target: nil,
@@ -48,20 +48,7 @@ final class GridValuePanel: NSView, NSOutlineViewDataSource, NSOutlineViewDelega
         text.setAccessibilityIdentifier("valuePanel.text")
         textScroll.documentView = text
         textScroll.hasVerticalScroller = true
-        let key = NSTableColumn(identifier: .init("key")), node = NSTableColumn(identifier: .init("value"))
-        key.title = "Key"
-        node.title = "Value"
-        key.width = 110
-        outline.addTableColumn(key)
-        outline.addTableColumn(node)
-        outline.outlineTableColumn = key
-        outline.dataSource = self
-        outline.delegate = self
-        outline.style = .plain
-        outline.usesAlternatingRowBackgroundColors = true
         outline.setAccessibilityIdentifier("valuePanel.tree")
-        outlineScroll.documentView = outline
-        outlineScroll.hasVerticalScroller = true
         image.imageScaling = .scaleProportionallyDown
         image.setAccessibilityIdentifier("valuePanel.image")
         let top = NSStackView(views: [title, NSView(), modes])
@@ -127,9 +114,7 @@ final class GridValuePanel: NSView, NSOutlineViewDataSource, NSOutlineViewDelega
         switch mode {
         case .text: text.string = value ?? ""
         case .hex: text.string = Self.hexDump(bytes ?? [])
-        case .json:
-            outline.reloadData()
-            outline.expandItem(nil, expandChildren: true)
+        case .json: outlineScroll.tree = tree
         case .image: break
         }
         setWrap(mode == .text && wrap.state == .on)
@@ -167,26 +152,4 @@ final class GridValuePanel: NSView, NSOutlineViewDataSource, NSOutlineViewDelega
     }
 
     @objc private func toggleWrap(_ sender: Any?) { setWrap(wrap.state == .on) }
-
-    // MARK: JSON tree
-
-    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-        (item as? JSONNode)?.children.count ?? (tree == nil ? 0 : 1)
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-        (item as? JSONNode)?.children[index] ?? tree!
-    }
-
-    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool { !((item as? JSONNode)?.children.isEmpty ?? true) }
-
-    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
-        guard let node = item as? JSONNode else { return nil }
-        let isKey = tableColumn?.identifier.rawValue == "key"
-        let colours: [JSONNode.Kind: NSColor] = [.string: .sqlString, .number: .sqlNumber, .bool: .sqlKeyword, .null: .dataNull]
-        let field = label(isKey ? (node.key.isEmpty ? "(root)" : node.key) : node.value, font: .monospacedSystemFont(ofSize: 11.5, weight: .regular),
-                          color: isKey ? .labelColor : colours[node.kind] ?? .secondaryLabelColor, truncates: true)
-        field.toolTip = isKey ? nil : node.value
-        return field
-    }
 }
