@@ -147,8 +147,23 @@ extension AppTests {
             #expect(await call(harness, "press", ["id": "preview.cancel"]).error == nil)
             await #expect(throws: AirSQLError.self) { try await declined.value }
 
-            // A connection whose safety settings let agents' changes through isn't asked about.
-            var local = Fixtures.local
+            // The connected connection whose sessions sent it decides, by the name they connected with: another one
+            // renamed to that name since, whose settings don't ask, changes nothing...
+            let stand = Connection(options: ConnectOptions(name: request.connection, host: "127.0.0.1", port: 1, user: "root",
+                                                           connectTimeout: 2))
+            service.model.attach(stand, to: Fixtures.local.id)
+            defer { service.model.detach(Fixtures.local.id) }
+            var local = Fixtures.local, other = Fixtures.staging
+            local.name = "Local, renamed"
+            other.name = request.connection
+            other.safety?.askBeforeAgentChanges = false
+            service.model.save(local)
+            service.model.save(other)
+            let asked = Task { try await service.approve(request) }
+            #expect(await eventually(timeout: 5) { Self.preview(main) != nil })
+            #expect(await call(harness, "press", ["id": "preview.cancel"]).error == nil)
+            await #expect(throws: AirSQLError.self) { try await asked.value }
+            // ...and one whose own safety settings let agents' changes through isn't asked about.
             local.safety = SafetySettings()
             local.safety?.askBeforeAgentChanges = false
             service.model.save(local)

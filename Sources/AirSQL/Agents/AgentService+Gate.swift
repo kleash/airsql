@@ -81,8 +81,10 @@ extension AgentService {
     /// The driver's question about one statement an agent's request sent on a session of the person's: on the SQL
     /// preview sheet, unless the connection's Safety settings say agents' changes needn't ask.
     func approve(_ request: AgentGate.Request) async throws {
-        let named = model.data.connections.filter { $0.displayName == request.connection }
-        let saved = named.count == 1 ? named[0] : nil
+        // The connected connection whose sessions these are, by the name they connected with: renaming connections
+        // since (agents may rename them while Ask before agents change anything is off) can't point it at another.
+        let named = model.open.values.filter { $0.connection.options.name == request.connection }
+        let saved = named.count == 1 ? model.connection(named[0].id) : nil
         if let saved, !model.data.safety(for: saved).askBeforeAgentChanges { return }
         guard model.data.settings.agentsAllowed, let window = main?.window else {
             throw AirSQLError(.readOnly, "Agents are off, so nobody was asked: nothing ran.")
