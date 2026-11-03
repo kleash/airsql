@@ -21,10 +21,7 @@ extension MainMenu {
         menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
         menus.data.add([Commands.chooseReferencedRow, Commands.useAsLabel, Commands.addVirtualKey, Commands.removeVirtualKey])
         menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
-        let filters: [Command?] = [Commands.filterEquals, Commands.filterNotEquals, Commands.filterLess, Commands.filterGreater,
-                                   Commands.filterStartsWith, Commands.filterEndsWith, Commands.filterContains, Commands.filterIn,
-                                   Commands.filterNotIn, Commands.filterNull, Commands.filterNotNull, nil, Commands.filterPrompt]
-        menus.data.addItem(submenu("Quick Filter", filters.map { $0?.item() ?? .separator() }))
+        menus.data.addItem(submenu("Quick Filter", QuickFilter.commands.map { $0.item() } + [.separator(), Commands.filterPrompt.item()]))
         menus.data.add([Commands.filterByValues, Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending,
                         Commands.sortColumns, Commands.clearSort, nil,
                         Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn, Commands.freeze])
