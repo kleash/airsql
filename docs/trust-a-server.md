@@ -1,3 +1,8 @@
+---
+title: Trust a server
+nav_order: 6
+---
+
 # Trust a server
 
 When a server's certificate isn't one macOS trusts (it is self-signed, or from your company's own certificate

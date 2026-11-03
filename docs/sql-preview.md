@@ -1,3 +1,8 @@
+---
+title: Check SQL before it runs
+nav_order: 5
+---
+
 # Check SQL before it runs
 
 Some changes show their SQL in a sheet before anything runs: applying edits in a table, changing a table's structure,

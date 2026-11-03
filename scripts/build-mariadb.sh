@@ -3,7 +3,7 @@
 # universal dynamic library
 #   vendor/out/universal/lib/libmariadb.3.dylib  (arm64 + x86_64, install name @rpath/libmariadb.3.dylib)
 #   vendor/out/universal/include                 (Connector/C's headers; OpenSSL's in openssl/)
-#   vendor/out/source/                           (Connector/C's source tarball as built, for releases: LGPL)
+#   vendor/out/source/                           (Connector/C's and OpenSSL's source tarballs as built, for releases)
 # The result is kept outside the repository in $AIRSQL_VENDOR_CACHE/<SHA-256 of this script> (default: the folder
 # airsql-vendor-cache next to the repository, so every worktree shares it) and copied into vendor/out; vendor/out/stamp
 # holds the SHA-256. build.sh and test.sh run this when the stamp isn't the current one. A script with other versions or
@@ -164,7 +164,7 @@ codesign --force --sign - "$result/universal/lib/libmariadb.3.dylib"
 # The headers are the same for both architectures.
 cp -R "$work/stage/${archs[0]}$prefix/include" "$result/universal/"
 # The exact source of the library AirSQL ships (this script holds any patch): releases attach it.
-cp "$base/dl/mariadb-connector-c-$mariadb_version-src.tar.gz" "$result/source/"
+cp "$base/dl/mariadb-connector-c-$mariadb_version-src.tar.gz" "$base/dl/openssl-$openssl_version.tar.gz" "$result/source/"
 echo "$hash" > "$result/stamp"
 # Another build of the same script may have finished first: then that one is used.
 [ -d "$cache" ] || mv "$result" "$cache"
