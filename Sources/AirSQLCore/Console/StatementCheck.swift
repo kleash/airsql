@@ -135,3 +135,21 @@ public enum StatementCheck {
         return names.joined(separator: ", ")
     }
 }
+
+extension StatementCheck {
+    /// The database a USE statement makes current, its name without quotes; nil for any other statement.
+    public static func usedDatabase(_ sql: String, noBackslashEscapes: Bool = false) -> String? {
+        let words = codeWords(sql, noBackslashEscapes: noBackslashEscapes)
+        guard words.count >= 2, words[0].text == "USE" else { return nil }
+        let name = words[1]
+        guard name.kind == .quotedName else { return name.kind == .word ? name.raw : nil }
+        return String(name.raw.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
+    }
+}
+
+extension SQLStatement {
+    /// A statement that isn't in the console's text (Commit, Rollback, the transaction mode): it has no range.
+    public init(sql: String) {
+        self.init(range: 0..<0, end: 0, sql: sql)
+    }
+}

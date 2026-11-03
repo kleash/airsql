@@ -1,3 +1,4 @@
+import CMariaDB
 import Foundation
 
 /// How one statement of a console run ended (plan §2.6): its results (a result set each, or rows affected), the
@@ -101,5 +102,13 @@ public enum ConsoleRunner {
                 return fired
             }
         }
+    }
+}
+
+extension ResultStore.Column {
+    /// A number column, right-aligned in the console's result table: DECIMAL, the integers, FLOAT, DOUBLE.
+    public var isNumeric: Bool {
+        [MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT, MYSQL_TYPE_INT24, MYSQL_TYPE_LONG,
+         MYSQL_TYPE_LONGLONG, MYSQL_TYPE_FLOAT, MYSQL_TYPE_DOUBLE].contains(type)
     }
 }

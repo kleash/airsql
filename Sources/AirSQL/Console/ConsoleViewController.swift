@@ -1,0 +1,212 @@
+import AirSQLCore
+import AppKit
+
+extension Notification.Name {
+    /// Posted (object: the connection's id) when a connection's shared console state changes: a run starts or ends,
+    /// the database, the transaction.
+    static let consoleSessionDidChange = Notification.Name("AirSQLConsoleSessionDidChange")
+}
+
+/// A console tab (plan §2.6): a document bound to one connection, saved to a .sql file or kept as an unsaved tab that
+/// comes back after relaunch. The editor above, the result tabs and Messages below. Its statements run one at a time
+/// on the connection's main session, which every console tab of the connection shares (one transaction, shown in the
+/// toolbar and the status bar).
+@MainActor
+final class ConsoleViewController: NSViewController, TabContent {
+    // What lanes not yet in this build give the console: a connected connection's sessions (connections, L1), its
+    // schema cache (navigator, L5a) and its query timeout in seconds (L1's connection setting). Until then a connection
+    // counts as not connected.
+    static var openConnection: (UUID) -> Connection? = { _ in nil }
+    static var schemaCache: (UUID) -> SchemaCache? = { _ in nil }
+    static var queryTimeout: (UUID) -> Int = { _ in 0 }
+
+    /// What the console tabs of one connection share, as they share its main session.
+    struct Shared {
+        /// The console running a statement on it: one at a time, so each Cancel stops its own statement.
+        var runner: UUID?
+        /// The current database: the connection's own, then the last USE.
+        var database: String?
+        /// Rows changed in the open transaction.
+        var changes: UInt64 = 0
+        var isolation: IsolationLevel?
+        /// The main session, once a console has used it.
+        var session: DBConnection?
+    }
+    static var shared: [UUID: Shared] = [:]
+
+    let model: AppModel
+    /// The document's own id: what restores it after relaunch.
+    let documentID: UUID
+    private(set) var connectionID: UUID?
+    private(set) var fileURL: URL?
+    /// The text as last saved to its file ("" for an untitled console).
+    var savedText = ""
+    private(set) var editor: SQLEditorView!
+    private(set) var editorScroll: NSScrollView!
+    let results = ResultsView()
+    let messagesView = ConsoleMessagesView()
+    lazy var messagesTab: ResultTab = {
+        let tab = ResultTab(title: "Messages", content: .messages, summary: "")
+        tab.makeView = { [weak self] in self?.messagesView ?? NSView() }
+        return tab
+    }()
+    var resultTabs: [ResultTab] = []
+    var selectedResult: ResultTab?
+    let split = NSSplitView()
+    private let initialText: String
+    /// The run under way, if any.
+    var running: ConsoleRun?
+    /// Result tabs made so far ("Result 3").
+    var resultNumber = 0
+    /// The editor's font size while zoomed (⌘+, ⌘−); nil: Settings ▸ Editor's.
+    var zoomedSize: CGFloat?
+
+    init(model: AppModel, connection: UUID?, text: String = "", fileURL: URL? = nil, documentID: UUID = UUID()) {
+        self.model = model
+        connectionID = connection
+        initialText = text
+        self.fileURL = fileURL
+        self.documentID = documentID
+        if fileURL != nil { savedText = text }
+        super.init(nibName: nil, bundle: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionChanged(_:)), name: .consoleSessionDidChange, object: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func loadView() {
+        let root = SurfaceView(.content)
+        let (scroll, editor) = SQLEditorView.make(fontSize: CGFloat(model.data.settings.editorFontSize))
+        self.editor = editor
+        editorScroll = scroll
+        editor.setText(initialText)
+        editor.onChange = { [weak self] in self?.textChanged() }
+        split.isVertical = false
+        split.dividerStyle = .thin
+        split.autosaveName = layoutName("Console")
+        split.translatesAutoresizingMaskIntoConstraints = false
+        split.addArrangedSubview(scroll)
+        split.addArrangedSubview(results)
+        split.setHoldingPriority(.defaultLow - 1, forSubviewAt: 0)
+        split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
+        root.addSubview(split)
+        split.pin(to: root)
+        NSLayoutConstraint.activate([
+            scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
+            results.heightAnchor.constraint(greaterThanOrEqualToConstant: ResultsView.barHeight + 90),
+        ])
+        results.onSelect = { [weak self] tab in self?.selectResult(tab) }
+        results.onRename = { [weak self] tab, title in
+            tab.title = title
+            self?.showResults()
+        }
+        results.tabMenu = { [weak self] in self?.resultMenu() ?? NSMenu() }
+        messagesView.onOpen = { [weak self] message in self?.reveal(message) }
+        view = root
+        showResults()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        if split.subviews.count == 2, split.subviews[1].frame.height < 150 {
+            split.setPosition(max(120, split.bounds.height * 0.5), ofDividerAt: 0)
+        }
+        view.window?.makeFirstResponder(editor)
+        syncToolbar()
+    }
+
+    // MARK: State
+
+    var text: String { editor?.string ?? initialText }
+    var connection: SavedConnection? { model.connection(connectionID) }
+    var shared: Shared { connectionID.flatMap { Self.shared[$0] } ?? Shared() }
+
+    /// The connection's main session as it stands, if a console has used it and it is still connected.
+    var session: DBConnection? {
+        guard let id = connectionID, Self.openConnection(id) != nil, let session = Self.shared[id]?.session,
+              session.isConnected else { return nil }
+        return session
+    }
+
+    var isConnected: Bool {
+        guard let id = connectionID, Self.openConnection(id) != nil else { return false }
+        if case .connected? = model.states[id] { return true }
+        return Self.shared[id]?.session?.isConnected == true
+    }
+
+    func changeShared(_ change: (inout Shared) -> Void) {
+        guard let id = connectionID else { return }
+        var value = Self.shared[id] ?? Shared()
+        change(&value)
+        Self.shared[id] = value
+        NotificationCenter.default.post(name: .consoleSessionDidChange, object: id)
+    }
+
+    @objc private func sessionChanged(_ notification: Notification) {
+        guard notification.object as? UUID == connectionID else { return }
+        contentChanged()
+    }
+
+    /// Tells the tab bar and the status bar.
+    func contentChanged() {
+        NotificationCenter.default.post(name: .tabContentDidChange, object: self)
+        syncToolbar()
+    }
+
+    private func textChanged() {
+        resultsRuler?.errorLine = nil
+        ConsoleDocuments.shared.changed(self)
+        contentChanged()
+    }
+
+    var resultsRuler: LineNumberRuler? { editorScroll?.verticalRulerView as? LineNumberRuler }
+
+    /// The main window's tab that shows this console.
+    var tab: Tab? { mainWindow?.tabs.first { $0.content === self } }
+    var mainWindow: MainWindowController? { view.window?.windowController as? MainWindowController }
+
+    // MARK: TabContent
+
+    var canRename: Bool { fileURL == nil }
+    var isEdited: Bool { fileURL == nil ? !text.isEmpty : text != savedText }
+    var canDuplicate: Bool { true }
+
+    func duplicate() -> NSViewController? {
+        ConsoleViewController(model: model, connection: connectionID, text: text)
+    }
+
+    var transactionBadge: String? {
+        guard let session, session.inTransaction else { return nil }
+        var badge = "Transaction open"
+        let changes = shared.changes
+        if changes > 0 { badge += " · \(changes.formatted()) change\(changes == 1 ? "" : "s")" }
+        if let started = session.transactionStarted, let connection {
+            let minutes = Int(Date().timeIntervalSince(started) / 60)
+            if minutes >= model.data.safety(for: connection).openTransactionMinutes { badge += " · \(minutes) min" }
+        }
+        return badge
+    }
+
+    func shouldClose(_ answer: @escaping (Bool) -> Void) {
+        ConsoleClosing.ask(self, answer: answer)
+    }
+
+    // MARK: File
+
+    /// The console now shows `url`, saved with `text`.
+    func setFile(_ url: URL, savedText: String) {
+        fileURL = url
+        self.savedText = savedText
+        if let tab { mainWindow?.rename(tab, to: url.lastPathComponent) }
+        ConsoleDocuments.shared.changed(self)
+        contentChanged()
+    }
+
+    func setConnection(_ id: UUID) {
+        connectionID = id
+        tab?.connectionID = id
+        ConsoleDocuments.shared.changed(self)
+        mainWindow?.refresh()
+        contentChanged()
+    }
+}
