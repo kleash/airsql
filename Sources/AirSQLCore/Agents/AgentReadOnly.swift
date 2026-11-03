@@ -31,8 +31,8 @@ public enum AgentReadOnly {
             let mariaDB = server.flavor == .mariadb
             _ = try await session.query(mariaDB ? "SET SESSION max_statement_time = \(timeout)"
                                         : "SET SESSION max_execution_time = \(timeout * 1000)")
-            let variable = mariaDB ? (server.versionNumber >= 110100 ? "transaction_read_only" : "tx_read_only")
-                : (server.versionNumber >= 50720 ? "transaction_read_only" : "tx_read_only")
+            let variable = mariaDB ? (server.atLeast(11, 1) ? "transaction_read_only" : "tx_read_only")
+                : (server.atLeast(5, 7, 20) ? "transaction_read_only" : "tx_read_only")
             let runner = Runner(session: session, timeout: timeout, check: "SELECT @@session." + variable)
             try await runner.checkReadOnly()
             return try await body(runner)

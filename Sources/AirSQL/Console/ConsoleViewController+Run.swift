@@ -86,8 +86,16 @@ extension ConsoleViewController {
         updateRunning()
         guard let session = run.session else { return }
         Task { [weak self] in
-            if case .unsafe(let reason)? = try? await session.cancel() {
-                self?.note(.warning, "AirSQL couldn't stop the statement safely: \(reason) Disconnect to stop it.")
+            let result = try? await session.cancel()
+            guard let self else { return }
+            switch result {
+            case .unsafe(let reason):
+                self.note(.warning, "AirSQL couldn't stop the statement safely: \(reason) Disconnect to stop it.")
+            case .notRunning where self.running === run:
+                self.note(.warning, "AirSQL couldn't find the statement to stop: it may be starting or between "
+                    + "statements. If it keeps going, disconnect to stop it.")
+            default:
+                break
             }
         }
     }
@@ -140,6 +148,14 @@ extension ConsoleViewController {
     }
 
     private func perform(_ run: ConsoleRun, on session: DBConnection, connection id: UUID) async {
+        // The database made current in the navigator or the toolbar since the session's last USE: used first, so the
+        // statements run where the window says (and a run under way is never switched midway). If it fails, nothing runs.
+        if run.statements.contains(where: { !$0.range.isEmpty }), let wanted = model.openConnection(id)?.currentDatabase,
+           wanted != shared.database ?? session.options.database {
+            let use = await ConsoleRunner.run(SQLStatement(sql: "USE " + SQLQuote.identifier(wanted)), in: run.text, on: session)
+            show(use, title: nil, run: run, session: session)
+            guard use.error == nil else { return }
+        }
         switch run.kind {
         case .explain: return await explain(run, on: session)
         case .profile:  // profiling's switch is AirSQL's, not an agent's: the agents' gate doesn't ask about it

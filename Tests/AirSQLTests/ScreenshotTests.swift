@@ -111,13 +111,12 @@ extension AppTests {
                 request.warnings = ["Deleting from orders also deletes rows in order_items (ON DELETE CASCADE)."]
                 request.accessory = checkbox("Read new rows back (shows the new id)", id: "preview.readBack",
                                              tip: "Read the new rows back after Apply", on: true, target: nil, action: nil)
-                SQLPreviewSheet.changesetWriter = { _ in }
+                request.offersChangeset = true
                 SQLPreviewSheet.show(request, connection: Fixtures.production, on: main.window!) { _ in }
                 _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
                 try await save(harness, "sql-preview-\(suffix)")
                 _ = await call(harness, "press", ["title": "Cancel"])
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
-                SQLPreviewSheet.changesetWriter = nil
 
                 // Trust and password.
                 showTrust(server: "db.example.com", fingerprint: "SHA256:9F:2C:41:7A:0B:E3:55:D8:6C:11:AF:30:72:9E:C4:5B:"

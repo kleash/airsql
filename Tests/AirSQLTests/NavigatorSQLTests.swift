@@ -104,4 +104,56 @@ struct NavigatorSQLTests {
         #expect(NavigatorSQL.stillConnected(hostile, noBackslashEscapes: true)
                 == "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE ID = 13 AND USER = 'x''; KILL 1; --' AND HOST = 'h'")
     }
+
+    /// Generate SELECT, INSERT and UPDATE from the cached tables: the server's own columns (auto-increment, generated) left
+    /// out of what is written, the key naming the row, `?` for each value to fill in.
+    @Test func generatesStatementsFromTheCachedColumns() async throws {
+        let snapshot = try await SchemaTests.loaded(SchemaFixtures.mariadb118).0.snapshot
+        func table(_ name: String) throws -> (DatabaseObject, SchemaTable) {
+            (DatabaseObject(.table, "airsql_fixture", name), try #require(snapshot.table("airsql_fixture", name)))
+        }
+        let (orders, ordersTable) = try table("orders")
+        #expect(NavigatorSQL.select(orders, ordersTable.columns)
+                == "SELECT `id`, `customer_id`, `region`, `number`, `total`, `parent_id`\nFROM `airsql_fixture`.`orders`;")
+        #expect(NavigatorSQL.select(orders, []) == "SELECT *\nFROM `airsql_fixture`.`orders`;")
+        #expect(NavigatorSQL.insert(orders, ordersTable.columns)
+                == "INSERT INTO `airsql_fixture`.`orders` (`customer_id`, `region`, `number`, `total`, `parent_id`)\nVALUES (?, ?, ?, ?, ?);")
+        #expect(NavigatorSQL.update(orders, ordersTable) == "UPDATE `airsql_fixture`.`orders`\n"
+                + "SET `customer_id` = ?, `region` = ?, `number` = ?, `total` = ?, `parent_id` = ?\nWHERE `id` = ?;")
+        let (customers, customersTable) = try table("customers")
+        let insert = NavigatorSQL.insert(customers, customersTable.columns)
+        #expect(insert.hasPrefix("INSERT INTO `airsql_fixture`.`customers` (`email`, `name`,") && insert.contains("`secret`"))
+        #expect(!insert.contains("`id`") && !insert.contains("`email_domain`") && !insert.contains("`name_upper`"))
+        #expect(!NavigatorSQL.update(customers, customersTable).contains("`name_upper` ="))
+        let (lines, linesTable) = try table("order_lines")
+        #expect(NavigatorSQL.update(lines, linesTable)
+                == "UPDATE `airsql_fixture`.`order_lines`\nSET `qty` = ?\nWHERE `region` = ? AND `number` = ? AND `line` = ?;")
+        // No key names a row: the condition is the person's to write.
+        let (log, logTable) = try table("log")
+        #expect(NavigatorSQL.update(log, logTable) == "UPDATE `airsql_fixture`.`log`\nSET `at` = ?, `message` = ?\nWHERE ?;")
+        let (weird, weirdTable) = try table("we`ird 'name' ✓")
+        #expect(NavigatorSQL.select(weird, weirdTable.columns)
+                == "SELECT `col ``1`, `naïve \"x\"`\nFROM `airsql_fixture`.`we``ird 'name' ✓`;")
+    }
+
+    /// Run…: a CALL with `?` for each IN value (named and typed beside it), OUT and INOUT values in user variables read
+    /// back; a function in a SELECT. A name can't end the comment it is put in.
+    @Test func runsRoutinesWithTheirParametersToFillIn() {
+        let procedure = DatabaseObject(.procedure, "fixture", "customer_orders")
+        #expect(NavigatorSQL.run(procedure, [.init(mode: "IN", name: "p_customer", type: "int"),
+                                             .init(mode: "OUT", name: "p_count", type: "int")])
+                == "CALL `fixture`.`customer_orders`(? /* p_customer int */, @`p_count`);\nSELECT @`p_count`;")
+        #expect(NavigatorSQL.run(procedure, [.init(mode: "INOUT", name: "total", type: "decimal(12,2)")])
+                == "SET @`total` = ? /* total decimal(12,2) */;\nCALL `fixture`.`customer_orders`(@`total`);\nSELECT @`total`;")
+        #expect(NavigatorSQL.run(procedure, []) == "CALL `fixture`.`customer_orders`();")
+        #expect(NavigatorSQL.run(DatabaseObject(.function, "fixture", "greeting"), [.init(mode: "IN", name: "p_name", type: "varchar(50)")])
+                == "SELECT `fixture`.`greeting`(? /* p_name varchar(50) */);")
+        let hostile = NavigatorSQL.run(procedure, [.init(mode: "IN", name: "a */ DROP TABLE t; /*", type: "int"),
+                                                   .init(mode: "OUT", name: "b`; DROP TABLE t; --", type: "int")])
+        #expect(hostile == "CALL `fixture`.`customer_orders`(? /* a * / DROP TABLE t; /* int */, @`b``; DROP TABLE t; --`);"
+                + "\nSELECT @`b``; DROP TABLE t; --`;")
+        #expect(NavigatorSQL.parameters(DatabaseObject(.function, "it's", "f"), noBackslashEscapes: false)
+                == "SELECT PARAMETER_MODE, PARAMETER_NAME, DTD_IDENTIFIER FROM information_schema.PARAMETERS WHERE SPECIFIC_SCHEMA = "
+                + "'it\\'s' AND SPECIFIC_NAME = 'f' AND ROUTINE_TYPE = 'FUNCTION' AND ORDINAL_POSITION > 0 ORDER BY ORDINAL_POSITION")
+    }
 }

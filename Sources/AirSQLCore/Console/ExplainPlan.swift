@@ -9,7 +9,7 @@ public enum ExplainPlan {
 
     /// The statement that gives the plan as a tree or as JSON, and whether its answer is JSON to flatten.
     public static func treeSQL(_ sql: String, server: ServerInfo?) -> (sql: String, json: Bool) {
-        if let server, server.flavor == .mysql, server.versionNumber >= 80016 { return ("EXPLAIN FORMAT=TREE " + sql, false) }
+        if let server, server.flavor == .mysql, server.atLeast(8, 0, 16) { return ("EXPLAIN FORMAT=TREE " + sql, false) }
         return ("EXPLAIN FORMAT=JSON " + sql, true)
     }
 

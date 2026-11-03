@@ -203,7 +203,8 @@ extension AppTests {
         let drop = (sheet["buttons"] as? [[String: Any]])?.first { $0["title"] as? String == "Drop" }
         #expect(drop?["enabled"] as? Bool == false && drop?["destructive"] as? Bool == true)
         #expect(drop?["help"] as? String == "Type “shop” first")
-        #expect(!titles(sheet["buttons"]).contains("Save as Liquibase changeset"))
+        #expect(!(sheet["fields"] as? [[String: Any]] ?? []).contains { $0["id"] as? String == "preview.saveChangeset" },
+                "only requests that offer a changeset show the box")
         let elements = await call(harness, "snapshot", ["include": ["elements"], "in": "sheet"])
         let ids = (elements["elements"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
         #expect(ids.contains("preview.production") && ids.contains("preview.warning") && ids.contains("preview.sql"))
@@ -214,13 +215,12 @@ extension AppTests {
         #expect(result?.approved == true && result?.saveAsChangeset == false)
         #expect(await call(harness, "wait", ["until": "no_sheet", "timeout": 10]).error == nil)
 
-        // With a changeset writer (L8b) the box shows; an agent's request names the agent and can be declined.
-        SQLPreviewSheet.changesetWriter = { _ in }
-        defer { SQLPreviewSheet.changesetWriter = nil }
+        // A request that offers a changeset shows the box; an agent's request names the agent and can be declined.
         var agentRequest = SQLPreviewRequest(change: ChangeSQL(title: "Apply", statements: ["UPDATE `t` SET `a` = 1 WHERE `id` = 2"],
                                                                connection: Fixtures.local.id),
                                              heading: "Apply 1 change to shop.t?", caption: "It runs in one transaction.")
         agentRequest.agent = "Claude Code"
+        agentRequest.offersChangeset = true
         result = nil
         SQLPreviewSheet.show(agentRequest, connection: Fixtures.local, on: window) { result = $0 }
         let agentSheet = await call(harness, "wait", ["until": "sheet", "timeout": 10])

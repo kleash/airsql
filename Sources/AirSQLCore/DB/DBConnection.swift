@@ -69,6 +69,8 @@ public struct ConnectOptions: Equatable, Sendable, CustomStringConvertible, Cust
 public struct ServerInfo: Equatable, Sendable {
     public enum Flavor: String, Sendable {
         case mysql, mariadb
+
+        public var title: String { self == .mysql ? "MySQL" : "MariaDB" }
     }
 
     public var flavor: Flavor
@@ -82,6 +84,11 @@ public struct ServerInfo: Equatable, Sendable {
     public var tls: String?
     /// The certificate the server showed, when TLS is on.
     public var certificate: TLSCertificate?
+
+    /// The server is this version or later, as `SchemaServer.atLeast` asks it.
+    public func atLeast(_ major: Int, _ minor: Int = 0, _ patch: Int = 0) -> Bool {
+        versionNumber >= major * 10_000 + minor * 100 + patch
+    }
 }
 
 /// One result of a statement: its rows, or what it changed. A procedure (CALL) gives one per result set and one for
@@ -384,7 +391,7 @@ public final class DBConnection: @unchecked Sendable {
             lockName = locked ? lock : nil
             lost = nil
         }
-        log.note("connected: \(server.flavor == .mariadb ? "MariaDB" : "MySQL") \(server.version), thread \(server.threadID)"
+        log.note("connected: \(server.flavor.title) \(server.version), thread \(server.threadID)"
                  + (server.tls.map { ", " + $0 } ?? ", no TLS"), context: context)
         connected = true
         return server
@@ -668,16 +675,28 @@ public final class DBConnection: @unchecked Sendable {
         defer { side.closeHere() }
         _ = try side.connectHere()
         guard let mysql = side.state.locked({ side.mysql }) else { return unsafe }
-        // MySQL's process list has no query id; MariaDB's lets KILL name the statement itself.
+        // MySQL's process list has no query id; MariaDB's lets KILL name the statement itself. The second value is our
+        // tagged statement when its tag still shows in INFO; the third is whatever query the thread runs now, for a
+        // procedure the tagged CALL started, where INFO shows the inner statement, not the CALL's tag.
         let statement = flavor == .mariadb ? "QUERY_ID" : "ID"
         let check = try side.run(mysql, "SELECT IS_USED_LOCK(\(SQLQuote.string(lockName))), (SELECT \(statement) FROM "
                                  + "information_schema.PROCESSLIST WHERE ID = \(thread) AND LEFT(INFO, \(tag.count)) = "
-                                 + "\(SQLQuote.string(tag)))", flavor: flavor)
+                                 + "\(SQLQuote.string(tag))), (SELECT \(statement) FROM information_schema.PROCESSLIST "
+                                 + "WHERE ID = \(thread) AND COMMAND = 'Query')", flavor: flavor)
         guard let rows = check.first?.rows, rows.rowCount == 1 else { return unsafe }
         guard rows.string(0, 0) == String(thread) else { return unsafe }
-        guard let id = rows.string(0, 1) else { return .notRunning }
-        _ = try side.run(mysql, flavor == .mariadb ? "KILL QUERY ID \(id)" : "KILL QUERY \(thread)", flavor: flavor)
-        return .cancelled
+        if let id = rows.string(0, 1) {
+            _ = try side.run(mysql, flavor == .mariadb ? "KILL QUERY ID \(id)" : "KILL QUERY \(thread)", flavor: flavor)
+            return .cancelled
+        }
+        // The tag isn't in INFO: a statement inside a procedure the tagged CALL started is running. Kill it only while
+        // the thread still runs a query and this session hasn't moved on to another statement (a new one can't start
+        // while a cancel is under way, since run() waits for cancels == 0), so KILL QUERY still hits the CALL alone.
+        if let id = rows.string(0, 2), state.locked({ running }) == tag {
+            _ = try side.run(mysql, flavor == .mariadb ? "KILL QUERY ID \(id)" : "KILL QUERY \(thread)", flavor: flavor)
+            return .cancelled
+        }
+        return .notRunning
     }
 }
 

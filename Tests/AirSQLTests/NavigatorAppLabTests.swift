@@ -114,5 +114,68 @@ extension AppTests {
             #expect(await eventually(timeout: 20) { main.sidebar.treeNodes[.database(id, db)] == nil })
             await setup.close()
         }
+
+        /// The current database and the Tx pop-up on a real session: a database chosen in the toolbar is USEd before the
+        /// console's next statement, a USE typed there moves the navigator's bold one, an isolation level chosen in the
+        /// Tx pop-up is the session's, and Run… writes the CALL with the parameters the server lists.
+        @Test func theConsoleRunsInTheCurrentDatabaseAndRunWritesTheCall() async throws {
+            let setup = DBConnection(options: DBLab.options(Lab.mariadb118), role: .tools, log: DBLab.log)
+            try await setup.connect()
+            let (a, b) = ("lane_fix_int_a", "lane_fix_int_b")
+            for sql in ["DROP DATABASE IF EXISTS \(a)", "DROP DATABASE IF EXISTS \(b)", "CREATE DATABASE \(a)", "CREATE DATABASE \(b)",
+                        "CREATE PROCEDURE \(a).twice(IN p_in INT, OUT p_out INT) SET p_out = p_in * 2"] {
+                _ = try await setup.query(sql)
+            }
+            let (model, main, harness, open) = try await connected(Lab.mariadb118)
+            ConsoleViewController.openConnection = { model.openConnection($0)?.connection }
+            defer {
+                ConsoleViewController.openConnection = { _ in nil }
+                ConsoleViewController.shared[open.id] = nil
+                model.detach(open.id)
+            }
+            model.states[open.id] = .connected(server: "MariaDB 11.8")
+            main.sidebar.select([open.id])
+            main.refresh()
+            let popup = main.toolbarController.databasePopup
+            popup.menu?.performActionForItem(at: popup.indexOfItem(withTitle: b))
+            #expect(open.currentDatabase == b)
+            let console = try #require(main.openConsole(text: "SELECT DATABASE();", title: nil, connection: open.id).content
+                                       as? ConsoleViewController)
+            func run(_ text: String) async {
+                console.editor.setText(text)
+                console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+                console.runStatement(nil)
+                _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            }
+            await run("SELECT DATABASE();")
+            #expect(console.lastOutcome?.results.first?.rows?.string(0, 0) == b, "\(console.messagesView.messages.map(\.text))")
+            #expect(console.messagesView.messages.contains { $0.statement == "USE `\(b)`" })
+            await run("USE \(a);")
+            #expect(open.currentDatabase == a && popup.titleOfSelectedItem == a)
+
+            // The Tx pop-up: an isolation level, as choosing it sends it.
+            let tx = main.toolbarController.transactionPopup
+            tx.selectItem(withTitle: "Read Committed")
+            NSApp.sendAction(Commands.isolation.action, to: harness.target(for: Commands.isolation.action, explicit: nil, in: main.window),
+                             from: tx)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            await run("SELECT @@SESSION.transaction_isolation;")
+            #expect(console.lastOutcome?.results.first?.rows?.string(0, 0) == "READ-COMMITTED")
+            // Opened, the pop-up ticks it (its items are checked by the console, as the menu bar's are).
+            let level = try #require(tx.item(withTitle: "Read Committed"))
+            #expect((harness.target(for: level.action!, explicit: nil, in: main.window) as? NSMenuItemValidation)?
+                .validateMenuItem(level) == true)
+            #expect(level.state == .on && tx.titleOfSelectedItem == "Tx: Auto-commit")
+
+            // Run…: the procedure's CALL, its parameters as the server lists them.
+            let routine = try #require(treeRow(main, .object(open.id, DatabaseObject(.procedure, a, "twice"))))
+            _ = await call(harness, "click", ["x": routine.point.0, "y": routine.point.1, "button": "right"])
+            #expect(await call(harness, "menu", ["path": "context > Run…"]).error == nil)
+            #expect(await eventually(timeout: 10) { (main.selectedTab?.content as? ConsoleViewController) !== console })
+            let routineConsole = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(routineConsole.text == "CALL `\(a)`.`twice`(? /* p_in int(11) */, @`p_out`);\nSELECT @`p_out`;\n")
+            for database in [a, b] { _ = try await setup.query("DROP DATABASE " + database) }
+            await setup.close()
+        }
     }
 }

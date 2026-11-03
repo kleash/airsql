@@ -2,11 +2,7 @@ import Foundation
 
 /// A client tool's version, as its --version line says it.
 public struct ToolVersion: Equatable, Sendable, CustomStringConvertible {
-    public enum Family: String, Sendable {
-        case mysql, mariadb
-
-        public var title: String { self == .mysql ? "MySQL" : "MariaDB" }
-    }
+    public typealias Family = ServerInfo.Flavor
 
     public var family: Family
     /// The server release the tool comes with: [8, 4, 3], [11, 8, 3].
@@ -162,7 +158,7 @@ public enum ClientTools {
     public static func best(_ tools: [ClientTool], for server: ServerInfo?) -> ClientTool? {
         let usable = tools.filter { fit($0, server: server).isUsable }
         guard let server else { return usable.first }
-        let family = usable.filter { $0.version?.family.rawValue == server.flavor.rawValue }
+        let family = usable.filter { $0.version?.family == server.flavor }
         let serverRelease = server.versionNumber / 100
         let newEnough = family.filter { ($0.version?.majorMinor ?? 0) >= serverRelease }
         return newEnough.last ?? family.first ?? usable.first
@@ -184,11 +180,10 @@ public enum ClientTools {
                 + "client tools (for example with Homebrew) and choose them in Settings ▸ Client Tools.")
         }
         guard let server else { return .good(version.description) }
-        let serverTitle = (server.flavor == .mysql ? "MySQL " : "MariaDB ") + release(server.versionNumber)
-        if version.family.rawValue != server.flavor.rawValue {
+        let serverTitle = server.flavor.title + " " + release(server.versionNumber)
+        if version.family != server.flavor {
             return .warning("\(version.family.title)'s tool for a \(serverTitle) server: it may miss or fail on "
-                + "\(server.flavor == .mysql ? "MySQL" : "MariaDB")-only features. \(server.flavor == .mysql ? "MySQL" : "MariaDB")'s "
-                + "own tools are safer.")
+                + "\(server.flavor.title)-only features. \(server.flavor.title)'s own tools are safer.")
         }
         if version.majorMinor < server.versionNumber / 100 {
             return .warning("\(tool.title) is older than the server (\(serverTitle)): it may miss newer features. A tool "
