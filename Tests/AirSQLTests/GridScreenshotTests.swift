@@ -70,6 +70,15 @@ extension AppTests {
                 window.displayIfNeeded()
                 try await save(focusedHarness, "grid-selection-\(suffix)", target: "window:Grid")
 
+                // Pending changes (an edited cell, an added row, a deleted row) and rows still loading.
+                let states = ChangingGridSource(rows: 40, columns: 6)
+                states.loadingFrom = 7
+                content.grid.source = states
+                content.grid.selection.select(GridPosition(row: 5, column: 2))
+                window.displayIfNeeded()
+                try await save(focusedHarness, "grid-states-\(suffix)", target: "window:Grid")
+                content.grid.source = FakeGridSource.large()
+
                 // The editor over a cell, after typing.
                 content.editable = true
                 content.grid.selection.select(GridPosition(row: 4, column: 1))

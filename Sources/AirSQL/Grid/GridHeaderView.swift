@@ -36,6 +36,11 @@ final class GridHeaderView: NSRulerView {
         ceil(nameFont.ascender - nameFont.descender) + ceil(typeFont.ascender - typeFont.descender) + 8
     }
 
+    /// Follows the grid's text size.
+    func updateThickness() {
+        if ruleThickness != thickness { ruleThickness = thickness }
+    }
+
     /// The width a column needs for its header: the key mark, the longer of name and type, the sort control.
     func width(for column: GridColumn) -> CGFloat {
         let name = (column.name as NSString).size(withAttributes: [.font: nameFont]).width + (column.isKey ? 13 : 0)

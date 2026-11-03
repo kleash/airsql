@@ -147,6 +147,4 @@ extension DataGridView {
         guard rowCount > 0, columnCount > 0 else { return }
         selection.selectAll()
     }
-
-    override func cancelOperation(_ sender: Any?) {}
 }

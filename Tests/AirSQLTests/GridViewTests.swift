@@ -34,6 +34,31 @@ final class GridFixtureContent: NSViewController, TabContent, DataGridViewDelega
     }
 }
 
+/// A small source whose size can change, with pending changes on some rows and a page still loading.
+final class ChangingGridSource: GridSource {
+    var columns: [GridColumn]
+    var rowCount: Int
+    var loadingFrom = Int.max
+
+    init(rows: Int, columns: Int) {
+        rowCount = rows
+        self.columns = (0..<columns).map { GridColumn(name: "c\($0)", kind: $0 == 0 ? .number : .text, isKey: $0 == 0) }
+    }
+
+    func cell(_ row: Int, _ column: Int) -> GridCell {
+        row >= loadingFrom ? .loading : column == 0 ? .text(String(row + 1)) : .text("value \(row):\(column)")
+    }
+
+    func mark(_ row: Int, _ column: Int) -> GridMark {
+        switch row {
+        case 1: return column == 2 ? .edited : .none
+        case 2: return .inserted
+        case 3: return .deleted
+        default: return .none
+        }
+    }
+}
+
 extension AppTests {
     /// A main window showing `source` in a grid tab.
     func gridWindow(_ source: GridSource, size: NSSize = NSSize(width: 1200, height: 760))
@@ -249,5 +274,25 @@ extension AppTests {
         // Scrolling far keeps a bounded number of elements.
         for row in stride(from: 0, to: 600_000, by: 100) { _ = grid.accessibilityCell(forColumn: row % 50, row: row) }
         #expect(grid.accessibilityElements.cells.count <= 4_001)
+    }
+
+    @Test func gridReloadKeepsTheSelectionInside() {
+        let source = ChangingGridSource(rows: 100, columns: 10)
+        let (_, _, content) = gridWindow(source)
+        let grid = content.grid
+        grid.selection.select(GridPosition(row: 90, column: 8))
+        grid.selection.select(GridPosition(row: 95, column: 9), extend: true)
+        source.rowCount = 50
+        source.columns.removeLast(5)
+        grid.reloadData()
+        #expect(grid.columnOrder == [0, 1, 2, 3, 4] && grid.columnWidths.count == 5)
+        #expect(grid.selection.cursor == GridPosition(row: 49, column: 4))
+        #expect(grid.frame.height == 50 * grid.rowHeight)
+        // Pending changes and a page still loading draw without trouble.
+        source.loadingFrom = 10
+        grid.reloadRows(0..<50)
+        #expect(drawCells(grid, grid.visibleRect) > 0)
+        grid.source = FakeGridSource(rows: 3, columns: 2)
+        #expect(grid.selection.isEmpty && grid.columnCount == 2)
     }
 }

@@ -141,10 +141,14 @@ final class DataGridView: NSView {
             updateSize()
             return
         }
-        if columnWidths.count != source.columns.count { columnWidths = (0..<source.columns.count).map(measure) }
-        columnOrder = columnOrder.filter { $0 < source.columns.count }
+        if columnWidths.count != source.columns.count {
+            // New columns: all of them, in the source's order, measured again.
+            columnOrder = Array(0..<source.columns.count)
+            columnWidths = (0..<source.columns.count).map(measure)
+        }
         if !selection.isEmpty { selection.clamp(rows: rowCount, columns: columnCount) }
         accessibilityElements.removeAll()
+        header.updateThickness()
         rowNumbers.updateThickness()
         layoutColumns()
         needsDisplay = true
@@ -308,28 +312,29 @@ final class DataGridView: NSView {
         delegate?.dataGridColumnsDidChange(self)
     }
 
-    /// Redraws what a selection covers on screen.
+    /// Redraws what a selection covers on screen (an old selection may reach past columns a reload took away).
     private func invalidate(_ selection: GridSelection) {
         let visible = visibleRect
         guard !visible.isEmpty, columnCount > 0 else { return }
+        func column(_ index: Int) -> NSRect { columnRect(min(index, columnCount - 1)) }
         var dirty = NSRect.zero
         for area in selection.areas {
             let rect: NSRect
             switch area {
             case .cells(let rows, let columns):
-                rect = cellRect(GridPosition(row: rows.lowerBound, column: columns.lowerBound))
-                    .union(cellRect(GridPosition(row: rows.upperBound, column: columns.upperBound)))
+                rect = column(columns.lowerBound).union(column(columns.upperBound))
+                    .intersection(rowRect(rows.lowerBound).union(rowRect(rows.upperBound)))
             case .rows(let rows):
                 rect = rowRect(rows.lowerBound).union(rowRect(rows.upperBound))
             case .columns(let columns):
-                rect = columnRect(columns.lowerBound).union(columnRect(columns.upperBound))
+                rect = column(columns.lowerBound).union(column(columns.upperBound))
             case .all:
                 rect = visible
             }
             dirty = dirty.union(rect.intersection(visible))
         }
-        if let cursor = selection.cursor, cursor.row < rowCount, cursor.column < columnCount {
-            dirty = dirty.union(cellRect(cursor).intersection(visible))
+        if let cursor = selection.cursor {
+            dirty = dirty.union(column(cursor.column).intersection(rowRect(cursor.row)).intersection(visible))
         }
         if !dirty.isEmpty { setNeedsDisplay(dirty) }
         header.needsDisplay = true
