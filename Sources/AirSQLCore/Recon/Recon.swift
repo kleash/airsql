@@ -219,8 +219,8 @@ public enum Recon {
     /// SHOW CREATE … of an object: its CREATE statement, or "" when the server won't show it to this login.
     private static func showCreate(_ side: ReconSide, _ kind: String, _ name: String, column: Int) async throws -> String {
         do {
-            let rows = try await ReconQuery.strings(side.session, "SHOW CREATE \(kind) " + SQLQuote.identifier(side.database, name))
-            return rows.first.flatMap { $0.count > column ? $0[column] : nil } ?? ""
+            let store = try await ReconQuery.store(side.session, "SHOW CREATE \(kind) " + SQLQuote.identifier(side.database, name))
+            return store.rowCount > 0 && column < store.columns.count ? store.string(0, column) ?? "" : ""
         } catch let error as AirSQLError where error.kind != .cancelled && error.kind != .disconnected {
             return ""
         }

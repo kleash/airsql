@@ -99,7 +99,7 @@ final class RestoreSheet: ToolSheet {
             do {
                 let session = DBConnection(options: options, role: .tools)
                 let server = try await session.connect()
-                let names = try await SQLExport.rows(session, PickerNode.databasesSQL).compactMap { $0[0] }
+                let names = try await session.rows(PickerNode.databasesSQL).compactMap { $0[0] }
                 await session.close()
                 let tools = await ClientTools.find(.client, chosen: chosen)
                 show(server: server, tools: tools, databases: names)
