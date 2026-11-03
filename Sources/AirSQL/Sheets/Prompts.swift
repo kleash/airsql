@@ -69,7 +69,7 @@ func showPasswordPrompt(for connection: String, user: String, retry: Bool, canRe
 }
 
 /// Text under an alert's message, its letters in line with the message's: AppKit puts an accessory 4 points left of the
-/// alert's text (room for fields' bezels), whose letters start 2 points into their frames.
+/// alert's text (room for fields' bezels), and a label's letters start 2 points into its frame.
 @MainActor
 func alertText(_ lines: [NSTextField], width: CGFloat) -> NSView {
     let stack = NSStackView(views: lines)

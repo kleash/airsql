@@ -116,7 +116,6 @@ final class RenameField: NSTextField, NSTextFieldDelegate {
     private var done: ((String?) -> Void)?
 
     /// Shows the field with `text` at `frame` in `title`'s superview, over `title` (hidden meanwhile), with the focus.
-    @discardableResult
     static func show(_ text: String, over title: NSTextField, frame: NSRect, id: String, tip: String,
                      done: @escaping (String?) -> Void) -> RenameField {
         let field = RenameField(string: text)
