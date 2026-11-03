@@ -135,4 +135,48 @@ struct ClientToolsLabTests {
         _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
         await session.close()
     }
+
+    /// Copy to Another Server: under another name on the same server (views follow the new name), and from MySQL to
+    /// MariaDB, with the same rows.
+    @Test func copiesGiveTheSameRows() async throws {
+        let mysql = DBConnection(options: Self.options(Lab.mysql84), role: .tools, log: Self.log)
+        let maria = DBConnection(options: Self.options(Lab.mariadb114), role: .tools, log: Self.log)
+        _ = try await mysql.connect()
+        _ = try await maria.connect()
+        let target = "lane_l6_copy"
+        for session in [mysql, maria] { _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target)) }
+        var request = DumpRequest(databases: [Lab.fixture], tables: Self.tables + ["customer_order_totals"])
+        request.singleTransaction = true
+        // The same server, another name.
+        let reader = DBConnection(options: Self.options(Lab.mysql84), role: .tools, log: Self.log)
+        _ = try await reader.connect()
+        try await SQLExport.run(request, from: reader, into: SQLServerSink(mysql), names: [Lab.fixture: target],
+                                cancellation: Cancellation()) { _ in }
+        #expect(try await Self.checksums(mysql, target) == Self.checksums(mysql, Lab.fixture))
+        let view = { (database: String) in
+            try await mysql.query("SELECT COUNT(*) FROM \(SQLQuote.identifier(database, "customer_order_totals"))").first?.rows?.string(0, 0)
+        }
+        #expect(try await view(target) == view(Lab.fixture))
+        // MySQL to MariaDB.
+        request.tables = ["customers", "orders", "order_items", "texts"]
+        request.objects = false
+        try await SQLExport.run(request, from: reader, into: SQLServerSink(maria), names: [Lab.fixture: target],
+                                cancellation: Cancellation()) { _ in }
+        await reader.close()
+        for table in request.tables {
+            let count = "SELECT COUNT(*) FROM "
+            let a = try await mysql.query(count + SQLQuote.identifier(Lab.fixture, table)).first?.rows?.string(0, 0)
+            let b = try await maria.query(count + SQLQuote.identifier(target, table)).first?.rows?.string(0, 0)
+            #expect(a != nil && a == b, "\(table)")
+        }
+        for session in [mysql, maria] { _ = try await session.query("SET SESSION group_concat_max_len = 1000000") }
+        let body = "SELECT GROUP_CONCAT(body ORDER BY id SEPARATOR '|') FROM "
+        let a = try await mysql.query(body + SQLQuote.identifier(Lab.fixture, "texts")).first?.rows?.string(0, 0)
+        let b = try await maria.query(body + SQLQuote.identifier(target, "texts")).first?.rows?.string(0, 0)
+        #expect(a != nil && a == b)
+        for session in [mysql, maria] {
+            _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
+            await session.close()
+        }
+    }
 }

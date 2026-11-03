@@ -37,6 +37,45 @@ public final class SQLFileSink: SQLSink {
     public func writeNow(_ pieces: [SQLPiece]) throws { try pieces.forEach { try writer.write($0.fileText) } }
 }
 
+/// An export run on another server as it is read (Copy to Another Server): each statement through the target's session.
+public final class SQLServerSink: SQLSink {
+    public let session: DBConnection
+
+    public init(_ session: DBConnection) { self.session = session }
+
+    public func write(_ piece: SQLPiece) async throws {
+        switch piece {
+        case .comment: return
+        case .statement(let sql), .routine(let sql): _ = try await session.query(sql)
+        }
+    }
+
+    /// Blocks the reading session's thread (not one of Swift's) until the target has run `pieces`: the source's rows
+    /// wait for the target rather than pile up in memory.
+    public func writeNow(_ pieces: [SQLPiece]) throws {
+        guard !pieces.isEmpty else { return }
+        let done = DispatchSemaphore(value: 0)
+        let outcome = Outcome()
+        Task {
+            do {
+                for piece in pieces { try await write(piece) }
+            } catch {
+                outcome.set(error)
+            }
+            done.signal()
+        }
+        done.wait()
+        if let error = outcome.error { throw error }
+    }
+
+    private final class Outcome: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: Error?
+        var error: Error? { lock.locked { stored } }
+        func set(_ error: Error) { lock.locked { stored = error } }
+    }
+}
+
 /// AirSQL's own SQL export, without client tools (plan §2.9; scope: built-in SQL export, copy straight to another
 /// server): the tables' CREATE statements and their rows as INSERTs of about 1 MB, then views (in dependency order),
 /// routines, triggers and events, read in one consistent snapshot through a session of its own, as mysqldump would.
