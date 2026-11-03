@@ -61,8 +61,7 @@ extension SchemaColumn {
     /// The Insert Value items that fit this column, in menu order.
     public var insertValues: [InsertValue] {
         guard generated == nil else { return [] }
-        let type = ColumnType(self), spatial = ["geometry", "point", "linestring", "polygon", "multipoint",
-                                                "multilinestring", "multipolygon", "geometrycollection", "geomcollection", "vector"]
+        let type = ColumnType(self), shape = ColumnType.shapes.contains(dataType.lowercased())
         var items: [InsertValue] = []
         if nullable { items.append(.null) }
         switch newRowValue {
@@ -79,13 +78,13 @@ extension SchemaColumn {
         case .text(let characters, _):
             if (characters ?? 36) >= 36 { items.append(.uuid) }
             if (characters ?? 32) >= 32 { items.append(.uuidWithoutDashes) }
-        case .binary(let bytes, _) where bytes >= 16 && !spatial.contains(dataType.lowercased()): items.append(.uuidBinary)
+        case .binary(let bytes, _) where bytes >= 16 && !shape: items.append(.uuidBinary)
         case .other where dataType.lowercased() == "uuid": items.append(.uuid)
         default: break
         }
         switch type.kind {
         case .json, .other: break
-        case .binary where spatial.contains(dataType.lowercased()): break
+        case .binary where shape: break
         default: items.append(.random)
         }
         return items

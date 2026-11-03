@@ -87,13 +87,6 @@ public struct ColumnType: Hashable, Sendable {
     /// The column's character set ("utf8mb4", "latin1"); nil for numbers, dates and bytes.
     public var charset: String?
 
-    public init(kind: Kind, definition: String, unsigned: Bool = false, charset: String? = nil) {
-        self.kind = kind
-        self.definition = definition
-        self.unsigned = unsigned
-        self.charset = charset
-    }
-
     public init(_ column: SchemaColumn) {
         self.init(dataType: column.dataType, columnType: column.columnType, isJSON: column.isJSON,
                   charset: column.charset)
@@ -129,14 +122,17 @@ public struct ColumnType: Hashable, Sendable {
         case "binary": kind = .binary(bytes: first ?? 1, fixed: true)
         case "varbinary": kind = .binary(bytes: first ?? 65_535, fixed: false)
         case "tinyblob", "blob", "mediumblob", "longblob": kind = .binary(bytes: sizes[base] ?? 65_535, fixed: false)
-        case "geometry", "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon",
-             "geometrycollection", "geomcollection": kind = .binary(bytes: 4_294_967_295, fixed: false)
         case "vector": kind = .binary(bytes: 4 * (first ?? 2048), fixed: true)
+        case _ where Self.shapes.contains(base): kind = .binary(bytes: 4_294_967_295, fixed: false)
         case "enum": kind = .enumeration(Self.members(columnType))
         case "set": kind = .set(Self.members(columnType))
         default: kind = .other
         }
     }
+
+    /// Spatial types and VECTOR: bytes in the server's own format, edited as hex but never made up (no random bytes).
+    static let shapes: Set<String> = ["geometry", "point", "linestring", "polygon", "multipoint", "multilinestring",
+                                      "multipolygon", "geometrycollection", "geomcollection", "vector"]
 
     /// TINYINT(1) and BIT(1): edited with a checkbox.
     public var isBoolean: Bool {

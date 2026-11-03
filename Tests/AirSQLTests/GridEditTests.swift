@@ -63,6 +63,12 @@ struct GridEditTests {
         #expect(InsertValue.random.sql(for: C.type("set('it''s')"), C.withMode("NO_BACKSLASH_ESCAPES"))
             == "ELT(1 + FLOOR(RAND() * 1), 'it''s')")
         #expect(InsertValue.allCases.allSatisfy { !$0.help.isEmpty && !$0.help.hasSuffix(".") })
+        // Shapes and vectors are bytes in the server's own format: edited as hex, never made up.
+        #expect(C.type("point").kind == .binary(bytes: 4_294_967_295, fixed: false))
+        #expect(C.type("vector(3)").kind == .binary(bytes: 12, fixed: true))
+        #expect(GridEditPasteTests.column("geometry").insertValues == [.null, .default])
+        #expect(GridEditPasteTests.column("uuid").insertValues == [.null, .default, .uuid])
+        #expect(C.type("inet6").kind == .other && C.result(C.type("inet6"), "::1") == "'::1'")
     }
 
     @Test(arguments: [SchemaFixtures.mariadb118, SchemaFixtures.mysql84])
