@@ -6,6 +6,7 @@ import AppKit
 /// implement the methods in their own responders; new commands are added here (a shared file) and in `Commands`.
 @objc protocol AirSQLActions {
     // AirSQL and Help
+    @objc optional func showAbout(_ sender: Any?)
     @objc optional func showSettings(_ sender: Any?)
     @objc optional func showHelpSite(_ sender: Any?)
     @objc optional func showGettingStarted(_ sender: Any?)
@@ -87,6 +88,8 @@ import AppKit
     @objc optional func addRow(_ sender: Any?)
     @objc optional func duplicateRow(_ sender: Any?)
     @objc optional func duplicateRowWithoutKeys(_ sender: Any?)
+    @objc optional func pasteAsNewRows(_ sender: Any?)
+    @objc optional func chooseReferencedRow(_ sender: Any?)
     @objc optional func deleteRows(_ sender: Any?)
     @objc optional func setCellNull(_ sender: Any?)
     @objc optional func setCellDefault(_ sender: Any?)
@@ -245,7 +248,7 @@ private let f2 = String(UnicodeScalar(NSF2FunctionKey)!)
 /// HeidiSQL; Commit and Rollback have none, so a slip never commits.
 enum Commands {
     // MARK: AirSQL
-    static let about = Command("About AirSQL", #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+    static let about = Command("About AirSQL", #selector(AirSQLActions.showAbout(_:)),
                                tip: "Show AirSQL's version and the licences of what it is built with")
     static let settings = Command("Settings…", #selector(AirSQLActions.showSettings(_:)), ",",
                                   tip: "Change the look, the editor and grid, safety checks, agents and client tools")
@@ -429,6 +432,8 @@ enum Commands {
                                       tip: "Add a copy of the selected rows, keys included")
     static let duplicateRowWithoutKeys = Command("Duplicate Row Without Keys", #selector(AirSQLActions.duplicateRowWithoutKeys(_:)), "D",
                                                  tip: "Add a copy of the selected rows, leaving their keys to the server")
+    static let pasteAsNewRows = Command("Paste as New Rows", #selector(AirSQLActions.pasteAsNewRows(_:)),
+                                        tip: "Add the copied cells as new rows; they are saved when you apply the changes")
     static let deleteRows = Command("Delete Rows…", #selector(AirSQLActions.deleteRows(_:)), "\u{8}",
                                     tip: "Mark the selected rows for deletion; they are deleted when you apply")
     static let setNull = Command("Set NULL", #selector(AirSQLActions.setCellNull(_:)), "n", [.command, .option],
@@ -462,6 +467,8 @@ enum Commands {
                                         tip: "Sort by this column, largest first")
     static let clearSort = Command("Clear Sort", #selector(AirSQLActions.clearSort(_:)), tip: "Show rows in the table's own order again")
     static let goToRow = Command("Go to Row…", #selector(AirSQLActions.goToRow(_:)), "l", tip: "Go to a row by its number, or to column:row")
+    static let chooseReferencedRow = Command("Choose Referenced Row…", #selector(AirSQLActions.chooseReferencedRow(_:)),
+                                             tip: "Pick the row this foreign key points to by its label; its key goes in the cell")
     static let relatedRows = Command("Related Rows", #selector(AirSQLActions.showRelatedRows(_:)), down, [.command, .control],
                                      tip: "Show the rows this value refers to, or the rows that refer to it")
     static let columnSummary = Command("Column Summary…", #selector(AirSQLActions.showColumnSummary(_:)),
@@ -628,9 +635,9 @@ enum Commands {
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
-        addRow, duplicateRow, duplicateRowWithoutKeys, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
+        addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterByValues, clearFilter, sortAscending,
-        sortDescending, clearSort, goToRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
+        sortDescending, clearSort, goToRow, chooseReferencedRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,

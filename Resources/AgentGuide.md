@@ -176,9 +176,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
   helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
   history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
-- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor`; the status bar's `grid.rows`,
+- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (a value its column refuses
+  keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it was); the status bar's `grid.rows`,
   `grid.position`, `grid.figure`; the value panel `valuePanel` (`valuePanel.mode`, `valuePanel.text`, `valuePanel.tree`,
-  `valuePanel.image`); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
+  `valuePanel.image`, `valuePanel.actions`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
+  edit, Esc puts it back; Load from File… and Save to File… are the person's); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
   `grid.chart` (`chart.kind`, `chart.x`, `chart.y`); Column List `columnList.search`, `columnList.table`; Column
   Summary `columnSummary` (in a table tab, a `columnSummary.value` filters by it); Go to Row `goToRow.text`.
 - **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
@@ -190,7 +192,12 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `find.previous`, `find.next`, `find.count`, `find.replace`, `find.replaceAll`, `find.done`; Export Rows `export.rows`,
   `export.format`, `export.headers`, `export.null`, `export.crlf`, `export.copy`, `export.save` (the person's),
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
-  `values.cancel`. Edits wait as pending changes until Apply.
+  `values.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
+  or a double-click on an ENUM cell shows its values as a menu; on a SET cell a checklist `grid.set` (`grid.set.member`
+  checkboxes, `grid.set.done`, `grid.set.cancel`); on a foreign key cell the referenced rows `grid.lookup`
+  (`grid.lookup.search`, `grid.lookup.rows`; Return picks). Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
+  Paste and Paste as New Rows are the person's (the clipboard is). Quit is the person's too: it lists pending changes
+  and open transactions first.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.

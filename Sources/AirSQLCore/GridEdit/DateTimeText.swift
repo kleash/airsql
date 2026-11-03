@@ -137,3 +137,75 @@ enum DateTimeText {
         text.isEmpty || !text.allSatisfy({ $0.isASCII && $0.isNumber }) ? nil : Int(text)
     }
 }
+
+extension ColumnType {
+    /// ↑ and ↓ in a date or time editor (grid-spec §5): the part under the cursor (`offset`, in UTF-16 units) one step
+    /// up or down, wrapping within the part as a date picker does (a day past the month's last comes back to 1); a new
+    /// month or year keeps the day inside its month. Returns the text and the part's range, to keep it selected; nil
+    /// when the type has no parts or the text isn't a date or time (an empty cell stays empty: no made-up NOW()).
+    public func step(_ text: String, at offset: Int, by amount: Int) -> (text: String, part: NSRange)? {
+        let names: [Character]
+        switch kind {
+        case .date: names = ["y", "M", "d"]
+        case .datetime, .timestamp: names = ["y", "M", "d", "h", "m", "s", "f"]
+        case .time: names = text.contains(" ") ? ["D", "h", "m", "s", "f"] : ["h", "m", "s", "f"]
+        case .year: names = ["y"]
+        default: return nil
+        }
+        let utf16 = Array(text.utf16), digit = { (unit: UInt16) in unit >= 48 && unit <= 57 }
+        var parts: [Range<Int>] = [], index = 0
+        while index < utf16.count {
+            guard digit(utf16[index]) else { index += 1; continue }
+            let start = index
+            while index < utf16.count, digit(utf16[index]) { index += 1 }
+            parts.append(start..<index)
+        }
+        guard !parts.isEmpty, parts.count <= names.count,
+              let chosen = parts.lastIndex(where: { $0.lowerBound <= offset }) ?? parts.indices.first else { return nil }
+        let value = { (part: Int) in Int(String(decoding: utf16[parts[part]], as: UTF16.self)) ?? 0 }
+        let name = names[chosen], width = parts[chosen].count
+        func wrapped(_ number: Int, _ low: Int, _ high: Int) -> Int {
+            let count = high - low + 1
+            return low + ((number - low) % count + count) % count
+        }
+        func days(year: Int, month: Int) -> Int {
+            let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+            return [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][min(max(month, 1), 12) - 1]
+        }
+        var replacements: [Int: Int] = [:]
+        let current = value(chosen)
+        switch name {
+        case "y": replacements[chosen] = kind == .year ? min(max(current + amount, 1901), 2155) : min(max(current + amount, 0), 9999)
+        case "M": replacements[chosen] = wrapped(current + amount, 1, 12)
+        case "d": replacements[chosen] = wrapped(current + amount, 1, days(year: value(0), month: value(1)))
+        case "D": replacements[chosen] = min(max(current + amount, 0), 34)
+        case "h": replacements[chosen] = kind.isDateTime ? wrapped(current + amount, 0, 23) : min(max(current + amount, 0), 838)
+        case "m", "s": replacements[chosen] = wrapped(current + amount, 0, 59)
+        default: replacements[chosen] = wrapped(current + amount, 0, Int(pow(10, Double(width))) - 1)
+        }
+        // A new month or year keeps the day within the month.
+        if (name == "y" || name == "M"), names.count > 2, parts.count > 2 {
+            let year = replacements[0] ?? value(0), month = replacements[1] ?? value(1)
+            if value(2) > days(year: year, month: month) { replacements[2] = days(year: year, month: month) }
+        }
+        var result = utf16, shift = 0, selected = NSRange()
+        for part in parts.indices {
+            guard let number = replacements[part] else { continue }
+            let digits = String(number), padded = String(repeating: "0", count: max(0, parts[part].count - digits.count)) + digits
+            let range = (parts[part].lowerBound + shift)..<(parts[part].upperBound + shift)
+            result.replaceSubrange(range, with: Array(padded.utf16))
+            if part == chosen { selected = NSRange(location: range.lowerBound, length: padded.utf16.count) }
+            shift += padded.utf16.count - parts[part].count
+        }
+        return (String(decoding: result, as: UTF16.self), selected)
+    }
+}
+
+private extension ColumnType.Kind {
+    var isDateTime: Bool {
+        switch self {
+        case .datetime, .timestamp: return true
+        default: return false
+        }
+    }
+}

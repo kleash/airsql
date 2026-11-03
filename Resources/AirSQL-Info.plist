@@ -23,6 +23,8 @@
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>AirSQL</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.kleash.airsql</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -31,6 +33,9 @@
 	<string>AirSQL</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Shown in About AirSQL and in the Finder's Get Info. -->
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright 2026 kleash</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>

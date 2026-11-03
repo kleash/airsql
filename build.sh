@@ -57,6 +57,7 @@ done
 cp Resources/AirSQL-Info.plist "$app/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$version" "$app/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$version" "$app/Contents/Info.plist"
+cp Resources/AppIcon.icns "$app/Contents/Resources/"  # scripts/make-icon.swift draws it
 # The app finds it through its rpath, @executable_path/../Frameworks (Package.swift).
 cp vendor/out/universal/lib/libmariadb.3.dylib "$app/Contents/Frameworks/"
 # The libraries' licences, and NOTICE (it says how to use another build of libmariadb).

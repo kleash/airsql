@@ -90,6 +90,23 @@ public enum Paste {
     /// gets the column's default), or a cell past the last column (listed).
     public static func convert(_ cells: [[String]], columns: [SchemaColumn], format: PasteFormat = PasteFormat(),
                                context: EditContext) -> (values: [[String?]], failures: [PasteFailure]) {
+        let (values, failures) = values(cells, columns: columns, format: format, context: context)
+        let types = columns.map(ColumnType.init)
+        return (values.map { line in
+            line.enumerated().map { index, value -> String? in
+                switch value {
+                case .text(let text)?: return try? types[index].literal(text, context)
+                case .null?: return "NULL"
+                default: return nil
+                }
+            }
+        }, failures)
+    }
+
+    /// The cells as pending values, as `convert` decides them: `.text` written the way `ColumnType.literal` reads it
+    /// (numbers with a point and no grouping, dates as YYYY-MM-DD; checked already), `.null`, or nil to leave the cell.
+    public static func values(_ cells: [[String]], columns: [SchemaColumn], format: PasteFormat = PasteFormat(),
+                              context: EditContext) -> (values: [[PendingChanges.Value?]], failures: [PasteFailure]) {
         let width = cells.map(\.count).max() ?? 0
         let types = columns.map(ColumnType.init)
         let decimals = (0..<min(width, columns.count)).map { index in
@@ -100,7 +117,7 @@ public enum Paste {
         }
         var failures: [PasteFailure] = []
         let values = cells.enumerated().map { row, line in
-            line.enumerated().map { index, text -> String? in
+            line.enumerated().map { index, text -> PendingChanges.Value? in
                 guard index < columns.count else {
                     failures.append(PasteFailure(row: row, column: index, text: text, reason: "No column here to paste into"))
                     return nil
@@ -109,11 +126,13 @@ public enum Paste {
                 do {
                     if let reason = column.readOnlyReason { throw EditError(reason) }
                     if text == format.nullText || text.isEmpty && !isText(type) {
-                        if column.nullable { return "NULL" }
+                        if column.nullable { return .null }
                         if text.isEmpty { return nil }
                         throw EditError("The column is NOT NULL")
                     }
-                    return try type.literal(try normalised(text, type, decimal: decimals[index], order: orders[index]), context)
+                    let normalised = try normalised(text, type, decimal: decimals[index], order: orders[index])
+                    _ = try type.literal(normalised, context)
+                    return .text(normalised)
                 } catch {
                     failures.append(PasteFailure(row: row, column: index, text: text,
                                                  reason: (error as? EditError)?.message ?? "\(error)"))
