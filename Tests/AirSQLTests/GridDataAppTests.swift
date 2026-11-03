@@ -13,6 +13,8 @@ final class FakeTableSession: TableSession {
     var rows: [[String?]] = [["1", "7", "EU", "100", "12.50", nil], ["2", nil, "US", "101", "99.00", "1"],
                              ["3", "9", "EU", "102", "0.10", nil]]
     var changed: (String) -> UInt64 = { _ in 1 }
+    /// The server's error for a statement, if it refuses it.
+    var refuse: (String) -> Error? = { _ in nil }
     /// INSERT's insert ID, and the row a read-back SELECT (… WHERE `id` = that ID) finds.
     var insertID: UInt64 = 0
     var readBack: [String?]?
@@ -57,6 +59,7 @@ final class FakeTableSession: TableSession {
         }
         if let readBack, sql.hasPrefix("SELECT"), sql.hasSuffix("WHERE `id` = \(insertID)") { return result(columns, [readBack]) }
         if sql.hasPrefix("SELECT") { return result(columns, rows) }
+        if let error = refuse(sql) { throw error }
         let affected = ["START TRANSACTION", "COMMIT", "ROLLBACK"].contains(sql) ? 0 : changed(sql)
         return [StatementResult(rows: nil, affectedRows: affected, insertID: sql.hasPrefix("INSERT") ? insertID : 0, warnings: 0,
                                 info: nil, duration: 0)]
@@ -162,6 +165,31 @@ extension AppTests {
             #expect(session.statements.last == "ROLLBACK")
             #expect(main.window?.attachedSheet != nil)
             #expect(tab.grid.selection.containsRow(1) && tab.source?.changes.rowCount == 2)
+            _ = await call(harness, "press", ["title": "OK"])
+        }
+
+        @Test func aServerErrorNamingAColumnPointsAtTheCell() async throws {
+            let session = FakeTableSession()
+            session.refuse = { sql in
+                sql.hasSuffix("`id` = 2") ? ErrorMapping.map(code: 1406, message: "Data too long for column 'region' at row 1") : nil
+            }
+            let (main, harness, tab) = try await Self.tab(session: session)
+            tab.source?.set(.text("5"), row: 0, column: 4)
+            tab.source?.set(.text("EU"), row: 1, column: 2)
+            tab.changesDidChange()
+            tab.grid.selection.select(GridPosition(row: 0, column: 0))
+            tab.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(session.statements.last == "ROLLBACK" && main.window?.attachedSheet != nil)
+            #expect(tab.grid.selection.cursor == GridPosition(row: 1, column: 2) && !tab.grid.selection.containsRow(1))
+            _ = await call(harness, "press", ["title": "OK"])
+            // A value its column refuses before anything runs points at its cell too.
+            tab.source?.set(.text("x"), row: 0, column: 4)
+            tab.changesDidChange()
+            let sent = session.statements.count
+            tab.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(session.statements.count == sent && tab.grid.selection.cursor == GridPosition(row: 0, column: 4))
             _ = await call(harness, "press", ["title": "OK"])
         }
 

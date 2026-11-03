@@ -129,6 +129,41 @@ struct PendingChangesTests {
         #expect(refused?.errorDescription == "Duplicate entry 'x' for key 'name'. Nothing was applied.")
     }
 
+    @Test func aFailureFindsTheColumnTheServerNames() {
+        var table = SchemaTable(name: "items", kind: .table, engine: "InnoDB")
+        table.columns = [cachedColumn("id", "int"), cachedColumn("name", "varchar(20)"), cachedColumn("owner", "int")]
+        table.indexes = [SchemaIndex(name: "by_name", unique: true, type: "BTREE",
+                                     parts: [.init(column: "name", expression: nil, prefixLength: nil, descending: false)],
+                                     visible: true, comment: "")]
+        func column(_ code: Int, _ text: String) -> String? {
+            let error = ErrorMapping.map(code: code, message: text, mariaDB: true)
+            return ApplyFailure(statement: .init(sql: "", expectedRows: 1, target: .update(["1"])), changed: nil, error: error).column(in: table)
+        }
+        #expect(column(1406, "Data too long for column 'name' at row 1") == "name")
+        #expect(column(1366, "Incorrect integer value: 'name' for column `shop`.`items`.`owner` at row 1") == "owner")
+        #expect(column(1048, "Column 'owner' cannot be null") == "owner")
+        #expect(column(1364, "Field 'id' doesn't have a default value") == "id")
+        #expect(column(1452, "Cannot add or update a child row: a foreign key constraint fails (`shop`.`items`, CONSTRAINT `fk` "
+                       + "FOREIGN KEY (`owner`) REFERENCES `people` (`id`))") == "owner")
+        #expect(column(1062, "Duplicate entry 'x' for key 'items.by_name'") == "name")
+        #expect(column(1062, "Duplicate entry 'x' for key 'PRIMARY'") == nil)
+        #expect(column(1054, "Unknown column 'gone' in 'field list'") == nil)
+        #expect(column(1136, "Column count doesn't match value count at row 1") == nil)
+        // A value refused before anything ran names its column itself.
+        var changes = PendingChanges(keyColumns: ["id"])
+        changes.set(.text("x"), column: "owner", key: ["1"], original: nil)
+        do {
+            _ = try changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: false) { _, _ in
+                throw EditError("Not a whole number")
+            }
+            Issue.record("the value wasn't refused")
+        } catch let failure as ApplyFailure {
+            #expect(failure.column(in: table) == "owner")
+        } catch {
+            Issue.record("unexpected \(error)")
+        }
+    }
+
     @Test func onlyTablesWithAKeyCanBeEdited() {
         func index(_ name: String, unique: Bool = true, _ columns: [String]) -> SchemaIndex {
             SchemaIndex(name: name, unique: unique, type: "BTREE",
