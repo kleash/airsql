@@ -14,16 +14,10 @@ enum AgentGuard {
 
     @TaskLocal static var notes: Notes?
 
-    /// Why the request being carried out was refused, if it was.
-    static var refusal: String? {
-        get { notes?.refusal }
-        set { notes?.refusal = newValue }
-    }
-
     /// While an agent's request is carried out: notes `message` and returns true (refused); the person's own: false.
     static func refuses(_ message: @autoclosure () -> String) -> Bool {
         guard AgentGate.agent != nil else { return false }
-        refusal = message()
+        notes?.refusal = message()
         return true
     }
 
@@ -42,7 +36,7 @@ enum AgentGuard {
     /// Whether an agent's request may change the saved data to `new`: when not, notes why.
     static func allows(changing old: AirSQLData, to new: AirSQLData) -> Bool {
         guard let refusal = refusal(changing: old, to: new) else { return true }
-        self.refusal = refusal
+        notes?.refusal = refusal
         return false
     }
 

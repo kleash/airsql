@@ -39,7 +39,7 @@ final class AgentServer {
         let notes = AgentGuard.Notes()
         do {
             let reply = try await AgentGuard.$notes.withValue(notes) { try await run(tool, arguments) }
-            if AgentGate.agent != nil, let refusal = notes.refusal { throw Failure(refusal) }
+            if let refusal = notes.refusal { throw Failure(refusal) }
             return reply
         } catch let failure as Failure {
             return Self.text(["error": failure.message], isError: true, raw: failure.message)
