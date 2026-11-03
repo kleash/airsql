@@ -8,6 +8,18 @@ enum QuickFilter {
     /// The focused cell's column and value, and the distinct values selected in its column (for IN and NOT IN).
     typealias Focus = (column: GridColumn, value: String?, values: [String?])
 
+    /// The focused cell of `viewer`, its value and the distinct values selected in its column (the first 1,000 cells, as
+    /// a menu opens with them), `value` reading the host's rows.
+    static func focus(_ viewer: GridViewer, columns: [GridColumn], value: (Int, Int) -> String?) -> Focus? {
+        guard let (row, column) = viewer.focusedCell else { return nil }
+        var values: [String?] = []
+        for cell in viewer.selectedCells(limit: 1_000) where cell.column == column {
+            let value = value(cell.row, column)
+            if !values.contains(value) { values.append(value) }
+        }
+        return (columns[column], value(row, column), values)
+    }
+
     /// The operators a value offers: NULL only IS [NOT] NULL, and binary values compare whole (LIKE would read their hex
     /// as text); IN and NOT IN when several values are selected.
     static func operators(_ focus: Focus) -> [GridCondition.Operator] {

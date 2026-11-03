@@ -563,6 +563,16 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         return hostCell(cursor.row, grid.sourceColumn(cursor.column))
     }
 
+    /// The host's column of the focused cell, or of the first selected header (not while the rows are on their side).
+    var focusedColumn: Int? {
+        if let cell = focusedCell { return cell.column }
+        guard !transposed, record == nil else { return nil }
+        for case .columns(let columns) in grid.selection.areas where columns.lowerBound < grid.columnCount {
+            return grid.sourceColumn(columns.lowerBound)
+        }
+        return nil
+    }
+
     /// The host's cells the selection covers (the focused one when nothing is selected), for its commands: at most
     /// `limit`.
     func selectedCells(limit: Int = .max) -> [(row: Int, column: Int)] {

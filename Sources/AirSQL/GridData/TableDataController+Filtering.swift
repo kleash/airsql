@@ -104,16 +104,9 @@ extension TableDataController {
         }
     }
 
-    /// The focused cell's column and value, and the distinct values selected in that column (at most 1,000 cells looked
-    /// at, as a menu opens with them).
     func focusedValues() -> QuickFilter.Focus? {
-        guard let source, let (row, column) = viewer.focusedCell else { return nil }
-        var values: [String?] = []
-        for cell in viewer.selectedCells(limit: 1_000) where cell.column == column {
-            let value = source.value(cell.row, column)
-            if !values.contains(value) { values.append(value) }
-        }
-        return (source.columns[column], source.value(row, column), values)
+        guard let source else { return nil }
+        return QuickFilter.focus(viewer, columns: source.columns) { source.value($0, $1) }
     }
 
     /// Column Summary's value clicked: the rows with that value, added to the filter.
@@ -125,7 +118,7 @@ extension TableDataController {
 
     /// Filter by Values…: the focused column's values with their counts, from the server within the current filter.
     @objc func filterByValues(_ sender: Any?) {
-        guard let source, let column = focusedColumn(), let window = view.window else { return NSSound.beep() }
+        guard let source, let column = viewer.focusedColumn, let window = view.window else { return NSSound.beep() }
         let info = source.columns[column], sql = source.topValuesSQL(column, limit: FilterByValuesSheet.limit)
         let open = openSession
         FilterByValuesSheet.show(column: info, table: tableName, on: window, read: {
@@ -217,18 +210,8 @@ extension TableDataController {
     }
 
     private func sortFocused(ascending: Bool) {
-        guard let source, let column = focusedColumn() else { return NSSound.beep() }
+        guard let source, let column = viewer.focusedColumn else { return NSSound.beep() }
         setSort([TableViewSettings.SortKey(column: source.columns[column].name, ascending: ascending)])
-    }
-
-    /// The column of the focused cell or of the selected header.
-    func focusedColumn() -> Int? {
-        if let cell = viewer.focusedCell { return cell.column }
-        guard !(grid.source is TransposedSource) else { return nil }
-        for case .columns(let columns) in grid.selection.areas where columns.lowerBound < grid.columnCount {
-            return grid.sourceColumn(columns.lowerBound)
-        }
-        return nil
     }
 
     /// Sorts on the server; a table of over a million rows asks first when a new column has no index (R17).

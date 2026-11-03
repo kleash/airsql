@@ -63,7 +63,7 @@ extension TableDataController: NSMenuItemValidation {
             return viewer.validateMenuItem(menuItem)
         }
         var (enabled, reason) = state(of: menuItem.action)
-        if menuItem.action == Commands.filterLess.action, GridCondition.Operator.allCases.indices.contains(menuItem.tag) {
+        if menuItem.action == Commands.quickFilter.action, GridCondition.Operator.allCases.indices.contains(menuItem.tag) {
             reason = QuickFilter.reason(GridCondition.Operator.allCases[menuItem.tag], focusedValues())
             enabled = reason == nil
         }
@@ -117,11 +117,11 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.countRows.action: return (loading == nil, "Wait until the rows have loaded")
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.sortAscending.action,
              Commands.sortDescending.action:
-            return (viewer.focusedCell != nil || focusedColumn() != nil, "Select a cell first")
+            return (viewer.focusedColumn != nil, "Select a cell first")
         case Commands.filterPrompt.action: return (viewer.focusedCell != nil, "Select a cell first")
         case Commands.clearSort.action: return (!source.sort.isEmpty || !source.localSort.isEmpty, "The rows aren't sorted")
         case Commands.sortColumns.action: return (!(grid.source is TransposedSource), "Leave Transpose or Record View first")
-        case Commands.filterByValues.action: return (focusedColumn() != nil, "Select a cell or a column first")
+        case Commands.filterByValues.action: return (viewer.focusedColumn != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:
             return (!bar.filterText.isEmpty || !bar.searchField.stringValue.isEmpty, "The rows aren't filtered")
         case Commands.exportRows.action: return (source.rowCount > 0 || source.hasMore, "There are no rows to export")
