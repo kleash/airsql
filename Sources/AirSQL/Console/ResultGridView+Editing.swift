@@ -6,7 +6,7 @@ extension ResultEditSource: GridBytes {}
 // Editing a console result (grid-spec §5, R15): a SELECT from one table that includes its key, or an inner join with
 // every table's key, edits as a table tab does: changes wait until Apply, which runs them in one transaction on the data
 // session (a join's shows the SQL first), then reads the edited rows back. Read-only cells say why when double-clicked.
-extension ResultGridView: NSMenuItemValidation {
+extension ResultGridView {
     var edits: ResultEditSource? { source as? ResultEditSource }
 
     /// Works out which columns of the result of `sql` can be edited: the tables it names are read into the schema cache
@@ -179,28 +179,25 @@ extension ResultGridView: NSMenuItemValidation {
         Commands.previewChanges.action, #selector(revertAllChanges(_:)), Commands.undo.action, Commands.redo.action,
     ]
 
-    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        guard let edits else { return true }
-        let pending = !edits.isEmpty
-        let (enabled, reason): (Bool, String?)
+    /// Whether an editing command can act now, and why not; nil for the other commands (`validateMenuItem`).
+    func editingState(_ menuItem: NSMenuItem) -> (Bool, String?)? {
+        guard let edits else { return nil }
         switch menuItem.action {
-        case #selector(AirSQLActions.saveQuery(_:)): (enabled, reason) = (false, "Apply or revert the result's changes first (⌘S applies them)")
+        case #selector(AirSQLActions.saveQuery(_:)): return (false, "Apply or revert the result's changes first (⌘S applies them)")
         case Commands.setNull.action:
+            if let off = editingOff { return (false, off) }
             let cells = viewer.selectedCells(limit: 10_000).filter { edits.canEdit(rows.baseRow($0.row), $0.column) }
-            (enabled, reason) = editingOff.map { (false, $0) } ?? (cells.contains { edits.nullable($0.column) },
-                                                                    cells.isEmpty ? "Select cells you can edit first" : "These columns can't be NULL")
+            return (cells.contains { edits.nullable($0.column) }, cells.isEmpty ? "Select cells you can edit first" : "These columns can't be NULL")
         case Commands.deleteRows.action:
-            (enabled, reason) = editingOff.map { (false, $0) } ?? (!selectedRows.isEmpty, "Select the rows first")
+            return editingOff.map { (false, $0) } ?? (!selectedRows.isEmpty, "Select the rows first")
         case Commands.revert.action:
-            (enabled, reason) = (selectedRows.contains(where: edits.isChanged), "The selected rows have no pending changes")
+            return (selectedRows.contains(where: edits.isChanged), "The selected rows have no pending changes")
         case Commands.apply.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
-            (enabled, reason) = (pending, "No changes are pending")
-        case Commands.undo.action: (enabled, reason) = (edits.canUndo, "Nothing to undo")
-        case Commands.redo.action: (enabled, reason) = (edits.canRedo, "Nothing to redo")
-        default: return true
+            return (!edits.isEmpty, "No changes are pending")
+        case Commands.undo.action: return (edits.canUndo, "Nothing to undo")
+        case Commands.redo.action: return (edits.canRedo, "Nothing to redo")
+        default: return nil
         }
-        menuItem.explain(enabled: enabled, reason: reason)
-        return enabled
     }
 
     // MARK: Apply
