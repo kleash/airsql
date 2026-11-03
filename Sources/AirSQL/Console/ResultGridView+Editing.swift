@@ -80,8 +80,10 @@ extension ResultGridView: NSMenuItemValidation {
 
     // MARK: Changes
 
+    /// Not while an Apply runs on the connection (it would take the edit with the others).
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool {
-        editingOff == nil && edits?.canEdit(rows.baseRow(row), column) == true
+        guard let id = editingContext?.connection.id, !TableDataController.applying.contains(id) else { return false }
+        return editingOff == nil && edits?.canEdit(rows.baseRow(row), column) == true
     }
 
     func dataGrid(_ grid: DataGridView, check text: String, row: Int, column: Int) -> String? {
