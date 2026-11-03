@@ -94,7 +94,14 @@ struct SQLLexerTests {
         #expect(lexed("/*!50000 a /* b */ c */") == [
             "codeStart /*!50000", "word a", "comment /* b */", "word c", "codeEnd */",
         ])
-        #expect(lexed("/*!50000 '*/' */") == ["codeStart /*!50000", "string '*/'", "codeEnd */"])
+        // A */ inside a string inside the comment would put the comment's end in one place for a server that runs the
+        // body as code and another for a server that skips the whole comment. No real statement does this, so the
+        // lexer reads the whole thing as the skippable comment it is to a server over the gate (R4): the quote can't
+        // swallow a */ and hide code after it.
+        #expect(lexed("/*!50000 '*/' */") == ["comment /*!50000 '*/", "string ' */ (open)"])
+        #expect(lexed("/*!99999 ' */ DROP TABLE t -- '") == [
+            "comment /*!99999 ' */", "word DROP", "word TABLE", "word t", "comment -- '",
+        ])
     }
 
     @Test func variables() {

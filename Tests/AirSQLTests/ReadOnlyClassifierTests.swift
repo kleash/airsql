@@ -45,6 +45,22 @@ struct ReadOnlyClassifierTests {
         #expect(refusal("SELECT SUBSTRING(s FROM 1 FOR 2) FROM t") == nil)
     }
 
+    /// A version-gated comment above the server's version is skipped whole by the server, which then runs the code
+    /// after its */. A quote in such a comment must not open a string that swallows the */ and hides that code.
+    @Test func versionGatedCommentCannotHideCode() {
+        #expect(refusal("SELECT 1 /*!99999 ' */, GET_LOCK('x', 0) -- ' */")
+            == "GET_LOCK() isn't on the list of functions read-only queries may call")
+        #expect(refusal("SELECT 1 /*M!999999 ' */, SLEEP(5) -- ' */")
+            == "SLEEP() isn't on the list of functions read-only queries may call")
+        #expect(refusal("SELECT 1 /*!99999 ' */ INTO OUTFILE '/tmp/x' -- ' */")
+            == "INTO writes the result to a file or to variables")
+        // A body that runs as code on a server at or over the gate is still read as code.
+        #expect(refusal("SELECT /*!40001 SQL_NO_CACHE */ 1") == nil)
+        #expect(refusal("SELECT 1 /*!50000 + 2 */") == nil)
+        #expect(refusal("SELECT 1 /*!50000 , SLEEP(5) */")
+            == "SLEEP() isn't on the list of functions read-only queries may call")
+    }
+
     @Test func functionsMustBeOnTheList() {
         #expect(refusal("SELECT sleep (1)") == "sleep() isn't on the list of functions read-only queries may call")
         #expect(refusal("SELECT ſum(a) FROM t") == "ſum() isn't on the list of functions read-only queries may call")
