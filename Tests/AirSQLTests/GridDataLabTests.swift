@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import Testing
+@testable import AirSQL
 @testable import AirSQLCore
 
 /// Pending changes applied on MySQL 8.4 and MariaDB 11.4 (AIRSQL_LAB=1): edits, new rows and deletes by key (hostile
@@ -150,6 +152,68 @@ struct GridDataLabTests {
             source.append(page, requested: 10)
             #expect((0..<source.rowCount).map { source.value($0, 1) } == ["Bob"])
             #expect(!source.hasMore)
+        }
+    }
+}
+
+// The table tab in the app on MySQL 8.4 and MariaDB 11.4 (AIRSQL_LAB=1): rows paged from the real data session, edits
+// applied through the preview on a Production-like connection, a row deleted by someone else rolling the Apply back.
+extension AppTests {
+    @MainActor @Suite(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh")) struct GridDataAppLabTests {
+        static let database = "lane_l3a_griddata_app"
+
+        @Test(arguments: GridDataLabTests.servers)
+        func editsAndAppliesThroughTheTableTab(_ lab: Lab.Server) async throws {
+            let connection = Connection(options: DBLab.options(lab), log: DBLab.log)
+            defer { Task { await connection.disconnect() } }
+            let schemaSession = try await connection.session(.schema)
+            let database = SQLQuote.identifier(Self.database)
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)",
+                        "CREATE TABLE \(database).items (id INT PRIMARY KEY, name VARCHAR(20), price DECIMAL(8,2) NOT NULL DEFAULT 0)",
+                        "INSERT INTO \(database).items VALUES (1, 'Ann', 1.50), (2, 'Bob', 2.00), (3, 'Cy', 3.00)"] {
+                _ = try await schemaSession.query(sql)
+            }
+            let name = Self.database
+            let schema = SchemaCache(source: schemaSession, includes: { $0 == name })
+            try await schema.load()
+            var saved = SavedConnection(name: "Lab \(lab)", host: "127.0.0.1", user: "airsql")
+            saved.safety = .production  // the preview comes first
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let context = EditorContext(connection: saved, sessions: connection, schema: schema)
+            let tab = TableDataController(model: model, context: context, database: Self.database, table: "items")
+            main.select(main.open(tab, title: "items", connection: saved.id))
+            await ready { tab.loading != nil || tab.source == nil }
+            #expect(tab.grid.rowCount == 3 && tab.status.rows.stringValue == "3 rows", "\(lab)")
+
+            tab.source?.set(.text("Anna"), row: 0, column: 1)
+            tab.source?.changes.delete([["3"]])
+            tab.changesDidChange()
+            tab.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Apply"])
+            _ = await eventually(timeout: 30) {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                return tab.source?.changes.isEmpty == true && tab.loading == nil
+            }
+            let after = try await schemaSession.rows("SELECT id, name FROM \(database).items ORDER BY id")
+            #expect(after == [["1", "Anna"], ["2", "Bob"]], "\(lab)")
+            #expect(tab.grid.rowCount == 2, "\(lab): the rows are read back")
+
+            // Someone else deletes row 2 after it was loaded: nothing is applied and the grid selects the row.
+            tab.source?.set(.text("first"), row: 0, column: 1)
+            tab.source?.set(.text("Bobby"), row: 1, column: 1)
+            tab.changesDidChange()
+            _ = try await schemaSession.query("DELETE FROM \(database).items WHERE id = 2")
+            tab.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Apply"])
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 30])  // the error
+            #expect(tab.grid.selection.containsRow(1) && tab.source?.changes.rowCount == 2, "\(lab)")
+            _ = await call(harness, "press", ["title": "OK"])
+            #expect(try await schemaSession.rows("SELECT name FROM \(database).items") == [["Anna"]], "\(lab)")
+            tab.revertAllChanges(nil)
+            _ = try await schemaSession.query("DROP DATABASE \(database)")
         }
     }
 }
