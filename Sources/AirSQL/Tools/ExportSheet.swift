@@ -291,12 +291,17 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         panel.message = "Choose where to save the dump."
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let self, let chosen = panel.url else { return }
-            self.url = chosen
-            self.gzip.state = chosen.pathExtension == "gz" ? .on : .off
-            self.saveTo.stringValue = SettingsPaneController.shown(chosen)
-            self.saveTo.toolTip = chosen.path
-            self.formChanged(nil)
+            self.use(chosen)
         }
+    }
+
+    /// Saves to `chosen` (the save panel's choice).
+    func use(_ chosen: URL) {
+        url = chosen
+        gzip.state = chosen.pathExtension == "gz" ? .on : .off
+        saveTo.stringValue = SettingsPaneController.shown(chosen)
+        saveTo.toolTip = chosen.path
+        formChanged(nil)
     }
 
     @objc private func copyCommand(_ sender: Any?) {

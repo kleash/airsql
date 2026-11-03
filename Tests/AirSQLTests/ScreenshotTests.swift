@@ -138,6 +138,7 @@ extension AppTests {
                 let export = ExportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
                 export.show(on: main.window!, loads: false)
                 export.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
+                export.use(URL(fileURLWithPath: "/Volumes/Backups/shop-2026-11-03-0930.sql"))  // not this Mac's Downloads
                 _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
                 try await save(harness, "export-\(suffix)")
                 _ = export.begin("Exporting shop")
@@ -148,6 +149,7 @@ extension AppTests {
                 export.finish("Stopped.", failed: true)
                 export.close()
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                _ = await eventually(timeout: 5) { main.statusBar.activity.isHidden }  // the status bar has caught up
                 let restore = RestoreSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: false)
                 restore.show(on: main.window!, loads: false)
                 restore.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["crm", "shop"])
@@ -191,6 +193,7 @@ extension AppTests {
                             window.contentView.flatMap { find(NSTextField.self, id: "settings.dumpFound", in: $0) }?.stringValue != "Looking…"
                         }
                     }
+                    try await Task.sleep(nanoseconds: 500_000_000)  // the toolbar's selection moves to it (it animates)
                     window.layoutIfNeeded()
                     try await save(settingsHarness, "settings-\(pane.rawValue)-\(suffix)", target: "window:\(pane.title)")
                 }
