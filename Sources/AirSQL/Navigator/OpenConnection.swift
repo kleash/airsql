@@ -42,12 +42,13 @@ final class OpenConnection {
     private var running: [Load: Int] = [:]
     private var tasks: [UUID: Task<Void, Never>] = [:]
 
-    init(id: UUID, connection: Connection, model: AppModel, includes: @escaping (String) -> Bool) {
+    /// `source`: where the schema is read (the schema session; tests replay a recording).
+    init(id: UUID, connection: Connection, model: AppModel, includes: @escaping (String) -> Bool, source: SchemaQuerying? = nil) {
         self.id = id
         self.connection = connection
         self.model = model
-        schema = SchemaCache(source: SchemaSession(connection: connection), tableThreshold: model.data.settings.detailsTableThreshold,
-                             includes: includes)
+        schema = SchemaCache(source: source ?? SchemaSession(connection: connection),
+                             tableThreshold: model.data.settings.detailsTableThreshold, includes: includes)
         currentDatabase = connection.options.database
         schema.onChange = { [weak self] snapshot in
             self?.snapshot = snapshot
