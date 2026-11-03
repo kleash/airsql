@@ -72,7 +72,7 @@ extension ObjectEditorController {
             if failure == nil, let newName {
                 let fresh = try? await context.read { try await ObjectDefinition.load(kind, database: database, name: newName, from: $0) }
                 setLoaded(name: newName, definition: fresh)
-                if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
+                if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, server.noBackslashEscapes) }
             }
             isBusyNow(false)
             if let failure {

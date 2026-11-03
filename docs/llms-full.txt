@@ -1405,9 +1405,10 @@ per structure step and one per run of row changes on a table, destructive steps 
 Choose the changelog to add to (**Choose…**), or start one (**New…**). The changesets go at its end and their ids carry
 on its numbering. A change keeps only what Liquibase runs: `USE` and the transaction around it are left out (each
 changeset runs in a transaction of its own), and so is the database the change named its objects with, so the
-changeset runs in whichever database Liquibase updates. A `--rollback` is added when every statement of the change can
-be undone: DROP for what it creates, DROP COLUMN for an added column, DROP INDEX and DROP FOREIGN KEY for added keys,
-RENAME back. Row changes and drops get none.
+changeset runs in whichever database Liquibase updates. A change made on a session with `NO_BACKSLASH_ESCAPES` in its
+sql_mode turns that on for its statements and back off after, so a backslash in its strings stays a backslash. A
+`--rollback` is added when every statement of the change can be undone: DROP for what it creates, DROP COLUMN for an
+added column, DROP INDEX and DROP FOREIGN KEY for added keys, RENAME back. Row changes and drops get none.
 
 ## Settings
 

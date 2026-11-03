@@ -255,7 +255,7 @@ extension TableDataController: DataGridViewDelegate {
                 let deleted = source.changes.state.deletes
                 source.changes = PendingChanges(keyColumns: source.changes.keyColumns)
                 changesDidChange()
-                if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
+                if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, session.noBackslashEscapes) }
                 var saved: [ResultStore] = []
                 for sql in readBack {
                     if let row = try? await session.query(sql, rowCap: 1).first?.rows, row.rowCount == 1 { saved.append(row) }

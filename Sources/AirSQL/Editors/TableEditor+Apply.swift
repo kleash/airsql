@@ -102,7 +102,7 @@ extension TableEditorController {
             designChanged()
             reloadList()
             renameTab()
-            if applied, saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
+            if applied, saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, server.noBackslashEscapes) }
             if let failure {
                 let message = (failure as? AirSQLError).map { $0.message + "\n\n" + $0.details } ?? failure.localizedDescription
                 let state = done == 0 ? "Nothing was changed." : "The first \(done) of \(change.statements.count) statements ran and stay "
