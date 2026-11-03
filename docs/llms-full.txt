@@ -17,11 +17,13 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
 
 - [Install AirSQL](https://kleash.github.io/airsql/install.html): with Homebrew or from the download.
 - [Getting started](https://kleash.github.io/airsql/getting-started.html): add a connection, find your way around the window.
-- [Settings](https://kleash.github.io/airsql/settings.html): the look, the editor and grid, safety checks, agents and client tools.
+- [Settings](https://kleash.github.io/airsql/settings.html): the look, the editor and grid, connections, safety checks, agents, client tools and
+  Liquibase.
 - [Check SQL before it runs](https://kleash.github.io/airsql/sql-preview.html): the sheet that shows every change first.
 - [Trust a server](https://kleash.github.io/airsql/trust-a-server.html): servers whose certificate macOS doesn't know.
 - [The SQL log](https://kleash.github.io/airsql/sql-log.html): every statement AirSQL sends, with passwords masked.
-- [Read-only queries](https://kleash.github.io/airsql/read-only-queries.html): what an agent's query may do, and why one is refused.
+- [Read-only queries](https://kleash.github.io/airsql/read-only-queries.html): what an agent's query, or a read-only connection, may run, and why one is
+  refused.
 - [The SQL console](https://kleash.github.io/airsql/console.html): write and run SQL, results, transactions, history and the SQL log.
 - [Connections and routes](https://kleash.github.io/airsql/connections.html): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, table commands, find text and the process list.
@@ -119,12 +121,18 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## General
 
-- **Appearance**: follow the Mac's light or dark mode (System), or always use Porcelain (light) or Deep Water (dark).
+- **Appearance**: **System** follows the Mac's light or dark mode; **Light** always uses Porcelain, **Dark** Deep
+  Water.
 - **Settings folder**: where your connections and settings are kept. Passwords are in your Keychain, never there.
 
-## Editor and Grid
+## Editor
 
-- The text size of the SQL editor and of the grid.
+- **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
+  moment; **Actual Size** (⌘0) goes back to this size.
+
+## Grid
+
+- **Text size**: the grid's, which ⌘+, ⌘− and ⌘0 change the same way while it has the focus.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
 - **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
   row is then held in memory.
@@ -281,8 +289,9 @@ Source: https://kleash.github.io/airsql/read-only-queries.html
 
 # Read-only queries
 
-Where only reading is allowed, such as a query from an AI agent, AirSQL first checks that the statement can only
-read. The check is strict on purpose: when in doubt it refuses, and it says why in one line.
+Where only reading is allowed, such as a query from an AI agent or anything run on a
+[read-only connection](https://kleash.github.io/airsql/connections.html#add-or-edit-a-connection), AirSQL first checks that the statement can only read.
+The check is strict on purpose: when in doubt it refuses, and it says why in one line.
 
 ## What passes
 
@@ -618,6 +627,242 @@ read-only connection too: they change no data.
 
 ---
 
+Source: https://kleash.github.io/airsql/table-data.html
+
+# A table's rows
+
+A table tab shows a table's or view's rows in the data grid. They load a page at a time from the connection's data
+session, a session of their own, so a long query in a console never holds them up. Edits wait until you apply them.
+
+## Load rows
+
+- The first page loads when the tab opens: **Settings ▸ Grid ▸ Rows per page** rows (1,000 at first), in the table's
+  key order, so pages follow one another.
+- The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
+  estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
+- **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
+  Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
+  while the tab is open. Cancel it in the status bar's activity.
+- **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
+  until you choose **Off**. Pending changes stay.
+
+## Filter, search and sort
+
+The chip at the left of the grid bar always says where filtering runs: **On server** (every row of the table, loaded or
+not) or **Local** (only the rows loaded so far, at once, with no query).
+
+- **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
+  fine. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last 20 filters; the ⓧ, or
+  **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next time the table opens.
+  On a read-only connection, the whole SELECT must pass the [read-only check](https://kleash.github.io/airsql/read-only-queries.html): a condition that
+  calls a function such as `SLEEP` or `GET_LOCK` isn't sent, and the bar under it says why.
+- **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
+  `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
+  loaded rows instead.
+- **Quick Filter**: right-click a cell for `=`, `<>`, `<`, `>`, `LIKE` (starts with, ends with, contains), `IS NULL` and
+  `IS NOT NULL` with its value, and `IN` / `NOT IN` with every value selected in its column. Each item shows its SQL.
+  Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. ⌃⌘1 and ⌃⌘2
+  filter by the focused cell's value, equal and not equal.
+- **Filter by Values…** (a column header's menu): the column's values with how many rows have each, counted on the
+  server within the current filter (the 1,000 most frequent). Tick the ones to show. In **Column Summary…**, a click on
+  one of a column's most frequent values adds it to the filter.
+- **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
+  to add the column to the sort. Rows sort on the server. On a table of over a million rows, sorting by a column without
+  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here instead.
+- **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
+  the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
+  Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
+  match. Replacements are pending edits, like any other.
+
+## Edit rows
+
+Nothing is written until you apply. Leaving a row writes nothing.
+
+- **Edit a cell**: type over it, double-click it or press Return. Return keeps the edit, Esc cancels, Tab moves to
+  the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
+  the same way.
+- **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
+  number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't
+  one of an ENUM's. The editor then stays open and says why under the cell: fix the value or press Esc. Typing is never
+  blocked, and numbers and DECIMAL travel as the text you typed, so nothing is rounded on the way.
+- **Each type has its editor**:
+  - BOOLEAN, TINYINT(1) and BIT(1) show a checkbox. Space, Return or a double click ticks or clears it; typing `t`,
+    `f` or `n` sets true, false or NULL.
+  - An ENUM shows its values in a list over the cell; a SET a checklist, where **Set** keeps the ticked ones. Typing
+    still works: `read,write`.
+  - Dates and times are typed as `YYYY-MM-DD hh:mm:ss`, with fractional seconds when the column keeps them; ↑ and ↓
+    step the part under the cursor (the day, the hour…). Zero dates are kept where sql_mode allows them, TIMESTAMP
+    values are in the session's time zone, and a NULL cell starts empty: it never fills in today's date.
+  - Bytes (BINARY, BLOB, shapes) are typed as hex: `0x00FF`. BIT shows and takes every bit: `b'1010'` or `1010`.
+  - A value of more than 256 characters, or of several lines, opens in the value panel (below).
+  - A foreign key shows the rows of the table it refers to, each as "label (key)", the label being that table's
+    first text column. They are searched on the server as you type, by label or by key, 100 at a time, so a big table
+    is never listed whole. Return or a double click puts the key in the cell. **Data ▸ Choose Referenced Row…** opens
+    the same list.
+- **The value panel** (⇧↩) edits the selected cell too: ⌘↩ or clicking elsewhere keeps the text as a pending edit,
+  Esc puts the cell's value back. A value the column refuses stays there, and the panel says why. Its **⋯** menu has
+  **Format JSON** and **Compact JSON**, **Load from File…** (a file's bytes in a binary column, else its UTF-8 text)
+  and **Save to File…**.
+- **Data ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
+  `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
+  or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
+- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
+  in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, keys
+  included; **Duplicate Row Without Keys** (⇧⌘D) leaves the key and AUTO_INCREMENT columns to the server.
+  **Delete Rows…** (⌘⌫) marks the selected rows for deletion. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  cells.
+- **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
+  selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
+  are read the way the column's values are written. Rows past the last loaded one become new rows, and one value pasted
+  over several selected cells fills them all. Cells that can't go in their column are listed first, so you can paste
+  the others or nothing. **Data ▸ Paste as New Rows** adds every copied row as a new one. A cell reading `NULL` (the
+  grid's NULL text) is NULL.
+- **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
+  the selected row; choosing one opens that table filtered to them.
+- Pending changes have their colours: an edited cell amber, a new row green, a row to delete struck through in red.
+  The bar under the grid bar counts them.
+- **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes (a paste or a multi-cell edit is one step);
+  **Revert** (⌥⌘Z) throws away the selected rows' changes, **Revert All** every one.
+- Pending changes are kept on disk as you make them. If AirSQL quits or the Mac restarts, they come back the next time
+  you open the table, marked "Kept from before".
+- Closing the tab with pending changes asks whether to keep them for later or throw them away. Quitting AirSQL lists,
+  in one sheet, the tables with pending changes and any console transaction still open (which is rolled back).
+
+### Which tables can be edited
+
+AirSQL addresses each row by its primary key, or, without one, by the first unique key whose columns can't be NULL. Key
+values are never shortened, so a change always reaches exactly its row. A table with neither is read-only, and the bar
+says why; so are views. Generated columns can't be edited.
+
+## Apply changes
+
+- **Data ▸ Apply Changes** (⌘S) writes every pending change in one transaction on the data session: deletes first (in
+  batches of 500), then edits, then new rows. Each statement must change exactly its rows. If one changes another
+  number (someone else changed or deleted the row since it was loaded) or the server refuses one, everything is rolled
+  back, nothing is applied, and the grid selects the row. Reload it, then apply again.
+- **Preview SQL…** shows the statements first, in the [SQL preview](https://kleash.github.io/airsql/sql-preview.html). The preview also comes first on
+  connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection),
+  and whenever there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes
+  that also change other tables through `ON DELETE CASCADE` or `SET NULL`.
+- Values are checked again as Apply writes them; one that no longer fits (sql_mode changed, or it came from a find
+  and replace) stops Apply before anything runs, and the grid selects its row.
+- After Apply, new rows stay where they were and show what the server filled in, their AUTO_INCREMENT key and defaults
+  included: each is read back by its key. The rest of the loaded rows load again.
+
+## Copy and export
+
+These work in a console's results too.
+
+- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a console
+  result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
+  whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
+- **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
+  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key columns copied, or by every column. The one
+  you choose becomes ⌘C's format.
+- **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
+  pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
+  Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
+  (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
+
+
+---
+
+Source: https://kleash.github.io/airsql/data-grid.html
+
+# Read the data in a grid
+
+A table's rows and a console's results show in the same grid. These parts of it help you read what is there: the
+status bar's figures, the value panel, Record View, Transpose, other ways to show a column, colours, text, charts, and
+a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
+[A table's rows](https://kleash.github.io/airsql/table-data.html).
+
+## The header
+
+Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:
+
+- a gold key: the primary key, or the unique key the grid uses to find a row when there is no primary key;
+- a grey key: another unique key; an outline key: an index;
+- an arrow: a foreign key.
+
+After the type, **auto** marks an auto-increment column, **generated** a generated one, **default** a column with a
+default value, and **null** a column that allows NULL. Hold the pointer over a header for all of this in words and the
+column's comment.
+
+## The status bar
+
+With cells selected, the status bar shows the focused cell (**r3 : c5**, row and column), how many cells are
+selected, and one figure for them: their sum, or their count when they aren't numbers. Click the figure to see them
+all (count, sum, average, smallest, largest, median, distinct values) and choose the one shown. Sums of decimals are
+exact. **Edit ▸ Copy Selection Summary** (⇧⌘C) copies every figure. Selections of more than 100,000 cells aren't added
+up.
+
+## Move around
+
+- **Data ▸ Go to Row…** (⌘L) goes to a row by its number, or to `column:row`, the column by its name or number:
+  `email:120`.
+- **View ▸ Column List…** (⌘J) lists every column. Type to find one; Return (or a double-click) jumps to it; its box,
+  or Space, shows or hides it; **Show All** brings back hidden columns.
+- **Edit ▸ Extend Selection** (⌥↑) grows the selection from the focused cell to its column, then its row, then
+  everything; **Shrink Selection** (⌥↓) goes back the same way.
+- Hold ⇧ to scroll a mouse wheel across, and ⌥ to scroll five times as far.
+- **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
+- **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
+  Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
+- Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
+  AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
+  each query in the console, so they open as you left them.
+- **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
+  goes back to the size in Settings ▸ Grid.
+
+## See a whole value
+
+- **View ▸ Value Panel** (⇧↩) opens the focused cell's whole value beside the grid, never shortened: as wrapped text,
+  as a JSON tree, as hex, or as a picture when the bytes are an image. It follows the cell you select. A double-click
+  on a cell you can't edit opens it too.
+- **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
+  (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
+  on a row's number opens it. In a table, its values can be edited there as in the grid.
+- **View ▸ Transpose** (⌥⌘T) turns rows into columns, with the column names down the left: handy for comparing a few
+  wide rows. A console result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
+  that off. Transpose shows the first 1,000 rows.
+
+## Show a column another way
+
+**Data ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
+copying and editing use the stored value.
+
+- Numbers: **Date from Unix Time** (seconds or milliseconds), in your time zone, or **Number with Grouping**.
+- Bytes: **UUID** (for `binary(16)`), **Hex**, or **Text (UTF-8)**.
+- **As Stored** shows the value as the server sent it again.
+
+## Colours
+
+- **View ▸ Heatmap** colours the selected number columns by value, pale for the smallest and strong for the largest.
+  A column with negative and positive numbers is red below zero and green above; one of only 0 and 1 marks the 1s.
+  With everything selected (⌘A), every number column gets one. Choose it again to take it away.
+- **View ▸ Highlight Equal Values** tints every cell holding the focused cell's value.
+
+## Text, tree and charts
+
+- **View ▸ View As ▸ Text** shows the rows as text in the copy format (**Edit ▸ Copy As**: TSV at first, or CSV, JSON,
+  Markdown, SQL INSERT…), with the column names; **Tree** shows them as JSON, a row per item, with JSON columns opened
+  up. **Table** goes back. Both show the first 10,000 rows.
+- **View ▸ Chart** draws the rows as a bar, line, area, pie, scatter or histogram chart of a number column, by another
+  column. Choose the kind and columns above the chart; point at it to read a value. Bars add up the values of each
+  label and show the first 30 labels; a pie shows eight slices and puts the rest in **Other**. **Save as PNG…** saves
+  a picture of it. Pie charts need macOS 14 or later.
+
+## Column Summary
+
+**Data ▸ Column Summary…** (also on a header's right-click menu) counts the focused column's distinct values and NULLs,
+finds its smallest and largest values, and lists its 50 most frequent values with how often each appears. For a table
+the server works this out over all its rows within the filter; it asks first when the table is larger than 2 GB.
+Click a value to show only the rows that hold it (it is added to the filter). For a console result it counts the rows
+you have.
+
+
+---
+
 Source: https://kleash.github.io/airsql/editors.html
 
 # Change tables, views and routines
@@ -942,7 +1187,7 @@ allow, never your passwords, and can't change data.
 
 ## Turn agents on
 
-1. **AirSQL ▸ Settings ▸ Agents**: tick **Allow AI agents to use AirSQL**.
+1. Choose **AirSQL ▸ Settings…** (⌘,), then **Agents**, and tick **Allow AI agents to use AirSQL**.
 2. Under **Connections**, choose what agents may do with each connection. Every connection starts at **Off**.
 3. Add AirSQL to your agent:
    - **Add to Claude Code…** or **Add to Gemini CLI…**: AirSQL shows the exact change to that program's settings
@@ -1113,242 +1358,6 @@ RENAME back. Row changes and drops get none.
 
 ---
 
-Source: https://kleash.github.io/airsql/table-data.html
-
-# A table's rows
-
-A table tab shows a table's or view's rows in the data grid. They load a page at a time from the connection's data
-session, a session of their own, so a long query in a console never holds them up. Edits wait until you apply them.
-
-## Load rows
-
-- The first page loads when the tab opens: **Settings ▸ Grid ▸ Rows per page** rows (1,000 at first), in the table's
-  key order, so pages follow one another.
-- The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
-  estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
-- **Load More** (⌥⌘↓) loads the next page; **Load All** (⇧⌥⌘↓) loads every row that's left, in batches as they arrive.
-  Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
-  while the tab is open. Cancel it in the status bar's activity.
-- **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
-  until you choose **Off**. Pending changes stay.
-
-## Filter, search and sort
-
-The chip at the left of the grid bar always says where filtering runs: **On server** (every row of the table, loaded or
-not) or **Local** (only the rows loaded so far, at once, with no query).
-
-- **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
-  fine. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last 20 filters; the ⓧ, or
-  **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next time the table opens.
-  On a read-only connection, the whole SELECT must pass the [read-only check](https://kleash.github.io/airsql/read-only-queries.html): a condition that
-  calls a function such as `SLEEP` or `GET_LOCK` isn't sent, and the bar under it says why.
-- **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
-  `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
-  loaded rows instead.
-- **Quick Filter**: right-click a cell for `=`, `<>`, `<`, `>`, `LIKE` (starts with, ends with, contains), `IS NULL` and
-  `IS NOT NULL` with its value, and `IN` / `NOT IN` with every value selected in its column. Each item shows its SQL.
-  Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. ⌃⌘1 and ⌃⌘2
-  filter by the focused cell's value, equal and not equal.
-- **Filter by Values…** (a column header's menu): the column's values with how many rows have each, counted on the
-  server within the current filter (the 1,000 most frequent). Tick the ones to show. In **Column Summary…**, a click on
-  one of a column's most frequent values adds it to the filter.
-- **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
-  to add the column to the sort. Rows sort on the server. On a table of over a million rows, sorting by a column without
-  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here instead.
-- **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
-  the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
-  Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
-  match. Replacements are pending edits, like any other.
-
-## Edit rows
-
-Nothing is written until you apply. Leaving a row writes nothing.
-
-- **Edit a cell**: type over it, double-click it or press Return. Return keeps the edit, Esc cancels, Tab moves to
-  the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
-  the same way.
-- **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
-  number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't
-  one of an ENUM's. The editor then stays open and says why under the cell: fix the value or press Esc. Typing is never
-  blocked, and numbers and DECIMAL travel as the text you typed, so nothing is rounded on the way.
-- **Each type has its editor**:
-  - BOOLEAN, TINYINT(1) and BIT(1) show a checkbox. Space, Return or a double click ticks or clears it; typing `t`,
-    `f` or `n` sets true, false or NULL.
-  - An ENUM shows its values in a list over the cell; a SET a checklist, where **Set** keeps the ticked ones. Typing
-    still works: `read,write`.
-  - Dates and times are typed as `YYYY-MM-DD hh:mm:ss`, with fractional seconds when the column keeps them; ↑ and ↓
-    step the part under the cursor (the day, the hour…). Zero dates are kept where sql_mode allows them, TIMESTAMP
-    values are in the session's time zone, and a NULL cell starts empty: it never fills in today's date.
-  - Bytes (BINARY, BLOB, shapes) are typed as hex: `0x00FF`. BIT shows and takes every bit: `b'1010'` or `1010`.
-  - A value of more than 256 characters, or of several lines, opens in the value panel (below).
-  - A foreign key shows the rows of the table it refers to, each as "label (key)", the label being that table's
-    first text column. They are searched on the server as you type, by label or by key, 100 at a time, so a big table
-    is never listed whole. Return or a double click puts the key in the cell. **Data ▸ Choose Referenced Row…** opens
-    the same list.
-- **The value panel** (⇧↩) edits the selected cell too: ⌘↩ or clicking elsewhere keeps the text as a pending edit,
-  Esc puts the cell's value back. A value the column refuses stays there, and the panel says why. Its **⋯** menu has
-  **Format JSON** and **Compact JSON**, **Load from File…** (a file's bytes in a binary column, else its UTF-8 text)
-  and **Save to File…**.
-- **Data ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
-  `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
-  or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
-- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
-  in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, keys
-  included; **Duplicate Row Without Keys** (⇧⌘D) leaves the key and AUTO_INCREMENT columns to the server.
-  **Delete Rows…** (⌘⌫) marks the selected rows for deletion. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
-  cells.
-- **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
-  selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
-  are read the way the column's values are written. Rows past the last loaded one become new rows, and one value pasted
-  over several selected cells fills them all. Cells that can't go in their column are listed first, so you can paste
-  the others or nothing. **Data ▸ Paste as New Rows** adds every copied row as a new one. A cell reading `NULL` (the
-  grid's NULL text) is NULL.
-- **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
-  the selected row; choosing one opens that table filtered to them.
-- Pending changes have their colours: an edited cell amber, a new row green, a row to delete struck through in red.
-  The bar under the grid bar counts them.
-- **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes (a paste or a multi-cell edit is one step);
-  **Revert** (⌥⌘Z) throws away the selected rows' changes, **Revert All** every one.
-- Pending changes are kept on disk as you make them. If AirSQL quits or the Mac restarts, they come back the next time
-  you open the table, marked "Kept from before".
-- Closing the tab with pending changes asks whether to keep them for later or throw them away. Quitting AirSQL lists,
-  in one sheet, the tables with pending changes and any console transaction still open (which is rolled back).
-
-### Which tables can be edited
-
-AirSQL addresses each row by its primary key, or, without one, by the first unique key whose columns can't be NULL. Key
-values are never shortened, so a change always reaches exactly its row. A table with neither is read-only, and the bar
-says why; so are views. Generated columns can't be edited.
-
-## Apply changes
-
-- **Data ▸ Apply Changes** (⌘S) writes every pending change in one transaction on the data session: deletes first (in
-  batches of 500), then edits, then new rows. Each statement must change exactly its rows. If one changes another
-  number (someone else changed or deleted the row since it was loaded) or the server refuses one, everything is rolled
-  back, nothing is applied, and the grid selects the row. Reload it, then apply again.
-- **Preview SQL…** shows the statements first, in the [SQL preview](https://kleash.github.io/airsql/sql-preview.html). The preview also comes first on
-  connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection),
-  and whenever there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes
-  that also change other tables through `ON DELETE CASCADE` or `SET NULL`.
-- Values are checked again as Apply writes them; one that no longer fits (sql_mode changed, or it came from a find
-  and replace) stops Apply before anything runs, and the grid selects its row.
-- After Apply, new rows stay where they were and show what the server filled in, their AUTO_INCREMENT key and defaults
-  included: each is read back by its key. The rest of the loaded rows load again.
-
-## Copy and export
-
-These work in a console's results too.
-
-- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a console
-  result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
-  whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
-- **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
-  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key columns copied, or by every column. The one
-  you choose becomes ⌘C's format.
-- **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
-  pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
-  Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
-  (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
-
-
----
-
-Source: https://kleash.github.io/airsql/data-grid.html
-
-# Read the data in a grid
-
-A table's rows and a console's results show in the same grid. These parts of it help you read what is there: the
-status bar's figures, the value panel, Record View, Transpose, other ways to show a column, colours, text, charts, and
-a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
-[A table's rows](https://kleash.github.io/airsql/table-data.html).
-
-## The header
-
-Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:
-
-- a gold key: the primary key, or the unique key the grid uses to find a row when there is no primary key;
-- a grey key: another unique key; an outline key: an index;
-- an arrow: a foreign key.
-
-After the type, **auto** marks an auto-increment column, **generated** a generated one, **default** a column with a
-default value, and **null** a column that allows NULL. Hold the pointer over a header for all of this in words and the
-column's comment.
-
-## The status bar
-
-With cells selected, the status bar shows the focused cell (**r3 : c5**, row and column), how many cells are
-selected, and one figure for them: their sum, or their count when they aren't numbers. Click the figure to see them
-all (count, sum, average, smallest, largest, median, distinct values) and choose the one shown. Sums of decimals are
-exact. **Edit ▸ Copy Selection Summary** (⇧⌘C) copies every figure. Selections of more than 100,000 cells aren't added
-up.
-
-## Move around
-
-- **Data ▸ Go to Row…** (⌘L) goes to a row by its number, or to `column:row`, the column by its name or number:
-  `email:120`.
-- **View ▸ Column List…** (⌘J) lists every column. Type to find one; Return (or a double-click) jumps to it; its box,
-  or Space, shows or hides it; **Show All** brings back hidden columns.
-- **Edit ▸ Extend Selection** (⌥↑) grows the selection from the focused cell to its column, then its row, then
-  everything; **Shrink Selection** (⌥↓) goes back the same way.
-- Hold ⇧ to scroll a mouse wheel across, and ⌥ to scroll five times as far.
-- **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
-- **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
-  Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
-- Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
-  AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
-  each query in the console, so they open as you left them.
-- **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
-  goes back to the size in Settings ▸ Grid.
-
-## See a whole value
-
-- **View ▸ Value Panel** (⇧↩) opens the focused cell's whole value beside the grid, never shortened: as wrapped text,
-  as a JSON tree, as hex, or as a picture when the bytes are an image. It follows the cell you select. A double-click
-  on a cell you can't edit opens it too.
-- **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
-  (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
-  on a row's number opens it. In a table, its values can be edited there as in the grid.
-- **View ▸ Transpose** (⌥⌘T) turns rows into columns, with the column names down the left: handy for comparing a few
-  wide rows. A console result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
-  that off. Transpose shows the first 1,000 rows.
-
-## Show a column another way
-
-**Data ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
-copying and editing use the stored value.
-
-- Numbers: **Date from Unix Time** (seconds or milliseconds), in your time zone, or **Number with Grouping**.
-- Bytes: **UUID** (for `binary(16)`), **Hex**, or **Text (UTF-8)**.
-- **As Stored** shows the value as the server sent it again.
-
-## Colours
-
-- **View ▸ Heatmap** colours the selected number columns by value, pale for the smallest and strong for the largest.
-  A column with negative and positive numbers is red below zero and green above; one of only 0 and 1 marks the 1s.
-  With everything selected (⌘A), every number column gets one. Choose it again to take it away.
-- **View ▸ Highlight Equal Values** tints every cell holding the focused cell's value.
-
-## Text, tree and charts
-
-- **View ▸ View As ▸ Text** shows the rows as text in the copy format (**Edit ▸ Copy As**: TSV at first, or CSV, JSON,
-  Markdown, SQL INSERT…), with the column names; **Tree** shows them as JSON, a row per item, with JSON columns opened
-  up. **Table** goes back. Both show the first 10,000 rows.
-- **View ▸ Chart** draws the rows as a bar, line, area, pie, scatter or histogram chart of a number column, by another
-  column. Choose the kind and columns above the chart; point at it to read a value. Bars add up the values of each
-  label and show the first 30 labels; a pie shows eight slices and puts the rest in **Other**. **Save as PNG…** saves
-  a picture of it. Pie charts need macOS 14 or later.
-
-## Column Summary
-
-**Data ▸ Column Summary…** (also on a header's right-click menu) counts the focused column's distinct values and NULLs,
-finds its smallest and largest values, and lists its 50 most frequent values with how often each appears. For a table
-the server works this out over all its rows within the filter; it asks first when the table is larger than 2 GB.
-Click a value to show only the rows that hold it (it is added to the filter). For a console result it counts the rows
-you have.
-
-
----
-
 Source: https://kleash.github.io/airsql/shortcuts.html
 
 # Keyboard shortcuts
@@ -1481,6 +1490,8 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
 - Nothing is written until you choose Run or Apply. Changes show their SQL first
   ([Check SQL before it runs](https://kleash.github.io/airsql/sql-preview.html)), and Apply checks that each change touched exactly the rows it should.
 - A connection coloured **Production** starts with stricter safety checks ([Settings](https://kleash.github.io/airsql/settings.html#safety)).
+- A **read-only** connection runs only what AirSQL can prove reads, on sessions the server keeps read-only
+  ([Connections](https://kleash.github.io/airsql/connections.html#add-or-edit-a-connection)).
 
 ## AI agents
 

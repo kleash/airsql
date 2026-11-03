@@ -1,6 +1,6 @@
 ---
 title: A table's rows
-nav_order: 17
+nav_order: 12
 ---
 
 # A table's rows
@@ -14,7 +14,7 @@ session, a session of their own, so a long query in a console never holds them u
   key order, so pages follow one another.
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
-- **Load More** (⌥⌘↓) loads the next page; **Load All** (⇧⌥⌘↓) loads every row that's left, in batches as they arrive.
+- **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
   Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
   while the tab is open. Cancel it in the status bar's activity.
 - **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
