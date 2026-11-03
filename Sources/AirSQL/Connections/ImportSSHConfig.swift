@@ -37,11 +37,12 @@ extension MainWindowController {
     private func showImport(_ hosts: [SSHConfigImport.Host], on window: NSWindow) {
         let known = Set(model.data.connections.filter { $0.route != .direct }.map(\.sshHost.host))
         let boxes = hosts.map { host -> NSButton in
+            // The tooltip has the whole of a shortened title.
             let box = checkbox(host.alias + "   " + host.summary, id: "import.host." + host.alias,
-                               tip: "Make a connection that tunnels through \(host.alias)", on: !known.contains(host.alias),
-                               target: nil, action: nil)
+                               tip: "Make a connection that tunnels through \(host.alias), \(host.summary)"
+                                   + (known.contains(host.alias) ? " (a connection goes through it already)" : ""),
+                               on: !known.contains(host.alias), target: nil, action: nil)
             box.lineBreakMode = .byTruncatingTail
-            box.toolTip = host.summary + (known.contains(host.alias) ? ": a connection goes through it already" : "")
             return box
         }
         let stack = NSStackView(views: boxes)
