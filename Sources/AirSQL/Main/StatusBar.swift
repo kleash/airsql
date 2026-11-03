@@ -9,7 +9,8 @@ import Combine
 final class StatusBarView: NSView {
     let route = StatusItemView(id: "status.route", symbol: "point.3.connected.trianglepath.dotted")
     let server = StatusItemView(id: "status.server", symbol: "server.rack")
-    let transaction = StatusItemView(id: "status.transaction", chip: .tinted(.statusWarning))
+    /// The only warning of an open transaction: its text is the last to shorten.
+    let transaction = StatusItemView(id: "status.transaction", chip: .tinted(.statusWarning), keepsText: true)
     let activity = StatusItemView(id: "status.activity", spinner: true)
     let agent = StatusItemView(id: "status.agent", chip: .accent)
     let sqlLog = NSButton(title: "SQL log", target: nil, action: Commands.sqlLog.action)
@@ -40,16 +41,20 @@ final class StatusBarView: NSView {
         accessory.translatesAutoresizingMaskIntoConstraints = false
         // One row: the route, server, transaction and work on the left, the tab's own items, the agents and the SQL log on
         // the right. Items keep their text (or a good part of it); when the window is too narrow for all of them, the
-        // less important ones step out (they stay in the popovers and the snapshot) rather than squeeze to nothing.
+        // less important ones step out (they stay in the popovers and the snapshot) rather than squeeze to nothing. The
+        // tab's own items (its row counts, Load More) are what the person works with, so the agents' chip goes first.
         let row = NSStackView()
         row.setViews([route, server, transaction, activity], in: .leading)
         row.setViews([accessory, agent, sqlLog], in: .trailing)
         row.spacing = 12
         row.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         row.setClippingResistancePriority(.defaultLow, for: .horizontal)
-        let priorities: [(NSView, Float)] = [(sqlLog, 1000), (transaction, 950), (activity, 900), (agent, 800), (accessory, 700),
+        let priorities: [(NSView, Float)] = [(sqlLog, 1000), (transaction, 950), (activity, 900), (accessory, 850), (agent, 800),
                                              (route, 600), (server, 500)]
-        for (view, priority) in priorities { row.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: priority), for: view) }
+        for (view, priority) in priorities {
+            row.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: priority), for: view)
+            (view as? StatusItemView)?.importance = NSStackView.VisibilityPriority(rawValue: priority)
+        }
         row.translatesAutoresizingMaskIntoConstraints = false
         addSubview(row)
         NSLayoutConstraint.activate([
@@ -89,8 +94,12 @@ final class StatusItemView: NSView {
     var popover: (() -> NSViewController?)?
     /// What a right-click opens (Copy is added first).
     var menuItems: (() -> [NSMenuItem])?
+    /// Its visibility priority in the bar, which steps the least important items out first when it is narrow.
+    var importance = NSStackView.VisibilityPriority.mustHold
 
-    init(id: String, symbol: String? = nil, chip style: ChipView.Style? = nil, spinner showsSpinner: Bool = false) {
+    /// `keepsText`: the item's text shortens only once the bar's other items have shortened or stepped out.
+    init(id: String, symbol: String? = nil, chip style: ChipView.Style? = nil, spinner showsSpinner: Bool = false,
+         keepsText: Bool = false) {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         setAccessibilityIdentifier(id)
@@ -135,15 +144,18 @@ final class StatusItemView: NSView {
         heightAnchor.constraint(equalToConstant: 18).isActive = true
         minimumWidth = (chip?.label ?? text).widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
         minimumWidth.isActive = true
+        if keepsText { (chip?.label ?? text).setContentCompressionResistancePriority(.defaultHigh, for: .horizontal) }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
     /// The item's text ("" hides it); its tooltip is the whole text (the item may be cut short) and what a click does.
     func show(_ value: String, tip: String) {
+        // Without text it steps out by its priority, not by hiding it: the bar hides the items it steps out when it is
+        // narrow, and one shown again by hand held its place from then on, ahead of the ones that matter more.
+        (superview as? NSStackView)?.setVisibilityPriority(value.isEmpty ? .notVisible : importance, for: self)
         if let chip { chip.text = value } else { text.stringValue = value }
         minimumWidth.constant = min((chip?.label ?? text).intrinsicContentSize.width, 110)
-        isHidden = value.isEmpty
         toolTip = value + " · " + tip
         setAccessibilityLabel(value)
         setAccessibilityHelp(toolTip)
