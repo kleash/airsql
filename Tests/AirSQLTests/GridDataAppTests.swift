@@ -453,6 +453,17 @@ extension AppTests.ScreenshotTests {
             viewMain.window?.displayIfNeeded()
             try await save(viewHarness, "table-data-read-only-\(suffix)")
             viewMain.window?.orderOut(nil)
+
+            // A read-only connection refusing a filter, in the smallest window: the notice says why.
+            let (locked, lockedHarness, lockedTab) = try await AppTests.GridDataAppTests.tab(
+                session: session, size: MainWindowController.minimumSize, readOnly: true)
+            locked.window?.appearance = NSAppearance(named: appearance)
+            locked.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+            locked.window?.orderFront(nil)
+            lockedTab.applyFilter("region = 'EU' OR SLEEP(5) = 0")
+            locked.window?.displayIfNeeded()
+            try await save(lockedHarness, "table-data-read-only-filter-\(suffix)")
+            locked.window?.orderOut(nil)
         }
     }
 }
