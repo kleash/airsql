@@ -309,11 +309,5 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
 final class ProcessTableView: NSTableView {
     weak var owner: ProcessListContent?
 
-    override func menu(for event: NSEvent) -> NSMenu? {
-        let row = self.row(at: convert(event.locationInWindow, from: nil))
-        guard row >= 0 else { return nil }
-        if !selectedRowIndexes.contains(row) { selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
-        window?.makeFirstResponder(self)
-        return owner?.contextMenu()
-    }
+    override func menu(for event: NSEvent) -> NSMenu? { selectsRow(for: event) ? owner?.contextMenu() : nil }
 }

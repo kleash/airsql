@@ -266,13 +266,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 final class DatabaseTableView: NSTableView {
     weak var owner: DatabaseViewController?
 
-    override func menu(for event: NSEvent) -> NSMenu? {
-        let row = self.row(at: convert(event.locationInWindow, from: nil))
-        guard row >= 0 else { return nil }
-        if !selectedRowIndexes.contains(row) { selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
-        window?.makeFirstResponder(self)
-        return owner?.contextMenu()
-    }
+    override func menu(for event: NSEvent) -> NSMenu? { selectsRow(for: event) ? owner?.contextMenu() : nil }
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {

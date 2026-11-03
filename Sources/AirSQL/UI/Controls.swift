@@ -242,6 +242,18 @@ extension NSView {
     }
 }
 
+extension NSTableView {
+    /// For a right-click: selects the row under the pointer unless it is part of the selection (plan §2.12), and moves
+    /// the focus to the list. False off the rows.
+    func selectsRow(for event: NSEvent) -> Bool {
+        let row = self.row(at: convert(event.locationInWindow, from: nil))
+        guard row >= 0 else { return false }
+        if !selectedRowIndexes.contains(row) { selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        window?.makeFirstResponder(self)
+        return true
+    }
+}
+
 extension NSEdgeInsets {
     static func all(_ value: CGFloat) -> NSEdgeInsets { NSEdgeInsets(top: value, left: value, bottom: value, right: value) }
 }

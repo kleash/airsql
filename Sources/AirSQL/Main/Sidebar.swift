@@ -394,11 +394,8 @@ final class SidebarOutlineView: NSOutlineView {
     weak var sidebar: SidebarController?
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        let row = self.row(at: convert(event.locationInWindow, from: nil))
-        guard row >= 0, (item(atRow: row) as? SidebarNode)?.kind != .header else { return nil }
-        if !selectedRowIndexes.contains(row) { selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
-        window?.makeFirstResponder(self)
-        return sidebar?.contextMenu()
+        let header = (item(atRow: row(at: convert(event.locationInWindow, from: nil))) as? SidebarNode)?.kind == .header
+        return !header && selectsRow(for: event) ? sidebar?.contextMenu() : nil
     }
 
     override func keyDown(with event: NSEvent) {
