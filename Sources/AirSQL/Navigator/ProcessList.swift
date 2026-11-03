@@ -17,8 +17,8 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     private var refreshing: Task<Void, Never>?
     private var timer: Task<Void, Never>?
     static let intervals = [0, 2, 5, 10, 30]
-    private static let columns: [(String, String, CGFloat)] = [("id", "Id", 60), ("user", "User", 90), ("host", "Host", 130),
-        ("db", "Database", 100), ("command", "Command", 80), ("time", "Time", 56), ("state", "State", 130), ("info", "Query", 300)]
+    private static let columns: [(String, String, CGFloat)] = [("id", "Id", 50), ("user", "User", 80), ("host", "Host", 120),
+        ("db", "Database", 90), ("command", "Command", 76), ("time", "Time", 50), ("state", "State", 120), ("info", "Query", 300)]
 
     init(_ open: OpenConnection) {
         self.open = open
@@ -57,7 +57,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             if id == "id" || id == "time" { column.headerCell.alignment = .right }
             table.addTableColumn(column)
         }
-        table.style = .inset
+        table.style = .fullWidth
         table.usesAlternatingRowBackgroundColors = true
         table.allowsMultipleSelection = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle

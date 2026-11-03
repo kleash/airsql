@@ -68,7 +68,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
             column.width = width
             table.addTableColumn(column)
         }
-        table.style = .inset
+        table.style = .fullWidth
         table.usesAlternatingRowBackgroundColors = true
         table.dataSource = self
         table.delegate = self

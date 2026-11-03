@@ -14,10 +14,10 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     private let caption = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
     private static let columns: [(id: String, title: String, width: CGFloat, tip: String)] = [
-        ("name", "Name", 220, "The table's name"), ("rows", "Rows", 90, "About how many rows (InnoDB estimates it)"),
-        ("data", "Data", 80, "Space its rows take"), ("index", "Indexes", 80, "Space its indexes take"),
-        ("engine", "Engine", 80, "Its storage engine"), ("collation", "Collation", 150, "How its text compares and sorts"),
-        ("updated", "Updated", 140, "When its rows last changed, where the engine keeps it"), ("comment", "Comment", 200, "Its comment"),
+        ("name", "Name", 180, "The table's name"), ("rows", "Rows", 80, "About how many rows (InnoDB estimates it)"),
+        ("data", "Data", 72, "Space its rows take"), ("index", "Indexes", 72, "Space its indexes take"),
+        ("engine", "Engine", 70, "Its storage engine"), ("collation", "Collation", 130, "How its text compares and sorts"),
+        ("updated", "Updated", 130, "When its rows last changed, where the engine keeps it"), ("comment", "Comment", 200, "Its comment"),
     ]
 
     init(_ open: OpenConnection, _ database: String) {
@@ -43,13 +43,13 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.id))
             tableColumn.title = column.title
             tableColumn.width = column.width
-            tableColumn.minWidth = column.id == "comment" ? 120 : 50
+            tableColumn.minWidth = column.id == "comment" ? 80 : 50
             tableColumn.headerToolTip = column.tip + "; click to sort by it"
             tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.id, ascending: true)
             if ["rows", "data", "index"].contains(column.id) { tableColumn.headerCell.alignment = .right }
             table.addTableColumn(tableColumn)
         }
-        table.style = .inset
+        table.style = .fullWidth
         table.usesAlternatingRowBackgroundColors = true
         table.allowsMultipleSelection = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
