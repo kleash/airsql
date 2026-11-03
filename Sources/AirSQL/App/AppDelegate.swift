@@ -139,6 +139,8 @@ enum HelpPage: String, CaseIterable {
     case compare = "compare.html"
     case agents = "agents.html"
     case connections = "connections.html"
+    case tableData = "table-data.html"
+    case dataGrid = "data-grid.html"
 
     /// The site: GitHub Pages, built from docs/.
     static let site = URL(string: "https://kleash.github.io/airsql/")!

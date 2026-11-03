@@ -1,25 +1,14 @@
 ---
 title: Read the data in a grid
+nav_order: 17
 ---
 
 # Read the data in a grid
 
-A table's rows and a console's results show in the same grid. These pages of it help you read what is there: the
-status bar's figures, the value panel, Record View, Transpose, other ways to show a column, colours, charts, and a
-column's summary. Editing, filters and sorting are on their own page.
-
-## Open a table's rows
-
-- **Data ▸ Open Table…** (⇧⌘O) asks for a table's name, as `table` (in the console's database) or `database.table`,
-  and opens its rows in a tab of their own. Names with dots or spaces go in backticks: `` `my.db`.`order lines` ``.
-- The first page of rows loads on the connection's data session, so a long query in a console doesn't hold it up.
-  **Settings ▸ Grid ▸ Rows per page** sets its size (1,000 at first).
-- The status bar says how many rows are loaded and how many the table has: **1,000 of ≈2,348,245 rows**. The number
-  after ≈ is the server's estimate (InnoDB's can be off by a lot); **Count exactly** in the status bar, or **Data ▸
-  Count Rows Exactly**, counts them with `COUNT(*)`.
-- **Load more** in the status bar, or **Data ▸ Load More** (⌥⌘↓), loads the next page. When a page comes back short,
-  every row is loaded and the status bar says how many there are.
-- **View ▸ Refresh** (⌘R) reads the first page again. Anything slow shows in the status bar's activity, with Cancel.
+A table's rows and a console's results show in the same grid. These parts of it help you read what is there: the
+status bar's figures, the value panel, Record View, Transpose, other ways to show a column, colours, text, charts, and
+a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
+[A table's rows](table-data.md).
 
 ## The header
 
@@ -60,7 +49,7 @@ up.
   on a cell you can't edit opens it too.
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
   (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
-  on a row's number opens it.
+  on a row's number opens it. In a table, its values can be edited there as in the grid.
 - **View ▸ Transpose** (⌥⌘T) turns rows into columns, with the column names down the left: handy for comparing a few
   wide rows. A console result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.
@@ -83,8 +72,9 @@ copying and editing use the stored value.
 
 ## Text, tree and charts
 
-- **View ▸ View As ▸ Text** shows the rows as a plain-text table, as the mysql client prints them; **Tree** shows them
-  as JSON, a row per item, with JSON columns opened up. **Table** goes back. Both show the first 10,000 rows.
+- **View ▸ View As ▸ Text** shows the rows as text in the copy format (**Edit ▸ Copy As**: TSV at first, or CSV, JSON,
+  Markdown, SQL INSERT…), with the column names; **Tree** shows them as JSON, a row per item, with JSON columns opened
+  up. **Table** goes back. Both show the first 10,000 rows.
 - **View ▸ Chart** draws the rows as a bar, line, area, pie, scatter or histogram chart of a number column, by another
   column. Choose the kind and columns above the chart; point at it to read a value. Bars add up the values of each
   label and show the first 30 labels; a pie shows eight slices and puts the rest in **Other**. **Save as PNG…** saves
@@ -94,5 +84,6 @@ copying and editing use the stored value.
 
 **Data ▸ Column Summary…** (also on a header's right-click menu) counts the focused column's distinct values and NULLs,
 finds its smallest and largest values, and lists its 50 most frequent values with how often each appears. For a table
-the server works this out over all its rows; it asks first when the table is larger than 2 GB. For a console result
-it counts the rows you have.
+the server works this out over all its rows within the filter; it asks first when the table is larger than 2 GB.
+Click a value to show only the rows that hold it (it is added to the filter). For a console result it counts the rows
+you have.

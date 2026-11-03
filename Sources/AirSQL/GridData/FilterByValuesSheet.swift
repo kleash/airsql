@@ -85,7 +85,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         okButton.keyEquivalent = "\r"
         okButton.isEnabled = false
         let status = NSStackView(views: [spinner, note])
-        let buttons = NSStackView(views: [all, none, NSView(), cancel, okButton])
+        let buttons = NSStackView(views: [helpButton(.tableData), all, none, NSView(), cancel, okButton])
         let stack = NSStackView(views: [heading, search, scroll, status, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading

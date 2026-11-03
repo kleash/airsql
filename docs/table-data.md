@@ -35,12 +35,13 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. ⌃⌘1 and ⌃⌘2
   filter by the focused cell's value, equal and not equal.
 - **Filter by Values…** (a column header's menu): the column's values with how many rows have each, counted on the
-  server within the current filter (the 1,000 most frequent). Tick the ones to show.
+  server within the current filter (the 1,000 most frequent). Tick the ones to show. In **Column Summary…**, a click on
+  one of a column's most frequent values adds it to the filter.
 - **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
   to add the column to the sort. Rows sort on the server. On a table of over a million rows, sorting by a column without
   an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here instead.
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
-  the bar says `3 of 12`. **Options** has Match Case, Regular Expression (`$1` in the replacement), Whole Words and
+  the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match Case, Regular Expression (`$1` in the replacement), Whole Words and
   Filter Rows, which hides the loaded rows without a match. Replacements are pending edits, like any other.
 
 ## Edit rows
@@ -48,7 +49,7 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 Nothing is written until you apply. Leaving a row writes nothing.
 
 - **Edit a cell**: type over it, double-click it or press Return. Return keeps the edit, Esc cancels, Tab moves to
-  the next cell. Select several cells and type: they all get the value.
+  the next cell. Select several cells and type: they all get the value. Record View and Transpose edit the same way.
 - **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones; columns you leave alone get their default or
   AUTO_INCREMENT value, which the new row shows as `(auto)` or the default. **Duplicate Row** (⌘D) copies the selected
   rows, keys included; **Duplicate Row Without Keys** (⇧⌘D) leaves the key and AUTO_INCREMENT columns to the server.
@@ -59,7 +60,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
 - **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes; **Revert** (⌥⌘Z) throws away the selected rows'
   changes, **Revert All** every one.
 - Pending changes are kept on disk as you make them. If AirSQL quits or the Mac restarts, they come back the next time
-  you open the table, marked "Left from before AirSQL quit".
+  you open the table, marked "Kept from before".
 - Closing the tab with pending changes asks whether to keep them for later or throw them away.
 
 ### Which tables can be edited
@@ -82,12 +83,15 @@ says why; so are views. Generated columns can't be edited.
 
 ## Copy and export
 
-- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first).
-  **Copy with Headers** (⌥⌘C) puts the column names first.
+These work in a console's results too.
+
+- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a console
+  result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
+  whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
   UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key columns copied, or by every column. The one
   you choose becomes ⌘C's format.
-- **Data ▸ Export Rows…** saves the selected rows, the loaded rows (with their pending changes) or every row of the
-  table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
+- **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
+  pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
   (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.

@@ -16,7 +16,11 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 - The text size of the SQL editor and of the grid.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
+- **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
+  row is then held in memory.
 - **NULL shown as**: how empty values look in the grid.
+- **Transpose results with one row**: a console result with a single row opens turned on its side, one line per
+  column (on by default).
 
 ## Connections
 

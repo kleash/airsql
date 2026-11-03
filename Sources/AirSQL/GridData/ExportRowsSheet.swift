@@ -81,7 +81,7 @@ final class ExportRowsSheet: NSWindowController {
         let save = button("Export…", id: "export.save", tip: "Choose a file and write the rows to it", target: self,
                           action: #selector(saveRows(_:)))
         save.keyEquivalent = "\r"
-        let buttons = NSStackView(views: [NSView(), cancel, copyButton, save])
+        let buttons = NSStackView(views: [helpButton(.tableData), NSView(), cancel, copyButton, save])
         buttons.spacing = Spacing.unit
         let stack = NSStackView(views: [heading, form.finish(), buttons])
         stack.orientation = .vertical

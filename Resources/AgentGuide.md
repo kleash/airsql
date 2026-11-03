@@ -126,9 +126,9 @@ its own:
   that is the person's.
 - **A production console's text:** `type` or `set` into the editor of a console on a connection coloured Production
   shows the person the text first; single keys that would change it are refused.
-- **Data you may not read is hidden:** on connections below Schema + read, grids, query results, the process list and
-  a compare's rows and sync script are covered in screenshots ("Hidden from agents") and left out of snapshots
-  (`hidden`).
+- **Data you may not read is hidden:** on connections below Schema + read, grids, query results (and the value panel,
+  View As, charts, Column Summary and the status bar's figure), the process list and a compare's rows and sync script
+  are covered in screenshots ("Hidden from agents") and left out of snapshots (`hidden`).
 
 The person can turn the asking off for a connection or for all (Settings ▸ Safety); person-only things stay theirs.
 
@@ -162,7 +162,21 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
   helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
   history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
-- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor`.
+- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor`; the status bar's `grid.rows`,
+  `grid.position`, `grid.figure`; the value panel `valuePanel` (`valuePanel.mode`, `valuePanel.text`, `valuePanel.tree`,
+  `valuePanel.image`); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
+  `grid.chart` (`chart.kind`, `chart.x`, `chart.y`); Column List `columnList.search`, `columnList.table`; Column
+  Summary `columnSummary` (in a table tab, a `columnSummary.value` filters by it); Go to Row `goToRow.text`.
+- **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
+  preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition,
+  Return applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
+  `tableData.busy`; the notice `tableData.notice` (`tableData.noticeText`, `tableData.preview`, `tableData.revert`,
+  `tableData.apply`: Apply opens the SQL preview, whose Run is the person's); the status bar's `tableData.count`,
+  `tableData.loadMore`, `tableData.loadAll`; find bar (⌘F) `find.text`, `find.replaceText`, `find.options`,
+  `find.previous`, `find.next`, `find.count`, `find.replace`, `find.replaceAll`, `find.done`; Export Rows `export.rows`,
+  `export.format`, `export.headers`, `export.null`, `export.crlf`, `export.copy`, `export.save` (the person's),
+  `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
+  `values.cancel`. Edits wait as pending changes until Apply.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
   `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.cancel`, `preview.run` (the person's).
@@ -187,7 +201,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
 - **Prompts**: `password.field`, `password.remember`, `login.user`, `login.password`, `prompt.answer`,
   `prompt.remember` (remembering is the person's), `trust.fingerprint` (Trust is the person's), `help`.
 - **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`;
-  Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.nullText`; Connections
+  Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.loadAllAsksAbove`, `settings.nullText`,
+  `settings.transposeSingleRow`; Connections
   `settings.detailsTableThreshold`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,
   `settings.agentAccessList`, `settings.agentExports`, `settings.copyMCPCommand`; Client Tools `settings.findTools`,
   `settings.toolsFound`.
