@@ -172,5 +172,62 @@ extension AppTests {
             #expect(await call(harness, "press", ["title": "Cancel", "in": "sheet"]).error == nil)
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
         }
+
+        /// The current database is one per connection: a double-click in the tree, the toolbar's database pop-up and New
+        /// Query from a database's menu all make it current, and the tree, the toolbar and the console show the same one.
+        @Test func theTreeTheToolbarAndTheConsoleShareTheCurrentDatabase() async throws {
+            let model = testModel(Fixtures.shop)
+            model.states[id] = .connected(server: "MariaDB 11.8.3")
+            let (main, harness) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let popup = main.toolbarController.databasePopup
+            let fixture = try #require(treeRow(main, .database(id, "airsql_fixture")))
+            _ = await call(harness, "click", ["x": fixture.point.0, "y": fixture.point.1, "count": 2])
+            #expect(open.currentDatabase == "airsql_fixture" && popup.title == "airsql_fixture" && popup.isEnabled)
+            // The pop-up lists the cached databases, the current one chosen.
+            #expect(popup.itemTitles == ["airsql other", "airsql_fixture"] && popup.titleOfSelectedItem == "airsql_fixture")
+            #expect(popup.lastItem?.toolTip == "Run the console's statements in airsql_fixture from now on")
+            // As choosing it does (the harness doesn't reach the toolbar's pop-ups).
+            popup.menu?.performActionForItem(at: popup.indexOfItem(withTitle: "airsql other"))
+            #expect(open.currentDatabase == "airsql other" && popup.title == "airsql other")
+            let other = try #require(main.openConsole(text: "", title: nil, connection: id).content as? ConsoleViewController)
+            #expect(other.database == "airsql other")
+            _ = await eventually { main.window?.firstResponder === other.editor }  // the console takes the focus as it shows
+            // New Query from a database's menu: a console in that database, which is current now.
+            _ = await call(harness, "click", ["x": fixture.point.0, "y": fixture.point.1, "button": "right"])
+            #expect(await call(harness, "menu", ["path": "context > New Query"]).error == nil)
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(console !== other && console.connectionID == id && console.database == "airsql_fixture")
+            #expect(open.currentDatabase == "airsql_fixture" && other.database == "airsql_fixture")
+            #expect(popup.title == "airsql_fixture")
+        }
+
+        /// Generate SELECT, INSERT and UPDATE (the tree's and the database view's menus) open a console tab with the
+        /// statement built from the cached columns; Run… stays off for what isn't a procedure or function.
+        @Test func generateOpensAConsoleTabWithTheStatement() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, harness) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let orders = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders"))))
+            _ = await call(harness, "click", ["x": orders.point.0, "y": orders.point.1, "button": "right"])
+            #expect(await call(harness, "menu", ["path": "context > Generate UPDATE"]).error == nil)
+            #expect(await eventually { main.selectedTab?.content is ConsoleViewController })
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(console.connectionID == id && console.text == "UPDATE `airsql_fixture`.`orders`\n"
+                    + "SET `customer_id` = ?, `region` = ?, `number` = ?, `total` = ?, `parent_id` = ?\nWHERE `id` = ?;\n")
+            #expect(console.messagesView.messages.last?.text.hasPrefix("Put a value in place of each ?") == true)
+            // The database view's table menu does the same.
+            let view = DatabaseViewController(open, "airsql_fixture")
+            main.open(view, title: "airsql_fixture", connection: id)
+            let row = try #require(view.rows.firstIndex { $0.name == "log" })
+            view.table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            view.generateSelect(nil)
+            #expect(await eventually { (main.selectedTab?.content as? ConsoleViewController)?.text == "SELECT `at`, `message`\nFROM `airsql_fixture`.`log`;\n" })
+            let trigger = try #require(main.sidebar.treeNodes[.category(id, "airsql_fixture", .trigger)]?.children.first)
+            main.sidebar.outline.expandItem(main.sidebar.treeNodes[.category(id, "airsql_fixture", .trigger)])
+            main.sidebar.outline.selectRowIndexes(IndexSet(integer: main.sidebar.outline.row(forItem: trigger)), byExtendingSelection: false)
+            let run = Commands.runRoutine.item()
+            #expect(!main.sidebar.validateMenuItem(run) && run.toolTip == "Select one procedure or function first")
+        }
     }
 }

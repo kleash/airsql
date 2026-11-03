@@ -17,13 +17,12 @@ extension NSToolbarItem.Identifier {
 /// Cancel. Its buttons send their commands through the responder chain and are enabled only where something can
 /// handle them, saying why not when they can't.
 @MainActor
-final class MainToolbar: NSObject, NSToolbarDelegate, NSMenuDelegate {
+final class MainToolbar: NSObject, NSToolbarDelegate {
     let model: AppModel
     weak var main: MainWindowController?
     let connectionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    /// Pull-downs: the title (their first item) shows the state, the menu the choices, ticked by their handler.
-    let databasePopup = NSPopUpButton(frame: .zero, pullsDown: true)
-    let transactionPopup = NSPopUpButton(frame: .zero, pullsDown: true)
+    let databasePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let transactionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     /// The pop-ups' toolbar items (a toolbar item's tooltip is its view's).
     private var popupItems: [NSPopUpButton: NSToolbarItem] = [:]
 
@@ -36,12 +35,16 @@ final class MainToolbar: NSObject, NSToolbarDelegate, NSMenuDelegate {
         connectionPopup.setAccessibilityLabel("Connection")
         databasePopup.setAccessibilityIdentifier("toolbar.database")
         databasePopup.setAccessibilityLabel("Database")
-        databasePopup.addItem(withTitle: "No Database")
-        databasePopup.menu?.delegate = self  // the databases are listed as it opens
         transactionPopup.setAccessibilityIdentifier("toolbar.transactionMode")
         transactionPopup.setAccessibilityLabel("Transaction mode")
-        transactionPopup.addItem(withTitle: "Tx: " + Commands.autoCommit.title)
-        transactionPopup.menu?.add([Commands.autoCommit, Commands.manualCommit, nil])
+        // The mode shown is the console's (`validateResponders`); the console ticks its mode and isolation level.
+        (transactionPopup.cell as? NSPopUpButtonCell)?.altersStateOfSelectedItem = false
+        for command in [Commands.autoCommit, Commands.manualCommit] {
+            let item = command.item()
+            item.title = "Tx: " + command.title
+            transactionPopup.menu?.addItem(item)
+        }
+        transactionPopup.menu?.addItem(.separator())
         let levels = NSMenuItem(title: "Isolation Level", action: nil, keyEquivalent: "")
         levels.toolTip = Commands.isolation.tip
         transactionPopup.menu?.addItem(levels)
@@ -120,8 +123,22 @@ final class MainToolbar: NSObject, NSToolbarDelegate, NSMenuDelegate {
             connectionPopup.toolTip = "The connection this window works on: choose another to show it"
         }
         let open = model.openConnection(active?.id)
-        databasePopup.item(at: 0)?.title = open?.currentDatabase ?? "No Database"
-        databasePopup.isEnabled = open?.snapshot.databases.isEmpty == false
+        // The cached databases (the current one too, when the list leaves it out), the current one chosen.
+        let names = open?.snapshot.databases.map(\.name) ?? []
+        let current = open?.currentDatabase ?? "No Database"
+        let titles = names.contains(current) ? names : [current] + names
+        if databasePopup.itemTitles != titles {
+            databasePopup.removeAllItems()
+            for title in titles {
+                let item = NSMenuItem(title: title, action: names.contains(title) ? #selector(databaseChosen(_:)) : nil, keyEquivalent: "")
+                item.target = self
+                item.toolTip = names.contains(title) ? "Run the console's statements in \(title) from now on"
+                    : "Not one of the databases listed: choose one"
+                databasePopup.menu?.addItem(item)
+            }
+        }
+        databasePopup.selectItem(withTitle: current)
+        databasePopup.isEnabled = !names.isEmpty
         databasePopup.toolTip = active == nil ? "Choose a connection first"
             : open == nil ? "Connect first: the list shows the server's databases"
             : open?.snapshot.databases.isEmpty != false ? "No databases to choose: the schema is loading, or none can be shown"
@@ -136,7 +153,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate, NSMenuDelegate {
         let manual = Commands.manualCommit.item()
         let (canSetMode, why) = Commands.manualCommit.availability(from: transactionPopup, item: manual,
                                                                    otherwise: "Open a console tab to choose how it commits")
-        transactionPopup.item(at: 0)?.title = "Tx: " + (manual.state == .on ? Commands.manualCommit : Commands.autoCommit).title
+        transactionPopup.selectItem(at: manual.state == .on ? 1 : 0)
         transactionPopup.isEnabled = canSetMode
         transactionPopup.toolTip = canSetMode ? "Choose Auto-commit or Manual, and how the console's transactions see others' "
             + "changes (the isolation level)" : why
@@ -145,24 +162,10 @@ final class MainToolbar: NSObject, NSToolbarDelegate, NSMenuDelegate {
 
     @objc private func openConnectionChanged() { update() }
 
-    /// The database pop-up's menu as it opens: the window's connection's databases, the current one ticked.
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        while menu.items.count > 1 { menu.removeItem(at: 1) }
-        guard let open = model.openConnection(main?.activeConnection?.id) else { return }
-        for database in open.snapshot.databases.map(\.name) {
-            let item = NSMenuItem(title: database, action: #selector(databaseChosen(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = database
-            item.state = database == open.currentDatabase ? .on : .off
-            item.toolTip = "Run the console's statements in \(database) from now on"
-            menu.addItem(item)
-        }
-    }
-
-    /// Makes the database current for the connection: the navigator shows it in bold, and its consoles USE it before
-    /// their next statement (`ConsoleViewController.perform`).
-    @objc private func databaseChosen(_ sender: NSMenuItem) {
-        guard let database = sender.representedObject as? String else { return }
+    /// Makes the database chosen current for the connection: the navigator shows it in bold, and its consoles USE it
+    /// before their next statement (`ConsoleViewController.perform`).
+    @objc private func databaseChosen(_ sender: Any?) {
+        guard let database = (sender as? NSMenuItem ?? (sender as? NSPopUpButton)?.selectedItem)?.title else { return }
         model.openConnection(main?.activeConnection?.id)?.currentDatabase = database
     }
 

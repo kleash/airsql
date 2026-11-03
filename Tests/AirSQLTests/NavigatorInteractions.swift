@@ -13,8 +13,9 @@ extension AppTests.InteractionTests {
         let views = SidebarNode.Kind.category(id, "airsql_fixture", .view)
         let tableMenu = ["Open Data", "Open Structure", "Copy Name", "Generate SELECT", "Generate INSERT", "Generate UPDATE",
                          "Export…", "Copy Table…", "Bulk Table Editor…", "Maintenance", "Truncate…", "Rename…", "Drop…", "Refresh"]
-        let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Copy Table…", "Bulk Table Editor…",
-                                          "Maintenance", "Truncate…", "Rename…", "Drop…", "Refresh"]
+        let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Generate SELECT", "Generate INSERT",
+                                          "Generate UPDATE", "Copy Table…", "Bulk Table Editor…", "Maintenance", "Truncate…",
+                                          "Rename…", "Drop…", "Refresh"]
         @MainActor func preview(_ main: MainWindowController) -> NSViewController? {
             (main.selectedTab?.content as? PreviewContent)?.shown
         }
@@ -30,7 +31,7 @@ extension AppTests.InteractionTests {
                     },
                     menu: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Generate Liquibase Changelog…",
                            "Compare…", "Refresh", "Drop…"],
-                    enabled: ["New Database…", "Create Table…", "Refresh", "Drop…"]),
+                    enabled: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Refresh", "Drop…"]),
             Surface(name: "Table or view in the tree",
                     place: { main, _ in treeRow(main, .object(id, orders))?.point },
                     clicked: { $0.selectedTab?.title == "orders" && preview($0) != nil },
@@ -41,7 +42,7 @@ extension AppTests.InteractionTests {
                     clicked: { preview($0) is TextContent && $0.selectedTab?.title == "add_customer" },
                     doubleClicked: { main, _ in main.selectedTab?.content is ObjectEditorController },
                     menu: ["Open", "Run…", "Copy CREATE", "Drop…", "Refresh"],
-                    enabled: ["Open", "Copy CREATE", "Drop…", "Refresh"]),
+                    enabled: ["Open", "Run…", "Copy CREATE", "Drop…", "Refresh"]),
             Surface(name: "Folder or category in the tree",
                     place: { main, _ in treeRow(main, views)?.point },
                     clicked: { $0.sidebar.selectedNodes.map(\.kind) == [views] },

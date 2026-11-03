@@ -138,6 +138,26 @@ extension AppTests {
                     || ReconWindowController.connect != nil)
         }
 
+        /// A side whose connection isn't connected connects it as the main window does (the Connector, its prompts and
+        /// errors on the compare window), instead of saying to connect first.
+        @Test func aSideConnectsItsConnectionItself() async throws {
+            let closed = SavedConnection(name: "Closed port", host: "127.0.0.1", port: 1, user: "nobody")
+            let model = testModel([closed])
+            ReconWindowController.connect = { saved, window in try await model.connector.connection(saved.id, on: window) }
+            defer { ReconWindowController.connect = nil }
+            let controller = ReconWindowController(model: model)
+            keptWindows.append(controller)
+            controller.window?.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+            controller.source.choose(closed)
+            #expect(await eventually(timeout: 5) { model.states[closed.id] != nil }, "choosing the connection connects it")
+            // Nothing listens on port 1: the connect fails, says why on the compare window, and the side can't list.
+            #expect(await eventually(timeout: 20) { controller.source.databases.placeholderString == "Couldn't connect" })
+            #expect(controller.source.databases.toolTip?.hasPrefix("Couldn't list the databases: ") == true)
+            if case .failed? = model.states[closed.id] {} else { Issue.record("\(String(describing: model.states[closed.id]))") }
+            #expect(await eventually(timeout: 5) { controller.window?.attachedSheet != nil }, "the connect error shows")
+            if let sheet = controller.window?.attachedSheet { controller.window?.endSheet(sheet) }
+        }
+
         @Test func theListAnswersSingleDoubleAndRightClicks() throws {
             let window = Self.window(Self.result())
             let list = window.results.list
@@ -165,6 +185,33 @@ extension AppTests {
 }
 
 extension AppTests.ReconAppTests {
+    /// A side whose connection isn't connected connects it through the Connector: the server's certificate, which macOS
+    /// doesn't know, asks for trust on the compare window, then the side lists the databases.
+    @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests")) func aSideConnectsAndAsksForTrustOnTheCompareWindow() async throws {
+        var mysql = SavedConnection(name: "MySQL 8.4", host: "127.0.0.1", port: Lab.mysql84.port, user: Lab.airsql.user)
+        mysql.tls = TLSOptions(mode: .verifyIdentity)
+        let model = testModel([mysql])
+        model.setSavedPassword(mysql.id.uuidString, Lab.airsql.password)
+        ReconWindowController.connect = { saved, window in try await model.connector.connection(saved.id, on: window) }
+        defer {
+            ReconWindowController.connect = nil
+            model.connector.disconnect(mysql.id)
+        }
+        let controller = ReconWindowController(model: model)
+        keptWindows.append(controller)
+        let window = try #require(controller.window)
+        window.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+        controller.source.choose(mysql)
+        #expect(await eventually(timeout: 30) { window.attachedSheet != nil }, "the Trust sheet shows on the compare window")
+        func button(_ title: String, in view: NSView) -> NSButton? {
+            (view as? NSButton).flatMap { $0.title == title ? $0 : nil } ?? view.subviews.lazy.compactMap { button(title, in: $0) }.first
+        }
+        let trust = try #require(window.attachedSheet?.contentView.flatMap { button("Trust", in: $0) })
+        trust.performClick(nil)
+        #expect(await eventually(timeout: 30) { controller.source.databases.numberOfItems > 0 })
+        #expect(model.states[mysql.id] == .connected(server: "MySQL " + Lab.mysql84.version), "\(String(describing: model.states[mysql.id]))")
+    }
+
     /// The whole path against the lab: both sides' databases listed, Compare with its activity, the result shown, and
     /// the sync script in a console tab marked "sync script", whose Run shows the SQL preview, which runs nothing until
     /// approved.
