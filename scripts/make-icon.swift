@@ -11,11 +11,14 @@ func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColo
     CGColor(srgbRed: r / 255, green: g / 255, blue: b / 255, alpha: a)
 }
 
-/// The front half of an ellipse centred on (x, y): a disk's rim seen from a little above.
-func rim(x: CGFloat, y: CGFloat, rx: CGFloat, ry: CGFloat) -> CGPath {
+/// The gap under a disk seen from a little above: a band 18 high under the front half of an ellipse centred on (x, y).
+func gap(x: CGFloat, y: CGFloat, rx: CGFloat, ry: CGFloat) -> CGPath {
     let path = CGMutablePath()
     path.addArc(center: .zero, radius: 1, startAngle: .pi, endAngle: 2 * .pi, clockwise: false,
                 transform: CGAffineTransform(translationX: x, y: y).scaledBy(x: rx, y: ry))
+    path.addArc(center: .zero, radius: 1, startAngle: 2 * .pi, endAngle: .pi, clockwise: true,
+                transform: CGAffineTransform(translationX: x, y: y - 18).scaledBy(x: rx, y: ry))
+    path.closeSubpath()
     return path
 }
 
@@ -58,7 +61,7 @@ func draw(_ cg: CGContext) {
         cg.fillEllipse(in: CGRect(x: 246 + CGFloat(index) * 54, y: 696, width: 34, height: 34))
     }
 
-    // A database: a cylinder of three stacked disks, their rims cut in the window's colour.
+    // A database: a cylinder of three stacked disks, the gaps between them in the window's colour.
     let x: CGFloat = 340, top: CGFloat = 588, bottom: CGFloat = 364, rx: CGFloat = 100, ry: CGFloat = 32
     let cylinder = CGMutablePath()
     cylinder.addEllipse(in: CGRect(x: x - rx, y: top - ry, width: 2 * rx, height: 2 * ry))
@@ -67,11 +70,10 @@ func draw(_ cg: CGContext) {
     cg.addPath(cylinder)
     cg.setFillColor(color(226, 240, 251))
     cg.fillPath()
-    cg.setStrokeColor(window)
-    cg.setLineWidth(18)
+    cg.setFillColor(window)
     for disk in 0..<3 {
-        cg.addPath(rim(x: x, y: top - CGFloat(disk) * (top - bottom) / 3, rx: rx, ry: ry))
-        cg.strokePath()
+        cg.addPath(gap(x: x, y: top - CGFloat(disk) * (top - bottom) / 3, rx: rx, ry: ry))
+        cg.fillPath()
     }
 
     // A table: two columns, their headers in AirSQL's petrol and one cell being edited (the grid's pending amber).
