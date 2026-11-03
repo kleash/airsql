@@ -202,6 +202,11 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             saveTo.toolTip = url.path
         }
         dropTable.isEnabled = !running && content.indexOfSelectedItem != 2
+        hexBlob.isEnabled = !running && tool != nil
+        if !running {
+            hexBlob.toolTip = tool == nil ? "AirSQL's own export always writes binary columns as hex"
+                : "Write binary columns as hex, so the file survives any editor or transfer"
+        }
         if let tool {
             let fitness = ClientTools.fit(tool, server: server)
             fit.stringValue = ToolCommand(tool: tool, options: options, server: server).tlsProblem ?? fitness.message
@@ -277,8 +282,8 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         } else if let tool {
             if case .unusable(let why) = ClientTools.fit(tool, server: server) { reason = why }
             if let problem = ToolCommand(tool: tool, options: options, server: server).tlsProblem { reason = problem }
-        } else {
-            reason = "AirSQL's built-in export comes with the next step of this lane: choose mysqldump or mariadb-dump"
+        } else if !extraWords.isEmpty {
+            reason = "Extra options are for mysqldump and mariadb-dump: AirSQL's own export takes none"
         }
         runButton.isEnabled = reason == nil
         runButton.toolTip = reason ?? "Write the dump to the file chosen in Save to"
@@ -308,21 +313,33 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
     // MARK: Running
 
     override func run() {
-        guard let request = makeRequest(), let tool else { return }
-        let command = ToolCommand(tool: tool, options: options, server: server)
-        let url = self.url
-        let estimate = picker.databases.flatMap(\.tables).filter(\.included).reduce(Int64(0)) { $0 + $1.bytes }
+        guard let request = makeRequest() else { return }
+        let url = self.url, options = self.options
+        let tables = picker.databases.flatMap(\.tables).filter(\.included)
+        let estimate = tables.reduce(Int64(0)) { $0 + $1.bytes }
         let what = request.databases.count == 1 ? request.databases[0] : "\(request.databases.count) databases"
         let cancellation = begin("Exporting \(what) from \(connection.displayName)")
         let updates = Throttle()
+        let tool = self.tool, command = tool.map { ToolCommand(tool: $0, options: options, server: server) }
         Task {
             do {
-                let outcome = try await ToolRun.dump(command, request, to: url, estimate: estimate > 0 ? estimate : nil,
+                let outcome: ToolOutcome
+                if let command {
+                    outcome = try await ToolRun.dump(command, request, to: url, estimate: estimate > 0 ? estimate : nil,
                                                      cancellation: cancellation) { state in
-                    updates.send {
-                        let written = Self.bytes(state.bytes) + (estimate > 0 ? " of ≈" + Self.bytes(estimate) : "")
-                        self.progress((state.table.map { "Writing \($0) · " } ?? "Writing · ") + written, done: state.bytes,
-                                      total: estimate > 0 ? estimate : nil)
+                        updates.send {
+                            let written = Self.bytes(state.bytes) + (estimate > 0 ? " of ≈" + Self.bytes(estimate) : "")
+                            self.progress((state.table.map { "Writing \($0) · " } ?? "Writing · ") + written, done: state.bytes,
+                                          total: estimate > 0 ? estimate : nil)
+                        }
+                    }
+                } else {
+                    outcome = try await ToolRun.export(request, options: options, to: url, cancellation: cancellation) { done, bytes in
+                        updates.send {
+                            let rows = ObjectPicker.compact(done.rows) + (done.totalRows > 0 ? " of ≈" + ObjectPicker.compact(done.totalRows) : "")
+                            self.progress("Writing \(done.table) · \(rows) rows · \(Self.bytes(bytes))", done: done.rows,
+                                          total: done.totalRows > 0 ? done.totalRows : nil)
+                        }
                     }
                 }
                 updates.cancel()

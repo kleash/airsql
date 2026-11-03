@@ -36,15 +36,11 @@ public enum ToolRun {
         let optionFile = try OptionFile.write(user: command.options.user, password: command.options.password)
         let remove = Once { unlink(optionFile.path) }
         defer { remove.run() }
-        let part = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString.prefix(6)).part")
-        let fd = open(part.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
-        guard fd >= 0 else {
-            throw AirSQLError(.other, "Can't write in \(url.deletingLastPathComponent().path): \(String(cString: strerror(errno)))")
-        }
+        let part = try PartFile(url)
         var state = ToolProgress(total: estimate)
         var tail = Data()
         let argv = command.dump(request, optionFile: optionFile.path)
-        let piped = await Runner.output(of: argv, to: fd, through: request.gzip ? ["/usr/bin/gzip", "-c"] : nil,
+        let piped = await Runner.output(of: argv, to: part.fd, through: request.gzip ? ["/usr/bin/gzip", "-c"] : nil,
                                         cancellation: cancellation, begun: { remove.run() }, chunk: { data in
             state.bytes += Int64(data.count)
             // mysqldump's comments name each table as it starts on it ("-- Dumping data for table `orders`").
@@ -53,21 +49,78 @@ public enum ToolRun {
             tail = window.suffix(160)
             progress(state)
         })
-        close(fd)
         guard !cancellation.isCancelled, piped.tool.status == 0, piped.filter?.status ?? 0 == 0, piped.ioError == nil else {
-            unlink(part.path)
+            part.discard()
             if cancellation.isCancelled { throw AirSQLError.cancelled }
             if let error = piped.ioError {
                 throw AirSQLError(.other, "Can't write the dump: \(String(cString: strerror(error)))")
             }
             throw failure(command.tool.name, piped.tool.status == 0 ? piped.filter ?? piped.tool : piped.tool)
         }
-        guard rename(part.path, url.path) == 0 else {
-            let reason = String(cString: strerror(errno))
-            unlink(part.path)
-            throw AirSQLError(.other, "Can't save \(url.lastPathComponent): \(reason)")
-        }
+        try part.keep()
         return ToolOutcome(bytes: piped.bytes, duration: Date().timeIntervalSince(started), errors: 0, lastError: nil)
+    }
+
+    /// AirSQL's own export of `request` into `url` (through /usr/bin/gzip when asked) through a session of its own, with
+    /// the same part file as `dump`. `progress` gets the export's rows and the bytes of SQL written.
+    public static func export(_ request: DumpRequest, options: ConnectOptions, to url: URL, cancellation: Cancellation,
+                              progress: @escaping (SQLExport.Progress, Int64) -> Void) async throws -> ToolOutcome {
+        let started = Date()
+        let session = DBConnection(options: options, role: .tools)
+        let part = try PartFile(url)
+        do {
+            _ = try await session.connect()
+            let writer = try Runner.Writer(file: part.fd, through: request.gzip ? ["/usr/bin/gzip", "-c"] : nil,
+                                           cancellation: cancellation)
+            do {
+                try await SQLExport.run(request, from: session, into: SQLFileSink(writer), cancellation: cancellation) { done in
+                    progress(done, writer.bytes)
+                }
+            } catch {
+                _ = writer.finish()
+                throw error
+            }
+            if let gzip = writer.finish(), gzip.status != 0 {
+                throw AirSQLError(.other, "gzip stopped: " + gzip.stderr.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            await session.close()
+            try part.keep()
+            return ToolOutcome(bytes: writer.bytes, duration: Date().timeIntervalSince(started), errors: 0, lastError: nil)
+        } catch {
+            await session.close()
+            part.discard()
+            throw cancellation.isCancelled ? AirSQLError.cancelled : error
+        }
+    }
+
+    /// A hidden file next to `url` that takes its place once complete (a failed or cancelled run leaves nothing).
+    final class PartFile {
+        let url: URL
+        let part: URL
+        let fd: Int32
+
+        init(_ url: URL) throws {
+            self.url = url
+            part = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString.prefix(6)).part")
+            fd = open(part.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
+            guard fd >= 0 else {
+                throw AirSQLError(.other, "Can't write in \(url.deletingLastPathComponent().path): \(String(cString: strerror(errno)))")
+            }
+        }
+
+        func discard() {
+            close(fd)
+            unlink(part.path)
+        }
+
+        func keep() throws {
+            close(fd)
+            guard rename(part.path, url.path) == 0 else {
+                let reason = String(cString: strerror(errno))
+                unlink(part.path)
+                throw AirSQLError(.other, "Can't save \(url.lastPathComponent): \(reason)")
+            }
+        }
     }
 
     /// Runs the SQL in `url` (.sql, or gzip-compressed .sql.gz) with `command`'s client in `database`, stopping at the

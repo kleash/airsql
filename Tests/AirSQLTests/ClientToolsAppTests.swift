@@ -106,6 +106,12 @@ extension AppTests {
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("password") == true)
             _ = await call(harness, "set", ["id": "export.extra", "value": ""])
             sheet.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            // AirSQL's own export: no command line, binary is always hex, no extra options.
+            _ = await call(harness, "set", ["id": "export.tool", "value": "AirSQL (built in)"])
+            let builtIn = await Self.text(harness, "export.command")
+            #expect(sheet.runButton.isEnabled && builtIn.hasPrefix("AirSQL writes the SQL itself"), "\(builtIn)")
+            #expect(sheet.window?.contentView.flatMap { find(NSButton.self, id: "export.hexBlob", in: $0) }?.isEnabled == false)
+            _ = await call(harness, "set", ["id": "export.tool", "value": "mariadb-dump 11.8.3"])
             // A partly ticked database ticks whole, then not at all: Export then says what to do.
             _ = await call(harness, "press", ["id": "tools.include.shop"])
             let whole = await Self.text(harness, "export.command")
@@ -155,10 +161,10 @@ extension AppTests {
     }
 }
 
-/// The first view of `type` under `view`.
+/// The first view of `type` under `view` (with the accessibility id `id`, when given).
 @MainActor
-func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
-    if let match = view as? T { return match }
-    for subview in view.subviews { if let match = find(type, in: subview) { return match } }
+func find<T: NSView>(_ type: T.Type, id: String? = nil, in view: NSView) -> T? {
+    if let match = view as? T, id == nil || match.accessibilityIdentifier() == id { return match }
+    for subview in view.subviews { if let match = find(type, id: id, in: subview) { return match } }
     return nil
 }
