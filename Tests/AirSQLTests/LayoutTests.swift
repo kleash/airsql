@@ -212,6 +212,31 @@ extension AppTests {
             if let sheet = window.attachedSheet { check(sheet, "SQL preview") }
             _ = await call(harness, "press", ["title": "Decline"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+
+            // The client tools' sheets (L6), with long names, an error and work running.
+            let export = ExportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            export.show(on: window, loads: false)
+            export.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            if let sheet = window.attachedSheet { check(sheet, "Export") }
+            _ = export.begin("Exporting shop")
+            export.progress("Writing this_table_name_is_sixty_four_characters_long_the_most_mysql_has · 1.9 GB of ≈3.1 GB", done: 19,
+                            total: 31)
+            if let sheet = window.attachedSheet { check(sheet, "Export running") }
+            export.finish("mariadb-dump stopped: mariadb-dump: Got error: 1045: \"Access denied for user 'a_very_long_user_name'@'"
+                          + "warehouse-primary-0001.analytics.internal.example.com' (using password: YES)\" when trying to connect",
+                          failed: true)
+            if let sheet = window.attachedSheet { check(sheet, "Export failed") }
+            export.close()
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            let restore = RestoreSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: true)
+            restore.show(on: window, loads: false)
+            restore.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["this_database_name_is_sixty_four_characters_long_the_most_it_has"])
+            restore.use(URL(fileURLWithPath: "/Users/Shared/" + String(repeating: "very long folder name/", count: 6) + "dump.sql"))
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            if let sheet = window.attachedSheet { check(sheet, "Run SQL File") }
+            restore.close()
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             return problems
         }
     }

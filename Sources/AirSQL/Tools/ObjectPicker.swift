@@ -78,6 +78,7 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
         outline.addTableColumn(column)
         outline.outlineTableColumn = column
         outline.headerView = nil
+        outline.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
         outline.rowHeight = 22
         outline.style = .inset
         outline.allowsMultipleSelection = true
@@ -101,7 +102,7 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
         let box = SurfaceView(.content, radius: Radius.card, border: .separatorColor)
         box.translatesAutoresizingMaskIntoConstraints = false
         box.addSubview(scroll)
-        scroll.pin(to: box, insets: .all(Radius.card / 2))
+        scroll.pin(to: box, insets: .all(Radius.card))
         box.heightAnchor.constraint(equalToConstant: height).isActive = true
         return box
     }
@@ -236,7 +237,10 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
         guard let node = item as? PickerNode else { return nil }
         let cell = outlineView.makeView(withIdentifier: PickerCell.id, owner: nil) as? PickerCell ?? PickerCell()
-        cell.box.title = node.name
+        cell.name.stringValue = node.name
+        cell.name.toolTip = node.name
+        cell.name.textColor = isEnabled ? .labelColor : .disabledControlTextColor
+        cell.box.setAccessibilityLabel(node.name)
         cell.box.allowsMixedState = node.isDatabase
         cell.box.state = node.state
         cell.box.isEnabled = isEnabled
@@ -276,26 +280,26 @@ final class PickerOutline: NSOutlineView {
     }
 }
 
-/// A row: the checkbox with the name, and the size at the end.
+/// A row: the checkbox, the name (shortened with an ellipsis when long, whole in its tooltip) and the size at the end.
 final class PickerCell: NSTableCellView {
     static let id = NSUserInterfaceItemIdentifier("pickerCell")
     let box = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let name = label("", truncates: true)
     let detail = label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
 
     init() {
         super.init(frame: .zero)
         identifier = Self.id
         box.translatesAutoresizingMaskIntoConstraints = false
-        box.lineBreakMode = .byTruncatingTail
-        box.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        addSubview(box)
-        addSubview(detail)
+        [box, name, detail].forEach(addSubview)
         NSLayoutConstraint.activate([
             box.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
             box.centerYAnchor.constraint(equalTo: centerYAnchor),
-            detail.leadingAnchor.constraint(greaterThanOrEqualTo: box.trailingAnchor, constant: Spacing.unit),
+            name.leadingAnchor.constraint(equalTo: box.trailingAnchor, constant: Spacing.half),
+            name.firstBaselineAnchor.constraint(equalTo: detail.firstBaselineAnchor),
+            name.centerYAnchor.constraint(equalTo: centerYAnchor),
+            detail.leadingAnchor.constraint(greaterThanOrEqualTo: name.trailingAnchor, constant: Spacing.unit),
             detail.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.half),
-            detail.firstBaselineAnchor.constraint(equalTo: box.firstBaselineAnchor),
         ])
     }
 
