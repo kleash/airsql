@@ -131,7 +131,6 @@ final class DataGridView: NSView {
         scrollToStart()
     }
 
-
     /// The columns or the row count changed: measures new columns, keeps the selection inside, redraws.
     func reloadData() {
         guard let source else {

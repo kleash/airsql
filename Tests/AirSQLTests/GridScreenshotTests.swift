@@ -1,5 +1,4 @@
 import AppKit
-import Darwin
 import Testing
 @testable import AirSQL
 @testable import AirSQLCore
@@ -15,31 +14,11 @@ final class KeyLookWindow: NSWindow {
 // docs/dev/mockups.html. Only with AIRSQL_SCREENSHOTS=1: they go to build/screenshots.
 extension AppTests {
     @MainActor @Suite(.enabled(if: ProcessInfo.processInfo.environment["AIRSQL_SCREENSHOTS"] == "1")) struct GridScreenshotTests {
-        /// The window as the window server shows it, through CGWindowListCreateImage (looked up at run time: the SDK
-        /// no longer declares it); nil where this Mac doesn't allow it. The harness's own picture redraws views, and
-        /// misses what is inside clip views of the grid's container.
-        private func capture(_ window: NSWindow) -> CGImage? {
-            typealias CreateImage = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
-            guard let symbol = dlsym(dlopen(nil, RTLD_NOW), "CGWindowListCreateImage") else { return nil }
-            // Only this window (8), without its shadow (1), at the screen's resolution (8).
-            return unsafeBitCast(symbol, to: CreateImage.self)(.null, 8, UInt32(window.windowNumber), 1 | 8)?.takeRetainedValue()
-        }
-
         private func save(_ window: NSWindow?, _ harness: AgentServer, _ name: String, target: String = "main") async throws {
-            // Core Animation fills the layers of a newly shown view a moment later.
             window?.displayIfNeeded()
-            CATransaction.flush()
-            try await Task.sleep(nanoseconds: 400_000_000)
-            var image = window.flatMap(capture).map { NSBitmapImageRep(cgImage: $0) }
-            if image == nil {
-                let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
-                guard let picture = reply.image else {
-                    Issue.record("\(name): \(reply.error ?? "")")
-                    return
-                }
-                image = picture
-            }
-            let png = try #require(image?.representation(using: .png, properties: [:]))
+            let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
+            let image = try #require(reply.image, "\(name): \(reply.error ?? "")")
+            let png = try #require(image.representation(using: .png, properties: [:]))
             try png.write(to: ScreenshotTests.folder.appendingPathComponent(name + ".png"))
         }
 
