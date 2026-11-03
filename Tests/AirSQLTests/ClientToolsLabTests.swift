@@ -179,4 +179,41 @@ struct ClientToolsLabTests {
             await session.close()
         }
     }
+
+    /// Import CSV: mapped fields into their columns, empty fields as NULL, a column left out takes its default, and a
+    /// record that fails leaves the table as it was.
+    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    func csvImportsIntoMappedColumnsOrNotAtAll(_ server: Lab.Server) async throws {
+        let session = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await session.connect()
+        let target = "lane_l6_csv"
+        _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target))
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+        _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(target, "people")) (id INT PRIMARY KEY, name VARCHAR(50) "
+                                    + "NOT NULL, note TEXT NULL, country CHAR(2) NOT NULL DEFAULT 'NL')")
+        let file = URL(fileURLWithPath: try scratch() + "/people.csv")
+        try "note;name;number\n\"says \"\"hi\"\"; twice\";Ada;1\n;Émile 👋;2\n\"two\nlines\";O'Brien \\ x;3\n"
+            .write(to: file, atomically: true, encoding: .utf8)
+        var options = CSVImport.Options()
+        options.separator = UInt8(ascii: ";")
+        let columns = ["id", "name", "note", "country"]
+        let rows = try await CSVImport.run(file, options: options, into: session, database: target, table: "people", columns: columns,
+                                           mapping: [2, 1, 0, nil], cancellation: Cancellation()) { _ in }
+        #expect(rows == 3)
+        let result = try await session.query("SELECT id, name, note, country FROM \(SQLQuote.identifier(target, "people")) ORDER BY id")
+            .first?.rows
+        let got = (0..<(result?.rowCount ?? 0)).map { row in (0..<4).map { result?.string(row, $0) ?? "NULL" } }
+        #expect(got == [["1", "Ada", #"says "hi"; twice"#, "NL"], ["2", "Émile 👋", "NULL", "NL"], ["3", "O'Brien \\ x", "two\nlines", "NL"]],
+                "\(server): \(got)")
+        // A duplicate key in the last record: nothing of this file stays.
+        try "name,id\nGrace,4\nAlan,1\n".write(to: file, atomically: true, encoding: .utf8)
+        await #expect(throws: AirSQLError.self) {
+            _ = try await CSVImport.run(file, options: CSVImport.Options(), into: session, database: target, table: "people",
+                                        columns: columns, mapping: [1, 0, nil, nil], cancellation: Cancellation()) { _ in }
+        }
+        let count = try await session.query("SELECT COUNT(*) FROM \(SQLQuote.identifier(target, "people"))").first?.rows?.string(0, 0)
+        #expect(count == "3")
+        _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
+        await session.close()
+    }
 }

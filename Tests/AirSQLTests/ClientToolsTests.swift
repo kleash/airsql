@@ -246,4 +246,22 @@ struct ClientToolsTests {
             == "DELIMITER ;;\nCREATE PROCEDURE p() BEGIN SELECT 1; END ;;\nDELIMITER ;\n")
         #expect(SQLPiece.statement("SET NAMES utf8mb4").fileText == "SET NAMES utf8mb4;\n")
     }
+
+    @Test func csvIsReadAsSpreadsheetsWriteItInAnyPieces() throws {
+        let text = "\u{FEFF}id,name,note\r\n1,Ada,\"says \"\"hi\"\", then, leaves\"\r\n2,,\"two\nlines\"\n3,Émile,\n4,\"\",last"
+        let expected = [["id", "name", "note"], ["1", "Ada", #"says "hi", then, leaves"#], ["2", "", "two\nlines"], ["3", "Émile", ""],
+                        ["4", "", "last"]]
+        // Whole, and a byte at a time (records and quotes cut anywhere).
+        var whole = CSVReader()
+        #expect(try whole.read(Data(text.utf8)) + whole.finish() == expected)
+        var bytes = CSVReader(), records: [[String]] = []
+        for byte in Data(text.utf8) { records += bytes.read(Data([byte])) }
+        #expect(try records + bytes.finish() == expected)
+        var open = CSVReader()
+        _ = open.read(Data("1,\"never closed".utf8))
+        #expect(throws: AirSQLError.self) { try open.finish() }
+        #expect(CSVReader.guessSeparator(Data("a;b;\"c,d\";e\n1,2,3,4,5,6".utf8)) == UInt8(ascii: ";"))
+        #expect(CSVReader.guessSeparator(Data("a\tb\tc\n".utf8)) == 0x09)
+        #expect(CSVReader.guessSeparator(Data("single".utf8)) == UInt8(ascii: ","))
+    }
 }
