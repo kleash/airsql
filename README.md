@@ -43,9 +43,9 @@ To come, in light and dark, made from neutral demo data:
 brew install --cask kleash/tap/airsql
 ```
 
-Or download the zip from [Releases](https://github.com/kleash/airsql/releases). AirSQL is signed and notarized by
-Apple, so it opens like any app. Every release has the zip's SHA-256, the exact source of the client library inside
-and signed build provenance: [check a download](SECURITY.md#check-a-download).
+Or download the zip from [Releases](https://github.com/kleash/airsql/releases). AirSQL is signed with a Developer ID
+and notarized by Apple, so it opens like any app. Every release has the zip's SHA-256, the exact source of the client
+library inside and signed build provenance: [check a download](SECURITY.md#check-a-download).
 
 ## Build from source
 
