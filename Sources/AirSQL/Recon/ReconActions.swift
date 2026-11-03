@@ -35,6 +35,7 @@ extension ReconWindowController {
                                              connection: saved.id).content as? ConsoleViewController else { return }
         console.editor.isEditable = false
         console.syncScript = { [weak self] in self?.confirmSync(result, destructive: destructive, on: saved) != nil }
+        console.syncChangesets = { [weak self] in self?.saveLiquibase(result, destructive: destructive) != nil }
         console.note(.info, "The compare's sync script, to review: it can't be edited here. Run shows it in the SQL preview "
                      + "in the compare window first; nothing runs on its own.")
         main.showWindow(nil)
@@ -134,6 +135,7 @@ extension ReconWindowController {
 
     private func saveLiquibase(_ result: ReconResult, destructive: Bool) {
         guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
         ChangesetSheet.show(Liquibase.changesets(result, destructive: destructive, rollback: model.data.settings.liquibase.rollback),
                             heading: "Save the sync script for \(result.target.name) · \(result.target.database) as changesets",
                             model: model, on: window)

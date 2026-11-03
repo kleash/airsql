@@ -44,24 +44,26 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
         }
     }
 
+    /// The console's selected statements, else the one at the caret, as Run picks them. A compare's sync script goes back
+    /// to its compare, as Run does, which saves a changeset per step.
     @objc func saveAsChangeset(_ sender: Any?) {
-        guard let main, let window = main.window, let console = main.selectedTab?.content as? ConsoleViewController else { return }
-        let statements = Self.statements(of: console)
-        guard !statements.isEmpty else { return }
+        guard let main, let window = main.window, let console = main.selectedTab?.content as? ConsoleViewController,
+              console.isViewLoaded else { return }
+        if let compare = console.syncChangesets {
+            if !compare() { console.note(.info, "The compare window that made this script is closed: compare again to save it.") }
+            return
+        }
+        let selection = console.editor.selectedRange()
+        let statements = ConsoleScript.statements(in: console.text, selection: selection.length > 0 ? Range(selection) : nil,
+                                                  caret: selection.location, all: false,
+                                                  noBackslashEscapes: console.editor.noBackslashEscapes).map(\.sql)
+        guard !statements.isEmpty else {
+            return console.note(.info, "There is no statement here to save: type one, or put the cursor in one.")
+        }
         let title = main.selectedTab?.title ?? "Console"
         let changeset = Liquibase.changeset(title: title, statements: statements, rollback: main.model.data.settings.liquibase.rollback)
         ChangesetSheet.show([changeset], heading: "Save " + (statements.count == 1 ? "the statement" : "\(statements.count) statements")
                             + " as a changeset", model: main.model, on: window)
-    }
-
-    /// The console's selected statements, else the one at the insertion point.
-    static func statements(of console: ConsoleViewController) -> [String] {
-        guard console.isViewLoaded else { return [] }
-        let text = console.text, range = console.editor.selectedRange(), escapes = console.editor.noBackslashEscapes
-        if range.length > 0 {
-            return SQLSplitter.statements(in: (text as NSString).substring(with: range), noBackslashEscapes: escapes).map(\.sql)
-        }
-        return SQLSplitter.statement(at: range.location, in: text, noBackslashEscapes: escapes).map { [$0.sql] } ?? []
     }
 
     // MARK: Validation
@@ -81,7 +83,7 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
             guard let console = main.selectedTab?.content as? ConsoleViewController else {
                 return "Open a console tab with the statements to save"
             }
-            return Self.statements(of: console).isEmpty ? "Type the statements to save, or select them" : nil
+            return console.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Type the statements to save first" : nil
         default:
             if main.sidebar.treeSelection != nil { return nil }
             guard let connection = main.activeConnection else {

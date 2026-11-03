@@ -62,8 +62,8 @@ differently from how it runs here, AirSQL says so and doesn't write it.
 When the [SQL preview](sql-preview.md) shows a change (the table editor, a view or routine, a sync script), tick
 **Save as Liquibase changeset**: once the change has run, a sheet shows the changeset. In the console, select the
 statements (or put the insertion point in one) and choose **Query ▸ Save as Changeset…**. In the compare window,
-**Save as Changeset…** saves the sync script: a changeset per structure step and one per run of row changes on a table,
-destructive steps saying so in their `--comment`.
+**Save as Changeset…** (or **Query ▸ Save as Changeset…** in its “Sync script” tab) saves the sync script: a changeset
+per structure step and one per run of row changes on a table, destructive steps saying so in their `--comment`.
 
 Choose the changelog to add to (**Choose…**), or start one (**New…**). The changesets go at its end and their ids carry
 on its numbering. A change keeps only what Liquibase runs: `USE` and the transaction around it are left out (each

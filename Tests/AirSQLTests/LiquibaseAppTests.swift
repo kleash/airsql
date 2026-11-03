@@ -126,15 +126,46 @@ extension AppTests {
             #expect(read[2].rollbackStatements == ["ALTER TABLE `orders` DROP COLUMN `paid`"])
         }
 
+        @Test func theConsoleSavesItsSelectionAndASyncScriptGoesBackToItsCompare() async throws {
+            let (main, harness) = ClientToolsAppTests.window()
+            let file = URL(fileURLWithPath: try scratch()).appendingPathComponent("changelog.sql")
+            try "--liquibase formatted sql\n".write(to: file, atomically: true, encoding: .utf8)
+            main.model.data.settings.liquibase.changelog = file.path
+            let sql = "USE `shop`;\nCREATE TABLE `shop`.`notes` (`id` int PRIMARY KEY);\nSELECT 1;"
+            let console = try #require(main.openConsole(text: sql, title: "Notes", connection: nil).content as? ConsoleViewController)
+            console.editor.setSelectedRange(NSRange(location: 0, length: (sql as NSString).range(of: "SELECT").location))
+            let responder = try Self.responder(of: main)
+            responder.saveAsChangeset(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let root = try #require(main.window?.attachedSheet?.contentView)
+            let save = try #require(descendants(of: root).compactMap { $0 as? NSButton }.first { $0.title == "Save" })
+            #expect(await eventually(timeout: 10) { save.isEnabled })
+            save.performClick(nil)
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            let read = try LiquibaseChangelog(String(contentsOf: file, encoding: .utf8)).changesets
+            #expect(read.map(\.statements) == [["CREATE TABLE `notes` (`id` int PRIMARY KEY)"]])
+            #expect(read.first?.rollbackStatements == ["DROP TABLE `notes`"])
+            // A compare's sync script: its compare saves it, a changeset per step, as Run hands it to the compare.
+            var handed = false
+            console.syncChangesets = { handed = true; return true }
+            responder.saveAsChangeset(nil)
+            #expect(handed && main.window?.attachedSheet == nil)
+        }
+
+        /// The Liquibase commands' responder in the window's chain.
+        static func responder(of main: MainWindowController) throws -> LiquibaseResponder {
+            var next = main.nextResponder
+            while let current = next, !(current is LiquibaseResponder) { next = current.nextResponder }
+            return try #require(next as? LiquibaseResponder)
+        }
+
         @Test func theMenusOfferBothCommandsAndSayWhyWhenTheyCant() throws {
             let (main, _) = ClientToolsAppTests.window()
             let menu = MainMenu.build()
             let items = menu.items.flatMap { $0.submenu?.items ?? [] }
             let generate = try #require(items.first { $0.action == Commands.generateLiquibase.action })
             let save = try #require(items.first { $0.action == Commands.saveAsChangeset.action })
-            var next = main.nextResponder
-            while let current = next, !(current is LiquibaseResponder) { next = current.nextResponder }
-            let responder = try #require(next as? LiquibaseResponder)
+            let responder = try Self.responder(of: main)
             #expect(responder.validateMenuItem(generate))
             #expect(!responder.validateMenuItem(save) && save.toolTip == "Open a console tab with the statements to save")
             #expect(SQLPreviewSheet.changesetWriter != nil, "the preview sheet offers Save as Liquibase changeset")

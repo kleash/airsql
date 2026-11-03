@@ -822,7 +822,8 @@ that could cut or refuse values (a shorter type, NOT NULL). Each destructive sta
 Rows of tables only in the source come with their `CREATE TABLE`. New columns of existing tables get their default
 values: after running the script, compare again to copy their values. After a sync, AirSQL offers to compare again.
 
-**Save as Changeset…** saves the script as [Liquibase](https://kleash.github.io/airsql/liquibase.html) changesets in a changelog you choose.
+**Save as Changeset…** saves the script as [Liquibase](https://kleash.github.io/airsql/liquibase.html) changesets in a changelog you choose; so does
+**Query ▸ Save as Changeset…** in the “Sync script” tab.
 
 ## Export the report
 
@@ -961,8 +962,8 @@ differently from how it runs here, AirSQL says so and doesn't write it.
 When the [SQL preview](https://kleash.github.io/airsql/sql-preview.html) shows a change (the table editor, a view or routine, a sync script), tick
 **Save as Liquibase changeset**: once the change has run, a sheet shows the changeset. In the console, select the
 statements (or put the insertion point in one) and choose **Query ▸ Save as Changeset…**. In the compare window,
-**Save as Changeset…** saves the sync script: a changeset per structure step and one per run of row changes on a table,
-destructive steps saying so in their `--comment`.
+**Save as Changeset…** (or **Query ▸ Save as Changeset…** in its “Sync script” tab) saves the sync script: a changeset
+per structure step and one per run of row changes on a table, destructive steps saying so in their `--comment`.
 
 Choose the changelog to add to (**Choose…**), or start one (**New…**). The changesets go at its end and their ids carry
 on its numbering. A change keeps only what Liquibase runs: `USE` and the transaction around it are left out (each
