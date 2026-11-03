@@ -32,6 +32,17 @@ extension DataGridView {
         let selectedRow = focused ? NSColor.selectedRow.solid : selected
         let marks: [GridMark: NSColor] = [.edited: NSColor.pendingEdit.solid, .inserted: NSColor.pendingInsert.solid,
                                           .deleted: NSColor.pendingDelete.solid]
+        // Booleans (TINYINT(1), BIT(1)) as checkboxes: ticked in the accent, empty in grey; made when one shows.
+        let booleans = Set(columns.map { columnOrder[$0] }.filter { source.columns[$0].isBoolean })
+        var boxes: [Bool: NSImage] = [:]
+        func checkbox(_ on: Bool) -> NSImage? {
+            if let image = boxes[on] { return image }
+            let size = NSImage.SymbolConfiguration(pointSize: styles.regular.pointSize + 2, weight: .regular)
+            let colours = NSImage.SymbolConfiguration(paletteColors: on ? [.white, .accent] : [.secondaryLabelColor])
+            boxes[on] = NSImage(systemSymbolName: on ? "checkmark.square.fill" : "square", accessibilityDescription: nil)?
+                .withSymbolConfiguration(size.applying(colours))
+            return boxes[on]
+        }
         // Attributes and "…" for each look, made once per draw.
         var looks: [Int: (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine)] = [:]
         func look(_ column: Int, _ info: GridColumn, isNull: Bool, deleted: Bool) -> (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine) {
@@ -82,6 +93,13 @@ extension DataGridView {
                                                      width: max(0, min(available, 64)), height: 8), xRadius: 4, yRadius: 4).fill()
                     continue
                 }
+                if booleans.contains(sourceColumn), case .text(let value) = cell, value == "0" || value == "1", let image = checkbox(value == "1") {
+                    let size = image.size
+                    image.draw(in: NSRect(x: rect.minX + GridStyles.padding, y: y + ((rowHeight - size.height) / 2).rounded(),
+                                          width: size.width, height: size.height),
+                               from: .zero, operation: .sourceOver, fraction: mark == .deleted ? 0.4 : 1, respectFlipped: true, hints: nil)
+                    continue
+                }
                 var text = GridStyles.text(cell, nullText: nullText)
                 guard !text.isEmpty, available > 0 else { continue }
                 // No more characters than the narrowest glyphs could fit: laying out long values was most of a screen's
@@ -89,7 +107,8 @@ extension DataGridView {
                 let limit = Int(available / (styles.regular.pointSize * 0.2)) + 1
                 if !info.isKey, text.count > limit { text = String(text.prefix(limit)) + "…" }
                 let deleted = mark == .deleted
-                let (attributes, ellipsis) = look(sourceColumn, info, isNull: cell == .null, deleted: deleted)
+                // NULL and what the server fills in at Apply (auto, default, ƒ NOW()) look alike: grey and slanted.
+                let (attributes, ellipsis) = look(sourceColumn, info, isNull: cell == .null || cell.isPlaceholder, deleted: deleted)
                 var line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
                 var width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
                 if width > available {

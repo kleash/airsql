@@ -92,6 +92,7 @@ nothing runs.
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
 - Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
+- Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes not yet applied.
 
 On a [read-only connection](connections.md#add-or-edit-a-connection), Run, Explain and Profile refuse any statement
 AirSQL can't prove only reads (SELECT, WITH … SELECT, SHOW, DESCRIBE, EXPLAIN and USE pass), and Messages says why.

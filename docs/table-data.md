@@ -51,19 +51,54 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 Nothing is written until you apply. Leaving a row writes nothing.
 
 - **Edit a cell**: type over it, double-click it or press Return. Return keeps the edit, Esc cancels, Tab moves to
-  the next cell. Select several cells and type: they all get the value. Record View and Transpose edit the same way.
-- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones; columns you leave alone get their default or
-  AUTO_INCREMENT value, which the new row shows as `(auto)` or the default. **Duplicate Row** (⌘D) copies the selected
-  rows, keys included; **Duplicate Row Without Keys** (⇧⌘D) leaves the key and AUTO_INCREMENT columns to the server.
+  the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
+  the same way.
+- **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
+  number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't
+  one of an ENUM's. The editor then stays open and says why under the cell: fix the value or press Esc. Typing is never
+  blocked, and numbers and DECIMAL travel as the text you typed, so nothing is rounded on the way.
+- **Each type has its editor**:
+  - BOOLEAN, TINYINT(1) and BIT(1) show a checkbox. Space, Return or a double click ticks or clears it; typing `t`,
+    `f` or `n` sets true, false or NULL.
+  - An ENUM shows its values in a list over the cell; a SET a checklist, where **Set** keeps the ticked ones. Typing
+    still works: `read,write`.
+  - Dates and times are typed as `YYYY-MM-DD hh:mm:ss`, with fractional seconds when the column keeps them; ↑ and ↓
+    step the part under the cursor (the day, the hour…). Zero dates are kept where sql_mode allows them, TIMESTAMP
+    values are in the session's time zone, and a NULL cell starts empty: it never fills in today's date.
+  - Bytes (BINARY, BLOB, shapes) are typed as hex: `0x00FF`. BIT shows and takes every bit: `b'1010'` or `1010`.
+  - A value of more than 256 characters, or of several lines, opens in the value panel (below).
+  - A foreign key shows the rows of the table it refers to, each as "label (key)", the label being that table's
+    first text column. They are searched on the server as you type, by label or by key, 100 at a time, so a big table
+    is never listed whole. Return or a double click puts the key in the cell. **Data ▸ Choose Referenced Row…** opens
+    the same list.
+- **The value panel** (⇧↩) edits the selected cell too: ⌘↩ or clicking elsewhere keeps the text as a pending edit,
+  Esc puts the cell's value back. A value the column refuses stays there, and the panel says why. Its **⋯** menu has
+  **Format JSON** and **Compact JSON**, **Load from File…** (a file's bytes in a binary column, else its UTF-8 text)
+  and **Save to File…**.
+- **Data ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
+  `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
+  or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
+- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
+  in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, keys
+  included; **Duplicate Row Without Keys** (⇧⌘D) leaves the key and AUTO_INCREMENT columns to the server.
   **Delete Rows…** (⌘⌫) marks the selected rows for deletion. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
+- **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
+  selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
+  are read the way the column's values are written. Rows past the last loaded one become new rows, and one value pasted
+  over several selected cells fills them all. Cells that can't go in their column are listed first, so you can paste
+  the others or nothing. **Data ▸ Paste as New Rows** adds every copied row as a new one. A cell reading `NULL` (the
+  grid's NULL text) is NULL.
+- **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
+  the selected row; choosing one opens that table filtered to them.
 - Pending changes have their colours: an edited cell amber, a new row green, a row to delete struck through in red.
   The bar under the grid bar counts them.
-- **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes; **Revert** (⌥⌘Z) throws away the selected rows'
-  changes, **Revert All** every one.
+- **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes (a paste or a multi-cell edit is one step);
+  **Revert** (⌥⌘Z) throws away the selected rows' changes, **Revert All** every one.
 - Pending changes are kept on disk as you make them. If AirSQL quits or the Mac restarts, they come back the next time
   you open the table, marked "Kept from before".
-- Closing the tab with pending changes asks whether to keep them for later or throw them away.
+- Closing the tab with pending changes asks whether to keep them for later or throw them away. Quitting AirSQL lists,
+  in one sheet, the tables with pending changes and any console transaction still open (which is rolled back).
 
 ### Which tables can be edited
 
@@ -81,7 +116,10 @@ says why; so are views. Generated columns can't be edited.
   connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection),
   and whenever there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes
   that also change other tables through `ON DELETE CASCADE` or `SET NULL`.
-- After Apply the rows load again, so new rows show their real ids.
+- Values are checked again as Apply writes them; one that no longer fits (sql_mode changed, or it came from a find
+  and replace) stops Apply before anything runs, and the grid selects its row.
+- After Apply, new rows stay where they were and show what the server filled in, their AUTO_INCREMENT key and defaults
+  included: each is read back by its key. The rest of the loaded rows load again.
 
 ## Copy and export
 
