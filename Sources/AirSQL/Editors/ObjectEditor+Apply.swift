@@ -69,7 +69,7 @@ extension ObjectEditorController {
             let names = Set([oldName, newName].compactMap { $0 })
             try? await context.schema.refresh(names.map { kind.schemaObject(database: database, name: $0) })
             if failure == nil, let newName {
-                let fresh = try? await context.withTools { try await ObjectDefinition.load(kind, database: database, name: newName, from: $0) }
+                let fresh = try? await context.read { try await ObjectDefinition.load(kind, database: database, name: newName, from: $0) }
                 setLoaded(name: newName, definition: fresh)
                 if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
             }

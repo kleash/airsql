@@ -62,8 +62,17 @@ final class ERDiagramView: NSView {
             height = max(height, y)
             x += width + Self.columnGap
         }
-        setFrameSize(NSSize(width: max(x - Self.columnGap + Self.margin, 320), height: max(height, 200)))
+        content = NSSize(width: max(x - Self.columnGap + Self.margin, 320), height: max(height, 200))
+        fit(visibleRect.size)
         needsDisplay = true
+    }
+
+    /// The diagram's own size.
+    private(set) var content = NSSize(width: 320, height: 200)
+
+    /// As large as the diagram, and at least as large as what the scroll view shows (so it starts at the top left).
+    func fit(_ visible: NSSize) {
+        setFrameSize(NSSize(width: max(content.width, visible.width), height: max(content.height, visible.height)))
     }
 
     /// A column's line in its box: key marks, name, type.

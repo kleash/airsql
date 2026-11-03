@@ -88,18 +88,13 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let bar = NSStackView(views: [kindLabel, definerLabel, definer, spacer, status, revertButton, applyButton])
         bar.spacing = Spacing.unit
+        bar.alignment = .firstBaseline
         bar.setCustomSpacing(Spacing.double, after: kindLabel)
         bar.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         let footer = NSStackView(views: [note])
         footer.edgeInsets = NSEdgeInsets(top: Spacing.half + 1, left: Spacing.double, bottom: Spacing.half + 1, right: Spacing.double)
 
-        let root = SurfaceView(.content)
-        let stack = NSStackView(views: [bar, Hairline(), scroll, Hairline(), footer])
-        stack.orientation = .vertical
-        stack.spacing = 0
-        for view in stack.views { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
-        root.addSubview(stack)
-        stack.pin(to: root)
+        let root = editorLayout(bar: bar, content: scroll, footer: footer)
         root.addSubview(overlay)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -126,7 +121,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
                 if context.schema.snapshot.server == nil { try await context.schema.load() }
                 guard let server = context.schema.snapshot.server else { throw DesignError("The server didn't say what it is") }
                 self.server = server
-                let (account, definition) = try await context.withTools { session -> (String?, ObjectDefinition?) in
+                let (account, definition) = try await context.read { session -> (String?, ObjectDefinition?) in
                     let account = try await EditorQueries.currentAccount(from: session)
                     guard let name else { return (account, nil) }
                     return (account, try await ObjectDefinition.load(kind, database: database, name: name, from: session))
@@ -137,6 +132,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
                 code.undoManager?.removeAllActions()
                 isBusy = false
                 overlay.hide()
+                NotificationCenter.default.post(name: .tabContentDidChange, object: self)
             } catch {
                 isBusy = false
                 overlay.show(error: error.localizedDescription, retry: (self, #selector(retry(_:))))

@@ -102,7 +102,7 @@ extension TableEditorController: NSComboBoxDataSource {
     // MARK: Controls
 
     private func text(_ value: String, placeholder: String, enabled: Bool = true) -> NSTextField {
-        let field = NSTextField(string: value)
+        let field = ListTextField(string: value)
         field.placeholderString = placeholder
         field.isBordered = false
         field.drawsBackground = false
@@ -119,14 +119,14 @@ extension TableEditorController: NSComboBoxDataSource {
     }
 
     private func check(_ on: Bool, enabled: Bool = true) -> NSButton {
-        let box = NSButton(checkboxWithTitle: "", target: self, action: #selector(cellEdited(_:)))
+        let box = ListCheckbox(checkboxWithTitle: "", target: self, action: #selector(cellEdited(_:)))
         box.state = on ? .on : .off
         box.isEnabled = enabled && !isBusy
         return box
     }
 
     private func choice(_ titles: [String], _ selected: String, enabled: [Bool]? = nil) -> NSPopUpButton {
-        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+        let popup = ListPopUp(frame: .zero, pullsDown: false)
         popup.isBordered = false
         popup.controlSize = .small
         popup.font = .systemFont(ofSize: 12)
@@ -144,7 +144,7 @@ extension TableEditorController: NSComboBoxDataSource {
     }
 
     private func combo(_ value: String, placeholder: String, enabled: Bool = true) -> NSComboBox {
-        let box = NSComboBox()
+        let box = ListComboBox()
         box.usesDataSource = true
         box.dataSource = self
         box.completes = true

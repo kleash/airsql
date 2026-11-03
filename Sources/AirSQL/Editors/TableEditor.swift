@@ -25,12 +25,16 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
     var engines: [String] = []
     var section = Section.columns
     var isBusy = false
+    /// The list shows no rows while its columns change.
+    var emptied = false
     let undo = UndoManager()
 
     let sections = NSSegmentedControl()
-    let list = NSTableView()
+    let list = EditorList()
     let listScroll = NSScrollView()
     let listHolder = NSView()
+    /// The list, its hairline and its + and − buttons (hidden while the options show).
+    let listColumn = NSView()
     let addButton = NSButton(), removeButton = NSButton()
     let options = TableOptionsView()
     let sqlText = NSTextView()
@@ -133,7 +137,7 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
         if context.schema.snapshot.server == nil { try await context.schema.load() }
         guard let server = context.schema.snapshot.server else { throw DesignError("The server didn't say what it is") }
         self.server = server
-        let (collations, engines) = try await context.withTools { session in
+        let (collations, engines) = try await context.read { session in
             (try await EditorQueries.collations(server: server, from: session), try await EditorQueries.engines(from: session))
         }
         self.collations = collations

@@ -17,6 +17,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
                                tip: "Save the diagram as Mermaid text, for docs and wikis that draw it", target: nil, action: nil)
     let summary = label("", font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, truncates: true)
     let overlay = EditorOverlay()
+    private let scroll = NSScrollView()
 
     init(context: EditorContext, database: String?, activity: ActivityCenter) {
         self.context = context
@@ -40,9 +41,9 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let bar = NSStackView(views: [label("Database:"), databases, summary, spacer, exportImage, exportMermaid])
         bar.spacing = Spacing.unit
+        bar.alignment = .firstBaseline
         bar.setCustomSpacing(Spacing.double, after: databases)
         bar.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
-        let scroll = NSScrollView()
         scroll.documentView = canvas
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
@@ -53,13 +54,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         let menu = NSMenu()
         menu.add([Commands.openStructure, Commands.copyName])
         canvas.menu = menu
-        let root = SurfaceView(.content)
-        let stack = NSStackView(views: [bar, Hairline(), scroll])
-        stack.orientation = .vertical
-        stack.spacing = 0
-        for view in stack.views { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
-        root.addSubview(stack)
-        stack.pin(to: root)
+        let root = editorLayout(bar: bar, content: scroll)
         root.addSubview(overlay)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -69,6 +64,11 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         root.setAccessibilityIdentifier("erDiagram")
         view = root
         load()
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        canvas.fit(scroll.contentSize)
     }
 
     /// Loads the database's details (if not yet) and draws it.
@@ -100,6 +100,8 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
     private func show(_ diagram: ERDiagram, databases names: [String]) {
         self.diagram = diagram
         canvas.show(diagram)
+        canvas.fit(scroll.contentSize)
+        canvas.scroll(.zero)
         databases.removeAllItems()
         databases.addItems(withTitles: names)
         databases.selectItem(withTitle: database ?? "")

@@ -52,11 +52,20 @@ extension TableEditorController {
         let buttons = NSStackView(views: [addButton, removeButton])
         buttons.spacing = 0
         buttons.edgeInsets = NSEdgeInsets(top: Spacing.half, left: Spacing.unit, bottom: Spacing.half, right: Spacing.unit)
-        let listColumn = NSStackView(views: [listScroll, Hairline(), buttons])
-        listColumn.orientation = .vertical
-        listColumn.alignment = .leading
-        listColumn.spacing = 0
-        for view in [listScroll, listColumn.views[1]] { view.widthAnchor.constraint(equalTo: listColumn.widthAnchor).isActive = true }
+        let line = Hairline()
+        for view in [listScroll, line, buttons] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            listColumn.addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            listScroll.topAnchor.constraint(equalTo: listColumn.topAnchor),
+            listScroll.leadingAnchor.constraint(equalTo: listColumn.leadingAnchor),
+            listScroll.trailingAnchor.constraint(equalTo: listColumn.trailingAnchor),
+            line.topAnchor.constraint(equalTo: listScroll.bottomAnchor), line.heightAnchor.constraint(equalToConstant: 1),
+            line.leadingAnchor.constraint(equalTo: listColumn.leadingAnchor), line.trailingAnchor.constraint(equalTo: listColumn.trailingAnchor),
+            buttons.topAnchor.constraint(equalTo: line.bottomAnchor), buttons.leadingAnchor.constraint(equalTo: listColumn.leadingAnchor),
+            buttons.bottomAnchor.constraint(equalTo: listColumn.bottomAnchor),
+        ])
         listHolder.addSubview(listColumn)
         listColumn.pin(to: listHolder)
         options.editor = self
@@ -88,18 +97,16 @@ extension TableEditorController {
         split.autosaveName = "TableEditorSplit"
         split.addArrangedSubview(listHolder)
         split.addArrangedSubview(sqlBox)
-        split.setHoldingPriority(.init(260), forSubviewAt: 0)
-        split.setHoldingPriority(.init(250), forSubviewAt: 1)
+        // The list takes the room the window gains; the SQL keeps its height (about eight lines) unless dragged.
+        split.setHoldingPriority(.init(250), forSubviewAt: 0)
+        split.setHoldingPriority(.init(270), forSubviewAt: 1)
         listHolder.heightAnchor.constraint(greaterThanOrEqualToConstant: 160).isActive = true
         sqlBox.heightAnchor.constraint(greaterThanOrEqualToConstant: 72).isActive = true
+        let preferred = sqlBox.heightAnchor.constraint(equalToConstant: 150)
+        preferred.priority = .init(240)
+        preferred.isActive = true
 
-        let root = SurfaceView(.content)
-        let stack = NSStackView(views: [bar, Hairline(), split])
-        stack.orientation = .vertical
-        stack.spacing = 0
-        for view in stack.views { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
-        root.addSubview(stack)
-        stack.pin(to: root)
+        let root = editorLayout(bar: bar, content: split)
         root.addSubview(overlay)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -118,12 +125,12 @@ extension TableEditorController {
 
     /// Shows a section: a list, or the options.
     func showSection(_ new: Section) {
-        view.window?.makeFirstResponder(nil)  // ends an edit in the list first
+        sections.window?.makeFirstResponder(nil)  // ends an edit in the list first
         section = new
         sections.selectedSegment = new.rawValue
         let isOptions = new == .options
         options.isHidden = !isOptions
-        listHolder.subviews.first?.isHidden = isOptions
+        listColumn.isHidden = isOptions
         if isOptions { options.show(self) } else { configureList() }
         updateButtons()
     }

@@ -8,6 +8,14 @@ struct EditorContext {
     let connection: SavedConnection
     let sessions: Connection
     let schema: SchemaCache
+    /// Answers the editors' reads instead of a tools session (the tests' recorded server); nil: a tools session.
+    var reads: SchemaQuerying?
+
+    /// Runs a read on `reads`, else on a tools session of its own.
+    func read<T>(_ work: (SchemaQuerying) async throws -> T) async throws -> T {
+        if let reads { return try await work(reads) }
+        return try await withTools { try await work($0) }
+    }
 
     /// Runs `work` on a tools session of its own, closed after.
     func withTools<T>(_ work: (DBConnection) async throws -> T) async throws -> T {
@@ -116,3 +124,30 @@ extension MainWindowController {
         return (true, nil)
     }
 }
+
+/// An editor's frame: `bar` along the top, then `content` filling the rest (and `footer` along the bottom), hairlines
+/// between them, all on the content surface.
+@MainActor
+func editorLayout(bar: NSView, content: NSView, footer: NSView? = nil) -> SurfaceView {
+    let root = SurfaceView(.content)
+    var column: [NSView] = [bar, Hairline(), content]
+    if let footer { column += [Hairline(), footer] }
+    var above: NSLayoutYAxisAnchor = root.topAnchor
+    for view in column {
+        view.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(view)
+        NSLayoutConstraint.activate([view.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+                                     view.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+                                     view.topAnchor.constraint(equalTo: above)])
+        if view is Hairline { view.heightAnchor.constraint(equalToConstant: 1).isActive = true }
+        above = view.bottomAnchor
+    }
+    above.constraint(equalTo: root.bottomAnchor).isActive = true
+    // The bar and the footer as tall as their contents (a stack view hugs by its own priority), the content the rest.
+    for view in [bar, footer].compactMap({ $0 }) {
+        view.setContentHuggingPriority(.required, for: .vertical)
+        (view as? NSStackView)?.setHuggingPriority(.required, for: .vertical)
+    }
+    return root
+}
+

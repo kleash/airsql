@@ -23,6 +23,32 @@ final class EditorList: NSTableView {
     }
 }
 
+/// The list's cells: a right-click on one opens the list's menu for its row, as on the row itself.
+final class ListTextField: NSTextField {
+    override func menu(for event: NSEvent) -> NSMenu? { enclosingList?.menu(for: event) }
+}
+
+final class ListCheckbox: NSButton {
+    override func menu(for event: NSEvent) -> NSMenu? { enclosingList?.menu(for: event) }
+}
+
+final class ListPopUp: NSPopUpButton {
+    override func menu(for event: NSEvent) -> NSMenu? { enclosingList?.menu(for: event) }
+}
+
+final class ListComboBox: NSComboBox {
+    override func menu(for event: NSEvent) -> NSMenu? { enclosingList?.menu(for: event) }
+}
+
+extension NSView {
+    /// The editor list this view is a cell of.
+    var enclosingList: EditorList? {
+        var view = superview
+        while let current = view, !(current is EditorList) { view = current.superview }
+        return view as? EditorList
+    }
+}
+
 /// A column of a list section: its identifier, header, width and what its header's tooltip says.
 struct ListColumn {
     let id: String
@@ -88,6 +114,9 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
             menu.add([Commands.addRow, Commands.duplicateRow, Commands.deleteRows])
             list.menu = menu
         }
+        // No rows while the columns change: the table view would ask the new section for the old rows' cells.
+        emptied = true
+        list.reloadData()
         for column in list.tableColumns { list.removeTableColumn(column) }
         for spec in listColumns(section) {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.id))
@@ -97,6 +126,7 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
             column.headerToolTip = spec.tip
             list.addTableColumn(column)
         }
+        emptied = false
         reloadList()
     }
 
@@ -109,6 +139,7 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
     var columnCheckRows: [Int] { design.columns.indices.filter { design.columns[$0].check != nil } }
 
     func numberOfRows(in tableView: NSTableView) -> Int {
+        if emptied { return 0 }
         switch section {
         case .columns: return design.columns.count
         case .indexes: return design.indexes.count
@@ -120,19 +151,22 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
 
     func tableViewSelectionDidChange(_ notification: Notification) { updateButtons() }
 
+    /// A double-click edits the cell (the row's name when no cell was clicked, as from the keyboard).
     @objc func listDoubleClicked(_ sender: Any?) {
-        guard list.clickedRow >= 0, list.clickedColumn >= 0 else { return }
-        list.editColumn(list.clickedColumn, row: list.clickedRow, with: nil, select: true)
+        let row = list.clickedRow >= 0 ? list.clickedRow : list.selectedRow
+        guard row >= 0, !isBusy else { return }
+        let column = list.clickedColumn > 0 ? list.clickedColumn : 1
+        list.editColumn(column, row: row, with: nil, select: true)
     }
 
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-        let rowView = NSTableRowView()
+    /// New rows tinted green, changed ones amber, as the grid marks pending inserts and edits (after the table view has
+    /// given the row its alternating colour).
+    func tableView(_ tableView: NSTableView, didAdd rowView: NSTableRowView, forRow row: Int) {
         switch rowState(row) {
         case .new: rowView.backgroundColor = .pendingInsert
         case .changed: rowView.backgroundColor = .pendingEdit
         case .same: break
         }
-        return rowView
     }
 
     enum RowState { case new, changed, same }
@@ -163,8 +197,18 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let id = tableColumn?.identifier.rawValue else { return nil }
-        let cell = makeCell(id, row: row)
-        cell.identifier = NSUserInterfaceItemIdentifier(id)
+        let control = makeCell(id, row: row)
+        control.identifier = NSUserInterfaceItemIdentifier(id)
+        // Every cell says what it holds (a text cell its whole text, when it has one).
+        if control.toolTip == nil { control.toolTip = tableColumn?.headerToolTip }
+        // In the middle of its row, across the column.
+        let cell = NSView()
+        control.translatesAutoresizingMaskIntoConstraints = false
+        cell.addSubview(control)
+        NSLayoutConstraint.activate([
+            control.leadingAnchor.constraint(equalTo: cell.leadingAnchor), control.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+            control.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+        ])
         return cell
     }
 }

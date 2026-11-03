@@ -116,7 +116,7 @@ extension TableEditorController {
         let context = self.context, server = self.server
         guard let cached = context.schema.snapshot.table(database, table) else { throw DesignError("\(table) isn't on the server any more") }
         guard cached.kind == .table else { throw DesignError("\(table) is a \(cached.kind.rawValue), not a table") }
-        let read = try await context.withTools { session in
+        let read = try await context.read { session in
             try await EditorQueries.table(database, table, server: server, from: session)
         }
         return TableDesign(cached, options: read.options, columnChecks: read.columnChecks, server: server)
