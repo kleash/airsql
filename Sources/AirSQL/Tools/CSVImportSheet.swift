@@ -95,10 +95,20 @@ final class CSVImportSheet: ToolSheet {
         return stack
     }
 
+    /// The controls' own tooltips, while running says why they are off.
+    private var ownTips: [NSControl: String] = [:]
+
     override func setFormEnabled(_ enabled: Bool) {
         for control in [choose, databaseMenu, tableMenu, separatorMenu, header, emptyIsNull] + mapping as [NSControl] {
             control.isEnabled = enabled
+            if enabled {
+                if let tip = ownTips[control] { control.toolTip = tip.isEmpty ? nil : tip }
+            } else {
+                if ownTips[control] == nil { ownTips[control] = control.toolTip ?? "" }
+                control.toolTip = "It is running: wait for it, or Stop it"
+            }
         }
+        if enabled { ownTips = [:] }
     }
 
     override func close() {

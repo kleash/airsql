@@ -196,6 +196,22 @@ extension AppTests {
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the field at least one column takes")
         }
 
+        @Test func theCSVFormSaysWhyItIsOffWhileItRuns() async throws {
+            let (main, _) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            sheet.show(columns: ToolFixtures.customerColumns)
+            let content = try #require(sheet.window?.contentView)
+            let separator = try #require(find(NSPopUpButton.self, id: "csv.separator", in: content))
+            let tip = separator.toolTip
+            sheet.setFormEnabled(false)
+            #expect(!separator.isEnabled && separator.toolTip == "It is running: wait for it, or Stop it")
+            sheet.setFormEnabled(true)
+            #expect(separator.isEnabled && separator.toolTip == tip)
+        }
+
         @Test func thePickerTicksWithAClickADoubleClickSpaceAndItsMenu() async throws {
             let (main, harness) = Self.window()
             let sheet = Self.exportSheet(on: main)

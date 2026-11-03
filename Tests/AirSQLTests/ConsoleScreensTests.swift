@@ -62,6 +62,23 @@ extension AppTests {
             console.toggleHelpers(nil)
         }
 
+        @Test func theLineNumbersDrawNothingOverTheFindBar() async throws {
+            let (main, harness, console) = try await Self.window()
+            console.findBar.show(replace: true)
+            main.window?.layoutIfNeeded()
+            let ruler = try #require(console.resultsRuler)
+            let window = try #require(main.window)
+            let image = try #require(await call(harness, "screenshot", ["target": "main", "scale": 2]).image)
+            // In the find bar's top margin, at the ruler's right edge (its line) and a little to the right of it.
+            let bar = console.findBar.convert(console.findBar.bounds, to: nil)
+            let edge = ruler.convert(NSPoint(x: ruler.bounds.maxX - 0.5, y: 0), to: nil).x
+            let y = Int((window.frame.height - bar.maxY + 3) * 2)
+            func pixel(_ x: CGFloat) -> NSColor? { image.colorAt(x: Int(x * 2), y: y)?.usingColorSpace(.sRGB) }
+            let line = try #require(pixel(edge)), beside = try #require(pixel(edge + 12))
+            #expect(line.luminance == beside.luminance, "the ruler's line shows over the find bar: \(line) beside \(beside)")
+            console.findBar.close(nil)
+        }
+
         @Test func everyConsoleControlSaysWhatItDoes() async throws {
             let (main, harness, console) = try await Self.window()
             var missing: [String] = []

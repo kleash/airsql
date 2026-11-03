@@ -115,6 +115,27 @@ extension AppTests {
             }
         }
 
+        @Test func theTablesSheetTicksWithADoubleClickAndItsMenu() throws {
+            let controller = Self.window(Self.result())
+            controller.showTables(nil)
+            let sheet = try #require(controller.window?.attachedSheet?.windowController as? ReconTablesSheet)
+            let content = try #require(sheet.window?.contentView)
+            let table = try #require(find(NSTableView.self, id: "reconTables.list", in: content))
+            func ticked(_ row: Int) -> Bool { (table.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSButton)?.state == .on }
+            table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            #expect(ticked(0))
+            let doubleAction = try #require(table.doubleAction)
+            NSApp.sendAction(doubleAction, to: table.target, from: table)
+            #expect(!ticked(0))
+            let menu = try #require(table.menu)
+            #expect(menu.items.map(\.title) == ["Compare", "Leave Out"])
+            #expect(menu.items.allSatisfy { $0.toolTip?.isEmpty == false })
+            let compare = try #require(menu.items[0].action)
+            NSApp.sendAction(compare, to: menu.items[0].target, from: menu.items[0])
+            #expect(ticked(0))
+            controller.window?.endSheet(sheet.window!)
+        }
+
         @Test func compareWindowIsTidyInLightAndDark() {
             var problems: [String] = []
             for appearance in [NSAppearance.Name.aqua, .darkAqua] {

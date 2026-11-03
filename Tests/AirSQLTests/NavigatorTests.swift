@@ -171,6 +171,40 @@ extension AppTests {
             return problems
         }
 
+        @Test func theKillButtonsSayWhyTheyAreOffUntilAProcessIsSelected() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let list = ProcessListContent(open)
+            main.open(list, title: "Processes", connection: id)
+            list.show([ServerProcess(id: 42, user: "app", host: "10.0.0.5:50500", database: "shop", command: "Query", time: 3,
+                                     state: "Sending data", info: "SELECT * FROM orders", queryID: 7)])
+            let killQuery = try #require(find(NSButton.self, id: "processes.killQuery", in: list.view))
+            let killConnection = try #require(find(NSButton.self, id: "processes.killConnection", in: list.view))
+            #expect(!killQuery.isEnabled && killQuery.toolTip == "Select a process that is running a statement first")
+            #expect(!killConnection.isEnabled && killConnection.toolTip == "Select a process first")
+            list.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            #expect(killQuery.isEnabled && killQuery.toolTip == Commands.killQuery.tip)
+            #expect(killConnection.isEnabled && killConnection.toolTip == Commands.killConnection.tip)
+        }
+
+        @Test func findTextSaysWhatItNeedsAndItsResultsHaveAMenu() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let findText = FindTextContent(open, database: nil)
+            main.open(findText, title: "Find Text", connection: id)
+            let go = try #require(find(NSButton.self, id: "find.go", in: findText.view))
+            #expect(!go.isEnabled && go.toolTip == "Type the text to find first")
+            findText.field.stringValue = "Ada"
+            findText.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: findText.field))
+            #expect(go.isEnabled && go.toolTip == "Search the tables for the text (Return)")
+            // A right-click offers what a double-click does first, then the table's commands; each says what it does.
+            let menu = try #require(findText.table.menu)
+            #expect(menu.items.map(\.title) == ["Open Matching Rows", "Open Data", "Copy Name"])
+            #expect(menu.items.allSatisfy { $0.toolTip?.isEmpty == false && $0.target === findText })
+        }
+
         @Test func dropShowsTheSQLAndAsksForTheNameOnProduction() async throws {
             let model = testModel(Fixtures.shop)
             let (main, harness) = appWindow(model)
