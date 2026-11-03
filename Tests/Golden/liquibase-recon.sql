@@ -12,7 +12,7 @@ CREATE TABLE `customers` (
 --rollback DROP TABLE `customers`;
 
 --changeset deploy:20261102-003-v
-CREATE OR REPLACE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `v` AS select 1 AS `1`;
+CREATE OR REPLACE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `v` AS select `customers`.`id` AS `id` from `customers`;
 
 --changeset deploy:20261102-004-customers
 SET @airsql_sql_mode = @@SESSION.sql_mode, @airsql_time_zone = @@SESSION.time_zone;

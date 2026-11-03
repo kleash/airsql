@@ -209,6 +209,8 @@ public enum Liquibase {
                 comment = String(sql[sql.index(sql.startIndex, offsetBy: 3)..<end])
                 sql = String(sql[sql.index(after: end)...])
             }
+            // The script names the target database (a view's body); a changeset runs in whichever one Liquibase updates.
+            sql = unqualified(sql, database: result.target.database)
             if step.kind == .data {
                 if data?.object != step.object { flushData() }
                 data = (step.object, (data?.statements ?? []) + [sql], data?.comment ?? comment)
