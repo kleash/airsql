@@ -121,6 +121,19 @@ extension AppTests {
                     },
                     menu: ["Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
                     enabled: ["Pin Result", "Rename Result…", "Close Result"]),
+            Surface(name: "Table rows: cell",
+                    place: { main, _ in
+                        guard let tab = try? await GridDataAppTests.open(in: main, connection: Fixtures.local) else { return nil }
+                        return windowPoint(tab.grid.cellRect(GridPosition(row: 1, column: 1)), in: tab.grid)
+                    },
+                    clicked: { main in
+                        (main.selectedTab?.content as? TableDataController)?.grid.selection.cursor == GridPosition(row: 1, column: 1)
+                    },
+                    doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Add Row",
+                           "Duplicate Row", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…"],
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set NULL", "Set DEFAULT", "Add Row", "Duplicate Row",
+                              "Delete Rows…", "Export Rows…"]),
             Surface(name: "Status bar: route",
                     place: { main, _ in statusItem(main.statusBar.route) },
                     clicked: { $0.statusBar.route.shown?.isShown == true },
@@ -179,10 +192,11 @@ extension AppTests {
         }
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
-        nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Status bar: route",
-                                       "Status bar: server", "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log",
-                                       "Database in the tree", "Table or view in the tree", "Routine, trigger or event",
-                                       "Folder or category in the tree", "Table in the database view", "Process list row"]
+        nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Table rows: cell",
+                                       "Status bar: route", "Status bar: server", "Status bar: transaction", "Status bar: activity",
+                                       "Status bar: agents", "Status bar: SQL log", "Database in the tree", "Table or view in the tree",
+                                       "Routine, trigger or event", "Folder or category in the tree", "Table in the database view",
+                                       "Process list row"]
 
         @Test func everyRowHasItsChecks() {
             #expect(Self.surfaces.map(\.name) == Self.rows)
