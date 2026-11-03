@@ -944,6 +944,9 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Comment Lines | ⌘/ |
+| Shift Right | ⌘] |
+| Shift Left | ⌘[ |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
