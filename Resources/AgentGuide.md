@@ -14,6 +14,7 @@ connection's access level is their choice alone.
 2. `get_schema` once per connection: every database's tables in one compact reply. Keep its `hash` and pass it back as
    `if_changed_from` later: an unchanged schema answers `{unchanged: true}` and costs nothing.
 3. `describe` the tables you'll query (columns, keys both ways, indexes, CREATE statement, row estimates).
+   `search_columns` finds a column by name (`email`, `*_id`) in every database without reading the whole schema.
 4. `run_queries` with several statements at once; `explain` a slow one; `profile` a table you don't know yet.
 5. To change anything, write the SQL and call `open_in_console`: the person reads it, edits it, runs it. Then
    `read_console` shows what they ran and the result or error.
@@ -27,7 +28,8 @@ Connections must be connected in AirSQL (by the person) before the database tool
 Each connection has one level, set by the person in Settings ▸ Agents (or the connection's Agents tab):
 
 - **Off** (the default; Production connections start here): invisible to agents.
-- **Schema**: `get_schema`, `describe`, the schema resource, `open_in_console`; `read_console` without result rows.
+- **Schema**: `get_schema`, `describe`, `search_columns`, the schema resource, `open_in_console`; `read_console` without
+  result rows.
 - **Schema + read**: also `run_queries` and `explain`, within the connection's row cap and timeout (Settings ▸ Safety:
   10,000 rows and 30 s by default, 1,000 and 15 s on Production).
 - **Schema + read + analytics**: also `profile`, `to_file`, ten times the rows and four times the timeout.
@@ -43,6 +45,7 @@ Statements you write run only when AirSQL's classifier proves them read-only: on
 `LOAD_FILE` and stored functions. Each statement then runs on AirSQL's own agent session, which is read-only, inside
 `START TRANSACTION READ ONLY` … `ROLLBACK`, with the server's statement timeout and a watchdog. Both guards always apply.
 A refused statement comes back with `ok: false` and the reason; the other statements of the call still run.
+The person sees each statement you ran and the rows you got in the connection's Agent tab (View ▸ Agent Results).
 
 ## tools
 
@@ -53,6 +56,11 @@ A refused statement comes back with `ok: false` and the reason; the other statem
   `-- comment`. Views start with `view`, sequences with `sequence`. System databases are left out unless named. A
   database too big for the reply comes as names only: name it, or describe its tables.
 - `describe {connection, objects: ["table" or "db.table"], database?}`: names in backquotes may contain dots.
+- `search_columns {connection, pattern, type?, databases?}`: from AirSQL's schema cache, so no query runs. `pattern` is
+  part of a column's name, or a whole name with `*` and `?`; `type` a data type (`varchar`, `json`, `*text`); neither
+  minds case. Each match has `database`, `table`, `column`, `type` (as `varchar(255)`), `nullable`, and `primaryKey`
+  and `kind` (`view`, `sequence`) when they apply. At most 500 (`capped: true` means more matched). Databases whose
+  columns aren't loaded yet (a very big server) are searched once you name them.
 - `run_queries {connection, database?, queries: [{sql, max_rows?}], format?: json | csv, to_file?}`: 200 rows per
   statement unless `max_rows` says more (up to the row cap); `capped: true` means there were more. `types` names each
   column's type as AirSQL's grid does (`bigint unsigned`, `varchar`, `datetime`). Values are text (binary as 0x…
@@ -80,6 +88,8 @@ Each connected connection you may read has its compact schema as a resource, `ai
 - **Analyse a big result**: with analytics, `run_queries` with `to_file: true`, then read the file with your own tools.
 - **Change data or structure**: write the statements, then `open_in_console` with a clear title; tell the person what
   they do. After they run them, `read_console`.
+- **Find where something is kept**: `search_columns` with part of its name (`email`, `*_at` with type `datetime`),
+  then `describe` the tables it found.
 - **Check a query's cost**: `explain` it, look for full scans (`type: ALL`) on big tables, `describe` for indexes.
 
 ## ui
@@ -182,6 +192,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
   `values.cancel`. Edits wait as pending changes until Apply.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
+- **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
+  `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
   `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.cancel`, `preview.run` (the person's).
 - **Table editor**: `tableEditor.sections`, `tableEditor.list`, `tableEditor.options` (`.name`, `.database`, `.engine`,
