@@ -29,6 +29,7 @@
     {"name": "context", "description": "The connections you may use, their access, the active connection and console tabs"},
     {"name": "get_schema", "description": "A connection's whole schema in one compact reply, with hashes to skip unchanged ones"},
     {"name": "describe", "description": "Tables and views in detail: columns, keys both ways, indexes, statistics, CREATE"},
+    {"name": "search_columns", "description": "Columns found by name (and type) in every database, from the schema cache"},
     {"name": "run_queries", "description": "Several read-only statements in one call, as JSON or CSV, or into files"},
     {"name": "profile", "description": "Column statistics of a table, computed on the server in one call"},
     {"name": "explain", "description": "The server's plan for a read-only statement"},

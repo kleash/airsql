@@ -28,7 +28,7 @@ The connection must be connected in AirSQL for an agent to read it.
 | Level | Agents may |
 |---|---|
 | Off | not see the connection at all |
-| Schema | read databases, tables, columns, keys and indexes; put SQL into a console tab |
+| Schema | read databases, tables, columns, keys and indexes, and find columns by name; put SQL into a console tab |
 | Schema + read | also run read-only queries and see query plans, within the row cap and time limit of Settings ▸ Safety |
 | Schema + read + analytics | also profile tables, get ten times the rows and four times the time, and save results to files |
 

@@ -93,11 +93,12 @@ final class AgentService {
             let structured: [String: Any]
             switch tool {
             case "context": structured = context()
-            case "get_schema", "describe", "run_queries", "profile", "explain":
+            case "get_schema", "describe", "search_columns", "run_queries", "profile", "explain":
                 structured = try await reading(tool, try target(arguments), progress: progress) { target, progress in
                     switch tool {
                     case "get_schema": return try await target.getSchema(arguments, progress: progress)
                     case "describe": return try await target.describe(arguments)
+                    case "search_columns": return try await target.searchColumns(arguments)
                     case "run_queries": return try await target.runQueries(arguments, progress: progress)
                     case "profile": return try await target.profile(arguments, progress: progress)
                     default: return try await target.explain(arguments)

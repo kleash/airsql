@@ -58,6 +58,50 @@ extension AgentTarget {
         return reply
     }
 
+    /// Columns a search_columns reply lists at most.
+    static let searchLimit = 500
+
+    /// search_columns: the columns whose name (and data type) match, read from the schema cache, so no statement runs on
+    /// the agent session. A pattern without * or ? matches part of a name; a type without them, the whole data type.
+    public func searchColumns(_ arguments: [String: Any]) async throws -> [String: Any] {
+        try require(.schema)
+        let pattern = (arguments["pattern"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+        guard !pattern.isEmpty else {
+            throw AirSQLError(.other, "search_columns needs a pattern: part of a column's name, or a name with * and ?.")
+        }
+        let name = pattern.contains(where: { $0 == "*" || $0 == "?" }) ? pattern : "*" + pattern + "*"
+        let type = (arguments["type"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+        let databases = try await databases(arguments["databases"] as? [String])
+        var columns: [[String: Any]] = [], capped = false
+        search: for database in databases where database.detailsLoaded {
+            for table in database.tables {
+                let primary = table.primaryKey?.parts.compactMap(\.column) ?? []
+                for column in table.columns where fnmatch(name, column.name, FNM_CASEFOLD) == 0
+                    && (type.isEmpty || fnmatch(type, column.dataType, FNM_CASEFOLD) == 0) {
+                    guard columns.count < Self.searchLimit else {
+                        capped = true
+                        break search
+                    }
+                    var entry: [String: Any] = ["database": database.name, "table": table.name, "column": column.name,
+                                                "type": column.columnType, "nullable": column.nullable]
+                    if primary.contains(column.name) { entry["primaryKey"] = true }
+                    if table.kind != .table { entry["kind"] = table.kind.rawValue }
+                    columns.append(entry)
+                }
+            }
+        }
+        var reply: [String: Any] = ["connection": saved.displayName, "columns": columns, "capped": capped]
+        var notes: [String] = []
+        if capped { notes.append("More than \(Self.searchLimit) columns match: narrow the pattern, add a type or name databases.") }
+        let notLoaded = databases.filter { !$0.detailsLoaded }.map(\.name)
+        if !notLoaded.isEmpty {
+            notes.append("Not searched, as their columns aren't loaded yet: " + notLoaded.joined(separator: ", ")
+                         + ". Name them in databases to search them.")
+        }
+        if !notes.isEmpty { reply["note"] = notes.joined(separator: " ") }
+        return reply
+    }
+
     /// The schema resource's text: every database but the system ones, compact.
     public func schemaText() async throws -> String {
         try require(.schema)
