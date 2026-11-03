@@ -234,6 +234,72 @@ public enum Runner {
         }
     }
 
+    /// What this process reads from `file`, through `filter` (gzip -dc) when given: `next` gives the text in pieces,
+    /// `fed` how much of the file has been taken so far (so progress is real for a compressed file too). The caller
+    /// closes `file` after `finish`.
+    public final class Inflow: @unchecked Sendable {
+        private let file: Int32
+        private let source: Int32
+        private let filtering: Started?
+        private let cancellation: Cancellation
+        private let lock = NSLock()
+        private var taken: Int64 = 0
+        private let copied = DispatchGroup()
+
+        public init(file: Int32, through filter: [String]?, cancellation: Cancellation) throws {
+            self.file = file
+            self.cancellation = cancellation
+            guard let filter else {
+                source = file
+                filtering = nil
+                return
+            }
+            guard let into = makePipe(), let out = makePipe() else { throw AirSQLError(.other, "Can't start \(filter[0]): no pipe") }
+            _ = fcntl(into.1, F_SETNOSIGPIPE, 1)
+            filtering = Started(filter, stdin: into.0, stdout: out.1, environment: [:], cancellation: cancellation)
+            close(into.0)
+            close(out.1)
+            source = out.0
+            copied.enter()
+            Thread.detachNewThread { [self] in
+                var buffer = [UInt8](repeating: 0, count: 65536)
+                while !cancellation.isCancelled {
+                    let count = read(file, &buffer, buffer.count)
+                    if count < 0 && errno == EINTR { continue }
+                    guard count > 0, buffer.withUnsafeBytes({ writeAll(into.1, UnsafeRawBufferPointer(rebasing: $0[0..<count])) })
+                    else { break }
+                    lock.locked { taken += Int64(count) }
+                }
+                close(into.1)
+                copied.leave()
+            }
+        }
+
+        /// Bytes of the file taken so far.
+        public var fed: Int64 { lock.locked { taken } }
+
+        /// The next piece (up to `size` bytes), nil at the end. Blocks: call it off the main thread.
+        public func next(_ size: Int = 4 << 20) -> Data? {
+            var data = Data(count: size), filled = 0
+            while filled < size && !cancellation.isCancelled {
+                let count = data.withUnsafeMutableBytes { read(source, $0.baseAddress! + filled, size - filled) }
+                if count < 0 && errno == EINTR { continue }
+                guard count > 0 else { break }
+                filled += count
+                if filtering == nil { lock.locked { taken += Int64(count) } }
+            }
+            return filled == 0 ? nil : data.prefix(filled)
+        }
+
+        /// Ends the reading: the filter's status (nil without one).
+        public func finish() -> CommandResult? {
+            guard let filtering else { return nil }
+            close(source)
+            copied.wait()
+            return filtering.finish(cancellation)
+        }
+    }
+
     // MARK: Internals
 
     /// Runs `work` on a thread of its own: it blocks (reading pipes, waiting for processes), so not on Dispatch's

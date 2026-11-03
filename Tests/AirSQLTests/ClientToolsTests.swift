@@ -264,4 +264,55 @@ struct ClientToolsTests {
         #expect(CSVReader.guessSeparator(Data("a\tb\tc\n".utf8)) == 0x09)
         #expect(CSVReader.guessSeparator(Data("single".utf8)) == UInt8(ascii: ","))
     }
+
+    static let dump = """
+        -- MySQL dump 10.13  Distrib 9.6.0
+        /*!40101 SET NAMES utf8mb4 */;
+        /*!40000 DROP DATABASE IF EXISTS `crm`*/;
+        CREATE DATABASE /*!32312 IF NOT EXISTS*/ `crm` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+        USE `crm`;
+        /* a comment; with a semicolon */
+        INSERT INTO `notes` VALUES (1,'é😀; USE elsewhere;\nnext line'),(2,'x');
+        DELIMITER ;;
+        CREATE PROCEDURE `p`() BEGIN SELECT 1; SELECT 'é'; END ;;
+        DELIMITER ;
+        SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ 'abc:1-5';
+        SELECT 'last' -- no delimiter
+        """
+
+    static let dumpStatements: [(String, Int)] = [
+        ("/*!40101 SET NAMES utf8mb4 */", 2), ("/*!40000 DROP DATABASE IF EXISTS `crm`*/", 3),
+        ("CREATE DATABASE /*!32312 IF NOT EXISTS*/ `crm` /*!40100 DEFAULT CHARACTER SET utf8mb4 */", 4), ("USE `crm`", 5),
+        ("INSERT INTO `notes` VALUES (1,'é😀; USE elsewhere;\nnext line'),(2,'x')", 7),
+        ("CREATE PROCEDURE `p`() BEGIN SELECT 1; SELECT 'é'; END", 10),
+        ("SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ 'abc:1-5'", 12), ("SELECT 'last'", 13),
+    ]
+
+    @Test func aScriptIsSplitTheSameWhereverItsPiecesEnd() async throws {
+        let file = URL(fileURLWithPath: try scratch() + "/dump.sql")
+        try Self.dump.write(to: file, atomically: true, encoding: .utf8)
+        for size in [1, 2, 3, 5, 7, 13, 64, 1 << 20] {
+            let (inflow, fd, _) = try SQLScript.open(file, cancellation: Cancellation())
+            var got: [(String, Int)] = []
+            try await SQLScript.statements(from: inflow, pieceSize: size) { got.append(($0, $1)) }
+            _ = inflow.finish()
+            close(fd)
+            #expect(got.map(\.0) == Self.dumpStatements.map(\.0) && got.map(\.1) == Self.dumpStatements.map(\.1), "\(size): \(got)")
+        }
+    }
+
+    @Test func theRestoreCheckFindsWhereADumpWritesEvenCompressed() async throws {
+        let dir = try scratch()
+        let file = URL(fileURLWithPath: dir + "/dump.sql")
+        try Self.dump.write(to: file, atomically: true, encoding: .utf8)
+        _ = try await run(["/bin/sh", "-c", "/usr/bin/gzip -c '\(file.path)' > '\(dir)/dump.sql.gz'"])
+        for url in [file, URL(fileURLWithPath: dir + "/dump.sql.gz")] {
+            var seen: Int64 = 0
+            let scan = try await DumpScan.scan(url, cancellation: Cancellation()) { read, _ in seen = read }
+            #expect(scan.findings.map(\.kind) == [.dropDatabase, .createDatabase, .use, .gtidPurged], "\(url.lastPathComponent)")
+            #expect(scan.findings.map(\.line) == [3, 4, 5, 12] && scan.target(picked: "shop") == "crm")
+            let size = try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64
+            #expect(seen == size)
+        }
+    }
 }

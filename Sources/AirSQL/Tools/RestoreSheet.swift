@@ -185,8 +185,6 @@ final class RestoreSheet: ToolSheet {
         } else if let tool {
             if case .unusable(let why) = ClientTools.fit(tool, server: server) { reason = why }
             if let problem = ToolCommand(tool: tool, options: options, server: server).tlsProblem { reason = problem }
-        } else {
-            reason = "AirSQL's own runner comes once the SQL splitter is in: choose mysql or mariadb for now"
         }
         runButton.isEnabled = reason == nil
         runButton.toolTip = reason ?? "Run the file's statements in “\(database)”"
@@ -228,15 +226,27 @@ final class RestoreSheet: ToolSheet {
     override func run() {
         guard let file, let window else { return }
         let database = self.database, options = self.options
-        loading("Checking \(file.lastPathComponent)…")
-        runButton.isEnabled = false
+        let cancellation = begin("Checking \(file.lastPathComponent)")
+        let updates = Throttle()
         Task {
-            // shortcut: the file's own USE, CREATE DATABASE and DROP DATABASE statements are found once P0-4's
-            // SQLSplitter is on main (DumpScan reads them); until then only the database's tables are checked.
-            let scan = DumpScan()
+            let scan: DumpScan
+            do {
+                // The file's own USE, CREATE DATABASE, DROP DATABASE and GTID_PURGED, before anything runs.
+                scan = try await DumpScan.scan(file, cancellation: cancellation) { read, size in
+                    updates.send {
+                        self.progress("Checking \(file.lastPathComponent) for the databases it writes to", done: read, total: size)
+                    }
+                }
+                updates.cancel()
+            } catch {
+                updates.cancel()
+                finish(cancellation.isCancelled ? "Stopped: nothing has run." : "Can't read the file: " + error.localizedDescription,
+                       failed: true)
+                return
+            }
             let target = scan.target(picked: database)
             let tables = await Self.tableCount(target, options: options)
-            loading(nil)
+            idle()
             var warnings = scan.warnings(picked: database)
             if tables > 0 {
                 warnings.append("“\(target)” has \(ObjectPicker.count(tables, "table")) already: the file's tables replace those "
@@ -247,12 +257,21 @@ final class RestoreSheet: ToolSheet {
                 start(file, database: database)
                 return
             }
+            let notable = scan.findings.map { finding -> String in
+                switch finding.kind {
+                case .use: return "USE " + SQLQuote.identifier(finding.database ?? "")
+                case .createDatabase: return "CREATE DATABASE " + SQLQuote.identifier(finding.database ?? "")
+                case .dropDatabase: return "DROP DATABASE " + SQLQuote.identifier(finding.database ?? "")
+                case .gtidPurged: return "SET @@GLOBAL.GTID_PURGED = …"
+                }
+            }
             var request = SQLPreviewRequest(change: ChangeSQL(title: "Restore \(file.lastPathComponent)",
-                                                              statements: ["USE " + SQLQuote.identifier(target)],
+                                                              statements: notable.isEmpty ? ["USE " + SQLQuote.identifier(target)] : notable,
                                                               connection: connection.id),
                                             heading: "Run \(file.lastPathComponent) in \(target)?",
                                             caption: "\(Self.bytes(fileSize)) of SQL runs on \(connection.displayName) with "
-                                                + (tool?.title ?? "AirSQL") + (goOn.state == .on ? ", going on past errors." : ", stopping at the first error."))
+                                                + (tool?.title ?? "AirSQL") + (goOn.state == .on ? ", going on past errors." : ", stopping at the first error.")
+                                                + (notable.isEmpty ? "" : " These are the file's statements that choose where it writes."))
             request.actionTitle = builtInFirst ? "Run" : "Restore"
             request.warnings = warnings
             request.destructive = !warnings.isEmpty
@@ -274,20 +293,29 @@ final class RestoreSheet: ToolSheet {
     }
 
     private func start(_ file: URL, database: String) {
-        guard let tool else { return }
-        let command = ToolCommand(tool: tool, options: options, server: server)
+        let command = tool.map { ToolCommand(tool: $0, options: options, server: server) }, options = self.options
         let continueOnError = goOn.state == .on
-        let cancellation = begin("Restoring \(file.lastPathComponent) into \(database)")
+        let cancellation = begin("Running \(file.lastPathComponent) in \(database)")
         let updates = Throttle()
+        let report = { (state: ToolProgress) in
+            updates.send {
+                let errors = state.errors == 0 ? "" : " · " + ObjectPicker.count(state.errors, "error")
+                self.progress("Read " + Self.bytes(state.bytes) + " of " + Self.bytes(state.total ?? 0) + errors,
+                              done: state.bytes, total: state.total)
+            }
+        }
         Task {
             do {
-                let outcome = try await ToolRun.restore(command, file: file, into: database, continueOnError: continueOnError,
-                                                        cancellation: cancellation) { state in
-                    updates.send {
-                        let errors = state.errors == 0 ? "" : " · " + ObjectPicker.count(state.errors, "error")
-                        self.progress("Read " + Self.bytes(state.bytes) + " of " + Self.bytes(state.total ?? 0) + errors,
-                                      done: state.bytes, total: state.total)
-                    }
+                let outcome: ToolOutcome
+                if let command {
+                    outcome = try await ToolRun.restore(command, file: file, into: database, continueOnError: continueOnError,
+                                                        cancellation: cancellation, progress: report)
+                } else {
+                    let session = DBConnection(options: options, role: .tools)
+                    defer { Task { await session.close() } }
+                    _ = try await session.connect()
+                    outcome = try await SQLScript.run(file, in: database, on: session, continueOnError: continueOnError,
+                                                      cancellation: cancellation, progress: report)
                 }
                 updates.cancel()
                 let errors = outcome.errors == 0 ? "" : " \(ObjectPicker.count(outcome.errors, "statement")) failed; the last: "
@@ -295,7 +323,7 @@ final class RestoreSheet: ToolSheet {
                 finish("Ran \(file.lastPathComponent) in \(database).\(errors)", failed: outcome.errors > 0)
             } catch {
                 updates.cancel()
-                finish(error.localizedDescription, failed: true)
+                finish(cancellation.isCancelled ? "Stopped. What ran before stays." : error.localizedDescription, failed: true)
             }
         }
     }

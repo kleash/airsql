@@ -216,4 +216,40 @@ struct ClientToolsLabTests {
         _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
         await session.close()
     }
+
+    /// Run SQL File without client tools takes mysqldump's own output (executable comments, LOCK TABLES, DELIMITER around
+    /// routines) to the same rows; and a dump of whole databases, which writes into its own, is flagged before it runs.
+    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    func theBuiltInRunnerRunsDumpsAndAHostileOneIsFlagged(_ server: Lab.Server) async throws {
+        guard let (session, info, dump, _) = try await Self.setUp(server) else { return }
+        let target = "lane_l6_run"
+        _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target))
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+        let command = ToolCommand(tool: dump, options: Self.options(server), server: info)
+        var request = DumpRequest(databases: [Lab.fixture], tables: Self.tables)
+        request.gzip = true
+        let file = URL(fileURLWithPath: try scratch() + "/fixture.sql.gz")
+        _ = try await ToolRun.dump(command, request, to: file, estimate: nil, cancellation: Cancellation()) { _ in }
+        let clean = try await DumpScan.scan(file, cancellation: Cancellation()) { _, _ in }
+        #expect(clean.warnings(picked: target).isEmpty && clean.target(picked: target) == target, "\(clean)")
+        let runner = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await runner.connect()
+        let outcome = try await SQLScript.run(file, in: target, on: runner, continueOnError: false, cancellation: Cancellation()) { _ in }
+        await runner.close()
+        #expect(outcome.errors == 0 && outcome.bytes > 0)
+        #expect(try await Self.checksums(session, target) == Self.checksums(session, Lab.fixture))
+        let routines = try await session.query("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = '\(target)'")
+            .first?.rows?.string(0, 0)
+        #expect(routines == "5", "\(server): \(routines ?? "")")  // mysqldump --routines: DELIMITER ;; … ;; ran as one
+        // A dump of the whole database (--databases) creates and uses fixture: restoring it into lane_l6_run is flagged.
+        var whole = DumpRequest(databases: [Lab.fixture])
+        whole.extra = ["--databases", "--no-data"]
+        let hostile = URL(fileURLWithPath: try scratch() + "/whole.sql")
+        _ = try await ToolRun.dump(command, whole, to: hostile, estimate: nil, cancellation: Cancellation()) { _ in }
+        let flagged = try await DumpScan.scan(hostile, cancellation: Cancellation()) { _, _ in }
+        #expect(flagged.target(picked: target) == Lab.fixture)
+        #expect(flagged.warnings(picked: target).contains { $0.contains("switches to the database “fixture”") }, "\(flagged)")
+        _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
+        await session.close()
+    }
 }

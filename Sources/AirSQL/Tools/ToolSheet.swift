@@ -214,6 +214,24 @@ class ToolSheet: NSWindowController {
         updateRunButton()
     }
 
+    /// A step of the work is over and nothing more runs until the person says so (the check before a restore): the
+    /// sheet as it was before `begin`.
+    func idle() {
+        running = false
+        cancellation = nil
+        activity?.end()
+        activity = nil
+        bar.stopAnimation(nil)
+        bar.isHidden = true
+        status.stringValue = ""
+        timeLeft.stringValue = ""
+        setFormEnabled(true)
+        cancelButton.title = "Cancel"
+        cancelButton.toolTip = "Close the sheet: nothing runs"
+        runButton.isEnabled = true
+        updateRunButton()
+    }
+
     /// Sets the run button's state from the form (subclasses: what is missing, in its tooltip).
     func updateRunButton() {}
 
