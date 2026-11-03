@@ -23,8 +23,8 @@ AirSQL is in development and not ready to use yet: the plan is in [docs/dev/plan
   filter and sort on the server or in the loaded rows, search every column, quick filters and filter by values; an
   editor for each type (dates, JSON, ENUM and SET, foreign keys with search), paste from a spreadsheet, undo. Nothing
   is written until you Apply, and Apply checks that every change touched exactly the rows it should. Transpose, record
-  view, value panel, heatmaps, charts, column summary and frozen columns; compare two results; copy and export as CSV,
-  JSON, SQL, Markdown, HTML, XML or Excel.
+  view, value panel, display formats (UUID, hex, numbers, dates, time zones), heatmaps, charts, column summary and
+  frozen columns; compare two results; copy and export as CSV, JSON, SQL, Markdown, HTML, XML or Excel.
 - **A SQL console** ([The SQL console](docs/console.md)) with completion, formatting, EXPLAIN as a plan, profiles,
   history, transactions, query helpers, result tabs and a log of every statement AirSQL sends.
 - **A server at a glance** ([Browse a server](docs/navigator.md)): the tree and the database view; create, rename,
