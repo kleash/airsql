@@ -32,7 +32,8 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
   diagram.
 - [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
   to another server; CSV import.
-- [Compare two databases](https://kleash.github.io/airsql/compare.html): structure and data, side by side, and a sync script you review first.
+- [Compare two databases](https://kleash.github.io/airsql/compare.html): structure and data, side by side, and a sync script you review first; or two
+  results, or a result with a table, row by row.
 - [AI agents](https://kleash.github.io/airsql/agents.html): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
 - [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html): a database as formatted SQL changesets, and any change saved as one.
@@ -393,7 +394,9 @@ nothing runs.
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
   tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result).
-- Double-click a result tab to rename it; right-click it to pin, rename or close it.
+- Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
+  with another result or a table (**Compare With…**, see [Compare](https://kleash.github.io/airsql/compare.html#compare-two-results-or-a-result-with-a-table)).
+  When more tabs are open than fit, scroll the tabs sideways.
 - **Messages** lists what each statement did: its rows or the rows it changed, how long it took, the server's
   warnings, or its error and the line it points to (that line is marked red beside the editor). Double-click a message
   to select its statement.
@@ -802,10 +805,14 @@ its rows when they differ.
   triggers, events and sequences. The **Structure** tab shows both definitions side by side, the lines only one
   side has marked.
 - **Data:** the rows of every table both sides have, matched on the primary key, or on a unique key whose columns
-  are all NOT NULL. The **Data** tab lists rows **missing** from the target, **extra** in it, and **changed** rows,
-  with the cells that differ marked (hold the pointer over one to see the target's value); ⌘C or a right-click copies
-  the selected rows as tab-separated text. Tables without such a key are still checked as a whole, but their rows
-  can't be matched or synced. Generated columns are left out: their values follow from the others.
+  are all NOT NULL. The **Data** tab shows the rows that differ in the [data grid](https://kleash.github.io/airsql/data-grid.html), as a sync would
+  change the target: rows only in the source in green (the script inserts them), rows only in the target in red and
+  struck through (it deletes them), then rows in both whose differing cells are amber (it updates them); hold the
+  pointer over an amber cell to see both values. The line above the rows counts each kind. The grid works as
+  elsewhere: select cells or rows with ⌘ and ⇧, copy them in any format (⌘C, **Copy with Headers**, **Copy As**),
+  sort by a header, see a long value in the value panel, or save the rows with **Export Rows…**. Tables without such a
+  key are still checked as a whole, but their rows can't be matched or synced. Generated columns are left out: their
+  values follow from the others.
 
 MySQL and MariaDB write the same thing differently, and the compare reads them alike: `int(11)` and `int`, MariaDB's
 JSON (a LONGTEXT with a check) and MySQL's, `CURRENT_TIMESTAMP` and `current_timestamp()`, `NO ACTION` and
@@ -869,6 +876,27 @@ values: after running the script, compare again to copy their values. After a sy
 
 **Save as Changeset…** saves the script as [Liquibase](https://kleash.github.io/airsql/liquibase.html) changesets in a changelog you choose; so does
 **Query ▸ Save as Changeset…** in the “Sync script” tab.
+
+## Compare two results, or a result with a table
+
+In a [console](https://kleash.github.io/airsql/console.html), **Compare With…** (a result tab's right-click menu, or **Query ▸ Compare With…**) compares
+the result shown with another one, row by row:
+
+- **Compare with** offers the other result tabs of the window, this console's nearest first (a result from another
+  console tab, such as the same query on another server, carries that tab's name), then the tables and views of the
+  console's database.
+- **Match rows on** says which columns tell rows apart: the result's key when it has one, a single column, or every
+  column (rows then differ only as being on one side). Rows with the same values there are the same row; when several
+  share them, they pair up in the order they come.
+- The rows that differ open in a result tab of their own, named after the other side (“vs Yesterday”), next to the
+  result: rows only in this result green, rows only in the other red and struck through, and in rows on both sides the
+  cells that differ amber (hold the pointer over one to see both values). The results bar says how many rows are the
+  same. When nothing differs, AirSQL says so instead.
+
+Only the columns both sides have, by name, are compared, with the rules of the data compare: numbers, decimals of
+another scale and floats as numbers, JSON as values (MySQL writes it its own way), NULL apart from an empty string. A
+table is read up to 100,000 rows; for a larger one, compare the result of a query with a WHERE, or whole tables with
+**Tools ▸ Compare…**. Comparing only reads.
 
 ## Export the report
 
@@ -1636,7 +1664,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `popover.rollback`), `popover.agent` (`agents.setUp`, `agents.turnOff`), `activity.popover` (`activity.cancel`,
   `activity.cancelAll`).
 - **Console**: `console.editor`, `console.cancel`, `console.summary`, `console.resultTab` (`console.resultRename`),
-  `console.messages`, `console.planChoice`, `console.planTree`, `console.empty`, `console.connectionChoice`; find bar
+  `console.messages`, `console.planChoice`, `console.planTree`, `console.empty`, `console.connectionChoice`; Compare
+  With… (the result tab's menu) asks with `compare.with` and `compare.key`, and opens the rows that differ in a result
+  tab of their own, a grid under the `grid.legend` line (added green, removed red, changed cells amber); find bar
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
   helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
   history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
@@ -1667,7 +1697,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
 - **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
   `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows`, `recon.script`, `recon.destructive`,
+  `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+  `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
   sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
 - **Client tools sheets**: `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,

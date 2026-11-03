@@ -74,7 +74,9 @@ nothing runs.
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
   tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result).
-- Double-click a result tab to rename it; right-click it to pin, rename or close it.
+- Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
+  with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
+  When more tabs are open than fit, scroll the tabs sideways.
 - **Messages** lists what each statement did: its rows or the rows it changed, how long it took, the server's
   warnings, or its error and the line it points to (that line is marked red beside the editor). Double-click a message
   to select its statement.

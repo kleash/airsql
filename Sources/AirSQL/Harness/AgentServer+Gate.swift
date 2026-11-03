@@ -73,8 +73,8 @@ extension AgentServer {
     }
 
     /// Whether `view` shows rows an agent may not read: of a connection whose agent access is below Schema + read, or of
-    /// one it can't tell (it fails closed). The main window's are its selected tab's connection's; a compare's, both
-    /// sides'.
+    /// one it can't tell (it fails closed). The main window's are its selected tab's connection's (and a console
+    /// comparison's other connection's); a compare's, both sides'.
     func hidesData(_ view: NSView) -> Bool {
         guard AgentGate.agent != nil, Self.showsData(view) else { return false }
         var window = view.window
@@ -85,7 +85,9 @@ extension AgentServer {
         if let recon = window?.windowController as? ReconWindowController {
             connections = [recon.source.connection?.id, recon.target.connection?.id]
         } else if let main, window === main.window {
-            connections = [main.selectedTab?.connectionID]
+            // A console's comparison with another connection's result shows that connection's rows too.
+            let compared = (main.selectedTab?.content as? ConsoleViewController)?.currentResult?.otherConnection
+            connections = [main.selectedTab?.connectionID] + (compared.map { [$0] } ?? [])
         } else {
             connections = [nil]
         }
