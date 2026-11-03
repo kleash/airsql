@@ -64,7 +64,8 @@ extension DataGridView {
         guard editor == nil, let source, position.row < rowCount, position.column < columnCount else { return }
         let column = columnOrder[position.column]
         guard canEdit(position) else { return NSSound.beep() }
-        selection.select(position)
+        // Typing over several selected cells keeps them selected: the host gives them all the value (multi-cell edit).
+        if text == nil || !selection.contains(position) { selection.select(position) }
         reveal(cellRect(position))
         let editor = GridEditor(grid: self, position: position, text: text ?? source.cell(position.row, column).text,
                                 font: styles.font(source.columns[column], isNull: false))

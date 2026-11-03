@@ -174,7 +174,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         guard let match = matches[safe: table.clickedRow >= 0 ? table.clickedRow : table.selectedRow],
               let main = view.window?.windowController as? MainWindowController else { return }
         let condition = NavigatorSQL.contains(searched, columns: match.columns, noBackslashEscapes: noBackslashEscapes)
-        main.open(NavigatorHooks.tableData(open, match.table, condition), title: match.table.name, connection: open.id)
+        main.openTableData(match.table, of: open, condition: condition)
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { matches.count }
