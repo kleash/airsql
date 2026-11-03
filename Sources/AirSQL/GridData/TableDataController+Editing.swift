@@ -94,6 +94,7 @@ extension TableDataController: DataGridViewDelegate {
     private func duplicate(keepingKeys: Bool) {
         guard let source, editingOff == nil else { return NSSound.beep() }
         var last: UUID?
+        let depth = source.changes.undoDepth
         for row in viewer.selectedRows() {
             var values: [String: PendingChanges.Value] = [:]
             for (index, column) in source.table.columns.enumerated() where column.generated == nil {
@@ -106,6 +107,7 @@ extension TableDataController: DataGridViewDelegate {
             }
             last = source.changes.addRow(values)
         }
+        source.changes.squashUndo(to: depth)  // one ⌘Z takes them all back
         changesDidChange()
         focus(row: last.flatMap(source.index(of:)))
     }

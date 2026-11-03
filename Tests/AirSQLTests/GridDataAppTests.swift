@@ -393,6 +393,15 @@ extension AppTests {
             #expect(tab.findBar.count.stringValue == "Replaced 2 values" && tab.source?.changes.rowCount == 2)
             tab.findBar.close(nil)
             #expect(tab.findBar.isHidden && tab.grid.rowCount == 3)
+            // One ⌘Z takes back every value Replace All changed, and every row Duplicate Row added.
+            tab.undo(nil)
+            #expect(tab.source?.changes.isEmpty == true)
+            tab.grid.selection.selectRow(0)
+            tab.grid.selection.selectRow(2, extend: true)
+            tab.duplicateRow(nil)
+            #expect(tab.source?.changes.state.inserts.count == 3)
+            tab.undo(nil)
+            #expect(tab.source?.changes.isEmpty == true)
         }
 
         @Test func whereBarCompletesColumnNames() async throws {
