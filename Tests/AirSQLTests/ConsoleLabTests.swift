@@ -40,7 +40,7 @@ struct ConsoleLabTests {
         let heavy = "SELECT BENCHMARK(100000000000, MD5('airsql'))"
         let start = Date()
         let timed = await run(heavy, on: session, timeout: 1)
-        #expect(timed.timedOut && timed.error?.kind == .cancelled, "\(String(describing: timed.error))")
+        #expect(timed.error?.kind == .cancelled, "\(String(describing: timed.error))")
         #expect(timed.error?.message.contains("query timeout") == true)
         #expect(Date().timeIntervalSince(start) < 15)
 
@@ -53,7 +53,7 @@ struct ConsoleLabTests {
             return result != .notRunning
         }
         let cancelled = await running.value
-        #expect(result == .cancelled && cancelled.error?.kind == .cancelled && !cancelled.timedOut)
+        #expect(result == .cancelled && cancelled.error?.kind == .cancelled && cancelled.error?.message.contains("query timeout") == false)
         #expect(await run("SELECT 3", on: session).results.first?.rows?.string(0, 0) == "3", "the session carries on")
         await session.close()
     }
