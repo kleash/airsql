@@ -71,6 +71,7 @@ struct TableDataSourceTests {
         #expect(source.rowCount == 4 && source.row(3) == .inserted(id) && source.mark(3, 2) == .inserted)
         // A new row shows what the server will put in the columns it leaves out.
         #expect(source.cell(3, 0) == .text("(auto)") && source.cell(3, 1) == .null && source.cell(3, 3) == .text("0.00"))
+        #expect(source.value(3, 0) == nil, "the server's AUTO_INCREMENT value isn't data yet: copies leave it out")
         source.set(.text("Dee"), row: 3, column: 1)
         #expect(source.cell(3, 1) == .text("Dee") && source.index(of: id) == 3)
         // Typing the loaded value again takes the edit away.

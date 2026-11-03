@@ -108,7 +108,11 @@ extension TableDataController: DataGridViewDelegate {
             var values: [String: PendingChanges.Value] = [:]
             for (index, column) in source.table.columns.enumerated() where column.generated == nil {
                 if !keepingKeys, source.columns[index].isKey || column.autoIncrement { continue }
-                values[column.name] = source.value(row, index).map(PendingChanges.Value.text) ?? .null
+                if case .inserted(let id) = source.row(row) {
+                    values[column.name] = source.changes.insert(id)?.values[column.name]  // a new row's own values only
+                } else {
+                    values[column.name] = source.value(row, index).map(PendingChanges.Value.text) ?? .null
+                }
             }
             last = source.changes.addRow(values)
         }

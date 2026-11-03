@@ -47,7 +47,9 @@ extension TableDataController {
     func quickFilterItem() -> NSMenuItem {
         var items: [NSMenuItem] = []
         if let (column, value, values) = focusedValues() {
-            var ops: [GridCondition.Operator] = value == nil ? [.isNull, .isNotNull]
+            // Binary values compare whole (LIKE would read their hex as text).
+            var ops: [GridCondition.Operator] = value == nil ? [.isNull, .isNotNull] : column.kind == .binary
+                ? [.equals, .notEquals, .isNull, .isNotNull]
                 : [.equals, .notEquals, .less, .greater, .startsWith, .endsWith, .contains, .isNull, .isNotNull]
             if values.count > 1 { ops.insert(contentsOf: [.isIn, .notIn], at: value == nil ? 0 : 2) }
             for op in ops {

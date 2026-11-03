@@ -181,22 +181,28 @@ public final class TableDataSource: GridSource {
             }
             return value(loaded: row, column)
         case .inserted(let id):
-            guard let value = changes.insert(id)?.values[columns[column].name] else { return placeholder(column) }
+            guard let value = changes.insert(id)?.values[columns[column].name] else { return unset(column) }
             return value.text ?? shownText(value)
         case nil: return nil
         }
     }
 
-    /// What an unset cell of a new row shows: what the server will put there.
-    private func placeholder(_ column: Int) -> String? {
+    /// An unset cell of a new row: the column's default, as the server will put it there (nil for an AUTO_INCREMENT or
+    /// generated value, which only the server knows).
+    private func unset(_ column: Int) -> String? {
         let info = table.columns[column]
-        if info.autoIncrement { return "(auto)" }
-        if info.generated != nil { return "(generated)" }
+        guard !info.autoIncrement, info.generated == nil else { return nil }
         switch info.defaultValue {
         case .none: return ""
         case .null: return nil
         case .value(let text), .expression(let text): return text
         }
+    }
+
+    /// What a new row's unset AUTO_INCREMENT or generated cell shows until Apply.
+    private func placeholder(_ index: Int, _ column: Int) -> String? {
+        guard case .inserted(let id) = row(index), changes.insert(id)?.values[columns[column].name] == nil else { return nil }
+        return table.columns[column].autoIncrement ? "(auto)" : table.columns[column].generated != nil ? "(generated)" : nil
     }
 
     private func shownText(_ value: PendingChanges.Value) -> String? { value == .default ? "DEFAULT" : nil }
@@ -205,7 +211,7 @@ public final class TableDataSource: GridSource {
 
     public func cell(_ row: Int, _ column: Int) -> GridCell {
         guard row < rowCount else { return .loading }
-        guard let text = value(row, column) else { return .null }
+        guard let text = value(row, column) ?? placeholder(row, column) else { return .null }
         guard !columns[column].isKey, text.count > Self.shownLimit else { return .text(text) }
         return .text(String(text.prefix(Self.shownLimit)) + "…")
     }
