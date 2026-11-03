@@ -147,7 +147,7 @@ final class GridHeaderView: NSView {
             color = .accent
         } else if hovered == column {
             symbol = "chevron.up.chevron.down"
-            color = .tertiaryLabelColor
+            color = .secondaryLabelColor
         } else {
             return
         }
