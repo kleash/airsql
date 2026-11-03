@@ -47,6 +47,8 @@ extension ConsoleViewController {
             note(.info, "There is no statement here to run: type one, or put the cursor in one.")
             return
         }
+        let sent = kind == .explain ? [ExplainPlan.tableSQL(statements[0].sql)] : statements.map(\.sql)
+        guard !ConsoleSafety.refusesOnReadOnly(sent, in: self) else { return }
         guard kind == .run else { return start(ConsoleRun(kind: kind, statements: [statements[0]], text: text)) }
         ConsoleSafety.check(statements, in: self) { [weak self] approved in
             guard approved, let self else { return }
@@ -68,7 +70,8 @@ extension ConsoleViewController {
         let selection = editor.selectedRange()
         guard let statement = ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil,
                                                        caret: selection.location, all: false,
-                                                       noBackslashEscapes: editor.noBackslashEscapes).first else { return }
+                                                       noBackslashEscapes: editor.noBackslashEscapes).first,
+              !ConsoleSafety.refusesOnReadOnly([statement.sql], in: self) else { return }
         ConsoleSafety.check([statement], in: self) { [weak self] approved in
             guard approved, let self else { return }
             self.start(ConsoleRun(kind: .profile, statements: [statement], text: self.text))

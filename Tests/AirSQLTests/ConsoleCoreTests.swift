@@ -84,6 +84,23 @@ struct StatementCheckTests {
         #expect(risk("/*!99999 ' */ UPDATE shop.t SET a = 1 -- ' */")?.kind == .unboundedWrite)
         #expect(StatementCheck.writes("/*!99999 ' */ DROP TABLE shop.t -- ' */", noBackslashEscapes: false))
     }
+
+    /// A read-only connection runs what the read-only check proves only reads, and a bare USE; nothing that could lift
+    /// the session's READ ONLY.
+    @Test func readOnlyConnectionsRunOnlyWhatOnlyReads() {
+        func refusal(_ sql: String) -> String? { StatementCheck.readOnlyRefusal(sql, on: "Prod", noBackslashEscapes: false) }
+        for sql in ["SELECT 1", "SHOW DATABASES", "EXPLAIN SELECT * FROM t", "DESCRIBE t", "USE shop", "USE `my db`"] {
+            #expect(refusal(sql) == nil, "\(sql)")
+        }
+        for sql in ["SET SESSION TRANSACTION READ WRITE", "START TRANSACTION READ WRITE", "SET transaction_read_only = 0",
+                    "CREATE DATABASE x", "INSERT INTO t VALUES (1)", "CALL p()", "SELECT SLEEP(1)", "EXPLAIN UPDATE t SET a = 1",
+                    "USE shop /*! , x */", "/*!99999 DROP TABLE t */ USE shop"] {
+            #expect(refusal(sql)?.hasPrefix("“Prod” is read-only, so nothing ran. ") == true, "\(sql)")
+        }
+        #expect(refusal("SET SESSION TRANSACTION READ WRITE") == "“Prod” is read-only, so nothing ran. SET isn't a read-only "
+            + "statement; only SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN are. To change anything, turn off Read-only "
+            + "in its connection settings.")
+    }
 }
 
 struct SQLFormatterTests {
