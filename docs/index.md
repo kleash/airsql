@@ -13,9 +13,9 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
 - [Settings](settings.md): the look, the editor and grid, safety checks, agents and client tools.
 - [Check SQL before it runs](sql-preview.md): the sheet that shows every change first.
 - [Trust a server](trust-a-server.md): servers whose certificate macOS doesn't know.
-- [The SQL console](console.md): write and run SQL, results, transactions, history and the SQL log.
 - [The SQL log](sql-log.md): every statement AirSQL sends, with passwords masked.
 - [Read-only queries](read-only-queries.md): what an agent's query may do, and why one is refused.
+- [The SQL console](console.md): write and run SQL, results, transactions, history and the SQL log.
 - [Connections and routes](connections.md): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](navigator.md): the tree, the database view, table commands, find text and the process list.
 - [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, and the ER
