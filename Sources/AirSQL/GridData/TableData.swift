@@ -15,6 +15,12 @@ extension MainWindowController {
         let content = TableDataController(model: model, context: context, database: database, table: table, filter: condition)
         return open(content, title: table, connection: context.connection.id)
     }
+
+    /// The navigator's double-click and Open Data, and Find Text on Server's matches (filtered by `condition`).
+    func openTableData(_ table: DatabaseObject, of open: OpenConnection, condition: String? = nil) {
+        guard let context = Editors.context(model.connection(open.id), in: model) else { return NSSound.beep() }
+        openTableData(table.name, database: table.database, context: context, condition: condition)
+    }
 }
 
 extension TableDataController {
