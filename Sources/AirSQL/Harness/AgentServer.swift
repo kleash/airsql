@@ -965,9 +965,16 @@ struct KeyCombo {
     }
 
     func events(window: NSWindow) -> (down: NSEvent, up: NSEvent) {
+        // A keyboard flags its function keys, and the arrows as the numeric pad's too: macOS 26 takes ⌘ and an arrow
+        // without them for a plain arrow.
+        var flags = modifiers
+        if let key = base.unicodeScalars.first?.value, key >= 0xF700 {
+            flags.insert(.function)
+            if key <= 0xF703 { flags.insert(.numericPad) }
+        }
         func event(_ type: NSEvent.EventType) -> NSEvent {
             // AppKit's "characters ignoring modifiers" keep Shift.
-            NSEvent.keyEvent(with: type, location: .zero, modifierFlags: modifiers, timestamp: ProcessInfo.processInfo.systemUptime,
+            NSEvent.keyEvent(with: type, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                              windowNumber: window.windowNumber, context: nil, characters: characters,
                              charactersIgnoringModifiers: modifiers.contains(.shift) ? base.uppercased() : base,
                              isARepeat: false, keyCode: keyCode)!
