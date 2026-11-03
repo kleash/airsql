@@ -117,6 +117,12 @@ extension AppTests {
             }
             #expect(color(at: "select") == .sqlKeyword && color(at: "'from'") == .sqlString && color(at: "-- note") == .sqlComment)
             #expect(color(at: "`from`") == .sqlIdentifier)
+            // A word becomes a call when ( is typed after it, and stops being one when the ( goes.
+            console.editor.setSelectedRange(NSRange(location: (storage.string as NSString).range(of: " t ").location + 3, length: 0))
+            _ = await call(harness, "type", ["text": "("])
+            #expect(color(at: "t (") == .sqlFunction)
+            console.editor.deleteBackward(nil)
+            #expect(color(at: "t where") == .sqlIdentifier)
             #expect(console.isEdited && main.tabBar.buttons.first?.toolTip?.contains("(unsaved)") == true)
 
             #expect(await call(harness, "menu", ["path": "Query > Format SQL"]).error == nil)
