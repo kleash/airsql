@@ -65,7 +65,7 @@ final class AgentsPane: SettingsPaneController {
         table.dataSource = accessTable
         table.delegate = accessTable
         accessTable.model = model
-        for (id, title, width) in [("name", "Connection", 160.0), ("access", "Access", 150.0), ("samples", "Sample rows", 76.0)] {
+        for (id, title, width) in [("name", "Connection", 150.0), ("access", "Access", 140.0), ("samples", "Sample rows", 96.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
