@@ -185,8 +185,8 @@ public enum Liquibase {
         var data: (object: String, statements: [String], comment: String?)?
         func flushData() {
             guard let run = data else { return }
-            changesets.append(LiquibaseChangeset(object: run.object, statements: rowsHead(noBackslashEscapes: result.target.noBackslashEscapes)
-                                                    + run.statements + [rowsTail], comment: run.comment))
+            changesets.append(LiquibaseChangeset(object: run.object, statements: sessionHead(noBackslashEscapes: result.target.noBackslashEscapes)
+                                                    + run.statements + [sessionTail], comment: run.comment))
             data = nil
         }
         for step in result.steps(destructive: destructive) {
@@ -208,15 +208,16 @@ public enum Liquibase {
         return changesets
     }
 
-    /// What a data changeset runs first: rows are written in UTC (TIMESTAMP values as read), with NO_AUTO_VALUE_ON_ZERO
-    /// (a 0 in an AUTO_INCREMENT column stays 0) and the backslash escapes their strings were written with; `rowsTail`
+    /// What a changeset of rows (or of a table with zero dates or TIMESTAMP defaults) runs first, as mysqldump does: in
+    /// UTC (TIMESTAMP values as they were read), with NO_AUTO_VALUE_ON_ZERO (a 0 in an AUTO_INCREMENT column stays 0)
+    /// and no strict mode (zero dates load), and the backslash escapes its strings were written with. `sessionTail`
     /// puts the session's own settings back.
-    public static func rowsHead(noBackslashEscapes: Bool = false) -> [String] {
+    public static func sessionHead(noBackslashEscapes: Bool = false) -> [String] {
         ["SET @airsql_sql_mode = @@SESSION.sql_mode, @airsql_time_zone = @@SESSION.time_zone",
          "SET SESSION sql_mode = '" + (noBackslashEscapes ? "NO_AUTO_VALUE_ON_ZERO,NO_BACKSLASH_ESCAPES" : "NO_AUTO_VALUE_ON_ZERO")
             + "', SESSION time_zone = '+00:00'"]
     }
-    public static let rowsTail = "SET SESSION sql_mode = @airsql_sql_mode, SESSION time_zone = @airsql_time_zone"
+    public static let sessionTail = "SET SESSION sql_mode = @airsql_sql_mode, SESSION time_zone = @airsql_time_zone"
 
     // MARK: Rollback
 

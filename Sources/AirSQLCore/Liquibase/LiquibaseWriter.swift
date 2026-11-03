@@ -155,7 +155,7 @@ extension LiquibaseSchema {
         if let filter = filter?.trimmingCharacters(in: .whitespacesAndNewlines), !filter.isEmpty { sql += " WHERE (\(filter))" }
         if !table.key.isEmpty { sql += " ORDER BY " + table.key.map { q($0) }.joined(separator: ", ") }
         let insert = "INSERT INTO \(q(table.name)) (\(list)) VALUES\n"
-        let head = "--changeset \(changeset.author):\(changeset.id)\n" + Liquibase.rowsHead().map { $0 + ";\n" }.joined()
+        let head = "--changeset \(changeset.author):\(changeset.id)\n" + Liquibase.sessionHead().map { $0 + ";\n" }.joined()
         var batch: [String] = [], total: Int64 = 0
         func flush() throws {
             guard !batch.isEmpty else { return }
@@ -176,7 +176,7 @@ extension LiquibaseSchema {
             counted(Int64(store.rowCount))
         }
         try flush()
-        if total > 0 { try files.write(Liquibase.rowsTail + ";\n") }
+        if total > 0 { try files.write(Liquibase.sessionTail + ";\n") }
         return total
     }
 }

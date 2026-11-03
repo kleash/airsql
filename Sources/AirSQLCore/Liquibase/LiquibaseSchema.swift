@@ -48,8 +48,8 @@ public struct LiquibaseSchema: Equatable {
         let data = tables.filter { rows.contains($0.name) }.map { LiquibasePiece.rows(table: $0.name) }
         guard content != .data else { return data }
         var pieces: [LiquibasePiece] = []
-        func add(_ object: Object, _ statement: String, drop: String?, check: String? = nil, runOnChange: Bool = false) {
-            var changeset = LiquibaseChangeset(object: object.name, statements: [statement],
+        func add(_ object: Object, _ statements: [String], drop: String?, check: String? = nil, runOnChange: Bool = false) {
+            var changeset = LiquibaseChangeset(object: object.name, statements: statements,
                                                rollback: settings.rollback ? drop.map { [$0] } ?? [] : [])
             changeset.runOnChange = runOnChange
             if preconditions { changeset.precondition = check }
@@ -57,11 +57,15 @@ public struct LiquibaseSchema: Equatable {
         }
         let q = SQLQuote.identifier, text = { SQLQuote.string($0) }
         for sequence in readable where sequence.kind == .sequence {
-            add(sequence, sequence.create, drop: "DROP SEQUENCE " + q(sequence.name),
+            add(sequence, [sequence.create], drop: "DROP SEQUENCE " + q(sequence.name),
                 check: Self.count("TABLES", "TABLE_SCHEMA", ["TABLE_NAME = " + text(sequence.name)]))
         }
         for table in tables {
-            add(table, ReconCreateTable(table.create)?.withoutForeignKeys ?? table.create, drop: "DROP TABLE " + q(table.name),
+            // Zero dates and TIMESTAMP defaults as SHOW CREATE wrote them (in UTC, from a server that took them) need the
+            // session the rows get.
+            let create = ReconCreateTable(table.create)?.withoutForeignKeys ?? table.create
+            let lenient = create.range(of: #"'0000-00-00|\btimestamp\b"#, options: [.regularExpression, .caseInsensitive]) != nil
+            add(table, lenient ? Liquibase.sessionHead() + [create, Liquibase.sessionTail] : [create], drop: "DROP TABLE " + q(table.name),
                 check: Self.count("TABLES", "TABLE_SCHEMA", ["TABLE_NAME = " + text(table.name)]))
         }
         if content == .both { pieces += data }
@@ -79,7 +83,7 @@ public struct LiquibaseSchema: Equatable {
         let code = { (object: Object) in settings.stripDefiner ? ReconNormal.definerRemoved(object.create) : object.create }
         for routine in readable where routine.kind == .function || routine.kind == .procedure {
             let kind = routine.kind == .function ? "FUNCTION" : "PROCEDURE"
-            add(routine, code(routine), drop: "DROP \(kind) " + q(routine.name),
+            add(routine, [code(routine)], drop: "DROP \(kind) " + q(routine.name),
                 check: Self.count("ROUTINES", "ROUTINE_SCHEMA", ["ROUTINE_NAME = " + text(routine.name), "ROUTINE_TYPE = '\(kind)'"]))
         }
         let views = readable.filter { $0.kind == .view }
@@ -87,14 +91,14 @@ public struct LiquibaseSchema: Equatable {
             // Written as CREATE OR REPLACE and run again when its SQL changes: editing a view in the changelog replaces it.
             var create = code(view)
             if create.hasPrefix("CREATE ") { create = "CREATE OR REPLACE " + create.dropFirst(7) }
-            add(view, create, drop: "DROP VIEW " + q(view.name), runOnChange: true)
+            add(view, [create], drop: "DROP VIEW " + q(view.name), runOnChange: true)
         }
         for trigger in readable where trigger.kind == .trigger {
-            add(trigger, code(trigger), drop: "DROP TRIGGER " + q(trigger.name),
+            add(trigger, [code(trigger)], drop: "DROP TRIGGER " + q(trigger.name),
                 check: Self.count("TRIGGERS", "TRIGGER_SCHEMA", ["TRIGGER_NAME = " + text(trigger.name)]))
         }
         for event in readable where event.kind == .event {
-            add(event, code(event), drop: "DROP EVENT " + q(event.name),
+            add(event, [code(event)], drop: "DROP EVENT " + q(event.name),
                 check: Self.count("EVENTS", "EVENT_SCHEMA", ["EVENT_NAME = " + text(event.name)]))
         }
         return pieces
