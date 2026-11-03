@@ -88,6 +88,7 @@ enum MainMenu {
         addGridItems(menus)
         addConsoleItems(menus)
         addNavigatorItems(menus)
+        addEditorItems(menus)
         addToolItems(menus)
         addAgentItems(menus)
         addReconItems(menus)

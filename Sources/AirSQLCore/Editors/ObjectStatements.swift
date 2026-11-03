@@ -23,6 +23,7 @@ public enum ObjectCode {
 
     /// `user`@`host` for an account as CURRENT_USER() gives it (user@host; the host after the last @).
     public static func quotedAccount(_ account: String) -> String {
+        if account.uppercased() == "CURRENT_USER" { return "CURRENT_USER" }
         guard let at = account.lastIndex(of: "@") else { return SQLQuote.identifier(account) }
         return SQLQuote.identifier(String(account[..<at])) + "@" + SQLQuote.identifier(String(account[account.index(after: at)...]))
     }

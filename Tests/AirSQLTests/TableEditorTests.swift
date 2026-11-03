@@ -327,4 +327,29 @@ struct TableEditorTests {
             #expect(!left.contains(name) || name.count < 3, "\(name): \(left)")
         }
     }
+
+    // MARK: Cell text
+
+    @Test func writesAndReadsTheCellsText() throws {
+        #expect(EditorText.names(["id", "order date", "a`b"]) == "id, `order date`, `a``b`")
+        #expect(EditorText.names(from: " id , `order date`,`a``b`, ,x") == ["id", "order date", "a`b", "x"])
+        let parts: [IndexDesign.Part] = [.init(column: "email", prefixLength: 10), .init(column: "made at", descending: true),
+                                         .init(column: nil, expression: "lower(`name`), 1", descending: false)]
+        #expect(EditorText.parts(parts) == "email(10), `made at` DESC, (lower(`name`), 1)")
+        #expect(try EditorText.parts(from: EditorText.parts(parts)) == parts)
+        #expect(try EditorText.parts(from: "`f(1)`, b asc") == [.init(column: "f(1)"), .init(column: "b")])
+        #expect(throws: DesignError.self) { try EditorText.parts(from: "email(x)") }
+        for (value, numeric, text) in [(SchemaDefault.none, false, ""), (.null, false, "NULL"), (.value("0.00"), true, "0.00"),
+                                       (.value("0"), false, "'0'"), (.value("it's"), false, "'it\\'s'"),
+                                       (.expression("CURRENT_TIMESTAMP(3)"), false, "CURRENT_TIMESTAMP(3)")] {
+            #expect(EditorText.defaultValue(value, numeric: numeric, noBackslashEscapes: false) == text)
+            let back = EditorText.defaultValue(from: text, noBackslashEscapes: false)
+            #expect(back == value || (back == .value("0") && value == .value("0")), "\(text)")
+        }
+        #expect(EditorText.qualified(from: "crm.`people.v2`") == ("crm", "people.v2"))
+        #expect(EditorText.qualified(from: " people ") == (nil, "people"))
+        #expect(EditorText.defaultValue(from: "null", noBackslashEscapes: false) == .null)
+        #expect(EditorText.defaultValue(from: "'a' 'b'", noBackslashEscapes: false) == .expression("'a' 'b'"))
+        #expect(EditorText.defaultValue(from: "-1.5", noBackslashEscapes: false) == .value("-1.5"))
+    }
 }

@@ -464,7 +464,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = model.data.settings.agentsAllowed
             reason = "Agents are off already"
         default:
-            break
+            if let check = validateEditorItem(item) { (enabled, reason) = check }
         }
         item.explain(enabled: enabled, reason: enabled ? nil : reason)
         return enabled

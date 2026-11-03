@@ -248,3 +248,11 @@ public struct TableOptions: Hashable {
     /// The row formats a table can have.
     public static let rowFormats = ["DEFAULT", "DYNAMIC", "COMPACT", "REDUNDANT", "COMPRESSED", "FIXED", "PAGE"]
 }
+
+extension SchemaColumn.Generated {
+    /// A generated column's expression for a design (the editor makes them).
+    public init(_ expression: String, stored: Bool) {
+        self.expression = expression
+        self.stored = stored
+    }
+}
