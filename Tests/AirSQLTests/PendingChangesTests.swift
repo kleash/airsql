@@ -9,11 +9,11 @@ struct PendingChangesTests {
     static let columns = [GridColumn(name: "id", type: "int", kind: .number, isKey: true), GridColumn(name: "name"),
                           GridColumn(name: "price", type: "decimal", kind: .number)]
 
-    func sql(_ changes: PendingChanges, noBackslashEscapes: Bool = false) -> [String] {
-        changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: noBackslashEscapes).map(\.sql)
+    func sql(_ changes: PendingChanges, noBackslashEscapes: Bool = false) throws -> [String] {
+        try changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: noBackslashEscapes).map(\.sql)
     }
 
-    @Test func editsInsertsAndDeletesBecomeStatementsInOrder() {
+    @Test func editsInsertsAndDeletesBecomeStatementsInOrder() throws {
         var changes = PendingChanges(keyColumns: ["id"])
         changes.set(.text("Bob"), column: "name", key: ["2"], original: "Bo")
         changes.set(.text("9.90"), column: "price", key: ["2"], original: "9")
@@ -22,7 +22,7 @@ struct PendingChangesTests {
         let id = changes.addRow(["name": .text("Cy"), "price": .default])
         changes.addRow()
         #expect(changes.rowCount == 6)
-        let statements = changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: false)
+        let statements = try changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: false)
         #expect(statements.map(\.sql) == [
             "DELETE FROM `shop`.`items` WHERE `id` IN (5, 7)",
             "UPDATE `shop`.`items` SET `name` = NULL WHERE `id` = 1",
@@ -35,7 +35,7 @@ struct PendingChangesTests {
         #expect(statements[3].target == .insert(id))
     }
 
-    @Test func settingTheLoadedValueAgainDropsTheEdit() {
+    @Test func settingTheLoadedValueAgainDropsTheEdit() throws {
         var changes = PendingChanges(keyColumns: ["id"])
         changes.set(.text("x"), column: "name", key: ["1"], original: "Ann")
         changes.set(.text("Ann"), column: "name", key: ["1"], original: "Ann")
@@ -46,12 +46,12 @@ struct PendingChangesTests {
         #expect(changes.value(["1"], "name") == .text(""))
     }
 
-    @Test func deletedRowsAreNotUpdatedAndNewRowsJustGo() {
+    @Test func deletedRowsAreNotUpdatedAndNewRowsJustGo() throws {
         var changes = PendingChanges(keyColumns: ["id"])
         changes.set(.text("x"), column: "name", key: ["1"], original: "Ann")
         let id = changes.addRow()
         changes.delete([["1"]], inserts: [id])
-        #expect(sql(changes) == ["DELETE FROM `shop`.`items` WHERE `id` IN (1)"])
+        #expect(try sql(changes) == ["DELETE FROM `shop`.`items` WHERE `id` IN (1)"])
         changes.revert([["1"]])
         #expect(changes.isEmpty)
     }
@@ -73,11 +73,11 @@ struct PendingChangesTests {
         #expect(changes.isDeleted(["1"]))
     }
 
-    @Test func compositeKeysAndBatchesOfFiveHundred() {
+    @Test func compositeKeysAndBatchesOfFiveHundred() throws {
         var changes = PendingChanges(keyColumns: ["shop", "sku"])
         changes.delete((0..<1_001).map { ["1", String(format: "s%04d", $0)] })
         changes.set(.text("x"), column: "name", key: ["2", "it's"], original: nil)
-        let statements = changes.statements(database: "db", table: "t", columns: [GridColumn(name: "shop", kind: .number)],
+        let statements = try changes.statements(database: "db", table: "t", columns: [GridColumn(name: "shop", kind: .number)],
                                             noBackslashEscapes: false)
         #expect(statements.map(\.expectedRows) == [500, 500, 1, 1])
         #expect(statements[0].sql.hasPrefix("DELETE FROM `db`.`t` WHERE (`shop`, `sku`) IN ((1, 's0000'), (1, 's0001'), "))
@@ -85,12 +85,12 @@ struct PendingChangesTests {
     }
 
     @Test(arguments: [false, true])
-    func hostileValuesAndNamesStayQuoted(noBackslashEscapes: Bool) {
+    func hostileValuesAndNamesStayQuoted(noBackslashEscapes: Bool) throws {
         for value in Hostile.names {
             var changes = PendingChanges(keyColumns: [value])
             changes.set(.text(value), column: value, key: [value], original: nil)
             let quotedName = SQLQuote.identifier(value), quoted = SQLQuote.string(value, noBackslashEscapes: noBackslashEscapes)
-            let statements = changes.statements(database: value, table: value, columns: [], noBackslashEscapes: noBackslashEscapes)
+            let statements = try changes.statements(database: value, table: value, columns: [], noBackslashEscapes: noBackslashEscapes)
             #expect(statements.map(\.sql) == ["UPDATE \(SQLQuote.identifier(value, value)) SET \(quotedName) = \(quoted) "
                                               + "WHERE \(quotedName) = \(quoted)"])
         }
@@ -100,7 +100,7 @@ struct PendingChangesTests {
         var changes = PendingChanges(keyColumns: ["id"])
         changes.set(.text("x"), column: "name", key: ["1"], original: nil)
         changes.set(.text("y"), column: "name", key: ["2"], original: nil)
-        let statements = changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: false)
+        let statements = try changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: false)
         var ran: [String] = []
         try await PendingChanges.apply(statements) { sql in
             ran.append(sql)

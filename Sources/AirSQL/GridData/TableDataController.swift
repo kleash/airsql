@@ -58,6 +58,11 @@ final class TableDataController: NSViewController, TabContent {
     var loading: Task<Void, Never>?
     /// The data session's NO_BACKSLASH_ESCAPES, as filters quote their values for it (read at each load).
     var noBackslashEscapes = false
+    /// The data session's sql_mode and time zone, which decide what a value may be (read with the first page).
+    var editContext: EditContext?
+    /// A SET column's checklist, or a foreign key's drop-down, while it shows.
+    var checklist: SetChecklist?
+    var lookup: ForeignKeyLookup?
     /// A new filter or sort came while rows were loading: load again once they are in.
     var reloadWhenDone = false
     /// What went wrong last (a filter the server refused), until the next load works.
@@ -95,6 +100,7 @@ final class TableDataController: NSViewController, TabContent {
         viewer.copyTable = (database, tableName)
         viewer.serverSummary = { [weak self] column, done in self?.summarize(column, done: done) }
         viewer.filterByValue = { [weak self] column, value in self?.filter(column, by: value) }
+        viewer.keepValue = { [weak self] row, column, text in self?.keep(.text(text), row: row, column: column) }
         for (index, link) in [countLink, moreLink, allLink].enumerated() { viewer.status.insertView(link, at: index + 1, in: .leading) }
         grid.nullText = model.data.settings.nullText
         grid.fontSize = CGFloat(model.data.settings.gridFontSize)
@@ -162,6 +168,7 @@ final class TableDataController: NSViewController, TabContent {
         if let changes, source.key != nil {
             source.changes = changes
             restored = true
+            NotificationCenter.default.post(name: .tabContentDidChange, object: self)  // the tab's dot
         }
         self.source = source
         grid.sortOrder = source.sort.compactMap { key in
@@ -171,8 +178,9 @@ final class TableDataController: NSViewController, TabContent {
 
     // MARK: Loading
 
-    /// Loads the first page again (a new filter or sort, Refresh), or the next one (Load More).
-    func loadRows(more: Bool, through rows: Int? = nil) {
+    /// Loads the first page again (a new filter or sort, Refresh), or the next one (Load More). `keepingSaved`: the new
+    /// rows read back after Apply stay after the loaded ones (unless the pages bring them).
+    func loadRows(more: Bool, through rows: Int? = nil, keepingSaved: Bool = false) {
         guard let source, loading == nil else { return }
         let limit = more ? rowsPerPage : max(rowsPerPage, rows ?? 0)
         let sql = source.pageSQL(offset: more ? source.loadedRows : 0, limit: limit)
@@ -182,8 +190,9 @@ final class TableDataController: NSViewController, TabContent {
             do {
                 let session = try await openSession()
                 noBackslashEscapes = session.noBackslashEscapes
+                if editContext == nil { editContext = try await readEditContext(session) }
                 let page = try await session.query(sql, rowCap: limit).first?.rows
-                if !more { source.reset() }
+                if !more { source.reset(keepingSaved: keepingSaved) }
                 if let page { source.append(page, requested: limit) }
                 problem = nil
                 if !more { remember() }
@@ -337,7 +346,7 @@ final class TableDataController: NSViewController, TabContent {
         guard loading == nil else { return }
         guard let source else { return open() }
         total = nil
-        loadRows(more: false, through: source.loadedRows)
+        loadRows(more: false, through: source.loadedRows, keepingSaved: true)
     }
 
     /// Keeps the WHERE bar's filter and the sort for the next time the table opens, the filter among the recent ones.

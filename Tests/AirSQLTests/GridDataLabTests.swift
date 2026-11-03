@@ -68,7 +68,7 @@ struct GridDataLabTests {
     }
 
     func apply(_ source: TableDataSource, on session: DBConnection) async throws {
-        try await PendingChanges.apply(source.changes.statements(database: Self.database, table: source.table.name,
+        try await PendingChanges.apply(try source.changes.statements(database: Self.database, table: source.table.name,
                                                                   columns: source.columns,
                                                                   noBackslashEscapes: session.noBackslashEscapes), on: session)
     }

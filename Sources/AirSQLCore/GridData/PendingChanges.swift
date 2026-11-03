@@ -14,8 +14,10 @@ public struct PendingChanges: Equatable {
         case text(String)
         /// The column's default (Set DEFAULT).
         case `default`
+        /// An SQL expression the server works out when Apply runs (Insert Value: NOW(), UUID()…), sent as it is.
+        case sql(String)
 
-        /// As the grid shows it: nil for NULL and DEFAULT, which the cell's style tells apart.
+        /// As the grid shows it: nil for NULL, DEFAULT and an expression, which the cell's style tells apart.
         public var text: String? {
             if case .text(let text) = self { return text }
             return nil
@@ -112,6 +114,15 @@ public struct PendingChanges: Equatable {
     /// Throws away every change (Revert with nothing selected, or after Apply).
     public mutating func revertAll() { change { $0 = State() } }
 
+    /// How many changes undo can take back: before several changes that undo as one, for `squashUndo(to:)`.
+    public var undoDepth: Int { undoStack.count }
+
+    /// Makes the changes since `depth` one step for undo (a paste, a multi-cell edit).
+    public mutating func squashUndo(to depth: Int) {
+        guard undoStack.count > depth + 1 else { return }
+        undoStack.removeSubrange((depth + 1)...)
+    }
+
     public mutating func undo() {
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(state)
@@ -153,18 +164,32 @@ public struct PendingChanges: Equatable {
 
     /// The statements that write the changes to `table` in `database`, in the order Apply runs them: deletes first (so a
     /// new row can take a deleted row's key), then updates, then inserts. `columns` are the table's, in its order.
-    public func statements(database: String, table: String, columns: [GridColumn], noBackslashEscapes: Bool) -> [Statement] {
+    /// `typed` turns a value's text into SQL for its column (the table tab's checks it by the column's type, as
+    /// `ColumnType.literal`); without it, `GridColumn.literal`. A value it refuses stops them all: the `ApplyFailure`
+    /// names the row and the column. Key values are the server's own, so they always go through `GridColumn.literal`.
+    public func statements(database: String, table: String, columns: [GridColumn], noBackslashEscapes: Bool,
+                           typed: ((_ text: String, _ column: String) throws -> String)? = nil) throws -> [Statement] {
         let name = SQLQuote.identifier(database, table)
         let byName = Dictionary(columns.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
-        func literal(_ value: Value, _ column: String) -> String {
+        func column(_ name: String) -> GridColumn { byName[name] ?? GridColumn(name: name) }
+        func literal(_ value: Value, _ name: String, _ target: Statement.Target) throws -> String {
             switch value {
-            case .null: "NULL"
-            case .default: "DEFAULT"
-            case .text(let text): (byName[column] ?? GridColumn(name: column)).literal(text, noBackslashEscapes: noBackslashEscapes)
+            case .null: return "NULL"
+            case .default: return "DEFAULT"
+            case .sql(let sql): return sql
+            case .text(let text):
+                guard let typed else { return column(name).literal(text, noBackslashEscapes: noBackslashEscapes) }
+                do {
+                    return try typed(text, name)
+                } catch {
+                    let reason = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+                    throw ApplyFailure(statement: Statement(sql: "", expectedRows: 1, target: target), changed: nil,
+                                       error: EditError("\(name): \(reason)."))
+                }
             }
         }
         func keyLiterals(_ key: Key) -> [String] {
-            zip(keyColumns, key).map { literal(.text($1), $0) }
+            zip(keyColumns, key).map { column($0).literal($1, noBackslashEscapes: noBackslashEscapes) }
         }
         func ordered(_ values: [String: Value]) -> [String] {
             columns.map(\.name).filter { values[$0] != nil } + values.keys.filter { byName[$0] == nil }.sorted()
@@ -184,16 +209,16 @@ public struct PendingChanges: Equatable {
         }
         for key in state.edits.keys.sorted(by: { $0.lexicographicallyPrecedes($1) }) where !state.deletes.contains(key) {
             let values = state.edits[key] ?? [:]
-            let set = ordered(values).map { SQLQuote.identifier($0) + " = " + literal(values[$0]!, $0) }
+            let set = try ordered(values).map { SQLQuote.identifier($0) + " = " + (try literal(values[$0]!, $0, .update(key))) }
             let condition = zip(keyColumns, keyLiterals(key)).map { SQLQuote.identifier($0) + " = " + $1 }
             statements.append(Statement(sql: "UPDATE \(name) SET " + set.joined(separator: ", ") + " WHERE "
                                         + condition.joined(separator: " AND "), expectedRows: 1, target: .update(key)))
         }
         for insert in state.inserts {
             let names = ordered(insert.values)
+            let values = try names.map { try literal(insert.values[$0]!, $0, .insert(insert.id)) }
             statements.append(Statement(sql: "INSERT INTO \(name) (" + names.map { SQLQuote.identifier($0) }.joined(separator: ", ")
-                                        + ") VALUES (" + names.map { literal(insert.values[$0]!, $0) }.joined(separator: ", ") + ")",
-                                        expectedRows: 1, target: .insert(insert.id)))
+                                        + ") VALUES (" + values.joined(separator: ", ") + ")", expectedRows: 1, target: .insert(insert.id)))
         }
         return statements
     }

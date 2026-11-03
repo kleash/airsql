@@ -5,9 +5,15 @@ import AppKit
 // a block, a double click or Return or typing edits in place, a right click asks the delegate for the menu. Keys arrive
 // as AppKit's standard commands (interpretKeyEvents), so people's own key bindings apply.
 extension DataGridView {
+    /// Takes the keyboard for a click: false while an editor keeps it, its value refused (the cell's editor or the
+    /// value panel says why instead).
+    func takeKeyboard() -> Bool {
+        guard let window else { return editor == nil }
+        return window.makeFirstResponder(self) && window.firstResponder === self
+    }
+
     override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(self)
-        guard let position = position(at: convert(event.locationInWindow, from: nil)) else { return }
+        guard takeKeyboard(), let position = position(at: convert(event.locationInWindow, from: nil)) else { return }
         let flags = event.modifierFlags
         if event.clickCount == 2, flags.isDisjoint(with: [.shift, .command]) {
             isDragging = false
@@ -60,8 +66,7 @@ extension DataGridView {
 
     /// A right click on a cell that isn't selected selects it first; the delegate's menu acts on the selection.
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let position = position(at: convert(event.locationInWindow, from: nil)) else { return nil }
-        window?.makeFirstResponder(self)
+        guard let position = position(at: convert(event.locationInWindow, from: nil)), takeKeyboard() else { return nil }
         if !selection.contains(position) { selection.select(position) }
         return delegate?.dataGrid(self, menuFor: .cells)
     }

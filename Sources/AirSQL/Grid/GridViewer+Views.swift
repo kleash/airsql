@@ -84,7 +84,7 @@ extension GridViewer {
             order.map { column -> String? in
                 switch shown.cell(row, column) {
                 case .text(let text): return text
-                case .null: return nil
+                case .null, .placeholder: return nil
                 case .loading: return "…"
                 }
             }

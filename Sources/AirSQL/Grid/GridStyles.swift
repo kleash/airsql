@@ -56,6 +56,7 @@ struct GridStyles {
         case .text(let text): return display(text)
         case .null: return nullText
         case .loading: return ""
+        case .placeholder(let text): return text
         }
     }
 
@@ -72,7 +73,7 @@ struct GridStyles {
     func width(of cell: GridCell, in column: GridColumn, nullText: String) -> CGFloat {
         let text = Self.text(cell, nullText: nullText)
         guard !text.isEmpty else { return 0 }
-        let font = font(column, isNull: cell == .null)
+        let font = font(column, isNull: cell == .null || cell.isPlaceholder)
         return ceil((text as NSString).size(withAttributes: [.font: font]).width)
     }
 }

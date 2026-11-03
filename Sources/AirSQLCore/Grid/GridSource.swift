@@ -93,6 +93,12 @@ public struct GridColumn: Equatable, Sendable {
 }
 
 extension GridColumn {
+    /// TINYINT(1), BOOLEAN and BIT(1): drawn and edited as a checkbox.
+    public var isBoolean: Bool {
+        let type = type.lowercased()
+        return type.hasPrefix("tinyint(1)") || type.hasPrefix("bit(1)") || type == "boolean" || type == "bool"
+    }
+
     /// The header's second line: the type, then "auto", "default" or "generated", then "null" when NULL is allowed.
     public var typeLine: String {
         var words = type.isEmpty ? [] : [type]
@@ -128,11 +134,19 @@ public enum GridCell: Equatable, Sendable {
     case null
     /// Its page hasn't arrived yet.
     case loading
+    /// What the server puts there when Apply runs, drawn like NULL: a new row's "auto" or "default", or a pending
+    /// expression such as "ƒ NOW()".
+    case placeholder(String)
 
-    /// The text an editor or a copy starts from: "" for NULL and for a cell still loading.
+    /// The text an editor or a copy starts from: "" for NULL, a placeholder and a cell still loading.
     public var text: String {
         if case .text(let text) = self { return text }
         return ""
+    }
+
+    public var isPlaceholder: Bool {
+        if case .placeholder = self { return true }
+        return false
     }
 }
 
