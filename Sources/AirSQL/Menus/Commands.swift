@@ -149,6 +149,10 @@ import AppKit
     @objc optional func restoreDatabase(_ sender: Any?)
     @objc optional func copyToServer(_ sender: Any?)
     @objc optional func compareDatabases(_ sender: Any?)
+    @objc optional func showSyncScript(_ sender: Any?)
+    @objc optional func exportReport(_ sender: Any?)
+    @objc optional func copySyncScript(_ sender: Any?)
+    @objc optional func leaveOutOfCompare(_ sender: Any?)
     @objc optional func generateLiquibase(_ sender: Any?)
     @objc optional func setUpAgents(_ sender: Any?)
     @objc optional func showAgentActivity(_ sender: Any?)
@@ -518,6 +522,14 @@ enum Commands {
                                       tip: "Copy databases or tables, with their rows, to another connection")
     static let compare = Command("Compare…", #selector(AirSQLActions.compareDatabases(_:)),
                                  tip: "Compare two databases' structure and data, and make a script that syncs them")
+    static let syncScript = Command("Sync Script…", #selector(AirSQLActions.showSyncScript(_:)),
+                                    tip: "Review the script that makes the target match the source, then run it if you want")
+    static let exportReport = Command("Export Report…", #selector(AirSQLActions.exportReport(_:)),
+                                      tip: "Save what the compare found as an HTML, CSV or Markdown file")
+    static let copySyncScript = Command("Copy Sync Script", #selector(AirSQLActions.copySyncScript(_:)),
+                                        tip: "Copy the sync statements of the selected objects")
+    static let leaveOutOfCompare = Command("Leave Out of Next Compare", #selector(AirSQLActions.leaveOutOfCompare(_:)),
+                                           tip: "Skip the selected tables when you compare again; Tables… brings them back")
     static let generateLiquibase = Command("Generate Liquibase Changelog…", #selector(AirSQLActions.generateLiquibase(_:)),
                                            tip: "Write a Liquibase changelog of a database's objects and rows")
     static let setUpAgents = Command("Set Up Agents…", #selector(AirSQLActions.setUpAgents(_:)),
@@ -573,7 +585,8 @@ enum Commands {
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
         killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal,
-        export, restore, copyToServer, compare, generateLiquibase, setUpAgents, agentActivity, turnAgentsOff,
+        export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
+        setUpAgents, agentActivity, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
         help, gettingStarted, reportProblem, copyDiagnostics,
     ]
