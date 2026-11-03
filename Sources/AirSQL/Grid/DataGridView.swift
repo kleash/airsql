@@ -1,7 +1,7 @@
 // The data grid (plan §2.5, docs/dev/grid-spec.md): a document view as tall and wide as all its cells, in an
-// NSScrollView, that draws only the cells in the rect AppKit asks for, with Core Text. The spike measured this at about
-// 2.5 ms a frame for 1,000,000 × 50 at full screen on a 120 Hz display, so there is no line cache. The column header
-// and the row numbers are the scroll view's rulers, so they scroll with it; one editor overlay edits a cell in place.
+// NSScrollView, that draws only the cells in the rect AppKit asks for, with Core Text and no line cache (scrolling draws
+// only the strip that comes into view). The column header and the row numbers follow its scrolling beside it
+// (GridContainerView); one editor overlay edits a cell in place.
 import AirSQLCore
 import AppKit
 
@@ -50,8 +50,10 @@ final class DataGridView: NSView {
     }
 
     weak var delegate: DataGridViewDelegate?
-    /// The scroll view to add to a screen: the grid is its document view, the header and row numbers its rulers.
-    let scrollView: NSScrollView = GridScrollView()
+    /// The view to add to a screen: the scroll view with the cells, the header and the row numbers.
+    private(set) var containerView: GridContainerView!
+    /// The cells' scroll view (the grid is its document view), inside `containerView`.
+    let scrollView = NSScrollView()
     private(set) var header: GridHeaderView!
     private(set) var rowNumbers: GridRowNumberView!
 
@@ -108,11 +110,7 @@ final class DataGridView: NSView {
         scrollView.documentView = self
         header = GridHeaderView(grid: self)
         rowNumbers = GridRowNumberView(grid: self)
-        scrollView.hasHorizontalRuler = true
-        scrollView.hasVerticalRuler = true
-        scrollView.horizontalRulerView = header
-        scrollView.verticalRulerView = rowNumbers
-        scrollView.rulersVisible = true
+        containerView = GridContainerView(grid: self)
         setAccessibilityIdentifier("grid")
         self.source = source
         sourceDidChange()
@@ -212,26 +210,19 @@ final class DataGridView: NSView {
         return row < rowCount ? GridPosition(row: row, column: column) : nil
     }
 
-    /// The part of the grid on screen that the header and the row numbers leave uncovered (since macOS 26 the scroll
-    /// view lays its rulers over the cells, with the clip view's insets making room at the start).
-    var shownRect: NSRect {
-        let clip = scrollView.contentView, insets = clip.contentInsets, area = clip.bounds
-        return NSRect(x: area.minX + insets.left, y: area.minY + insets.top, width: area.width - insets.left - insets.right,
-                      height: area.height - insets.top - insets.bottom).intersection(bounds)
-    }
+    /// The part of the grid on screen.
+    var shownRect: NSRect { visibleRect }
 
     /// Rows of a page: what fits on screen.
     var rowsPerPage: Int { max(1, Int(shownRect.height / rowHeight) - 1) }
 
-    /// Scrolls to the first row and column, clear of the header and row numbers.
+    /// Scrolls to the first row and column.
     func scrollToStart() {
-        scrollView.tile()
-        let insets = scrollView.contentView.contentInsets
-        scrollView.contentView.scroll(to: NSPoint(x: -insets.left, y: -insets.top))
+        scrollView.contentView.scroll(to: .zero)
         scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
-    /// Scrolls just enough to show `rect` (a cell) clear of the header and row numbers.
+    /// Scrolls just enough to show `rect` (a cell).
     func reveal(_ rect: NSRect) {
         let shown = shownRect, clip = scrollView.contentView
         guard !shown.isEmpty else { return }
@@ -262,7 +253,9 @@ final class DataGridView: NSView {
 
     private func updateSize() {
         let size = NSSize(width: offsets.last ?? 0, height: CGFloat(rowCount) * rowHeight)
-        if frame.size != size { setFrameSize(size) }
+        if frame.size != size {
+            setFrameSize(size)
+        }
     }
 
     /// A column's width from its header, its first rows and its last: 60 to 230 points, except that a key column is never
@@ -339,19 +332,5 @@ final class DataGridView: NSView {
         if !dirty.isEmpty { setNeedsDisplay(dirty) }
         header.needsDisplay = true
         rowNumbers.needsDisplay = true
-    }
-}
-
-/// The grid's scroll view: when the room for the rulers changes (the row numbers widen as rows arrive, or the view
-/// gets its size), a grid shown from its start stays at its start rather than slipping under the rulers.
-private final class GridScrollView: NSScrollView {
-    override func tile() {
-        let clip = contentView, before = clip.contentInsets, origin = clip.bounds.origin
-        let atStart = origin.x <= 0.5 - before.left && origin.y <= 0.5 - before.top
-        super.tile()
-        let after = clip.contentInsets
-        guard atStart, after.left != before.left || after.top != before.top else { return }
-        clip.scroll(to: NSPoint(x: -after.left, y: -after.top))
-        reflectScrolledClipView(clip)
     }
 }

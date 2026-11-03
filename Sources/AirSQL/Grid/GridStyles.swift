@@ -78,6 +78,14 @@ struct GridStyles {
 }
 
 extension NSColor {
+    /// This colour as the current appearance draws it, made opaque over the content colour: a translucent fill blends
+    /// every pixel (a third of a screen's drawing time went on blending the shaded rows), an opaque one doesn't.
+    var solid: NSColor {
+        guard let color = usingColorSpace(.sRGB) else { return self }
+        guard color.alphaComponent < 1, let content = NSColor.content.usingColorSpace(.sRGB) else { return color }
+        return content.blended(withFraction: color.alphaComponent, of: color.withAlphaComponent(1)) ?? color
+    }
+
     /// Every other row of the grid: the hover tint at 55 % (the mockups' zebra).
     static let gridZebra = NSColor(name: nil) { appearance in
         var color = NSColor.content

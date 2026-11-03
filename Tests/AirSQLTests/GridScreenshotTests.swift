@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Testing
 @testable import AirSQL
 @testable import AirSQLCore
@@ -14,10 +15,31 @@ final class KeyLookWindow: NSWindow {
 // docs/dev/mockups.html. Only with AIRSQL_SCREENSHOTS=1: they go to build/screenshots.
 extension AppTests {
     @MainActor @Suite(.enabled(if: ProcessInfo.processInfo.environment["AIRSQL_SCREENSHOTS"] == "1")) struct GridScreenshotTests {
-        private func save(_ harness: AgentServer, _ name: String, target: String = "main") async throws {
-            let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
-            let image = try #require(reply.image, "\(name): \(reply.error ?? "")")
-            let png = try #require(image.representation(using: .png, properties: [:]))
+        /// The window as the window server shows it, through CGWindowListCreateImage (looked up at run time: the SDK
+        /// no longer declares it); nil where this Mac doesn't allow it. The harness's own picture redraws views, and
+        /// misses what is inside clip views of the grid's container.
+        private func capture(_ window: NSWindow) -> CGImage? {
+            typealias CreateImage = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+            guard let symbol = dlsym(dlopen(nil, RTLD_NOW), "CGWindowListCreateImage") else { return nil }
+            // Only this window (8), without its shadow (1), at the screen's resolution (8).
+            return unsafeBitCast(symbol, to: CreateImage.self)(.null, 8, UInt32(window.windowNumber), 1 | 8)?.takeRetainedValue()
+        }
+
+        private func save(_ window: NSWindow?, _ harness: AgentServer, _ name: String, target: String = "main") async throws {
+            // Core Animation fills the layers of a newly shown view a moment later.
+            window?.displayIfNeeded()
+            CATransaction.flush()
+            try await Task.sleep(nanoseconds: 400_000_000)
+            var image = window.flatMap(capture).map { NSBitmapImageRep(cgImage: $0) }
+            if image == nil {
+                let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
+                guard let picture = reply.image else {
+                    Issue.record("\(name): \(reply.error ?? "")")
+                    return
+                }
+                image = picture
+            }
+            let png = try #require(image?.representation(using: .png, properties: [:]))
             try png.write(to: ScreenshotTests.folder.appendingPathComponent(name + ".png"))
         }
 
@@ -48,7 +70,7 @@ extension AppTests {
                 // Both fixtures in the main window.
                 let (main, harness, _) = AppTests().gridWindow(FakeGridSource.large())
                 show(main.window, appearance)
-                try await save(harness, "grid-large-\(suffix)")
+                try await save(main.window, harness, "grid-large-\(suffix)")
                 main.window?.orderOut(nil)
 
                 let (wide, wideHarness, wideContent) = AppTests().gridWindow(FakeGridSource.wide())
@@ -59,7 +81,7 @@ extension AppTests {
                 clip.scroll(to: NSPoint(x: grid.offsets[4] - clip.contentInsets.left, y: clip.bounds.minY))
                 grid.scrollView.reflectScrolledClipView(clip)
                 wide.window?.displayIfNeeded()
-                try await save(wideHarness, "grid-wide-\(suffix)")
+                try await save(wide.window, wideHarness, "grid-wide-\(suffix)")
                 wide.window?.orderOut(nil)
 
                 // A block of cells with the focused cell, a row added with ⌘, as the key window shows them.
@@ -68,7 +90,7 @@ extension AppTests {
                 content.grid.selection.select(GridPosition(row: 5, column: 3), extend: true)
                 content.grid.selection.selectRow(8, add: true)
                 window.displayIfNeeded()
-                try await save(focusedHarness, "grid-selection-\(suffix)", target: "window:Grid")
+                try await save(window, focusedHarness, "grid-selection-\(suffix)", target: "window:Grid")
 
                 // Pending changes (an edited cell, an added row, a deleted row) and rows still loading.
                 let states = ChangingGridSource(rows: 40, columns: 6)
@@ -76,7 +98,7 @@ extension AppTests {
                 content.grid.source = states
                 content.grid.selection.select(GridPosition(row: 5, column: 2))
                 window.displayIfNeeded()
-                try await save(focusedHarness, "grid-states-\(suffix)", target: "window:Grid")
+                try await save(window, focusedHarness, "grid-states-\(suffix)", target: "window:Grid")
                 content.grid.source = FakeGridSource.large()
 
                 // The editor over a cell, after typing.
@@ -84,7 +106,7 @@ extension AppTests {
                 content.grid.selection.select(GridPosition(row: 4, column: 1))
                 content.grid.beginEditing(at: GridPosition(row: 4, column: 1), text: "Customer 4 Barbara Liskov")
                 window.displayIfNeeded()
-                try await save(focusedHarness, "grid-editor-\(suffix)", target: "window:Grid")
+                try await save(window, focusedHarness, "grid-editor-\(suffix)", target: "window:Grid")
                 content.grid.endEditing(commit: false)
                 window.orderOut(nil)
             }

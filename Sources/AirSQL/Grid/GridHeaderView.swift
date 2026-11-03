@@ -1,11 +1,10 @@
 import AirSQLCore
 import AppKit
 
-/// The grid's column header (the scroll view's horizontal ruler, so it scrolls with the cells): each column's name in
-/// semibold over its type, a key mark on key columns, and at the right the sort control (the column's arrow and its
+/// The grid's column header, above the cells and scrolled across with them: each column's name in semibold over its type, a key mark on key columns, and at the right the sort control (the column's arrow and its
 /// place in the sort; on hover, both arrows). Clicking selects the column; the sort control sorts; dragging the border
 /// resizes and a double click on it auto-fits; dragging a header moves the column.
-final class GridHeaderView: NSRulerView {
+final class GridHeaderView: NSView {
     unowned let grid: DataGridView
     /// The display column under the pointer, for the hover sort control.
     var hovered: Int? { didSet { if hovered != oldValue { needsDisplay = true } } }
@@ -13,33 +12,32 @@ final class GridHeaderView: NSRulerView {
     var dropIndex: Int? { didSet { if dropIndex != oldValue { needsDisplay = true } } }
     static let sortWidth: CGFloat = 18
     private var drag: Drag?
+    private var symbols: [String: NSImage] = [:]
 
     init(grid: DataGridView) {
         self.grid = grid
-        super.init(scrollView: grid.scrollView, orientation: .horizontalRuler)
-        clientView = grid
-        reservedThicknessForMarkers = 0
-        reservedThicknessForAccessoryView = 0
-        ruleThickness = thickness
+        super.init(frame: .zero)
         setAccessibilityIdentifier("grid.header")
     }
 
-    required init(coder: NSCoder) { fatalError("not used") }
+    required init?(coder: NSCoder) { fatalError("not used") }
 
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { true }
-    override var requiredThickness: CGFloat { thickness }
 
     private var nameFont: NSFont { .systemFont(ofSize: grid.fontSize, weight: .semibold) }
     private var typeFont: NSFont { .systemFont(ofSize: grid.fontSize - 1.5) }
-    private var thickness: CGFloat {
+    var thickness: CGFloat {
         ceil(nameFont.ascender - nameFont.descender) + ceil(typeFont.ascender - typeFont.descender) + 8
     }
 
     /// Follows the grid's text size.
     func updateThickness() {
-        if ruleThickness != thickness { ruleThickness = thickness }
+        if frame.height != thickness { grid.containerView?.tile() }
     }
+
+    /// How far the cells are scrolled across: column x in the grid minus this is x here.
+    private var scrolled: CGFloat { grid.scrollView.contentView.bounds.minX }
 
     /// The width a column needs for its header: the key mark, the longer of name and type, the sort control.
     func width(for column: GridColumn) -> CGFloat {
@@ -48,34 +46,24 @@ final class GridHeaderView: NSRulerView {
         return ceil(max(name, type)) + 8 + 4 + Self.sortWidth
     }
 
-    /// A display column's left and right edges in this view.
+    /// A display column's left and right edges here.
     func edges(_ column: Int) -> (left: CGFloat, right: CGFloat) {
-        (convert(NSPoint(x: grid.offsets[column], y: 0), from: grid).x, convert(NSPoint(x: grid.offsets[column + 1], y: 0), from: grid).x)
+        (grid.offsets[column] - scrolled, grid.offsets[column + 1] - scrolled)
     }
 
-    /// Where the cells start in this view: left of it is the corner above the row numbers.
-    var contentLeft: CGFloat { convert(NSPoint(x: grid.shownRect.minX, y: 0), from: grid).x }
-
     override func draw(_ dirtyRect: NSRect) {
-        // Clipped by hand: AppKit doesn't clip a ruler when an ancestor caches its display (a screenshot), and the fill
-        // covered the cells.
-        bounds.clip()
-        NSColor.bar.setFill()
-        dirtyRect.intersection(bounds).fill()
+        let dirtyRect = dirtyRect.intersection(bounds)  // since macOS 14 it can reach past the view
+        NSColor.bar.solid.setFill()
+        dirtyRect.fill()
         let pixel = 1 / (window?.backingScaleFactor ?? 2)
-        let clipLeft = contentLeft
-        NSGraphicsContext.saveGraphicsState()
-        NSRect(x: clipLeft, y: 0, width: max(0, bounds.maxX - clipLeft), height: bounds.height).clip()
         if let source = grid.source {
-            let visible = grid.columns(in: grid.shownRect)
             let focused = grid.isFocused
-            for column in visible {
+            for column in grid.columns(in: dirtyRect.offsetBy(dx: scrolled, dy: 0)) {
                 let (left, right) = edges(column)
                 let rect = NSRect(x: left, y: 0, width: right - left, height: bounds.height)
-                guard rect.intersects(dirtyRect) else { continue }
                 let sourceColumn = grid.columnOrder[column], info = source.columns[sourceColumn]
                 if grid.selection.containsColumn(column) {
-                    (focused ? NSColor.selectedRow : .unemphasizedSelectedContentBackgroundColor).setFill()
+                    (focused ? NSColor.selectedRow : .unemphasizedSelectedContentBackgroundColor).solid.setFill()
                     rect.fill()
                 }
                 drawLabels(info, in: rect)
@@ -85,36 +73,47 @@ final class GridHeaderView: NSRulerView {
             }
             if let dropIndex, dropIndex <= grid.columnCount {
                 NSColor.accent.setFill()
-                let x = convert(NSPoint(x: grid.offsets[dropIndex], y: 0), from: grid).x
-                NSRect(x: x - 1, y: 0, width: 2, height: bounds.height).fill()
+                NSRect(x: grid.offsets[dropIndex] - scrolled - 1, y: 0, width: 2, height: bounds.height).fill()
             }
         }
-        NSGraphicsContext.restoreGraphicsState()
         NSColor.separatorColor.setFill()
-        NSRect(x: 0, y: bounds.height - pixel, width: bounds.width, height: pixel).fill()
-        // The corner's own edge, in line with the row numbers' border.
-        NSRect(x: clipLeft - pixel, y: 0, width: pixel, height: bounds.height).fill()
+        NSRect(x: dirtyRect.minX, y: bounds.height - pixel, width: dirtyRect.width, height: pixel).fill()
     }
 
     private func drawLabels(_ info: GridColumn, in rect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
         var x = rect.minX + 8
         let room = rect.maxX - Self.sortWidth - 4
         let nameHeight = ceil(nameFont.ascender - nameFont.descender)
-        if info.isKey, let key = NSImage(systemSymbolName: "key.fill", accessibilityDescription: "Key")?
-            .withSymbolConfiguration(.init(pointSize: grid.fontSize - 3, weight: .semibold).applying(.init(paletteColors: [.statusWarning]))) {
+        if info.isKey, let key = symbol("key.fill", size: grid.fontSize - 3, color: .statusWarning) {
             let size = key.size
             key.draw(in: NSRect(x: x, y: 4 + (nameHeight - size.height) / 2, width: size.width, height: size.height))
             x += size.width + 3
         }
-        let cut = NSMutableParagraphStyle()
-        cut.lineBreakMode = .byTruncatingTail
-        (info.name as NSString).draw(with: NSRect(x: x, y: 4, width: max(0, room - x), height: nameHeight),
-                                     options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                                     attributes: [.font: nameFont, .foregroundColor: NSColor.labelColor, .paragraphStyle: cut])
-        (info.type as NSString).draw(with: NSRect(x: rect.minX + 8, y: 4 + nameHeight, width: max(0, room - rect.minX - 8),
-                                                  height: ceil(typeFont.ascender - typeFont.descender)),
-                                     options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
-                                     attributes: [.font: typeFont, .foregroundColor: NSColor.tertiaryLabelColor, .paragraphStyle: cut])
+        func draw(_ text: String, _ font: NSFont, _ color: NSColor, x: CGFloat, baseline: CGFloat) {
+            guard !text.isEmpty, room - x > 0 else { return }
+            let attributes: [NSAttributedString.Key: Any] = [.font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): color.cgColor]
+            var line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+            if CTLineGetTypographicBounds(line, nil, nil, nil) > Double(room - x) {
+                let ellipsis = CTLineCreateWithAttributedString(NSAttributedString(string: "…", attributes: attributes))
+                line = CTLineCreateTruncatedLine(line, Double(room - x), .end, ellipsis) ?? line
+            }
+            context.textPosition = CGPoint(x: x, y: baseline)
+            CTLineDraw(line, context)
+        }
+        draw(info.name, nameFont, .labelColor, x: x, baseline: 4 + nameFont.ascender)
+        draw(info.type, typeFont, .tertiaryLabelColor, x: rect.minX + 8, baseline: 4 + nameHeight + typeFont.ascender)
+    }
+
+    /// A symbol in a colour, made once per look and size.
+    private func symbol(_ name: String, size: CGFloat, color: NSColor) -> NSImage? {
+        let key = "\(name) \(size) \(effectiveAppearance.isDark)"
+        if let image = symbols[key] { return image }
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: size, weight: .semibold).applying(.init(paletteColors: [color])))
+        symbols[key] = image
+        return image
     }
 
     /// The column's arrow (accent) and its place when the sort has several columns; both arrows on hover.
@@ -131,9 +130,7 @@ final class GridHeaderView: NSRulerView {
         } else {
             return
         }
-        guard let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: grid.fontSize - 2, weight: .semibold).applying(.init(paletteColors: [color])))
-        else { return }
+        guard let image = self.symbol(symbol, size: grid.fontSize - 2, color: color) else { return }
         let size = image.size
         image.draw(in: NSRect(x: control.midX - size.width / 2 - (grid.sortOrder.count > 1 && index != nil ? 3 : 0),
                               y: control.midY - size.height / 2, width: size.width, height: size.height))
@@ -156,16 +153,12 @@ final class GridHeaderView: NSRulerView {
         case move(column: Int, startX: CGFloat)
     }
 
-    /// The display column under a point (not the corner above the row numbers).
-    func column(at point: NSPoint) -> Int? {
-        guard point.x >= contentLeft else { return nil }
-        return grid.column(atX: grid.convert(point, from: self).x)
-    }
+    /// The display column under a point.
+    func column(at point: NSPoint) -> Int? { grid.column(atX: point.x + scrolled) }
 
     /// The display column whose right border is within 4 points of a point.
     func border(at point: NSPoint) -> Int? {
-        guard point.x >= contentLeft else { return nil }
-        return grid.columns(in: grid.shownRect).first { abs(edges($0).right - point.x) <= 4 }
+        grid.columns(in: NSRect(x: point.x + scrolled - 4, y: 0, width: 8, height: 1)).first { abs(edges($0).right - point.x) <= 4 }
     }
 
     private func isInSortControl(_ point: NSPoint, _ column: Int) -> Bool {
@@ -202,7 +195,7 @@ final class GridHeaderView: NSRulerView {
             guard abs(point.x - startX) > 4 else { return }
             grid.autoscroll(with: event)
             // The border nearest the pointer is where the column would go.
-            let x = grid.convert(event.locationInWindow, from: nil).x
+            let x = convert(event.locationInWindow, from: nil).x + scrolled
             dropIndex = grid.column(atX: x).map { x - grid.offsets[$0] < (grid.offsets[$0 + 1] - grid.offsets[$0]) / 2 ? $0 : $0 + 1 }
                 ?? (x < 0 ? 0 : grid.columnCount)
         case nil:

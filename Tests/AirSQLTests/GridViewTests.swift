@@ -19,7 +19,7 @@ final class GridFixtureContent: NSViewController, TabContent, DataGridViewDelega
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    override func loadView() { view = grid.scrollView }
+    override func loadView() { view = grid.containerView }
 
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool { editable }
     func dataGrid(_ grid: DataGridView, didEditRow row: Int, column: Int, text: String) { edits.append((row, column, text)) }

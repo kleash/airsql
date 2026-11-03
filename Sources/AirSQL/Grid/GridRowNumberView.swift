@@ -1,69 +1,68 @@
 import AirSQLCore
 import AppKit
 
-/// The grid's row numbers (the scroll view's vertical ruler, so they scroll with the cells): 1-based, right-aligned in
-/// tabular digits. Clicking selects the row, a double click opens it in Record View.
-final class GridRowNumberView: NSRulerView {
+/// The grid's row numbers, beside the cells and scrolled down with them: 1-based, right-aligned in tabular digits. Clicking selects the row, a double click opens it in Record View.
+final class GridRowNumberView: NSView {
     unowned let grid: DataGridView
     private var dragging = false
 
     init(grid: DataGridView) {
         self.grid = grid
-        super.init(scrollView: grid.scrollView, orientation: .verticalRuler)
-        clientView = grid
-        reservedThicknessForMarkers = 0
-        reservedThicknessForAccessoryView = 0
+        super.init(frame: NSRect(x: 0, y: 0, width: 40, height: 0))
         setAccessibilityIdentifier("grid.rowNumbers")
         toolTip = "Select the row; double-click to open it in Record View"
     }
 
-    required init(coder: NSCoder) { fatalError("not used") }
+    required init?(coder: NSCoder) { fatalError("not used") }
 
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { true }
-    override var requiredThickness: CGFloat { ruleThickness }
     private var font: NSFont { .monospacedDigitSystemFont(ofSize: grid.fontSize, weight: .regular) }
 
     /// As wide as the largest row number needs (at least 40 points).
-    func updateThickness() {
+    var thickness: CGFloat {
         let digits = String(repeating: "8", count: String(max(1, grid.rowCount)).count) as NSString
-        let width = max(40, ceil(digits.size(withAttributes: [.font: font]).width) + 2 * GridStyles.padding)
-        if ruleThickness != width { ruleThickness = width }
+        return max(40, ceil(digits.size(withAttributes: [.font: font]).width) + 2 * GridStyles.padding)
     }
 
+    func updateThickness() {
+        if frame.width != thickness { grid.containerView?.tile() }
+    }
+
+    /// How far the cells are scrolled down: row y in the grid minus this is y here.
+    private var scrolled: CGFloat { grid.scrollView.contentView.bounds.minY }
+
+    /// The numbers of the rows shown.
     override func draw(_ dirtyRect: NSRect) {
-        // Clipped by hand: AppKit doesn't clip a ruler when an ancestor caches its display (a screenshot), and the fill
-        // covered the cells.
-        bounds.clip()
-        NSColor.bar.setFill()
-        dirtyRect.intersection(bounds).fill()
+        let dirtyRect = dirtyRect.intersection(bounds)  // since macOS 14 it can reach past the view
+        NSColor.bar.solid.setFill()
+        dirtyRect.fill()
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
         let pixel = 1 / (window?.backingScaleFactor ?? 2)
-        let focused = grid.isFocused
-        let rows = grid.rows(in: grid.shownRect)
-        for row in rows {
-            let top = convert(NSPoint(x: 0, y: CGFloat(row) * grid.rowHeight), from: grid).y
-            let rect = NSRect(x: 0, y: top, width: bounds.width, height: grid.rowHeight)
-            guard rect.intersects(dirtyRect) else { continue }
+        let selectedFill = (grid.isFocused ? NSColor.selectedRow : .unemphasizedSelectedContentBackgroundColor).solid
+        for row in grid.rows(in: dirtyRect.offsetBy(dx: 0, dy: scrolled)) {
+            let top = CGFloat(row) * grid.rowHeight - scrolled
             let selected = grid.selection.containsRow(row)
             if selected {
-                (focused ? NSColor.selectedRow : .unemphasizedSelectedContentBackgroundColor).setFill()
-                rect.fill()
+                selectedFill.setFill()
+                NSRect(x: 0, y: top, width: bounds.width, height: grid.rowHeight).fill()
             }
             var color = selected ? NSColor.labelColor : .tertiaryLabelColor
             if let source = grid.source, let first = grid.columnOrder.first {
                 let mark = source.mark(row, first)
-                let line: NSColor? = mark == .inserted ? .pendingInsertLine : mark == .deleted ? .pendingDeleteLine : nil
-                if let line {
+                if let line = mark == .inserted ? NSColor.pendingInsertLine : mark == .deleted ? NSColor.pendingDeleteLine : nil {
                     line.setFill()
                     NSRect(x: 0, y: top, width: 3, height: grid.rowHeight).fill()
                     color = line
                 }
             }
-            let text = String(row + 1) as NSString
-            let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
-            let width = text.size(withAttributes: attributes).width
-            text.draw(at: NSPoint(x: bounds.width - GridStyles.padding - width, y: top + grid.styles.baseline - font.ascender),
-                      withAttributes: attributes)
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: String(row + 1), attributes: [
+                .font: font, NSAttributedString.Key(kCTForegroundColorAttributeName as String): color.cgColor,
+            ]))
+            let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+            context.textPosition = CGPoint(x: bounds.width - GridStyles.padding - width, y: top + grid.styles.baseline)
+            CTLineDraw(line, context)
             NSColor.softSeparator.setFill()
             NSRect(x: 0, y: top + grid.rowHeight - pixel, width: bounds.width, height: pixel).fill()
         }
@@ -74,7 +73,7 @@ final class GridRowNumberView: NSRulerView {
     // MARK: Mouse
 
     private func row(at event: NSEvent) -> Int? {
-        let y = grid.convert(event.locationInWindow, from: nil).y
+        let y = convert(event.locationInWindow, from: nil).y + scrolled
         return y >= 0 && Int(y / grid.rowHeight) < grid.rowCount ? Int(y / grid.rowHeight) : nil
     }
 

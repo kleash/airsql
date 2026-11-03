@@ -10,7 +10,10 @@ extension DataGridView {
 
     /// Draws the cells AppKit asks for (only newly shown strips while scrolling): backgrounds, text, lines, focus ring.
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.content.setFill()
+        // Since macOS 14 a view isn't clipped to itself and the rect to draw can reach past it.
+        let dirtyRect = dirtyRect.intersection(bounds)
+        let content = NSColor.content.solid
+        content.setFill()
         dirtyRect.fill()
         guard let source, let context = NSGraphicsContext.current?.cgContext else { return }
         let rows = rows(in: dirtyRect), columns = columns(in: dirtyRect)
@@ -23,6 +26,12 @@ extension DataGridView {
         let left = offsets[columns.lowerBound], right = offsets[columns.upperBound]
         let top = CGFloat(rows.lowerBound) * rowHeight, bottom = CGFloat(rows.upperBound) * rowHeight
         context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+        // Backgrounds as opaque colours, resolved once a draw.
+        let zebra = NSColor.gridZebra.solid, focus = NSColor.gridFocus.solid
+        let selected = focused ? NSColor.gridSelection.solid : NSColor.unemphasizedSelectedContentBackgroundColor.solid
+        let selectedRow = focused ? NSColor.selectedRow.solid : selected
+        let marks: [GridMark: NSColor] = [.edited: NSColor.pendingEdit.solid, .inserted: NSColor.pendingInsert.solid,
+                                          .deleted: NSColor.pendingDelete.solid]
         // Attributes and "…" for each look, made once per draw.
         var looks: [Int: (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine)] = [:]
         func look(_ column: Int, _ info: GridColumn, isNull: Bool, deleted: Bool) -> (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine) {
@@ -37,7 +46,7 @@ extension DataGridView {
         for row in rows {
             let y = CGFloat(row) * rowHeight
             if row % 2 == 1 {
-                NSColor.gridZebra.setFill()
+                zebra.setFill()
                 NSRect(x: left, y: y, width: right - left, height: rowHeight).fill()
             }
             let wholeRow = selection.containsRow(row)
@@ -45,17 +54,15 @@ extension DataGridView {
                 let rect = NSRect(x: offsets[column], y: y, width: offsets[column + 1] - offsets[column], height: rowHeight)
                 let sourceColumn = columnOrder[column], info = source.columns[sourceColumn]
                 let mark = source.mark(row, sourceColumn), position = GridPosition(row: row, column: column)
-                switch mark {
-                case .edited: NSColor.pendingEdit.setFill(); rect.fill()
-                case .inserted: NSColor.pendingInsert.setFill(); rect.fill()
-                case .deleted: NSColor.pendingDelete.setFill(); rect.fill()
-                case .none: break
+                if let fill = marks[mark] {
+                    fill.setFill()
+                    rect.fill()
                 }
                 if focused, selection.cursor == position {
-                    NSColor.gridFocus.setFill()
+                    focus.setFill()
                     rect.fill()
                 } else if selection.contains(position) {
-                    (focused ? wholeRow ? NSColor.selectedRow : .gridSelection : .unemphasizedSelectedContentBackgroundColor).setFill()
+                    (wholeRow ? selectedRow : selected).setFill()
                     rect.fill()
                 }
                 if mark == .edited {
@@ -72,8 +79,12 @@ extension DataGridView {
                                                      width: max(0, min(available, 64)), height: 8), xRadius: 4, yRadius: 4).fill()
                     continue
                 }
-                let text = GridStyles.text(cell, nullText: nullText)
+                var text = GridStyles.text(cell, nullText: nullText)
                 guard !text.isEmpty, available > 0 else { continue }
+                // No more characters than the narrowest glyphs could fit: laying out long values was most of a screen's
+                // drawing time. Shortened, it always ends in "…".
+                let limit = Int(available / (styles.regular.pointSize * 0.2)) + 1
+                if !info.isKey, text.count > limit { text = String(text.prefix(limit)) + "…" }
                 let deleted = mark == .deleted
                 let (attributes, ellipsis) = look(sourceColumn, info, isNull: cell == .null, deleted: deleted)
                 var line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
