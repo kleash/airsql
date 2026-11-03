@@ -85,6 +85,27 @@ struct GridTests {
         #expect(selection.areas == [.rows(10...11)])
     }
 
+    @Test func selectionGrowsAndShrinksFromTheFocusedCell() {
+        var selection = GridSelection()
+        selection.grow()  // nothing focused: nothing to grow
+        #expect(selection.isEmpty)
+        selection.select(GridPosition(row: 3, column: 2))
+        selection.select(GridPosition(row: 5, column: 4), extend: true)
+        let steps: [GridSelection.Area] = [.columns(4...4), .rows(5...5), .all]
+        for step in steps {
+            selection.grow()
+            #expect(selection.areas == [step] && selection.cursor == GridPosition(row: 5, column: 4))
+        }
+        selection.grow()  // everything already
+        #expect(selection.areas == [.all])
+        for step in [GridSelection.Area.rows(5...5), .columns(4...4), .cells(rows: 5...5, columns: 4...4)] {
+            selection.shrink()
+            #expect(selection.areas == [step] && selection.cursor == GridPosition(row: 5, column: 4))
+        }
+        selection.shrink()  // one cell: stays
+        #expect(selection.areas == [.cells(rows: 5...5, columns: 4...4)])
+    }
+
     @Test func reloadKeepsTheSelectionInside() {
         var selection = GridSelection()
         selection.select(GridPosition(row: 50, column: 4))

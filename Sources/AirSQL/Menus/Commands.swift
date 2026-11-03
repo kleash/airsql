@@ -111,6 +111,8 @@ import AppKit
     @objc optional func countRows(_ sender: Any?)
     @objc optional func hideColumn(_ sender: Any?)
     @objc optional func freezeColumns(_ sender: Any?)
+    @objc optional func extendSelection(_ sender: Any?)
+    @objc optional func shrinkSelection(_ sender: Any?)
     @objc optional func displayAs(_ sender: Any?)
     @objc optional func exportRows(_ sender: Any?)
 
@@ -231,6 +233,7 @@ struct Command {
 
 private func sel(_ name: String) -> Selector { NSSelectorFromString(name) }
 
+private let up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
 private let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
 private let f9 = String(UnicodeScalar(NSF9FunctionKey)!)
 
@@ -296,6 +299,10 @@ enum Commands {
     static let delete = Command("Delete", #selector(NSText.delete(_:)), tip: "Delete the selection")
     static let selectAll = Command("Select All", #selector(NSText.selectAll(_:)), "a",
                                    tip: "Select everything in the editor, grid or list that has the focus")
+    static let extendSelection = Command("Extend Selection", #selector(AirSQLActions.extendSelection(_:)), up, .option,
+                                         tip: "Grow the grid's selection from the cell to its column, its row, then everything")
+    static let shrinkSelection = Command("Shrink Selection", #selector(AirSQLActions.shrinkSelection(_:)), down, .option,
+                                         tip: "Shrink the grid's selection back: everything, the row, the column, the cell")
     static let copyName = Command("Copy Name", #selector(AirSQLActions.copyName(_:)), tip: "Copy the selected object's name, quoted for SQL")
     static let copyColumnName = Command("Copy Column Name", #selector(AirSQLActions.copyColumnNames(_:)),
                                         tip: "Copy the name of the selected column")
@@ -606,7 +613,7 @@ enum Commands {
         about, settings, hide, hideOthers, showAll, quit,
         newConnection, newQuery, open, closeTab, closeOtherTabs, closeWindow, save, saveAs, duplicateTab, renameTab, revealInFinder,
         runSQLFile, importCSV, importSSHConfig,
-        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, copyName, copyColumnName, copyCreate,
+        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,

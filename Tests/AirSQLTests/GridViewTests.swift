@@ -176,6 +176,24 @@ extension AppTests {
         #expect(grid.selection.cursor == GridPosition(row: 0, column: 49))
         await key("cmd+a")
         #expect(grid.selection.areas == [.all])
+        await key("opt+down"); await key("opt+down")  // ⌥↓: the row, then the column
+        #expect(grid.selection.areas == [.columns(49...49)] && grid.selection.cursor == GridPosition(row: 0, column: 49))
+        await key("opt+up")
+        #expect(grid.selection.areas == [.rows(0...0)])
+    }
+
+    @Test func gridScrollsAcrossWithShiftAndFasterWithOption() {
+        func scroll(_ flags: CGEventFlags, down: Int32 = -40, across: Int32 = 0) -> NSPoint {
+            let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: down, wheel2: across, wheel3: 0)!
+            event.flags = flags
+            let changed = DataGridView.scroll(NSEvent(cgEvent: event)!)
+            return NSPoint(x: changed.scrollingDeltaX, y: changed.scrollingDeltaY)
+        }
+        let plain = scroll([])
+        #expect(plain.x == 0 && plain.y == -40)
+        #expect(scroll(.maskShift) == NSPoint(x: -40, y: 0))
+        #expect(scroll(.maskShift, down: 0, across: -40) == NSPoint(x: -40, y: 0))  // a wheel macOS already turned
+        #expect(scroll(.maskAlternate) == NSPoint(x: 0, y: -200))
     }
 
     @Test func gridEditsInPlace() async {
