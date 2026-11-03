@@ -8,6 +8,7 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
     weak var window: ReconWindowController?
     let view = NSView()
     let tabs = NSSegmentedControl(labels: ["Structure", "Data"], trackingMode: .selectOne, target: nil, action: nil)
+    static let structureTip = "Show the two definitions side by side", dataTip = "Show the rows that differ, down to the cell"
     let ignoring = label("", font: .systemFont(ofSize: 11.5), color: .tertiaryLabelColor, truncates: true)
     let left = ReconDetailView.textView(id: "recon.sourceDDL")
     let right = ReconDetailView.textView(id: "recon.targetDDL")
@@ -31,8 +32,8 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         tabs.action = #selector(tabChosen(_:))
         tabs.selectedSegment = 0
         tabs.selectedSegmentBezelColor = .selectedSegment
-        tabs.setToolTip("Show the two definitions side by side", forSegment: 0)
-        tabs.setToolTip("Show the rows that differ, down to the cell", forSegment: 1)
+        tabs.setToolTip(Self.structureTip, forSegment: 0)
+        tabs.setToolTip(Self.dataTip, forSegment: 1)
         tabs.setAccessibilityIdentifier("recon.tabs")
         destructive.target = self
         destructive.action = #selector(destructiveToggled(_:))
@@ -122,7 +123,10 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
 
     /// Before the first compare: what to do.
     func showStart() {
-        for segment in 0..<2 { tabs.setEnabled(false, forSegment: segment) }
+        for segment in 0..<2 {
+            tabs.setEnabled(false, forSegment: segment)
+            tabs.setToolTip("Compare first: then there is something to show", forSegment: segment)
+        }
         structure.isHidden = true
         rowsScroll.isHidden = true
         message.stringValue = "Choose a database on each side, then Compare (⌘R). The script it makes changes the target only "
@@ -134,11 +138,14 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
     func update() {
         guard let result else { return }
         tabs.setEnabled(true, forSegment: 0)
+        tabs.setToolTip(Self.structureTip, forSegment: 0)
         let rules = result.options.ignore
         let ignored = [rules.autoIncrement ? "AUTO_INCREMENT" : nil, rules.definer ? "DEFINER" : nil,
                        rules.collation ? "collations" : nil, rules.whitespace ? "whitespace" : nil].compactMap { $0 }
         ignoring.stringValue = ignored.isEmpty ? "Nothing ignored" : "Ignoring " + ignored.joined(separator: ", ")
         tabs.setEnabled(object?.data != nil, forSegment: 1)
+        tabs.setToolTip(object?.data != nil ? Self.dataTip : object == nil ? "Select a table first"
+                        : "Only tables on both sides whose rows were compared show their rows", forSegment: 1)
         if object?.data == nil { tabs.selectedSegment = 0 }
         let showsData = tabs.selectedSegment == 1
         structure.isHidden = showsData || object == nil

@@ -212,6 +212,8 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
         control.identifier = NSUserInterfaceItemIdentifier(id)
         // Every cell says what it holds (a text cell its whole text, when it has one).
         if control.toolTip == nil { control.toolTip = tableColumn?.headerToolTip }
+        // A checkbox has no title of its own: VoiceOver reads its column's.
+        if let box = control as? NSButton, box.title.isEmpty { box.setAccessibilityLabel(tableColumn?.title) }
         // In the middle of its row, across the column.
         let cell = NSView()
         control.translatesAutoresizingMaskIntoConstraints = false

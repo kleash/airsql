@@ -40,6 +40,8 @@ extension AppTests {
             let tx = main.toolbarController.transactionPopup
             toolbar.validateVisibleItems()
             #expect(button(.run)?.isEnabled == false && button(.run)?.toolTip?.hasPrefix("Connect first: double-click") == true)
+            let help = AXNode.flatten(try #require(main.window)).first { $0.id == "toolbar.run" }?.help
+            #expect(help?.hasPrefix("Connect first: double-click") == true, "VoiceOver reads why too: \(help ?? "")")
             #expect(button(.commit)?.isEnabled == false && button(.commit)?.toolTip == "No transaction is open in this tab")
             #expect(button(.cancel)?.isEnabled == false && button(.cancel)?.toolTip == "Nothing is running in this tab")
             #expect(!tx.isEnabled && tx.toolTip?.hasPrefix("Connect first: double-click") == true)

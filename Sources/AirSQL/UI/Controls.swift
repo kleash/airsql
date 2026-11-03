@@ -171,6 +171,11 @@ final class Form {
     func row(_ title: String, _ views: [NSView], caption text: String? = nil) -> NSGridRow {
         let name = label(title.isEmpty ? "" : title + ":")
         name.alignment = .right
+        // VoiceOver reads the label with the row's first control when that has no title of its own (a field, a pop-up).
+        if !title.isEmpty, let control = views.first,
+           (control as? NSTextField)?.isEditable == true || control is NSPopUpButton || control is NSSegmentedControl {
+            control.setAccessibilityTitleUIElement(name)
+        }
         let content: NSView
         if views.count == 1 {
             content = views[0]

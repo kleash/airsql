@@ -82,6 +82,8 @@ final class ResultTabButton: NSView {
         return true
     }
 
+    override func isAccessibilityEnabled() -> Bool { true }
+
     // MARK: Renaming in place
 
     func beginRename() {

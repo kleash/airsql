@@ -37,13 +37,13 @@ extension TableEditorController {
         listScroll.hasHorizontalScroller = true
         listScroll.autohidesScrollers = true
         listScroll.borderType = .noBorder
-        for (control, symbol, tip, action, id) in [
-            (addButton, "plus", Commands.addRow.tip, Commands.addRow.action, "tableEditor.add"),
-            (removeButton, "minus", "Remove the selected rows from the design; they go when you apply", Commands.deleteRows.action,
-             "tableEditor.remove"),
+        for (control, symbol, name, tip, action, id) in [
+            (addButton, "plus", "Add Row", Commands.addRow.tip, Commands.addRow.action, "tableEditor.add"),
+            (removeButton, "minus", "Remove Rows", "Remove the selected rows from the design; they go when you apply",
+             Commands.deleteRows.action, "tableEditor.remove"),
         ] {
             control.bezelStyle = .smallSquare
-            control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
+            control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: name)
             control.target = self
             control.action = action
             control.toolTip = tip
