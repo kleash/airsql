@@ -167,6 +167,13 @@ P0 builds and freezes, so lanes plug in instead of inventing:
   editing; built in the spike, not after (R15).
 - **Spike (gate):** the targets in grid-spec §8; frame rate measured on this Mac's 120 Hz ProMotion display; CI
   checks deterministic numbers instead (R14).
+- **Spike outcome (P0-6):** the grid is the scroll view's document view, as big as all its cells, drawing only the
+  rect AppKit asks for; no line or glyph cache (one was built and changed nothing, R19). The header and row numbers
+  are plain views beside the scroll view (a screen adds `grid.containerView`), not rulers, which macOS 26 lays over
+  the cells and redraws on every frame. Scrolling down meets 120 Hz for 1,000,000 × 50 and for 300 columns;
+  scrolling across 300 columns doesn't (about 11 ms a frame: AppKit draws the visible text again on each step). The
+  fallback, for L3 to evaluate with its 300-column tables: redraw the visible area each frame from a `CTLine` cache
+  (a median 2.9 ms a frame at full screen in the spike), or a tiled `CALayer` document.
 
 ### 2.6 Console
 
@@ -439,7 +446,7 @@ wave.
 
 | Risk | Mitigation |
 |---|---|
-| Custom grid misses targets | Spike gate in P0; fallback recorded |
+| Custom grid misses targets | Spike gate in P0; scrolling across 300 columns missed it, fallback in §2.5 for L3 |
 | TLS verification through tunnels | P0-2 proves the callback or adds a small patch; lab certificates test both outcomes |
 | libmariadb build with Command Line Tools | P0-1 first; CMake pinned like AirSCP's FreeRDP script; vendor cache shared by worktrees |
 | Agent writes or reads beyond access | Fail-closed gate in `DBConnection`, person-only settings, redaction, attack corpus |
