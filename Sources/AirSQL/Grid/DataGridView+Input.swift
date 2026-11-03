@@ -36,13 +36,15 @@ extension DataGridView {
         isDragging = false
     }
 
-    /// The cell under the pointer shows its whole value (the first 1 KB) as a tooltip when the cell cuts it.
+    /// The cell under the pointer shows its whole value (the first 1 KB) as a tooltip when the cell cuts it, or what its
+    /// source notes about it (a diff's other value).
     override func mouseMoved(with event: NSEvent) {
         let position = position(at: convert(event.locationInWindow, from: nil))
         guard position != hoveredCell else { return }
         hoveredCell = position
         guard let position, let source else { return toolTip = nil }
         let column = columnOrder[position.column], cell = source.cell(position.row, column)
+        if let note = source.note(position.row, column) { return toolTip = note }
         let width = styles.width(of: cell, in: source.columns[column], nullText: nullText)
         let text = cell.text
         let cut = width > cellRect(position).width - 2 * GridStyles.padding || text.contains(where: \.isNewline)

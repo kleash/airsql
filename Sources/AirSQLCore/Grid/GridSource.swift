@@ -16,8 +16,10 @@
 ///   `.loading`); read-only unless the result comes from one table with a key.
 /// - Transpose and Record View: a `TransposedSource` wraps another source: a row per column, its name, then a column
 ///   per row (the first 1,000, or Record View's one); `base(_:_:)` maps a cell back to the source's.
-/// - Diff (compare results, recon): a `DiffSource` lines up two sources by key and marks rows added (`.inserted`),
-///   removed (`.deleted`) or changed (`.edited`, on the cells that differ).
+/// - Diff (the compare window's rows that differ, a console result compared with another result or a table): a
+///   `DiffSource` shows a `ReconTableData`, rows matched by key: those only the first side has (`.inserted`), those only
+///   the second has (`.deleted`), then those both have with other values (`.edited` on the cells that differ, whose
+///   `note` gives the second side's value).
 public protocol GridSource: AnyObject {
     /// The columns in the source's order; the grid keeps its own display order and widths.
     var columns: [GridColumn] { get }
@@ -33,6 +35,8 @@ public protocol GridSource: AnyObject {
     /// The cell's whole value, never shortened (copy, the value panel, the selection's sum): nil for NULL and while
     /// loading.
     func value(_ row: Int, _ column: Int) -> String?
+    /// What the cell's tooltip says instead of its value: a diff's other value for a changed cell; nil for nothing.
+    func note(_ row: Int, _ column: Int) -> String?
 }
 
 public extension GridSource {
@@ -42,6 +46,7 @@ public extension GridSource {
         if case .text(let text) = cell(row, column) { return text }
         return nil
     }
+    func note(_ row: Int, _ column: Int) -> String? { nil }
 }
 
 /// A column as the grid shows it.

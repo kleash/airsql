@@ -161,4 +161,60 @@ extension AppTests {
         #expect((leakRun["error"] as? String)?.contains("S3cret-pass") == false)
         for tab in main.tabs { main.close(tab) }
     }
+
+    /// The Agent tab (scope ai-3): each statement of a run_queries call and the rows the agent got, read-only, in one tab
+    /// per connection that is reused. A double-click in Agent Activity opens it at that call; one on a statement opens it
+    /// in a new console.
+    @Test func theAgentTabShowsWhatAgentsRanAndGot() async throws {
+        let model = testModel(Self.agentConnections())
+        let (main, harness) = appWindow(model)
+        let service = AgentService(model: model, main: main, directory: URL(fileURLWithPath: try scratch() + "/agent"))
+        let reports = model.data.connections[2]
+        main.sidebar.select([reports.id])
+        main.sidebarSelectionChanged()
+        #expect(await call(harness, "menu", ["path": "View > Agent Results"]).error == nil)
+        let tab = try #require(main.selectedTab?.content as? AgentResultsContent)
+        #expect(main.selectedTab?.title == "Agent Results" && main.selectedTab?.connectionID == reports.id)
+        #expect(find(NSTextField.self, id: "agentResults.empty", in: tab.view)?.isHidden == false)
+
+        let rows = ResultStore(columns: [ResultStore.Column(name: "name", type: MYSQL_TYPE_VAR_STRING)])
+        _ = rows.append([Array("Ada".utf8)])
+        let id = service.record("claude-code 2", "run_queries · SELECT name FROM customers (+1)")
+        service.keep(["results": [["sql": "SELECT name FROM customers", "ok": true, "columns": ["name"], "rowCount": 1,
+                                   "capped": true],
+                                  ["sql": "UPDATE customers SET name = ''", "ok": false, "error": "Refused: it isn't read-only"]]],
+                     [0: rows], call: id, client: "claude-code 2", connection: reports.id)
+        service.finish(id, "1 row, 1 refused or failed")
+        // The newest statement is selected: the refused one says why.
+        #expect(tab.runs.map(\.outcome) == ["1 row, more weren't sent", "Refused: it isn't read-only"])
+        #expect(tab.table.selectedRowIndexes == [1] && find(NSTextField.self, id: "agentResults.empty", in: tab.view)?.isHidden == true)
+        #expect(find(NSTextField.self, id: "agentResults.detail", in: tab.view)?.stringValue == "Refused: it isn't read-only")
+        // A click shows the first one's rows in the result grid.
+        tab.table.selectRowIndexes([0], byExtendingSelection: false)
+        let grid = try #require(find(ResultGridView.self, in: tab.view))
+        #expect((grid.source as? ResultSetSource)?.store === rows && grid.grid.source?.value(0, 0) == "Ada")
+
+        // One tab per connection: the menu shows it again; Agent Activity's double-click opens it at the call.
+        main.select(main.openConsole(text: "", title: nil, connection: reports.id))
+        main.showAgentResults(nil)
+        #expect(main.selectedTab?.content === tab && main.tabs.filter { $0.content is AgentResultsContent }.count == 1)
+        tab.table.selectRowIndexes([], byExtendingSelection: false)
+        main.select(main.tabs[0])
+        #expect(main.statusBar.agent.showPopover())
+        let popover = try #require(main.statusBar.agent.shown?.contentViewController?.view)
+        let row = try #require(Self.views(in: popover).first { $0.toolTip?.hasPrefix("Double-click to see") == true })
+        row.mouseDown(with: try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                              windowNumber: 0, context: nil, eventNumber: 0, clickCount: 2,
+                                                              pressure: 1)))
+        #expect(main.selectedTab?.content === tab && tab.table.selectedRowIndexes == [0, 1])
+
+        // A double-click on a statement, or Open in New Console, puts it in a new console tab of the connection.
+        tab.table.selectRowIndexes([0], byExtendingSelection: false)
+        tab.openInNewConsole(nil)
+        let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+        #expect(console.agentText == "SELECT name FROM customers;" && main.selectedTab?.connectionID == reports.id)
+        for tab in main.tabs { main.close(tab) }
+    }
+
+    static func views(in view: NSView) -> [NSView] { [view] + view.subviews.flatMap { views(in: $0) } }
 }

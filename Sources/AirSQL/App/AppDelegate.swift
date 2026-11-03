@@ -136,6 +136,7 @@ enum HelpPage: String, CaseIterable {
     case clientTools = "client-tools.html"
     case editors = "editors.html"
     case compare = "compare.html"
+    case compareResults = "compare.html#compare-two-results-or-a-result-with-a-table"
     case agents = "agents.html"
     case connections = "connections.html"
     case tableData = "table-data.html"

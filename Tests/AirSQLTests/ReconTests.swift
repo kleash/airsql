@@ -1,3 +1,4 @@
+import CMariaDB
 import Foundation
 import Testing
 @testable import AirSQLCore
@@ -400,5 +401,79 @@ struct ReconTests {
         let rows = ReconLines.aligned("a\nb\nc\nd", "a\nc\nx\nd")
         #expect(rows.map { "\($0.left ?? "-")\($0.right ?? "-")" } == ["aa", "b-", "cc", "-x", "dd"])
         #expect(ReconLines.aligned("", "").count == 1)
+    }
+}
+
+/// A result compared with another result in memory (Compare With…), and the diff as the grid shows it.
+struct ReconResultsTests {
+    /// A result of `columns` (the first as the primary key when `keyed`) holding `rows`; nil cells are NULL.
+    static func store(_ columns: [(String, enum_field_types)], keyed: Bool = true, _ rows: [[String?]]) -> ResultStore {
+        let store = ResultStore(columns: columns.enumerated().map { index, column in
+            ResultStore.Column(name: column.0, originalTable: "t", type: column.1, flags: keyed && index == 0 ? UInt32(PRI_KEY_FLAG) : 0)
+        })
+        for row in rows { store.append(row.map { $0.map { Array($0.utf8) } }) }
+        return store
+    }
+
+    static let ints = MYSQL_TYPE_LONG, text = MYSQL_TYPE_VAR_STRING, money = MYSQL_TYPE_NEWDECIMAL, json = MYSQL_TYPE_JSON
+
+    /// Matched on the key: rows only in the first are missing, only in the second extra, and changed rows name the
+    /// cells that differ, values compared as the data compare compares them (2.50 = 2.5, JSON by value, NULL ≠ "").
+    /// Columns go by name in the first's order; those only one side has aren't compared.
+    @Test func resultsCompareOnTheirKey() {
+        let first = Self.store([("id", Self.ints), ("name", Self.text), ("price", Self.money), ("tags", Self.json), ("extra", Self.text)], [
+            ["1", "pen", "2.50", #"{"a": 1, "b": 2}"#, "x"], ["2", "ink", "4.00", nil, "y"], ["3", "pad", "1.00", "[]", "z"],
+            ["5", "", "9.99", nil, nil],
+        ])
+        let second = Self.store([("PRICE", Self.money), ("id", Self.ints), ("name", Self.text), ("tags", Self.json)], [
+            ["2.5", "1", "pen", #"{"b":2,"a":1}"#], ["4.10", "2", "INK", nil], ["7.00", "4", "cap", nil], ["9.99", "5", nil, nil],
+        ])
+        let data = ReconTableData.compare(first, second, key: ["id"])
+        #expect(data.outcome == .different && data.key == ["id"] && data.columns.map(\.name) == ["id", "name", "price", "tags"])
+        #expect(data.columns.map(\.kind) == [.integer, .text, .decimal, .json])
+        #expect(data.missing.map { $0.text(0, kind: .integer) } == ["3"])
+        #expect(data.extra.map { $0.text(0, kind: .integer) } == ["4"])
+        #expect(data.changed.map { $0.source.text(0, kind: .integer) ?? "" } == ["2", "5"])
+        #expect(data.changed.map(\.columns) == [[1, 2], [1]])
+        #expect(data.sourceRows == 4 && data.targetRows == 4)
+        // The diff in the grid: added, removed, then changed rows, the first's values with both in a changed cell's note.
+        let diff = DiffSource(data, names: ("Result 2", "Result 1"))
+        #expect(diff.rowCount == 4 && (0..<4).map { diff.mark($0, 1) } == [.inserted, .deleted, .edited, .edited])
+        #expect(diff.mark(2, 0) == .none && diff.value(1, 1) == "cap" && diff.cell(3, 1) == .text(""))
+        #expect(diff.note(2, 1) == "Result 1 has INK; Result 2 has ink" && diff.note(3, 1) == "Result 1 has NULL; Result 2 has ")
+        #expect(diff.note(0, 1) == nil && diff.note(2, 3) == nil)
+        #expect(diff.columns.map(\.isKey) == [true, false, false, false] && diff.columns[2].kind == .number)
+    }
+
+    /// Without a key, rows match on every value (so a changed row is missing and extra); rows sharing a key pair up in
+    /// their order; a key column only one side has, or no shared columns, is said rather than compared.
+    @Test func resultsMatchOnEveryColumnOrSayWhyNot() {
+        let first = Self.store([("a", Self.text), ("b", Self.text)], keyed: false, [["x", "1"], ["x", "1"], ["y", "2"]])
+        let second = Self.store([("a", Self.text), ("b", Self.text)], keyed: false, [["y", "3"], ["x", "1"]])
+        let whole = ReconTableData.compare(first, second, key: [])
+        #expect(whole.key.isEmpty && whole.changed.isEmpty)
+        #expect(whole.missing.map { $0.text(1, kind: .text) } == ["1", "2"] && whole.extra.map { $0.text(1, kind: .text) } == ["3"])
+        let byA = ReconTableData.compare(first, second, key: ["A"])
+        #expect(byA.key == ["a"] && byA.missing.count == 1 && byA.changed.map(\.columns) == [[1]] && byA.extra.isEmpty)
+        #expect(ReconTableData.compare(first, first, key: ["a"]).outcome == .same)
+        #expect(ReconTableData.compare(first, second, key: ["c"]).outcome
+                == .notCompared("“c” isn't a column of both, so rows can't be matched on it."))
+        #expect(ReconTableData.compare(first, Self.store([("z", Self.text)], [["1"]]), key: []).outcome
+                == .notCompared("The two have no columns of the same name."))
+    }
+
+    /// A long value shows its first 1,000 characters (a BLOB its first 500 bytes as hex), never cut in a key column;
+    /// copying takes all of it.
+    @Test func longValuesAreShortenedOnScreenOnly() {
+        var data = ReconTableData(outcome: .different)
+        data.key = ["k"]
+        data.columns = [ReconColumn(name: "k", kind: .text), ReconColumn(name: "body", kind: .longText),
+                        ReconColumn(name: "blob", kind: .blob)]
+        let long = String(repeating: "é", count: 3_000), key = String(repeating: "k", count: 1_500)
+        data.missing = [ReconRow([Array(key.utf8), Array(long.utf8), Array(repeating: 0xAB, count: 2_000)])]
+        let diff = DiffSource(data, names: ("a", "b"))
+        #expect(diff.cell(0, 0) == .text(key) && diff.cell(0, 1) == .text(String(repeating: "é", count: 1_000) + "…"))
+        #expect(diff.cell(0, 2) == .text("0x" + String(repeating: "AB", count: 500) + "…"))
+        #expect(diff.value(0, 1) == long && diff.value(0, 2)?.count == 4_002 && diff.columns[2].kind == .binary)
     }
 }

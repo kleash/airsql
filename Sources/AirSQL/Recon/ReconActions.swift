@@ -151,9 +151,8 @@ extension ReconWindowController {
                             model: model, on: window)
     }
 
-    /// Copies the selected objects' names, or the rows chosen in the rows that differ.
+    /// Copies the selected objects' names (the grid of rows that differ copies its own cells).
     @objc func copy(_ sender: Any?) {
-        if window?.firstResponder === results.detail.rows { return results.detail.copy(sender) }
         put(results.selected.map(\.name).joined(separator: "\n"))
     }
 

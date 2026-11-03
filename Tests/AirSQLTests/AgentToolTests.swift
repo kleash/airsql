@@ -78,6 +78,33 @@ struct AgentToolTests {
         #expect(resource.hasPrefix("-- Shop · schema hash \(hash)") && resource.contains("-- database `airsql other`"))
     }
 
+    /// search_columns answers from the schema cache, sending nothing: part of a name, or a whole name with * and ?,
+    /// narrowed by data type.
+    @Test func searchColumnsReadsTheCache() async throws {
+        let (cache, source) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+        let target = Self.target(.schema, schema: cache)
+        let sent = source.sent.count
+        func found(_ arguments: [String: Any]) async throws -> Set<String> {
+            let reply = try await target.searchColumns(arguments)
+            #expect(reply["connection"] as? String == "Shop" && reply["capped"] as? Bool == false)
+            return Set((reply["columns"] as? [[String: Any]] ?? []).map { "\($0["table"] ?? "").\($0["column"] ?? "")" })
+        }
+        #expect(try await found(["pattern": "EMAIL"]) == ["customers.email", "customers.email_domain", "customer_emails.email"])
+        #expect(try await found(["pattern": "*_id"]) == ["refs.customer_id", "orders.customer_id", "orders.parent_id"])
+        #expect(try await found(["pattern": "id", "type": "BIGINT"]) == ["orders.id", "orders.parent_id"])
+        #expect(try await found(["pattern": "*", "type": "*text", "databases": ["airsql_fixture"]])
+                == ["customers.note", "customers.prefs"])
+        let reply = try await target.searchColumns(["pattern": "id", "databases": ["airsql_fixture"]])
+        let columns = try #require(reply["columns"] as? [[String: Any]])
+        let id = try #require(columns.first { $0["table"] as? String == "customers" && $0["column"] as? String == "id" })
+        #expect(id["type"] as? String == "int(10) unsigned" && id["primaryKey"] as? Bool == true && id["nullable"] as? Bool == false)
+        #expect(columns.first { $0["table"] as? String == "customer_emails" }?["kind"] as? String == "view")
+        #expect(source.sent.count == sent, "no SQL")
+        #expect(await Self.refusal { try await target.searchColumns(["pattern": " "]) }?.contains("needs a pattern") == true)
+        #expect(await Self.refusal { try await Self.target(.off, schema: cache).searchColumns(["pattern": "id"]) }?
+            .contains("needs Schema") == true)
+    }
+
     @Test func namesSplitOutsideBackquotes() {
         #expect(AgentTarget.split("orders") == (nil, "orders"))
         #expect(AgentTarget.split("shop.orders") == ("shop", "orders"))

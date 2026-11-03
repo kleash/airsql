@@ -17,8 +17,11 @@ extension ConsoleViewController {
 
     /// The grid's part of the status bar, for the result shown.
     var statusAccessory: NSView? {
-        guard let tab = selectedResult ?? resultTabs.last, case .rows = tab.content else { return nil }
-        return (tab.view as? ResultGridView)?.viewer.status
+        guard let tab = selectedResult ?? resultTabs.last else { return nil }
+        switch tab.content {
+        case .rows, .diff: return (tab.view as? ResultGridView)?.viewer.status
+        case .plan, .messages: return nil
+        }
     }
 
     func selectResult(_ tab: ResultTab) {

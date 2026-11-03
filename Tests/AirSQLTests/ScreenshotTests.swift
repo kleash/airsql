@@ -1,4 +1,5 @@
 import AppKit
+import CMariaDB
 import Testing
 @testable import AirSQL
 @testable import AirSQLCore
@@ -97,6 +98,29 @@ extension AppTests {
                 _ = await call(harness, "wait", ["until": "popover", "timeout": 5])
                 try await save(harness, "main-agents-\(suffix)")
                 main.statusBar.agent.shown?.close()
+
+                // The Agent tab: what an agent ran on Production and the rows it got.
+                let rows = ResultStore(columns: [ResultStore.Column(name: "status", type: MYSQL_TYPE_VAR_STRING),
+                                                 ResultStore.Column(name: "orders", type: MYSQL_TYPE_LONGLONG),
+                                                 ResultStore.Column(name: "revenue", type: MYSQL_TYPE_NEWDECIMAL, decimals: 2)])
+                for (status, count, total) in [("paid", "48211", "3920114.50"), ("shipped", "45120", "3611092.00"),
+                                               ("refunded", "1290", "98110.25"), ("cancelled", "604", "41003.90")] {
+                    _ = rows.append([Array(status.utf8), Array(count.utf8), Array(total.utf8)])
+                }
+                let queries = agents.record("claude-code 2.1", "run_queries · SELECT status, COUNT(*) AS orders … (+2)")
+                agents.keep(["results": [
+                    ["sql": "SELECT COUNT(*) FROM orders", "ok": true, "columns": ["COUNT(*)"], "rowCount": 1, "capped": false],
+                    ["sql": "SELECT status, COUNT(*) AS orders, SUM(total) AS revenue FROM orders GROUP BY status ORDER BY orders DESC",
+                     "ok": true, "columns": ["status", "orders", "revenue"], "rowCount": 4, "capped": false],
+                    ["sql": "SELECT * FROM orders WHERE status = 'paid' FOR UPDATE", "ok": false,
+                     "error": "Refused: FOR UPDATE would lock rows, and agents only read"],
+                ]], [1: rows], call: queries, client: "claude-code 2.1", connection: Fixtures.production.id)
+                agents.finish(queries, "5 rows, 1 refused or failed")
+                agents.showResults(Fixtures.production.id, call: queries)
+                let agentTab = try #require(main.selectedTab?.content as? AgentResultsContent)
+                agentTab.table.selectRowIndexes([1], byExtendingSelection: false)
+                _ = await eventually(timeout: 5) { (agentTab.table.enclosingScrollView?.frame.height ?? 0) > 100 }  // placed
+                try await save(harness, "agent-results-\(suffix)")
                 agents.close()
                 model.data.settings.agentsAllowed = false
 
@@ -254,6 +278,12 @@ extension AppTests {
                 onScreen(window.window)
                 let (_, harness) = appWindow(window.model, windows: { [window.window!] })
                 try await save(harness, "compare-\(suffix)", target: "window:Compare Production")
+                // A table's rows that differ, in the grid.
+                let products = try #require(window.results.objects.firstIndex { $0.name == "products" })
+                window.results.list.selectRowIndexes(IndexSet(integer: products), byExtendingSelection: false)
+                window.results.detail.show(window.results.objects[products], result: try #require(window.result), data: true)
+                window.window?.displayIfNeeded()
+                try await save(harness, "compare-data-\(suffix)", target: "window:Compare Production")
                 window.window?.orderOut(nil)
             }
         }
