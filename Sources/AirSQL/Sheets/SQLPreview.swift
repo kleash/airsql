@@ -93,7 +93,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
                                 + "changes.", symbol: "sparkles", color: .accent, id: "preview.agent"))
         }
         if let connection, connection.colour == .production {
-            views.append(banner("This runs on \(connection.displayName), a production connection.", symbol: "exclamationmark.octagon.fill",
+            let words = request.text == nil ? "This runs on \(connection.displayName), a production connection."
+                : "\(connection.displayName) is a production connection."
+            views.append(banner(words, symbol: "exclamationmark.octagon.fill",
                                 color: ConnectionColour.production.color!, id: "preview.production"))
         }
         for warning in request.warnings {
@@ -243,7 +245,8 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         runButton.hasDestructiveAction = request.destructive
         if !request.destructive { runButton.bezelColor = .accent }
         runButton.toolTip = request.typeToConfirm.map { "Type “\($0)” first" }
-            ?? "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : "")
+            ?? (request.text != nil ? "Put the text in the console's editor: nothing runs"
+                : "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : ""))
         runButton.isEnabled = request.typeToConfirm == nil
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)

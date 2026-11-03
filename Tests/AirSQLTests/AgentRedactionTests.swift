@@ -112,11 +112,13 @@ extension AppTests {
                 try save(await agentCall(service, "screenshot", ["scale": 2]), "agent-hidden-rows")
                 let typing = Task { await agentCall(service, "type", ["text": "UPDATE orders SET status = 'refunded'\nWHERE id = 7;"]) }
                 _ = await eventually(timeout: 5) { main.window?.attachedSheet != nil }
+                try await Task.sleep(nanoseconds: 600_000_000)  // the sheet's slide down
                 try save(await call(harness, "screenshot", ["target": "sheet", "scale": 2]), "agent-gate-text")
                 _ = await call(harness, "press", ["id": "preview.run"])
                 _ = await typing.value
                 _ = await agentCall(service, "key", ["combo": "cmd+return"])
                 _ = await eventually(timeout: 5) { main.window?.attachedSheet != nil }
+                try await Task.sleep(nanoseconds: 600_000_000)
                 try save(await call(harness, "screenshot", ["scale": 2]), "agent-gate-run")
                 _ = await call(harness, "press", ["id": "preview.cancel"])
             }
