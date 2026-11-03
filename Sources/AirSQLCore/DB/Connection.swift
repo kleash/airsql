@@ -77,6 +77,21 @@ public final class Connection: @unchecked Sendable {
         return session
     }
 
+    /// Reconnects after a drop (plan §2.2, R8): the main session is set up again through the same route, the thread
+    /// the server may still have is killed so its locks go, and the result says whether an open transaction was rolled
+    /// back. The other sessions are closed and forgotten, so they open again, fresh, on next use.
+    public func reconnect() async throws -> Reconnected {
+        let main = try await session(.main)
+        let report = try await main.reconnect()
+        let others: [Task<DBConnection, Error>] = lock.locked {
+            let tasks = opening.filter { $0.key != .main }.map(\.value)
+            opening = opening.filter { $0.key == .main }
+            return tasks
+        }
+        for task in others { if let session = try? await task.value { await session.close() } }
+        return report
+    }
+
     /// Pings the open sessions that are idle, so firewalls and wait_timeout don't drop them, except a session whose
     /// transaction has been open longer than `transactionLimit` (the Safety setting, 15 minutes by default): that one is
     /// left for the server to time out, and the Tx badge warns.
