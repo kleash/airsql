@@ -201,6 +201,24 @@ extension AppTests.AgentGateUITests {
         #expect(await !sees(in: "window:SQL Log").contains("Nordlicht"))
     }
 
+    /// A menu while it is open is an untitled window of AppKit's (Recent Filters lists conditions, the status bar's
+    /// figure sums): not one of the windows agents look at.
+    @Test func aMenuWhileItIsOpenIsNotTheAgents() async throws {
+        let menu = NSWindow(contentRect: NSRect(x: -21000, y: -21000, width: 240, height: 30), styleMask: [.borderless],
+                            backing: .buffered, defer: false)
+        menu.isReleasedWhenClosed = false
+        menu.contentView = label("region = 'Nordlicht AG'")
+        menu.orderFront(nil)
+        let (_, _, service) = try await Self.agents(windows: [menu])
+        defer {
+            service.close()
+            menu.orderOut(nil)
+        }
+        let shot = await agentCall(service, "screenshot", ["target": "window:"])
+        #expect(shot.image == nil && shot.error?.hasPrefix("No window") == true, "\(shot.error ?? "an image")")
+        #expect((await agentCall(service, "snapshot")["windows"] as? [[String: Any]])?.count == 1, "the main window only")
+    }
+
     @Test func theUIToolsAndTheGateWorkThroughAirSQLMCP() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)

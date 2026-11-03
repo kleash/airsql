@@ -190,12 +190,13 @@ extension AgentServer {
     }
 
     /// The windows an agent works with: the main window (also while closed) and AirSQL's other windows on screen
-    /// (Settings). Tests, which share NSApp with other tests' windows, give their own list.
+    /// (Settings), which have titles: not AppKit's untitled ones, such as a menu while it is open (Recent Filters lists
+    /// conditions, the status bar's figure sums). Tests, which share NSApp with other tests' windows, give their own list.
     var appWindows: [NSWindow] {
         let main = self.main?.window
         return (main.map { [$0] } ?? []) + otherWindows().filter { window in
             window !== main && window.isVisible && window.sheetParent == nil && !(window.windowController is MainWindowController)
-                && !(window is NSPanel && window.title.isEmpty) && !window.className.contains("Popover")
+                && !window.title.isEmpty && !window.className.contains("Popover")
         }
     }
 
