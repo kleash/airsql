@@ -2,37 +2,44 @@ import AirSQLCore
 import AppKit
 
 /// A result tab's rows in the data grid (plan §2.5's embedding API: a `ResultSetSource` over the statement's
-/// `ResultStore`), read-only. ⌘C copies the selected cells (all of them when none are selected) in the grids' copy
-/// format (`GridCopy`: TSV until Copy As chooses another), ⌥⌘C with the column names first; Export Rows… saves them.
-/// The headers' sort controls sort the rows here (⌥ adds a column), asking first above 100,000 rows.
+/// `ResultStore`), read-only, in a `GridViewer` (the status bar's figures, the value panel, Record View, the grids'
+/// copy formats, columns kept per query). The headers' sort controls sort the rows here (⌥ adds a column), asking first
+/// above 100,000 rows; Export Rows… saves them.
 @MainActor
 final class ResultGridView: NSView, DataGridViewDelegate {
-    let grid: DataGridView
+    let viewer: GridViewer
+    var grid: DataGridView { viewer.grid }
     let source: ResultSetSource
     /// The rows in the order shown.
     let rows: ReorderedSource
 
-    init(store: ResultStore, nullText: String, fontSize: CGFloat) {
+    /// `viewKey`: where its columns are kept (the statement, on its connection).
+    /// `transposed`: shown on its side (a result with one row).
+    init(store: ResultStore, nullText: String, fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil, transposed: Bool = false) {
         source = ResultSetSource(store)
         rows = ReorderedSource(source)
-        grid = DataGridView(source: rows)
+        viewer = GridViewer(source: nil)
         super.init(frame: .zero)
-        grid.nullText = nullText
-        grid.fontSize = fontSize
-        grid.delegate = self
+        viewer.grid.nullText = nullText
+        viewer.grid.fontSize = fontSize
+        viewer.host = self
+        viewer.viewKey = viewKey
+        viewer.copyTable = table
+        // ⌘C with nothing selected copies the whole result.
+        viewer.copiesEverything = true
+        viewer.show(rows, transposed: transposed)
         grid.setAccessibilityLabel("Result rows")
-        addSubview(grid.containerView)
-        grid.containerView.pin(to: self)
+        addSubview(viewer)
+        viewer.pin(to: self)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
+        if case .column = target { return nil }
         let menu = NSMenu(title: "Result")
-        menu.add([Commands.copy, Commands.copyWithHeaders])
-        menu.addItem(GridCopy.copyAsItem())
-        menu.add([nil, Commands.exportRows])
-        for item in menu.items + (menu.items[2].submenu?.items ?? []) where item.action != nil { item.target = self }
+        menu.add([Commands.exportRows])
+        menu.items.forEach { $0.target = self }
         return menu
     }
 
@@ -44,16 +51,6 @@ final class ResultGridView: NSView, DataGridViewDelegate {
             return (nil, "table")
         }
         return (first.database.isEmpty ? nil : first.database, first.originalTable)
-    }
-
-    /// A shown row's value, whole.
-    private var value: (Int, Int) -> String? {
-        { [source, rows] in source.value(rows.baseRow($0), $1) }
-    }
-
-    private func copyRows(_ format: CopyFormat, headers: Bool) {
-        if grid.selection.isEmpty, grid.selection.cursor == nil { grid.selectAll(nil) }
-        GridCopy.copy(grid, format: format, headers: headers, value: value, database: table.database, table: table.name)
     }
 
     /// Ascending, descending, then off; with ⌥ the column joins the sort.
@@ -69,7 +66,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
             rows.order = keys.isEmpty ? nil : GridSorting.sorted(Array(0..<source.rowCount), by: keys.map { ($0.column, $0.ascending) },
                                                                  columns: source.columns) { source.value($0, $1) }
             grid.sortOrder = keys
-            grid.needsDisplay = true
+            viewer.reloadData()
         }
         guard source.rowCount > 100_000, let window else { return sort() }
         let alert = NSAlert()
@@ -82,24 +79,15 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         }
     }
 
-    @objc func copy(_ sender: Any?) { copyRows(GridCopy.format, headers: false) }
-    @objc func copyWithHeaders(_ sender: Any?) { copyRows(GridCopy.format, headers: true) }
-
-    @objc func copyAs(_ sender: Any?) {
-        guard let format = GridCopy.format(of: sender) else { return }
-        GridCopy.format = format
-        copyRows(format, headers: false)
-    }
-
-    /// Export Rows…: the selected rows or every row of the result.
+    /// Export Rows… (and the result tab's Export Result…): the selected rows or every row of the result.
     @objc func exportRows(_ sender: Any?) {
         guard let window else { return }
-        let source = source, order = grid.columnOrder, selected = GridCopy.covered(grid).rows, table = table, value = value
+        let rows = rows, order = viewer.shownColumns, selected = viewer.selectedRows(), table = table
+        func values(_ row: Int) -> [String?] { order.map { rows.value(row, $0) } }
         let request = ExportRowsRequest(
             title: table.name == "table" ? "result" : table.name, columns: order.map { source.columns[$0] }, database: table.database,
-            table: table.name, selectedCount: selected.count, selected: { selected.map { row in order.map { value(row, $0) } } },
-            loadedCount: source.rowCount, loaded: { (0..<source.rowCount).map { row in order.map { value(row, $0) } } },
-            all: nil)
+            table: table.name, selectedCount: selected.count, selected: { selected.map(values) },
+            loadedCount: rows.rowCount, loaded: { (0..<rows.rowCount).map(values) }, all: nil)
         ExportRowsSheet.show(request, activity: ActivityCenter.shared, on: window)
     }
 }

@@ -11,18 +11,7 @@ public final class ResultSetSource: GridSource {
 
     public init(_ store: ResultStore) {
         self.store = store
-        columns = store.columns.map { column in
-            let kind: GridColumn.Kind
-            if column.isNumeric { kind = .number } else if column.type == MYSQL_TYPE_JSON { kind = .json } else if column.isBinary {
-                kind = .binary
-            } else if [MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE, MYSQL_TYPE_TIME, MYSQL_TYPE_DATETIME, MYSQL_TYPE_TIMESTAMP,
-                        MYSQL_TYPE_YEAR].contains(column.type) {
-                kind = .date
-            } else {
-                kind = .text
-            }
-            return GridColumn(name: column.name, type: column.typeName, kind: kind, isKey: column.flags & UInt32(PRI_KEY_FLAG) != 0)
-        }
+        columns = store.columns.map(\.gridColumn)
     }
 
     public var rowCount: Int { store.rowCount }
@@ -41,6 +30,20 @@ public final class ResultSetSource: GridSource {
 }
 
 extension ResultStore.Column {
+    /// The column as the grid shows it: its kind from its type, the key and marks from its flags.
+    public var gridColumn: GridColumn {
+        let kind: GridColumn.Kind
+        if isNumeric { kind = .number } else if type == MYSQL_TYPE_JSON { kind = .json } else if isBinary {
+            kind = .binary
+        } else if [MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE, MYSQL_TYPE_TIME, MYSQL_TYPE_DATETIME, MYSQL_TYPE_TIMESTAMP,
+                    MYSQL_TYPE_YEAR].contains(type) {
+            kind = .date
+        } else {
+            kind = .text
+        }
+        return GridColumn(name: name, type: typeName, kind: kind, isKey: flags & UInt32(PRI_KEY_FLAG) != 0, marks: marks)
+    }
+
     /// The column's type as the header's second line shows it: "int unsigned", "varchar", "decimal", "datetime".
     public var typeName: String {
         let names: [enum_field_types: String] = [
@@ -56,6 +59,17 @@ extension ResultStore.Column {
         ]
         let name = names[type] ?? ""
         return isNumeric && flags & UInt32(UNSIGNED_FLAG) != 0 ? name + " unsigned" : name
+    }
+
+    /// The header's marks the server's column flags give: keys, auto-increment, NULL allowed. Only for a table's column
+    /// (an expression's flags say nothing about a table).
+    var marks: GridColumn.Marks {
+        guard !originalTable.isEmpty else { return [] }
+        let pairs: [(Int32, GridColumn.Marks)] = [(PRI_KEY_FLAG, .primary), (UNIQUE_KEY_FLAG, .unique), (MULTIPLE_KEY_FLAG, .indexed),
+                                                  (AUTO_INCREMENT_FLAG, .autoIncrement)]
+        var marks: GridColumn.Marks = flags & UInt32(NOT_NULL_FLAG) == 0 ? .nullable : []
+        for (flag, mark) in pairs where flags & UInt32(flag) != 0 { marks.insert(mark) }
+        return marks
     }
 
     /// A number column, right-aligned: DECIMAL, the integers, FLOAT, DOUBLE.

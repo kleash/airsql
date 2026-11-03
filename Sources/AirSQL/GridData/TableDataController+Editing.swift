@@ -12,10 +12,10 @@ extension TableDataController: DataGridViewDelegate {
         return (source.value(row, column)?.count ?? 0) <= TableDataSource.shownLimit
     }
 
-    /// Why nothing can be edited here, if so: a read-only connection, or a table without a key.
+    /// Why nothing can be edited here, if so: a read-only connection, or a table without a key (a view, a sequence).
     var editingOff: String? {
         if context.connection.readOnly {
-            return "This connection is read-only: turn that off in Edit Connection… ▸ Options to change rows."
+            return "This connection is read-only: turn that off in Edit Connection… ▸ Options to change rows"
         }
         return source?.readOnlyReason
     }
@@ -35,21 +35,16 @@ extension TableDataController: DataGridViewDelegate {
         sort(by: column, adding: adding)
     }
 
+    /// The tab's items in the grid's menu, after the viewer's Copy items and before its own.
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
         let menu = NSMenu(title: tableName)
         switch target {
         case .column:
             menu.add([Commands.sortAscending, Commands.sortDescending, Commands.clearSort, nil, Commands.filterByValues,
-                      Commands.clearFilter, nil, Commands.copyColumnName])
+                      Commands.clearFilter])
         case .row:
-            menu.add([Commands.copy, Commands.copyWithHeaders])
-            menu.addItem(GridCopy.copyAsItem())
-            menu.add([nil, Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows,
-                      Commands.revert])
+            menu.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, Commands.revert])
         case .cells:
-            menu.add([Commands.copy, Commands.copyWithHeaders])
-            menu.addItem(GridCopy.copyAsItem())
-            menu.addItem(.separator())
             menu.addItem(quickFilterItem())
             menu.add([Commands.clearFilter, nil, Commands.setNull, Commands.setDefault, nil, Commands.addRow, Commands.duplicateRow,
                       Commands.deleteRows, Commands.revert, nil, Commands.previewChanges, Commands.apply, nil, Commands.exportRows])
@@ -60,24 +55,15 @@ extension TableDataController: DataGridViewDelegate {
 
     // MARK: Selection
 
-    /// The selected cells as (row, source column), the focused cell when nothing is selected.
-    func selectedCells() -> [(row: Int, column: Int)] {
-        let (rows, columns) = GridCopy.covered(grid)
-        let selection = grid.selection
-        return rows.flatMap { row in
-            columns.compactMap { column -> (row: Int, column: Int)? in
-                guard let display = grid.columnOrder.firstIndex(of: column) else { return nil }
-                let position = GridPosition(row: row, column: display)
-                return selection.isEmpty || selection.contains(position) ? (row, column) : nil
-            }
-        }
-    }
+    /// The selected cells as (row, source column), the focused cell when nothing is selected; in Transpose and Record
+    /// View, the cells they show.
+    func selectedCells() -> [(row: Int, column: Int)] { viewer.selectedCells() }
 
     /// The rows the selection touches, as loaded rows' keys and new rows' ids.
     func selectedRows() -> (keys: [PendingChanges.Key], inserts: [UUID]) {
         guard let source else { return ([], []) }
         var keys: [PendingChanges.Key] = [], inserts: [UUID] = []
-        for row in GridCopy.covered(grid).rows {
+        for row in viewer.selectedRows() {
             switch source.row(row) {
             case .loaded: if let key = source.rowKey(row) { keys.append(key) }
             case .inserted(let id): inserts.append(id)
@@ -104,7 +90,7 @@ extension TableDataController: DataGridViewDelegate {
     private func duplicate(keepingKeys: Bool) {
         guard let source, editingOff == nil else { return NSSound.beep() }
         var last: UUID?
-        for row in GridCopy.covered(grid).rows {
+        for row in viewer.selectedRows() {
             var values: [String: PendingChanges.Value] = [:]
             for (index, column) in source.table.columns.enumerated() where column.generated == nil {
                 if !keepingKeys, source.columns[index].isKey || column.autoIncrement { continue }
@@ -161,8 +147,9 @@ extension TableDataController: DataGridViewDelegate {
         changesDidChange()
     }
 
-    /// Selects a row's first cell and scrolls to it.
+    /// Selects a row's first cell and scrolls to it (in the grid: out of Transpose and Record View).
     func focus(row: Int?) {
+        viewer.backToGrid(nil)
         guard let row, row < grid.rowCount, grid.columnCount > 0 else { return }
         grid.selection.select(GridPosition(row: row, column: 0))
         grid.reveal(grid.cellRect(GridPosition(row: row, column: 0)))
@@ -174,7 +161,7 @@ extension TableDataController: DataGridViewDelegate {
         guard let source else { return }
         PendingChangesStore.shared.save(source.changes, connection: context.connection.id, database: database, table: tableName)
         if source.changes.isEmpty { restored = false }
-        grid.reloadData()
+        viewer.reloadData()
         updateBars()
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
     }
@@ -273,6 +260,7 @@ extension TableDataController: DataGridViewDelegate {
         case .insert(let id): row = source.index(of: id)
         }
         guard let row else { return }
+        viewer.backToGrid(nil)
         grid.selection.selectRow(row)
         grid.reveal(grid.rowRect(row))
     }

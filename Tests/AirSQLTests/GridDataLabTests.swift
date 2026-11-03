@@ -184,7 +184,7 @@ extension AppTests {
             let tab = TableDataController(model: model, context: context, database: Self.database, table: "items")
             main.select(main.open(tab, title: "items", connection: saved.id))
             await ready { tab.loading != nil || tab.source == nil }
-            #expect(tab.grid.rowCount == 3 && tab.status.rows.stringValue == "3 rows", "\(lab)")
+            #expect(tab.grid.rowCount == 3 && tab.viewer.status.rows.stringValue == "3 rows", "\(lab)")
 
             tab.source?.set(.text("Anna"), row: 0, column: 1)
             tab.source?.changes.delete([["3"]])

@@ -49,7 +49,7 @@ extension TableDataController {
     /// filter and sort, streamed on a session of its own.
     @objc func exportRows(_ sender: Any?) {
         guard let source, let window = view.window else { return NSSound.beep() }
-        let order = grid.columnOrder, rows = GridCopy.covered(grid).rows, sessions = context.sessions
+        let order = viewer.shownColumns, rows = viewer.selectedRows(), sessions = context.sessions
         let sql = source.pageSQL(offset: 0, limit: nil)
         let request = ExportRowsRequest(
             title: tableName, columns: order.map { source.columns[$0] }, database: database, table: tableName,

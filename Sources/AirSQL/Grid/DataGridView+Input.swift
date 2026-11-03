@@ -11,7 +11,12 @@ extension DataGridView {
         let flags = event.modifierFlags
         if event.clickCount == 2, flags.isDisjoint(with: [.shift, .command]) {
             isDragging = false
-            beginEditing(at: position)
+            if canEdit(position) {
+                beginEditing(at: position)
+            } else {
+                selection.select(position)
+                delegate?.dataGridOpenValue(self)
+            }
             return
         }
         selection.select(position, extend: flags.contains(.shift), add: flags.contains(.command))
@@ -60,7 +65,12 @@ extension DataGridView {
     }
 
     override func keyDown(with event: NSEvent) {
-        interpretKeyEvents([event])
+        // ⇧↩ is Value Panel's shortcut (menus take only ⌘ and ⌃ keys).
+        if [36, 76].contains(event.keyCode), event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .shift {
+            sendCommand(Commands.valuePanel.action)
+        } else {
+            interpretKeyEvents([event])
+        }
     }
 
     override func becomeFirstResponder() -> Bool {

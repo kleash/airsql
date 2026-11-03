@@ -24,6 +24,8 @@ public struct TableViewSettings: Codable, Equatable {
     public var widths: [String: Double] = [:]
     /// Display types by column name (the grid names them: "uuid", "hex", "unixTime"…).
     public var displayTypes: [String: String] = [:]
+    /// The columns' order on screen, by name, as last arranged (hidden ones too); [] for the table's own order.
+    public var order: [String] = []
 
     public static let recentLimit = 20
 
@@ -47,6 +49,7 @@ public struct TableViewSettings: Codable, Equatable {
         hiddenColumns = try container.decodeIfPresent([String].self, forKey: .hiddenColumns) ?? []
         widths = try container.decodeIfPresent([String: Double].self, forKey: .widths) ?? [:]
         displayTypes = try container.decodeIfPresent([String: String].self, forKey: .displayTypes) ?? [:]
+        order = try container.decodeIfPresent([String].self, forKey: .order) ?? []
     }
 }
 

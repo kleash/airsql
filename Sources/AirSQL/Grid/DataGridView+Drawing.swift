@@ -57,6 +57,9 @@ extension DataGridView {
                 if let fill = marks[mark] {
                     fill.setFill()
                     rect.fill()
+                } else if let tint = cellTint?(row, sourceColumn) {
+                    tint.setFill()
+                    rect.fill(using: .sourceOver)
                 }
                 if focused, selection.cursor == position {
                     focus.setFill()

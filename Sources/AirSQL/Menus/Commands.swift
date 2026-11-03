@@ -119,6 +119,10 @@ import AppKit
     @objc optional func createTable(_ sender: Any?)
     @objc optional func createObject(_ sender: Any?)
     @objc optional func openData(_ sender: Any?)
+    @objc optional func showPreviousRecord(_ sender: Any?)
+    @objc optional func toggleHeatmap(_ sender: Any?)
+    @objc optional func highlightEqualValues(_ sender: Any?)
+    @objc optional func showNextRecord(_ sender: Any?)
     @objc optional func openStructure(_ sender: Any?)
     @objc optional func openObject(_ sender: Any?)
     @objc optional func runRoutine(_ sender: Any?)
@@ -321,6 +325,14 @@ enum Commands {
                                     tip: "Show or hide the selected cell's full value beside the grid: text, JSON, hex")
     static let recordView = Command("Record View", #selector(AirSQLActions.showRecordView(_:)), "r", [.command, .option],
                                     tip: "Show the selected row as a form, one field per column")
+    static let previousRecord = Command("Previous Record", #selector(AirSQLActions.showPreviousRecord(_:)),
+                                        tip: "Show the row before this one in Record View")
+    static let nextRecord = Command("Next Record", #selector(AirSQLActions.showNextRecord(_:)),
+                                    tip: "Show the row after this one in Record View")
+    static let heatmap = Command("Heatmap", #selector(AirSQLActions.toggleHeatmap(_:)),
+                                 tip: "Colour the selected number columns by value, from low to high")
+    static let highlightEqual = Command("Highlight Equal Values", #selector(AirSQLActions.highlightEqualValues(_:)),
+                                        tip: "Tint every cell that holds the focused cell's value")
     static let transpose = Command("Transpose", #selector(AirSQLActions.transposeGrid(_:)), "t", [.command, .option],
                                    tip: "Turn rows into columns to compare a few wide rows side by side")
     static let viewAs = Command("View As", #selector(AirSQLActions.viewAs(_:)),
@@ -595,7 +607,8 @@ enum Commands {
         runSQLFile, importCSV, importSSHConfig,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
-        toggleSidebar, filterSidebar, valuePanel, recordView, transpose, viewAs, chart, columnList, sqlLog, clearSQLLog, activity,
+        toggleSidebar, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
+        chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,

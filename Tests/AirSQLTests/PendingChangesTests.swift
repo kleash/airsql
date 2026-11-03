@@ -137,14 +137,16 @@ struct PendingChangesTests {
         }
         var table = SchemaTable(name: "t", kind: .table, engine: "InnoDB")
         table.columns = [cachedColumn("a", "int"), cachedColumn("b", "int", nullable: true), cachedColumn("c", "int")]
-        #expect(TableEditing.key(of: table).columns == nil)
-        #expect(TableEditing.key(of: table).reason?.contains("no primary key") == true)
+        #expect(table.editingKey == nil && TableDataSource(database: "d", table: table).key == nil)
+        #expect(table.editingRefusal?.contains("no primary key") == true)
         table.indexes = [index("ub", ["b"]), index("ix", unique: false, ["c"]), index("uac", ["a", "c"])]
-        #expect(TableEditing.key(of: table).columns == ["a", "c"])  // b can be NULL; ix isn't unique
+        #expect(table.editingKey == ["a", "c"])  // b can be NULL; ix isn't unique
+        #expect(TableDataSource(database: "d", table: table).key == [0, 2])
         table.indexes.append(index("PRIMARY", ["c"]))
-        #expect(TableEditing.key(of: table).columns == ["c"])
-        let view = SchemaTable(name: "v", kind: .view)
-        #expect(TableEditing.key(of: view).columns == nil && TableEditing.key(of: view).reason?.hasPrefix("Views") == true)
+        #expect(table.editingKey == ["c"])
+        var view = SchemaTable(name: "v", kind: .view)
+        view.columns = table.columns
+        #expect(view.editingRefusal?.hasPrefix("A view") == true && TableDataSource(database: "d", table: view).key == nil)
     }
 
     @Test func previewWarnsAboutEnginesAndCascades() {

@@ -67,7 +67,8 @@ extension DataGridView {
         // Typing over several selected cells keeps them selected: the host gives them all the value (multi-cell edit).
         if text == nil || !selection.contains(position) { selection.select(position) }
         reveal(cellRect(position))
-        let editor = GridEditor(grid: self, position: position, text: text ?? source.cell(position.row, column).text,
+        // The stored value, not what Display As shows (a date for a Unix time) or a new row's (auto) mark.
+        let editor = GridEditor(grid: self, position: position, text: text ?? source.value(position.row, column) ?? "",
                                 font: styles.font(source.columns[column], isNull: false))
         self.editor = editor
         editor.place(over: cellRect(position))

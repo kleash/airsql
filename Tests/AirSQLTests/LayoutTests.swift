@@ -262,6 +262,9 @@ extension AppTests {
             csv.close()
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             try await connectionScreens(main, harness, check: check)
+
+            // The grid's reading tools (L2): status, value panel, Record View, Transpose, View As, Chart and popovers.
+            problems += gridViewerLayoutProblems(main, appearance: appearance, place: place)
             return problems
         }
     }

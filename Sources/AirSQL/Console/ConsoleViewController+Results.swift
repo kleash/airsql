@@ -11,6 +11,14 @@ extension ConsoleViewController {
         if let selected = selectedResult, !allResultTabs.contains(where: { $0 === selected }) { selectedResult = nil }
         let shown = selectedResult ?? resultTabs.last ?? (messagesView.messages.isEmpty ? nil : messagesTab)
         results.show(allResultTabs, selected: shown, empty: emptyResults())
+        // The status bar shows the shown result's figures.
+        NotificationCenter.default.post(name: .tabContentDidChange, object: self)
+    }
+
+    /// The grid's part of the status bar, for the result shown.
+    var statusAccessory: NSView? {
+        guard let tab = selectedResult ?? resultTabs.last, case .rows = tab.content else { return nil }
+        return (tab.view as? ResultGridView)?.viewer.status
     }
 
     func selectResult(_ tab: ResultTab) {
@@ -25,11 +33,16 @@ extension ConsoleViewController {
     }
 
     /// A result set's tab, after the others.
-    func addResult(_ store: ResultStore, title: String?, summary: String) {
+    /// `query`: the statement it came from, under which its columns are kept.
+    func addResult(_ store: ResultStore, title: String?, summary: String, query: String? = nil) {
         resultNumber += 1
         let tab = ResultTab(title: title ?? "Result \(resultNumber)", content: .rows(store), summary: summary)
         let settings = model.data.settings
-        tab.makeView = { ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize)) }
+        let key = connectionID.flatMap { id in query.map { GridViewer.ViewKey(connection: id, database: database ?? "", table: $0) } }
+        tab.makeView = {
+            ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize), viewKey: key,
+                           transposed: settings.transposeSingleRow && store.rowCount == 1 && store.columns.count > 1)
+        }
         resultTabs.append(tab)
         if selectedResult == nil || selectedResult === messagesTab { selectedResult = tab }
     }
@@ -106,6 +119,12 @@ extension ConsoleViewController {
         resultTabs.removeAll { $0 === tab }
         selectedResult = resultTabs.isEmpty ? messagesTab : resultTabs[min(index, resultTabs.count - 1)]
         showResults()
+    }
+
+    /// Export Result…: the shown result's Export Rows…, wherever the focus is.
+    @objc func exportResult(_ sender: Any?) {
+        guard let grid = currentResult?.view as? ResultGridView else { return NSSound.beep() }
+        grid.exportRows(sender)
     }
 
     @objc func closeOtherResults(_ sender: Any?) {

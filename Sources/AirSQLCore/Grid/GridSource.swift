@@ -2,18 +2,20 @@
 /// (Transpose) or two result sets compared (a diff). The grid asks only for the cells on screen, on the main thread, so
 /// `cell` answers from memory; a source that fetches shows `.loading` until its page arrives.
 ///
-/// How a screen hosts a grid (the embedding API): it makes a source and a `DataGridView` (the app's `Grid` folder), sets
-/// the grid's `source` and `delegate` and adds `grid.containerView` (cells, header and row numbers) to its own view. It
-/// calls `grid.reloadData()` when the columns or the row count change and `grid.reloadRows(_:)` when rows change or a
-/// page arrives. The grid never writes anything: edits, sorting, record view and menus go to the delegate, which
-/// decides what they mean.
-/// - Table tab: a `TableDataSource` pages `SELECT … LIMIT … OFFSET …` off the main thread on the data session; `prefetch`
-///   queues the pages about to be shown. The key columns (primary key, or a NOT NULL unique key) are fetched whole,
-///   never shortened, so an edit addresses the exact row; committed edits become pending changes that the source shows
-///   through `mark` until Apply.
+/// How a screen hosts a grid (the embedding API): it makes a source and a `GridViewer` (the app's `Grid` folder: a
+/// `DataGridView` with the status bar's figures, the value panel, Record View, Transpose and the copy formats), becomes
+/// the viewer's `host` (a `DataGridViewDelegate`) and shows the source with `show(_:)`. It calls the viewer's
+/// `reloadData()` when the columns, the rows or their values change. The grid never writes anything: edits, sorting and
+/// the first items of its menus go to the host, which decides what they mean.
+/// - Table tab: a `TableDataSource` holds the pages of `SELECT … LIMIT … OFFSET …` loaded so far off the main thread on
+///   the data session: the first one, then one per Load More, or the rest streamed in batches by Load All. Rows don't
+///   load as they scroll into view, so `rowCount` is the rows loaded and nothing is `.loading`. The key columns (primary
+///   key, or a NOT NULL unique key) are never shortened, so an edit addresses the exact row; edits are pending changes,
+///   which the source draws over its rows (`mark`, new rows after the loaded ones) until Apply.
 /// - Console result tab: a `ResultSetSource` over the statement's `ResultStore` (every row in memory, so never
 ///   `.loading`); read-only unless the result comes from one table with a key.
-/// - Transpose: a `TransposedSource` wraps another source and one of its rows: a row per column, name and value.
+/// - Transpose and Record View: a `TransposedSource` wraps another source: a row per column, its name, then a column
+///   per row (the first 1,000, or Record View's one); `base(_:_:)` maps a cell back to the source's.
 /// - Diff (compare results, recon): a `DiffSource` lines up two sources by key and marks rows added (`.inserted`),
 ///   removed (`.deleted`) or changed (`.edited`, on the cells that differ).
 public protocol GridSource: AnyObject {
@@ -28,11 +30,18 @@ public protocol GridSource: AnyObject {
     func prefetch(_ rows: Range<Int>)
     /// A pending change or a difference on this cell, drawn in its colour.
     func mark(_ row: Int, _ column: Int) -> GridMark
+    /// The cell's whole value, never shortened (copy, the value panel, the selection's sum): nil for NULL and while
+    /// loading.
+    func value(_ row: Int, _ column: Int) -> String?
 }
 
 public extension GridSource {
     func prefetch(_ rows: Range<Int>) {}
     func mark(_ row: Int, _ column: Int) -> GridMark { .none }
+    func value(_ row: Int, _ column: Int) -> String? {
+        if case .text(let text) = cell(row, column) { return text }
+        return nil
+    }
 }
 
 /// A column as the grid shows it.
@@ -48,12 +57,61 @@ public struct GridColumn: Equatable, Sendable {
     public var kind: Kind
     /// Part of the key that addresses a row: its values are never shortened, and the grid never cuts them on screen.
     public var isKey: Bool
+    /// What the header marks besides the name and type: from the result's column flags, or the table's schema.
+    public var marks: Marks
+    /// The column's comment (from the schema), shown in the header's tooltip.
+    public var comment: String
 
-    public init(name: String, type: String = "", kind: Kind = .text, isKey: Bool = false) {
+    /// The header's marks: key icons for the first four, words after the type for the rest.
+    public struct Marks: OptionSet, Sendable {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+
+        public static let primary = Marks(rawValue: 1 << 0)
+        public static let foreign = Marks(rawValue: 1 << 1)
+        public static let unique = Marks(rawValue: 1 << 2)
+        public static let indexed = Marks(rawValue: 1 << 3)
+        public static let autoIncrement = Marks(rawValue: 1 << 4)
+        public static let hasDefault = Marks(rawValue: 1 << 5)
+        public static let generated = Marks(rawValue: 1 << 6)
+        public static let nullable = Marks(rawValue: 1 << 7)
+    }
+
+    public init(name: String, type: String = "", kind: Kind = .text, isKey: Bool = false, marks: Marks = [], comment: String = "") {
         self.name = name
         self.type = type
         self.kind = kind
         self.isKey = isKey
+        self.marks = marks
+        self.comment = comment
+    }
+}
+
+extension GridColumn {
+    /// The header's second line: the type, then "auto", "default" or "generated", then "null" when NULL is allowed.
+    public var typeLine: String {
+        var words = type.isEmpty ? [] : [type]
+        if marks.contains(.autoIncrement) { words.append("auto") }
+        if marks.contains(.generated) { words.append("generated") }
+        if marks.contains(.hasDefault) { words.append("default") }
+        if marks.contains(.nullable) { words.append("null") }
+        return words.joined(separator: " · ")
+    }
+
+    /// The header's tooltip after what a click does: the type in words, the keys, the comment.
+    public var details: String {
+        var facts: [String] = []
+        if marks.contains(.primary) { facts.append("primary key") }
+        if marks.contains(.unique) { facts.append("unique key") }
+        if marks.contains(.foreign) { facts.append("foreign key") }
+        if marks.contains(.indexed) { facts.append("indexed") }
+        if marks.contains(.autoIncrement) { facts.append("auto-increment") }
+        if marks.contains(.generated) { facts.append("generated, read-only") }
+        if marks.contains(.hasDefault) { facts.append("has a default") }
+        if marks.contains(.nullable) { facts.append("NULL allowed") }
+        let first = ([name] + (type.isEmpty ? [] : [type])).joined(separator: " · ")
+        return ([first] + (facts.isEmpty ? [] : [facts.joined(separator: ", ")]) + (comment.isEmpty ? [] : ["“\(comment)”"]))
+            .joined(separator: "\n")
     }
 }
 

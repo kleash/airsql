@@ -7,8 +7,9 @@ extension TableDataController: NSMenuItemValidation {
         guard let source else {
             bar.scope.isHidden = true
             notice.show(.problem, problem)
-            status.rows.stringValue = problem == nil ? "Loading…" : ""
-            for link in [status.count, status.more, status.all] { link.isHidden = true }
+            viewer.status.rows.stringValue = problem == nil ? "Loading…" : ""
+            for link in [countLink, moreLink, allLink] { link.isHidden = true }
+            viewer.status.update()
             return
         }
         bar.scope.isHidden = false
@@ -29,19 +30,22 @@ extension TableDataController: NSMenuItemValidation {
         } else if !source.changes.isEmpty {
             notice.show(.pending, (restored ? "Left from before AirSQL quit: " : "") + pendingSummary(source.changes))
         } else {
-            notice.show(.readOnly, editingOff.map { "Read-only. " + $0 })
+            notice.show(.readOnly, editingOff.map { "Read-only. " + $0 + "." })
         }
         let loaded = source.loadedRows.formatted()
+        let rows = viewer.status.rows
         if !source.hasMore {
-            status.rows.stringValue = "\(loaded) \(source.loadedRows == 1 ? "row" : "rows")"
+            rows.stringValue = "\(loaded) \(source.loadedRows == 1 ? "row" : "rows")"
         } else if let total, total.filter == source.filter {
-            status.rows.stringValue = "\(loaded) of \(total.exact ? "" : "about ")\(total.rows.formatted()) rows"
+            rows.stringValue = "\(loaded) of \(total.exact ? "" : "about ")\(total.rows.formatted()) rows"
         } else {
-            status.rows.stringValue = "\(loaded) rows loaded"
+            rows.stringValue = "\(loaded) rows loaded"
         }
-        status.count.isHidden = total?.exact == true && total?.filter == source.filter || !source.hasMore
-        status.more.isHidden = !source.hasMore
-        status.all.isHidden = !source.hasMore
+        rows.toolTip = total?.exact == false && source.hasMore ? "The server's estimate: Count Exactly counts the rows" : nil
+        countLink.isHidden = total?.exact == true && total?.filter == source.filter || !source.hasMore
+        moreLink.isHidden = !source.hasMore
+        allLink.isHidden = !source.hasMore
+        viewer.status.update()
     }
 
     /// "3 pending changes: 1 edited row, 1 new row, 1 deleted row".
@@ -55,12 +59,19 @@ extension TableDataController: NSMenuItemValidation {
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if let action = menuItem.action, !Self.instancesRespond(to: action), viewer.responds(to: action) {
+            return viewer.validateMenuItem(menuItem)
+        }
         let (enabled, reason) = state(of: menuItem.action)
         menuItem.explain(enabled: enabled, reason: reason)
-        if menuItem.action == Commands.copyAs.action { menuItem.state = GridCopy.format(of: menuItem) == GridCopy.format ? .on : .off }
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
         return enabled
     }
+
+    // The viewer's commands (Go to Row, Copy As, Record View…) reach it from the menu bar while the focus is in the grid
+    // bar or the find bar.
+    override func responds(to selector: Selector!) -> Bool { super.responds(to: selector) || viewer.responds(to: selector) }
+    override func forwardingTarget(for selector: Selector!) -> Any? { viewer.responds(to: selector) ? viewer : nil }
 
     /// Whether a command can run now, and why not.
     private func state(of action: Selector?) -> (Bool, String?) {
@@ -73,14 +84,13 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.addRow.action: return (editable, readOnly)
         case Commands.duplicateRow.action, Commands.duplicateRowWithoutKeys.action, Commands.deleteRows.action:
             return !editable ? (false, readOnly) : (hasSelection, "Select the rows first")
-        case Commands.setNull.action:
-            let cells = selectedCells().filter { source.canEdit($0.row, $0.column) }
+        case Commands.setNull.action, Commands.setDefault.action:
             if !editable { return (false, readOnly) }
+            // The first cells tell (listing a big selection would take a while).
+            let cells = viewer.selectedCells(limit: 10_000).filter { source.canEdit($0.row, $0.column) }
             if cells.isEmpty { return (false, "Select cells you can edit first") }
+            guard action == Commands.setNull.action else { return (true, nil) }
             return (cells.contains { source.table.columns[$0.column].nullable }, "These columns can't be NULL")
-        case Commands.setDefault.action:
-            if !editable { return (false, readOnly) }
-            return (selectedCells().contains { source.canEdit($0.row, $0.column) }, "Select cells you can edit first")
         case Commands.apply.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
             return (pending && loading == nil, pending ? "Wait until the rows have loaded" : "No changes are pending")
         case Commands.revert.action:
@@ -94,14 +104,12 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.countRows.action: return (loading == nil, "Wait until the rows have loaded")
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.sortAscending.action,
              Commands.sortDescending.action:
-            return (grid.selection.cursor != nil || focusedColumn() != nil, "Select a cell first")
+            return (viewer.focusedCell != nil || focusedColumn() != nil, "Select a cell first")
         case Commands.clearSort.action: return (!source.sort.isEmpty, "The rows aren't sorted")
         case Commands.filterByValues.action: return (focusedColumn() != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:
             return (!bar.filterText.isEmpty || !bar.searchField.stringValue.isEmpty, "The rows aren't filtered")
         case Commands.exportRows.action: return (source.rowCount > 0 || source.hasMore, "There are no rows to export")
-        case Commands.copy.action, Commands.copyWithHeaders.action, Commands.copyAs.action, Commands.copyColumnName.action:
-            return (hasSelection, "Select cells first")
         default: return (true, nil)
         }
     }

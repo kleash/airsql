@@ -78,13 +78,13 @@ extension AppTests {
             let session = FakeTableSession()
             let (main, _, tab) = try await Self.tab(session: session)
             #expect(tab.grid.rowCount == 3 && tab.source?.cell(1, 2) == .text("US"))
-            #expect(tab.bar.scope.text == "On server · all rows" && tab.status.rows.stringValue == "3 rows")
+            #expect(tab.bar.scope.text == "On server · all rows" && tab.viewer.status.rows.stringValue == "3 rows")
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)
             #expect(tab.notice.isHidden && !tab.isEdited && main.selectedTab?.title == "orders")
 
             tab.applyFilter("WHERE region = 'EU'")
             await ready { tab.loading != nil }
-            #expect(session.statements.last?.contains(" WHERE region = 'EU' ORDER BY `id` ASC") == true)
+            #expect(session.statements.last?.contains(" WHERE (region = 'EU'\n) ORDER BY `id` ASC") == true)
             #expect(tab.bar.scope.text == "On server · filtered" && tab.settings.recentFilters == ["region = 'EU'"])
 
             // Searching the loaded rows only filters here, without a query.
@@ -171,12 +171,12 @@ extension AppTests {
             let (_, _, tab) = try await Self.tab()
             tab.grid.selection.select(GridPosition(row: 0, column: 0))
             tab.grid.selection.select(GridPosition(row: 1, column: 2), extend: true)
-            tab.copy(nil)
+            tab.viewer.copy(nil)
             #expect(NSPasteboard.general.string(forType: .string) == "1\t7\tEU\n2\tNULL\tUS\n")
             let item = NSMenuItem()
             item.representedObject = CopyFormat.jsonLines.rawValue
-            tab.copyAs(item)
-            tab.copy(nil)
+            tab.viewer.copyAs(item)
+            tab.viewer.copy(nil)
             #expect(NSPasteboard.general.string(forType: .string)
                     == "{\"id\": 1, \"customer_id\": 7, \"region\": \"EU\"}\n{\"id\": 2, \"customer_id\": null, \"region\": \"US\"}\n")
             GridCopy.format = .tsv
@@ -215,12 +215,12 @@ extension AppTests {
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
             #expect(session.statements.last == "SELECT `region`, COUNT(*) FROM `airsql_fixture`.`orders` GROUP BY `region` "
-                    + "ORDER BY COUNT(*) DESC LIMIT 1000")
+                    + "ORDER BY COUNT(*) DESC, `region` LIMIT 1000")
             _ = await eventually(timeout: 10) { await call(harness, "press", ["title": "US  (1)"]).error == nil }
             _ = await call(harness, "press", ["id": "values.ok"])
             #expect(main.window?.attachedSheet == nil && tab.bar.filterText == "`region` IN ('EU')")
             await ready { tab.loading != nil }
-            #expect(session.statements.last?.contains(" WHERE `region` IN ('EU') ORDER BY") == true)
+            #expect(session.statements.last?.contains(" WHERE (`region` IN ('EU')\n) ORDER BY") == true)
         }
 
         @Test func findAndReplaceInTheLoadedRows() async throws {
@@ -260,7 +260,7 @@ extension AppTests {
 
         @Test func consoleResultsCopyInTheGridsFormat() async throws {
             let view = ResultGridView(store: ConsoleFixtures.customers(rows: 2), nullText: "NULL", fontSize: 12)
-            view.copy(nil)  // nothing selected: every row, in TSV
+            view.viewer.copy(nil)  // nothing selected: every row, in TSV
             #expect(NSPasteboard.general.string(forType: .string)
                     == "10482\tHarbor Supply Co.\tcustomer0@mail.example\t318\t184220.50\n"
                     + "10475\tNordlicht GmbH\tcustomer1@mail.example\t317\t183889.25\n")
@@ -268,9 +268,9 @@ extension AppTests {
             view.grid.selection.select(GridPosition(row: 1, column: 1), extend: true)
             let item = NSMenuItem()
             item.representedObject = CopyFormat.insert.rawValue
-            view.copyAs(item)
+            view.viewer.copyAs(item)
             #expect(NSPasteboard.general.string(forType: .string) == "INSERT INTO `table` (`id`, `name`) VALUES (10475, 'Nordlicht GmbH');\n")
-            view.copyWithHeaders(nil)
+            view.viewer.copyWithHeaders(nil)
             #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("INSERT INTO") == true)
             GridCopy.format = .tsv
             // The headers sort the rows here: by spent, smallest first, then back.
@@ -279,8 +279,9 @@ extension AppTests {
             view.dataGrid(view.grid, sortBy: 4, adding: false)
             view.dataGrid(view.grid, sortBy: 4, adding: false)
             #expect(view.grid.sortOrder.isEmpty && view.rows.cell(0, 0) == .text("10482"))
-            let menu = try #require(view.dataGrid(view.grid, menuFor: .cells))
-            #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) == ["Copy", "Copy with Headers", "Copy As", "Export Rows…"])
+            let menu = try #require(view.viewer.dataGrid(view.grid, menuFor: .cells))
+            #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title)
+                    == ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Value Panel", "Record View", "Column Summary…", "Display As"])
         }
 
         @Test func readOnlyConnectionsAndLongValuesAreNotEditedInPlace() async throws {
@@ -301,10 +302,10 @@ extension AppTests {
 
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
             let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
-            #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. Views are read-only"))
+            #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. A view has no key to address its rows"))
             #expect(tab.source?.canEdit(0, 0) == false)
             let item = Commands.addRow.item()
-            #expect(!tab.validateMenuItem(item) && item.toolTip?.hasPrefix("Views are read-only") == true)
+            #expect(!tab.validateMenuItem(item) && item.toolTip?.hasPrefix("A view has no key") == true)
         }
 
         @Test func pendingChangesComeBackAfterACrash() async throws {
@@ -416,7 +417,7 @@ extension AppTests {
             var missing = unexplained([window], where: "table tab")
             tab.grid.selection.select(GridPosition(row: 0, column: 1))
             for target in [DataGridView.Target.cells, .column(1), .row(0)] {
-                if let menu = tab.dataGrid(tab.grid, menuFor: target) { missing += unexplained(menu, path: ["\(target)"]) }
+                if let menu = tab.viewer.dataGrid(tab.grid, menuFor: target) { missing += unexplained(menu, path: ["\(target)"]) }
             }
             tab.exportRows(nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])

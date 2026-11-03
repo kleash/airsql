@@ -21,6 +21,8 @@ protocol DataGridViewDelegate: AnyObject {
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool)
     /// A double click on a row's number: Record View.
     func dataGrid(_ grid: DataGridView, openRecord row: Int)
+    /// A double click on a cell that can't be edited: show its whole value (default: a beep).
+    func dataGridOpenValue(_ grid: DataGridView)
     /// Columns were resized, auto-fitted or moved: remember `columnWidths` and `columnOrder`.
     func dataGridColumnsDidChange(_ grid: DataGridView)
 }
@@ -32,6 +34,7 @@ extension DataGridViewDelegate {
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? { nil }
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {}
     func dataGrid(_ grid: DataGridView, openRecord row: Int) {}
+    func dataGridOpenValue(_ grid: DataGridView) { NSSound.beep() }
     func dataGridColumnsDidChange(_ grid: DataGridView) {}
 }
 
@@ -76,6 +79,8 @@ final class DataGridView: NSView {
     /// Widths by source column; empty until the first reload measures them.
     var columnWidths: [CGFloat] = [] { didSet { layoutColumns() } }
     var nullText = "NULL" { didSet { needsDisplay = true } }
+    /// A colour over a cell's background (a heatmap, equal values), by row and source column; nil for none.
+    var cellTint: ((Int, Int) -> NSColor?)? { didSet { needsDisplay = true } }
     var fontSize: CGFloat = 12 {
         didSet {
             styles = GridStyles(fontSize: fontSize)
@@ -179,8 +184,9 @@ final class DataGridView: NSView {
                width: offsets[position.column + 1] - offsets[position.column], height: rowHeight)
     }
 
-    /// The rows a rect crosses.
+    /// The rows a rect crosses (none for the null rect a dirty rect outside a view intersects to).
     func rows(in rect: NSRect) -> Range<Int> {
+        guard !rect.isNull, !rect.isEmpty else { return 0..<0 }
         let first = max(0, Int(floor(rect.minY / rowHeight))), last = min(rowCount, Int(ceil(rect.maxY / rowHeight)))
         return first..<max(first, last)
     }

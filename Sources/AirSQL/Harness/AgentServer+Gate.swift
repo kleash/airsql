@@ -64,10 +64,12 @@ extension AgentServer {
 
     static let hiddenNote = "Hidden from agents: this connection's agent access doesn't include reading data"
 
-    /// Views that show a connection's rows: grids (table data, results, Transpose), the compare's rows and sync script,
-    /// and the process list (other sessions' statements carry their values).
+    /// Views that show a connection's rows: grids (table data, results, Transpose and Record View), what the grid's viewer
+    /// shows of them (the value panel, View As ▸ Text and Tree, a chart, Column Summary, the status bar's figure), the
+    /// compare's rows and sync script, and the process list (other sessions' statements carry their values).
     static func showsData(_ view: NSView) -> Bool {
-        view is DataGridView || ["recon.rows", "recon.script", "processes.list"].contains(view.accessibilityIdentifier())
+        view is DataGridView || ["valuePanel", "grid.text", "grid.tree", "grid.chart", "columnSummary", "grid.figure", "recon.rows",
+                                 "recon.script", "processes.list"].contains(view.accessibilityIdentifier())
     }
 
     /// Whether `view` shows rows an agent may not read: of a connection whose agent access is below Schema + read, or of

@@ -170,6 +170,8 @@ extension AppTests {
             try await ConnectionsScreens.each(main, harness, long: false) { _, name in
                 missing += unexplained(harness.openSheets(), where: name)
             }
+            // The grid's reading tools (L2).
+            missing += await gridViewerUnexplained(main, harness)
 
             #expect(missing.isEmpty, "\(missing.joined(separator: "\n"))")
         }

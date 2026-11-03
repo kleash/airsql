@@ -207,6 +207,8 @@ public struct AppSettings: Codable, Equatable {
     public var dumpPath = ""
     /// Settings ▸ Grid: Load All asks first when a table has more rows than this.
     public var loadAllAsksAbove = 100_000
+    /// Settings ▸ Grid: a console result with one row opens transposed (its columns down the left).
+    public var transposeSingleRow = true
 
     public init() {}
 
@@ -228,6 +230,7 @@ public struct AppSettings: Codable, Equatable {
         clientPath = try value(.clientPath, defaults.clientPath)
         dumpPath = try value(.dumpPath, defaults.dumpPath)
         loadAllAsksAbove = try value(.loadAllAsksAbove, defaults.loadAllAsksAbove)
+        transposeSingleRow = try value(.transposeSingleRow, defaults.transposeSingleRow)
     }
 }
 

@@ -114,6 +114,9 @@ extension ConsoleViewController: NSMenuItemValidation {
                 return (false, "This is the only result tab")
             }
             return (currentResult != nil, "Run a query first: there is no result tab yet")
+        case #selector(exportResult(_:)):
+            if case .rows = currentResult?.content { return (true, "") }
+            return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This result has no rows to export")
         case #selector(changeConnection(_:)):
             if let reason = busy { return (false, reason) }
             return (model.data.connections.count > 1 || connectionID == nil, "There is no other connection to choose")

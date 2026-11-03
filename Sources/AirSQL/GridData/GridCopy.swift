@@ -1,9 +1,9 @@
 import AirSQLCore
 import AppKit
 
-/// Copying a grid's selection (grid-spec §6) for any screen that hosts one: ⌘C in the format last chosen in Copy As
-/// (TSV at first), ⌥⌘C with the column names first, Copy As ▸ every format. A host gives the values whole (never
-/// shortened) and, for the SQL formats, the table they come from.
+/// Copying a grid's selection (grid-spec §6), which `GridViewer` does for every grid: ⌘C in the format last chosen in
+/// Copy As (TSV at first), ⌥⌘C with the column names first, Copy As ▸ every format. Values are whole (never shortened);
+/// the SQL formats name the table they come from. View As ▸ Text shows the rows in the same format.
 @MainActor
 enum GridCopy {
     private static let formatKey = "gridCopyFormat"
@@ -46,25 +46,24 @@ enum GridCopy {
         return (Array(rows), columns.map(grid.sourceColumn))
     }
 
-    /// The selection as text in `format`.
-    static func text(_ grid: DataGridView, format: CopyFormat, headers: Bool, value: (Int, Int) -> String?,
-                     database: String? = nil, table: String = "table", noBackslashEscapes: Bool = false) -> String? {
-        guard let source = grid.source else { return nil }
-        let (rows, columns) = covered(grid)
-        guard !rows.isEmpty, !columns.isEmpty else { return nil }
-        var options = CopyOptions(headers: headers, nullText: format == .tsv || format == .csv ? grid.nullText : "NULL")
-        options.noBackslashEscapes = noBackslashEscapes
+    /// `rows` by `columns` (source columns, in the order given) of `source` as text in `format`, whole values.
+    static func text(_ source: GridSource, rows: [Int], columns: [Int], format: CopyFormat, headers: Bool, nullText: String,
+                     database: String? = nil, table: String = "table") -> String {
+        let options = CopyOptions(headers: headers, nullText: format == .tsv || format == .csv ? nullText : "NULL")
         var writer = CopyWriter(format, columns: columns.map { source.columns[$0] }, database: database, table: table, options: options)
         var text = writer.header()
-        for row in rows { text += writer.row(columns.map { value(row, $0) }) }
+        for row in rows { text += writer.row(columns.map { source.value(row, $0) }) }
         return text + writer.footer()
     }
 
-    /// Puts the selection on the pasteboard; beeps when nothing is selected.
-    static func copy(_ grid: DataGridView, format: CopyFormat, headers: Bool = false, value: (Int, Int) -> String?,
-                     database: String? = nil, table: String = "table", noBackslashEscapes: Bool = false) {
-        guard let text = text(grid, format: format, headers: headers, value: value, database: database, table: table,
-                              noBackslashEscapes: noBackslashEscapes) else { return NSSound.beep() }
+    /// Puts the cells the grid's selection covers on the pasteboard, read from `source` (in the grid's coordinates);
+    /// beeps when nothing is selected.
+    static func copy(_ grid: DataGridView, source: GridSource, format: CopyFormat, headers: Bool = false, database: String? = nil,
+                     table: String = "table") {
+        let (rows, columns) = covered(grid)
+        guard !rows.isEmpty, !columns.isEmpty else { return NSSound.beep() }
+        let text = text(source, rows: rows, columns: columns, format: format, headers: headers, nullText: grid.nullText,
+                        database: database, table: table)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }

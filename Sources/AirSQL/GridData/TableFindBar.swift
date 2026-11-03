@@ -120,15 +120,30 @@ extension TableDataController {
         }
     }
 
-    /// The text or an option changed: the rows again when Filter Rows is on, and the count.
+    /// The text or an option changed: the rows again when Filter Rows is on, the matches tinted, and the count.
     func findChanged() {
         updateLocalFilter()
+        updateHighlight()
         updateFindCount()
     }
 
     func findClosed() {
         updateLocalFilter()
+        updateHighlight()
         view.window?.makeFirstResponder(grid)
+    }
+
+    /// Tints the cells the find bar matches and those holding Search All Columns' text (through the viewer).
+    func updateHighlight() {
+        let search = bar.searchField.stringValue, find = findBar.find, expression = findBar.isHidden ? nil : find.expression
+        guard let source, !search.isEmpty || expression != nil else {
+            viewer.highlight = nil
+            return
+        }
+        viewer.highlight = { row, column in
+            let value = source.value(row, column)
+            return expression.map { find.matches(value, $0) } == true || !search.isEmpty && GridFilter.matches(search, [value])
+        }
     }
 
     /// The loaded rows shown: those holding the loaded-rows search (Loaded rows only) and a match of the find bar
@@ -144,7 +159,7 @@ extension TableDataController {
                 (search.isEmpty || GridFilter.matches(search, values)) && (expression == nil || values.contains { find.matches($0, expression) })
             }
         }
-        grid.reloadData()
+        viewer.reloadData()
         updateBars()
     }
 
@@ -175,9 +190,11 @@ extension TableDataController {
         }
     }
 
-    /// Selects the next (or previous) matching cell after the focused one, wrapping around.
+    /// Selects the next (or previous) matching cell after the focused one, wrapping around (in the grid: out of Transpose
+    /// and Record View).
     func findMatch(forward: Bool) {
         if findBar.isHidden { findBar.show(replacing: false) }
+        viewer.backToGrid(nil)
         let found = matches()
         guard !found.isEmpty else {
             updateFindCount()
@@ -194,6 +211,7 @@ extension TableDataController {
     /// Replaces the match in the focused cell (then shows the next), or in every loaded cell: pending edits.
     func replaceMatch(all: Bool) {
         guard let source, editingOff == nil else { return NSSound.beep() }
+        viewer.backToGrid(nil)
         let find = findBar.find, replacement = findBar.replaceField.stringValue
         guard let expression = find.expression else { return NSSound.beep() }
         let targets = all ? matches() : grid.selection.cursor.map { [$0] } ?? []

@@ -1,9 +1,9 @@
 import AirSQLCore
 import AppKit
 
-// Filtering, searching, sorting and copying a table's rows (grid-spec §4, §6). The WHERE bar, quick filters, Filter by
-// Values and Search All Columns run on the server over every row; "Loaded rows only" searches the rows loaded so far.
-// The grid bar's chip always says which.
+// Filtering, searching and sorting a table's rows (grid-spec §4). The WHERE bar, quick filters, Filter by Values, Column
+// Summary's values and Search All Columns run on the server over every row; "Loaded rows only" searches the rows loaded
+// so far. The grid bar's chip always says which; the cells the search matches are tinted.
 extension TableDataController {
     /// The condition the server gets: the WHERE bar's, and the search's when it runs on the server.
     var serverFilter: String {
@@ -25,6 +25,7 @@ extension TableDataController {
         bar.searchField.stringValue = text
         bar.loadedOnly.state = loadedOnly ? .on : .off
         updateLocalFilter()
+        updateHighlight()
         if !loadedOnly, !source.localSort.isEmpty {
             source.localSort = []
             grid.sortOrder = source.sort.compactMap { key in
@@ -101,24 +102,29 @@ extension TableDataController {
         applyFilter(GridCondition(column, op, [value]).sql(noBackslashEscapes: noBackslashEscapes))
     }
 
-    /// The focused cell's column and value, and the distinct values selected in that column.
+    /// The focused cell's column and value, and the distinct values selected in that column (at most 1,000 cells looked
+    /// at, as a menu opens with them).
     func focusedValues() -> (GridColumn, String?, [String?])? {
-        guard let source, let cursor = grid.selection.cursor, cursor.row < grid.rowCount, cursor.column < grid.columnCount else { return nil }
-        let column = grid.sourceColumn(cursor.column)
+        guard let source, let (row, column) = viewer.focusedCell else { return nil }
         var values: [String?] = []
-        for cell in selectedCells() where cell.column == column {
+        for cell in viewer.selectedCells(limit: 1_000) where cell.column == column {
             let value = source.value(cell.row, column)
             if !values.contains(value) { values.append(value) }
         }
-        return (source.columns[column], source.value(cursor.row, column), values)
+        return (source.columns[column], source.value(row, column), values)
+    }
+
+    /// Column Summary's value clicked: the rows with that value, added to the filter.
+    func filter(_ column: Int, by value: String?) {
+        guard let source else { return }
+        applyFilter(GridFilter.adding(GridCondition(source.columns[column], .equals, [value]).sql(noBackslashEscapes: noBackslashEscapes),
+                                      to: bar.filterText))
     }
 
     /// Filter by Values…: the focused column's values with their counts, from the server within the current filter.
     @objc func filterByValues(_ sender: Any?) {
         guard let source, let column = focusedColumn(), let window = view.window else { return NSSound.beep() }
-        let info = source.columns[column], name = SQLQuote.identifier(info.name), condition = GridFilter.condition(source.filter)
-        let sql = "SELECT \(name), COUNT(*) FROM " + SQLQuote.identifier(database, tableName) + (condition.isEmpty ? "" : " WHERE " + condition)
-            + " GROUP BY \(name) ORDER BY COUNT(*) DESC LIMIT \(FilterByValuesSheet.limit)"
+        let info = source.columns[column], sql = source.topValuesSQL(column, limit: FilterByValuesSheet.limit)
         let open = openSession
         FilterByValuesSheet.show(column: info, table: tableName, on: window, read: {
             guard let store = try await open().query(sql, rowCap: FilterByValuesSheet.limit).first?.rows else { return [] }
@@ -132,6 +138,7 @@ extension TableDataController {
     @objc func clearFilter(_ sender: Any?) {
         bar.searchField.stringValue = ""
         updateLocalFilter()
+        updateHighlight()
         applyFilter("")
     }
 
@@ -168,7 +175,7 @@ extension TableDataController {
         let apply = { [weak self] in
             source.localSort = keys
             self?.grid.sortOrder = keys.map { DataGridView.Sort(column: $0.column, ascending: $0.ascending) }
-            self?.grid.reloadData()
+            self?.viewer.reloadData()
             self?.updateBars()
         }
         guard source.loadedRows > 100_000, let window = view.window else { return apply() }
@@ -193,7 +200,8 @@ extension TableDataController {
 
     /// The column of the focused cell or of the selected header.
     func focusedColumn() -> Int? {
-        if let cursor = grid.selection.cursor, cursor.column < grid.columnCount { return grid.sourceColumn(cursor.column) }
+        if let cell = viewer.focusedCell { return cell.column }
+        guard !(grid.source is TransposedSource) else { return nil }
         for case .columns(let columns) in grid.selection.areas where columns.lowerBound < grid.columnCount {
             return grid.sourceColumn(columns.lowerBound)
         }
@@ -223,29 +231,5 @@ extension TableDataController {
         alert.beginSheetModal(for: window) { response in
             if response == .alertFirstButtonReturn { apply() }
         }
-    }
-
-    // MARK: Copy
-
-    @objc func copy(_ sender: Any?) { copySelection(GridCopy.format, headers: false) }
-    @objc func copyWithHeaders(_ sender: Any?) { copySelection(GridCopy.format, headers: true) }
-
-    @objc func copyAs(_ sender: Any?) {
-        guard let format = GridCopy.format(of: sender) else { return }
-        GridCopy.format = format
-        copySelection(format, headers: false)
-    }
-
-    @objc func copyColumnNames(_ sender: Any?) {
-        guard let source else { return }
-        let names = GridCopy.covered(grid).columns.map { source.columns[$0].name }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(names.joined(separator: "\t"), forType: .string)
-    }
-
-    private func copySelection(_ format: CopyFormat, headers: Bool) {
-        guard let source else { return NSSound.beep() }
-        GridCopy.copy(grid, format: format, headers: headers, value: { source.value($0, $1) },
-                      database: database, table: tableName)
     }
 }

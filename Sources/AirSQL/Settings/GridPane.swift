@@ -1,7 +1,8 @@
 import AirSQLCore
 import AppKit
 
-/// Settings ▸ Grid: its text, how many rows load at a time, and how NULL looks. The grid lanes (L2, L3) add theirs here.
+/// Settings ▸ Grid: its text, how many rows load at a time and when Load All asks, how NULL looks, and whether a
+/// one-row result opens transposed.
 final class GridPane: SettingsPaneController {
     override func build() {
         form.row("Text size", [choice(\.gridFontSize, id: "settings.gridFontSize",
@@ -18,5 +19,9 @@ final class GridPane: SettingsPaneController {
                                         tip: "How empty (NULL) values look in the grid; they are drawn in grey italics",
                                         placeholder: "NULL", width: 120)],
                  caption: "Only how it looks: an empty text is still different from NULL.")
+        form.row("", [toggle("Transpose results with one row", id: "settings.transposeSingleRow",
+                             tip: "Show a console result with a single row turned on its side, one line per column",
+                             \.transposeSingleRow)],
+                 caption: "Transpose (⌥⌘T) turns any grid back and forth.")
     }
 }

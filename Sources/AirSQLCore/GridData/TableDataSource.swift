@@ -4,7 +4,8 @@ import Foundation
 /// A table's rows in the grid (`GridSource`'s table tab): pages of `SELECT … LIMIT … OFFSET …` with the WHERE filter
 /// and ORDER BY on the server, which the tab runs on the data session and hands over (`append`); the loaded rows
 /// searched locally (`localFilter`); and the pending changes drawn over them, new rows after the loaded ones. Key
-/// columns are fetched and kept whole, so an edit addresses its exact row. Main thread.
+/// columns are fetched and kept whole, so an edit addresses its exact row. It writes every statement the tab sends
+/// about the table (pages, counts, Column Summary, Filter by Values), so they share one filter. Main thread.
 public final class TableDataSource: GridSource {
     public let database: String
     public let table: SchemaTable
@@ -35,12 +36,14 @@ public final class TableDataSource: GridSource {
     public init(database: String, table: SchemaTable) {
         self.database = database
         self.table = table
-        let (keyColumns, reason) = TableEditing.key(of: table)
         columns = table.columns.map { column in
-            GridColumn(name: column.name, type: column.columnType, kind: Self.kind(column), isKey: keyColumns?.contains(column.name) ?? false)
+            var shown = GridColumn(name: column.name, kind: Self.kind(column))
+            shown.describe(table)
+            return shown
         }
+        readOnlyReason = table.editingRefusal
+        let keyColumns = readOnlyReason == nil ? table.editingKey : nil
         key = keyColumns?.compactMap { name in table.columns.firstIndex { $0.name == name } }
-        readOnlyReason = reason
         changes = PendingChanges(keyColumns: keyColumns ?? [])
     }
 
@@ -55,15 +58,19 @@ public final class TableDataSource: GridSource {
         return .text
     }
 
-    // MARK: Pages
+    // MARK: Statements
+
+    /// " FROM `database`.`table`", then " WHERE (…)" with the filter: a newline before the closing parenthesis, so a
+    /// condition ending in a -- comment can't swallow it (or the ORDER BY and LIMIT after it).
+    private var from: String {
+        let condition = GridFilter.condition(filter)
+        return " FROM " + SQLQuote.identifier(database, table.name) + (condition.isEmpty ? "" : " WHERE (\(condition)\n)")
+    }
 
     /// The SELECT of `limit` rows from `offset` (no limit: nil): every column by name (invisible ones too), the filter,
     /// and the sort, else the key's order, so pages follow one another.
     public func pageSQL(offset: Int, limit: Int?) -> String {
-        var sql = "SELECT " + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") + " FROM "
-            + SQLQuote.identifier(database, table.name)
-        let condition = GridFilter.condition(filter)
-        if !condition.isEmpty { sql += " WHERE " + condition }
+        var sql = "SELECT " + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") + from
         let order = sort.isEmpty ? (key ?? []).map { TableViewSettings.SortKey(column: columns[$0].name, ascending: true) } : sort
         if !order.isEmpty { sql += " ORDER BY " + GridSorting.orderBy(order) }
         if let limit { sql += " LIMIT \(limit)" }
@@ -72,9 +79,27 @@ public final class TableDataSource: GridSource {
     }
 
     /// `SELECT COUNT(*)` with the filter: Count Rows Exactly.
-    public var countSQL: String {
-        let condition = GridFilter.condition(filter)
-        return "SELECT COUNT(*) FROM " + SQLQuote.identifier(database, table.name) + (condition.isEmpty ? "" : " WHERE " + condition)
+    public var countSQL: String { "SELECT COUNT(*)" + from }
+
+    /// The server's estimate of the table's rows (InnoDB's is a guess), for the status bar until they are counted, and
+    /// its size in bytes (Column Summary asks first above 2 GB).
+    public func estimateSQL(noBackslashEscapes: Bool) -> String {
+        "SELECT TABLE_ROWS, DATA_LENGTH FROM information_schema.TABLES WHERE TABLE_SCHEMA = "
+            + SQLQuote.string(database, noBackslashEscapes: noBackslashEscapes) + " AND TABLE_NAME = "
+            + SQLQuote.string(table.name, noBackslashEscapes: noBackslashEscapes)
+    }
+
+    /// Column Summary on the server: a column's distinct values, NULLs, smallest, largest and all rows, within the filter.
+    public func summarySQL(_ column: Int) -> String {
+        let name = SQLQuote.identifier(columns[column].name)
+        return "SELECT COUNT(DISTINCT \(name)), COUNT(*) - COUNT(\(name)), MIN(\(name)), MAX(\(name)), COUNT(*)" + from
+    }
+
+    /// A column's most frequent values with how many rows have each, within the filter (Column Summary, Filter by
+    /// Values).
+    public func topValuesSQL(_ column: Int, limit: Int) -> String {
+        let name = SQLQuote.identifier(columns[column].name)
+        return "SELECT \(name), COUNT(*)" + from + " GROUP BY \(name) ORDER BY COUNT(*) DESC, \(name) LIMIT \(limit)"
     }
 
     /// Forgets the loaded rows (a new filter or sort, Refresh); the pending changes stay.
@@ -155,6 +180,14 @@ public final class TableDataSource: GridSource {
     public func value(loaded row: Int, _ column: Int) -> String? {
         let (store, local) = page(row)
         return Self.text(store, local, column)
+    }
+
+    /// A loaded cell's bytes as the server sent them, for the value panel's hex and image (nil for NULL, and for a cell
+    /// with a pending change or of a new row: those show as text).
+    public func bytes(_ index: Int, _ column: Int) -> [UInt8]? {
+        guard case .loaded(let row) = self.row(index), mark(index, column) == .none else { return nil }
+        let (store, local) = page(row)
+        return store.bytes(local, column)
     }
 
     /// A stored value as the grid's sources give it whole (export streams them this way too).
@@ -247,5 +280,31 @@ public final class TableDataSource: GridSource {
         case .inserted(let id): changes.set(value, column: columns[column].name, insert: id)
         case nil: break
         }
+    }
+}
+
+extension GridColumn {
+    /// Adds what a table's schema says to a column of its rows: the full type ("varchar(120)"), the key marks
+    /// (primary, foreign, unique, indexed), auto-increment, a default, generated, NULL allowed, and the comment.
+    /// `isKey` marks the key that addresses a row (`SchemaTable.editingKey`).
+    public mutating func describe(_ table: SchemaTable) {
+        guard let column = table.column(name) else { return }
+        func has(_ index: SchemaIndex) -> Bool {
+            index.parts.contains { $0.column?.caseInsensitiveCompare(column.name) == .orderedSame }
+        }
+        type = column.columnType
+        comment = column.comment
+        var marks: Marks = column.nullable ? .nullable : []
+        if column.autoIncrement { marks.insert(.autoIncrement) }
+        if column.generated != nil { marks.insert(.generated) }
+        if column.defaultValue != .none, column.defaultValue != .null, column.generated == nil { marks.insert(.hasDefault) }
+        for index in table.indexes where has(index) {
+            marks.insert(index.isPrimary ? .primary : index.unique ? .unique : .indexed)
+        }
+        if table.foreignKeys.contains(where: { $0.columns.contains { $0.caseInsensitiveCompare(column.name) == .orderedSame } }) {
+            marks.insert(.foreign)
+        }
+        self.marks = marks
+        isKey = table.editingKey?.contains { $0.caseInsensitiveCompare(column.name) == .orderedSame } ?? false
     }
 }

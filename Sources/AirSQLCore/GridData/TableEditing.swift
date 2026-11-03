@@ -1,27 +1,8 @@
 import Foundation
 import os
 
-/// What decides whether a table's rows can be edited, and what Apply runs and checks (plan §2.5, R7).
+/// What Apply warns about first (plan §2.5, R7). Whether a table's rows can be edited at all: `SchemaTable.editingKey`.
 public enum TableEditing {
-    /// The columns that tell the table's rows apart: the primary key, else the first unique key whose columns are all
-    /// NOT NULL. Nil with the reason the grid shows when there is none: then the table is read-only.
-    public static func key(of table: SchemaTable) -> (columns: [String]?, reason: String?) {
-        switch table.kind {
-        case .table: break
-        case .view: return (nil, "Views are read-only in the grid: open the table the view reads from to edit its rows.")
-        case .sequence: return (nil, "Sequences are read-only in the grid: change one with ALTER SEQUENCE in a console.")
-        }
-        let candidates = (table.primaryKey.map { [$0] } ?? []) + table.indexes.filter { $0.unique && !$0.isPrimary }
-        for index in candidates {
-            let names = index.parts.compactMap(\.column)
-            guard !names.isEmpty, names.count == index.parts.count,
-                  names.allSatisfy({ name in table.column(name).map { !$0.nullable } == true }) else { continue }
-            return (names, nil)
-        }
-        return (nil, "This table has no primary key, and no unique key on columns that can't be NULL, so AirSQL can't "
-                + "tell its rows apart: it is read-only here. Add a primary key in the table editor to edit its rows.")
-    }
-
     /// Engines whose changes a ROLLBACK undoes.
     static let transactional: Set<String> = ["innodb", "xtradb", "rocksdb", "tokudb", "ndb", "ndbcluster"]
 
