@@ -280,6 +280,78 @@ extension AppTests {
             #expect(commit.error?.contains("No transaction is open") == true, "\(commit.error ?? "")")
         }
 
+        /// A read-only connection's console refuses what AirSQL can't prove only reads before it sends anything: here to a
+        /// connection that can't connect (nothing listens on port 1), so a statement sent would fail there instead.
+        @Test func aReadOnlyConnectionsConsoleRefusesWhatMayWrite() async throws {
+            var saved = Fixtures.production
+            saved.readOnly = true
+            let unreachable = Connection(options: ConnectOptions(host: "127.0.0.1", port: 1, user: "nobody"))
+            ConsoleViewController.openConnection = { $0 == saved.id ? unreachable : nil }
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let (_, harness, console) = try await Self.console(testModel([saved]))
+            for (sql, command) in [("SET SESSION TRANSACTION READ WRITE;\nCREATE DATABASE lane_safety_probe;", "Run All"),
+                                   ("START TRANSACTION READ WRITE", "Run Statement"), ("UPDATE t SET a = 1", "Explain"),
+                                   ("SELECT SLEEP(1)", "Profile")] {
+                console.editor.setText(sql)
+                #expect(await call(harness, "menu", ["path": "Query > " + command]).error == nil, "\(command)")
+                #expect(console.running == nil, "\(command)")
+                #expect(console.messagesView.messages.last?.text.hasPrefix("“Production · shop” is read-only, so nothing ran.")
+                        == true, "\(command): \(console.messagesView.messages.last?.text ?? "")")
+            }
+            #expect(console.messagesView.messages.first?.text == "“Production · shop” is read-only, so nothing ran. SET isn't "
+                + "a read-only statement; only SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN are. To change anything, "
+                + "turn off Read-only in its connection settings.")
+            #expect(console.messagesView.messages.map(\.statement) == ["SET SESSION TRANSACTION READ WRITE",
+                                                                    "START TRANSACTION READ WRITE",
+                                                                    "EXPLAIN UPDATE t SET a = 1", "SELECT SLEEP(1)"])
+        }
+
+        /// The audit's probe on a read-only connection to MariaDB 11.4 and MySQL 8.4: SET SESSION TRANSACTION READ WRITE
+        /// would lift the session's own READ ONLY and let CREATE DATABASE through, so the console refuses both, and START
+        /// TRANSACTION READ WRITE; SELECT, SHOW, EXPLAIN and USE still run, and Explain and Profile too.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"), arguments: [Lab.mariadb114, Lab.mysql84])
+        func aReadOnlyConnectionRefusesTheProbeAndStillReads(_ server: Lab.Server) async throws {
+            var options = DBLab.options(server, tls: DBLab.required)
+            options.readOnly = true
+            let connection = Connection(options: options, log: DBLab.log)
+            try await connection.connect()
+            var saved = Fixtures.production
+            saved.readOnly = true
+            ConsoleViewController.openConnection = { $0 == saved.id ? connection : nil }
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let (_, harness, console) = try await Self.console(testModel([saved]))
+            func run(_ sql: String, _ command: String = "Run All") async {
+                console.editor.setText(sql)
+                #expect(await call(harness, "menu", ["path": "Query > " + command]).error == nil, "\(command)")
+                _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            }
+
+            let probe = "lane_safety_probe"
+            for sql in ["SET SESSION TRANSACTION READ WRITE;\nCREATE DATABASE \(probe);", "START TRANSACTION READ WRITE",
+                        "CREATE DATABASE \(probe)"] {
+                await run(sql)
+                #expect(console.messagesView.messages.last?.text.contains("is read-only, so nothing ran.") == true,
+                        "\(sql): \(console.messagesView.messages.map(\.text))")
+            }
+            let main = try await connection.session(.main)
+            #expect(try await main.query("SELECT @@transaction_read_only").first?.rows?.string(0, 0) == "1")
+            #expect(try await main.query("SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '\(probe)'")
+                .first?.rows?.string(0, 0) == "0")
+
+            let before = console.messagesView.messages.count
+            await run("USE fixture;\nSELECT COUNT(*) FROM customers;\nSHOW TABLES;\nEXPLAIN SELECT * FROM customers WHERE id = 1;")
+            // MySQL's EXPLAIN adds a note (1003, the query as it rewrote it): a warning, not an error.
+            #expect(console.messagesView.messages.dropFirst(before).prefix(4).map(\.level) == [.ok, .ok, .ok, .ok]
+                    && !console.messagesView.messages.dropFirst(before).contains { $0.level == .error },
+                    "\(console.messagesView.messages.dropFirst(before).map(\.text))")
+            #expect(console.resultTabs.count == 3)
+            await run("SELECT * FROM customers WHERE id = 1", "Explain")
+            #expect(console.selectedResult?.title == "Plan")
+            await run("SELECT * FROM customers WHERE id = 1", "Profile")
+            #expect(console.resultTabs.last?.title == "Profile", "\(console.resultTabs.map(\.title))")
+            await connection.disconnect()
+        }
+
         /// Run All against MariaDB 11.8: a result tab per result set (named from the comment above), Messages, Manual
         /// mode's transaction in the badge, and closing the last console with the transaction open.
         @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))

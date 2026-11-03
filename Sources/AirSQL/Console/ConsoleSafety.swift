@@ -59,11 +59,15 @@ enum ConsoleSafety {
 
     /// On a read-only connection, says in Messages why the statements don't run unless each one is proven read-only.
     static func refusesOnReadOnly(_ statements: [String], in console: ConsoleViewController) -> Bool {
-        guard let saved = console.connection, saved.readOnly, let refusal = statements.lazy.compactMap({
-            StatementCheck.readOnlyRefusal($0, on: saved.displayName, noBackslashEscapes: console.editor.noBackslashEscapes)
-        }).first else { return false }
-        console.note(.error, refusal)
-        return true
+        guard let saved = console.connection, saved.readOnly else { return false }
+        for sql in statements {
+            if let refusal = StatementCheck.readOnlyRefusal(sql, on: saved.displayName,
+                                                            noBackslashEscapes: console.editor.noBackslashEscapes) {
+                console.note(.error, refusal, statement: SQLStatement(sql: sql))
+                return true
+            }
+        }
+        return false
     }
 
     /// Names as the person types them: each one without its backticks (`shop`.`my orders`, `a.b` → shop.my orders, a.b).
