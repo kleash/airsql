@@ -11,6 +11,8 @@ final class SQLEditorView: NSTextView {
     var onChange: (() -> Void)?
     /// Called as the selection moves (the helpers panel follows the statement at the caret).
     var onSelectionChange: (() -> Void)?
+    /// The menu's Find commands (their tag is the NSTextFinder action): the console's find bar.
+    var onFind: ((NSTextFinder.Action) -> Void)?
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
     static let indentUnit = "    "
@@ -80,6 +82,17 @@ final class SQLEditorView: NSTextView {
     }
 
     var fontSize: CGFloat { font?.pointSize ?? 13 }
+
+    override func performTextFinderAction(_ sender: Any?) {
+        guard let onFind, let tag = (sender as? NSValidatedUserInterfaceItem)?.tag, let action = NSTextFinder.Action(rawValue: tag)
+        else { return super.performTextFinderAction(sender) }
+        onFind(action)
+    }
+
+    override func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(performTextFinderAction(_:)) { return onFind != nil }
+        return super.validateMenuItem(item)
+    }
 
     // MARK: Colours
 

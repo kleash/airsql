@@ -50,6 +50,52 @@ extension AppTests {
             #expect(console.text.hasPrefix("SELECT"))
         }
 
+        @Test func findAndReplaceWithARegularExpression() async throws {
+            let (_, harness, console) = try await Self.console()
+            _ = await call(harness, "type", ["text": "SELECT o1, o2 FROM t WHERE o3 = 'O4'"])
+            #expect(await call(harness, "menu", ["path": "Edit > Find > Find and Replace…"]).error == nil)
+            let find = try #require(console.findBar)
+            #expect(!find.isHidden && console.view.window?.firstResponder === find.search.currentEditor())
+            find.search.stringValue = "o(\\d)"
+            find.update()
+            #expect(find.matches()?.isEmpty == true, "plain text: there is no o(\\d)")
+            find.regex.state = .on
+            find.update()
+            #expect(find.matches()?.count == 4, "any case by default")
+            find.matchCase.state = .on
+            find.update()
+            #expect(find.matches()?.count == 3)
+            find.replacement.stringValue = "col$1"
+            find.update()
+            _ = await call(harness, "press", ["id": "find.replaceAll"])
+            #expect(console.text == "SELECT col1, col2 FROM t WHERE col3 = 'O4'")
+            find.search.stringValue = "("
+            find.update()
+            #expect(find.matches() == nil, "not a regular expression")
+            find.close(nil)
+            #expect(find.isHidden && console.view.window?.firstResponder === console.editor)
+        }
+
+        @Test func theSQLLogShowsFiltersAndClearsTheLog() async throws {
+            let folder = try scratch()
+            let log = SQLLog(fileURL: URL(fileURLWithPath: folder + "/SQL.log"))
+            log.statement("SELECT * FROM orders", context: "Shop main:1", noBackslashEscapes: false)
+            log.statement("CREATE USER x IDENTIFIED BY 'secret'", context: "Shop main:2", noBackslashEscapes: false)
+            let viewer = SQLLogWindowController.show(log)
+            keptWindows.append(viewer)
+            viewer.window?.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+            #expect(try await eventually(timeout: 5) { viewer.lines.count == 2 })
+            #expect(viewer.lines.last?.contains("<secret>") == true && viewer.lines.last?.contains("'secret'") == false)
+            log.statement("SELECT 2", context: "Shop main:3", noBackslashEscapes: false)
+            viewer.refresh()
+            #expect(try await eventually(timeout: 5) { viewer.lines.count == 3 }, "follows what is added")
+            SQLLogWindowController.clear(log)
+            #expect(try await eventually(timeout: 5) { !FileManager.default.fileExists(atPath: log.fileURL.path) })
+            viewer.refresh()
+            #expect(try await eventually(timeout: 5) { viewer.lines.isEmpty })
+            viewer.close()
+        }
+
         @Test func runSaysToConnectFirst() async throws {
             let (_, harness, console) = try await Self.console()
             _ = await call(harness, "type", ["text": "SELECT 1"])

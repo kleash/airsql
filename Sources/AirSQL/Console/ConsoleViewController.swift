@@ -43,6 +43,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     var savedText = ""
     private(set) var editor: SQLEditorView!
     private(set) var editorScroll: NSScrollView!
+    private(set) var findBar: FindBar!
     let results = ResultsView()
     let messagesView = ConsoleMessagesView()
     lazy var messagesTab: ResultTab = {
@@ -85,7 +86,14 @@ final class ConsoleViewController: NSViewController, TabContent {
         split.dividerStyle = .thin
         split.autosaveName = layoutName("Console")
         split.translatesAutoresizingMaskIntoConstraints = false
-        split.addArrangedSubview(scroll)
+        let find = FindBar(editor: editor)
+        findBar = find
+        editor.onFind = { [weak find] action in find?.perform(action) }
+        let top = NSStackView(views: [find, scroll])
+        top.orientation = .vertical
+        top.spacing = 0
+        top.setHuggingPriority(.defaultLow, for: .vertical)
+        split.addArrangedSubview(top)
         split.addArrangedSubview(results)
         split.setHoldingPriority(.defaultLow - 1, forSubviewAt: 0)
         split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
@@ -155,6 +163,7 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     private func textChanged() {
         resultsRuler?.errorLine = nil
+        if findBar?.isHidden == false { findBar.update() }
         ConsoleDocuments.shared.changed(self)
         contentChanged()
     }
