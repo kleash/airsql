@@ -81,7 +81,8 @@ final class AgentActivityPopover: NSViewController {
         return formatter
     }()
 
-    /// One row per call: what was asked and when, then how it ended.
+    /// One row per call: what was asked and when, then how it ended. A run_queries call's row opens its statements and
+    /// rows in the connection's Agent tab on a double-click.
     private func rebuild() {
         list.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let events = service.events
@@ -104,7 +105,15 @@ final class AgentActivityPopover: NSViewController {
             let result = label(event.client + " · " + outcome, font: .systemFont(ofSize: 11),
                                color: event.failed ? .statusBad : Self.quiet, truncates: true)
             result.toolTip = outcome
-            let row = NSStackView(views: [top, result])
+            let row = EventRow(views: [top, result])
+            if let run = service.runs.first(where: { $0.call == event.id }) {
+                row.open = { [weak self] in
+                    guard let self else { return }
+                    self.service.main?.statusBar.agent.shown?.performClose(nil)
+                    self.service.showResults(run.connection, call: run.call)
+                }
+                row.toolTip = "Double-click to see the statements and the rows they got: " + event.summary + " · " + outcome
+            }
             row.orientation = .vertical
             row.alignment = .leading
             row.spacing = 1
@@ -117,6 +126,18 @@ final class AgentActivityPopover: NSViewController {
         scroll.heightAnchor.constraint(equalToConstant: height).isActive = true
         scroll.documentView?.scroll(NSPoint(x: 0, y: list.fittingSize.height))
     }
+}
+
+/// A call's row: a double-click anywhere on it opens what it got, when it got rows.
+private final class EventRow: NSStackView {
+    var open: (() -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2, let open { open() } else { super.mouseDown(with: event) }
+    }
+
+    /// The labels' clicks are the row's.
+    override func hitTest(_ point: NSPoint) -> NSView? { open != nil && super.hitTest(point) != nil ? self : super.hitTest(point) }
 }
 
 /// A stack as a scroll view's document, laid out from the top.

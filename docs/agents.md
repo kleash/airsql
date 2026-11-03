@@ -68,6 +68,12 @@ The agents' item in the status bar says what they're doing. Click it (or choose 
 for every call since AirSQL opened, with how it ended. A call that reads a database also shows in Activity, where
 **Cancel** stops it. **Turn Agents Off** in that popover (or in Tools ▸ Agents) stops them at once.
 
+**View ▸ Agent Results** opens the connection's Agent tab: every statement agents ran on it with `run_queries`, newest
+last, and under the list the rows the selected one got, read-only and no more than the agent got. Double-click a
+`run_queries` call in Agent Activity to open the tab at its statements. Double-click a statement (or choose **Query ▸
+Open in New Console**) to put it in a new console tab, where you can change it and run it yourself. The tab keeps the
+last 100 statements since AirSQL opened.
+
 ## Files agents save
 
 With analytics, agents can save query results as CSV or JSON files. They go only to the **Agent Exports** folder in

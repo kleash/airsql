@@ -45,6 +45,7 @@ Statements you write run only when AirSQL's classifier proves them read-only: on
 `LOAD_FILE` and stored functions. Each statement then runs on AirSQL's own agent session, which is read-only, inside
 `START TRANSACTION READ ONLY` … `ROLLBACK`, with the server's statement timeout and a watchdog. Both guards always apply.
 A refused statement comes back with `ok: false` and the reason; the other statements of the call still run.
+The person sees each statement you ran and the rows you got in the connection's Agent tab (View ▸ Agent Results).
 
 ## tools
 
@@ -189,6 +190,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
   `values.cancel`. Edits wait as pending changes until Apply.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
+- **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
+  `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
   `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.cancel`, `preview.run` (the person's).
 - **Table editor**: `tableEditor.sections`, `tableEditor.list`, `tableEditor.options` (`.name`, `.database`, `.engine`,
