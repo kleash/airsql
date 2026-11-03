@@ -1,4 +1,5 @@
 import AppKit
+import CMariaDB
 import Testing
 @testable import AirSQL
 @testable import AirSQLCore
@@ -165,6 +166,34 @@ extension AppTests {
                     menu: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Value Panel", "Record View", "Column Summary…",
                            "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
+            // A console result of one table with its key: a double-click edits the cell.
+            Surface(name: "Editable result cell",
+                    place: { main, _ in
+                        let console = ConsoleViewController(model: main.model, connection: Fixtures.production.id)
+                        main.open(console, title: "Query 1", connection: Fixtures.production.id)
+                        try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the editor and results take their share
+                        let c = { AppTests.GridEditResultAppTests.column("customers", "customers", $0, $1) }
+                        let store = ResultStore(columns: [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING)])
+                        for row in [["7", "ann@example.com"], ["9", "cy@example.org"]] { store.append(row.map { Array($0.utf8) }) }
+                        let view = ResultGridView(store: store, nullText: "NULL", fontSize: 12, editable: true)
+                        view.editingContext = try? await recordedEditorContext(Fixtures.production)
+                        view.model = main.model
+                        view.openSession = { FakeTableSession() }
+                        console.addResult(store, title: "Customers", summary: "1 ms · 2 rows")
+                        console.resultTabs.last?.makeView = { view }
+                        console.showResults()
+                        view.prepareEditing(sql: "SELECT id, email FROM customers", database: "airsql_fixture", noBackslashEscapes: false)
+                        await ready { view.edits?.editing == nil }
+                        main.window?.layoutIfNeeded()
+                        return windowPoint(view.grid.cellRect(GridPosition(row: 1, column: 1)), in: view.grid)
+                    },
+                    clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
+                    doubleClicked: { main, _ in resultGrid(main).editor != nil },
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Set NULL", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes",
+                           "Export Rows…", "Value Panel", "Record View", "Column Summary…", "Display As"],
+                    // email is NOT NULL: Set NULL is off, saying so.
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Delete Rows…", "Export Rows…", "Value Panel", "Record View",
+                              "Column Summary…"]),
             Surface(name: "Grid row number",
                     place: { main, _ in
                         let grid = resultGrid(main)
@@ -257,7 +286,7 @@ extension AppTests {
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
         nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Table rows: cell",
-                                       "Grid cell", "Grid row number", "Status bar: route", "Status bar: server", "Status bar: transaction",
+                                       "Grid cell", "Editable result cell", "Grid row number", "Status bar: route", "Status bar: server", "Status bar: transaction",
                                        "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Agent tab statement",
                                        "Database in the tree",
                                        "Table or view in the tree", "Routine, trigger or event", "Folder or category in the tree",

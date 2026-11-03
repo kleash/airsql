@@ -188,3 +188,40 @@ extension AppTests {
         }
     }
 }
+
+extension AppTests.HelpTests {
+    /// An edited console result's bar and status say what they do, and its menu items why they're off.
+    @Test func anEditedResultSaysWhatItsControlsDo() async throws {
+        let c = { AppTests.GridEditResultAppTests.column("customers", "customers", $0, $1) }
+        let (main, _, view) = try await AppTests.GridEditResultAppTests.result(
+            "SELECT id, email FROM customers", [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING)], rows: [["7", "a@x"]],
+            session: FakeTableSession())
+        view.keep(.text("b@x"), row: 0, column: 1)
+        main.window?.orderFront(nil)
+        var missing = unexplained([try #require(main.window)], where: "edited result")
+        if view.editState.toolTip?.isEmpty != false { missing.append("result.editState") }
+        missing += unexplained(try #require(view.viewer.dataGrid(view.grid, menuFor: .cells)), path: ["result cell"])
+        main.window?.orderOut(nil)
+        #expect(missing.isEmpty, "\(missing)")
+    }
+}
+
+extension AppTests.LayoutTests {
+    /// An edited console result's bar fits its words and buttons, in light and dark.
+    @Test func anEditedResultIsTidy() async throws {
+        var problems: [String] = []
+        let c = { AppTests.GridEditResultAppTests.column("customers", "customers", $0, $1) }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let (main, _, view) = try await AppTests.GridEditResultAppTests.result(
+                "SELECT id, email FROM customers", [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING)], rows: [["7", "a@x"]],
+                session: FakeTableSession())
+            main.window?.appearance = NSAppearance(named: appearance)
+            main.window?.orderFront(nil)
+            view.keep(.text("b@x"), row: 0, column: 1)
+            main.window?.contentView?.layoutSubtreeIfNeeded()
+            problems += layoutProblems(view, where: "\(appearance) edited result")
+            main.window?.orderOut(nil)
+        }
+        #expect(problems.isEmpty, "\(problems)")
+    }
+}
