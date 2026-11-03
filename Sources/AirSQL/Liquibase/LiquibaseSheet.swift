@@ -20,7 +20,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     private let databaseMenu = popup([], selected: 0, id: "liquibase.database", tip: "Choose the database to write a changelog of",
                                      target: nil, action: nil)
     private let list = LiquibaseObjectTable()
-    private let author = AirSQL.textField("", placeholder: NSUserName(), id: "liquibase.author",
+    private let author = AirSQL.textField("", placeholder: "Your Mac account's name", id: "liquibase.author",
                                           tip: "Who the changesets are by, as Liquibase records it", width: 200)
     private let ids = AirSQL.textField("", placeholder: "{date}-{n}-{object}", id: "liquibase.ids",
                                        tip: "How changeset ids are made: {date}, {time}, {n} (001, 002…) and {object}", width: 200)

@@ -7,9 +7,8 @@ final class LiquibasePane: SettingsPaneController {
     override var helpPage: HelpPage { .liquibase }
 
     override func build() {
-        form.row("Author", [text(\.liquibase.author, id: "settings.liquibaseAuthor",
-                                 tip: "Who the changesets are by, as Liquibase records it", placeholder: NSUserName(), width: 200)],
-                 caption: "Empty: your Mac account's name.")
+        form.row("Author", [text(\.liquibase.author, id: "settings.liquibaseAuthor", tip: "Who the changesets are by, as Liquibase records it",
+                                 placeholder: "Your Mac account's name", width: 200)])
         form.row("Ids", [text(\.liquibase.ids, id: "settings.liquibaseIds",
                               tip: "How changeset ids are made: {date}, {time}, {n} (001, 002…) and {object}",
                               placeholder: "{date}-{n}-{object}", width: 200)],
