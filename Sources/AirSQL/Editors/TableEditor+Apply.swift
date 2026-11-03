@@ -10,7 +10,7 @@ final class RunningSession: @unchecked Sendable {
 // them, one at a time on a tools session, and the table read back from the server.
 extension TableEditorController {
     func preview(run: Bool) {
-        view.window?.makeFirstResponder(nil)  // an edit in progress counts
+        endEditing()  // an edit in progress counts
         guard let window = view.window, applyReason == nil, case .success(let statements) = statements, let database else { return }
         let name = before?.name ?? design.name
         let creating = before == nil

@@ -125,7 +125,7 @@ extension TableEditorController {
 
     /// Shows a section: a list, or the options.
     func showSection(_ new: Section) {
-        sections.window?.makeFirstResponder(nil)  // ends an edit in the list first
+        endEditing()
         section = new
         sections.selectedSegment = new.rawValue
         let isOptions = new == .options
@@ -197,15 +197,18 @@ extension TableEditorController {
 
     @objc func revertChanges(_ sender: Any?) {
         guard let before, !isBusy else { return }
-        view.window?.makeFirstResponder(nil)
+        endEditing()
         update { $0 = before }
         reloadList()
     }
 
-    @objc func undo(_ sender: Any?) {
-        view.window?.makeFirstResponder(nil)
-        undo.undo()
+    /// Ends an edit in a cell or field (keeping it), the focus staying in the list.
+    func endEditing() {
+        guard let window = sections.window, window.firstResponder is NSText else { return }
+        if section == .options || !window.makeFirstResponder(list) { window.makeFirstResponder(nil) }
     }
+
+    @objc func undo(_ sender: Any?) { undo.undo() }
 
     @objc func redo(_ sender: Any?) { undo.redo() }
 

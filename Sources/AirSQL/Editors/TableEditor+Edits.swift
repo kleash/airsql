@@ -112,7 +112,7 @@ extension TableEditorController {
 
     @objc func addRow(_ sender: Any?) {
         guard !isBusy, section != .options else { return }
-        view.window?.makeFirstResponder(nil)
+        endEditing()
         let at = (list.selectedRowIndexes.last.map { $0 + 1 }) ?? numberOfRows(in: list)
         update { table in
             switch section {
@@ -180,7 +180,7 @@ extension TableEditorController {
     @objc func deleteRows(_ sender: Any?) {
         let rows = list.selectedRowIndexes
         guard !isBusy, !rows.isEmpty else { return }
-        view.window?.makeFirstResponder(nil)
+        endEditing()
         let checkColumns = columnCheckRows
         update { table in
             for row in rows.reversed() {

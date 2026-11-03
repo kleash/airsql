@@ -82,9 +82,12 @@ extension AppTests {
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             #expect(editor.design.columns.count == 7)
 
-            // Undo takes the name, then the column, back out.
-            editor.undo(nil)
-            editor.undo(nil)
+            // Edit ▸ Undo takes the name, then the column, back out.
+            main.window?.makeFirstResponder(editor.list)
+            let undone = await call(harness, "menu", ["path": "Edit > Undo Change"])
+            #expect(undone.error == nil, "\(undone.error ?? "")")
+            let second = await call(harness, "menu", ["path": "Edit > Undo Change"])
+            #expect(second.error == nil, "\(second.error ?? "") rows \(editor.list.numberOfRows) canUndo \(editor.undo.canUndo)")
             #expect(editor.list.numberOfRows == 6 && editor.sqlText.string.hasPrefix("-- No changes yet"))
         }
 
