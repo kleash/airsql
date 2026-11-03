@@ -183,10 +183,11 @@ public enum Liquibase {
             statements = [sessionSave] + statements + [sessionTail]
         }
         let undo = statements.reversed().map(rollback)
-        // The first name in backticks: the table or routine the change is about.
+        // The first name in backticks: the table or routine the change is about; else the one a statement typed without
+        // backticks starts with (the console's).
         let object = statements.lazy.compactMap { statement in
             Tokens(statement).tokens.first { $0.kind == .quotedName }.map { unquotedName(String(decoding: Array(statement.utf16)[$0.range], as: UTF16.self)) }
-        }.first
+        }.first ?? statements.lazy.compactMap { headName($0)?.name }.first
         return LiquibaseChangeset(object: object ?? title, statements: statements,
                                   rollback: wanted && !undo.contains(nil) ? undo.compactMap { $0 } : [], comment: title)
     }
@@ -414,6 +415,7 @@ public enum Liquibase {
     /// The database a statement's first object is named with, `db` of CREATE TABLE `db`.`t`, ALTER TABLE `db`.`t`,
     /// DROP VIEW `db`.`v`, INSERT INTO `db`.`t`, UPDATE `db`.`t`….
     static func namedDatabase(_ statement: String) -> String? {
+        if let database = headName(statement)?.database { return database }
         let tokens = Tokens(statement)
         for k in 0..<min(tokens.count, 8) where tokens.tokens[k].kind == .quotedName {
             guard tokens.text(k + 1) == ".", let name = tokens.text(k) else { return nil }
@@ -422,15 +424,40 @@ public enum Liquibase {
         return nil
     }
 
-    /// `statement` with `database`'s qualifier left out of the names it qualifies (`db`.`t` → `t`).
+    /// The words that start a statement before the name it is about; after the ones in `introducers` the name comes
+    /// next (past IF [NOT] EXISTS, or UPDATE's LOW_PRIORITY and IGNORE), so a table named `event` is still a name.
+    private static let introducers: Set<String> = ["TABLE", "VIEW", "PROCEDURE", "FUNCTION", "TRIGGER", "EVENT", "SEQUENCE",
+                                                   "INDEX", "INTO", "FROM", "UPDATE"]
+    private static let headWords = introducers.union(["CREATE", "OR", "REPLACE", "TEMPORARY", "UNIQUE", "FULLTEXT", "SPATIAL",
+                                                      "AGGREGATE", "ALTER", "ONLINE", "IGNORE", "DROP", "INSERT", "LOW_PRIORITY",
+                                                      "DELAYED", "HIGH_PRIORITY", "DELETE", "QUICK", "RENAME", "TRUNCATE"])
+
+    /// The name a statement is about, quoted or not (CREATE TABLE `db`.`t`, INSERT INTO db.t, DROP VIEW IF EXISTS v),
+    /// unquoted, with the database it is named with.
+    static func headName(_ statement: String) -> (database: String?, name: String)? {
+        let tokens = Tokens(statement)
+        var k = 0
+        while let word = tokens.word(k), headWords.contains(word) {
+            k += 1
+            guard introducers.contains(word) else { continue }
+            while ["IF", "NOT", "EXISTS", "LOW_PRIORITY", "IGNORE"].contains(tokens.word(k) ?? "") { k += 1 }
+            break
+        }
+        guard k > 0, tokens.text(k + 1) != "=", let (_, next) = tokens.name(k), let first = tokens.text(k) else { return nil }
+        guard next == k + 3, let second = tokens.text(k + 2) else { return (nil, unquotedName(first)) }
+        return (unquotedName(first), unquotedName(second))
+    }
+
+    /// `statement` with `database`'s qualifier left out of the names it qualifies (`db`.`t` → `t`, db.t → t).
     static func unqualified(_ statement: String, database: String) -> String {
         let quoted = SQLQuote.identifier(database)
-        guard statement.contains(quoted + ".") else { return statement }
+        guard statement.contains(quoted + ".") || statement.contains(database + ".") else { return statement }
         let text = Array(statement.utf16), tokens = SQLLexer.tokens(statement)
+        func isDot(_ k: Int) -> Bool { k >= 0 && k < tokens.count && tokens[k].range.count == 1 && text[tokens[k].range.lowerBound] == 0x2E }
         var result = text, removed = 0
-        for (k, token) in tokens.enumerated() where token.kind == .quotedName && k + 1 < tokens.count
-            && String(decoding: text[token.range], as: UTF16.self) == quoted && tokens[k + 1].range.count == 1
-            && text[tokens[k + 1].range.lowerBound] == 0x2E {
+        for (k, token) in tokens.enumerated() where isDot(k + 1) && !isDot(k - 1) {
+            let name = String(decoding: text[token.range], as: UTF16.self)
+            guard token.kind == .quotedName && name == quoted || token.kind == .word && name == database else { continue }
             let start = token.range.lowerBound - removed, end = tokens[k + 1].range.upperBound - removed
             result.removeSubrange(start..<end)
             removed += end - start

@@ -245,6 +245,15 @@ struct LiquibaseTests {
         let grid = Liquibase.changeset(ChangeSQL(title: "Apply 2 changes", statements: [
             "START TRANSACTION", "UPDATE `t` SET `a` = 'x' WHERE `id` = 1", "commit"], connection: UUID()))
         #expect(grid.statements == ["UPDATE `t` SET `a` = 'x' WHERE `id` = 1"] && grid.rollback.isEmpty)
+        // The console's statements, typed without backticks: the database leaves those names too, but not other names.
+        let console = Liquibase.changeset(title: "Query 1", statements: [
+            "CREATE TABLE IF NOT EXISTS shop.notes (id INT PRIMARY KEY)", "INSERT INTO shop.notes VALUES (1)",
+            "UPDATE event SET event.n = shop.f(1)"])
+        #expect(console.statements == ["CREATE TABLE IF NOT EXISTS notes (id INT PRIMARY KEY)", "INSERT INTO notes VALUES (1)",
+                                       "UPDATE event SET event.n = f(1)"])
+        #expect(console.object == "notes")
+        #expect(Liquibase.changeset(title: "Query 1", statements: ["UPDATE event SET event.n = 1"]).object == "event")
+        #expect(Liquibase.changeset(title: "Query 1", statements: ["CREATE TABLE shop.t (id INT)"]).rollback == ["DROP TABLE t"])
         var numbered = Liquibase.numbered([grid], settings: Self.settings, first: 4, date: Self.date)[0]
         numbered.statements.append("UPDATE t SET begin = 1")  // an unquoted BEGIN keeps Liquibase from splitting there
         #expect(throws: LiquibaseChangelog.Problem.self) { try numbered.checkedText() }
