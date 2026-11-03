@@ -36,11 +36,13 @@ final class ConsoleDocuments {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
 
-    /// The window's console tabs now, in their order (a console being closed, and an empty one without a file, left
-    /// out).
+    /// The window's console tabs now, in their order (a console being closed, an empty one without a file, and a sync
+    /// script, whose compare doesn't outlive the app, left out).
     var snapshot: [SavedConsole] {
         (main?.tabs ?? []).compactMap { tab in
-            guard let console = tab.content as? ConsoleViewController, !console.closing else { return nil }
+            guard let console = tab.content as? ConsoleViewController, !console.closing, console.syncScript == nil else {
+                return nil
+            }
             let text = console.text
             guard console.fileURL != nil || !text.isEmpty else { return nil }
             return SavedConsole(id: console.documentID, title: tab.title, connection: console.connectionID,
