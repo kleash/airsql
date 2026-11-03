@@ -1,6 +1,6 @@
 ---
 title: Compare two databases
-nav_order: 14
+nav_order: 16
 ---
 
 # Compare two databases

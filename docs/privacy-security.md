@@ -35,6 +35,8 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
 - Nothing is written until you choose Run or Apply. Changes show their SQL first
   ([Check SQL before it runs](sql-preview.md)), and Apply checks that each change touched exactly the rows it should.
 - A connection coloured **Production** starts with stricter safety checks ([Settings](settings.md#safety)).
+- A **read-only** connection runs only what AirSQL can prove reads, on sessions the server keeps read-only
+  ([Connections](connections.md#add-or-edit-a-connection)).
 
 ## AI agents
 

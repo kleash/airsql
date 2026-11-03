@@ -5,8 +5,9 @@ nav_order: 8
 
 # Read-only queries
 
-Where only reading is allowed, such as a query from an AI agent, AirSQL first checks that the statement can only
-read. The check is strict on purpose: when in doubt it refuses, and it says why in one line.
+Where only reading is allowed, such as a query from an AI agent or anything run on a
+[read-only connection](connections.md#add-or-edit-a-connection), AirSQL first checks that the statement can only read.
+The check is strict on purpose: when in doubt it refuses, and it says why in one line.
 
 ## What passes
 

@@ -14,8 +14,9 @@ Choose **File ▸ New Connection…** (⌘N), or select a connection and choose 
 tabs:
 
 - **General**: a name, the sidebar folder, a colour (Production also turns on the strict safety checks), the host and
-  port, or for a server on this Mac its socket file, the user and password, and the database to open. Tick **Ask at
-  each connect** to type the user and password each time; they are kept until you disconnect and never saved.
+  port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
+  it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
+  you disconnect and never saved.
 - **TLS**: how the connection is encrypted. **Check the authority and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
   shows its fingerprint when you connect (see [Trust a server](trust-a-server.md)). Add an authority file for a
@@ -34,7 +35,10 @@ A **read-only** connection's sessions are read-only on the server, and AirSQL it
 prove only read: SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN (as [read-only queries](read-only-queries.md)
 decide), and USE. Anything else is refused before it is sent, with the reason, from the console, the navigator, a
 compare's sync script, Restore, Run SQL File and CSV import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
-it. The grid and the editors don't apply changes to it, and agents can't write to it either.
+it. A table tab's WHERE filter goes through the same check, within the whole SELECT it runs in, so a condition can't
+call a function such as `SLEEP` or `GET_LOCK` there. Open in Terminal starts `mysql` with a read-only session. The
+grid and the editors don't apply changes to it, and agents can't write to it either. The process list's Kill Query
+and Kill Connection still work: they stop a statement or a connection and change no data.
 
 **Test Connection** connects with what the editor shows, reports each hop with its time, and disconnects. **Save and
 Connect** saves and connects; **Save** only saves.

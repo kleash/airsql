@@ -151,6 +151,14 @@ struct ClientToolsTests {
             == ["/opt/homebrew/bin/mysql", "--defaults-file=/f", "--protocol=SOCKET", "--socket=/tmp/mysql.sock",
                 "--default-character-set=utf8mb4", "--batch", "--force", "shop"])
         #expect(client.terminal(database: "", optionFile: "/f").last == "--default-character-set=utf8mb4")
+
+        // A read-only connection's tools run READ ONLY sessions: Terminal's mysql, and the dumps where they know how.
+        options.readOnly = true
+        let readOnly = "--loose-init-command=SET SESSION TRANSACTION READ ONLY"
+        let locked = ToolCommand(tool: Self.tool("mysql", .mysql, [8, 4, 3]), options: options, server: nil)
+        #expect(locked.terminal(database: "shop", optionFile: "/f").suffix(2) == [readOnly, "shop"])
+        #expect(ToolCommand(tool: Self.tool("mariadb-dump", .mariadb, [11, 8, 3]), options: options, server: nil)
+            .dump(DumpRequest(databases: ["shop"]), optionFile: "/f").contains(readOnly))
     }
 
     @Test func toolsThatCantCheckTheCertificateAsAirSQLDoesSaySo() {
