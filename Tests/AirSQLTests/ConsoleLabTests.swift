@@ -58,6 +58,24 @@ struct ConsoleLabTests {
         await session.close()
     }
 
+    /// EXPLAIN as a table and a tree: MySQL 8.4's own tree, MariaDB's JSON plan flattened.
+    @Test(arguments: ["mariadb", "mysql"])
+    func explainGivesATableAndATree(_ flavor: String) async throws {
+        let session = try await session(flavor)
+        // No aliases: both servers name tables by their alias in a plan.
+        let sql = "SELECT customers.id, COUNT(orders.id) FROM fixture.customers JOIN fixture.orders "
+            + "ON orders.customer_id = customers.id GROUP BY customers.id"
+        let table = await run(ExplainPlan.tableSQL(sql), on: session)
+        #expect(table.error == nil && (table.results.first?.rows?.rowCount ?? 0) >= 2, "\(String(describing: table.error))")
+        let (treeSQL, json) = ExplainPlan.treeSQL(sql, server: session.server)
+        #expect(json == (flavor == "mariadb"))
+        let answer = try await session.query(treeSQL).first?.rows?.string(0, 0) ?? ""
+        let tree = json ? ExplainPlan.tree(fromJSON: answer) : answer
+        #expect(tree.contains("customers") && tree.contains("orders"), "\(tree.debugDescription)")
+        if json { #expect(tree.hasPrefix("Query block") && !tree.contains("{"), "\(tree)") }
+        await session.close()
+    }
+
     @Test(arguments: ["mariadb", "mysql"])
     func manualModeHoldsChangesUntilCommitOrRollback(_ flavor: String) async throws {
         let console = try await session(flavor), other = try await session(flavor)

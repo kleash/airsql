@@ -42,7 +42,13 @@ public enum ExplainPlan {
             case "table":
                 guard let table = value as? [String: Any] else { continue }
                 let name = table["table_name"].map { "\($0)" } ?? "table"
-                let details = shown.compactMap { field in table[field].map { "\(field.replacingOccurrences(of: "_", with: " ")): \(text($0))" } }
+                let details = shown.compactMap { field -> String? in
+                    guard let value = table[field] else { return nil }
+                    let name = field.replacingOccurrences(of: "_", with: " ")
+                    // using_index: true reads "using index".
+                    if field.hasPrefix("using_") { return (value as? Bool) == true ? name : nil }
+                    return "\(name): \(text(value))"
+                }
                 lines.append(indent + "Table " + name + (details.isEmpty ? "" : " (" + details.joined(separator: ", ") + ")"))
                 for (inner, child) in table where child is [String: Any] || child is [Any] {
                     if inner == "possible_keys" || inner == "used_key_parts" { continue }

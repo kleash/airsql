@@ -151,3 +151,17 @@ struct SQLCompletionTests {
         #expect(try await suggest("SELECT * FROM we|").first?.text == "`we``ird 'name' ✓`")
     }
 }
+
+struct ExplainPlanTests {
+    @Test func mariaDBsJSONPlanReadsAsATree() {
+        let json = #"{"query_block": {"select_id": 1, "nested_loop": [{"table": {"table_name": "o", "access_type": "range", "key": "k", "rows": 4, "using_index": true}}, {"table": {"table_name": "c", "access_type": "eq_ref", "rows": 1, "using_index": false}}]}}"#
+        #expect(ExplainPlan.tree(fromJSON: json) == """
+            Query block #1
+                Nested Loop
+                    Table o (access type: range, key: k, rows: 4, using index)
+                    Table c (access type: eq_ref, rows: 1)
+            """)
+        #expect(ExplainPlan.tree(fromJSON: "not json") == "not json")
+        #expect(ExplainPlan.treeSQL("SELECT 1", server: nil).json)
+    }
+}
