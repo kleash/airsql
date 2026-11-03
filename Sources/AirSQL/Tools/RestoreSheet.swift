@@ -296,7 +296,8 @@ final class RestoreSheet: ToolSheet {
     }
 
     private func start(_ file: URL, database: String) {
-        let command = tool.map { ToolCommand(tool: $0, options: options, server: server) }, options = self.options
+        let options = self.options
+        let command = tool.map { ToolCommand(tool: $0, options: options, server: server) }
         let continueOnError = goOn.state == .on
         let cancellation = begin("Running \(file.lastPathComponent) in \(database)")
         let updates = Throttle()
