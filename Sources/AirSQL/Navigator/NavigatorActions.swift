@@ -90,7 +90,9 @@ enum NavigatorActions {
                 }
             }
         }
-        guard ask else { return run(false) }
+        // What an agent set off asks whatever the setting (the agents' gate, plan §2.8).
+        let agent = AgentGate.agent != nil && safety(open).askBeforeAgentChanges
+        guard ask || agent else { return run(false) }
         guard let window else { return }
         SQLPreviewSheet.show(request, connection: saved, on: window) { result in
             if result.approved { run(result.saveAsChangeset) }

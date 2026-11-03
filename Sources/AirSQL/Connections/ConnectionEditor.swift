@@ -187,9 +187,13 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
             status.stringValue = problem
             return
         }
+        // The gate (plan §2.8): an agent's Save keeps no password, and nothing the person alone may change.
+        guard password.isEmpty && proxyPassword.isEmpty || !AgentGuard.refuses("Only the person at the Mac can save a "
+                                                                                + "password: nothing was saved.") else { return }
         testTask?.cancel()
         model.connector.cancelTest(draft.id)
         model.save(draft)
+        guard model.connection(draft.id) == draft else { return }  // refused (AgentGuard): the editor stays open
         let write = model.setSavedPassword, keys = (draft.id.uuidString, draft.proxySecretKey)
         let typed = (password, proxyPassword)
         // An existing password stays unless a new one was typed; the Keychain may wait for the person: not here.

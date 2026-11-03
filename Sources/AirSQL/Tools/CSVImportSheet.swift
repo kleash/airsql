@@ -318,7 +318,9 @@ final class CSVImportSheet: ToolSheet {
                 }
             }
         }
-        guard connection.colour == .production else {
+        // Production asks, and so does what an agent set off (plan §2.8).
+        let agent = AgentGate.agent != nil && model.data.safety(for: connection).askBeforeAgentChanges
+        guard agent || connection.colour == .production else {
             start()
             return
         }
