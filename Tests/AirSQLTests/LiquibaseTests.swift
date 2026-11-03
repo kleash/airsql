@@ -268,7 +268,8 @@ struct LiquibaseTests {
         data.missing = (1...150).map { ReconRow([Array("\($0)".utf8), Array("it's \($0)".utf8)]) }
         customers.data = data
         var view = ReconObject(kind: .view, name: "v", status: .onlyInSource)
-        view.sourceDDL = "CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`%` SQL SECURITY DEFINER VIEW `v` AS select 1 AS `1`"
+        view.sourceDDL = "CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`%` SQL SECURITY DEFINER VIEW `shop`.`v` AS select "
+            + "`shop`.`customers`.`id` AS `id` from `shop`.`customers`"  // as SHOW CREATE VIEW names them
         let gone = ReconObject(kind: .procedure, name: "old", status: .onlyInTarget)
         let result = ReconResult(source: ReconEnd(name: "Dev", database: "shop", version: "11.8.9-MariaDB"),
                                  target: ReconEnd(name: "Prod", database: "shop", version: "11.8.9-MariaDB"),
