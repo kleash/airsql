@@ -114,7 +114,7 @@ public enum SQLExport {
             // Made current, so SHOW CREATE writes the database's own names without it (views and routines then restore
             // into any database), as mysqldump does.
             _ = try await source.query("USE " + SQLQuote.identifier(database))
-            let tables = try await rows(source, "SELECT TABLE_NAME, TABLE_TYPE, TABLE_ROWS FROM information_schema.TABLES "
+            let tables = try await source.rows("SELECT TABLE_NAME, TABLE_TYPE, TABLE_ROWS FROM information_schema.TABLES "
                                         + "WHERE TABLE_SCHEMA = \(quote(database)) ORDER BY TABLE_NAME")
                 .filter { request.tables.isEmpty || request.tables.contains($0[0] ?? "") }
             done.totalRows += tables.reduce(0) { $0 + (Int64($1[2] ?? "") ?? 0) }
@@ -127,7 +127,7 @@ public enum SQLExport {
             try await sink.write(.comment("Database \(target)"))
             if names != nil || request.databases.count > 1, request.content != .data {
                 // "CREATE DATABASE `shop` /*!40100 DEFAULT CHARACTER SET …*/": its options, for the name it gets.
-                let create = try await rows(source, "SHOW CREATE DATABASE " + SQLQuote.identifier(database)).first?[1] ?? ""
+                let create = try await source.rows("SHOW CREATE DATABASE " + SQLQuote.identifier(database)).first?[1] ?? ""
                 let options = create.range(of: SQLQuote.identifier(database)).map { String(create[$0.upperBound...]) } ?? ""
                 try await sink.write(.statement("CREATE DATABASE IF NOT EXISTS " + SQLQuote.identifier(target) + options))
             }
@@ -138,7 +138,7 @@ public enum SQLExport {
                 if cancellation.isCancelled { throw AirSQLError.cancelled }
                 if table[1] == "VIEW" {
                     if request.content != .data, request.objects,
-                       let sql = try await rows(source, "SHOW CREATE VIEW " + SQLQuote.identifier(database, name)).first?[1] {
+                       let sql = try await source.rows("SHOW CREATE VIEW " + SQLQuote.identifier(database, name)).first?[1] {
                         views.append((name, renamed(sql)))
                     }
                     continue
@@ -146,7 +146,7 @@ public enum SQLExport {
                 if request.content != .data {
                     try await sink.write(.comment("Table \(name)"))
                     if request.addDropTable { try await sink.write(.statement("DROP TABLE IF EXISTS " + SQLQuote.identifier(name))) }
-                    let create = try await rows(source, "SHOW CREATE TABLE " + SQLQuote.identifier(database, name)).first?[1] ?? ""
+                    let create = try await source.rows("SHOW CREATE TABLE " + SQLQuote.identifier(database, name)).first?[1] ?? ""
                     try await sink.write(.statement(create))
                 }
                 guard request.content != .structure, table[1] != "SEQUENCE" else { continue }
@@ -174,32 +174,32 @@ public enum SQLExport {
     /// Routines, then the exported tables' triggers, then events.
     private static func writeObjects(of database: String, from source: DBConnection, into sink: SQLSink, tables: Set<String>,
                                      addDrop: Bool, renamed: (String) -> String, quote: (String) -> String) async throws {
-        let routines = try await rows(source, "SELECT ROUTINE_NAME, ROUTINE_TYPE FROM information_schema.ROUTINES "
+        let routines = try await source.rows("SELECT ROUTINE_NAME, ROUTINE_TYPE FROM information_schema.ROUTINES "
                                       + "WHERE ROUTINE_SCHEMA = \(quote(database)) ORDER BY ROUTINE_TYPE, ROUTINE_NAME")
         for routine in routines {
             guard let name = routine[0], let kind = routine[1], kind == "PROCEDURE" || kind == "FUNCTION" else { continue }
             if addDrop { try await sink.write(.statement("DROP \(kind) IF EXISTS " + SQLQuote.identifier(name))) }
-            guard let sql = try await rows(source, "SHOW CREATE \(kind) " + SQLQuote.identifier(database, name)).first?[2] else {
+            guard let sql = try await source.rows("SHOW CREATE \(kind) " + SQLQuote.identifier(database, name)).first?[2] else {
                 try await sink.write(.comment("\(kind.capitalized) \(name): its definition can't be read with this account"))
                 continue
             }
             try await sink.write(.routine(renamed(sql)))
         }
-        let triggers = try await rows(source, "SELECT TRIGGER_NAME, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS "
+        let triggers = try await source.rows("SELECT TRIGGER_NAME, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS "
                                       + "WHERE TRIGGER_SCHEMA = \(quote(database)) ORDER BY EVENT_OBJECT_TABLE, ACTION_ORDER")
         for trigger in triggers where tables.contains(trigger[1] ?? "") {
             guard let name = trigger[0] else { continue }
             if addDrop { try await sink.write(.statement("DROP TRIGGER IF EXISTS " + SQLQuote.identifier(name))) }
-            if let sql = try await rows(source, "SHOW CREATE TRIGGER " + SQLQuote.identifier(database, name)).first?[2] {
+            if let sql = try await source.rows("SHOW CREATE TRIGGER " + SQLQuote.identifier(database, name)).first?[2] {
                 try await sink.write(.routine(renamed(sql)))
             }
         }
-        let events = try await rows(source, "SELECT EVENT_NAME FROM information_schema.EVENTS WHERE EVENT_SCHEMA = \(quote(database)) "
+        let events = try await source.rows("SELECT EVENT_NAME FROM information_schema.EVENTS WHERE EVENT_SCHEMA = \(quote(database)) "
                                     + "ORDER BY EVENT_NAME")
         for event in events {
             guard let name = event[0] else { continue }
             if addDrop { try await sink.write(.statement("DROP EVENT IF EXISTS " + SQLQuote.identifier(name))) }
-            if let sql = try await rows(source, "SHOW CREATE EVENT " + SQLQuote.identifier(database, name)).first?[3] {
+            if let sql = try await source.rows("SHOW CREATE EVENT " + SQLQuote.identifier(database, name)).first?[3] {
                 try await sink.write(.routine(renamed(sql)))
             }
         }
@@ -210,7 +210,7 @@ public enum SQLExport {
     static func copyRows(of table: String, in database: String, from source: DBConnection, into sink: SQLSink,
                          cancellation: Cancellation, counted: @escaping (Int64) -> Void) async throws {
         let quote = { (text: String) in SQLQuote.string(text, noBackslashEscapes: source.noBackslashEscapes) }
-        let columns = try await rows(source, "SELECT COLUMN_NAME, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "
+        let columns = try await source.rows("SELECT COLUMN_NAME, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "
                                      + "\(quote(database)) AND TABLE_NAME = \(quote(table)) ORDER BY ORDINAL_POSITION")
             .filter { !isGenerated($0[1] ?? "") }.compactMap { $0[0] }
         guard !columns.isEmpty else { return }
@@ -270,11 +270,5 @@ public enum SQLExport {
             result.append(left.remove(at: next))
         }
         return result
-    }
-
-    /// Every row of a statement's result as text (NULL as nil).
-    public static func rows(_ session: DBConnection, _ sql: String) async throws -> [[String?]] {
-        guard let store = try await session.query(sql, rowCap: .max).first?.rows else { return [] }
-        return (0..<store.rowCount).map { row in (0..<store.columns.count).map { store.isNull(row, $0) ? nil : store.string(row, $0) } }
     }
 }

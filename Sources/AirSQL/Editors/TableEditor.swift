@@ -38,7 +38,8 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
     let addButton = NSButton(), removeButton = NSButton()
     let options = TableOptionsView()
     let sqlText = NSTextView()
-    let applyButton = button("Apply", id: "tableEditor.apply", tip: "", target: nil, action: #selector(AirSQLActions.applyChanges(_:)))
+    let applyButton = button("Apply", id: "tableEditor.apply", tip: "", target: nil, action: #selector(AirSQLActions.applyChanges(_:)),
+                             primary: true)
     let discardButton = button("Discard", id: "tableEditor.discard", tip: "", target: nil,
                                action: #selector(AirSQLActions.revertChanges(_:)))
     let status = NSProgressIndicator()

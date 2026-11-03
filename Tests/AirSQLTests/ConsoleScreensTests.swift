@@ -52,6 +52,16 @@ extension AppTests {
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
         }
 
+        @Test func findAndTheHelpersKeepTheWindowAtItsMinimumSize() async throws {
+            let (main, _, console) = try await Self.window(size: MainWindowController.minimumSize)
+            console.findBar.show(replace: true)
+            console.toggleHelpers(nil)
+            main.window?.layoutIfNeeded()
+            #expect(main.window?.frame.width == MainWindowController.minimumSize.width)
+            console.findBar.close(nil)
+            console.toggleHelpers(nil)
+        }
+
         @Test func everyConsoleControlSaysWhatItDoes() async throws {
             let (main, harness, console) = try await Self.window()
             var missing: [String] = []

@@ -66,8 +66,13 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
             rows.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
             line.leadingAnchor.constraint(equalTo: leadingAnchor), line.trailingAnchor.constraint(equalTo: trailingAnchor),
             line.bottomAnchor.constraint(equalTo: bottomAnchor), line.heightAnchor.constraint(equalToConstant: 1),
-            search.widthAnchor.constraint(equalToConstant: 240), replacement.widthAnchor.constraint(equalTo: search.widthAnchor),
+            search.widthAnchor.constraint(greaterThanOrEqualToConstant: 120), search.widthAnchor.constraint(lessThanOrEqualToConstant: 240),
+            replacement.widthAnchor.constraint(equalTo: search.widthAnchor),
         ])
+        // 240 wide when there is room; narrower beside the helpers rather than widening the window.
+        let preferred = search.widthAnchor.constraint(equalToConstant: 240)
+        preferred.priority = .init(490)
+        preferred.isActive = true
         isHidden = true
     }
 

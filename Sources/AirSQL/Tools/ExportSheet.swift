@@ -139,8 +139,8 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             do {
                 let session = DBConnection(options: options, role: .tools)
                 let server = try await session.connect()
-                let names = try await SQLExport.rows(session, PickerNode.databasesSQL).compactMap { $0[0] }
-                let tables = try await SQLExport.rows(session, PickerNode.listSQL)
+                let names = try await session.rows(PickerNode.databasesSQL).compactMap { $0[0] }
+                let tables = try await session.rows(PickerNode.listSQL)
                 await session.close()
                 let tools = await ClientTools.find(.dump, chosen: chosen)
                 let databases = PickerNode.databases(names, tables: tables)

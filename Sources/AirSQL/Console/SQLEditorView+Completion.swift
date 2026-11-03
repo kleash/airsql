@@ -9,7 +9,7 @@ extension SQLEditorView {
         super.insertText(string, replacementRange: replacementRange)
         let typed = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
         // One character typed: a letter, digit, _ or a dot opens or narrows the list; anything else closes it.
-        if typed.count == 1, let unit = typed.utf16.first, unit == 0x2E || SQLCompletion.isWordChar(unit) {
+        if typed.count == 1, let unit = typed.utf16.first, unit == 0x2E || SQLLexer.isNameChar(unit) {
             updateCompletion(force: false)
         } else {
             completionPopup?.close()

@@ -98,8 +98,6 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         view = root
     }
 
-    var isSearching: Bool { search != nil }
-
     private func updateButtons() {
         go?.isEnabled = search == nil
         go?.toolTip = search == nil ? "Search the tables for the text (Return)" : "It is searching: Stop first to search again"

@@ -122,12 +122,23 @@ public struct SQLLexer {
             while end < text.count && text[end] != 0x0A { end += 1 }
         } else if c == Self.slash && c1 == Self.star {
             if c2 == Self.bang || (c2 == 0x4D && at(start + 3) == Self.bang) {  // /*! or /*M!
-                kind = .codeStart
-                end = start + (c2 == Self.bang ? 3 : 4)
+                var body = start + (c2 == Self.bang ? 3 : 4)
                 var digits = 0
-                while digits < 6 && Self.isDigit(at(end + digits)) { digits += 1 }
-                if digits >= 5 { end += digits }  // the version: 5 digits, or 6 from MariaDB 10
-                openCodeComments += 1
+                while digits < 6 && Self.isDigit(at(body + digits)) { digits += 1 }
+                if digits >= 5 { body += digits }  // the version: 5 digits, or 6 from MariaDB 10
+                if executableRunsAsCode(from: body) {
+                    kind = .codeStart
+                    end = body
+                    openCodeComments += 1
+                } else {
+                    // A string in the body would run across the */ that would close the comment, so a server that
+                    // runs the body as code and one that skips the whole comment (its version is out of the gate's
+                    // range) would end it in different places. Follow the skipping server, which every server over
+                    // the gate is: the comment ends at the first raw */, its body discarded, so code hidden after the
+                    // */ is read as code and can't slip past the read-only check or the console's prompts (R4).
+                    kind = .comment
+                    (end, closed) = commentEnd(body)
+                }
             } else {
                 kind = c2 == Self.plus ? .hint : .comment
                 (end, closed) = commentEnd(start + 2)
@@ -186,6 +197,34 @@ public struct SQLLexer {
             j += 1
         }
         return (text.count, false)
+    }
+
+    /// Whether the server runs the body (from `from`) of a /*! or /*M! comment as code. It does unless a string or
+    /// quoted name in the body, or the text ending, falls across the first raw */ that would close the comment: then a
+    /// server over the gate (which skips the whole comment, ending it at that */) and one reading the body as code
+    /// disagree where it ends. Only a crafted statement does this, so AirSQL takes it as the skipped comment it is to
+    /// every real server, and a quote in the body can't hide code after the */. Scans with the session's escape rule,
+    /// as `quoted` does.
+    private func executableRunsAsCode(from: Int) -> Bool {
+        var j = from
+        while j < text.count {
+            let c = text[j]
+            if c == Self.apostrophe || c == Self.doubleQuote || c == Self.backtick {
+                let (close, closed) = quoted(j)
+                guard closed else { return false }  // open at the text's end: the server skips the comment
+                var k = j
+                while k + 1 < close {
+                    if text[k] == Self.star && text[k + 1] == Self.slash { return false }  // a */ inside the string
+                    k += 1
+                }
+                j = close
+            } else if c == Self.star && at(j + 1) == Self.slash {
+                return true  // the first raw */, with no string across it: the body is code
+            } else {
+                j += 1
+            }
+        }
+        return false  // no */ at all: unterminated, so a comment the server skips to the end
     }
 
     /// MySQL's reading of text that starts with a digit: 0x1F and 0b101 unless name characters follow, 12 and 1.5,
@@ -253,7 +292,7 @@ public struct SQLLexer {
     static func isDigit(_ c: UInt16) -> Bool { (0x30...0x39).contains(c) }
     static func isHexDigit(_ c: UInt16) -> Bool { isDigit(c) || (0x41...0x46).contains(c) || (0x61...0x66).contains(c) }
     /// Letters, digits, _ and $, and anything beyond ASCII (MySQL reads every multibyte character as part of a name).
-    static func isNameChar(_ c: UInt16) -> Bool {
+    public static func isNameChar(_ c: UInt16) -> Bool {
         c >= 0x80 || c == 0x5F || c == 0x24 || isDigit(c) || (0x41...0x5A).contains(c) || (0x61...0x7A).contains(c)
     }
 }

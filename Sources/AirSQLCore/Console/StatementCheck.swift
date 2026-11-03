@@ -143,7 +143,7 @@ extension StatementCheck {
         guard words.count >= 2, words[0].text == "USE" else { return nil }
         let name = words[1]
         guard name.kind == .quotedName else { return name.kind == .word ? name.raw : nil }
-        return String(name.raw.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
+        return SQLQuote.unquoted(name.raw)
     }
 }
 
