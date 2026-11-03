@@ -209,11 +209,8 @@ final class DataGridView: NSView {
         return row < rowCount ? GridPosition(row: row, column: column) : nil
     }
 
-    /// The part of the grid on screen.
-    var shownRect: NSRect { visibleRect }
-
     /// Rows of a page: what fits on screen.
-    var rowsPerPage: Int { max(1, Int(shownRect.height / rowHeight) - 1) }
+    var rowsPerPage: Int { max(1, Int(visibleRect.height / rowHeight) - 1) }
 
     /// Scrolls to the first row and column.
     func scrollToStart() {
@@ -223,7 +220,7 @@ final class DataGridView: NSView {
 
     /// Scrolls just enough to show `rect` (a cell).
     func reveal(_ rect: NSRect) {
-        let shown = shownRect, clip = scrollView.contentView
+        let shown = visibleRect, clip = scrollView.contentView
         guard !shown.isEmpty else { return }
         var origin = clip.bounds.origin
         if rect.minX < shown.minX { origin.x -= shown.minX - rect.minX } else if rect.maxX > shown.maxX {

@@ -107,7 +107,7 @@ extension AppTests {
                 main.window?.makeKeyAndOrderFront(nil)
                 main.window?.displayIfNeeded()
                 let result = await FrameMeter(grid: content.grid, speed: speed, horizontal: horizontal).run()
-                print("GRID FPS \(name) at \(Int(speed)) pt/s, grid \(Int(content.grid.shownRect.width))×\(Int(content.grid.shownRect.height)) pt: \(result)")
+                print("GRID FPS \(name) at \(Int(speed)) pt/s, grid \(Int(content.grid.visibleRect.width))×\(Int(content.grid.visibleRect.height)) pt: \(result)")
                 // Each frame drawn and committed within a refresh (Core Animation draws the views as it commits).
                 let refresh = 1000.0 / Double(screen.maximumFramesPerSecond)
                 if horizontal {

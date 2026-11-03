@@ -20,15 +20,15 @@ extension DataGridView {
     override func accessibilityRows() -> [Any]? { accessibilityVisibleRows() }
 
     override func accessibilityVisibleRows() -> [Any]? {
-        rows(in: shownRect).map(rowElement)
+        rows(in: visibleRect).map(rowElement)
     }
 
     override func accessibilitySelectedRows() -> [Any]? {
-        rows(in: shownRect).filter(selection.containsRow).map(rowElement)
+        rows(in: visibleRect).filter(selection.containsRow).map(rowElement)
     }
 
     override func accessibilityColumnHeaderUIElements() -> [Any]? {
-        columns(in: shownRect).map(headerElement)
+        columns(in: visibleRect).map(headerElement)
     }
 
     override func accessibilityVisibleCells() -> [Any]? { shownCells { _ in true } }
@@ -37,8 +37,8 @@ extension DataGridView {
 
     private func shownCells(_ include: (GridPosition) -> Bool) -> [Any] {
         var cells: [Any] = []
-        let columns = columns(in: shownRect)
-        for row in rows(in: shownRect) {
+        let columns = columns(in: visibleRect)
+        for row in rows(in: visibleRect) {
             for column in columns where include(GridPosition(row: row, column: column)) {
                 cells.append(cellElement(GridPosition(row: row, column: column)))
             }
@@ -65,7 +65,7 @@ extension DataGridView {
 
     func cellElement(_ position: GridPosition) -> GridCellElement {
         if let element = accessibilityElements.cells[position] { return element }
-        accessibilityElements.trim(keeping: rows(in: shownRect))
+        accessibilityElements.trim(keeping: rows(in: visibleRect))
         let element = GridCellElement(grid: self, position: position)
         accessibilityElements.cells[position] = element
         return element
@@ -125,7 +125,7 @@ final class GridRowElement: NSAccessibilityElement {
     override func isAccessibilitySelected() -> Bool { grid.selection.containsRow(row) }
 
     override func accessibilityChildren() -> [Any]? {
-        grid.columns(in: grid.shownRect).map { grid.cellElement(GridPosition(row: row, column: $0)) }
+        grid.columns(in: grid.visibleRect).map { grid.cellElement(GridPosition(row: row, column: $0)) }
     }
 
     override func accessibilityFrame() -> NSRect {

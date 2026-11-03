@@ -36,18 +36,6 @@ struct GridTests {
         }
     }
 
-    @Test @MainActor func pagesLoadAfterPrefetch() async {
-        let source = FakeGridSource(rows: 1_000, columns: 5, pageSize: 100)
-        #expect(source.cell(250, 1) == .loading)
-        let loaded = await withCheckedContinuation { continuation in
-            source.onLoad = { continuation.resume(returning: $0) }
-            source.prefetch(210..<260)
-        }
-        #expect(loaded == 200..<300)
-        #expect(source.cell(250, 1) != .loading)
-        #expect(source.cell(300, 1) == .loading)
-    }
-
     @Test func clicksSelectCellsBlocksRowsAndColumns() {
         var selection = GridSelection()
         selection.select(GridPosition(row: 2, column: 1))

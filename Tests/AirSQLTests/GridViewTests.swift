@@ -162,7 +162,7 @@ extension AppTests {
         #expect(grid.selection.cursor?.row == 2 + grid.rowsPerPage)
         await key("cmd+down")
         #expect(grid.selection.cursor == GridPosition(row: 999_999, column: 3))
-        #expect(grid.shownRect.maxY >= grid.cellRect(grid.selection.cursor!).maxY)  // scrolled to it
+        #expect(grid.visibleRect.maxY >= grid.cellRect(grid.selection.cursor!).maxY)  // scrolled to it
         await key("cmd+right")
         #expect(grid.selection.cursor?.column == 49)
         await key("tab")  // the last cell: stays
@@ -171,12 +171,8 @@ extension AppTests {
         #expect(grid.selection.cursor == GridPosition(row: 0, column: 49))
         await key("cmd+left")
         #expect(grid.selection.cursor == GridPosition(row: 0, column: 0))
-        // ⇧Tab as the keyboard sends it (the harness's "shift+tab" sends a Tab with ⇧, which key bindings read as Tab).
-        let backtab = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: 0,
-                                       windowNumber: main.window!.windowNumber, context: nil, characters: "\u{19}",
-                                       charactersIgnoringModifiers: "\u{19}", isARepeat: false, keyCode: 48)!
         grid.selection.select(GridPosition(row: 1, column: 0))
-        grid.keyDown(with: backtab)  // wraps to the end of the row above
+        await key("shift+tab")  // wraps to the end of the row above
         #expect(grid.selection.cursor == GridPosition(row: 0, column: 49))
         await key("cmd+a")
         #expect(grid.selection.areas == [.all])
@@ -244,11 +240,11 @@ extension AppTests {
         #expect(grid.accessibilityRowCount() == 1_000_000 && grid.accessibilityColumnCount() == 50)
         // Elements only for what is on screen.
         let rows = grid.accessibilityVisibleRows() ?? []
-        #expect(rows.count == grid.rows(in: grid.shownRect).count && rows.count < 40)
+        #expect(rows.count == grid.rows(in: grid.visibleRect).count && rows.count < 40)
         #expect((rows.first as? GridRowElement)?.accessibilityIndex() == 0)
-        #expect(((rows.first as? GridRowElement)?.accessibilityChildren() ?? []).count == grid.columns(in: grid.shownRect).count)
+        #expect(((rows.first as? GridRowElement)?.accessibilityChildren() ?? []).count == grid.columns(in: grid.visibleRect).count)
         let headers = grid.accessibilityColumnHeaderUIElements() as? [GridHeaderElement] ?? []
-        #expect(headers.first?.accessibilityLabel() == "id" && headers.count == grid.columns(in: grid.shownRect).count)
+        #expect(headers.first?.accessibilityLabel() == "id" && headers.count == grid.columns(in: grid.visibleRect).count)
 
         let cell = grid.accessibilityCell(forColumn: 1, row: 3) as? GridCellElement
         #expect(cell?.accessibilityValue() as? String == "Customer 3 Dennis" && cell?.accessibilityLabel() == "name_1")

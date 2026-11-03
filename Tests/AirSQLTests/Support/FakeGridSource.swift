@@ -1,26 +1,20 @@
+import AirSQLCore
 import Foundation
 
 /// A made-up table for the grid's tests, screenshots and frame-rate check: every cell is worked out from its position,
 /// so a million rows cost nothing to hold. It has an id key and, column by column, names, numbers, dates, NULLs, empty
-/// strings, long, emoji and right-to-left text, JSON and bytes. With a `pageSize` its pages start "not loaded" and
-/// arrive a moment after `prefetch` asks for them, as a server's would.
-public final class FakeGridSource: GridSource {
-    public let columns: [GridColumn]
-    public let rowCount: Int
-    public let pageSize: Int?
-    /// Called on the main thread with the rows of each page that arrives.
-    public var onLoad: ((Range<Int>) -> Void)?
-    private var loaded: Set<Int> = []
-    private var requested: Set<Int> = []
+/// strings, long, emoji and right-to-left text, JSON and bytes.
+final class FakeGridSource: GridSource {
+    let columns: [GridColumn]
+    let rowCount: Int
 
     /// 1,000,000 rows of 50 columns: the grid's size target.
-    public static func large() -> FakeGridSource { FakeGridSource(rows: 1_000_000, columns: 50) }
+    static func large() -> FakeGridSource { FakeGridSource(rows: 1_000_000, columns: 50) }
     /// 300 columns, with a 60-character column name: the wide target.
-    public static func wide() -> FakeGridSource { FakeGridSource(rows: 10_000, columns: 300) }
+    static func wide() -> FakeGridSource { FakeGridSource(rows: 10_000, columns: 300) }
 
-    public init(rows: Int, columns: Int, pageSize: Int? = nil) {
+    init(rows: Int, columns: Int) {
         rowCount = rows
-        self.pageSize = pageSize
         self.columns = (0..<columns).map { c in
             let kinds: [(String, String, GridColumn.Kind)] = [
                 ("name", "varchar(60)", .text), ("amount", "decimal(12,2)", .number), ("created", "datetime", .date),
@@ -35,8 +29,7 @@ public final class FakeGridSource: GridSource {
         }
     }
 
-    public func cell(_ row: Int, _ column: Int) -> GridCell {
-        if let pageSize, !loaded.contains(row / pageSize) { return .loading }
+    func cell(_ row: Int, _ column: Int) -> GridCell {
         if column == 0 { return .text(String(row + 1)) }
         let n = row &* 31 &+ column
         switch (column - 1) % 9 {
@@ -51,18 +44,6 @@ public final class FakeGridSource: GridSource {
         case 7: return .text(String(format: "0x%08X%08X", UInt32(truncatingIfNeeded: n &* 2_654_435_761),
                                     UInt32(truncatingIfNeeded: row)))
         default: return .text(String(n % 1000))
-        }
-    }
-
-    public func prefetch(_ rows: Range<Int>) {
-        guard let pageSize, !rows.isEmpty else { return }
-        for page in rows.lowerBound / pageSize...(rows.upperBound - 1) / pageSize where !requested.contains(page) {
-            requested.insert(page)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                guard let self else { return }
-                loaded.insert(page)
-                onLoad?(page * pageSize..<min(rowCount, (page + 1) * pageSize))
-            }
         }
     }
 
