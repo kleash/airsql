@@ -312,6 +312,9 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
     // MARK: Running
 
     override func run() {
+        // The gate (plan §2.8): an export writes a file on this Mac, with a program AirSQL runs.
+        guard !AgentGuard.refuses("An export writes a file on this Mac: only the person at the Mac can start one. Leave the "
+                                  + "sheet for them, or use run_queries with to_file.") else { return }
         guard let request = makeRequest() else { return }
         let url = self.url, options = self.options
         let tables = picker.databases.flatMap(\.tables).filter(\.included)

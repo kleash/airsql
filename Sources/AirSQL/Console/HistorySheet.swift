@@ -188,7 +188,8 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
                              "The history of this connection is removed from this Mac. The statements' results on the server stay.",
                              buttons: [("Clear", "Forget every statement in this history"), ("Cancel", "Keep the history")],
                              destructive: 0) { [weak self] choice in
-            guard choice == 0, let self else { return }
+            // The gate (plan §2.8): the history is the person's record.
+            guard choice == 0, let self, !AgentGuard.refuses("The history is the person's: only they can clear it.") else { return }
             QueryHistory.shared.clear(self.connection)
             self.load()
         }

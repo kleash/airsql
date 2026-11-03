@@ -41,7 +41,8 @@ func showSSHPrompt(_ kind: PromptKind, text: String, hop: String?, title: String
     alert.addButton(withTitle: "Cancel").toolTip = "Don't answer: connecting stops"
     alert.window.initialFirstResponder = field
     alert.beginSheetModal(for: window) { response in
-        reply(response == .alertFirstButtonReturn ? field.stringValue : nil, canRemember && remember.state == .on)
+        reply(response == .alertFirstButtonReturn ? field.stringValue : nil,
+              canRemember && remember.state == .on && !AgentGuard.refuses("Only the person at the Mac can save a password: it was used for this login only."))
     }
     return alert
 }
@@ -61,7 +62,8 @@ func showHostKeyTrust(host: String, fingerprint: String, prompt: String, on wind
     alert.addButton(withTitle: "Trust").toolTip = "Remember this key and connect"
     alert.addButton(withTitle: "Cancel").toolTip = "Don't connect"
     addHelp(to: alert, .trust)
-    alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn) }
+    // Trust is the person's (the agents' gate, plan §2.8): an agent's Trust is a Cancel.
+    alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn && !AgentGuard.refuses("Only the person at the Mac can trust a certificate or host key: nothing was trusted.")) }
     return alert
 }
 
@@ -84,7 +86,8 @@ func showChangedCertificate(server: String, certificate: TLSCertificate, on wind
     alert.buttons[1].keyEquivalent = "\r"  // the safe answer is the default
     trust.keyEquivalent = ""
     addHelp(to: alert, .trust)
-    alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn) }
+    // Trust is the person's (the agents' gate, plan §2.8): an agent's Trust is a Cancel.
+    alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn && !AgentGuard.refuses("Only the person at the Mac can trust a certificate or host key: nothing was trusted.")) }
     return alert
 }
 

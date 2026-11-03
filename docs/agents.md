@@ -44,6 +44,24 @@ no agent can, whatever it asks.
 - To change something, an agent puts the SQL into a console tab. Nothing runs until you press Run.
 - For more safety still, connect with a database user that can only read.
 
+## Agents in AirSQL's windows
+
+Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
+Whatever that would change waits for you:
+
+- Anything that would run on a server (Run in a console, Apply, a compare's sync, Restore, Copy, CSV import, Commit)
+  first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
+  can only decline. Statements that AirSQL proves only read run without asking.
+- Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,
+  startup SQL or safety settings, nor save files, start an export, save a password, trust a certificate, paste from
+  your clipboard, quit AirSQL or press a button marked destructive (Don't Save, Disconnect with a transaction open).
+  Text an agent types into a console of a Production connection is shown to you first.
+- On connections whose agent access doesn't include reading, grids and results are hidden from the agent's snapshots
+  and screenshots.
+
+**Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Options tab) turns the
+asking off; what is yours alone stays yours.
+
 ## See what agents did
 
 The agents' item in the status bar says what they're doing. Click it (or choose **Tools ▸ Agents ▸ Agent Activity**)
