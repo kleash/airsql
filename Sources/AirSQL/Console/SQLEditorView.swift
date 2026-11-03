@@ -193,8 +193,9 @@ final class SQLEditorView: NSTextView {
     private func markMatchingBracket() {
         let caret = selectedRange()
         guard caret.length == 0, let layout = layoutManager else { return }
-        let symbols = tokens.filter { $0.kind == .symbol && $0.range.count == 1 }
         let utf16 = Array(string.utf16)
+        // During an edit the tokens are the text's before it: only those still inside the text count.
+        let symbols = tokens.filter { $0.kind == .symbol && $0.range.count == 1 && $0.range.upperBound <= utf16.count }
         let pairs: [UInt16: UInt16] = [0x28: 0x29, 0x5B: 0x5D, 0x7B: 0x7D]
         let closers = Dictionary(uniqueKeysWithValues: pairs.map { ($1, $0) })
         guard let index = symbols.lastIndex(where: { [caret.location - 1, caret.location].contains($0.range.lowerBound)

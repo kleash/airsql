@@ -111,3 +111,5 @@ shows in a sheet, with what it will do:
   server's table, or as a tree (MySQL's own tree; MariaDB's plan made into one).
 - **Query ▸ Profile** runs the statement and shows where the server spent its time, step by step, where the server keeps
   profiles (SHOW PROFILE).
+- **Query ▸ Save as Changeset…** saves the selected statements (or the one at the cursor) as a Liquibase changeset in a
+  changelog you choose. See [Liquibase changelogs](liquibase.md).

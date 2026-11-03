@@ -228,8 +228,7 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         set(tables, window.result == nil ? "Compare once to list the tables, then choose which to compare" : nil,
             "Choose the tables to compare, columns to leave out, a WHERE per table and renamed tables")
         set(export, noResult, Commands.exportReport.tip)
-        set(changeset, noResult ?? (SQLPreviewSheet.changesetWriter == nil ? "This build of AirSQL can't write Liquibase changesets yet" : nil),
-            "Save the sync script as a Liquibase changeset")
+        set(changeset, noResult, "Save the sync script as a Liquibase changeset")
         set(sync, noResult, Commands.syncScript.tip)
         for control in [mode, ignore] as [NSControl] { control.isEnabled = !window.isRunning }
     }

@@ -69,6 +69,8 @@ final class ConsoleViewController: NSViewController, TabContent {
     /// A compare's sync script (plan §2.9): Run hands it back to the compare, which shows it in the SQL preview and
     /// runs it on a session of its own; false once the compare's window is closed.
     var syncScript: (() -> Bool)?
+    /// Query ▸ Save as Changeset… hands the sync script back to its compare too, which saves a changeset per step.
+    var syncChangesets: (() -> Bool)?
     /// It said yes to closing: it isn't kept for the next launch.
     var closing = false
     private var placedDivider = false

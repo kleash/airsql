@@ -76,6 +76,23 @@ extension AppTests {
             #expect(main.selectedTab?.title == "Query 2")
         }
 
+        /// The bracket marks look at the text being edited, whose tokens are a moment old: deleting where an old token
+        /// ended the text, or putting a shorter text in place, mustn't read past its end.
+        @Test func editsThatShortenTheTextNextToABracketKeepTheEditor() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            editor.setText("SELECT (1);")
+            editor.setSelectedRange(NSRange(location: 11, length: 0))
+            editor.deleteBackward(nil)
+            editor.setSelectedRange(NSRange(location: 7, length: 3))
+            editor.deleteBackward(nil)
+            #expect(editor.string == "SELECT ")
+            editor.setText("SELECT (1), (2), (3);")
+            editor.setSelectedRange(NSRange(location: 21, length: 0))
+            editor.insertText("SELECT 1", replacementRange: NSRange(location: 0, length: 21))
+            #expect(editor.string == "SELECT 1")
+        }
+
         /// Statements after which the navigator's tree reloads.
         @Test func schemaChangesAreToldApart() {
             #expect(ConsoleViewController.changesSchema("/* new */ create table t (id int)"))

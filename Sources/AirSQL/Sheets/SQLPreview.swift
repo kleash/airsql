@@ -23,6 +23,8 @@ struct SQLPreviewRequest {
     var text: String?
     /// The caller's own options under the SQL ("Read new rows back").
     var accessory: NSView?
+    /// Shows "Save as Liquibase changeset": the caller saves the change once it has run, when the box is ticked.
+    var offersChangeset = false
     /// The session's NO_BACKSLASH_ESCAPES (`DBConnection.noBackslashEscapes`), as `SQLQuote.string` wrote the SQL: it
     /// decides where the strings end, so the colours match what the server will read.
     var noBackslashEscapes = false
@@ -40,8 +42,8 @@ struct SQLPreviewResult {
     var saveAsChangeset: Bool
 }
 
-/// The SQL preview sheet. "Save as Liquibase changeset" shows once `changesetWriter` is set (the Liquibase lane, L8b):
-/// the caller runs the SQL and, when it succeeded and the box was ticked, passes the change to the writer.
+/// The SQL preview sheet. "Save as Liquibase changeset" shows for the callers that offer it (`offersChangeset`): they
+/// run the SQL and, when it succeeded and the box was ticked, pass the change to the writer.
 @MainActor
 final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     /// Saves a change as a Liquibase changeset (L8b sets it).
@@ -116,7 +118,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
             views.append(row)
         }
         var options: [NSView] = []
-        if Self.changesetWriter != nil {
+        if request.offersChangeset {
             let box = checkbox("Save as Liquibase changeset", id: "preview.saveChangeset",
                                tip: "Once it has run, save these statements as a changeset in your changelog", on: false,
                                target: nil, action: nil)
