@@ -47,6 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let main = MainWindowController(model: model)
         self.main = main
         agents = AgentService(model: model, main: main)
+        // The compare window works on connected connections, on tools sessions of its own.
+        ReconWindowController.connect = { [weak model] saved in
+            guard let connection = model?.openConnection(saved.id)?.connection else {
+                throw AirSQLError(.disconnected, "Connect to \(saved.displayName) first, in the main window")
+            }
+            return connection
+        }
         main.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
         log.log("launched with \(model.data.connections.count, privacy: .public) connection(s)")

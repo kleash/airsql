@@ -6,8 +6,8 @@ import AppKit
 /// only when the person says so, on a session of its own.
 @MainActor
 final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
-    /// Reaches a saved connection's sessions: the connections lane's connection manager (the integrator sets it). Each
-    /// compare and each sync opens tools sessions of its own on it and closes them when done.
+    /// Reaches a saved connection's sessions: the connected connection's (`AppDelegate` sets it; tests reach the lab).
+    /// Each compare and each sync opens tools sessions of its own on it and closes them when done.
     static var connect: ((SavedConnection) async throws -> Connection)?
 
     nonisolated static let minimumSize = NSSize(width: 960, height: 600)
