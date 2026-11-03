@@ -143,7 +143,7 @@ final class GridTiles: NSView {
         let width = grid.frozenWidth
         grid.drawCells(NSRect(x: rect.minX, y: rect.minY, width: max(0, min(rect.maxX, width) - rect.minX), height: rect.height))
         NSColor.separatorColor.setFill()
-        NSRect(x: width - 1, y: rect.minY, width: 1, height: rect.height).fill()
+        NSRect(x: width - 1, y: rect.minY, width: 1, height: max(0, min(rect.maxY, grid.bounds.height) - rect.minY)).fill()
     }
 }
 
