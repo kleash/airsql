@@ -71,7 +71,7 @@ struct AXNode {
     /// A click on `button` as AppKit's would do it (next state, then its action), for agents.
     @discardableResult
     static func click(_ button: NSButton) -> Bool {
-        guard button.isEnabled else { return false }
+        guard button.isEnabled, !AgentServer.refusesDestructive(button) else { return false }
         if let cell = button.cell as? NSButtonCell, !cell.showsStateBy.isEmpty { button.setNextState() }
         if let action = button.action { button.sendAction(action, to: button.target) }
         return true

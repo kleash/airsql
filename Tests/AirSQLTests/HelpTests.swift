@@ -166,6 +166,10 @@ extension AppTests {
             missing += unexplained(harness.openSheets(), where: "Delete")
             _ = await call(harness, "press", ["title": "Cancel"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            // The connections lane's: the editor's tabs with every part of a route, the Trust sheets, ssh's questions.
+            try await ConnectionsScreens.each(main, harness, long: false) { _, name in
+                missing += unexplained(harness.openSheets(), where: name)
+            }
 
             #expect(missing.isEmpty, "\(missing.joined(separator: "\n"))")
         }

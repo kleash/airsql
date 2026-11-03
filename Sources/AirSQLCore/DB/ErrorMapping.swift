@@ -22,6 +22,8 @@ public struct AirSQLError: Error, LocalizedError, Equatable {
         /// The server showed another certificate than the one pinned for this connection.
         case certificateChanged(TLSCertificate)
         case syntax, notFound, duplicate, foreignKey, readOnly, deadlock, lockTimeout
+        /// An SSH host showed another host key than the one known for it (`ErrorMapping.ssh`).
+        case hostKeyChanged
         case other
     }
 

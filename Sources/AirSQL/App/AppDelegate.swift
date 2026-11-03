@@ -48,6 +48,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         self.main = main
         agents = AgentService(model: model, main: main)
         agents?.consoles = main
+        // The console's sessions, schema and query timeout: the connected connection's.
+        ConsoleViewController.openConnection = { [weak model] in model?.openConnection($0)?.connection }
+        ConsoleViewController.schemaCache = { [weak model] in model?.openConnection($0)?.schema }
+        ConsoleViewController.queryTimeout = { [weak model] in model?.connection($0)?.queryTimeout ?? 0 }
+        // The compare window works on connected connections, on tools sessions of its own.
+        ReconWindowController.connect = { [weak model] saved in
+            guard let connection = model?.openConnection(saved.id)?.connection else {
+                throw AirSQLError(.disconnected, "Connect to \(saved.displayName) first, in the main window")
+            }
+            return connection
+        }
         main.showWindow(nil)
         ConsoleDocuments.shared.restore(into: main)
         NSApp.activate(ignoringOtherApps: true)
@@ -127,6 +138,7 @@ enum HelpPage: String, CaseIterable {
     case editors = "editors.html"
     case compare = "compare.html"
     case agents = "agents.html"
+    case connections = "connections.html"
 
     /// The site: GitHub Pages, built from docs/.
     static let site = URL(string: "https://kleash.github.io/airsql/")!
@@ -141,7 +153,7 @@ enum HelpPage: String, CaseIterable {
     static var reportProblem: URL {
         let system = ProcessInfo.processInfo.operatingSystemVersion
         var form = URLComponents(string: "https://github.com/kleash/airsql/issues/new")!
-        form.queryItems = [URLQueryItem(name: "version", value: version),
+        form.queryItems = [URLQueryItem(name: "template", value: "bug_report.yml"), URLQueryItem(name: "version", value: version),
                            URLQueryItem(name: "macos", value: "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)")]
         return form.url!
     }

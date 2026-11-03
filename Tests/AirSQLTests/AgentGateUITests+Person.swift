@@ -45,15 +45,28 @@ extension AppTests.AgentGateUITests {
         model.setSavedPassword(Fixtures.local.id.uuidString, "secret")
         main.sidebar.select([Fixtures.local.id])
         let before = model.data
-        for path in ["Connection > Colour > Production", "Connection > Duplicate", "File > New Connection"] {
+        for path in ["Connection > Colour > Production", "Connection > Duplicate"] {
             let refused = await agentCall(service, "menu", ["path": path])
             #expect(refused.error?.hasPrefix("Only the person at the Mac can change") == true, "\(path): \(refused.error ?? "let through")")
         }
+        // The connection editor opens for an agent, but its Save keeps nothing of theirs.
+        #expect(await agentCall(service, "menu", ["path": "File > New Connection"]).error == nil)
+        for (id, value) in [("editor.name", "Sneaky"), ("editor.host", "db.example.com"), ("editor.user", "root")] {
+            #expect(await agentCall(service, "set", ["id": id, "value": value]).error == nil, "\(id)")
+        }
+        let saved = await agentCall(service, "press", ["id": "editor.save"])
+        #expect(saved.error?.contains("a connection's server, route, login") == true, "\(saved.error ?? "let through")")
+        #expect(await agentCall(service, "set", ["id": "editor.password", "value": "guess"]).error == nil)
+        let password = await agentCall(service, "press", ["id": "editor.save"])
+        #expect(password.error?.contains("can save a password") == true, "\(password.error ?? "let through")")
+        #expect(main.window?.attachedSheet != nil && model.data == before)
+        #expect(await agentCall(service, "press", ["id": "editor.cancel"]).error == nil)
+        _ = await agentCall(service, "wait", ["until": "no_sheet", "timeout": 5])
         main.sidebar.select([Fixtures.local.id])  // a refused Duplicate selects the copies it didn't make: none
         #expect(await agentCall(service, "menu", ["path": "Connection > Delete…"]).error == nil)
         _ = await agentCall(service, "wait", ["until": "sheet", "timeout": 5])
         let delete = await agentCall(service, "press", ["title": "Delete"])
-        #expect(delete.error?.contains("Saved connections and settings are the person's") == true, "\(delete.error ?? "let through")")
+        #expect(delete.error?.contains("“Delete” can't be undone") == true, "\(delete.error ?? "let through")")
         #expect(model.data == before && model.savedPassword(Fixtures.local.id.uuidString) == "secret")
 
         // What the connection editor (the connections lane's) would save for an agent's request goes back too.
@@ -61,7 +74,9 @@ extension AppTests.AgentGateUITests {
         let changes: [(String, (inout SavedConnection) -> Void)] = [
             ("what agents may do", { $0.agentAccess = .schemaReadAnalytics }), ("colour", { $0.colour = .none }),
             ("read-only", { $0.readOnly = true }), ("safety settings", { $0.safety = SafetySettings.production }),
-            ("server, route or login", { $0.host = "elsewhere.example.com" }), ("client tools", { $0.clientPath = "/tmp/mysql" }),
+            ("server, route", { $0.host = "elsewhere.example.com" }), ("client tools", { $0.clientPath = "/tmp/mysql" }),
+            ("startup SQL", { $0.startupSQL = "DROP TABLE orders" }), ("TLS", { $0.tls.mode = .off }),
+            ("route", { $0.jumpHosts.append(SSHHop()) }),
         ]
         let notes = AgentGuard.Notes()
         AgentGuard.$notes.withValue(notes) { AgentGate.$agent.withValue("Claude Code") {

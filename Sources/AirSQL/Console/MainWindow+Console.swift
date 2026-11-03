@@ -70,15 +70,6 @@ extension MainWindowController: AgentConsoles {
                                                        + "runs until you press Run.")
         return tab
     }
-
-    /// A console command sent while the focus is elsewhere in the window (the sidebar, the tab bar) goes to the console
-    /// shown, as the toolbar's Run does.
-    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        if let console = selectedTab?.content as? ConsoleViewController, console.isViewLoaded, console.responds(to: action) {
-            return console
-        }
-        return super.supplementalTarget(forAction: action, sender: sender)
-    }
 }
 
 /// A console tab as agents' read_console sees it: its text, its database and the person's last statement.

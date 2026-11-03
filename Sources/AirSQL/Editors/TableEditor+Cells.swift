@@ -26,7 +26,7 @@ extension TableEditorController: NSComboBoxDataSource {
                 if !names.contains(column.type.name.uppercased()) { names.append(column.type.name.uppercased()) }
                 return choice(names, column.type.name.uppercased())
             case "length":
-                return text(column.type.length, placeholder: type?.hint ?? "", enabled: type?.length != ColumnType.Length.none)
+                return text(column.type.length, placeholder: type?.hint ?? "", enabled: type?.length != EditorColumnType.Length.none)
             case "unsigned": return check(column.type.unsigned, enabled: type?.numeric ?? false)
             case "null": return check(column.nullable)
             case "default":

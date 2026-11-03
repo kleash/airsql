@@ -1,0 +1,57 @@
+# Ported from AirSCP's .github/ISSUE_TEMPLATE/bug_report.yml. Help ▸ Report a Problem opens this form with the version
+# fields filled in (?template=bug_report.yml&version=…&macos=…).
+name: Report a problem
+description: Something in AirSQL doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for telling us. Many answers are in [AirSQL Help](https://kleash.github.io/airsql/troubleshooting.html).
+        Please don't paste passwords, server names or data you want to keep private.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: I connected through a jump host, and…
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to see it again
+      placeholder: |
+        1. Connect to a MariaDB 11.4 server through an SSH tunnel
+        2. …
+  - type: textarea
+    id: message
+    attributes:
+      label: Message
+      description: The error message, with what Details shows (the server's or ssh's own words).
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: AirSQL version
+      description: AirSQL ▸ About AirSQL
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.5"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where in AirSQL?
+      options:
+        - Connecting (passwords, TLS, SSH tunnels, jump hosts, proxies)
+        - The navigator (databases, tables, process list)
+        - Table and object editors
+        - Export, restore, copy or import
+        - Compare
+        - AI agents (MCP)
+        - Something else

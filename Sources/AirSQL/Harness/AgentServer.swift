@@ -240,7 +240,7 @@ final class AgentServer {
     /// target sends its action up its window's responder chain, as it would in the key window.
     @discardableResult
     func pressButton(_ button: NSButton) -> Bool {
-        guard button.isEnabled else { return false }
+        guard button.isEnabled, !Self.refusesDestructive(button) else { return false }
         if let cell = button.cell as? NSButtonCell, !cell.showsStateBy.isEmpty { button.setNextState() }
         guard let action = button.action else { return true }
         let target = button.target ?? target(for: action, explicit: nil, in: button.window)

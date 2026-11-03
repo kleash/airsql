@@ -80,8 +80,8 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         guard let connection = main.activeConnection else {
             return (false, main.selectedConnections.count > 1 ? "Select only one connection" : "Select a connection in the sidebar first")
         }
-        if connection.route != .direct {
-            return (false, "The client tools reach SSH and proxy routes once AirSQL has connected through them")
+        if connection.route != .direct, main.model.openConnection(connection.id) == nil {
+            return (false, "Connect to \(connection.displayName) first: the client tools go through its SSH or proxy route")
         }
         if let action, writes.contains(action), connection.readOnly {
             return (false, "\(connection.displayName) is read-only: turn that off in the connection's settings to write to it")
@@ -91,11 +91,11 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
 
     // MARK: The connection's login
 
-    /// The connection's options for the client tools and AirSQL's own sessions, with its password: from the Keychain, or
-    /// asked when it isn't saved or is asked each time. Nil when the person cancels.
-    /// shortcut: direct connections only (TCP or the server's own socket), as saved; the connections lane (L1) gives these
-    /// from the connected connection instead, its route's socket and TLS settings included.
+    /// The connection's options for the client tools and AirSQL's own sessions, with its password: the connected
+    /// connection's (its route's socket, TLS settings and password), else a direct connection's saved settings with the
+    /// Keychain's password, or one asked when it isn't saved or is asked each time. Nil when the person cancels.
     static func options(for saved: SavedConnection, model: AppModel, on window: NSWindow) async -> ConnectOptions? {
+        if let open = model.openConnection(saved.id) { return open.connection.options }
         let read = model.savedPassword, key = saved.id.uuidString
         var password = saved.askPassword ? nil : await Task.detached { read(key) }.value
         if password == nil {
@@ -103,7 +103,7 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
                 showPasswordPrompt(for: saved.displayName, user: saved.user, retry: false, canRemember: !saved.askPassword,
                                    on: window) { password, remember in
                     // Credentials are the person's (plan §2.8): an agent's typing logs in once, never saved.
-                    if let password, remember, !AgentGuard.refuses("Only the person at the Mac can save a password.") {
+                    if let password, remember, !AgentGuard.refuses("Only the person at the Mac can save a password: it was used for this login only.") {
                         let write = model.setSavedPassword
                         DispatchQueue.global(qos: .userInitiated).async { write(key, password) }
                     }
@@ -112,8 +112,6 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
             }
         }
         guard let password else { return nil }
-        return ConnectOptions(name: saved.displayName, host: saved.host.isEmpty ? "localhost" : saved.host, port: saved.port ?? 3306,
-                              endpoint: saved.socket.isEmpty ? .tcp : .socket(saved.socket), user: saved.user, password: password,
-                              database: saved.database.isEmpty ? nil : saved.database, readOnly: saved.readOnly)
+        return saved.connectOptions(password: password, routeSocket: nil)
     }
 }

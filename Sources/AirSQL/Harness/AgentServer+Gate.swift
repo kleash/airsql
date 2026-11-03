@@ -16,6 +16,13 @@ extension AgentServer {
         }
     }
 
+    /// A button marked destructive (Disconnect with a transaction open, Don't Save, Clear) is the person's call: an
+    /// agent's press is refused (noted for the reply).
+    static func refusesDestructive(_ button: NSButton) -> Bool {
+        button.hasDestructiveAction && AgentGuard.refuses("“\(button.title)” can't be undone: only the person at the Mac can "
+                                                          + "choose it. Ask them, or choose another button.")
+    }
+
     /// Refuses an agent's menu command that pastes, or acts in Settings.
     func checkAgentMayChoose(_ action: Selector, target: AnyObject?) throws {
         guard AgentGate.agent != nil else { return }

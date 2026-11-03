@@ -14,9 +14,8 @@ extension Notification.Name {
 /// toolbar and the status bar).
 @MainActor
 final class ConsoleViewController: NSViewController, TabContent {
-    // What lanes not yet in this build give the console: a connected connection's sessions (connections, L1), its
-    // schema cache (navigator, L5a) and its query timeout in seconds (L1's connection setting). Until then a connection
-    // counts as not connected.
+    // A connected connection's sessions, its schema cache and its query timeout in seconds: the app sets them to the
+    // connected connections (`AppModel.open`), tests to their own. Nil: not connected.
     static var openConnection: (UUID) -> Connection? = { _ in nil }
     static var schemaCache: (UUID) -> SchemaCache? = { _ in nil }
     static var queryTimeout: (UUID) -> Int = { _ in 0 }
@@ -147,10 +146,14 @@ final class ConsoleViewController: NSViewController, TabContent {
         })
     }
 
-    /// The editor over the results, about half each, the first time the console is laid out at its size, unless the
-    /// person moved the divider before (then it is where they left it).
     override func viewDidLayout() {
         super.viewDidLayout()
+        placeDivider()
+    }
+
+    /// The editor over the results, about half each, the first time the console is laid out at its size, unless the
+    /// person moved the divider before (then it is where they left it).
+    private func placeDivider() {
         guard !placedDivider, split.bounds.height > 2 * 120 else { return }
         placedDivider = true
         if split.autosaveName == nil || UserDefaults.standard.object(forKey: "NSSplitView Subview Frames Console") == nil {
@@ -160,6 +163,9 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     override func viewDidAppear() {
         super.viewDidAppear()
+        // A new tab's first layout comes before it has its size, and none follows.
+        view.window?.layoutIfNeeded()
+        placeDivider()
         view.window?.makeFirstResponder(editor)
         syncToolbar()
     }

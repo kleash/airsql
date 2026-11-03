@@ -49,16 +49,15 @@ public enum AgentGate {
 }
 
 /// What only the person at the Mac may change (plan §2.8), even with approval: who agents may reach and how far, what
-/// marks production, what asks first, what AirSQL runs and where it connects.
+/// marks production, what asks first, what AirSQL runs and where and how it connects. Everything but a few plain fields
+/// (names, folders, comments, looks), so a field added later is the person's too.
 extension AgentGate {
     /// The first person-only change from `old` to `new`, in a few words ("a connection's colour"), or nil. A connection
     /// that is new is compared with a new connection's defaults.
     public static func personOnlyChange(from old: AirSQLData, to new: AirSQLData) -> String? {
         if old.settings.safety != new.settings.safety { return "the safety settings" }
         if old.settings.agentsAllowed != new.settings.agentsAllowed { return "whether agents may use AirSQL" }
-        if old.settings.clientPath != new.settings.clientPath || old.settings.dumpPath != new.settings.dumpPath {
-            return "the client tools AirSQL runs"
-        }
+        if personsPart(old.settings) != personsPart(new.settings) { return "the client tools AirSQL runs" }
         for connection in new.connections {
             let before = old.connection(connection.id) ?? SavedConnection(id: connection.id)
             if before.agentAccess != connection.agentAccess || before.agentSampleRows != connection.agentSampleRows {
@@ -67,14 +66,34 @@ extension AgentGate {
             if before.colour != connection.colour { return "a connection's colour" }
             if before.readOnly != connection.readOnly { return "whether a connection is read-only" }
             if before.safety != connection.safety { return "a connection's safety settings" }
-            if before.route != connection.route || before.host != connection.host || before.port != connection.port
-                || before.socket != connection.socket || before.user != connection.user || before.askPassword != connection.askPassword {
-                return "a connection's server, route or login"
-            }
-            if before.clientPath != connection.clientPath || before.dumpPath != connection.dumpPath {
-                return "the client tools a connection runs"
+            if personsPart(before) != personsPart(connection) {
+                return "a connection's server, route, login, TLS, startup SQL or client tools"
             }
         }
         return nil
+    }
+
+    /// The settings without those anyone may change (the look of the app, the editor and the grid).
+    static func personsPart(_ settings: AppSettings) -> AppSettings {
+        var part = settings
+        let plain = AppSettings()
+        part.appearance = plain.appearance
+        part.editorFontSize = plain.editorFontSize
+        part.gridFontSize = plain.gridFontSize
+        part.rowsPerPage = plain.rowsPerPage
+        part.nullText = plain.nullText
+        part.detailsTableThreshold = plain.detailsTableThreshold
+        return part
+    }
+
+    /// A connection without the fields anyone may change (its name, folder, comment, database and how its list looks).
+    static func personsPart(_ connection: SavedConnection) -> SavedConnection {
+        var part = connection
+        part.name = ""
+        part.folderID = nil
+        part.comment = ""
+        part.database = ""
+        part.databaseFilter = ""
+        return part
     }
 }

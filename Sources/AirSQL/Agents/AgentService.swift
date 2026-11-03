@@ -29,10 +29,7 @@ final class AgentService {
     private var running: [Activity] = []
     static let eventLimit = 200
 
-    /// What lanes not yet in this build give agents: the open connection and its schema cache (connections, L1), and
-    /// the console (L4). Until then a connection counts as not connected.
-    var openConnection: (UUID) -> Connection? = { _ in nil }
-    var schemaCache: (UUID) -> SchemaCache? = { _ in nil }
+    /// The console (L4), which isn't in this build yet: until it is, open_in_console says so.
     var consoles: AgentConsoles?
     /// Carries out the UI tools on the person's windows.
     lazy var harness = AgentServer(main: main, model: model)
@@ -176,19 +173,20 @@ final class AgentService {
         return target(saved)
     }
 
+    /// The connection as agents reach it: its sessions and schema cache while it is connected (`AppModel.open`).
     func target(_ saved: SavedConnection) -> AgentTarget {
-        let connected: Bool
-        if case .connected? = model.states[saved.id] { connected = true } else { connected = false }
-        return AgentTarget(saved: saved, safety: model.data.safety(for: saved),
-                           connection: connected ? openConnection(saved.id) : nil,
-                           schema: connected ? schemaCache(saved.id) : nil, database: database(of: saved))
+        let open = model.openConnection(saved.id)
+        return AgentTarget(saved: saved, safety: model.data.safety(for: saved), connection: open?.connection,
+                           schema: open?.schema, database: database(of: saved))
     }
 
-    /// The database a connection's statements run in: the active console tab's, else the connection's own.
+    /// The database a connection's statements run in: the active console tab's, else the navigator's current one (the
+    /// connection's own until another is double-clicked).
     func database(of saved: SavedConnection) -> String? {
         if let tab = main?.selectedTab, tab.connectionID == saved.id, let database = (tab.content as? AgentConsole)?.agentDatabase {
             return database
         }
+        if let current = model.openConnection(saved.id)?.currentDatabase, !current.isEmpty { return current }
         return saved.database.isEmpty ? nil : saved.database
     }
 

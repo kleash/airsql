@@ -27,6 +27,13 @@ extension AppTests {
             #expect(main.selectedTab?.title == "Query 2")
         }
 
+        /// Statements after which the navigator's tree reloads.
+        @Test func schemaChangesAreToldApart() {
+            #expect(ConsoleViewController.changesSchema("/* new */ create table t (id int)"))
+            #expect(ConsoleViewController.changesSchema("DROP VIEW v") && ConsoleViewController.changesSchema("rename table a to b"))
+            #expect(!ConsoleViewController.changesSchema("SELECT 'CREATE'") && !ConsoleViewController.changesSchema("INSERT INTO t VALUES (1)"))
+        }
+
         @Test func typingColoursTheSQLAndTheEditorsCommandsChangeIt() async throws {
             let (main, harness, console) = try await Self.console()
             _ = await call(harness, "type", ["text": "select a, `from` from t where x = 'from' -- note"])
