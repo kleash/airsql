@@ -185,6 +185,11 @@ extension AppTests {
                                   ["sql": "UPDATE customers SET name = ''", "ok": false, "error": "Refused: it isn't read-only"]]],
                      [0: rows], call: id, client: "claude-code 2", connection: reports.id)
         service.finish(id, "1 row, 1 refused or failed")
+        // A time is short: shown whole, in the person's format (12-hour ones were cut).
+        main.window?.layoutIfNeeded()
+        let time = try #require(tab.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)
+        #expect(time.frame.width >= time.intrinsicContentSize.width,
+                "“\(time.stringValue)” has \(time.frame.width) of \(time.intrinsicContentSize.width)")
         // The newest statement is selected: the refused one says why.
         #expect(tab.runs.map(\.outcome) == ["1 row, more weren't sent", "Refused: it isn't read-only"])
         #expect(tab.table.selectedRowIndexes == [1] && find(NSTextField.self, id: "agentResults.empty", in: tab.view)?.isHidden == true)

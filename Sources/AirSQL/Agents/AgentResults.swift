@@ -70,6 +70,12 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
         formatter.dateStyle = .none
         return formatter
     }()
+    /// The time column's width: a late time in the person's format ("10:58:58 PM") and the cell's margins.
+    private static var timeWidth: CGFloat {
+        let late = Calendar.current.date(bySettingHour: 22, minute: 58, second: 58, of: Date()) ?? Date()
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        return ceil((time.string(from: late) as NSString).size(withAttributes: [.font: font]).width) + 16
+    }
 
     init(service: AgentService, connection: UUID) {
         self.service = service
@@ -89,7 +95,7 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
         for (id, title, width) in Self.columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
-            column.width = width
+            column.width = id == "time" ? max(width, Self.timeWidth) : width
             column.minWidth = id == "sql" ? 160 : 50
             table.addTableColumn(column)
         }
