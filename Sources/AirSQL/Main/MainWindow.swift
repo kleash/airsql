@@ -413,6 +413,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     @objc func turnAgentsOff(_ sender: Any?) { model.data.settings.agentsAllowed = false }
 
+    /// A command sent while the focus is elsewhere in the window: New Database, Find Text on Server and Process List go
+    /// to the sidebar (they work on the window's connection), a console command to the console shown, as the toolbar's
+    /// Run does.
+    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
+        if [Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action].contains(action) { return sidebar }
+        if let console = selectedTab?.content as? ConsoleViewController, console.isViewLoaded, console.responds(to: action) {
+            return console
+        }
+        return super.supplementalTarget(forAction: action, sender: sender)
+    }
+
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
@@ -430,6 +441,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.newConnection.action?:
             enabled = window?.attachedSheet == nil
             reason = "A sheet is open: answer it first"
+        case Commands.newQuery.action?:
+            enabled = activeConnection != nil
+            reason = "Select one connection in the sidebar first"
         case Commands.closeTab.action?, Commands.renameTab.action?:
             enabled = selectedTab != nil
             reason = "No tab is open"

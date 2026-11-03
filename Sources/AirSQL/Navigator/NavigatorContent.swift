@@ -194,13 +194,3 @@ extension OpenConnection {
         return rows.string(0, column) ?? ""
     }
 }
-
-extension MainWindowController {
-    /// New Database, Find Text on Server and Process List work on the window's connection wherever the focus is: the
-    /// sidebar takes them when nothing in the focused part does.
-    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        let connectionWide = [Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action]
-        if connectionWide.contains(action) { return sidebar }
-        return super.supplementalTarget(forAction: action, sender: sender)
-    }
-}

@@ -7,6 +7,7 @@ extension MainWindowController {
     /// tree's database, as the source.
     @objc func compareDatabases(_ sender: Any?) {
         let compare = ReconWindowController.show(model: model, source: selectedConnections.first)
+        compare.main = self
         if let (open, nodes) = sidebar.treeSelection {
             compare.source.choose(model.connection(open.id), database: nodes.first?.database)
         }
@@ -15,12 +16,12 @@ extension MainWindowController {
 
 /// The compare window's commands: the sync script, the report, the changeset, copying and leaving tables out.
 extension ReconWindowController {
-    /// The whole sync script in the SQL preview; run on a session of the target's own only when the person approves.
+    /// The whole sync script in a console tab of the target marked "sync script" (plan §2.9), to review. It never runs
+    /// on its own: Run there brings this window back with the script in the SQL preview.
     @objc func showSyncScript(_ sender: Any?) {
-        guard let result, let window, let saved = target.connection else { return }
+        guard let result, let window, let saved = target.connection, let main else { return }
         let destructive = results.detail.includeDestructive
-        let steps = result.steps(destructive: destructive)
-        guard !steps.isEmpty else {
+        guard !result.steps(destructive: destructive).isEmpty else {
             let why = !result.objects.contains(where: \.differs) ? "The two databases match."
                 : !destructive && !result.steps(destructive: true).isEmpty
                 ? "What differs only goes away with destructive steps (DROP, DELETE): tick “Include destructive steps” to put "
@@ -29,6 +30,21 @@ extension ReconWindowController {
             showError(why, title: "Nothing to sync", on: window)
             return
         }
+        let script = result.script(destructive: destructive).map { $0 + ";" }.joined(separator: "\n\n")
+        guard let console = main.openConsole(text: script, title: "Sync script · \(result.target.database)",
+                                             connection: saved.id).content as? ConsoleViewController else { return }
+        console.editor.isEditable = false
+        console.syncScript = { [weak self] in self?.confirmSync(result, destructive: destructive, on: saved) != nil }
+        console.note(.info, "The compare's sync script, to review: it can't be edited here. Run shows it in the SQL preview "
+                     + "in the compare window first; nothing runs on its own.")
+        main.showWindow(nil)
+    }
+
+    /// The sync script in the SQL preview; run on a session of the target's own only when the person approves.
+    private func confirmSync(_ result: ReconResult, destructive: Bool, on saved: SavedConnection) {
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        let steps = result.steps(destructive: destructive)
         let change = ChangeSQL(title: "Sync \(result.target.name) · \(result.target.database) with \(result.source.name)",
                                statements: result.script(destructive: destructive), connection: saved.id)
         var request = SQLPreviewRequest(
@@ -43,12 +59,13 @@ extension ReconWindowController {
         }.map { "\($0.targetName) uses \($0.targetEngine ?? ""): a failed sync can't roll its rows back" }
         SQLPreviewSheet.show(request, connection: saved, on: window) { [weak self] answer in
             guard answer.approved else { return }
-            self?.sync(result, destructive: destructive, change: change, saveAsChangeset: answer.saveAsChangeset)
+            self?.sync(result, destructive: destructive, change: change, saveAsChangeset: answer.saveAsChangeset, on: saved)
         }
     }
 
-    private func sync(_ result: ReconResult, destructive: Bool, change: ChangeSQL, saveAsChangeset: Bool) {
-        guard let connect = Self.connect, let saved = target.connection else { return }
+    private func sync(_ result: ReconResult, destructive: Bool, change: ChangeSQL, saveAsChangeset: Bool,
+                      on saved: SavedConnection) {
+        guard let connect = Self.connect else { return }
         let total = result.runnable(destructive: destructive).count
         let work = model.activity.start("Running the sync script on \(saved.displayName) · \(result.target.database)",
                                         connection: saved.id, cancel: nil)

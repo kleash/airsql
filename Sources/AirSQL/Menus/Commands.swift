@@ -77,6 +77,10 @@ import AppKit
     @objc optional func closeOtherResults(_ sender: Any?)
     @objc optional func exportResult(_ sender: Any?)
     @objc optional func compareResult(_ sender: Any?)
+    @objc optional func toggleComment(_ sender: Any?)
+    @objc optional func indentLines(_ sender: Any?)
+    @objc optional func outdentLines(_ sender: Any?)
+    @objc optional func toggleHelpers(_ sender: Any?)
 
     // Data (the grid)
     @objc optional func addRow(_ sender: Any?)
@@ -389,6 +393,13 @@ enum Commands {
                                       tip: "Save this result's rows to a CSV, JSON, SQL, Excel or other file")
     static let compareResult = Command("Compare With…", #selector(AirSQLActions.compareResult(_:)),
                                        tip: "Compare this result with another result or a table, row by row")
+    static let toggleComment = Command("Comment Lines", #selector(AirSQLActions.toggleComment(_:)), "/",
+                                       tip: "Comment out the selected lines with --, or take the comment away")
+    static let shiftRight = Command("Shift Right", #selector(AirSQLActions.indentLines(_:)), "]", tip: "Indent the selected lines")
+    static let shiftLeft = Command("Shift Left", #selector(AirSQLActions.outdentLines(_:)), "[",
+                                   tip: "Take one indent off the selected lines")
+    static let helpers = Command("Query Helpers", #selector(AirSQLActions.toggleHelpers(_:)),
+                                 tip: "Show or hide the columns, functions and keywords beside the editor")
 
     // MARK: Data
     static let addRow = Command("Add Row", #selector(AirSQLActions.addRow(_:)), "i",
@@ -588,7 +599,7 @@ enum Commands {
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
-        closeOtherResults, exportResult, compareResult,
+        closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         addRow, duplicateRow, duplicateRowWithoutKeys, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterByValues, clearFilter, sortAscending,
         sortDescending, clearSort, goToRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,

@@ -2,8 +2,8 @@ import AirSQLCore
 import AppKit
 
 /// The compare window (plan §2.9, mockups screen 8): two databases, on the same or different connections, compared in
-/// structure and data; the differences listed with what makes them; a sync script reviewed in the SQL preview and run
-/// only when the person says so, on a session of its own.
+/// structure and data; the differences listed with what makes them; a sync script reviewed in a console tab and the SQL
+/// preview, and run only when the person says so, on a session of its own.
 @MainActor
 final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     /// Reaches a saved connection's sessions: the connected connection's (`AppDelegate` sets it; tests reach the lab).
@@ -17,6 +17,8 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
     private static var open: [ReconWindowController] = []
 
     let model: AppModel
+    /// The main window that opened it: the sync script opens in a console tab there.
+    weak var main: MainWindowController?
     var options = ReconOptions()
     private(set) var result: ReconResult?
     private var task: Task<Void, Never>?
