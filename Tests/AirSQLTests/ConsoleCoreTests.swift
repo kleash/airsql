@@ -108,3 +108,46 @@ struct SQLFormatterTests {
         if let formatted { #expect(SQLLexer.sameTokens(sql, formatted)) }
     }
 }
+
+/// Completion from the schema cache (the MariaDB 11.8 recording of the fixture schema): tables after FROM, columns
+/// through aliases, joins from foreign keys, databases after USE, functions of the server's flavour, keywords.
+struct SQLCompletionTests {
+    func suggest(_ text: String, database: String? = "airsql_fixture") async throws -> [CompletionItem] {
+        let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+        let caret = (text as NSString).range(of: "|").location
+        let clean = text.replacingOccurrences(of: "|", with: "")
+        return SQLCompletion.suggestions(text: clean, caret: caret, snapshot: cache.snapshot, database: database).items
+    }
+
+    @Test func tablesAfterFromAndJoin() async throws {
+        let items = try await suggest("SELECT * FROM cu|")
+        #expect(items.map(\.label) == ["customers", "customer_emails"])
+        #expect(items.last?.kind == .view)
+        let qualified = try await suggest("SELECT * FROM airsql_fixture.or|")
+        #expect(Set(qualified.map(\.label)) == ["orders", "order_lines", "order_seq"])
+        #expect(try await suggest("USE airsql|").map(\.label) == ["airsql other", "airsql_fixture"])
+        #expect(try await suggest("USE airsql|").first?.text == "`airsql other`")
+    }
+
+    @Test func columnsThroughAliasesAndJoinsFromForeignKeys() async throws {
+        let columns = try await suggest("SELECT o.| FROM orders AS o")
+        #expect(columns.first?.label == "id" && columns.contains { $0.label == "customer_id" } && columns.allSatisfy { $0.kind == .column })
+        let unqualified = try await suggest("SELECT cust| FROM orders o JOIN customers c ON c.id = o.customer_id")
+        #expect(unqualified.first?.label == "customer_id" && unqualified.first?.detail.hasSuffix("· o") == true)
+        let joins = try await suggest("SELECT * FROM orders o JOIN |")
+        #expect(joins.first?.kind == .join)
+        #expect(joins.first?.text == "customers c ON c.id = o.customer_id", "\(joins.first?.text ?? "")")
+        let back = try await suggest("SELECT * FROM customers c JOIN |")
+        #expect(back.contains { $0.text == "orders o ON o.customer_id = c.id" }, "\(back.prefix(3).map(\.text))")
+    }
+
+    @Test func functionsOfTheServerAndKeywords() async throws {
+        let items = try await suggest("SELECT CONC|")
+        #expect(items.map(\.label) == ["CONCAT", "CONCAT_WS"] && items.first?.text == "CONCAT(")
+        #expect(try await suggest("SELECT JSON_D|").map(\.label) == ["JSON_DETAILED"], "MariaDB's")
+        #expect(try await suggest("SELECT REGEXP_L|").isEmpty, "MySQL's only")
+        #expect(try await suggest("SELECT 1 FR|").map(\.label) == ["FROM", "FROM_UNIXTIME"])
+        // A name that needs quoting is offered quoted.
+        #expect(try await suggest("SELECT * FROM we|").first?.text == "`we``ird 'name' ✓`")
+    }
+}
