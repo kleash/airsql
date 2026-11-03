@@ -69,7 +69,7 @@ extension TableDataController: NSMenuItemValidation {
         }
         menuItem.explain(enabled: enabled, reason: reason)
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
-        if menuItem.action == Commands.useAsLabel.action { menuItem.state = isLabel(focusedColumn()) ? .on : .off }
+        if menuItem.action == Commands.useAsLabel.action { menuItem.state = isLabel(viewer.focusedColumn) ? .on : .off }
         return enabled
     }
 

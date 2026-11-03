@@ -84,14 +84,14 @@ extension TableDataController {
 
     /// Use as Label: the focused column shows beside keys that refer to this table (again: back to the first text column).
     @objc func useAsLabel(_ sender: Any?) {
-        guard let source, let column = focusedColumn() else { return NSSound.beep() }
+        guard let source, let column = viewer.focusedColumn else { return NSSound.beep() }
         let name = source.columns[column].name
         changeSettings { $0.labelColumn = $0.labelColumn == name ? nil : name }
     }
 
     /// Add Virtual Foreign Key…: which table's key the focused column holds, chosen from each table with a one-column key.
     @objc func addVirtualKey(_ sender: Any?) {
-        guard let source, let column = focusedColumn(), let window = view.window else { return NSSound.beep() }
+        guard let source, let column = viewer.focusedColumn, let window = view.window else { return NSSound.beep() }
         let name = source.columns[column].name
         let targets = (context.schema.snapshot.database(database)?.tables ?? []).compactMap { table -> (String, String)? in
             guard table.kind == .table, let key = table.editingKey, key.count == 1 else { return nil }
@@ -129,14 +129,14 @@ extension TableDataController {
     }
 
     @objc func removeVirtualKey(_ sender: Any?) {
-        guard let source, let column = focusedColumn() else { return NSSound.beep() }
+        guard let source, let column = viewer.focusedColumn else { return NSSound.beep() }
         let name = source.columns[column].name
         changeSettings { $0.virtualKeys.removeAll { $0.columns.contains(name) } }
     }
 
     /// Whether Use as Label and the virtual foreign key commands can act on the focused column, and why not.
     func keyState(of action: Selector?) -> (Bool, String?) {
-        guard let source, let column = focusedColumn() else { return (false, "Select a column first") }
+        guard let source, let column = viewer.focusedColumn else { return (false, "Select a column first") }
         let name = source.columns[column].name
         switch action {
         case Commands.useAsLabel.action:
