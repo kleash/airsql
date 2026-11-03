@@ -3,7 +3,7 @@ import AppKit
 
 /// The table tab's grid bar (grid-spec §4): a chip saying where filtering runs, the WHERE condition (coloured, growing to
 /// eight lines; Return applies it, ⌥↓ or the clock lists the table's recent filters), Search All Columns and its "Loaded
-/// rows only" switch.
+/// rows only" switch, and the Data Grid page of the help.
 @MainActor
 final class TableDataBar: NSView, NSTextViewDelegate {
     weak var owner: TableDataController?
@@ -62,7 +62,8 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityIdentifier("tableData.busy")
         spinner.toolTip = "Rows are loading from the server"
-        let row = NSStackView(views: [scope, whereLabel, whereField.box, clearButton, recentButton, searchField, loadedOnly, spinner])
+        let row = NSStackView(views: [scope, whereLabel, whereField.box, clearButton, recentButton, searchField, loadedOnly, spinner,
+                                      helpButton(.dataGrid)])
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.setCustomSpacing(Spacing.half, after: whereLabel)

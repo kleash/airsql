@@ -116,6 +116,8 @@ extension AppTests {
             #expect(tab.bar.scope.text == "On server · all rows" && tab.viewer.status.rows.stringValue == "3 rows")
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)
             #expect(tab.notice.isHidden && !tab.isEdited && main.selectedTab?.title == "orders")
+            // The bar's ? opens the Data Grid page of the help.
+            #expect(find(NSButton.self, id: "help", in: tab.bar)?.identifier?.rawValue == "help:" + HelpPage.dataGrid.rawValue)
 
             tab.applyFilter("WHERE region = 'EU'")
             await ready { tab.loading != nil }
