@@ -43,16 +43,13 @@ extension GridViewer {
             text.isEditable = false
             let font = NSFont.monospacedSystemFont(ofSize: grid.fontSize, weight: .regular)
             text.font = font
-            // Tabs (TSV) every eight characters, however many: past the last of the default stops a tab breaks the line.
+            // Tabs (TSV) every eight characters, past the default stops too. Long rows wrap, so only what shows is laid out: a
+            // text as wide as its longest row is laid out whole first (CI's Mac never got through 10,000 rows of it).
             let tabs = NSMutableParagraphStyle()
             tabs.tabStops = []
             tabs.defaultTabInterval = 8 * ("0" as NSString).size(withAttributes: [.font: font]).width
             text.defaultParagraphStyle = tabs
             text.textContainerInset = NSSize(width: 8, height: 8)
-            text.isHorizontallyResizable = true
-            text.textContainer?.widthTracksTextView = false
-            text.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
-            scroll.hasHorizontalScroller = true
             text.string = GridCopy.text(source, rows: rows, columns: grid.columnOrder, format: GridCopy.format, headers: true,
                                         nullText: grid.nullText, database: copyTable.database, table: copyTable.name) + note(rows.count)
             text.setAccessibilityIdentifier("grid.text")
