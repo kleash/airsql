@@ -62,6 +62,9 @@ final class RestoreSheet: ToolSheet {
         fit.preferredMaxLayoutWidth = 460
         let grid = form.finish()
         grid.column(at: 1).width = 470
+        // Long names are shortened in the menus' buttons, whole in the menus.
+        databaseMenu.widthAnchor.constraint(lessThanOrEqualToConstant: 360).isActive = true
+        toolMenu.widthAnchor.constraint(lessThanOrEqualToConstant: 360).isActive = true
         return grid
     }
 
@@ -96,10 +99,10 @@ final class RestoreSheet: ToolSheet {
             do {
                 let session = DBConnection(options: options, role: .tools)
                 let server = try await session.connect()
-                let names = try await session.query(PickerNode.databasesSQL).first?.rows
+                let names = try await SQLExport.rows(session, PickerNode.databasesSQL).compactMap { $0[0] }
                 await session.close()
                 let tools = await ClientTools.find(.client, chosen: chosen)
-                show(server: server, tools: tools, databases: (0..<(names?.rowCount ?? 0)).compactMap { names?.string($0, 0) })
+                show(server: server, tools: tools, databases: names)
             } catch {
                 loading(nil)
                 status.textColor = .statusBad

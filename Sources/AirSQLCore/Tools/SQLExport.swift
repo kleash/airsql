@@ -236,7 +236,7 @@ public enum SQLExport {
 
     /// information_schema.COLUMNS.EXTRA of a generated column (VIRTUAL GENERATED, STORED GENERATED, MariaDB's PERSISTENT),
     /// not of one whose default is an expression (MySQL's DEFAULT_GENERATED).
-    static func isGenerated(_ extra: String) -> Bool {
+    public static func isGenerated(_ extra: String) -> Bool {
         let extra = extra.uppercased()
         return extra.contains("VIRTUAL") || extra.contains("STORED GENERATED") || extra.contains("PERSISTENT")
     }
@@ -273,7 +273,7 @@ public enum SQLExport {
     }
 
     /// Every row of a statement's result as text (NULL as nil).
-    static func rows(_ session: DBConnection, _ sql: String) async throws -> [[String?]] {
+    public static func rows(_ session: DBConnection, _ sql: String) async throws -> [[String?]] {
         guard let store = try await session.query(sql, rowCap: .max).first?.rows else { return [] }
         return (0..<store.rowCount).map { row in (0..<store.columns.count).map { store.isNull(row, $0) ? nil : store.string(row, $0) } }
     }

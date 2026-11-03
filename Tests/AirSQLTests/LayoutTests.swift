@@ -244,6 +244,14 @@ extension AppTests {
             if let sheet = window.attachedSheet { check(sheet, "Copy to Another Server") }
             copy.close()
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            let csv = CSVImportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            csv.show(on: window, loads: false)
+            csv.show(databases: ToolFixtures.databases())
+            csv.show(columns: ToolFixtures.customerColumns)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            if let sheet = window.attachedSheet { check(sheet, "Import CSV") }
+            csv.close()
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             return problems
         }
     }

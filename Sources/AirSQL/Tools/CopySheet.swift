@@ -58,6 +58,8 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
         let grid = form.finish()
         grid.setContentHuggingPriority(.defaultHigh, for: .vertical)  // its rows stay together at the top
         databaseField.widthAnchor.constraint(equalToConstant: 260).isActive = true
+        // Long connection names are shortened in the menu's button, whole in the menu.
+        targetMenu.widthAnchor.constraint(lessThanOrEqualToConstant: 320).isActive = true
         let columns = NSStackView(views: [picker.view(height: 250), grid])
         columns.alignment = .top
         columns.spacing = 14
@@ -88,11 +90,10 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
             do {
                 let session = DBConnection(options: options, role: .tools)
                 _ = try await session.connect()
-                let names = try await session.query(PickerNode.databasesSQL).first?.rows
-                let tables = try await session.query(PickerNode.listSQL).first?.rows
+                let names = try await SQLExport.rows(session, PickerNode.databasesSQL).compactMap { $0[0] }
+                let tables = try await SQLExport.rows(session, PickerNode.listSQL)
                 await session.close()
-                show(databases: PickerNode.databases((0..<(names?.rowCount ?? 0)).compactMap { names?.string($0, 0) },
-                                                     tables: ExportSheet.rows(tables)))
+                show(databases: PickerNode.databases(names, tables: tables))
             } catch {
                 loading(nil)
                 status.textColor = .statusBad

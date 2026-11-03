@@ -45,6 +45,8 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
 
     @objc func copyToServer(_ sender: Any?) { open { CopySheet(model: $0, connection: $1, options: $2) } }
 
+    @objc func importCSV(_ sender: Any?) { open { CSVImportSheet(model: $0, connection: $1, options: $2) } }
+
     @objc func openInTerminal(_ sender: Any?) {
         guard let main, let window = main.window, let saved = main.activeConnection else { return }
         Task {
@@ -88,7 +90,7 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
     func availability(_ action: Selector?) -> (Bool, String?) {
         guard let main else { return (false, nil) }
         // Copy to Another Server only reads this connection: its sheet checks the one it writes to.
-        let writes = [#selector(restoreDatabase(_:)), #selector(runSQLFile(_:)), #selector(AirSQLActions.importCSV(_:))]
+        let writes = [#selector(restoreDatabase(_:)), #selector(runSQLFile(_:)), #selector(importCSV(_:))]
         if main.window?.attachedSheet != nil { return (false, "A sheet is open: answer it first") }
         guard let connection = main.activeConnection else {
             return (false, main.selectedConnections.count > 1 ? "Select only one connection" : "Select a connection in the sidebar first")

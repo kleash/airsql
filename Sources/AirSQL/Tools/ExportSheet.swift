@@ -87,6 +87,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         let grid = form.finish()
         grid.column(at: 1).width = 400
         grid.setContentHuggingPriority(.defaultHigh, for: .vertical)
+        toolMenu.widthAnchor.constraint(lessThanOrEqualToConstant: 300).isActive = true
         let columns = NSStackView(views: [picker.view(height: 250), grid])
         columns.alignment = .top
         columns.spacing = 14
@@ -140,12 +141,11 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             do {
                 let session = DBConnection(options: options, role: .tools)
                 let server = try await session.connect()
-                let names = try await session.query(PickerNode.databasesSQL).first?.rows
-                let tables = try await session.query(PickerNode.listSQL).first?.rows
+                let names = try await SQLExport.rows(session, PickerNode.databasesSQL).compactMap { $0[0] }
+                let tables = try await SQLExport.rows(session, PickerNode.listSQL)
                 await session.close()
                 let tools = await ClientTools.find(.dump, chosen: chosen)
-                let databases = PickerNode.databases((0..<(names?.rowCount ?? 0)).compactMap { names?.string($0, 0) },
-                                                     tables: Self.rows(tables))
+                let databases = PickerNode.databases(names, tables: tables)
                 show(server: server, tools: tools, databases: databases)
             } catch {
                 loading(nil)
@@ -154,11 +154,6 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
                 updateRunButton()
             }
         }
-    }
-
-    static func rows(_ store: ResultStore?) -> [[String?]] {
-        guard let store else { return [] }
-        return (0..<store.rowCount).map { row in (0..<store.columns.count).map { store.isNull(row, $0) ? nil : store.string(row, $0) } }
     }
 
     /// Fills the form once the server, its databases and the tools are known.

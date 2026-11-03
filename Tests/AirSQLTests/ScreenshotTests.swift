@@ -147,6 +147,18 @@ extension AppTests {
                 try await save(harness, "copy-\(suffix)")
                 copy.close()
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                let csv = CSVImportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+                csv.show(on: main.window!, loads: false)
+                csv.show(databases: ToolFixtures.databases())
+                csv.show(columns: ToolFixtures.customerColumns)
+                let people = FileManager.default.temporaryDirectory.appendingPathComponent("customers-2026-11.csv")
+                try "id,name,email\n1,Ada Lovelace,ada@example.com\n2,Émile Durand,\n".write(to: people, atomically: true, encoding: .utf8)
+                csv.use(people)
+                _ = await eventually(timeout: 5) { csv.runButton.isEnabled }
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "csv-import-\(suffix)")
+                csv.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
 
                 // Settings, every pane.
                 let settings = SettingsWindowController(model: model)

@@ -28,6 +28,9 @@ enum ToolFixtures {
         return PickerNode.databases(["crm", "shop", "empty_one"], tables: rows)
     }
 
+    static let customerColumns: [(name: String, type: String)] = [("id", "int(11)"), ("name", "varchar(100)"), ("email", "varchar(255)"),
+                                                                  ("this_column_name_is_long_enough_to_need_an_ellipsis_in_the_sheet", "text")]
+
     static var local: SavedConnection {
         var connection = Fixtures.local
         connection.database = "shop"
@@ -164,6 +167,31 @@ extension AppTests {
             // A read-only connection can't be copied to.
             _ = await call(harness, "set", ["id": "copy.target", "value": "Locked"])
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("read-only") == true)
+        }
+
+        @Test func theCSVSheetMapsFieldsByNameAndShowsASample() async throws {
+            let (main, harness) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            sheet.show(columns: ToolFixtures.customerColumns)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the CSV file first")
+            let file = URL(fileURLWithPath: try scratch() + "/people.csv")
+            try "Email;NAME;phone\nada@example.com;Ada Lovelace;\n".write(to: file, atomically: true, encoding: .utf8)
+            sheet.use(file)
+            _ = await eventually(timeout: 5) { sheet.runButton.isEnabled }
+            // By name, whatever the case; the separator guessed; a column without a field keeps its default.
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            #expect(await Self.text(harness, "csv.map.name") == "NAME (field 2)")
+            #expect(await Self.text(harness, "csv.map.email") == "Email (field 1)")
+            #expect(await Self.text(harness, "csv.map.id") == "Leave out (its default)")
+            #expect(await Self.text(harness, "csv.separator") == "Semicolon")
+            #expect(await Self.text(harness, "csv.sample.name") == "Ada Lovelace")
+            _ = await call(harness, "set", ["id": "csv.map.name", "value": "Leave out (its default)"])
+            _ = await call(harness, "set", ["id": "csv.map.email", "value": "Leave out (its default)"])
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the field at least one column takes")
         }
 
         @Test func thePickerTicksWithAClickADoubleClickSpaceAndItsMenu() async throws {
