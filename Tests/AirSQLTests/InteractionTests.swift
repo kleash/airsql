@@ -252,6 +252,22 @@ extension AppTests {
                     // In Record View now (the double-click), so without Display As.
                     menu: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Value Panel"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Value Panel"]),
+            // View As ▸ Tree: the result's first row, an object (so Copy, of a value, is off).
+            Surface(name: "JSON tree",
+                    place: { main, _ in
+                        guard let viewer = resultViewer(main) else { return nil }
+                        viewer.present(.tree)
+                        try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the editor and results take their share
+                        main.window?.layoutIfNeeded()
+                        guard let tree = find(JSONTreeView.self, in: viewer) else { return nil }
+                        return windowPoint(tree.outline.rect(ofRow: 1), in: tree.outline)
+                    },
+                    clicked: { main in resultViewer(main).flatMap { find(JSONTreeView.self, in: $0) }?.outline.selectedRow == 1 },
+                    doubleClicked: { main, _ in
+                        guard let outline = resultViewer(main).flatMap({ find(JSONTreeView.self, in: $0) })?.outline else { return false }
+                        return outline.isItemExpanded(outline.item(atRow: 1))
+                    },
+                    menu: ["Copy", "Expand All", "Collapse All"], enabled: ["Expand All", "Collapse All"]),
             Surface(name: "Status bar: route",
                     place: { main, _ in statusItem(main.statusBar.route) },
                     clicked: { $0.statusBar.route.shown?.isShown == true },
@@ -282,6 +298,19 @@ extension AppTests {
                     clicked: { _ in true },
                     doubleClicked: { _, received in received.contains("showSQLLog(_:)") },
                     menu: ["SQL Log", "Clear SQL Log"], enabled: ["SQL Log"]),
+            Surface(name: "Status bar: grid",
+                    place: { main, _ in
+                        guard let viewer = resultViewer(main) else { return nil }
+                        viewer.grid.selection.select(GridPosition(row: 1, column: 1))
+                        viewer.status.update()
+                        main.refresh()
+                        main.window?.layoutIfNeeded()
+                        let position = viewer.status.position
+                        return position.isHiddenOrHasHiddenAncestor ? nil : windowPoint(position.bounds, in: position)
+                    },
+                    clicked: { _ in true },
+                    doubleClicked: { _, _ in true },
+                    menu: ["Copy"], enabled: ["Copy"]),
             Surface(name: "Agent tab statement",
                     place: { main, _ in
                         main.model.data.settings.agentsAllowed = false  // this row's service opens no socket
@@ -332,9 +361,10 @@ extension AppTests {
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
         nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Table rows: cell",
                                        "Table rows: column header", "Grid cell", "Editable result cell", "Grid column header", "Grid row number",
-                                       "Status bar: route",
+                                       "JSON tree", "Status bar: route",
                                        "Status bar: server", "Status bar: transaction",
-                                       "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Agent tab statement",
+                                       "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Status bar: grid",
+                                       "Agent tab statement",
                                        "Database in the tree",
                                        "Table or view in the tree", "Routine, trigger or event", "Folder or category in the tree",
                                        "Table in the database view", "Process list row"]

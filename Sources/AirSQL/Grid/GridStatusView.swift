@@ -123,6 +123,31 @@ final class GridStatusView: NSStackView {
     /// The width of parts side by side.
     private func span(_ widths: [CGFloat]) -> CGFloat { widths.reduce(0, +) + spacing * CGFloat(max(0, widths.count - 1)) }
 
+    /// A right-click: Copy what the status says, then the host's actions shown beside it (Count Exactly, Load More).
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu(title: "Grid Status")
+        let copy = Commands.copy.item()
+        copy.target = self
+        copy.toolTip = "Copy what the grid's status says"
+        menu.addItem(copy)
+        let links = arrangedSubviews.compactMap { $0 as? NSButton }.filter { $0 !== figure && !$0.isHidden && $0.action != nil }
+        if !links.isEmpty { menu.addItem(.separator()) }
+        for link in links {
+            // As the menu bar has it ("Count Rows Exactly"), with its shortcut.
+            let item = Commands.all.first { $0.action == link.action }?.item() ?? NSMenuItem(title: link.title, action: link.action, keyEquivalent: "")
+            item.target = link.target
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    /// The menu's Copy: the rows, the position and the figure, as shown.
+    @objc func copy(_ sender: Any?) {
+        let parts = [rows, position].filter { !$0.isHidden }.map(\.stringValue) + (figure.isHidden ? [] : [figure.title])
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(parts.filter { !$0.isEmpty }.joined(separator: " · "), forType: .string)
+    }
+
     /// The figure shown now, as plain text for the clipboard.
     var copyText: String? {
         guard let aggregate else { return nil }

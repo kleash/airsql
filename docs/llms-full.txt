@@ -862,7 +862,7 @@ selected, and one figure for them: their sum, or their count when they aren't nu
 all (count, sum, average, smallest, largest, median, distinct values) and choose the one shown. Sums of decimals are
 exact. **Edit ▸ Copy Selection Summary** (⇧⌘C) copies every figure. Selections of more than 100,000 cells aren't added
 up. In a narrow window the figure, then the focused cell, make way for the rest; a table's row count and its **Count
-Exactly**, **Load More** and **Load All** stay.
+Exactly**, **Load More** and **Load All** stay. Right-click them to copy what they say, or to count or load rows.
 
 ## Move around
 
@@ -923,7 +923,8 @@ copying and editing use the stored value.
 
 - **View ▸ View As ▸ Text** shows the rows as text in the copy format (**Edit ▸ Copy As**: TSV at first, or CSV, JSON,
   Markdown, SQL INSERT…), with the column names; **Tree** shows them as JSON, a row per item, with JSON columns opened
-  up. **Table** goes back. Both show the first 10,000 rows.
+  up. **Table** goes back. Both show the first 10,000 rows. In a tree (here or in the value panel), double-click an
+  object or array to open or close it; right-click to copy a value or to open or close every one.
 - **View ▸ Chart** draws the rows as a bar, line, area, pie, scatter or histogram chart of a number column, by another
   column. Choose the kind and columns above the chart; point at it to read a value. Bars add up the values of each
   label and show the first 30 labels; a pie shows eight slices and puts the rest in **Other**. **Save as PNG…** saves
