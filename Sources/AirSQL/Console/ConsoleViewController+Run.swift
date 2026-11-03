@@ -86,8 +86,16 @@ extension ConsoleViewController {
         updateRunning()
         guard let session = run.session else { return }
         Task { [weak self] in
-            if case .unsafe(let reason)? = try? await session.cancel() {
-                self?.note(.warning, "AirSQL couldn't stop the statement safely: \(reason) Disconnect to stop it.")
+            let result = try? await session.cancel()
+            guard let self else { return }
+            switch result {
+            case .unsafe(let reason):
+                self.note(.warning, "AirSQL couldn't stop the statement safely: \(reason) Disconnect to stop it.")
+            case .notRunning where self.running === run:
+                self.note(.warning, "AirSQL couldn't find the statement to stop: it may be starting or between "
+                    + "statements. If it keeps going, disconnect to stop it.")
+            default:
+                break
             }
         }
     }

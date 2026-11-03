@@ -34,9 +34,10 @@ public final class ResultSetSource: GridSource {
         return .text(String(text.prefix(Self.shownLimit)) + "…")
     }
 
-    /// The whole value, for copying: nil for NULL.
+    /// The whole value, for copying and export: nil for NULL. Unlike the cell on screen, a BINARY or BLOB value is its
+    /// whole hex, not cut to 256 bytes, so ⌘C and export don't shorten it.
     public func value(_ row: Int, _ column: Int) -> String? {
-        store.isNull(row, column) ? nil : store.display(row, column) ?? ""
+        store.isNull(row, column) ? nil : store.display(row, column, binaryBytes: .max) ?? ""
     }
 }
 
