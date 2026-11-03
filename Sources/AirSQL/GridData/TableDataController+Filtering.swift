@@ -41,6 +41,7 @@ extension TableDataController {
         source.filter = serverFilter
         guard !refusesOnReadOnly(source) else {
             source.filter = before
+            updateBars()
             return
         }
         if loading == nil { loadRows(more: false) } else { reloadWhenDone = true }
@@ -49,15 +50,14 @@ extension TableDataController {
     /// On a read-only connection, whether the read-only check refuses the rows' SELECT with its filter, as the console
     /// refuses what it can't prove only reads: a typed condition can hold a subquery that locks or a function with side
     /// effects. It checks the whole SELECT as the data session reads it (its NO_BACKSLASH_ESCAPES); the ORDER BY is built
-    /// from column names. The notice says why until rows load again. A refused filter never becomes the source's, so no
-    /// statement of the tab (count, summary, export) sends it.
+    /// from column names. The notice says why (`problem`) until rows load again. A refused filter never stays the
+    /// source's, so no statement of the tab (count, summary, export) sends it.
     func refusesOnReadOnly(_ source: TableDataSource) -> Bool {
         guard context.connection.readOnly, !source.filter.isEmpty,
               let refusal = StatementCheck.readOnlyRefusal(source.pageSQL(offset: 0, limit: rowsPerPage),
                                                             on: context.connection.displayName,
                                                             noBackslashEscapes: noBackslashEscapes) else { return false }
         problem = refusal
-        updateBars()
         return true
     }
 

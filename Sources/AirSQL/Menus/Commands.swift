@@ -124,6 +124,7 @@ import AppKit
     @objc optional func extendSelection(_ sender: Any?)
     @objc optional func shrinkSelection(_ sender: Any?)
     @objc optional func displayAs(_ sender: Any?)
+    @objc optional func displayTimeZone(_ sender: Any?)
     @objc optional func exportRows(_ sender: Any?)
 
     // Database (the navigator and editors)
@@ -528,6 +529,8 @@ enum Commands {
                                 tip: "Keep the columns up to this one in view while scrolling sideways")
     static let displayAs = Command("Display As", #selector(AirSQLActions.displayAs(_:)),
                                    tip: "Show this column's values another way: hex, UUID, date from a Unix time…")
+    static let displayZone = Command("Time Zone", #selector(AirSQLActions.displayTimeZone(_:)),
+                                     tip: "Show this column's dates and times moved from UTC to this Mac's time zone, or back")
     static let exportRows = Command("Export Rows…", #selector(AirSQLActions.exportRows(_:)),
                                     tip: "Save the selected or loaded rows, or all of them, to a file")
 
@@ -682,7 +685,7 @@ enum Commands {
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
+        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
@@ -720,6 +723,8 @@ enum Commands {
         "Quick Filter": quickFilter.tip,
         "Sort": "Sort the rows by this column, or show them in the table's own order",
         "Display As": displayAs.tip,
+        "Decimal Places": "Round this number column's values to some decimal places, grouped by thousands",
+        "Time Zone": displayZone.tip,
         "Maintenance": maintenance.tip,
         "New Object": "Write a new view, procedure, function, trigger or event as its CREATE statement",
         "Colour": colour.tip,

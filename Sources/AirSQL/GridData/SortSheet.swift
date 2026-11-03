@@ -102,10 +102,14 @@ final class SortSheet: NSWindowController {
     private func symbolButton(_ symbol: String, id: String, tip: String, action: Selector) -> NSButton {
         let button = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: tip) ?? NSImage(), target: self,
                               action: action)
-        button.bezelStyle = .rounded
+        button.title = ""
+        button.imagePosition = .imageOnly
+        button.isBordered = false
+        button.contentTintColor = .secondaryLabelColor
         button.toolTip = tip
         button.setAccessibilityIdentifier(id)
         button.setAccessibilityLabel(tip)
+        button.widthAnchor.constraint(equalToConstant: 22).isActive = true
         return button
     }
 

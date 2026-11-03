@@ -85,7 +85,7 @@ enum QuickFilter {
         let choices = focus.column.kind == .binary ? Array(typed.prefix(2)) : typed
         let alert = NSAlert()
         alert.messageText = "Filter by \(focus.column.name)"
-        alert.informativeText = "Show only the rows whose \(focus.column.name) compares so with the value you type."
+        alert.informativeText = "Choose how \(focus.column.name) compares with the value, type the value, and press Filter."
         let pick = popup(choices.map(\.title), selected: 0, id: "quickFilter.operator",
                          tip: "Choose how the column's values compare with the value", target: nil, action: nil)
         let field = textField(focus.value ?? "", placeholder: focus.column.kind == .binary ? "0x00FF" : "Value",

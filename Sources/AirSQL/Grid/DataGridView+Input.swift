@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 // Clicks and keys on the cells (grid-spec §2, plan §2.12): a click selects the cell, ⇧ extends, ⌘ adds, a drag selects
-// a block, a double click or Return or typing edits in place, a right click asks the delegate for the menu. Keys arrive
+// a block, a double click, Return, F2 or typing edits in place, a right click asks the delegate for the menu. Keys arrive
 // as AppKit's standard commands (interpretKeyEvents), so people's own key bindings apply.
 extension DataGridView {
     /// Takes the keyboard for a click: false while an editor keeps it, its value refused (the cell's editor or the
@@ -72,9 +72,13 @@ extension DataGridView {
     }
 
     override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.function, .numericPad])
         // ⇧↩ is Value Panel's shortcut (menus take only ⌘ and ⌃ keys).
-        if [36, 76].contains(event.keyCode), event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .shift {
+        if [36, 76].contains(event.keyCode), flags == .shift {
             sendCommand(Commands.valuePanel.action)
+        } else if event.specialKey == .f2, flags.isEmpty, let cursor = selection.cursor {
+            // F2 edits the focused cell, as in HeidiSQL; one that can't be edited shows its value, as a double click does.
+            if canEdit(cursor) { beginEditing(at: cursor) } else { delegate?.dataGridOpenValue(self) }
         } else {
             interpretKeyEvents([event])
         }

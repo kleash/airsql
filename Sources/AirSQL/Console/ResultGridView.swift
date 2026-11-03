@@ -4,8 +4,9 @@ import AppKit
 /// A result tab's rows in the data grid (plan §2.5's embedding API: a `ResultSetSource` over the statement's
 /// `ResultStore`, or a `DiffSource` for a compared result), in a `GridViewer` (the status bar's figures, the value panel,
 /// Record View, the grids' copy formats, columns kept per query). The headers' sort controls sort the rows here (⌥ adds
-/// a column), asking first above 100,000 rows; Export Rows… saves them. A console's result of a SELECT is a
-/// `ResultEditSource`, editable when its tables' keys are in it (`ResultGridView+Editing`); the rest are read-only.
+/// a column), asking first above 100,000 rows; the filter bar's conditions and search filter them here too
+/// (`ResultFilterBar`); Export Rows… saves them. A console's result of a SELECT is a `ResultEditSource`, editable when
+/// its tables' keys are in it (`ResultGridView+Editing`); the rest are read-only.
 @MainActor
 final class ResultGridView: NSView, DataGridViewDelegate {
     let viewer: GridViewer
@@ -15,6 +16,9 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     let rows: ReorderedSource
     /// The table the rows come from, for the SQL formats and the export's name.
     private let table: (database: String?, name: String)
+    /// The bar over the rows, and its conditions on the source's columns (ANDed).
+    let filterBar = ResultFilterBar()
+    var conditions: [(column: Int, condition: GridCondition)] = []
     /// Editing a console result: the connection it was run on (nil: not connected), the app (for Settings ▸ Safety),
     /// whether the console has a transaction open, and the data session's sql_mode and time zone once read.
     var editingContext: EditorContext?
@@ -52,10 +56,26 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         // ⌘C with nothing selected copies the whole result.
         viewer.copiesEverything = true
         viewer.show(rows, transposed: transposed)
+        viewer.filterByValue = { [weak self] column, value in
+            guard let self else { return }
+            self.filter(column, by: GridCondition(self.source.columns[column], .equals, [value]), adding: true)
+        }
         grid.setAccessibilityLabel("Result rows")
+        filterBar.owner = self
+        filterBar.show([], shown: source.rowCount, of: source.rowCount)
+        // The filter bar shows while a filter or a search is on (⇧⌘E opens it), and an edited result's notice while its
+        // changes wait; hidden, they take no room.
+        let bars = NSStackView(views: [filterBar, notice])
+        bars.orientation = .vertical
+        bars.spacing = 0
+        bars.translatesAutoresizingMaskIntoConstraints = false
+        for bar in [filterBar, notice] as [NSView] { bar.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true }
+        filterBar.isHidden = true
+        notice.owner = self
+        addSubview(bars)
         addSubview(viewer)
         viewer.translatesAutoresizingMaskIntoConstraints = false
-        var top = topAnchor, gap: CGFloat = 0
+        var top = topAnchor
         if let legend {
             let line = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
             line.attributedStringValue = legend.text
@@ -67,27 +87,17 @@ final class ResultGridView: NSView, DataGridViewDelegate {
                 line.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
                 line.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
             ])
-            (top, gap) = (line.bottomAnchor, 5)
+            top = line.bottomAnchor
         }
         if source is ResultEditSource {
-            // The notice takes no room while hidden (a stack leaves hidden views out).
-            let bars = NSStackView(views: [notice])
-            bars.orientation = .vertical
-            bars.translatesAutoresizingMaskIntoConstraints = false
-            notice.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true
-            notice.owner = self
-            addSubview(bars)
-            NSLayoutConstraint.activate([
-                bars.topAnchor.constraint(equalTo: top, constant: gap), bars.leadingAnchor.constraint(equalTo: leadingAnchor),
-                bars.trailingAnchor.constraint(equalTo: trailingAnchor),
-            ])
-            (top, gap) = (bars.bottomAnchor, 0)
             editState.setAccessibilityIdentifier("result.editState")
             editState.isHidden = true
             viewer.status.insertView(editState, at: 0, in: .leading)
         }
         NSLayoutConstraint.activate([
-            viewer.topAnchor.constraint(equalTo: top, constant: gap),
+            bars.topAnchor.constraint(equalTo: top, constant: legend == nil ? 0 : 5),
+            bars.leadingAnchor.constraint(equalTo: leadingAnchor), bars.trailingAnchor.constraint(equalTo: trailingAnchor),
+            viewer.topAnchor.constraint(equalTo: bars.bottomAnchor),
             viewer.leadingAnchor.constraint(equalTo: leadingAnchor), viewer.trailingAnchor.constraint(equalTo: trailingAnchor),
             viewer.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
@@ -96,14 +106,25 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
-        if case .column = target { return nil }
         let menu = NSMenu(title: "Result")
-        if edits?.editing?.isEditable == true {
-            menu.add([Commands.setNull, nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
-                     Commands.previewChanges, Commands.apply, nil])
+        let editable = edits?.editing?.isEditable == true
+        switch target {
+        case .column:
+            menu.add([Commands.sortAscending, Commands.sortDescending, Commands.sortColumns, Commands.clearSort, nil,
+                      Commands.filterByValues, Commands.clearFilter])
+        case .cells:
+            menu.addItem(quickFilterItem())
+            menu.add([Commands.clearFilter, nil])
+            if editable {
+                menu.add([Commands.setNull, nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
+                         Commands.previewChanges, Commands.apply, nil])
+            }
+            menu.add([Commands.exportRows])
+        case .row:
+            if editable { menu.add((edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil]) }
+            menu.add([Commands.exportRows])
         }
-        menu.add([Commands.exportRows])
-        menu.items.forEach { $0.target = self }
+        for item in menu.items + menu.items.compactMap(\.submenu).flatMap(\.items) where item.target == nil { item.target = self }
         return menu
     }
 
@@ -137,12 +158,10 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         }
     }
 
-    /// Shows the rows sorted by `keys` (none: as they came).
+    /// Shows the rows sorted by `keys` (none: as they came), filtered as they are.
     func sortRows(_ keys: [DataGridView.Sort]) {
-        rows.order = keys.isEmpty ? nil : GridSorting.sorted(Array(0..<source.rowCount), by: keys.map { ($0.column, $0.ascending) },
-                                                             columns: source.columns) { source.value($0, $1) }
         grid.sortOrder = keys
-        viewer.reloadData()
+        reorder()
     }
 
     /// Export Rows… (and the result tab's Export Result…): the selected rows or every row of the result.

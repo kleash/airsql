@@ -2,8 +2,8 @@ import AirSQLCore
 import AppKit
 
 /// Filter by Values… (grid-spec §4): a column's values within the current filter, each with its count, worked out on
-/// the server (the 1,000 most frequent); tick the ones to show, as in a spreadsheet. OK adds `column IN (…)` to the
-/// filter.
+/// the server for a table (the 1,000 most frequent), from the rows shown for a console result; tick the ones to show,
+/// as in a spreadsheet. OK adds `column IN (…)` to the filter.
 @MainActor
 final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
     static let limit = 1_000
@@ -15,16 +15,19 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
     private var shown: [Int] = []
     private let table = NSTableView()
     private let search = NSSearchField()
-    private let note = label("Counting the values on the server…", font: .systemFont(ofSize: NSFont.smallSystemFontSize),
+    private let note = label("Counting the values…", font: .systemFont(ofSize: NSFont.smallSystemFontSize),
                              color: .secondaryLabelColor, truncates: true)
+    /// Where the values were counted, for the note under them.
+    private var place = "on the server within the current filter"
     private let spinner = NSProgressIndicator()
     private var okButton: NSButton!
     private var retainUntilClosed: FilterByValuesSheet?
 
-    /// Shows the sheet for `column` and reads its values with `read` (rows of value and count).
-    static func show(column: GridColumn, table: String, on window: NSWindow, read: @escaping () async throws -> [[String?]],
-                     completion: @escaping (GridCondition?) -> Void) {
+    /// Shows the sheet for `column` and reads its values with `read` (rows of value and count); `onServer` says where.
+    static func show(column: GridColumn, table: String, onServer: Bool = true, on window: NSWindow,
+                     read: @escaping () async throws -> [[String?]], completion: @escaping (GridCondition?) -> Void) {
         let sheet = FilterByValuesSheet(column: column, table: table, completion: completion)
+        if !onServer { sheet.place = "in the rows shown" }
         sheet.retainUntilClosed = sheet
         window.beginSheet(sheet.window!)
         Task {
@@ -104,7 +107,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         filter()
         spinner.stopAnimation(nil)
         let more = rows.count >= Self.limit ? " (the \(Self.limit.formatted()) most frequent)" : ""
-        note.stringValue = "\(rows.count.formatted()) values\(more), counted on the server within the current filter"
+        note.stringValue = "\(rows.count.formatted()) values\(more), counted \(place)"
         okButton.isEnabled = true
     }
 

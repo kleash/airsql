@@ -26,23 +26,32 @@ The chip at the left of the grid bar always says where filtering runs: **On serv
 not) or **Local** (only the rows loaded so far, at once, with no query).
 
 - **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
-  fine. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last 20 filters; the ⓧ, or
-  **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next time the table opens.
-  On a read-only connection, the whole SELECT must pass the [read-only check](read-only-queries.md): a condition that
-  calls a function such as `SLEEP` or `GET_LOCK` isn't sent, and the bar under it says why.
+  fine. It is coloured as SQL, as in the console, and the field grows as the condition wraps, up to eight lines (then
+  it scrolls); ⌥↩ starts a new line. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last
+  20 filters; the ⓧ, or **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next
+  time the table opens. On a read-only connection, the whole SELECT must pass the
+  [read-only check](read-only-queries.md): a condition that calls a function such as `SLEEP` or `GET_LOCK` isn't sent,
+  and the bar under it says why. The **?** at the bar's end opens [Read the data in a grid](data-grid.md).
 - **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
   `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
   loaded rows instead.
 - **Quick Filter**: right-click a cell for `=`, `<>`, `<`, `>`, `LIKE` (starts with, ends with, contains), `IS NULL` and
   `IS NOT NULL` with its value, and `IN` / `NOT IN` with every value selected in its column. Each item shows its SQL.
-  Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. ⌃⌘1 and ⌃⌘2
+  Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. **Data ▸ Quick
+  Filter** has the same conditions by name (Less Than Selection, Contains Selection, In Selected Values…); ⌃⌘1 and ⌃⌘2
   filter by the focused cell's value, equal and not equal.
-- **Filter by Values…** (a column header's menu): the column's values with how many rows have each, counted on the
-  server within the current filter (the 1,000 most frequent). Tick the ones to show. In **Column Summary…**, a click on
-  one of a column's most frequent values adds it to the filter.
+- **Type a Value…** (in both Quick Filter menus) asks for the value: choose how to compare (`=`, `<>`, `<`, `>`, starts
+  with, contains, ends with), type the value, and press **Filter**. Tick **Add to the current filter** to keep the
+  filter there is and add the condition with `AND`.
+- **Filter by Values…** (**Data ▸ Filter by Values…**, or a column header's menu): the column's values with how many
+  rows have each, counted on the server within the current filter (the 1,000 most frequent). Tick the ones to show. In
+  **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
 - **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
-  to add the column to the sort. Rows sort on the server. On a table of over a million rows, sorting by a column without
-  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here instead.
+  to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
+  column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
+  and the minus takes it away. Rows sort on the server. On a table of over a million rows, sorting by a column without
+  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here
+  instead.
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
@@ -52,8 +61,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 
 Nothing is written until you apply. Leaving a row writes nothing.
 
-- **Edit a cell**: type over it, double-click it or press Return. Return keeps the edit, Esc cancels, Tab moves to
-  the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
+- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). Return keeps the edit, Esc
+  cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
   the same way.
 - **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
   number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't

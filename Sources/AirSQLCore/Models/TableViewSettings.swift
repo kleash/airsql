@@ -24,6 +24,8 @@ public struct TableViewSettings: Codable, Equatable {
     public var widths: [String: Double] = [:]
     /// Display types by column name (the grid names them: "uuid", "hex", "unixTime"…).
     public var displayTypes: [String: String] = [:]
+    /// The time zones date columns are shown in, by column name ("utcToLocal", "localToUTC").
+    public var displayZones: [String: String] = [:]
     /// The columns' order on screen, by name, as last arranged (hidden ones too); [] for the table's own order.
     public var order: [String] = []
     /// How many columns, from the first shown, stay in view while the grid scrolls across (Freeze).
@@ -56,6 +58,7 @@ public struct TableViewSettings: Codable, Equatable {
         hiddenColumns = try container.decodeIfPresent([String].self, forKey: .hiddenColumns) ?? []
         widths = try container.decodeIfPresent([String: Double].self, forKey: .widths) ?? [:]
         displayTypes = try container.decodeIfPresent([String: String].self, forKey: .displayTypes) ?? [:]
+        displayZones = try container.decodeIfPresent([String: String].self, forKey: .displayZones) ?? [:]
         order = try container.decodeIfPresent([String].self, forKey: .order) ?? []
         frozenColumns = try container.decodeIfPresent(Int.self, forKey: .frozenColumns) ?? 0
         virtualKeys = try container.decodeIfPresent([SchemaForeignKey].self, forKey: .virtualKeys) ?? []

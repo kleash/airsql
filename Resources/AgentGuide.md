@@ -180,23 +180,29 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
   helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
   history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
-- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (a value its column refuses
-  keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it was); the status bar's `grid.rows`,
+- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (Return or F2 opens it on the
+  focused cell; a value its column refuses keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it
+  was); the status bar's `grid.rows`,
   `grid.position`, `grid.figure`; the value panel `valuePanel` (`valuePanel.mode`, `valuePanel.text`, `valuePanel.tree`,
   `valuePanel.image`, `valuePanel.actions`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
   edit, Esc puts it back; Load from File… and Save to File… are the person's); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
   `grid.chart` (`chart.kind`, `chart.x`, `chart.y`); Column List `columnList.search`, `columnList.table`; Column
-  Summary `columnSummary` (in a table tab, a `columnSummary.value` filters by it); Go to Row `goToRow.text`.
+  Summary `columnSummary` (a `columnSummary.value` filters by it); Go to Row `goToRow.text`. A console result filters
+  its own rows (Data ▸ Quick Filter, Filter by Values…, Sort by Columns…, Search All Columns): its bar
+  `result.filterBar`, shown while a filter or search is on, has `result.scope`, `result.filter` (the conditions as SQL),
+  `result.clearFilter` and `result.search` (Return searches).
 - **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
-  preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition,
-  Return applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
+  preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition:
+  set it, then key `return` applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
   `tableData.busy`; the notice `tableData.notice` (`tableData.noticeText`, `tableData.preview`, `tableData.revert`,
   `tableData.apply`: Apply opens the SQL preview, whose Run is the person's); the status bar's `tableData.count`,
   `tableData.loadMore`, `tableData.loadAll`; find bar (⌘F) `find.text`, `find.replaceText`, `find.options`,
   `find.previous`, `find.next`, `find.count`, `find.replace`, `find.replaceAll`, `find.done`; Export Rows `export.rows`,
   `export.format`, `export.headers`, `export.null`, `export.crlf`, `export.copy`, `export.save` (the person's),
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
-  `values.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
+  `values.cancel`; Data ▸ Quick Filter ▸ Type a Value… `quickFilter.operator`, `quickFilter.value`, `quickFilter.add`
+  (then press Filter); Data ▸ Sort by Columns… `sort.column.N`, `sort.direction.N`, `sort.up.N`, `sort.down.N`,
+  `sort.remove.N` (N from 0, the first sort column first), `sort.add`, `sort.ok`, `sort.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
   or a double-click on an ENUM cell shows its values as a menu; on a SET cell a checklist `grid.set` (`grid.set.member`
   checkboxes, `grid.set.done`, `grid.set.cancel`); on a foreign key cell the referenced rows `grid.lookup`
   (`grid.lookup.search`, `grid.lookup.rows`; Return picks); a one-column foreign key's cell shows the referenced row's

@@ -187,9 +187,10 @@ extension AppTests {
                     },
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultViewer(main)?.valuePanel != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Value Panel", "Record View", "Column Summary…",
-                           "Display As"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel",
+                           "Record View", "Column Summary…", "Display As"],
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Export Rows…", "Value Panel", "Record View",
+                              "Column Summary…"]),
             // A console result of one table with its key: a double-click edits the cell.
             Surface(name: "Editable result cell",
                     place: { main, _ in
@@ -213,11 +214,31 @@ extension AppTests {
                     },
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultGrid(main).editor != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Set NULL", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes",
-                           "Export Rows…", "Value Panel", "Record View", "Column Summary…", "Display As"],
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Delete Rows…", "Revert",
+                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Column Summary…", "Display As"],
                     // email is NOT NULL: Set NULL is off, saying so.
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Delete Rows…", "Export Rows…", "Value Panel", "Record View",
-                              "Column Summary…"]),
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Delete Rows…", "Export Rows…", "Value Panel",
+                              "Record View", "Column Summary…"]),
+            // A console result's header: its rows sort and filter here.
+            Surface(name: "Grid column header",
+                    place: { main, _ in
+                        let grid = resultGrid(main)
+                        try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the editor and results take their share
+                        grid.columnWidths[grid.columnOrder[1]] = 300
+                        main.window?.layoutIfNeeded()
+                        guard let header = grid.header else { return nil }
+                        let left = header.edges(1).left
+                        return windowPoint(NSRect(x: left + 10, y: 0, width: 20, height: header.bounds.height), in: header)
+                    },
+                    clicked: { main in resultGrid(main).selection.containsColumn(1) },
+                    doubleClicked: { main, _ in
+                        let grid = resultGrid(main)
+                        return grid.columnWidths[grid.columnOrder[1]] < 300
+                    },
+                    menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
+                           "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Display As"],
+                    enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
+                              "Column Summary…", "Hide Column", "Freeze", "Column List…"]),
             Surface(name: "Grid row number",
                     place: { main, _ in
                         let grid = resultGrid(main)
@@ -310,7 +331,8 @@ extension AppTests {
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
         nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Table rows: cell",
-                                       "Table rows: column header", "Grid cell", "Editable result cell", "Grid row number", "Status bar: route",
+                                       "Table rows: column header", "Grid cell", "Editable result cell", "Grid column header", "Grid row number",
+                                       "Status bar: route",
                                        "Status bar: server", "Status bar: transaction",
                                        "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Agent tab statement",
                                        "Database in the tree",

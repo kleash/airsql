@@ -410,6 +410,13 @@ nothing runs.
   warnings, or its error and the line it points to (that line is marked red beside the editor). Double-click a message
   to select its statement.
 - A result keeps at most its first 100,000 rows; the tab then says it is cut short.
+- **Filter, search and sort a result** on its rows, at once, without running the query again: right-click a cell for
+  **Quick Filter** (the same conditions as in a [table tab](https://kleash.github.io/airsql/table-data.html#filter-search-and-sort), Type a Value…
+  included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Sort by
+  Columns…**, or click a value in **Column Summary…**. **Data ▸ Search All Columns** (⇧⌘E) keeps the rows with the text
+  in any column and tints it. A bar over the rows shows while a filter or a search is on: **Local · 12 of 200 rows**,
+  the conditions as SQL, and the search; its ⓧ or **Data ▸ Clear Filter** shows every row again. Copy and Export Rows…
+  take the rows shown. The **?** at the right of the result tabs opens [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html).
 
 ### Edit a result
 
@@ -679,23 +686,32 @@ The chip at the left of the grid bar always says where filtering runs: **On serv
 not) or **Local** (only the rows loaded so far, at once, with no query).
 
 - **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
-  fine. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last 20 filters; the ⓧ, or
-  **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next time the table opens.
-  On a read-only connection, the whole SELECT must pass the [read-only check](https://kleash.github.io/airsql/read-only-queries.html): a condition that
-  calls a function such as `SLEEP` or `GET_LOCK` isn't sent, and the bar under it says why.
+  fine. It is coloured as SQL, as in the console, and the field grows as the condition wraps, up to eight lines (then
+  it scrolls); ⌥↩ starts a new line. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last
+  20 filters; the ⓧ, or **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next
+  time the table opens. On a read-only connection, the whole SELECT must pass the
+  [read-only check](https://kleash.github.io/airsql/read-only-queries.html): a condition that calls a function such as `SLEEP` or `GET_LOCK` isn't sent,
+  and the bar under it says why. The **?** at the bar's end opens [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html).
 - **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
   `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
   loaded rows instead.
 - **Quick Filter**: right-click a cell for `=`, `<>`, `<`, `>`, `LIKE` (starts with, ends with, contains), `IS NULL` and
   `IS NOT NULL` with its value, and `IN` / `NOT IN` with every value selected in its column. Each item shows its SQL.
-  Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. ⌃⌘1 and ⌃⌘2
+  Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. **Data ▸ Quick
+  Filter** has the same conditions by name (Less Than Selection, Contains Selection, In Selected Values…); ⌃⌘1 and ⌃⌘2
   filter by the focused cell's value, equal and not equal.
-- **Filter by Values…** (a column header's menu): the column's values with how many rows have each, counted on the
-  server within the current filter (the 1,000 most frequent). Tick the ones to show. In **Column Summary…**, a click on
-  one of a column's most frequent values adds it to the filter.
+- **Type a Value…** (in both Quick Filter menus) asks for the value: choose how to compare (`=`, `<>`, `<`, `>`, starts
+  with, contains, ends with), type the value, and press **Filter**. Tick **Add to the current filter** to keep the
+  filter there is and add the condition with `AND`.
+- **Filter by Values…** (**Data ▸ Filter by Values…**, or a column header's menu): the column's values with how many
+  rows have each, counted on the server within the current filter (the 1,000 most frequent). Tick the ones to show. In
+  **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
 - **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
-  to add the column to the sort. Rows sort on the server. On a table of over a million rows, sorting by a column without
-  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here instead.
+  to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
+  column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
+  and the minus takes it away. Rows sort on the server. On a table of over a million rows, sorting by a column without
+  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here
+  instead.
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
@@ -705,8 +721,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 
 Nothing is written until you apply. Leaving a row writes nothing.
 
-- **Edit a cell**: type over it, double-click it or press Return. Return keeps the edit, Esc cancels, Tab moves to
-  the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
+- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). Return keeps the edit, Esc
+  cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
   the same way.
 - **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
   number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't
@@ -856,7 +872,8 @@ up.
 - **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
 - **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
-- Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
+- Drag a header to move its column, drag its right edge to resize it, and double-click the edge, or the header, to fit
+  its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the console, so they open as you left them.
 - **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
@@ -879,9 +896,15 @@ up.
 **Data ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
 copying and editing use the stored value.
 
-- Numbers: **Date from Unix Time** (seconds or milliseconds), in your time zone, or **Number with Grouping**.
+- Numbers: **Number with Grouping**; **Decimal Places ▸** rounds them (half up) to none, 1, 2, 3 or 4 decimal places,
+  grouped by thousands as your Mac groups them; or **Date from Unix Time** (seconds or milliseconds), in your time zone.
+- Dates: **Short**, **Medium** or **Long Date and Time**, as your Mac writes dates (System Settings ▸ General ▸ Language
+  & Region). A DATE column shows the date only. Zero dates, TIME and YEAR stay as stored.
+- **Time Zone ▸** (DATETIME and TIMESTAMP columns) moves the values: **From UTC to This Mac's** takes them as UTC and
+  shows them in your time zone; **From This Mac's to UTC** does the reverse. A TIMESTAMP arrives in the session's time
+  zone, so choose the first one when that is UTC. The header says so (`datetime as medium date, UTC → this Mac's`).
 - Bytes: **UUID** (for `binary(16)`), **Hex**, or **Text (UTF-8)**.
-- **As Stored** shows the value as the server sent it again.
+- **As Stored** shows the value as the server sent it again. AirSQL remembers each column's choice for each table.
 
 ## Colours
 
@@ -889,6 +912,8 @@ copying and editing use the stored value.
   A column with negative and positive numbers is red below zero and green above; one of only 0 and 1 marks the 1s.
   With everything selected (⌘A), every number column gets one. Choose it again to take it away.
 - **View ▸ Highlight Equal Values** tints every cell holding the focused cell's value.
+- What a colour marks is said too: with VoiceOver, a cell says **changed**, **added** or **removed** after its column's
+  name, for pending changes and for a comparison's rows, and a compared cell's help gives the other side's value.
 
 ## Text, tree and charts
 
@@ -1418,7 +1443,8 @@ the pointer over a menu item to see what it does. A greyed-out item says why it 
 Tab indents, ⌃⇥ moves on.
 
 F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar, else the tab shown
-(a console that isn't saved in a file). In a grid, F2 is the grid's.
+(a console that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
+edited (a console result's) shows its value in the value panel.
 
 The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delete.
 
@@ -1804,23 +1830,29 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
   helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
   history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
-- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (a value its column refuses
-  keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it was); the status bar's `grid.rows`,
+- **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (Return or F2 opens it on the
+  focused cell; a value its column refuses keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it
+  was); the status bar's `grid.rows`,
   `grid.position`, `grid.figure`; the value panel `valuePanel` (`valuePanel.mode`, `valuePanel.text`, `valuePanel.tree`,
   `valuePanel.image`, `valuePanel.actions`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
   edit, Esc puts it back; Load from File… and Save to File… are the person's); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
   `grid.chart` (`chart.kind`, `chart.x`, `chart.y`); Column List `columnList.search`, `columnList.table`; Column
-  Summary `columnSummary` (in a table tab, a `columnSummary.value` filters by it); Go to Row `goToRow.text`.
+  Summary `columnSummary` (a `columnSummary.value` filters by it); Go to Row `goToRow.text`. A console result filters
+  its own rows (Data ▸ Quick Filter, Filter by Values…, Sort by Columns…, Search All Columns): its bar
+  `result.filterBar`, shown while a filter or search is on, has `result.scope`, `result.filter` (the conditions as SQL),
+  `result.clearFilter` and `result.search` (Return searches).
 - **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
-  preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition,
-  Return applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
+  preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition:
+  set it, then key `return` applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
   `tableData.busy`; the notice `tableData.notice` (`tableData.noticeText`, `tableData.preview`, `tableData.revert`,
   `tableData.apply`: Apply opens the SQL preview, whose Run is the person's); the status bar's `tableData.count`,
   `tableData.loadMore`, `tableData.loadAll`; find bar (⌘F) `find.text`, `find.replaceText`, `find.options`,
   `find.previous`, `find.next`, `find.count`, `find.replace`, `find.replaceAll`, `find.done`; Export Rows `export.rows`,
   `export.format`, `export.headers`, `export.null`, `export.crlf`, `export.copy`, `export.save` (the person's),
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
-  `values.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
+  `values.cancel`; Data ▸ Quick Filter ▸ Type a Value… `quickFilter.operator`, `quickFilter.value`, `quickFilter.add`
+  (then press Filter); Data ▸ Sort by Columns… `sort.column.N`, `sort.direction.N`, `sort.up.N`, `sort.down.N`,
+  `sort.remove.N` (N from 0, the first sort column first), `sort.add`, `sort.ok`, `sort.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
   or a double-click on an ENUM cell shows its values as a menu; on a SET cell a checklist `grid.set` (`grid.set.member`
   checkboxes, `grid.set.done`, `grid.set.cancel`); on a foreign key cell the referenced rows `grid.lookup`
   (`grid.lookup.search`, `grid.lookup.rows`; Return picks); a one-column foreign key's cell shows the referenced row's

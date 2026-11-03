@@ -127,6 +127,8 @@ extension AppTests {
             #expect(tab.bar.scope.text == "On server · all rows" && tab.viewer.status.rows.stringValue == "3 rows")
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)
             #expect(tab.notice.isHidden && !tab.isEdited && main.selectedTab?.title == "orders")
+            // The bar's ? opens the Data Grid page of the help.
+            #expect(find(NSButton.self, id: "help", in: tab.bar)?.identifier?.rawValue == "help:" + HelpPage.dataGrid.rawValue)
 
             tab.applyFilter("WHERE region = 'EU'")
             await ready { tab.loading != nil }
@@ -402,6 +404,73 @@ extension AppTests {
             #expect(words == ["customer_id", "CURDATE()"])
         }
 
+        /// A console result filters, searches and sorts its own rows, as a table tab's loaded rows, with no query.
+        @Test func consoleResultsFilterSearchAndSortTheirRows() async throws {
+            let (main, harness) = appWindow(testModel(Fixtures.shop))
+            let viewer = try #require(resultViewer(main))
+            let result = try #require(viewer.superview as? ResultGridView)
+            let window = try #require(main.window)
+            try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the console's editor took the focus
+            window.makeFirstResponder(viewer.grid)
+            // The bar shows only while a filter or a search is on; the results bar's ? opens the Data Grid page.
+            #expect(result.filterBar.isHidden && result.filterBar.scope.text == "Local · every row")
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(!console.results.help.isHidden && console.results.help.identifier?.rawValue == "help:" + HelpPage.dataGrid.rawValue)
+            viewer.grid.selection.select(GridPosition(row: 1, column: 3))
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Greater Than Selection"]).error == nil)
+            #expect(viewer.grid.rowCount == 1 && result.rows.value(0, 3) == "318" && !result.filterBar.isHidden)
+            #expect(result.filterBar.scope.text == "Local · 1 of 5 rows" && result.filterBar.conditionsText.stringValue == "`orders` > 317")
+            window.makeFirstResponder(viewer.grid)
+            // A value typed in, added: no row has both.
+            viewer.grid.selection.select(GridPosition(row: 0, column: 1))
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Type a Value…"]).error == nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(await call(harness, "set", ["id": "quickFilter.value", "value": "Ama Mensah"]).error == nil)
+            #expect(await call(harness, "set", ["id": "quickFilter.add", "value": true]).error == nil)
+            #expect(await call(harness, "press", ["title": "Filter", "in": "sheet"]).error == nil)
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(viewer.grid.rowCount == 0 && result.conditions.count == 2)
+
+            // The search keeps the rows holding its text, tinted, and the sort orders them.
+            result.clearFilter(nil)
+            #expect(viewer.grid.rowCount == 5 && result.filterBar.isHidden)
+            #expect(await call(harness, "menu", ["path": "Data > Search All Columns"]).error == nil)
+            #expect(!result.filterBar.isHidden && result.filterBar.searchField.currentEditor() != nil)
+            result.filterBar.searchField.stringValue = "or"
+            result.reorder()
+            let found = (0..<viewer.grid.rowCount).map { result.rows.value($0, 1) ?? "" }
+            #expect(found == ["Harbor Supply Co.", "Nordlicht GmbH", "Lucía Ortega", "Kestrel Outdoor"] && viewer.highlight?(0, 1) == true)
+            result.dataGrid(viewer.grid, sortBy: 1, adding: false)
+            #expect((0..<viewer.grid.rowCount).map { result.rows.value($0, 1) ?? "" } == found.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
+            #expect(result.filterBar.scope.text == "Local · 4 of 5 rows")
+
+            // Filter by Values counts the rows shown.
+            result.clearFilter(nil)
+            result.clearSort(nil)
+            viewer.grid.selection.select(GridPosition(row: 0, column: 1))
+            result.filterByValues(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await eventually(timeout: 10) { await call(harness, "press", ["title": "Ama Mensah  (1)"]).error == nil }
+            _ = await call(harness, "press", ["id": "values.ok"])
+            #expect(window.attachedSheet == nil && viewer.grid.rowCount == 4 && !(0..<4).contains { result.rows.value($0, 1) == "Ama Mensah" })
+        }
+
+        /// F2 edits the focused cell, as in HeidiSQL; in a console result, which can't be edited, it shows the value panel.
+        @Test func f2EditsTheCellOrShowsItsValue() async throws {
+            let (main, harness, tab) = try await Self.tab()
+            let window = try #require(main.window)
+            window.makeFirstResponder(tab.grid)
+            tab.grid.selection.select(GridPosition(row: 1, column: 2))
+            #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+            #expect(tab.grid.editor != nil && tab.grid.editor?.position == GridPosition(row: 1, column: 2))
+            tab.grid.endEditing(commit: false)
+            let viewer = try #require(resultViewer(main))
+            window.makeFirstResponder(viewer.grid)
+            viewer.grid.selection.select(GridPosition(row: 0, column: 1))
+            #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+            #expect(viewer.grid.editor == nil && viewer.valuePanel != nil)
+        }
+
         /// The condition is coloured as SQL, grows a line at a time up to eight (then scrolls), and Return applies it.
         @Test func whereBarColoursItsSQLAndGrowsToEightLines() async throws {
             let session = FakeTableSession()
@@ -454,7 +523,8 @@ extension AppTests {
             #expect(view.grid.sortOrder.isEmpty && view.rows.cell(0, 0) == .text("10482"))
             let menu = try #require(view.viewer.dataGrid(view.grid, menuFor: .cells))
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title)
-                    == ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Value Panel", "Record View", "Column Summary…", "Display As"])
+                    == ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel", "Record View",
+                        "Column Summary…", "Display As"])
         }
 
         @Test func readOnlyConnectionsRefuseEditsAndLongValuesOpenInTheValuePanel() async throws {
@@ -486,6 +556,7 @@ extension AppTests {
             tab.applyFilter("region = 'EU' OR SLEEP(5) = 0")
             #expect(session.statements.count == sent && tab.source?.filter == "" && tab.grid.rowCount == 3)
             #expect(tab.notice.text.stringValue.contains("is read-only, so nothing ran. SLEEP() isn't on the list"))
+            #expect(tab.bar.scope.text == "On server · all rows")
             // The tab's other statements keep the filter that ran.
             tab.countRows(nil)
             await ready { tab.loading != nil }
@@ -505,7 +576,8 @@ extension AppTests {
             main.select(main.open(opened, title: "orders", connection: connection.id))
             await ready { opened.loading != nil || (opened.source == nil && opened.problem == nil) }
             #expect(quiet.statements.isEmpty && opened.source?.filter == "" && opened.bar.filterText.contains("GET_LOCK"))
-            #expect(opened.notice.text.stringValue.contains("GET_LOCK() isn't on the list"))
+            #expect(opened.notice.text.stringValue.contains("GET_LOCK() isn't on the list")
+                    && opened.bar.scope.text == "On server · all rows")
             opened.applyFilter("")
             await ready { opened.loading != nil }
             #expect(opened.grid.rowCount == 3 && opened.problem == nil)
@@ -557,7 +629,7 @@ extension AppTests.ScreenshotTests {
             tab.applyFilter("region IN ('EU', 'US') AND total > 100")
             await ready { tab.loading != nil }
             tab.source?.set(.text("1999.90"), row: 1, column: 4)
-            tab.source?.set(.text("APAC"), row: 3, column: 2)
+            tab.source?.set(.text("UK"), row: 3, column: 2)  // region is char(2)
             tab.source?.changes.delete([["2400965"]])
             tab.source?.changes.addRow(["region": .text("EU"), "number": .text("9100"), "total": .text("42.00")])
             tab.changesDidChange()
@@ -566,11 +638,38 @@ extension AppTests.ScreenshotTests {
             main.window?.displayIfNeeded()
             try await save(harness, "table-data-\(suffix)")
 
+            // Sort by Columns… with two columns, and Type a Value….
+            tab.sortColumns(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "set", ["id": "sort.column.0", "value": "region"])
+            _ = await call(harness, "press", ["id": "sort.add"])
+            _ = await call(harness, "set", ["id": "sort.direction.1", "value": "Descending"])
+            try await save(harness, "table-data-sort-\(suffix)", target: "sheet")
+            _ = await call(harness, "press", ["id": "sort.cancel"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            tab.grid.selection.select(GridPosition(row: 1, column: 4))
+            tab.quickFilterPrompt(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "set", ["id": "quickFilter.operator", "value": "Greater than (>)"])
+            try await save(harness, "table-data-type-a-value-\(suffix)", target: "sheet")
+            _ = await call(harness, "press", ["title": "Cancel", "in": "sheet"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             tab.previewChanges(nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             try await save(harness, "table-data-preview-\(suffix)", target: "sheet")
             _ = await call(harness, "press", ["title": "Cancel"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             tab.revertAllChanges(nil)
+            // A console result filtered and searched in its own bar.
+            if let viewer = resultViewer(main), let result = viewer.superview as? ResultGridView {
+                viewer.grid.selection.select(GridPosition(row: 1, column: 3))
+                result.quickFilter(Commands.filterGreater.item())
+                result.filterBar.searchField.stringValue = "Harbor"
+                result.reorder()
+                main.window?.makeFirstResponder(viewer.grid)
+                main.window?.displayIfNeeded()
+                try await save(harness, "console-result-filter-\(suffix)")
+            }
             main.window?.orderOut(nil)
 
             // The smallest window, with the find bar.
@@ -640,7 +739,29 @@ extension AppTests.HelpTests {
         _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
         missing += unexplained([try #require(window.attachedSheet)], where: "Filter by Values")
         _ = await call(harness, "press", ["id": "values.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        tab.sortColumns(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["id": "sort.add"])
+        missing += unexplained([try #require(window.attachedSheet)], where: "Sort by Columns")
+        _ = await call(harness, "press", ["id": "sort.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        tab.grid.selection.select(GridPosition(row: 0, column: 2))
+        tab.quickFilterPrompt(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        missing += unexplained([try #require(window.attachedSheet)], where: "Type a Value")
+        _ = await call(harness, "press", ["title": "Cancel", "in": "sheet"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
         tab.revertAllChanges(nil)
+        // A console result's filter bar, and its menus.
+        let viewer = try #require(resultViewer(main))
+        let result = try #require(viewer.superview as? ResultGridView)
+        viewer.grid.selection.select(GridPosition(row: 0, column: 1))
+        result.quickFilterEquals(nil)
+        missing += unexplained([window], where: "console result")
+        for target in [DataGridView.Target.cells, .column(1), .row(0)] {
+            if let menu = viewer.dataGrid(viewer.grid, menuFor: target) { missing += unexplained(menu, path: ["result \(target)"]) }
+        }
         #expect(missing.isEmpty, "\(missing)")
     }
 }
@@ -693,6 +814,26 @@ extension AppTests.LayoutTests {
                 check("Filter by Values", window.attachedSheet)
                 _ = await call(harness, "press", ["id": "values.cancel"])
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                tab.sortColumns(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                for _ in 0..<3 { _ = await call(harness, "press", ["id": "sort.add"]) }
+                check("Sort by Columns", window.attachedSheet)
+                _ = await call(harness, "press", ["id": "sort.cancel"])
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                tab.quickFilterPrompt(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                check("Type a Value", window.attachedSheet)
+                _ = await call(harness, "press", ["title": "Cancel", "in": "sheet"])
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                // A console result filtered by long conditions, in the same window.
+                if let viewer = resultViewer(main), let result = viewer.superview as? ResultGridView {
+                    for column in 1...4 {
+                        viewer.grid.selection.select(GridPosition(row: 0, column: column))
+                        result.filter(column, by: GridCondition(result.source.columns[column], .notEquals, [String(repeating: "long ", count: 12)]),
+                                      adding: true)
+                    }
+                    check("console result's filter bar")
+                }
                 tab.revertAllChanges(nil)
                 let (viewMain, _, _) = try await AppTests.GridDataAppTests.tab("customer_emails", session: .emails(), size: size)
                 viewMain.window?.appearance = NSAppearance(named: appearance)

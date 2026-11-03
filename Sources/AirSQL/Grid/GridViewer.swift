@@ -84,8 +84,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private(set) var record: Int?
     /// The grid's columns and sort as they were before Transpose or Record View, to put back after.
     private var layout: (order: [Int], widths: [CGFloat], sort: [DataGridView.Sort], frozen: Int)?
-    /// Display As, by the source's column.
+    /// Display As and its Time Zone, by the source's column.
     private(set) var displays: [Int: GridDisplay] = [:]
+    private(set) var zones: [Int: GridZone] = [:]
     /// Heatmaps by the source's column, and whether equal values are tinted (`GridViewer+Colours`).
     var heat: [Int: HeatScale] = [:]
     var highlightsEqual = false
@@ -112,8 +113,12 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             displays = Dictionary(source.columns.indices.compactMap { index in
                 settings.displayTypes[source.columns[index].name].flatMap(GridDisplay.init(rawValue:)).map { (index, $0) }
             }, uniquingKeysWith: { first, _ in first })
+            zones = Dictionary(source.columns.indices.compactMap { index in
+                settings.displayZones[source.columns[index].name].flatMap(GridZone.init(rawValue:)).map { (index, $0) }
+            }, uniquingKeysWith: { first, _ in first })
         } else {
             displays = [:]
+            zones = [:]
         }
         displayed = source.map(display)
         heat = [:]
@@ -128,7 +133,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     /// `source` with the display types, when there are any.
     private func display(_ source: GridSource) -> GridSource {
-        displays.isEmpty ? source : DisplaySource(source, displays: displays, bytes: { [weak source] row, column in
+        displays.isEmpty && zones.isEmpty ? source : DisplaySource(source, displays: displays, zones: zones, bytes: { [weak source] row, column in
             (source as? GridBytes)?.bytes(row, column)
         })
     }
@@ -155,6 +160,22 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         for column in focusedColumns where GridDisplay.choices(for: source.columns[column]).contains(chosen) {
             displays[column] = chosen == .standard ? nil : chosen
         }
+        displayChanged()
+    }
+
+    /// Display As ▸ Time Zone ▸ (the item's tag is the `GridZone`'s index): the selected DATETIME and TIMESTAMP columns.
+    @objc func displayTimeZone(_ sender: Any?) {
+        guard let source, let item = sender as? NSMenuItem, GridZone.allCases.indices.contains(item.tag) else { return }
+        if transposed || record != nil { transposeGrid(nil) }
+        let chosen = GridZone.allCases[item.tag]
+        for column in focusedColumns where GridZone.applies(to: source.columns[column]) {
+            zones[column] = chosen == .stored ? nil : chosen
+        }
+        displayChanged()
+    }
+
+    private func displayChanged() {
+        guard let source else { return }
         displayed = display(source)
         replaceShown(displayed)
         saveColumns()
@@ -167,14 +188,25 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         return (selected.isEmpty ? grid.selection.cursor.map { [$0.column] } ?? [] : selected).map(grid.sourceColumn)
     }
 
-    /// Display As ▸, as in the Data menu: the ways the focused column's kind can be shown are on.
+    /// Display As ▸, as in the Data menu: the ways the focused column's kind can be shown are on, in groups (numbers,
+    /// dates, bytes), with Decimal Places and Time Zone in submenus.
     static func displayMenu() -> NSMenuItem {
-        MainMenu.submenu("Display As", GridDisplay.allCases.enumerated().map { index, display in
+        func item(_ display: GridDisplay) -> NSMenuItem {
             let item = Commands.displayAs.item()
             item.title = display.title
+            item.tag = GridDisplay.allCases.firstIndex(of: display) ?? 0
+            return item
+        }
+        let decimals = MainMenu.submenu("Decimal Places", [GridDisplay.decimals0, .decimals1, .decimals2, .decimals3, .decimals4].map(item))
+        let zones = MainMenu.submenu("Time Zone", GridZone.allCases.enumerated().map { index, zone in
+            let item = Commands.displayZone.item()
+            item.title = zone.title
             item.tag = index
             return item
         })
+        return MainMenu.submenu("Display As", [item(.standard), .separator(), item(.grouped), decimals, item(.unixTime), item(.unixMillis),
+                                               .separator(), item(.dateShort), item(.dateMedium), item(.dateLong), zones, .separator(),
+                                               item(.uuid), item(.hex), item(.text)])
     }
 
     /// The host's rows or columns changed (a page arrived): shows them again.
@@ -369,6 +401,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         settings.hiddenColumns = hidden
         settings.frozenColumns = grid.frozenColumns
         settings.displayTypes = Dictionary(displays.map { (names[$0.key], $0.value.rawValue) }, uniquingKeysWith: { first, _ in first })
+        settings.displayZones = Dictionary(zones.map { (names[$0.key], $0.value.rawValue) }, uniquingKeysWith: { first, _ in first })
         settings.widths = Dictionary(names.indices.map { (names[$0], Double(grid.columnWidths[$0])) },
                                      uniquingKeysWith: { first, _ in first })
         TableViewSettingsStore.shared.set(settings, connection: viewKey.connection, database: viewKey.database,
@@ -596,6 +629,13 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             let enabled = !columns.isEmpty && columns.allSatisfy { GridDisplay.choices(for: $0).contains(display) }
             item.state = enabled && focusedColumns.allSatisfy({ (displays[$0] ?? .standard) == display }) ? .on : .off
             item.explain(enabled: enabled, reason: columns.isEmpty ? "Select a column first" : "Not for this column's type")
+            return enabled
+        case #selector(displayTimeZone(_:)):
+            let zone = GridZone.allCases.indices.contains(item.tag) ? GridZone.allCases[item.tag] : .stored
+            let columns = focusedColumns.compactMap { source?.columns[$0] }
+            let enabled = !columns.isEmpty && columns.allSatisfy(GridZone.applies)
+            item.state = enabled && focusedColumns.allSatisfy({ (zones[$0] ?? .stored) == zone }) ? .on : .off
+            item.explain(enabled: enabled, reason: columns.isEmpty ? "Select a column first" : "Only for DATETIME and TIMESTAMP columns")
             return enabled
         case #selector(toggleValuePanel(_:)):
             item.state = valuePanel == nil ? .off : .on

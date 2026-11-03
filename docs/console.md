@@ -81,6 +81,13 @@ nothing runs.
   warnings, or its error and the line it points to (that line is marked red beside the editor). Double-click a message
   to select its statement.
 - A result keeps at most its first 100,000 rows; the tab then says it is cut short.
+- **Filter, search and sort a result** on its rows, at once, without running the query again: right-click a cell for
+  **Quick Filter** (the same conditions as in a [table tab](table-data.md#filter-search-and-sort), Type a Value…
+  included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Sort by
+  Columns…**, or click a value in **Column Summary…**. **Data ▸ Search All Columns** (⇧⌘E) keeps the rows with the text
+  in any column and tints it. A bar over the rows shows while a filter or a search is on: **Local · 12 of 200 rows**,
+  the conditions as SQL, and the search; its ⓧ or **Data ▸ Clear Filter** shows every row again. Copy and Export Rows…
+  take the rows shown. The **?** at the right of the result tabs opens [Read the data in a grid](data-grid.md).
 
 ### Edit a result
 
