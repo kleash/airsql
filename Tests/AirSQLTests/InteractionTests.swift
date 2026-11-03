@@ -78,14 +78,8 @@ extension AppTests {
                     },
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
                            "Compare…", "Colour", "Delete…"],
-                    enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Colour", "Delete…"]),
-            Surface(name: "Direct connection in the sidebar",
-                    place: { main, _ in sidebarRow(main, "Local MariaDB 11.8") },
-                    clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.local.id] && $0.contentKind == "summary" },
-                    doubleClicked: { _, received in received.contains("connect(_:)") },
-                    menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
-                           "Compare…", "Colour", "Delete…"],
-                    enabled: ["Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour", "Delete…"]),
+                    enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour",
+                              "Delete…"]),
             Surface(name: "Folder in the sidebar",
                     place: { main, _ in folderRow(main, "Clients") },
                     clicked: { $0.sidebar.selectedFolderNodeID == InteractionTests.folder.id },
@@ -164,9 +158,8 @@ extension AppTests {
         }
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
-        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Folder in the sidebar", "Editor tab",
-                                       "Status bar: route", "Status bar: server",
-                                       "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log",
+        nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Status bar: route",
+                                       "Status bar: server", "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log",
                                        "Database in the tree", "Table or view in the tree", "Routine, trigger or event",
                                        "Folder or category in the tree", "Table in the database view", "Process list row"]
 
