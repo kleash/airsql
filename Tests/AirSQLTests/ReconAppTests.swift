@@ -241,14 +241,15 @@ extension AppTests.ReconAppTests {
         let controller = ReconWindowController(model: model)
         keptWindows.append(controller)
         let window = try #require(controller.window)
+        // Ordered in, as the harness acts only in visible windows, then moved off the screen.
+        window.orderFront(nil)
         window.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+        let harness = AgentServer(main: nil, model: model, windows: { [window] })
         controller.source.choose(mysql)
         #expect(await eventually(timeout: 30) { window.attachedSheet != nil }, "the Trust sheet shows on the compare window")
-        func button(_ title: String, in view: NSView) -> NSButton? {
-            (view as? NSButton).flatMap { $0.title == title ? $0 : nil } ?? view.subviews.lazy.compactMap { button(title, in: $0) }.first
-        }
-        let trust = try #require(window.attachedSheet?.contentView.flatMap { button("Trust", in: $0) })
-        trust.performClick(nil)
+        // Pressed as the harness does: performClick's event tracking can end the test process.
+        let trust = await call(harness, "press", ["title": "Trust"])
+        #expect(trust.error == nil, "\(trust.error ?? "")")
         #expect(await eventually(timeout: 30) { controller.source.databases.numberOfItems > 0 })
         #expect(model.states[mysql.id] == .connected(server: "MySQL " + Lab.mysql84.version), "\(String(describing: model.states[mysql.id]))")
     }

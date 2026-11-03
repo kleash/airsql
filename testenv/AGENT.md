@@ -9,7 +9,7 @@ start, which pulls and builds the images.
 ```sh
 testenv/up.sh                          # the whole lab; the first start seeds every server (several minutes)
 testenv/up.sh mysql84 bastion secure   # only these services, and what they depend on
-AIRSQL_LAB=1 ./test.sh                 # every test, the lab's included (it runs testenv/up.sh first)
+AIRSQL_LAB=1 ./test.sh                 # every test, the lab's included (testenv/up.sh first, unless all of it runs)
 testenv/down.sh                        # removes the lab: containers, networks, data (--images: the images it built)
 ```
 
@@ -17,6 +17,13 @@ testenv/down.sh                        # removes the lab: containers, networks, 
 healthy and every published port answers. It seeds three servers at a time: the whole lab takes about 1.5 GB of
 Docker's memory once running, and more while seeding. On a busy Docker, start only what a test needs. If Docker runs
 out of memory anyway, the kernel stops a lab server first, never another project's container (`oom_score_adj`).
+
+One lab serves every checkout of the repository, and only the main checkout (git's first worktree, the parent of
+`git rev-parse --git-common-dir`) starts it: in another worktree `up.sh` refuses, as it would make a new key and CA
+there and point the lab's containers at that worktree's files, which go when the worktree does.
+`AIRSQL_LAB=1 ./test.sh` uses the lab as it is while every service of it runs, and runs `up.sh` only when one isn't
+running (in a worktree it then stops and says what to run in the main checkout). The tests in any worktree use the
+main checkout's key and certificates (`Lab.testenv`).
 
 ## Servers
 
