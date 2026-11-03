@@ -15,6 +15,9 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     private var loading: Task<Void, Never>?
     private lazy var insertButton = button("Insert", id: "history.insert", tip: "Put the selected statement in the editor at the cursor",
                                            target: self, action: #selector(insertSelected(_:)), primary: true)
+    /// The rows' baseline: the system font's capitals centred in a 22-point row.
+    private static let baseline = ((22 + NSFont.systemFont(ofSize: NSFont.systemFontSize).capHeight) / 2).rounded()
+
     private static let time: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -172,8 +175,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         NSLayoutConstraint.activate([
             field.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
             field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
-            field.firstBaselineAnchor.constraint(equalTo: cell.topAnchor,
-                                                 constant: ((tableView.rowHeight + NSFont.systemFont(ofSize: NSFont.systemFontSize).capHeight) / 2).rounded()),
+            field.firstBaselineAnchor.constraint(equalTo: cell.topAnchor, constant: Self.baseline),
         ])
         return cell
     }

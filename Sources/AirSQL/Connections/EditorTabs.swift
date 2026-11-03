@@ -239,13 +239,15 @@ extension ConnectionEditor {
         let check: (String) -> Void = { [weak self] chosen in
             Task {
                 let tools = await ClientTools.find(kind, chosen: chosen.isEmpty ? fallback : chosen)
-                (note.stringValue, note.textColor) = ClientToolsPane.note(tools, kind: kind, chosen: chosen.isEmpty ? fallback : chosen)
+                (note.stringValue, note.textColor) = ClientToolsPane.note(tools, kind: kind,
+                                                                          chosen: chosen.isEmpty ? fallback : chosen)
                 self?.fitWindow()
             }
         }
+        let id = kind == .client ? "editor.clientPath" : "editor.dumpPath"
+        let tip = "Type or choose the \(what) program for this connection; empty: Settings ▸ Client Tools' choice"
         form.row(kind == .client ? "Client tool" : "Dump tool",
-                 file(draft[keyPath: path], placeholder: "Settings ▸ Client Tools", id: kind == .client ? "editor.clientPath" : "editor.dumpPath",
-                      tip: "Type or choose the \(what) program for this connection; empty: Settings ▸ Client Tools' choice") { [weak self] in
+                 file(draft[keyPath: path], placeholder: "Settings ▸ Client Tools", id: id, tip: tip) { [weak self] in
                      self?.draft[keyPath: path] = $0
                      check($0)
                  })
