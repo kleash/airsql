@@ -187,12 +187,15 @@ struct ResultSetSourceTests {
             ResultStore.Column(name: "raw", type: MYSQL_TYPE_BLOB, charset: 63),
         ])
         let long = String(repeating: "x", count: 5_000)
-        store.append([Array("7".utf8), Array(long.utf8), nil, Array("{}".utf8), [0x01]])
+        store.append([Array("7".utf8), Array(long.utf8), nil, Array("{}".utf8), Array(repeating: 0xFF, count: 300)])
         let source = ResultSetSource(store)
         #expect(source.columns.map(\.kind) == [.number, .text, .date, .json, .binary])
         #expect(source.columns[0].isKey && source.columns.map(\.type) == ["int", "text", "datetime", "json", "blob"])
         #expect(source.rowCount == 1 && source.cell(0, 0) == .text("7") && source.cell(0, 2) == .null)
         #expect(source.cell(0, 1).text.count == ResultSetSource.shownLimit + 1 && source.cell(0, 1).text.hasSuffix("…"))
         #expect(source.value(0, 1) == long && source.value(0, 2) == nil)
+        // The cell on screen cuts a BLOB to 256 bytes, but ⌘C and export copy the whole value.
+        #expect(source.cell(0, 4).text == "0x" + String(repeating: "FF", count: 256) + "…")
+        #expect(source.value(0, 4) == "0x" + String(repeating: "FF", count: 300))
     }
 }

@@ -181,9 +181,10 @@ public final class ResultStore {
         withBytes(row, column) { String(decoding: $0, as: UTF8.self) }
     }
 
-    /// The cell as people read it: text as text, BINARY/BLOB bytes as 0x… hex (the first 256 bytes), BIT as its bits
-    /// ("101" for BIT(3)); nil for NULL.
-    public func display(_ row: Int, _ column: Int) -> String? {
+    /// The cell as people read it: text as text, BINARY/BLOB bytes as 0x… hex, BIT as its bits ("101" for BIT(3)); nil
+    /// for NULL. Binary hex is cut to `binaryBytes` bytes plus … for drawing; copy and export pass Int.max to get the
+    /// whole value.
+    public func display(_ row: Int, _ column: Int, binaryBytes: Int = 256) -> String? {
         let info = columns[column]
         return withBytes(row, column) { bytes in
             if info.type == MYSQL_TYPE_BIT {
@@ -196,11 +197,11 @@ public final class ResultStore {
             if info.isBinary {
                 let digits = Array("0123456789ABCDEF".utf8)
                 var text = Array("0x".utf8)
-                for byte in bytes.prefix(256) {
+                for byte in bytes.prefix(binaryBytes) {
                     text.append(digits[Int(byte >> 4)])
                     text.append(digits[Int(byte & 0x0F)])
                 }
-                return String(decoding: text, as: UTF8.self) + (bytes.count > 256 ? "…" : "")
+                return String(decoding: text, as: UTF8.self) + (bytes.count > binaryBytes ? "…" : "")
             }
             return String(decoding: bytes, as: UTF8.self)
         }
