@@ -436,8 +436,9 @@ unique key whose columns can't be NULL); so can an inner join's when every table
   console has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
 - After Apply, the edited rows are read back from the server, so the result shows what was stored; deleted rows go.
   New rows and pasting are for a table tab: open the table to add rows.
-- Edits not applied are never thrown away unasked: the next run keeps their result tab, and closing it, closing the
-  console, disconnecting or quitting asks first (unless the connection's Safety settings don't warn on close).
+- Edits not applied are never thrown away unasked: the next run keeps their result tab, and disconnecting asks first;
+  so do closing the result, closing the console and quitting, unless the connection's Safety settings don't warn on
+  close.
 - On a read-only connection nothing can be edited.
 
 ### Edit INSERT statements as a table
