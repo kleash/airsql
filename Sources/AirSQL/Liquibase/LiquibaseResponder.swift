@@ -32,12 +32,15 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
 
     // MARK: Commands
 
+    /// The tree's database (a database's right-click menu), else the window's connection with its own database chosen.
     @objc func generateLiquibase(_ sender: Any?) {
-        guard let main, let window = main.window, window.attachedSheet == nil, let saved = main.activeConnection else { return }
+        guard let main, let window = main.window, window.attachedSheet == nil else { return }
+        let tree = main.sidebar.treeSelection
+        guard let saved = tree.flatMap({ main.model.connection($0.open.id) }) ?? main.activeConnection else { return }
         Task {
             guard let options = await ToolsResponder.options(for: saved, model: main.model, on: window),
                   window.attachedSheet == nil else { return }
-            LiquibaseSheet(model: main.model, connection: saved, options: options).show(on: window)
+            LiquibaseSheet(model: main.model, connection: saved, options: options, database: tree?.nodes.first?.database).show(on: window)
         }
     }
 
@@ -80,6 +83,7 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
             }
             return Self.statements(of: console).isEmpty ? "Type the statements to save, or select them" : nil
         default:
+            if main.sidebar.treeSelection != nil { return nil }
             guard let connection = main.activeConnection else {
                 return main.selectedConnections.count > 1 ? "Select only one connection" : "Select a connection in the sidebar first"
             }

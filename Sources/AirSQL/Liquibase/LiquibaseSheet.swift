@@ -41,9 +41,12 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     private var url: URL
     /// Whether the person chose `url` (else it follows the database and the layout).
     private var chosen = false
+    /// The database chosen first: the tree's, else the connection's own.
+    private let preferred: String
     private var reading: Task<Void, Never>?
 
-    init(model: AppModel, connection: SavedConnection, options: ConnectOptions) {
+    init(model: AppModel, connection: SavedConnection, options: ConnectOptions, database: String? = nil) {
+        preferred = database ?? connection.database
         url = (FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory()))
             .appendingPathComponent("changelog.sql")
         super.init(model: model, connection: connection, options: options, width: 960, action: "Save Changelog",
@@ -188,7 +191,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
                 await session.close()
                 databaseMenu.removeAllItems()
                 databaseMenu.addItems(withTitles: names)
-                databaseMenu.selectItem(withTitle: connection.database)
+                databaseMenu.selectItem(withTitle: preferred)
                 if databaseMenu.indexOfSelectedItem < 0 { databaseMenu.selectItem(at: 0) }
                 readSchema()
             } catch {
