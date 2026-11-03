@@ -95,7 +95,7 @@ extension NSColor {
     static let selectedSegment = NSColor(name: nil) { appearance in
         var color = NSColor.labelColor
         if appearance.isDark {
-            appearance.performAsCurrentDrawingAppearance { color = NSColor.accent.blended(withFraction: 0.35, of: .black) ?? color }
+            appearance.performAsCurrentDrawingAppearance { color = NSColor.accent.blended(withFraction: 0.45, of: .black) ?? color }
         }
         return color
     }

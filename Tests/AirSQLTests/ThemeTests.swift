@@ -18,44 +18,88 @@ private let themes: [(NSAppearance, String)] = [(NSAppearance(named: .aqua)!, "P
 
 extension AppTests {
     @MainActor @Suite struct ThemeTests {
+        /// The contrast of the darkest and lightest pixels in `rect` (points in `control`) as `control` is drawn in an
+        /// active window in `appearance`: a title on its fill.
+        func drawnContrast(_ control: NSView, size: NSSize, in rect: (NSView) -> NSRect, appearance: NSAppearance) throws -> CGFloat {
+            let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: size.width + 40, height: size.height + 28),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.appearance = appearance
+            control.translatesAutoresizingMaskIntoConstraints = true
+            control.frame = NSRect(x: 20, y: 14, width: size.width, height: size.height)
+            window.contentView?.addSubview(control)
+            window.orderFront(nil)
+            window.displayIfNeeded()
+            defer { window.orderOut(nil) }
+            let frame = window.frame.size
+            let canvas = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(frame.width * 2), pixelsHigh: Int(frame.height * 2),
+                                                       bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                       colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            canvas.size = frame
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: canvas)
+            AgentServer.drawingAsKey([window]) { AgentServer.draw(window, at: .zero) }
+            NSGraphicsContext.restoreGraphicsState()
+            let area = control.convert(rect(control), to: nil)
+            return try pixelContrast(canvas, NSRect(x: area.minX, y: frame.height - area.maxY, width: area.width, height: area.height))
+        }
+
+        /// The contrast of the darkest and lightest pixels of a picture at scale 2 in `rect` (points from its top left).
+        func pixelContrast(_ image: NSBitmapImageRep, _ rect: NSRect) throws -> CGFloat {
+            var colors: [NSColor] = []
+            for y in stride(from: rect.minY, to: rect.maxY, by: 0.5) {
+                for x in stride(from: rect.minX, to: rect.maxX, by: 0.5) {
+                    if let color = image.colorAt(x: Int(x * 2), y: Int(y * 2))?.usingColorSpace(.sRGB) { colors.append(color) }
+                }
+            }
+            let darkest = try #require(colors.min { $0.luminance < $1.luminance })
+            let lightest = try #require(colors.max { $0.luminance < $1.luminance })
+            return darkest.contrast(with: lightest)
+        }
+
+        @Test func theAgentsPopoversQuietTextReads() async throws {
+            for (appearance, theme) in themes {
+                let model = testModel(Fixtures.shop)
+                let (main, harness) = appWindow(model)
+                let window = try #require(main.window)
+                window.appearance = appearance
+                window.setFrameOrigin(NSPoint(x: 40, y: 40))  // a popover goes on a screen: so does its window
+                window.orderFront(nil)
+                defer { window.orderOut(nil) }
+                model.data.settings.agentsAllowed = true
+                let agents = AgentService(model: model, main: main, directory: URL(fileURLWithPath: try scratch() + "/agent"))
+                defer {
+                    agents.close()
+                    model.data.settings.agentsAllowed = false
+                }
+                agents.finish(agents.record("claude-code 2.1", "context"), "2 connections")
+                main.refresh()
+                main.statusBar.agent.showPopover()
+                _ = await call(harness, "wait", ["until": "popover", "timeout": 5])
+                defer { main.statusBar.agent.shown?.close() }
+                let content = try #require(main.statusBar.agent.shown?.contentViewController?.view)
+                let image = try #require(await call(harness, "screenshot", ["target": "main", "scale": 2]).image)
+                // The note under the list, where the main window's picture has it.
+                func fields(_ view: NSView) -> [NSTextField] { [view as? NSTextField].compactMap { $0 } + view.subviews.flatMap(fields) }
+                let note = try #require(fields(content).first { $0.stringValue.hasPrefix("Agents never see") })
+                let popover = try #require(note.window)
+                let inPopover = note.convert(note.bounds, to: nil)
+                let x = popover.frame.minX - window.frame.minX + inPopover.minX
+                let top = window.frame.maxY - (popover.frame.minY + inPopover.maxY)
+                let contrast = try pixelContrast(image, NSRect(x: x, y: top, width: inPopover.width, height: inPopover.height))
+                #expect(contrast >= 4.5, "\(theme): the note is \(contrast):1")
+            }
+        }
+
         @Test func primaryButtonTitleReadsOnTheAccent() throws {
             for (appearance, theme) in themes {
                 appearance.performAsCurrentDrawingAppearance {
                     #expect(NSColor.onAccent.contrast(with: .accent) >= 4.5, "\(theme)")
                 }
-                // As drawn: the title's darkest and lightest pixels against each other, in an active window.
-                let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: 240, height: 60), styleMask: [.titled],
-                                      backing: .buffered, defer: false)
-                window.isReleasedWhenClosed = false
-                window.appearance = appearance
                 let primary = button("Save and Connect", id: "test.primary", tip: "", target: nil, action: nil, primary: true)
-                primary.translatesAutoresizingMaskIntoConstraints = true
-                primary.frame = NSRect(x: 20, y: 14, width: 200, height: 32)
-                window.contentView?.addSubview(primary)
-                window.orderFront(nil)
-                window.displayIfNeeded()
-                let size = window.frame.size
-                let canvas = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
-                                                           bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-                                                           colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
-                canvas.size = size
-                NSGraphicsContext.saveGraphicsState()
-                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: canvas)
-                AgentServer.drawingAsKey([window]) { AgentServer.draw(window, at: .zero) }
-                NSGraphicsContext.restoreGraphicsState()
-                window.orderOut(nil)
-                let title = primary.convert(primary.bounds, to: nil).insetBy(dx: 40, dy: 9)
-                var colors: [NSColor] = []
-                for y in stride(from: title.minY, to: title.maxY, by: 0.5) {
-                    for x in stride(from: title.minX, to: title.maxX, by: 0.5) {
-                        if let color = canvas.colorAt(x: Int(x * 2), y: canvas.pixelsHigh - 1 - Int(y * 2))?.usingColorSpace(.sRGB) {
-                            colors.append(color)
-                        }
-                    }
-                }
-                let darkest = try #require(colors.min { $0.luminance < $1.luminance })
-                let lightest = try #require(colors.max { $0.luminance < $1.luminance })
-                #expect(darkest.contrast(with: lightest) >= 4.5, "\(theme): the title is \(darkest.contrast(with: lightest)):1 on its fill")
+                let contrast = try drawnContrast(primary, size: NSSize(width: 200, height: 32), in: { $0.bounds.insetBy(dx: 40, dy: 9) },
+                                                 appearance: appearance)
+                #expect(contrast >= 4.5, "\(theme): the title is \(contrast):1 on its fill")
             }
         }
 
@@ -77,12 +121,16 @@ extension AppTests {
             }
         }
 
-        @Test func selectedSegmentCarriesAppKitsWhiteLabel() {
+        @Test func selectedSegmentCarriesAppKitsWhiteLabel() throws {
             for (appearance, theme) in themes {
-                appearance.performAsCurrentDrawingAppearance {
-                    let fill = composite(.selectedSegment, over: .windowBackgroundColor)
-                    #expect(NSColor.white.contrast(with: fill) >= 4.5, "\(theme): \(NSColor.white.contrast(with: fill)):1")
-                }
+                let segments = NSSegmentedControl(labels: ["Columns", "Indexes"], trackingMode: .selectOne, target: nil, action: nil)
+                segments.selectedSegment = 0
+                segments.selectedSegmentBezelColor = .selectedSegment
+                // Inside the selected segment: its fill and its white label.
+                let contrast = try drawnContrast(segments, size: NSSize(width: 200, height: 28), in: { view in
+                    NSRect(x: 6, y: 6, width: (view.bounds.width / 2) - 12, height: view.bounds.height - 12)
+                }, appearance: appearance)
+                #expect(contrast >= 4.5, "\(theme): the label is \(contrast):1 on its fill")
             }
         }
     }

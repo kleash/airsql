@@ -149,6 +149,7 @@ extension TableEditorController: NSComboBoxDataSource {
         box.dataSource = self
         box.completes = true
         box.stringValue = value
+        box.toolTip = value.isEmpty ? nil : value  // whole, when the column is too narrow for it
         box.placeholderString = placeholder
         box.isBordered = false
         box.drawsBackground = false

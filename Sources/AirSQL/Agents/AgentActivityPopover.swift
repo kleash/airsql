@@ -41,7 +41,7 @@ final class AgentActivityPopover: NSViewController {
         document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
         let caption = label("Agents never see passwords and can't change data: they read within each connection's access "
                             + "(Settings ▸ Agents) and propose SQL in console tabs for you to run.",
-                            font: .systemFont(ofSize: 11), color: .secondaryLabelColor, wraps: true)
+                            font: .systemFont(ofSize: 11), color: Self.quiet, wraps: true)
         caption.preferredMaxLayoutWidth = 380
         let stack = NSStackView(views: [header, scroll, caption])
         stack.orientation = .vertical
@@ -64,6 +64,16 @@ final class AgentActivityPopover: NSViewController {
         if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
+    /// The quieter text (times, outcomes, the note): secondaryLabelColor 40 % of the way to the text colour, 4.5:1
+    /// on the popover in both themes (the plain colour is 3.9:1 and 4.1:1 there).
+    private static let quiet = NSColor(name: nil) { appearance in
+        var color = NSColor.secondaryLabelColor
+        appearance.performAsCurrentDrawingAppearance {
+            color = NSColor.secondaryLabelColor.blended(withFraction: 0.4, of: .textColor) ?? color
+        }
+        return color
+    }
+
     private static let time: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .medium
@@ -79,7 +89,7 @@ final class AgentActivityPopover: NSViewController {
             let empty = service.model.data.settings.agentsAllowed
                 ? "No agent has used AirSQL yet. Add AirSQL to Claude Code or Gemini CLI in Settings ▸ Agents."
                 : "Agents are off. Turn them on in Settings ▸ Agents to let Claude Code or Gemini CLI read your schemas."
-            let text = label(empty, font: .systemFont(ofSize: 12), color: .secondaryLabelColor, wraps: true)
+            let text = label(empty, font: .systemFont(ofSize: 12), color: Self.quiet, wraps: true)
             text.preferredMaxLayoutWidth = 380
             list.addArrangedSubview(text)
         }
@@ -87,12 +97,12 @@ final class AgentActivityPopover: NSViewController {
             let what = label(event.summary, font: .systemFont(ofSize: 12), truncates: true)
             what.toolTip = event.client + ": " + event.summary
             let when = label(Self.time.string(from: event.time), font: .monospacedDigitSystemFont(ofSize: 11, weight: .regular),
-                             color: .secondaryLabelColor)
+                             color: Self.quiet)
             when.setContentCompressionResistancePriority(.required, for: .horizontal)
             let top = NSStackView(views: [what, NSView(), when])
             let outcome = event.outcome ?? "running…"
             let result = label(event.client + " · " + outcome, font: .systemFont(ofSize: 11),
-                               color: event.failed ? .statusBad : .secondaryLabelColor, truncates: true)
+                               color: event.failed ? .statusBad : Self.quiet, truncates: true)
             result.toolTip = outcome
             let row = NSStackView(views: [top, result])
             row.orientation = .vertical

@@ -223,7 +223,6 @@ extension ConnectionEditor {
         scroll.heightAnchor.constraint(equalToConstant: 72).isActive = true
         sql.autoresizingMask = [.width]
         form.row("Startup SQL", [scroll], caption: "Runs in every session after it logs in (SET sql_mode, time_zone…).")
-        form.heading("Client tools")
         for kind in [ClientTool.Kind.client, .dump] { toolRow(form, kind) }
         safetyRows(form)
         return content(form)
@@ -244,7 +243,7 @@ extension ConnectionEditor {
                 self?.fitWindow()
             }
         }
-        form.row(kind == .client ? "Client" : "Dump tool",
+        form.row(kind == .client ? "Client tool" : "Dump tool",
                  file(draft[keyPath: path], placeholder: "Settings ▸ Client Tools", id: kind == .client ? "editor.clientPath" : "editor.dumpPath",
                       tip: "Type or choose the \(what) program for this connection; empty: Settings ▸ Client Tools' choice") { [weak self] in
                      self?.draft[keyPath: path] = $0
