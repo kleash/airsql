@@ -67,6 +67,8 @@ extension AppTests {
             _ = await call(harness, "select", ["pane": "sidebar", "names": ["Production · shop"]])
             missing += unexplained([window], where: "summary")
             model.states[Fixtures.production.id] = .connected(server: "MySQL 8.4.3")
+            _ = await eventually(timeout: 10) { find(NSButton.self, id: "summary.disconnect", in: window.contentView!) != nil }
+            missing += unexplained([window], where: "summary of a connected connection")
             model.agentStatus = "Claude Code · reading schema"
             let content = FixtureContent()
             content.badge = "Transaction open · 2 changes"
