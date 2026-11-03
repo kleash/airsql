@@ -250,12 +250,10 @@ final class TableDataController: NSViewController, TabContent {
 
     @objc func loadMore(_ sender: Any?) { loadRows(more: true) }
 
-    /// Load All asks first above this many rows.
-    static let loadAllAsksAbove = 100_000
-
+    /// Load All: asks first above Settings ▸ Grid's number of rows.
     @objc func loadAll(_ sender: Any?) {
         guard let source, source.hasMore else { return }
-        guard let total, total.rows > Self.loadAllAsksAbove, let window = view.window else { return loadAllRows() }
+        guard let total, total.rows > model.data.settings.loadAllAsksAbove, let window = view.window else { return loadAllRows() }
         let alert = NSAlert()
         alert.messageText = "Load all \(total.exact ? "" : "about ")\(total.rows.formatted()) rows?"
         alert.informativeText = "They are held in memory while the tab is open. A filter shows fewer rows."

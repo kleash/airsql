@@ -33,7 +33,7 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
         scope.setAccessibilityIdentifier("tableData.scope")
         scope.toolTip = "Where the filter and the sort run: on the server for every row, or here on the loaded rows"
         let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .tertiaryLabelColor)
-        whereField.placeholderString = "Type a condition, for example status = 'paid'"
+        whereField.placeholderString = "for example status = 'paid'"
         whereField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         whereField.toolTip = "Type a WHERE condition and press Return to filter every row on the server"
         whereField.setAccessibilityIdentifier("tableData.where")

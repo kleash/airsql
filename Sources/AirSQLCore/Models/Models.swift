@@ -179,6 +179,8 @@ public struct AppSettings: Codable, Equatable {
     /// automatically.
     public var clientPath = ""
     public var dumpPath = ""
+    /// Settings ▸ Grid: Load All asks first when a table has more rows than this.
+    public var loadAllAsksAbove = 100_000
 
     public init() {}
 
@@ -199,6 +201,7 @@ public struct AppSettings: Codable, Equatable {
         agentsAllowed = try value(.agentsAllowed, defaults.agentsAllowed)
         clientPath = try value(.clientPath, defaults.clientPath)
         dumpPath = try value(.dumpPath, defaults.dumpPath)
+        loadAllAsksAbove = try value(.loadAllAsksAbove, defaults.loadAllAsksAbove)
     }
 }
 
