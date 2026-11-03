@@ -12,9 +12,13 @@ public enum ReadOnlyClassifier {
     /// ANALYZE or the plan of a write; and the schema session's `SET SESSION information_schema_stats_expiry = 0`.
     /// Refuses, wherever they are: INTO, locking clauses, optimizer hints, temporary tables, := and sequences, and calls
     /// to anything but `SQLWords.readOnlyFunctions`. Executable comments count as code, whatever their version.
-    public static func classify(_ sql: String) -> Verdict {
+    ///
+    /// `noBackslashEscapes`: the session's sql_mode (`DBConnection.noBackslashEscapes`), as for `SQLQuote.string`. It
+    /// decides where a string with a backslash before a quote ends ('it\'s'), so it must be the mode of the session
+    /// that runs the statement.
+    public static func classify(_ sql: String, noBackslashEscapes: Bool) -> Verdict {
         do {
-            try check(sql)
+            try check(sql, noBackslashEscapes: noBackslashEscapes)
             return .readOnly
         } catch let refusal as Refusal {
             return .refused(refusal.reason)
@@ -37,16 +41,17 @@ public enum ReadOnlyClassifier {
         var name: String { raw.count > 64 ? String(raw.prefix(64)) + "…" : raw }
     }
 
-    private static func check(_ sql: String) throws {
-        var lexer = SQLLexer(sql)
+    private static func check(_ sql: String, noBackslashEscapes: Bool) throws {
+        var lexer = SQLLexer(sql, noBackslashEscapes: noBackslashEscapes)
         var tokens: [SQLToken] = []
         while let token = lexer.next() { tokens.append(token) }
         guard !lexer.text.contains(0) else { throw Refusal("It contains a NUL character") }
-        // Where a string ends depends on NO_BACKSLASH_ESCAPES when a backslash comes before a quote ('it\'s'). Text that
-        // reads two ways is refused, so the check never rests on knowing the session's mode.
-        guard tokens == SQLLexer.tokens(sql, noBackslashEscapes: true) else {
-            throw Refusal("A backslash before a quote makes it read differently under NO_BACKSLASH_ESCAPES; write a "
-                + "quote inside a string as two quotes ('')")
+        // Under ANSI_QUOTES, which MySQL doesn't report to clients, "text" is a name, where a backslash escapes nothing:
+        // with one inside, the server could end it elsewhere and run what this check read as a string.
+        guard !tokens.contains(where: { [.string, .variable].contains($0.kind) && doubleQuotedWithBackslash($0, lexer) })
+        else {
+            throw Refusal("Double-quoted text with a backslash in it is a name under ANSI_QUOTES, where the backslash "
+                + "escapes nothing; use single quotes")
         }
         guard tokens.allSatisfy(\.isClosed), lexer.openCodeComments == 0 else {
             throw Refusal("A string, quoted name or comment in it isn't closed")
@@ -67,6 +72,12 @@ public enum ReadOnlyClassifier {
         if code.map(\.text) == ["SET", "SESSION", "INFORMATION_SCHEMA_STATS_EXPIRY", "=", "0"] { return }
         try checkStatement(code)
         try checkClauses(code)
+    }
+
+    private static func doubleQuotedWithBackslash(_ token: SQLToken, _ lexer: SQLLexer) -> Bool {
+        let text = lexer.text[token.range]
+        return text.dropFirst(text.first == SQLLexer.at ? 1 : 0).first == SQLLexer.doubleQuote
+            && text.contains(SQLLexer.backslash)
     }
 
     /// SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN.

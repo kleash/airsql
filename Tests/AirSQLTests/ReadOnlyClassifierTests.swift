@@ -2,8 +2,10 @@ import AirSQLCore
 import Testing
 
 /// The reason a statement is refused, or nil when it's read-only.
-func refusal(_ sql: String) -> String? {
-    if case .refused(let reason) = ReadOnlyClassifier.classify(sql) { return reason }
+func refusal(_ sql: String, noBackslashEscapes: Bool = false) -> String? {
+    if case .refused(let reason) = ReadOnlyClassifier.classify(sql, noBackslashEscapes: noBackslashEscapes) {
+        return reason
+    }
     return nil
 }
 
@@ -88,12 +90,24 @@ struct ReadOnlyClassifierTests {
         #expect(refusal("SELECT * FROM t OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY") == nil)
     }
 
-    @Test func textThatReadsTwoWaysIsRefused() {
-        let reason = "A backslash before a quote makes it read differently under NO_BACKSLASH_ESCAPES; write a quote "
-            + "inside a string as two quotes ('')"
-        #expect(refusal(#"SELECT * FROM t WHERE name = 'O\'Brien'"#) == reason)
-        #expect(refusal(#"SELECT "say \"hi\"""#) == reason)
-        #expect(refusal(#"SELECT * FROM t WHERE name = 'O''Brien' AND path = 'C:\\temp\\'"#) == nil)
+    @Test func backslashesFollowTheSessionsMode() {
+        let oBrien = #"SELECT * FROM t WHERE name = 'O\'Brien'"#
+        #expect(refusal(oBrien) == nil)
+        #expect(refusal(oBrien, noBackslashEscapes: true) == "A string, quoted name or comment in it isn't closed")
+        #expect(refusal(#"SELECT 'C:\'"#, noBackslashEscapes: true) == nil)
+        let hidden = #"SELECT 'x\'; DROP TABLE t; -- '"#
+        #expect(refusal(hidden) == nil)  // one string, as the server reads it with backslash escapes
+        #expect(refusal(hidden, noBackslashEscapes: true) == "It holds more than one statement; send one at a time")
+    }
+
+    @Test func doubleQuotedTextWithABackslashIsRefused() {
+        let reason = "Double-quoted text with a backslash in it is a name under ANSI_QUOTES, where the backslash "
+            + "escapes nothing; use single quotes"
+        for noBackslashEscapes in [false, true] {
+            #expect(refusal(#"SELECT "say \"hi\"""#, noBackslashEscapes: noBackslashEscapes) == reason)
+            #expect(refusal(#"SELECT "C:\\temp", @"a\b""#, noBackslashEscapes: noBackslashEscapes) == reason)
+            #expect(refusal(#"SELECT "say ""hi""", 'C:\\temp'"#, noBackslashEscapes: noBackslashEscapes) == nil)
+        }
     }
 
     @Test func brokenText() {

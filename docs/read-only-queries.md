@@ -31,11 +31,11 @@ One statement at a time (a `;` at the end is fine):
 
 The text inside executable comments, `/*! … */` and `/*M! … */`, counts as code, whatever server version it names.
 
-## Quotes inside strings
+## Backslashes and double quotes
 
-Write a quote inside a string by doubling it: `'O''Brien'`. `'O\'Brien'` is refused, because whether the backslash
-escapes the quote depends on the server's `NO_BACKSLASH_ESCAPES` setting, so the same text could be read as two
-different statements.
+The check reads a backslash in a string as the server does: as an escape, unless the session's sql_mode has
+`NO_BACKSLASH_ESCAPES`. Double-quoted text with a backslash in it is refused either way: with `ANSI_QUOTES` it is a
+name, where a backslash escapes nothing, so the server could end it somewhere else. Write strings in single quotes.
 
 ## A safeguard, not the only one
 

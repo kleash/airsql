@@ -1,8 +1,9 @@
 /// Statements the read-only check must refuse (plan §2.8, R4), by the trick they try. Second half in
 /// ReadOnlyCorpus+Attacks2.swift.
 enum AttackCorpus {
+    /// Refused whatever the session's NO_BACKSLASH_ESCAPES.
     static var all: [String] { filesAndVariables + holdingTheServer + functionsThatAreNotBuiltIn + commentTricks
-        + backslashTricks + executableComments + hints + withAndExplain + locks + sequencesAndAssignments
+        + backslashesInDoubleQuotes + executableComments + hints + withAndExplain + locks + sequencesAndAssignments
         + temporaryTables + severalStatements + otherStatements + brokenText }
 
     static let filesAndVariables = [
@@ -87,17 +88,29 @@ enum AttackCorpus {
         "SELECT 1 # \u{0}\n, SLEEP(5)",
     ]
 
-    /// Text whose strings end in different places with and without NO_BACKSLASH_ESCAPES, so that one reading hides
-    /// code the other runs.
-    static let backslashTricks = [
-        #"SELECT '\'' , SLEEP(5) , ''''"#,
-        #"SELECT 'a\' , SLEEP(5) , '\'"#,
-        #"SELECT "\"" , SLEEP(5) , """"#,
-        #"SELECT "a\" , SLEEP(5) , "\""#,
+    /// Strings that end elsewhere when backslashes escape: refused on a session with backslash escapes, where the
+    /// server runs what a reading without escapes would take for a string.
+    static let againstBackslashEscapes = [
+        #"SELECT '\'' , SLEEP(5) , '\''"#,
+        #"SELECT * FROM t WHERE a = '\'' UNION SELECT LOAD_FILE('/etc/passwd') -- '"#,
         #"SELECT 'x\\' , SLEEP(1) -- '"#,
+    ]
+
+    /// The other way round: refused on a NO_BACKSLASH_ESCAPES session.
+    static let againstNoBackslashEscapes = [
+        #"SELECT 'a\' , SLEEP(5) , '\'"#,
         #"SELECT 1 FROM t WHERE a = '\' OR 1=1 INTO OUTFILE '/tmp/x' -- '"#,
         #"SELECT 1 FROM t WHERE a = '\\\' UNION SELECT LOAD_FILE('/etc/passwd') -- '"#,
         #"SELECT * FROM users WHERE name = 'x\'; DROP TABLE users; -- '"#,
+        #"SELECT 'x\\' , SLEEP(1) -- '"#,
+    ]
+
+    /// Under ANSI_QUOTES "…" is a name and its backslashes escape nothing, whatever NO_BACKSLASH_ESCAPES says.
+    static let backslashesInDoubleQuotes = [
+        #"SELECT "\"" , SLEEP(5) , """"#,
+        #"SELECT "a\" , SLEEP(5) , "\""#,
+        #"SELECT "x\" , LOAD_FILE('/etc/passwd') , \"" FROM t"#,
+        #"SELECT @"v\" , SLEEP(1) , \"""#,
     ]
 
     static let executableComments = [
