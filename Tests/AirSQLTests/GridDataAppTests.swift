@@ -319,175 +319,166 @@ extension AppTests {
             again.openSession = { session }
             main.select(main.open(again, title: "orders", connection: tab.context.connection.id))
             await ready { again.loading != nil || again.source == nil }
-            #expect(again.source?.cell(0, 2) == .text("ZZ") && again.notice.text.stringValue.hasPrefix("Left from before AirSQL quit"))
+            #expect(again.source?.cell(0, 2) == .text("ZZ") && again.notice.text.stringValue.hasPrefix("Kept from before: "))
             again.revertAllChanges(nil)
             PendingChangesStore.shared.flush()
         }
     }
 }
 
-extension AppTests {
-    /// Light and dark pictures of the table tab (AIRSQL_SCREENSHOTS=1, into build/screenshots): rows with pending
-    /// changes and a filter, the Apply preview, and a read-only view.
-    @MainActor @Suite(.enabled(if: ProcessInfo.processInfo.environment["AIRSQL_SCREENSHOTS"] == "1")) struct GridDataScreenshotTests {
-        @Test func tableTab() async throws {
-            let session = FakeTableSession()
-            let regions = ["EU", "US", "APAC", "EU", "US"]
-            session.rows = (1...28).map { (id: Int) -> [String?] in
-                let customer: String? = id % 4 == 0 ? nil : String(1_000 + id * 7)
-                let parent: String? = id % 6 == 0 ? String(2_400_960 + id - 1) : nil
-                let total = String(format: "%.2f", Double(id * 1_337 % 5_000) / 3)
-                return [String(2_400_960 + id), customer, regions[id % 5], String(9_000 + id), total, parent]
-            }
-            for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
-                let (main, harness, tab) = try await GridDataAppTests.tab(session: session, size: NSSize(width: 1180, height: 720))
-                main.window?.appearance = NSAppearance(named: appearance)
-                main.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
-                main.window?.orderFront(nil)
-                tab.bar.filterText = "total > 100"
-                tab.applyFilter("total > 100")
-                await ready { tab.loading != nil }
-                tab.source?.set(.text("1999.90"), row: 1, column: 4)
-                tab.source?.set(.text("APAC"), row: 3, column: 2)
-                tab.source?.changes.delete([["2400965"]])
-                tab.source?.changes.addRow(["region": .text("EU"), "number": .text("9100"), "total": .text("42.00")])
-                tab.changesDidChange()
-                tab.grid.selection.select(GridPosition(row: 1, column: 4))
-                main.window?.makeFirstResponder(tab.grid)
-                main.window?.displayIfNeeded()
-                try await save(harness, "table-data-\(suffix)")
-
-                tab.previewChanges(nil)
-                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-                try await save(harness, "table-data-preview-\(suffix)", target: "sheet")
-                _ = await call(harness, "press", ["title": "Cancel"])
-                tab.revertAllChanges(nil)
-                main.window?.orderOut(nil)
-
-                // The smallest window, with the find bar.
-                let (small, smallHarness, smallTab) = try await GridDataAppTests.tab(session: session, size: MainWindowController.minimumSize)
-                small.window?.appearance = NSAppearance(named: appearance)
-                small.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
-                small.window?.orderFront(nil)
-                smallTab.source?.set(.text("APAC"), row: 3, column: 2)
-                smallTab.changesDidChange()
-                smallTab.performTextFinderAction(nil)
-                smallTab.findBar.findField.stringValue = "EU"
-                smallTab.findChanged()
-                small.window?.displayIfNeeded()
-                try await save(smallHarness, "table-data-small-\(suffix)")
-                smallTab.revertAllChanges(nil)
-                small.window?.orderOut(nil)
-
-                let (viewMain, viewHarness, _) = try await GridDataAppTests.tab("customer_emails", session: .emails(),
-                                                                                size: NSSize(width: 1180, height: 520))
-                viewMain.window?.appearance = NSAppearance(named: appearance)
-                viewMain.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
-                viewMain.window?.orderFront(nil)
-                viewMain.window?.displayIfNeeded()
-                try await save(viewHarness, "table-data-read-only-\(suffix)")
-                viewMain.window?.orderOut(nil)
-            }
+extension AppTests.ScreenshotTests {
+    /// The table tab: rows with pending changes and a filter, the Apply preview, the smallest window with the find bar,
+    /// and a read-only view.
+    @Test func tableTab() async throws {
+        let session = FakeTableSession()
+        let regions = ["EU", "US", "APAC", "EU", "US"]
+        session.rows = (1...28).map { (id: Int) -> [String?] in
+            let customer: String? = id % 4 == 0 ? nil : String(1_000 + id * 7)
+            let parent: String? = id % 6 == 0 ? String(2_400_960 + id - 1) : nil
+            let total = String(format: "%.2f", Double(id * 1_337 % 5_000) / 3)
+            return [String(2_400_960 + id), customer, regions[id % 5], String(9_000 + id), total, parent]
         }
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            let (main, harness, tab) = try await AppTests.GridDataAppTests.tab(session: session, size: NSSize(width: 1180, height: 720))
+            main.window?.appearance = NSAppearance(named: appearance)
+            main.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+            main.window?.orderFront(nil)
+            tab.bar.filterText = "total > 100"
+            tab.applyFilter("total > 100")
+            await ready { tab.loading != nil }
+            tab.source?.set(.text("1999.90"), row: 1, column: 4)
+            tab.source?.set(.text("APAC"), row: 3, column: 2)
+            tab.source?.changes.delete([["2400965"]])
+            tab.source?.changes.addRow(["region": .text("EU"), "number": .text("9100"), "total": .text("42.00")])
+            tab.changesDidChange()
+            tab.grid.selection.select(GridPosition(row: 1, column: 4))
+            main.window?.makeFirstResponder(tab.grid)
+            main.window?.displayIfNeeded()
+            try await save(harness, "table-data-\(suffix)")
 
-        func save(_ harness: AgentServer, _ name: String, target: String = "main") async throws {
-            let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
-            let image = try #require(reply.image, "\(name): \(reply.error ?? "")")
-            let png = try #require(image.representation(using: .png, properties: [:]))
-            try png.write(to: AppTests.ScreenshotTests.folder.appendingPathComponent(name + ".png"))
+            tab.previewChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            try await save(harness, "table-data-preview-\(suffix)", target: "sheet")
+            _ = await call(harness, "press", ["title": "Cancel"])
+            tab.revertAllChanges(nil)
+            main.window?.orderOut(nil)
+
+            // The smallest window, with the find bar.
+            let (small, smallHarness, smallTab) = try await AppTests.GridDataAppTests.tab(session: session, size: MainWindowController.minimumSize)
+            small.window?.appearance = NSAppearance(named: appearance)
+            small.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+            small.window?.orderFront(nil)
+            smallTab.source?.set(.text("APAC"), row: 3, column: 2)
+            smallTab.changesDidChange()
+            smallTab.performTextFinderAction(nil)
+            smallTab.findBar.findField.stringValue = "EU"
+            smallTab.findChanged()
+            small.window?.displayIfNeeded()
+            try await save(smallHarness, "table-data-small-\(suffix)")
+            smallTab.revertAllChanges(nil)
+            small.window?.orderOut(nil)
+
+            let (viewMain, viewHarness, _) = try await AppTests.GridDataAppTests.tab("customer_emails", session: .emails(),
+                                                                            size: NSSize(width: 1180, height: 520))
+            viewMain.window?.appearance = NSAppearance(named: appearance)
+            viewMain.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+            viewMain.window?.orderFront(nil)
+            viewMain.window?.displayIfNeeded()
+            try await save(viewHarness, "table-data-read-only-\(suffix)")
+            viewMain.window?.orderOut(nil)
         }
     }
 }
 
-extension AppTests {
-    /// The table tab's polish (plan §2.13), as `LayoutTests` checks every screen: its bars and notices with long text, the
-    /// find bar, and its sheets, in light and dark, at the window's smallest and default size.
-    @MainActor @Suite struct GridDataLayoutTests {
-        /// Every control of the table tab, its find bar, notices and sheets has a tooltip (as `HelpTests` checks), and
-        /// so does every item of its menus.
-        @Test func everyControlOfTheTableTabSaysWhatItDoes() async throws {
-            let session = FakeTableSession()
-            let (main, harness, tab) = try await GridDataAppTests.tab(session: session)
-            let window = try #require(main.window)
-            tab.source?.set(.text("x"), row: 0, column: 2)
-            tab.changesDidChange()
-            let replace = NSMenuItem()
-            replace.tag = NSTextFinder.Action.showReplaceInterface.rawValue
-            tab.performTextFinderAction(replace)
-            var missing = unexplained([window], where: "table tab")
-            tab.grid.selection.select(GridPosition(row: 0, column: 1))
-            for target in [DataGridView.Target.cells, .column(1), .row(0)] {
-                if let menu = tab.viewer.dataGrid(tab.grid, menuFor: target) { missing += unexplained(menu, path: ["\(target)"]) }
-            }
-            tab.exportRows(nil)
-            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            missing += unexplained([try #require(window.attachedSheet)], where: "Export Rows")
-            _ = await call(harness, "press", ["id": "export.cancel"])
-            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
-            tab.filterByValues(nil)
-            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
-            missing += unexplained([try #require(window.attachedSheet)], where: "Filter by Values")
-            _ = await call(harness, "press", ["id": "values.cancel"])
-            tab.revertAllChanges(nil)
-            #expect(missing.isEmpty, "\(missing)")
+extension AppTests.HelpTests {
+    /// Every control of the table tab, its find bar, notices and sheets has a tooltip, and so does every item of its
+    /// menus.
+    @Test func everyControlOfTheTableTabSaysWhatItDoes() async throws {
+        let session = FakeTableSession()
+        let (main, harness, tab) = try await AppTests.GridDataAppTests.tab(session: session)
+        let window = try #require(main.window)
+        tab.source?.set(.text("x"), row: 0, column: 2)
+        tab.changesDidChange()
+        let replace = NSMenuItem()
+        replace.tag = NSTextFinder.Action.showReplaceInterface.rawValue
+        tab.performTextFinderAction(replace)
+        var missing = unexplained([window], where: "table tab")
+        tab.grid.selection.select(GridPosition(row: 0, column: 1))
+        for target in [DataGridView.Target.cells, .column(1), .row(0)] {
+            if let menu = tab.viewer.dataGrid(tab.grid, menuFor: target) { missing += unexplained(menu, path: ["\(target)"]) }
         }
+        tab.exportRows(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        missing += unexplained([try #require(window.attachedSheet)], where: "Export Rows")
+        _ = await call(harness, "press", ["id": "export.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        tab.filterByValues(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
+        missing += unexplained([try #require(window.attachedSheet)], where: "Filter by Values")
+        _ = await call(harness, "press", ["id": "values.cancel"])
+        tab.revertAllChanges(nil)
+        #expect(missing.isEmpty, "\(missing)")
+    }
+}
 
-        @Test func tableTabIsTidyInLightAndDarkAtEverySize() async throws {
-            var problems: [String] = []
-            for appearance in [NSAppearance.Name.aqua, .darkAqua] {
-                for size in [MainWindowController.minimumSize, MainWindowController.defaultSize] {
-                    let place = "\(appearance == .aqua ? "light" : "dark") \(Int(size.width))×\(Int(size.height))"
-                    let session = FakeTableSession()
-                    session.rows[0][2] = String(repeating: "A very long region name ", count: 20)
-                    let (main, harness, tab) = try await GridDataAppTests.tab(session: session, size: size)
-                    let window = try #require(main.window)
-                    func check(_ what: String, _ in: NSWindow? = nil) {
-                        let target = `in` ?? window
-                        target.appearance = NSAppearance(named: appearance)
-                        target.contentView?.layoutSubtreeIfNeeded()
-                        if let content = target.contentView { problems += layoutProblems(content, where: "\(place) \(what)") }
-                    }
-                    check("table tab")
-                    tab.applyFilter("region = 'EU' AND " + String(repeating: "total > 100 AND ", count: 20) + "1")
-                    await ready { tab.loading != nil }
-                    for row in 0..<3 { tab.source?.set(.text("x"), row: row, column: 2) }
-                    tab.source?.changes.addRow()
-                    tab.changesDidChange()
-                    check("pending changes")
-                    tab.problem = "The rows didn't load: " + String(repeating: "You have an error in your SQL syntax; ", count: 6)
-                    tab.updateBars()
-                    check("a problem")
-                    tab.problem = nil
-                    tab.performTextFinderAction(nil)
-                    let replace = NSMenuItem()
-                    replace.tag = NSTextFinder.Action.showReplaceInterface.rawValue
-                    tab.performTextFinderAction(replace)
-                    tab.findBar.findField.stringValue = "EU"
-                    tab.findChanged()
-                    check("find and replace")
-                    tab.exportRows(nil)
-                    _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-                    check("Export Rows", window.attachedSheet)
-                    _ = await call(harness, "press", ["id": "export.cancel"])
-                    _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
-                    tab.grid.selection.select(GridPosition(row: 0, column: 2))
-                    tab.filterByValues(nil)
-                    _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-                    _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
-                    check("Filter by Values", window.attachedSheet)
-                    _ = await call(harness, "press", ["id": "values.cancel"])
-                    _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
-                    tab.revertAllChanges(nil)
-                    let (viewMain, _, _) = try await GridDataAppTests.tab("customer_emails", session: .emails(), size: size)
-                    viewMain.window?.appearance = NSAppearance(named: appearance)
-                    viewMain.window?.contentView?.layoutSubtreeIfNeeded()
-                    if let content = viewMain.window?.contentView { problems += layoutProblems(content, where: "\(place) read-only view") }
-                    window.orderOut(nil)
-                    viewMain.window?.orderOut(nil)
+extension AppTests.LayoutTests {
+    /// The table tab's polish (plan §2.13): its bars and notices with long text, the find bar, and its sheets, in light
+    /// and dark, at the window's smallest and default size.
+    @Test func tableTabIsTidyInLightAndDarkAtEverySize() async throws {
+        var problems: [String] = []
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            for size in [MainWindowController.minimumSize, MainWindowController.defaultSize] {
+                let place = "\(appearance == .aqua ? "light" : "dark") \(Int(size.width))×\(Int(size.height))"
+                let session = FakeTableSession()
+                session.rows[0][2] = String(repeating: "A very long region name ", count: 20)
+                let (main, harness, tab) = try await AppTests.GridDataAppTests.tab(session: session, size: size)
+                let window = try #require(main.window)
+                func check(_ what: String, _ in: NSWindow? = nil) {
+                    let target = `in` ?? window
+                    target.appearance = NSAppearance(named: appearance)
+                    target.contentView?.layoutSubtreeIfNeeded()
+                    if let content = target.contentView { problems += layoutProblems(content, where: "\(place) \(what)") }
                 }
+                check("table tab")
+                tab.applyFilter("region = 'EU' AND " + String(repeating: "total > 100 AND ", count: 20) + "1")
+                await ready { tab.loading != nil }
+                for row in 0..<3 { tab.source?.set(.text("x"), row: row, column: 2) }
+                tab.source?.changes.addRow()
+                tab.changesDidChange()
+                check("pending changes")
+                tab.problem = "The rows didn't load: " + String(repeating: "You have an error in your SQL syntax; ", count: 6)
+                tab.updateBars()
+                check("a problem")
+                tab.problem = nil
+                tab.performTextFinderAction(nil)
+                let replace = NSMenuItem()
+                replace.tag = NSTextFinder.Action.showReplaceInterface.rawValue
+                tab.performTextFinderAction(replace)
+                tab.findBar.findField.stringValue = "EU"
+                tab.findChanged()
+                check("find and replace")
+                tab.exportRows(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                check("Export Rows", window.attachedSheet)
+                _ = await call(harness, "press", ["id": "export.cancel"])
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                tab.grid.selection.select(GridPosition(row: 0, column: 2))
+                tab.filterByValues(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
+                check("Filter by Values", window.attachedSheet)
+                _ = await call(harness, "press", ["id": "values.cancel"])
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                tab.revertAllChanges(nil)
+                let (viewMain, _, _) = try await AppTests.GridDataAppTests.tab("customer_emails", session: .emails(), size: size)
+                viewMain.window?.appearance = NSAppearance(named: appearance)
+                viewMain.window?.contentView?.layoutSubtreeIfNeeded()
+                if let content = viewMain.window?.contentView { problems += layoutProblems(content, where: "\(place) read-only view") }
+                window.orderOut(nil)
+                viewMain.window?.orderOut(nil)
             }
-            #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
         }
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 }

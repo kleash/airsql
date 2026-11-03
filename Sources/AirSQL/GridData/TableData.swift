@@ -13,7 +13,10 @@ extension MainWindowController {
             return tab
         }
         let content = TableDataController(model: model, context: context, database: database, table: table, filter: condition)
-        return open(content, title: table, connection: context.connection.id)
+        let tab = open(content, title: table, connection: context.connection.id)
+        // The keyboard goes to the rows: arrows, Return to edit, ⇧↩ for the value panel.
+        window?.makeFirstResponder(content.grid)
+        return tab
     }
 
     /// The navigator's double-click and Open Data, and Find Text on Server's matches (filtered by `condition`).

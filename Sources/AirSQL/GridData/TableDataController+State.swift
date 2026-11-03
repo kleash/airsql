@@ -28,7 +28,7 @@ extension TableDataController: NSMenuItemValidation {
         if let problem {
             notice.show(.problem, problem)
         } else if !source.changes.isEmpty {
-            notice.show(.pending, (restored ? "Left from before AirSQL quit: " : "") + pendingSummary(source.changes))
+            notice.show(.pending, (restored ? "Kept from before: " : "") + pendingSummary(source.changes))
         } else {
             notice.show(.readOnly, editingOff.map { "Read-only. " + $0 + "." })
         }

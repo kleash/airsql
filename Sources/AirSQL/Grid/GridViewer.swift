@@ -295,12 +295,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     private func updateValuePanel() {
         guard let valuePanel else { return }
-        guard let source, let cursor = grid.selection.cursor, cursor.row < grid.rowCount, cursor.column < grid.columnCount else {
-            return valuePanel.show(column: nil, value: nil, bytes: nil)
-        }
-        let column = grid.sourceColumn(cursor.column)
-        valuePanel.show(column: source.columns[column], value: source.value(cursor.row, column),
-                        bytes: (source as? GridBytes)?.bytes(cursor.row, column))
+        // The host's cell, also in Transpose and Record View (the names down their left show nothing).
+        guard let source, let (row, column) = focusedCell else { return valuePanel.show(column: nil, value: nil, bytes: nil) }
+        valuePanel.show(column: source.columns[column], value: source.value(row, column), bytes: (source as? GridBytes)?.bytes(row, column))
     }
 
     // MARK: Columns kept
@@ -446,6 +443,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     /// Hide Column: the selected columns, or the focused cell's.
     @objc func hideColumn(_ sender: Any?) {
+        if transposed || record != nil { transposeGrid(nil) }
         setHidden(true, columns: focusedColumns)
     }
 
