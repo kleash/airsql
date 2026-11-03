@@ -13,6 +13,60 @@ A release is a tag `vX.Y.Z` whose `VERSION` says `X.Y.Z`, made as AirSCP's are (
 and the Homebrew cask in `kleash/homebrew-tap`. `.github/workflows/release.yml` does everything after the zip; the
 zip is made either on the Mac (`scripts/release-local.sh`) or in CI when the signing secrets exist.
 
+## 1.0.0: what only the owner can do
+
+Everything else is ready (the dry run, `scripts/release-local.sh --adhoc`, passes). As of 2026-11-04 the repository
+has no Pages site, no secrets and no release, and `kleash/homebrew-tap` has no `Casks/airsql.rb`. In this order:
+
+1. **GitHub Pages**: Settings ▸ Pages ▸ Build and deployment ▸ Deploy from a branch ▸ `main`, `/docs` ▸ Save (or
+   `gh api -X POST repos/kleash/airsql/pages -f 'source[branch]=main' -f 'source[path]=/docs'`). After the first
+   build (Actions ▸ pages-build-deployment), https://kleash.github.io/airsql/ is AirSQL Help: the Help menu, the
+   README and the cask link there.
+2. **Security settings**: private vulnerability reporting (SECURITY.md points to it) and Dependabot alerts on, in
+   Settings ▸ Advanced Security, or `gh api -X PUT repos/kleash/airsql/private-vulnerability-reporting` and
+   `gh api -X PUT repos/kleash/airsql/vulnerability-alerts`. Secret scanning and push protection are on already.
+3. **Signing secrets**, so that CI signs and notarizes and a tag alone releases:
+   ```sh
+   # Keychain Access ▸ My Certificates ▸ "Developer ID Application: …" ▸ Export… as DeveloperID.p12, with a password
+   base64 -i DeveloperID.p12 | gh secret set DEVELOPER_ID_P12 -R kleash/airsql
+   gh secret set DEVELOPER_ID_P12_PASSWORD -R kleash/airsql      # it asks for the password
+   # App Store Connect ▸ Users and Access ▸ Integrations ▸ App Store Connect API ▸ Team Keys ▸ + (access: Developer):
+   # download AuthKey_<Key ID>.p8 (Apple offers it once), note the Key ID and the Issuer ID shown above the keys
+   base64 -i AuthKey_<Key ID>.p8 | gh secret set NOTARY_KEY -R kleash/airsql
+   gh secret set NOTARY_KEY_ID -R kleash/airsql --body <Key ID>
+   gh secret set NOTARY_ISSUER -R kleash/airsql --body <Issuer ID>
+   rm DeveloperID.p12                                            # keep the .p8 somewhere safe, offline
+   ```
+   Without them, the Mac signs instead: the notary profile in the table below, then step 6's second way.
+4. **The tap's token**: github.com ▸ Settings ▸ Developer settings ▸ Fine-grained tokens ▸ Generate: repository
+   access **Only `kleash/homebrew-tap`**, permission **Contents: Read and write**; then
+   `gh secret set TAP_TOKEN -R kleash/airsql` and paste it. Without it, step 7 is by hand.
+5. **The version**: `1.0.0` in `VERSION`, `mcpb/manifest.json` and `plugins/airsql/.claude-plugin/plugin.json`
+   ("version"), and the bug form's placeholder (`.github/ISSUE_TEMPLATE/bug_report.yml`); drop "in development" from
+   README.md, docs/index.md, AGENTS.md and CLAUDE.md; `scripts/llms.sh`; commit and push; wait until CI, CodeQL and
+   Security are green on that commit (`gh run watch`).
+6. **The tag**, which starts release.yml (scan, build, sign, notarize, check the zip, the release with its notes and
+   files, the cask):
+   ```sh
+   git tag -a v1.0.0 -m "AirSQL 1.0.0" && git push origin v1.0.0
+   gh run watch "$(gh run list -R kleash/airsql -w Release -L 1 --json databaseId -q '.[0].databaseId')"
+   ```
+   Without the signing secrets, on the Mac with the Developer ID (`gh release create` makes the tag; release.yml adds
+   the rest, see Release below):
+   ```sh
+   scripts/release-local.sh
+   gh release create v1.0.0 build/AirSQL-1.0.0.zip build/AirSQL-1.0.0.zip.sha256 --target main \
+       --title "AirSQL 1.0.0" --generate-notes
+   ```
+7. **The cask**: with `TAP_TOKEN`, release.yml has written `Casks/airsql.rb` to `kleash/homebrew-tap`. Without it,
+   copy the cask from the run's summary (Actions ▸ Release ▸ the run ▸ Summary) into the tap:
+   ```sh
+   gh repo clone kleash/homebrew-tap "$TMPDIR/tap" && cd "$TMPDIR/tap"
+   pbpaste > Casks/airsql.rb                                     # the summary's cask, copied
+   git add Casks/airsql.rb && git commit -m "AirSQL 1.0.0" && git push
+   ```
+8. **Check it from the outside**: the commands under "After" below, on a Mac that never built AirSQL if you can.
+
 ## One-time setup
 
 | What | How |
