@@ -133,5 +133,30 @@ extension AppTests {
                 #expect(contrast >= 4.5, "\(theme): the label is \(contrast):1 on its fill")
             }
         }
+
+        /// The navigator's selected rows, a connection and a database: their name and count on the accent, in the
+        /// accent's own text colour (the mockups' `.tr.sel`), not AppKit's white.
+        @Test func theNavigatorsSelectionReadsOnTheAccent() throws {
+            for (appearance, theme) in themes {
+                let database = TreeCell()
+                database.show(TreeIcon.database, "airsql_fixture", count: "13", busy: false, tip: "")
+                let connection = SidebarCell()
+                connection.show(Fixtures.production, state: .connected(server: "MariaDB 11.8"))
+                for cell in [database, connection] as [NSTableCellView] {
+                    let row = SidebarRowView(frame: NSRect(x: 0, y: 0, width: 240, height: 22))
+                    cell.frame = row.bounds
+                    row.addSubview(cell)
+                    row.isEmphasized = true
+                    row.isSelected = true
+                    func fields(_ view: NSView) -> [NSTextField] { [view as? NSTextField].compactMap { $0 } + view.subviews.flatMap(fields) }
+                    cell.layoutSubtreeIfNeeded()
+                    for field in fields(cell) where !field.isHiddenOrHasHiddenAncestor && !field.stringValue.isEmpty {
+                        let contrast = try drawnContrast(row, size: row.frame.size, in: { field.convert(field.bounds, to: $0) },
+                                                         appearance: appearance)
+                        #expect(contrast >= 4.5, "\(theme): “\(field.stringValue)” is \(contrast):1 on the selection")
+                    }
+                }
+            }
+        }
     }
 }
