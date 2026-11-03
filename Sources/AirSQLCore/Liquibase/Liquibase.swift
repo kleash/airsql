@@ -185,7 +185,7 @@ public enum Liquibase {
         let undo = statements.reversed().map(rollback)
         // The first name in backticks: the table or routine the change is about.
         let object = statements.lazy.compactMap { statement in
-            Tokens(statement).tokens.first { $0.kind == .quotedName }.map { unquotedName(String(decoding: Array(statement.utf16)[$0.range], as: UTF16.self)) }
+            Tokens(statement).tokens.first { $0.kind == .quotedName }.map { SQLQuote.unquoted(String(decoding: Array(statement.utf16)[$0.range], as: UTF16.self)) }
         }.first
         return LiquibaseChangeset(object: object ?? title, statements: statements,
                                   rollback: wanted && !undo.contains(nil) ? undo.compactMap { $0 } : [], comment: title)
@@ -408,7 +408,7 @@ public enum Liquibase {
     static func usedDatabase(_ statement: String) -> String? {
         let tokens = Tokens(statement)
         guard tokens.count == 2, tokens.word(0) == "USE", let (name, _) = tokens.name(1) else { return nil }
-        return unquotedName(name)
+        return SQLQuote.unquoted(name)
     }
 
     /// The database a statement's first object is named with, `db` of CREATE TABLE `db`.`t`, ALTER TABLE `db`.`t`,
@@ -417,7 +417,7 @@ public enum Liquibase {
         let tokens = Tokens(statement)
         for k in 0..<min(tokens.count, 8) where tokens.tokens[k].kind == .quotedName {
             guard tokens.text(k + 1) == ".", let name = tokens.text(k) else { return nil }
-            return unquotedName(name)
+            return SQLQuote.unquoted(name)
         }
         return nil
     }
@@ -436,11 +436,6 @@ public enum Liquibase {
             removed += end - start
         }
         return String(decoding: result, as: UTF16.self)
-    }
-
-    static func unquotedName(_ name: String) -> String {
-        name.hasPrefix("`") && name.hasSuffix("`") && name.count >= 2
-            ? String(name.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`") : name
     }
 
     static func stamp(_ date: Date, _ format: String) -> String {

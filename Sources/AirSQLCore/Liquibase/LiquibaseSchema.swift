@@ -113,7 +113,7 @@ public struct LiquibaseSchema: Equatable {
     static func names(in sql: String) -> Set<String> {
         let text = Array(sql.utf16)
         return Set(SQLLexer.tokens(sql).filter { $0.kind == .quotedName }.map {
-            Liquibase.unquotedName(String(decoding: text[$0.range], as: UTF16.self))
+            SQLQuote.unquoted(String(decoding: text[$0.range], as: UTF16.self))
         })
     }
 
