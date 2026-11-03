@@ -58,3 +58,8 @@ find them: it looks in Homebrew's folders, `/usr/local/mysql/bin`, MAMP and your
 tools of its family and version. Under each field the pane says which program and version it found, or why there is
 none or it can't be used; **Found** lists every tool on this Mac, and **Find Again** looks again after you install or
 update some. See [Export, restore, copy and import](client-tools.md).
+
+## Liquibase
+
+Who changesets are by, how their ids are made, whether a changelog is one file or a folder, how procedures, functions,
+triggers and events are kept whole, DEFINER, and `--rollback`. See [Liquibase changelogs](liquibase.md#settings).
