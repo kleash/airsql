@@ -91,7 +91,8 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
     override func accessibilityChildren() -> [Any]? { elements }
 
     /// A box's tooltip: its table's name and column lines, whole.
-    func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+    func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint,
+              userData data: UnsafeMutableRawPointer?) -> String {
         guard let box = boxes.first(where: { $0.frame.contains(point) }) else { return "" }
         let more = box.table.columns.count - box.shown.count
         return ([box.table.name] + box.shown.map { line($0, in: box.table) } + (more > 0 ? ["+ \(more) more"] : []))
