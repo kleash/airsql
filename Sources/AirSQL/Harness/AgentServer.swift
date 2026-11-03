@@ -938,6 +938,8 @@ struct KeyCombo {
         modifiers = try Self.modifiers(parts.joined(separator: "+"))
         let lower = key.lowercased()
         if let (code, character) = Self.named[lower] {
+            // ⇧Tab types backtab (U+0019), as a keyboard does, so key bindings see insertBacktab:.
+            let character = lower == "tab" && modifiers.contains(.shift) ? 0x19 : character
             base = String(UnicodeScalar(UInt32(character)).map(Character.init) ?? " ")
             keyCode = code
             characters = base
