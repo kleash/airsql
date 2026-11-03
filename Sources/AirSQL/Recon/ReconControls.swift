@@ -162,7 +162,7 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         }
         ignore.toolTip = "Choose differences the compare doesn't count: AUTO_INCREMENT values, DEFINER, collations, whitespace"
         ignore.setAccessibilityIdentifier("recon.ignore")
-        sync.keyEquivalent = ""
+        for button in [compare, tables, export, changeset, sync] { button.bezelStyle = .texturedRounded }  // as the main toolbar's
         sync.bezelColor = .controlAccentColor
     }
 
