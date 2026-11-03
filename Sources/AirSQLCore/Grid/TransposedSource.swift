@@ -48,5 +48,9 @@ public final class TransposedSource: GridSource {
         column == 0 ? .none : base.mark(sourceRow(column), order[row])
     }
 
+    public func note(_ row: Int, _ column: Int) -> String? {
+        column == 0 ? nil : base.note(sourceRow(column), order[row])
+    }
+
     public func prefetch(_ rows: Range<Int>) {}
 }

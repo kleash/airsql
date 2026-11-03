@@ -28,6 +28,17 @@ extension AppTests {
                            _ visit: (String, [NSWindow]) async -> Void) async throws {
             let window = try #require(main.window)
             await visit("console results", [window])
+            // Compare With…: its sheet, then the rows that differ from yesterday's result in a tab of their own.
+            console.addResult(yesterday(), title: "Yesterday", summary: "41 ms · 200 rows")
+            console.selectResult(console.resultTabs[0])
+            console.compareResult(nil)
+            await visit("compare with", harness.openSheets())
+            _ = await call(harness, "press", ["title": "Compare"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(await eventually(timeout: 10) { console.resultTabs.count == 3 })
+            window.layoutIfNeeded()
+            await visit("console comparison", [window])
+            for _ in 0..<2 { console.closeResult(nil) }
             console.selectResult(console.messagesTab)
             await visit("console messages", [window])
             console.addPlan(table: ConsoleFixtures.customers(rows: 3), tree: "-> Limit: 200 row(s)\n    -> Sort: spent DESC", title: "Plan")
@@ -50,6 +61,23 @@ extension AppTests {
             await visit("history", harness.openSheets())
             _ = await call(harness, "press", ["title": "Cancel"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        }
+
+        /// The dressed console's customers as they were yesterday: a few spent other sums, three weren't there yet, and two
+        /// have gone since.
+        static func yesterday() -> ResultStore {
+            let today = ConsoleFixtures.customers()
+            let store = ResultStore(columns: today.columns)
+            for row in 0..<today.rowCount where row % 61 != 4 {
+                var cells = (0..<today.columns.count).map { today.bytes(row, $0) }
+                if row % 17 == 3 { cells[4] = Array(String(format: "%.2f", 180_000 - Double(row) * 300).utf8) }
+                if row == 8 { cells[2] = Array("old.address@mail.example".utf8) }
+                store.append(cells)
+            }
+            for id in [20_001, 20_002] {
+                store.append([Array("\(id)".utf8), Array("Closed account \(id)".utf8), nil, Array("0".utf8), Array("0.00".utf8)])
+            }
+            return store
         }
 
         @Test func theHistoryRowsShareABaselineAndShowTheirResult() async throws {

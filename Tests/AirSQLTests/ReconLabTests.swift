@@ -239,3 +239,69 @@ struct ReconLabTests {
         try await Self.run(target, ["DROP DATABASE lane_l8a_hostile_dst"])
     }
 }
+
+/// Compare With… against the lab: a result compared with another result and with a table on MariaDB 11.8 and MySQL 8.4,
+/// and results of the two flavours compared as values. Writes only in databases named lane_gridcompare_*.
+@Suite(.serialized, .enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests"))
+struct ReconResultsLabTests {
+    /// `items` and `items_copy`, which differs from it by a changed row (2), one row fewer (3) and one more (4).
+    static let items = [
+        """
+        CREATE TABLE items (id INT PRIMARY KEY, name VARCHAR(40) NOT NULL, price DECIMAL(10,2), tags JSON, img BLOB,
+            seen TIMESTAMP NULL, ratio DOUBLE)
+        """,
+        """
+        INSERT INTO items VALUES (1, 'pen', 2.50, '{"b":[2,3],"a":1}', X'00FF', '2026-01-02 03:04:05', 0.1),
+            (2, 'ink', 4.00, NULL, NULL, NULL, 1e-3), (3, 'pad', 1.00, '[]', '', NULL, 2)
+        """,
+    ]
+    static let copy = ["CREATE TABLE items_copy LIKE items", "INSERT INTO items_copy SELECT * FROM items",
+                       "UPDATE items_copy SET name = 'INK', price = 4.10 WHERE id = 2", "DELETE FROM items_copy WHERE id = 3",
+                       "INSERT INTO items_copy VALUES (4, 'cap', 7.00, NULL, X'01', NULL, NULL)"]
+
+    static func rows(_ session: DBConnection, _ sql: String) async throws -> ResultStore {
+        try #require(try await session.query(sql).first { $0.rows != nil }?.rows)
+    }
+
+    @Test(arguments: [Lab.mariadb118, Lab.mysql84])
+    func aResultComparesWithAnotherAndWithATable(_ server: Lab.Server) async throws {
+        let session = try await ReconLabTests.session(server)
+        let database = "lane_gridcompare_\(server.flavor == .mysql ? "mysql" : "mariadb")"
+        try await ReconLabTests.database(session, database, Self.items + Self.copy)
+        let items = try await Self.rows(session, "SELECT * FROM items"), copy = try await Self.rows(session, "SELECT * FROM items_copy")
+        let data = ReconTableData.compare(items, copy, key: ["id"])
+        #expect(data.columns.map(\.kind) == [.integer, .text, .decimal, server.flavor == .mysql ? .json : .longText, .blob, .temporal, .float])
+        #expect(data.missing.map { $0.text(0, kind: .integer) } == ["3"] && data.extra.map { $0.text(0, kind: .integer) } == ["4"])
+        #expect(data.changed.map(\.columns) == [[1, 2]] && data.changed.first?.target.text(1, kind: .text) == "INK")
+        // The table read from the server gives the same, its own table nothing; matched on every column, the changed
+        // row is on both sides.
+        #expect(try await ReconTableData.compare(items, table: "items_copy", database: database, on: session, key: ["id"]) == data)
+        #expect(try await ReconTableData.compare(items, table: "items", database: database, on: session, key: ["id"]).outcome == .same)
+        let whole = try await ReconTableData.compare(items, table: "items_copy", database: database, on: session, key: [])
+        #expect(whole.missing.count == 2 && whole.extra.count == 2 && whole.changed.isEmpty)
+        // More rows than a result holds: not compared, saying what to do instead.
+        let big = try await ReconTableData.compare(items, table: "big", database: "fixture", on: session, key: ["id"])
+        #expect(big.outcome == .notCompared("big has more than 100,000 rows: compare the result of a query with a WHERE instead, "
+            + "or whole tables with Tools ▸ Compare."))
+        try await ReconLabTests.run(session, ["DROP DATABASE \(database)"])
+        await session.close()
+    }
+
+    /// The same rows read from MariaDB and from MySQL compare the same either way round, though MySQL rewrites the JSON
+    /// (`{"a": 1, "b": [2, 3]}`) and MariaDB keeps it as written; a changed value on one side shows.
+    @Test func resultsOfMariaDBAndMySQLCompareAsValues() async throws {
+        let maria = try await ReconLabTests.session(Lab.mariadb118), mysql = try await ReconLabTests.session(Lab.mysql84)
+        for session in [maria, mysql] { try await ReconLabTests.database(session, "lane_gridcompare_both", Self.items) }
+        let a = try await Self.rows(maria, "SELECT * FROM items"), b = try await Self.rows(mysql, "SELECT * FROM items")
+        #expect(a.string(0, 3) != b.string(0, 3), "each server writes the JSON its own way")
+        #expect(ReconTableData.compare(a, b, key: ["id"]).outcome == .same)
+        #expect(ReconTableData.compare(b, a, key: ["id"]).outcome == .same)
+        try await ReconLabTests.run(mysql, ["UPDATE items SET tags = '{\"a\": 1, \"b\": [3, 2]}', ratio = 0.25 WHERE id = 1"])
+        let changed = ReconTableData.compare(a, try await Self.rows(mysql, "SELECT * FROM items"), key: ["id"])
+        #expect(changed.changed.map(\.columns) == [[3, 6]] && changed.missing.isEmpty && changed.extra.isEmpty)
+        for session in [maria, mysql] {
+            try await ReconLabTests.run(session, ["DROP DATABASE lane_gridcompare_both"])
+            await session.close()
+        }
+    }
+}

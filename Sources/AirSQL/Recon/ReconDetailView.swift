@@ -2,9 +2,9 @@ import AirSQLCore
 import AppKit
 
 /// The selected object's details: its two definitions side by side with the lines that differ marked, or its rows that
-/// differ; and its part of the sync script.
+/// differ in the data grid (a `DiffSource`); and its part of the sync script.
 @MainActor
-final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
+final class ReconDetailView: NSObject {
     weak var window: ReconWindowController?
     let view = NSView()
     let tabs = NSSegmentedControl(labels: ["Structure", "Data"], trackingMode: .selectOne, target: nil, action: nil)
@@ -14,7 +14,8 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
     let right = ReconDetailView.textView(id: "recon.targetDDL")
     let leftTitle = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     let rightTitle = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
-    let rows = NSTableView()
+    /// The selected table's rows that differ, while the Data tab shows them.
+    private(set) var rows: ResultGridView?
     let message = label("", color: .secondaryLabelColor, wraps: true)
     let scriptTitle = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     let destructive = checkbox("Include destructive steps", id: "recon.destructive",
@@ -22,7 +23,7 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
                                on: false, target: nil, action: nil)
     let script = ReconDetailView.textView(id: "recon.script")
     private let structure = NSSplitView()
-    private let rowsScroll = NSScrollView()
+    private let rowsHolder = NSView()
     private var object: ReconObject?
     private var result: ReconResult?
 
@@ -57,26 +58,13 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         let halves = leftColumn.widthAnchor.constraint(equalTo: rightColumn.widthAnchor)
         halves.priority = .defaultLow  // halves to start with; dragging the divider wins
         halves.isActive = true
-        rows.usesAlternatingRowBackgroundColors = true
-        rows.dataSource = self
-        rows.delegate = self
-        rows.allowsMultipleSelection = true
-        rows.columnAutoresizingStyle = .noColumnAutoresizing
-        rows.setAccessibilityIdentifier("recon.rows")
-        rows.setAccessibilityLabel("Rows that differ")
-        rows.menu = NSMenu()
-        rows.menu?.delegate = self
-        rowsScroll.documentView = rows
-        rowsScroll.hasVerticalScroller = true
-        rowsScroll.hasHorizontalScroller = true
-        rowsScroll.autohidesScrollers = true
         message.alignment = .center
         let scriptHeader = NSStackView(views: [scriptTitle, destructive])
         scriptHeader.spacing = Spacing.double
         scriptHeader.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 4, right: Spacing.double)
         script.heightAnchor.constraint(equalToConstant: 150).isActive = true
         let content = NSView()
-        for view in [structure, rowsScroll] as [NSView] {
+        for view in [structure, rowsHolder] {
             content.addSubview(view)
             view.pin(to: content)
         }
@@ -119,6 +107,8 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
     func show(_ object: ReconObject?, result: ReconResult, data: Bool? = nil) {
         self.object = object
         self.result = result
+        rows?.removeFromSuperview()
+        rows = nil
         if let data { tabs.selectedSegment = data ? 1 : 0 }
         update()
     }
@@ -130,7 +120,7 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
             tabs.setToolTip("Compare first: then there is something to show", forSegment: segment)
         }
         structure.isHidden = true
-        rowsScroll.isHidden = true
+        rowsHolder.isHidden = true
         message.stringValue = "Choose a database on each side, then Compare (⌘R). The script it makes changes the target only "
             + "when you run it."
         message.isHidden = false
@@ -151,7 +141,7 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         if object?.data == nil { tabs.selectedSegment = 0 }
         let showsData = tabs.selectedSegment == 1
         structure.isHidden = showsData || object == nil
-        rowsScroll.isHidden = !showsData || object == nil
+        rowsHolder.isHidden = !showsData || object == nil
         message.isHidden = true
         scriptTitle.stringValue = "Sync script (makes \(result.target.name) match \(result.source.name)) · review before running"
         guard let object else {
@@ -216,85 +206,34 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
 
     // MARK: Rows
 
-    private var shown: [(kind: String, row: ReconRow, changed: ReconRowChange?)] = []
-
+    /// The rows that differ in the grid: those only in the source, only in the target, then those changed, with the cells
+    /// that differ marked. The sides go by their connections' names, or their databases' when the connection is the same.
+    /// Made once per object shown, so its selection, sort and scrolling stay while the window updates.
     private func showRows(_ object: ReconObject) {
-        guard let data = object.data else { return }
-        shown = data.missing.map { ("Missing", $0, nil) } + data.extra.map { ("Extra", $0, nil) }
-            + data.changed.map { ("Changed", $0.source, $0) }
-        for column in rows.tableColumns.reversed() { rows.removeTableColumn(column) }
-        for (index, title) in (["Row"] + data.columns.map(\.name)).enumerated() {
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("\(index)"))
-            column.title = title
-            column.headerToolTip = index == 0 ? "Missing: only in the source; Extra: only in the target; Changed: in both"
-                : (index - 1 < data.key.count ? "Key column \(title)" : "Column \(title)")
-            column.width = index == 0 ? 80 : 140
-            rows.addTableColumn(column)
-        }
-        rows.reloadData()
+        guard let data = object.data, let result else { return }
         switch data.outcome {
         case .differentWithoutKey, .tooManyDifferences, .notCompared:
-            message.stringValue = ReconReport.lines(object, result!).last?.detail.capitalizedFirst ?? ""
+            message.stringValue = ReconReport.lines(object, result).last?.detail.capitalizedFirst ?? ""
             message.isHidden = false
-            rowsScroll.isHidden = true
+            rowsHolder.isHidden = true
         case .same:
             message.stringValue = "The rows of \(object.name) are the same on both sides."
             message.isHidden = false
-            rowsScroll.isHidden = true
-        case .different: break
+            rowsHolder.isHidden = true
+        case .different:
+            guard rows == nil else { return }
+            let names = result.source.name == result.target.name ? (result.source.database, result.target.database)
+                : (result.source.name, result.target.name)
+            let diff = DiffSource(data, names: names)
+            let settings = window?.model.data.settings ?? AppSettings()
+            let grid = ResultGridView(source: diff, table: (result.source.database, object.name), legend: diff.legend,
+                                      nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize))
+            grid.grid.setAccessibilityIdentifier("recon.rows")
+            grid.grid.setAccessibilityLabel("Rows that differ")
+            rowsHolder.addSubview(grid)
+            grid.pin(to: rowsHolder)
+            rows = grid
         }
-    }
-
-    func numberOfRows(in tableView: NSTableView) -> Int { shown.count }
-
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard let tableColumn, let index = Int(tableColumn.identifier.rawValue), let data = object?.data else { return nil }
-        let field = tableView.makeView(withIdentifier: tableColumn.identifier, owner: self) as? NSTextField
-            ?? label("", font: .monospacedSystemFont(ofSize: 11.5, weight: .regular), truncates: true)
-        field.identifier = tableColumn.identifier
-        let item = shown[row]
-        field.drawsBackground = false
-        guard index > 0 else {
-            field.stringValue = item.kind
-            field.textColor = item.kind == "Missing" ? .statusOK : item.kind == "Extra" ? .statusBad : .statusWarning
-            field.toolTip = nil
-            return field
-        }
-        let column = index - 1, kind = data.columns[column].kind
-        let value = item.row.text(column, kind: kind)
-        field.stringValue = value.map { String($0.prefix(300)) } ?? "NULL"
-        field.textColor = value == nil ? .dataNull : .labelColor
-        if let change = item.changed, change.columns.contains(column) {
-            let old = change.target.text(column, kind: kind) ?? "NULL"
-            field.drawsBackground = true
-            field.backgroundColor = .pendingEdit
-            field.toolTip = "\(result?.target.name ?? "Target") has \(old.prefix(300)); \(result?.source.name ?? "source") has \(value?.prefix(300) ?? "NULL")"
-        } else {
-            field.toolTip = value.map { String($0.prefix(300)) }
-        }
-        return field
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        // Right-clicking a row outside the selection selects it first.
-        if rows.clickedRow >= 0, !rows.selectedRowIndexes.contains(rows.clickedRow) {
-            rows.selectRowIndexes(IndexSet(integer: rows.clickedRow), byExtendingSelection: false)
-        }
-        menu.removeAllItems()
-        let copy = Commands.copy.item()
-        copy.target = self
-        menu.addItem(copy)
-    }
-
-    /// The selected rows (else every row shown) as tab-separated text under the columns' names, NULL as NULL.
-    @objc func copy(_ sender: Any?) {
-        guard let data = object?.data else { return }
-        let picked = rows.selectedRowIndexes.isEmpty ? IndexSet(shown.indices) : rows.selectedRowIndexes
-        let lines = [["Row"] + data.columns.map(\.name)] + picked.map { index in
-            [shown[index].kind] + data.columns.indices.map { shown[index].row.text($0, kind: data.columns[$0].kind) ?? "NULL" }
-        }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(lines.map { $0.joined(separator: "\t") }.joined(separator: "\n"), forType: .string)
     }
 
     @objc private func tabChosen(_ sender: Any?) { update() }

@@ -25,7 +25,8 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
   diagram.
 - [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy
   to another server; CSV import.
-- [Compare two databases](compare.md): structure and data, side by side, and a sync script you review first.
+- [Compare two databases](compare.md): structure and data, side by side, and a sync script you review first; or two
+  results, or a result with a table, row by row.
 - [AI agents](agents.md): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
 - [Liquibase changelogs](liquibase.md): a database as formatted SQL changesets, and any change saved as one.

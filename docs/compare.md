@@ -31,10 +31,14 @@ its rows when they differ.
   triggers, events and sequences. The **Structure** tab shows both definitions side by side, the lines only one
   side has marked.
 - **Data:** the rows of every table both sides have, matched on the primary key, or on a unique key whose columns
-  are all NOT NULL. The **Data** tab lists rows **missing** from the target, **extra** in it, and **changed** rows,
-  with the cells that differ marked (hold the pointer over one to see the target's value); ⌘C or a right-click copies
-  the selected rows as tab-separated text. Tables without such a key are still checked as a whole, but their rows
-  can't be matched or synced. Generated columns are left out: their values follow from the others.
+  are all NOT NULL. The **Data** tab shows the rows that differ in the [data grid](data-grid.md), as a sync would
+  change the target: rows only in the source in green (the script inserts them), rows only in the target in red and
+  struck through (it deletes them), then rows in both whose differing cells are amber (it updates them); hold the
+  pointer over an amber cell to see both values. The line above the rows counts each kind. The grid works as
+  elsewhere: select cells or rows with ⌘ and ⇧, copy them in any format (⌘C, **Copy with Headers**, **Copy As**),
+  sort by a header, see a long value in the value panel, or save the rows with **Export Rows…**. Tables without such a
+  key are still checked as a whole, but their rows can't be matched or synced. Generated columns are left out: their
+  values follow from the others.
 
 MySQL and MariaDB write the same thing differently, and the compare reads them alike: `int(11)` and `int`, MariaDB's
 JSON (a LONGTEXT with a check) and MySQL's, `CURRENT_TIMESTAMP` and `current_timestamp()`, `NO ACTION` and
@@ -98,6 +102,27 @@ values: after running the script, compare again to copy their values. After a sy
 
 **Save as Changeset…** saves the script as [Liquibase](liquibase.md) changesets in a changelog you choose; so does
 **Query ▸ Save as Changeset…** in the “Sync script” tab.
+
+## Compare two results, or a result with a table
+
+In a [console](console.md), **Compare With…** (a result tab's right-click menu, or **Query ▸ Compare With…**) compares
+the result shown with another one, row by row:
+
+- **Compare with** offers the other result tabs of the window, this console's nearest first (a result from another
+  console tab, such as the same query on another server, carries that tab's name), then the tables and views of the
+  console's database.
+- **Match rows on** says which columns tell rows apart: the result's key when it has one, a single column, or every
+  column (rows then differ only as being on one side). Rows with the same values there are the same row; when several
+  share them, they pair up in the order they come.
+- The rows that differ open in a result tab of their own, named after the other side (“vs Yesterday”), next to the
+  result: rows only in this result green, rows only in the other red and struck through, and in rows on both sides the
+  cells that differ amber (hold the pointer over one to see both values). The results bar says how many rows are the
+  same. When nothing differs, AirSQL says so instead.
+
+Only the columns both sides have, by name, are compared, with the rules of the data compare: numbers, decimals of
+another scale and floats as numbers, JSON as values (MySQL writes it its own way), NULL apart from an empty string. A
+table is read up to 100,000 rows; for a larger one, compare the result of a query with a WHERE, or whole tables with
+**Tools ▸ Compare…**. Comparing only reads.
 
 ## Export the report
 

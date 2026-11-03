@@ -50,6 +50,37 @@ extension AppTests.AgentGateUITests {
         #expect(Self.colours(await agentCall(service, "screenshot").image, patch) > 4)
     }
 
+    /// A console's comparison with another connection's result shows that connection's rows too: hidden from agents
+    /// unless they may read the data of both.
+    @Test func aComparisonWithAnotherConnectionsResultIsHiddenUnlessBothMayBeRead() async throws {
+        let (main, harness, service) = try await Self.agents()
+        defer {
+            service.close()
+            ConsoleViewController.openConnection = { _ in nil }
+        }
+        var production = Fixtures.production
+        production.agentAccess = .schemaRead
+        service.model.save(production)
+        let staging = try await Self.console(main, harness, on: Fixtures.staging.id)  // agents off
+        staging.addResult(ConsoleFixtures.customers(rows: 5), title: "Customers", summary: "")
+        let console = try await Self.console(main, harness, on: Fixtures.production.id)
+        console.addResult(ConsoleFixtures.customers(rows: 8), title: "Customers", summary: "")
+        console.showResults()
+        func hidden() async -> Bool {
+            let elements = (await agentCall(service, "snapshot", ["include": ["elements"]])["elements"] as? [[String: Any]]) ?? []
+            return elements.contains { $0["role"] as? String == "table" && ($0["hidden"] as? String)?.hasPrefix("Hidden from agents") == true }
+        }
+        #expect(await !hidden(), "Production's own rows: Schema + read")
+        console.compareResult(nil)
+        let sheet = try #require(main.window?.attachedSheet?.contentView)
+        let with = try #require(find(NSPopUpButton.self, id: "compare.with", in: sheet))
+        #expect(with.titleOfSelectedItem == "Query 1 › Customers · 5 × 5")
+        #expect(await call(harness, "press", ["title": "Compare"]).error == nil)
+        #expect(await eventually(timeout: 10) { console.selectedResult?.title == "vs Query 1 › Customers" })
+        #expect(console.selectedResult?.otherConnection == Fixtures.staging.id)
+        #expect(await hidden(), "the comparison shows Staging's rows too")
+    }
+
     @Test func theUIToolsAndTheGateWorkThroughAirSQLMCP() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)
