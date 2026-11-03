@@ -75,3 +75,66 @@ struct TableDataTests {
         #expect(column.typeLine.contains(" · default") && column.details.contains("has a default"))
     }
 }
+
+/// The status bar's figures, Go to Row's text and Open Table's names (L2).
+struct GridReadingTests {
+    @Test func figuresAddDecimalsExactlyAndSkipNulls() {
+        let figures = GridAggregate(["3905.20", "540.00", "2118.75", nil])
+        #expect(figures.count == 3 && figures.nulls == 1 && figures.distinct == 3)
+        #expect(figures.sum == Decimal(string: "6563.95"))
+        let posix = Locale(identifier: "en_US")
+        #expect(figures.text(.sum, locale: posix) == "6,563.95")
+        #expect(figures.text(.average, locale: posix) == "2,187.9833")
+        #expect(figures.text(.median, locale: posix) == "2,118.75")
+        #expect(figures.text(.minimum, locale: posix) == "540" && figures.text(.maximum, locale: posix) == "3,905.2")
+        #expect(figures.copyText(.sum) == "6563.95" && figures.copyText(.count) == "3")
+        // 0.1 + 0.2 is 0.3 here, not 0.30000000000000004.
+        #expect(GridAggregate(["0.1", "0.2"]).copyText(.sum) == "0.3")
+    }
+
+    @Test func wordsHaveNoSumButAMinimumAndMaximum() {
+        let figures = GridAggregate(["paid", "shipped", "paid", "12"])
+        #expect(figures.sum == nil && figures.text(.sum) == nil && figures.text(.average) == nil)
+        #expect(figures.minimum == "12" && figures.maximum == "shipped" && figures.distinct == 3)
+        #expect(GridAggregate([nil, nil]).text(.sum) == nil && GridAggregate([String?]()).count == 0)
+        #expect(GridAggregate(["-1e3", "+2", ".5"]).copyText(.sum) == "-997.5")
+    }
+
+    @Test func selectedCellsAreEachCountedOnce() {
+        var selection = GridSelection()
+        selection.select(GridPosition(row: 1, column: 1))
+        selection.select(GridPosition(row: 2, column: 2), extend: true)
+        #expect(selection.cellCount(rows: 10, columns: 5) == 4)
+        selection.selectColumn(2, add: true)
+        #expect(selection.cellCount(rows: 10, columns: 5) == 14)
+        let cells = selection.cells(rows: 10, columns: 5, limit: 100)
+        #expect(cells?.count == 12 && cells?.first == GridPosition(row: 0, column: 2))
+        #expect(selection.cells(rows: 10, columns: 5, limit: 13) == nil)
+        selection.selectAll()
+        #expect(selection.cellCount(rows: 1_000_000, columns: 50) == 50_000_000)
+        #expect(selection.cells(rows: 1_000_000, columns: 50, limit: 100_000) == nil)
+    }
+
+    @Test func goToRowTakesANumberOrColumnAndRow() {
+        #expect(GridGoTo("120") == GridGoTo("120"))
+        #expect(GridGoTo(" 1,200 ")?.row == 1_199 && GridGoTo("120")?.column == nil)
+        let target = GridGoTo("Email:7")
+        #expect(target?.row == 6 && target?.columnIndex(in: ["id", "name", "email"]) == 2)
+        #expect(GridGoTo("2:7")?.columnIndex(in: ["id", "name"]) == 1)
+        #expect(GridGoTo("a:b:3")?.column == "a:b")
+        #expect(GridGoTo("0") == nil && GridGoTo("x") == nil && GridGoTo("") == nil && GridGoTo("-4") == nil)
+        #expect(GridGoTo("nope:3")?.columnIndex(in: ["id"]) == nil)
+    }
+
+    @Test func openTableReadsDatabaseAndTableNames() {
+        func parsed(_ text: String, _ current: String? = "shop") -> [String]? {
+            TableQuery(name: text, database: current).map { [$0.database, $0.table] }
+        }
+        #expect(parsed("orders") == ["shop", "orders"])
+        #expect(parsed(" sales.orders ") == ["sales", "orders"])
+        #expect(parsed("`my.db`.`order``s.x`") == ["my.db", "order`s.x"])
+        #expect(parsed("`a b` ") == ["shop", "a b"])
+        #expect(parsed("orders", nil) == nil && parsed("") == nil && parsed("`open") == nil && parsed("shop.") == nil)
+        #expect(parsed("a.b.c") == ["a", "b.c"])
+    }
+}

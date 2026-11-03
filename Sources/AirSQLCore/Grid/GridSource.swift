@@ -28,11 +28,18 @@ public protocol GridSource: AnyObject {
     func prefetch(_ rows: Range<Int>)
     /// A pending change or a difference on this cell, drawn in its colour.
     func mark(_ row: Int, _ column: Int) -> GridMark
+    /// The cell's whole value, never shortened (copy, the value panel, the selection's sum): nil for NULL and while
+    /// loading.
+    func value(_ row: Int, _ column: Int) -> String?
 }
 
 public extension GridSource {
     func prefetch(_ rows: Range<Int>) {}
     func mark(_ row: Int, _ column: Int) -> GridMark { .none }
+    func value(_ row: Int, _ column: Int) -> String? {
+        if case .text(let text) = cell(row, column) { return text }
+        return nil
+    }
 }
 
 /// A column as the grid shows it.

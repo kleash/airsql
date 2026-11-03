@@ -16,6 +16,34 @@ public struct TableQuery: Equatable {
         self.sort = sort
     }
 
+    /// A table named as typed in Open Table: `table`, `database.table`, or either part in backticks (which may hold
+    /// dots); `table` alone is in `database`. Nil when it names no table, or no database is known.
+    public init?(name: String, database current: String?) {
+        var parts: [String] = [], part = "", quoted = false, wasQuoted = false
+        var characters = name.trimmingCharacters(in: .whitespacesAndNewlines)[...]
+        while let character = characters.popFirst() {
+            if character == "`" {
+                if quoted, characters.first == "`" {
+                    part.append(characters.removeFirst())
+                } else {
+                    quoted.toggle()
+                    wasQuoted = true
+                }
+            } else if character == ".", !quoted, parts.isEmpty {
+                parts.append(part)
+                part = ""
+                wasQuoted = false
+            } else {
+                part.append(character)
+            }
+        }
+        parts.append(wasQuoted ? part : part.trimmingCharacters(in: .whitespaces))
+        guard !quoted, let table = parts.last, !table.isEmpty else { return nil }
+        let database = parts.count == 2 ? parts[0] : current
+        guard let database, !database.isEmpty else { return nil }
+        self.init(database: database, table: table)
+    }
+
     private var from: String {
         let condition = filter.trimmingCharacters(in: .whitespacesAndNewlines)
         // A newline before the closing parenthesis, so a condition ending in a -- comment can't swallow it.

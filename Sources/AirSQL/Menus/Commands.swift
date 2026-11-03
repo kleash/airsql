@@ -119,6 +119,7 @@ import AppKit
     @objc optional func createTable(_ sender: Any?)
     @objc optional func createObject(_ sender: Any?)
     @objc optional func openData(_ sender: Any?)
+    @objc optional func openTable(_ sender: Any?)
     @objc optional func openStructure(_ sender: Any?)
     @objc optional func openObject(_ sender: Any?)
     @objc optional func runRoutine(_ sender: Any?)
@@ -464,6 +465,8 @@ enum Commands {
     static let createObject = Command("New…", #selector(AirSQLActions.createObject(_:)),
                                       tip: "Create a new object of this kind: a table, view, routine, trigger or event")
     static let openData = Command("Open Data", #selector(AirSQLActions.openData(_:)), tip: "Open the table's rows in a tab of their own")
+    static let openTable = Command("Open Table…", #selector(AirSQLActions.openTable(_:)), "O",
+                                   tip: "Open a table's rows in a tab by typing its name")
     static let openStructure = Command("Open Structure", #selector(AirSQLActions.openStructure(_:)),
                                        tip: "Open the table's columns, indexes and keys in the table editor")
     static let openObject = Command("Open", #selector(AirSQLActions.openObject(_:)), tip: "Open the routine, trigger or event in its editor")
@@ -595,7 +598,7 @@ enum Commands {
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterByValues, clearFilter, sortAscending,
         sortDescending, clearSort, goToRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
         exportRows,
-        newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
+        newDatabase, createTable, createObject, openData, openTable, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
         killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal,

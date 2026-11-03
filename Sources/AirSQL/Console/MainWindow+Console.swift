@@ -71,11 +71,11 @@ extension MainWindowController: AgentConsoles {
         return tab
     }
 
-    /// A console command sent while the focus is elsewhere in the window (the sidebar, the tab bar) goes to the console
-    /// shown, as the toolbar's Run does.
+    /// A console or grid command sent while the focus is elsewhere in the window (the sidebar, the tab bar) goes to the
+    /// tab shown, as the toolbar's Run does.
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        if let console = selectedTab?.content as? ConsoleViewController, console.isViewLoaded, console.responds(to: action) {
-            return console
+        if let content = selectedTab?.content, content.isViewLoaded, content.responds(to: action) {
+            return content
         }
         return super.supplementalTarget(forAction: action, sender: sender)
     }
