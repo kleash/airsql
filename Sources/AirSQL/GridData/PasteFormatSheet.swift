@@ -27,6 +27,7 @@ enum PasteFormatSheet {
                           tip: "Choose the order of day, month and year in the copied dates")
         let grid = NSGridView(views: [[label("Cells separated by:"), separator], [label("Decimal mark:"), mark], [label("Dates:"), order]])
         grid.column(at: 0).xPlacement = .trailing
+        grid.rowAlignment = .firstBaseline
         grid.rowSpacing = Spacing.unit
         grid.frame.size = grid.fittingSize
         var unsure: [String] = []
