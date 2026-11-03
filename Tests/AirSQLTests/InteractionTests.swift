@@ -104,6 +104,7 @@ extension AppTests {
                     place: { main, _ in
                         let console = ConsoleViewController(model: main.model, connection: Fixtures.production.id)
                         main.open(console, title: "Query 1", connection: Fixtures.production.id)
+                        try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the editor and results take their share
                         console.addResult(ConsoleFixtures.customers(rows: 3), title: "Top customers", summary: "38 ms · 3 rows")
                         console.selectResult(console.messagesTab)
                         main.window?.layoutIfNeeded()
