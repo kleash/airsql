@@ -14,11 +14,19 @@ final class FakeTableSession: TableSession {
                              ["3", "9", "EU", "102", "0.10", nil]]
     var changed: (String) -> UInt64 = { _ in 1 }
 
-    static let columns: [ResultStore.Column] = [
+    var columns: [ResultStore.Column] = [
         .init(name: "id", type: MYSQL_TYPE_LONGLONG), .init(name: "customer_id", type: MYSQL_TYPE_LONG),
         .init(name: "region", type: MYSQL_TYPE_STRING), .init(name: "number", type: MYSQL_TYPE_LONG),
         .init(name: "total", type: MYSQL_TYPE_NEWDECIMAL), .init(name: "parent_id", type: MYSQL_TYPE_LONGLONG),
     ]
+
+    /// The view customer_emails's rows instead.
+    static func emails() -> FakeTableSession {
+        let session = FakeTableSession()
+        session.columns = [.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING)]
+        session.rows = [["1", "ann@example.com"], ["2", nil], ["3", "cy@example.org"]]
+        return session
+    }
 
     func query(_ sql: String, rowCap: Int) async throws -> [StatementResult] {
         statements.append(sql)
@@ -30,7 +38,7 @@ final class FakeTableSession: TableSession {
         if sql.hasPrefix("SELECT TABLE_ROWS") || sql.hasPrefix("SELECT COUNT(*)") {
             return result([.init(name: "n", type: MYSQL_TYPE_LONGLONG)], [[String(rows.count)]])
         }
-        if sql.hasPrefix("SELECT") { return result(Self.columns, rows) }
+        if sql.hasPrefix("SELECT") { return result(columns, rows) }
         let affected = ["START TRANSACTION", "COMMIT", "ROLLBACK"].contains(sql) ? 0 : changed(sql)
         return [StatementResult(rows: nil, affectedRows: affected, insertID: 0, warnings: 0, info: nil, duration: 0)]
     }
@@ -151,7 +159,7 @@ extension AppTests {
         }
 
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
-            let (_, _, tab) = try await Self.tab("customer_emails")
+            let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
             #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. Views are read-only"))
             #expect(tab.source?.canEdit(0, 0) == false)
             let item = Commands.addRow.item()
@@ -172,6 +180,64 @@ extension AppTests {
             #expect(again.source?.cell(0, 2) == .text("ZZ") && again.notice.text.stringValue.hasPrefix("Left from before AirSQL quit"))
             again.revertAllChanges(nil)
             PendingChangesStore.shared.flush()
+        }
+    }
+}
+
+extension AppTests {
+    /// Light and dark pictures of the table tab (AIRSQL_SCREENSHOTS=1, into build/screenshots): rows with pending
+    /// changes and a filter, the Apply preview, and a read-only view.
+    @MainActor @Suite(.enabled(if: ProcessInfo.processInfo.environment["AIRSQL_SCREENSHOTS"] == "1")) struct GridDataScreenshotTests {
+        @Test func tableTab() async throws {
+            let session = FakeTableSession()
+            let regions = ["EU", "US", "APAC", "EU", "US"]
+            session.rows = (1...28).map { (id: Int) -> [String?] in
+                let customer: String? = id % 4 == 0 ? nil : String(1_000 + id * 7)
+                let parent: String? = id % 6 == 0 ? String(2_400_960 + id - 1) : nil
+                let total = String(format: "%.2f", Double(id * 1_337 % 5_000) / 3)
+                return [String(2_400_960 + id), customer, regions[id % 5], String(9_000 + id), total, parent]
+            }
+            for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+                let (main, harness, tab) = try await GridDataAppTests.tab(session: session, size: NSSize(width: 1180, height: 720))
+                main.window?.appearance = NSAppearance(named: appearance)
+                main.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+                main.window?.orderFront(nil)
+                tab.bar.filterText = "total > 100"
+                tab.applyFilter("total > 100")
+                await ready { tab.loading != nil }
+                tab.source?.set(.text("1999.90"), row: 1, column: 4)
+                tab.source?.set(.text("APAC"), row: 3, column: 2)
+                tab.source?.changes.delete([["2400965"]])
+                tab.source?.changes.addRow(["region": .text("EU"), "number": .text("9100"), "total": .text("42.00")])
+                tab.changesDidChange()
+                tab.grid.selection.select(GridPosition(row: 1, column: 4))
+                main.window?.makeFirstResponder(tab.grid)
+                main.window?.displayIfNeeded()
+                try await save(harness, "table-data-\(suffix)")
+
+                tab.previewChanges(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "table-data-preview-\(suffix)", target: "sheet")
+                _ = await call(harness, "press", ["title": "Cancel"])
+                tab.revertAllChanges(nil)
+                main.window?.orderOut(nil)
+
+                let (viewMain, viewHarness, _) = try await GridDataAppTests.tab("customer_emails", session: .emails(),
+                                                                                size: NSSize(width: 1180, height: 520))
+                viewMain.window?.appearance = NSAppearance(named: appearance)
+                viewMain.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+                viewMain.window?.orderFront(nil)
+                viewMain.window?.displayIfNeeded()
+                try await save(viewHarness, "table-data-read-only-\(suffix)")
+                viewMain.window?.orderOut(nil)
+            }
+        }
+
+        func save(_ harness: AgentServer, _ name: String, target: String = "main") async throws {
+            let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
+            let image = try #require(reply.image, "\(name): \(reply.error ?? "")")
+            let png = try #require(image.representation(using: .png, properties: [:]))
+            try png.write(to: AppTests.ScreenshotTests.folder.appendingPathComponent(name + ".png"))
         }
     }
 }

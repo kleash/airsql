@@ -90,9 +90,10 @@ final class TableDataController: NSViewController, TabContent {
         let stack = NSStackView(views: [bar, notice, grid.containerView])
         stack.orientation = .vertical
         stack.spacing = 0
-        stack.alignment = .width
+        stack.alignment = .leading
         view.addSubview(stack)
         stack.pin(to: view)
+        for child in stack.arrangedSubviews { child.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
         grid.containerView.setContentHuggingPriority(.defaultLow, for: .vertical)
         self.view = view
         updateBars()
