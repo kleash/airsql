@@ -43,8 +43,9 @@ extension TableDataController {
                 if schema.snapshot.table(key.referencedDatabase, key.referencedTable) == nil {
                     try? await schema.loadDetails([key.referencedDatabase])
                 }
-                var found = labels[column] ?? [:]
-                for value in wanted { found[value] = "" }  // none unless the server has one: not asked again
+                // None until the server says otherwise: the cells drawn meanwhile don't ask again.
+                for value in wanted { labels[column, default: [:]][value] = "" }
+                var found: [String: String] = [:]
                 if let referenced = schema.snapshot.table(key.referencedDatabase, key.referencedTable),
                    let label = labelColumn(of: referenced, database: key.referencedDatabase, key: key.referencedColumns) {
                     let list = Array(wanted)
@@ -57,7 +58,7 @@ extension TableDataController {
                         }
                     }
                 }
-                labels[column] = found
+                labels[column, default: [:]].merge(found) { _, new in new }
             }
             readingLabels = nil
             grid.needsDisplay = true
