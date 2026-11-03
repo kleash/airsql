@@ -3,7 +3,7 @@ import AppKit
 
 /// The Settings window's panes, in their order (plan §2.4). Each lane keeps its own pane's file.
 enum SettingsPane: String, CaseIterable {
-    case general, editor, grid, connections, safety, agents, clientTools
+    case general, editor, grid, connections, safety, agents, clientTools, liquibase
 
     var title: String {
         switch self {
@@ -14,6 +14,7 @@ enum SettingsPane: String, CaseIterable {
         case .safety: return "Safety"
         case .agents: return "Agents"
         case .clientTools: return "Client Tools"
+        case .liquibase: return "Liquibase"
         }
     }
 
@@ -26,6 +27,7 @@ enum SettingsPane: String, CaseIterable {
         case .safety: return "shield.lefthalf.filled"
         case .agents: return "sparkles"
         case .clientTools: return "terminal"
+        case .liquibase: return "doc.text"
         }
     }
 
@@ -38,6 +40,7 @@ enum SettingsPane: String, CaseIterable {
         case .safety: return "Show what asks first before it changes data, and the limits agents work within"
         case .agents: return "Show whether AI agents may use AirSQL, and where their exports go"
         case .clientTools: return "Show which mysql and mysqldump AirSQL runs"
+        case .liquibase: return "Show who changesets are by, their ids and files, and how routines are written"
         }
     }
 
@@ -51,6 +54,7 @@ enum SettingsPane: String, CaseIterable {
         case .safety: return SafetyPane(model: model)
         case .agents: return AgentsPane(model: model)
         case .clientTools: return ClientToolsPane(model: model)
+        case .liquibase: return LiquibasePane(model: model)
         }
     }
 }

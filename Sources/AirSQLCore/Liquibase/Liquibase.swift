@@ -164,7 +164,12 @@ public enum Liquibase {
     /// them: each changeset runs in a transaction of its own), and so is the database the change names its objects
     /// with, so the changeset runs in whichever database Liquibase updates.
     public static func changeset(_ change: ChangeSQL, rollback wanted: Bool = true) -> LiquibaseChangeset {
-        var statements = change.statements.map(trimmed)
+        changeset(title: change.title, statements: change.statements, rollback: wanted)
+    }
+
+    /// Statements run elsewhere (the console's) as one changeset, as `changeset(_:)` makes one of a previewed change.
+    public static func changeset(title: String, statements: [String], rollback wanted: Bool = true) -> LiquibaseChangeset {
+        var statements = statements.map(trimmed)
         let database = statements.lazy.compactMap(usedDatabase).first ?? statements.first.flatMap(namedDatabase)
         statements.removeAll { usedDatabase($0) != nil || ["START TRANSACTION", "BEGIN", "BEGIN WORK", "COMMIT", "ROLLBACK"]
             .contains($0.uppercased()) }
@@ -174,8 +179,8 @@ public enum Liquibase {
         let object = statements.lazy.compactMap { statement in
             Tokens(statement).tokens.first { $0.kind == .quotedName }.map { unquotedName(String(decoding: Array(statement.utf16)[$0.range], as: UTF16.self)) }
         }.first
-        return LiquibaseChangeset(object: object ?? change.title, statements: statements,
-                                  rollback: wanted && !undo.contains(nil) ? undo.compactMap { $0 } : [], comment: change.title)
+        return LiquibaseChangeset(object: object ?? title, statements: statements,
+                                  rollback: wanted && !undo.contains(nil) ? undo.compactMap { $0 } : [], comment: title)
     }
 
     /// A compare's sync script (`ReconResult.steps`): a changeset per structure step, one per run of data steps on the

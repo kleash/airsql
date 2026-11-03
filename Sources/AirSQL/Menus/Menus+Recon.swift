@@ -8,8 +8,12 @@ extension MainMenu {
         let tools = menus.tools
         let after = tools.items.firstIndex { $0.action == Commands.compare.action }.map { $0 + 1 } ?? tools.numberOfItems
         for (offset, command) in [Commands.syncScript, Commands.exportReport, Commands.copySyncScript,
-                                  Commands.leaveOutOfCompare].enumerated() {
+                                  Commands.leaveOutOfCompare, Commands.generateLiquibase].enumerated() {
             tools.insertItem(command.item(), at: after + offset)
         }
+        // The console's statements as a changeset (LiquibaseResponder), with the console's other commands.
+        let query = menus.query
+        let profile = query.items.firstIndex { $0.action == Commands.profile.action }.map { $0 + 1 } ?? query.numberOfItems
+        query.insertItem(Commands.saveAsChangeset.item(), at: profile)
     }
 }

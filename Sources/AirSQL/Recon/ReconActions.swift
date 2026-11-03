@@ -88,7 +88,7 @@ extension ReconWindowController {
                 showError(failure.localizedDescription, title: "The sync script stopped", on: window)
                 return
             }
-            if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
+            if saveAsChangeset { self.saveLiquibase(result, destructive: destructive) }
             let alert = NSAlert()
             alert.messageText = "The sync script ran"
             alert.informativeText = "Compare again to check, and to copy the values of columns the script added."
@@ -121,11 +121,17 @@ extension ReconWindowController {
         }
     }
 
-    /// Hands the sync script to the Liquibase writer (the Liquibase lane sets it).
+    /// The sync script as Liquibase changesets: one per structure step, one per run of row changes on a table.
     @objc func saveChangeset(_ sender: Any?) {
-        guard let result, let saved = target.connection, let writer = SQLPreviewSheet.changesetWriter else { return }
-        writer(ChangeSQL(title: "Sync \(result.target.name) · \(result.target.database) with \(result.source.name)",
-                         statements: result.script(destructive: results.detail.includeDestructive), connection: saved.id))
+        guard let result else { return }
+        saveLiquibase(result, destructive: results.detail.includeDestructive)
+    }
+
+    private func saveLiquibase(_ result: ReconResult, destructive: Bool) {
+        guard let window else { return }
+        ChangesetSheet.show(Liquibase.changesets(result, destructive: destructive, rollback: model.data.settings.liquibase.rollback),
+                            heading: "Save the sync script for \(result.target.name) · \(result.target.database) as changesets",
+                            model: model, on: window)
     }
 
     /// Copies the selected objects' names.

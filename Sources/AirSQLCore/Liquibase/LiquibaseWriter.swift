@@ -110,6 +110,14 @@ extension LiquibaseSchema {
                       from session: DBConnection?, date: Date = Date(), cancellation: Cancellation,
                       progress: @escaping (LiquibaseProgress) -> Void = { _ in }) async throws -> LiquibaseOutcome {
         let numbered = Self.numbered(pieces, settings: settings, date: date)
+        let rows = pieces.contains { if case .rows = $0 { return true } else { return false } }
+        if rows, let session {
+            // Every table's rows as of one moment, in UTC as the changesets write them.
+            for statement in ["SET SESSION time_zone = '+00:00'", "SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+                              "START TRANSACTION WITH CONSISTENT SNAPSHOT"] {
+                _ = try await session.query(statement)
+            }
+        }
         let files = try LiquibaseFiles(url, layout: settings.layout)
         var outcome = LiquibaseOutcome(), state = LiquibaseProgress(total: pieces.count)
         do {
@@ -137,9 +145,11 @@ extension LiquibaseSchema {
                 state.changesets += 1
                 progress(state)
             }
+            if rows, let session { _ = try await session.query("COMMIT") }
             outcome.bytes = try files.finish()
             return outcome
         } catch {
+            if rows, let session { _ = try? await session.query("ROLLBACK") }
             files.discard()
             throw cancellation.isCancelled ? AirSQLError.cancelled : error
         }

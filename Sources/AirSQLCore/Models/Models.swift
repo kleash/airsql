@@ -179,6 +179,8 @@ public struct AppSettings: Codable, Equatable {
     /// automatically.
     public var clientPath = ""
     public var dumpPath = ""
+    /// Settings ▸ Liquibase: how changesets and changelogs are written.
+    public var liquibase = LiquibaseSettings()
 
     public init() {}
 
@@ -199,6 +201,7 @@ public struct AppSettings: Codable, Equatable {
         agentsAllowed = try value(.agentsAllowed, defaults.agentsAllowed)
         clientPath = try value(.clientPath, defaults.clientPath)
         dumpPath = try value(.dumpPath, defaults.dumpPath)
+        liquibase = try value(.liquibase, defaults.liquibase)
     }
 }
 
