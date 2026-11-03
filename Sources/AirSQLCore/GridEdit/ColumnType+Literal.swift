@@ -41,17 +41,15 @@ extension ColumnType {
     /// for related rows. Numbers stay bare and exact, bytes become hex, BIT its bits, everything else a string.
     public func literal(stored bytes: [UInt8]?, _ context: EditContext) -> String {
         guard let bytes else { return "NULL" }
+        let text = String(decoding: bytes, as: UTF8.self)
         switch kind {
         case .bit: return SQLQuote.bits(bytes.reduce(0) { $0 << 8 | UInt64($1) })
         case .binary: return SQLQuote.hex(bytes)
-        case .integer, .decimal, .float, .year:
-            // The text protocol sends numbers as digits, sign, point and exponent; anything else is quoted.
-            if !bytes.isEmpty, bytes.allSatisfy({ Array("0123456789+-.eE".utf8).contains($0) }) {
-                return String(decoding: bytes, as: UTF8.self)
-            }
-            fallthrough
-        default: return SQLQuote.string(String(decoding: bytes, as: UTF8.self), noBackslashEscapes: context.noBackslashEscapes)
+        // Whole and decimal numbers stay bare (exact); anything else, FLOAT and DOUBLE included, is a string.
+        case .integer, .decimal, .year: if Self.decimalParts(text) != nil { return text }
+        default: break
         }
+        return SQLQuote.string(text, noBackslashEscapes: context.noBackslashEscapes)
     }
 
     /// The text an editor starts from for a stored value: "" for NULL (never a made-up value), every bit of a BIT
@@ -190,7 +188,7 @@ extension ColumnType {
         } else if digits.lowercased().hasPrefix("0x") {
             digits = digits.dropFirst(2)
         }
-        guard digits.count.isMultiple(of: 2), digits.allSatisfy(\.isHexDigit) else {
+        guard digits.count.isMultiple(of: 2), digits.allSatisfy({ $0.isASCII && $0.isHexDigit }) else {
             throw EditError("Bytes are typed as hex digits, two per byte, such as 0x00FF; \(quoted(text)) isn't that")
         }
         var bytes: [UInt8] = [], index = digits.startIndex

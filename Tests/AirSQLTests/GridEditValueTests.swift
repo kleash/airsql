@@ -200,6 +200,7 @@ struct GridEditValueTests {
         ("timestamp", "1969-12-31 23:59:59", "!TIMESTAMP holds dates from 1970 to 2038", "!TIMESTAMP holds dates from 1970 to 2106"),
         ("timestamp", "2040-01-01 00:00:00", "!TIMESTAMP holds dates from 1970 to 2038", "'2040-01-01 00:00:00'"),
         ("timestamp", "0000-00-00 00:00:00", "!(NO_ZERO_DATE)", "'0000-00-00 00:00:00'"),
+        ("timestamp", "2026-00-10 00:00:00", "!(NO_ZERO_IN_DATE)", "!TIMESTAMP has no 0 month or day"),
         ("timestamp(6)", "2026-11-03 14:05:06.000001", "'2026-11-03 14:05:06.000001'", "'2026-11-03 14:05:06.000001'"),
         ("year", "2024", "2024", "2024"), ("year", "0000", "0", "0"), ("year", "0", "0", "0"), ("year", "99", "!YEAR holds four digits", "!YEAR"),
         ("year", "1900", "!YEAR holds", "!YEAR holds"),

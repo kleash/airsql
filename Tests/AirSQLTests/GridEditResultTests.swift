@@ -39,11 +39,11 @@ struct GridEditResultTests {
         let keyless = Self.editing("select email from customers", [c("email")], snapshot)
         #expect(Self.reasons(keyless) == ["To edit, add customers.id to the SELECT"] && !keyless.isEditable)
         let log = Self.editing("SELECT * FROM log", [Self.column("log", "log", "at")], snapshot)
-        #expect(Self.reasons(log)[0].hasPrefix("To edit, log: It has no primary key or NOT NULL unique key"))
+        #expect(Self.reasons(log)[0].hasPrefix("log: It has no primary key or NOT NULL unique key"))
         let view = Self.editing("SELECT * FROM customer_emails", [Self.column("customer_emails", "customer_emails", "id")], snapshot)
-        #expect(Self.reasons(view)[0].hasPrefix("To edit, customer_emails: A view has no key"))
+        #expect(Self.reasons(view)[0].hasPrefix("customer_emails: A view has no key"))
         let unknown = Self.editing("SELECT * FROM nope", [Self.column("nope", "nope", "id")], snapshot)
-        #expect(Self.reasons(unknown) == ["To edit, AirSQL hasn't read the columns of nope yet"])
+        #expect(Self.reasons(unknown) == ["AirSQL hasn't read the columns of nope yet"])
         // A column that doesn't name its database is in the session's; a composite key in its own order.
         let line = { (name: String) in Self.column("l", "order_lines", name, database: "") }
         let lines = Self.editing("/* lines */ SELECT /*+ NO_ICP(l) */ line, qty, number, region FROM order_lines l",

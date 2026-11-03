@@ -83,14 +83,18 @@ public struct ResultEditing: Equatable {
             sources.append(Source(database: table.database, table: schema.name, key: key, keyColumns: positions.compactMap { $0 }))
             for index in table.columns {
                 let name = store.columns[index].originalName
-                reasons[index] = schema.column(name)?.readOnlyReason
-                    ?? (schema.column(name) == nil ? "AirSQL's copy of \(schema.name) has no column \(name): refresh the schema" : "")
+                if let column = schema.column(name) {
+                    reasons[index] = column.readOnlyReason ?? ""
+                } else {
+                    reasons[index] = "AirSQL's copy of \(schema.name) has no column \(name): refresh the schema"
+                }
             }
         }
         if !missing.isEmpty {
             sources = []
-            let prefix = tables.count > 1 ? "A joined result can be edited only when every table's key is in it: " : "To edit, "
-            columns = refuseAll(prefix + missing.joined(separator: "; "))
+            let text = missing.joined(separator: "; ")
+            columns = refuseAll(tables.count > 1 ? "A joined result can be edited only when every table's key is in it: " + text
+                : text.hasPrefix("add ") ? "To edit, " + text : text)
             return
         }
         // Every table has its key, so sources[i] is tables[i].

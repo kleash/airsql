@@ -59,9 +59,9 @@ enum DateTimeText {
     private static func time(_ text: String, fraction: Int, _ type: ColumnType) throws -> String {
         let (negative, hours, minutes, seconds, digits) = try clock(text, type, days: true)
         let fractionPart = try fractionText(digits, keeps: fraction)
-        let over = hours > 838 || hours == 838 && (minutes > 59 || seconds > 59 || fractionPart.contains { "123456789".contains($0) })
-        guard !over else { throw EditError("TIME holds -838:59:59 to 838:59:59") }
-        let zero = hours == 0 && minutes == 0 && seconds == 0 && !fractionPart.contains { "123456789".contains($0) }
+        let fractionZero = !fractionPart.contains { "123456789".contains($0) }
+        guard hours < 838 || hours == 838 && fractionZero else { throw EditError("TIME holds -838:59:59 to 838:59:59") }
+        let zero = hours == 0 && minutes == 0 && seconds == 0 && fractionZero
         return (negative && !zero ? "-" : "") + String(format: "%02d:%02d:%02d", hours, minutes, seconds) + fractionPart
     }
 
@@ -103,6 +103,8 @@ enum DateTimeText {
 
     /// Month 1–12 and a day the month has; zero dates and zero parts only where sql_mode allows them.
     private static func check(year: Int, month: Int, day: Int, _ type: ColumnType, _ context: EditContext) throws {
+        var timestamp = false
+        if case .timestamp = type.kind { timestamp = true }
         if year == 0 && month == 0 && day == 0 {
             guard !(context.sqlMode.contains("NO_ZERO_DATE") && context.strict) else {
                 throw EditError("This server's sql_mode (NO_ZERO_DATE) refuses the zero date; type a real date or use Set NULL")
@@ -114,12 +116,11 @@ enum DateTimeText {
             guard !context.sqlMode.contains("NO_ZERO_IN_DATE") else {
                 throw EditError("This server's sql_mode (NO_ZERO_IN_DATE) refuses a 0 month or day")
             }
+            guard !timestamp else { throw EditError("TIMESTAMP has no 0 month or day") }
             guard month <= 12, day <= 31 else { throw EditError("Months run from 1 to 12 and days from 1 to 31") }
             return
         }
         guard month <= 12 else { throw EditError("Months run from 1 to 12") }
-        var timestamp = false
-        if case .timestamp = type.kind { timestamp = true }
         let invalidAllowed = context.sqlMode.contains("ALLOW_INVALID_DATES") && !timestamp
         let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
         let length = invalidAllowed ? 31 : [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
