@@ -804,13 +804,11 @@ final class AgentServer {
             if current.masksToBounds { rect = rect.intersection(current.convert(current.bounds, to: root)) }
             ancestor = current.superlayer
         }
-        // A toolbar control hosted by SwiftUI (macOS 26) makes new layers when the frame is drawn: an old one is no longer
-        // under `root`, and drawn at its own coordinates it came out upside down in the window's bottom-left corner. The
-        // frame's picture has the new one.
-        guard ancestor === root else { return }
         let scale = NSGraphicsContext.current?.cgContext.ctm.a ?? 1
         let width = Int((layer.bounds.width * scale).rounded(.up)), height = Int((layer.bounds.height * scale).rounded(.up))
-        guard !rect.isEmpty, width > 0, height > 0, width * height < 4_000_000,
+        // A layer the window took out while it drew itself (SwiftUI replaces the toolbar's) has no place any more: drawn
+        // at its own origin, it put an upside-down copy over the window's bottom left corner.
+        guard ancestor === root, !rect.isEmpty, width > 0, height > 0, width * height < 4_000_000,
               let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
@@ -942,6 +940,8 @@ struct KeyCombo {
         modifiers = try Self.modifiers(parts.joined(separator: "+"))
         let lower = key.lowercased()
         if let (code, character) = Self.named[lower] {
+            // ⇧Tab types backtab (U+0019), as a keyboard does, so key bindings see insertBacktab:.
+            let character = lower == "tab" && modifiers.contains(.shift) ? 0x19 : character
             base = String(UnicodeScalar(UInt32(character)).map(Character.init) ?? " ")
             keyCode = code
             characters = base

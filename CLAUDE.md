@@ -22,7 +22,8 @@ Also `docs/dev/grid-spec.md` (the grid), `docs/dev/mockups.html` (the look: them
 - **Native feel**: single click selects or shows, double click opens or edits, right click opens the item's menu, on
   every surface (plan §2.12); ⌘/⇧ multi-select; every action in the menu bar with its shortcut; full keyboard use;
   **no database, network or file work on the main thread**; a busy indicator for anything slow (§2.11); a polished
-  layout with no cut text (§2.13).
+  layout with no cut text (§2.13). Since macOS 14 a view isn't clipped to its bounds: draw only inside it (intersect
+  `dirtyRect` with `bounds`).
 - **The app explains itself**: every control and menu item has a one-line tooltip (verb first, no full stop); disabled
   items say why; plain words before jargon; empty states say what to do next.
 - **Security defaults**: secrets only in the Keychain, never on a command line, in logs, in agent replies or the SQL
@@ -70,6 +71,9 @@ swift build              # debug build: must have 0 warnings (run the app from b
 ./test.sh                # Swift Testing (needs Swift 6); extra args go to swift test: ./test.sh --filter DriverTests
 AIRSQL_LAB=1 ./test.sh   # + the lab suites (starts the lab: testenv/up.sh)
 AIRSQL_SCREENSHOTS=1 ./test.sh --filter ScreenshotTests   # light and dark pictures of each screen, in build/screenshots
+AIRSQL_SCREENSHOTS=1 ./test.sh --filter GridScreenshotTests   # the grid's light and dark pictures, in build/screenshots
+AIRSQL_GRID_FPS=1 ./test.sh -c release -Xswiftc -enable-testing --filter GridFrameRateTests
+                         # the grid's frame rate on this Mac's display (puts a window on screen for about 15 s)
 ```
 
 UI tests drive the app in-process through `Sources/AirSQL/Harness` (`appWindow` and `call` in
