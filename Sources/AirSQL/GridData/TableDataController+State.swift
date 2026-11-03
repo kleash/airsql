@@ -12,10 +12,11 @@ extension TableDataController: NSMenuItemValidation {
             return
         }
         bar.scope.isHidden = false
-        let local = source.localFilter != nil
+        let local = source.localFilter != nil || !source.localSort.isEmpty
         if local {
             bar.scope.style = .neutral
-            bar.scope.text = "Local · \(source.shownLoadedRows.formatted()) of \(source.loadedRows.formatted()) loaded rows"
+            bar.scope.text = "Local · " + (source.localFilter == nil ? "sorted, " : "")
+                + "\(source.shownLoadedRows.formatted()) of \(source.loadedRows.formatted()) loaded rows"
         } else {
             bar.scope.style = .accent
             let filtered = !source.filter.isEmpty, sorted = !source.sort.isEmpty

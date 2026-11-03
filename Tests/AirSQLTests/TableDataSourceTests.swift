@@ -86,6 +86,10 @@ struct TableDataSourceTests {
         #expect(source.rowCount == 3 && source.rowKey(1) == ["3"] && source.index(of: ["3"]) == 1)
         source.localFilter = nil
         #expect(source.rowCount == 4)
+        source.localSort = [(column: 1, ascending: false)]
+        #expect((0..<3).map { source.value($0, 1) } == ["Joanna", "Bob", "Ann"] && source.rowKey(0) == ["3"])
+        source.localSort = []
+        #expect(source.rowKey(0) == ["1"])
     }
 
     @Test func longValuesAreShortenedOnScreenButNotKeys() {

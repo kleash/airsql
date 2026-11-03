@@ -18,6 +18,8 @@ public final class TableDataSource: GridSource {
     public var sort: [TableViewSettings.SortKey] = []
     /// Search on the loaded rows: only the rows it keeps are shown (nil: every loaded row).
     public var localFilter: (([String?]) -> Bool)? { didSet { applyLocalFilter() } }
+    /// The loaded rows sorted here, by columns in order, instead of on the server.
+    public var localSort: [(column: Int, ascending: Bool)] = [] { didSet { applyLocalFilter() } }
     /// The most characters a cell shows (key columns: all of them).
     static let shownLimit = 1_000
 
@@ -101,8 +103,10 @@ public final class TableDataSource: GridSource {
     }
 
     private func applyLocalFilter() {
-        guard let localFilter else { return shown = nil }
-        shown = (0..<loadedRows).filter { row in localFilter(columns.indices.map { value(loaded: row, $0) }) }
+        guard localFilter != nil || !localSort.isEmpty else { return shown = nil }
+        var rows = Array(0..<loadedRows)
+        if let localFilter { rows = rows.filter { row in localFilter(columns.indices.map { value(loaded: row, $0) }) } }
+        shown = GridSorting.sorted(rows, by: localSort, columns: columns) { value(loaded: $0, $1) }
     }
 
     // MARK: Rows

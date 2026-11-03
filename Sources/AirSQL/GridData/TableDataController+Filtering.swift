@@ -24,6 +24,12 @@ extension TableDataController {
     func search(_ text: String, loadedOnly: Bool) {
         guard let source else { return }
         source.localFilter = loadedOnly && !text.isEmpty ? { GridFilter.matches(text, $0) } : nil
+        if !loadedOnly, !source.localSort.isEmpty {
+            source.localSort = []
+            grid.sortOrder = source.sort.compactMap { key in
+                source.columns.firstIndex { $0.name == key.column }.map { DataGridView.Sort(column: $0, ascending: key.ascending) }
+            }
+        }
         if source.filter != serverFilter { reloadForFilter() } else { finishLocalChange() }
     }
 
@@ -139,6 +145,7 @@ extension TableDataController {
     /// The sort control in a header: ascending, descending, then off; with ⌥ the column joins the sort.
     func sort(by column: Int, adding: Bool) {
         guard let source else { return }
+        if bar.loadedOnly.state == .on { return sortLocally(by: column, adding: adding) }
         let name = source.columns[column].name
         var keys = source.sort
         if let index = keys.firstIndex(where: { $0.column == name }) {
@@ -148,6 +155,33 @@ extension TableDataController {
             keys = (adding ? keys : []) + [TableViewSettings.SortKey(column: name, ascending: true)]
         }
         setSort(keys)
+    }
+
+    /// With "Loaded rows only" the header sorts the loaded rows here, at once (asking first above 100,000 rows).
+    private func sortLocally(by column: Int, adding: Bool) {
+        guard let source else { return }
+        var keys = source.localSort
+        if let index = keys.firstIndex(where: { $0.column == column }) {
+            if keys[index].ascending { keys[index].ascending = false } else { keys.remove(at: index) }
+            if !adding { keys = keys.filter { $0.column == column } }
+        } else {
+            keys = (adding ? keys : []) + [(column: column, ascending: true)]
+        }
+        let apply = { [weak self] in
+            source.localSort = keys
+            self?.grid.sortOrder = keys.map { DataGridView.Sort(column: $0.column, ascending: $0.ascending) }
+            self?.grid.reloadData()
+            self?.updateBars()
+        }
+        guard source.loadedRows > 100_000, let window = view.window else { return apply() }
+        let alert = NSAlert()
+        alert.messageText = "Sort \(source.loadedRows.formatted()) loaded rows here?"
+        alert.informativeText = "Sorting this many rows takes a moment. Untick Loaded rows only to sort every row on the server."
+        alert.addButton(withTitle: "Sort")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn { apply() }
+        }
     }
 
     @objc func sortAscending(_ sender: Any?) { sortFocused(ascending: true) }
