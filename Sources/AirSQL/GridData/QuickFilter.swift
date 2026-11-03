@@ -43,16 +43,26 @@ enum QuickFilter {
         return focus.value == nil ? "The selected value is NULL: use Is NULL or Is Not NULL" : "Binary values only compare whole: use = or <>"
     }
 
+    /// Data ▸ Quick Filter ▸'s items, in `GridCondition.Operator.allCases`' order (as their tags are).
+    static let commands = [Commands.filterEquals, Commands.filterNotEquals, Commands.filterLess, Commands.filterGreater,
+                           Commands.filterStartsWith, Commands.filterEndsWith, Commands.filterContains, Commands.filterIn,
+                           Commands.filterNotIn, Commands.filterNull, Commands.filterNotNull]
+
     /// Quick Filter ▸ for a cell: each condition as its SQL (⌥ shows the same adding it with AND: tag 1), the clipboard's
-    /// text, then Type a Value…. Each item carries its `GridCondition`.
+    /// text, then Type a Value…. Each item carries its `GridCondition`. An agent's has the Data menu's items instead: the
+    /// value may be of rows it may not read (plan §2.8), and the clipboard is the person's.
     static func menuItem(_ focus: Focus?, noBackslashEscapes: Bool, target: AnyObject, action: Selector) -> NSMenuItem {
         var items: [NSMenuItem] = []
         if let focus {
             for op in operators(focus) {
-                items += pair(condition(op, focus), noBackslashEscapes: noBackslashEscapes, target: target, action: action)
+                if AgentGate.agent != nil, let index = GridCondition.Operator.allCases.firstIndex(of: op) {
+                    items.append(commands[index].item())
+                } else {
+                    items += pair(condition(op, focus), noBackslashEscapes: noBackslashEscapes, target: target, action: action)
+                }
             }
-            if let clipboard = NSPasteboard.general.string(forType: .string), !clipboard.isEmpty, !clipboard.contains(where: \.isNewline),
-               clipboard.count <= 1_000 {
+            if AgentGate.agent == nil, let clipboard = NSPasteboard.general.string(forType: .string), !clipboard.isEmpty,
+               !clipboard.contains(where: \.isNewline), clipboard.count <= 1_000 {
                 items.append(.separator())
                 for op in [GridCondition.Operator.equals, .notEquals, .contains] {
                     items += pair(GridCondition(focus.column, op, [clipboard]), noBackslashEscapes: noBackslashEscapes, target: target,

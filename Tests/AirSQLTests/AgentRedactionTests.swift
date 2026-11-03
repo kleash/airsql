@@ -50,6 +50,71 @@ extension AppTests.AgentGateUITests {
         #expect(Self.colours(await agentCall(service, "screenshot").image, patch) > 4)
     }
 
+    /// What a cell's value goes into shows agents nothing of rows they may not read: the cell's Quick Filter items, the
+    /// status bar's figure, the result's conditions, Filter by Values' list and Type a Value…'s field. No menu shows them
+    /// the person's clipboard, also where they may read the rows.
+    @Test func filtersAndCellMenusShowAgentsNoHiddenValueNorTheClipboard() async throws {
+        let (main, harness, service) = try await Self.agents()
+        let board = NSPasteboard.general, kept = board.string(forType: .string)
+        defer {
+            service.close()
+            ConsoleViewController.openConnection = { _ in nil }
+            board.clearContents()
+            if let kept { board.setString(kept, forType: .string) }
+        }
+        let console = try await Self.console(main, harness, on: Fixtures.production.id)  // Schema access: no data
+        ConsoleFixtures.dress(console)
+        let window = try #require(main.window)
+        window.layoutIfNeeded()
+        let content = try #require(window.contentView)
+        let grid = try #require(find(DataGridView.self, in: content))
+        func cell(_ row: Int, _ column: Int) -> [String: Any] {
+            let rect = grid.convert(grid.cellRect(GridPosition(row: row, column: column)), to: nil)
+            return ["x": rect.midX, "y": window.frame.height - rect.midY]
+        }
+        func text(_ reply: Reply) -> String {
+            String(decoding: (try? JSONSerialization.data(withJSONObject: reply.json)) ?? Data(), as: UTF8.self)
+        }
+        func agentSees() async -> String { text(await agentCall(service, "snapshot", ["include": ["elements", "sheets"]])) }
+        board.clearContents()
+        board.setString("clipboard-7Q2", forType: .string)
+        // Row 1 (the result shows two rows under the editor): Nordlicht GmbH, 317 orders.
+        let menu = await agentCall(service, "right_click", cell(1, 1))
+        #expect(menu.error == nil && text(menu).contains("Equal to Selection"), "\(menu.error ?? text(menu))")
+        let menus = text(menu) + (await agentSees())
+        #expect(!menus.contains("Nordlicht") && !menus.contains("clipboard-7Q2"), "\(menus)")
+        #expect(await agentCall(service, "click", cell(1, 3)).error == nil)
+        let figure = await agentSees()
+        #expect(grid.selection.cursor == GridPosition(row: 1, column: 3) && !figure.contains("Sum 317"), "\(figure.components(separatedBy: "Sum 317").first!.suffix(300))")
+
+        #expect(await agentCall(service, "click", cell(1, 1)).error == nil)
+        #expect(await agentCall(service, "menu", ["path": "Data > Quick Filter > Equal to Selection"]).error == nil)
+        #expect(text(await call(harness, "snapshot", ["include": ["elements"]])).contains("Nordlicht"), "the person sees the filter")
+        let filtered = await agentSees()
+        #expect(!filtered.contains("Nordlicht"), "\(filtered.components(separatedBy: "Nordlicht").first!.suffix(300))")
+        #expect(await agentCall(service, "menu", ["path": "Data > Filter by Values…"]).error == nil)
+        #expect(await agentCall(service, "wait", ["until": "sheet", "timeout": 10]).error == nil)
+        let values = try #require(window.attachedSheet?.contentView)
+        #expect(await eventually(timeout: 10) { (find(NSTableView.self, id: "values.list", in: values)?.numberOfRows ?? 0) > 0 })
+        #expect(!(await agentSees()).contains("Nordlicht"))
+        #expect(await agentCall(service, "press", ["id": "values.cancel"]).error == nil)
+        _ = await agentCall(service, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(await agentCall(service, "menu", ["path": "Data > Quick Filter > Type a Value…"]).error == nil)
+        #expect(await agentCall(service, "wait", ["until": "sheet", "timeout": 10]).error == nil)
+        #expect(!(await agentSees()).contains("Nordlicht"))
+        #expect(await agentCall(service, "press", ["title": "Cancel"]).error == nil)
+        _ = await agentCall(service, "wait", ["until": "no_sheet", "timeout": 10])
+
+        // Schema + read: the rows show, the clipboard still doesn't.
+        var production = Fixtures.production
+        production.agentAccess = .schemaRead
+        service.model.save(production)
+        board.clearContents()
+        board.setString("clipboard-7Q2", forType: .string)
+        let readable = text(await agentCall(service, "right_click", cell(0, 1)))
+        #expect(readable.contains("Equal to Selection") && !readable.contains("clipboard-7Q2"), "\(readable)")
+    }
+
     /// A console's comparison with another connection's result shows that connection's rows too: hidden from agents
     /// unless they may read the data of both.
     @Test func aComparisonWithAnotherConnectionsResultIsHiddenUnlessBothMayBeRead() async throws {

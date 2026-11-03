@@ -102,6 +102,33 @@ struct LiquibaseLabTests {
         try? FileManager.default.removeItem(at: folder.deletingLastPathComponent())
     }
 
+    /// A change written for NO_BACKSLASH_ESCAPES (Apply on such a session writes `C:\new` with a bare backslash), saved
+    /// as a changeset, stores the same value on a session without it, as Liquibase's is, whatever its other modes; the
+    /// session's own mode comes back after.
+    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    func aChangeWrittenWithoutBackslashEscapesStoresTheSameValue(_ server: Lab.Server) async throws {
+        let session = try await ReconLabTests.session(server)
+        defer { Task { await session.close() } }
+        try await ReconLabTests.database(session, "lane_l8b_backslashes", ["CREATE TABLE files (id INT PRIMARY KEY, path VARCHAR(20))"])
+        let insert = "INSERT INTO `lane_l8b_backslashes`.`files` VALUES (1, " + SQLQuote.string("C:\\new", noBackslashEscapes: true) + ")"
+        let change = ChangeSQL(title: "Apply changes to files", statements: [insert], connection: UUID())
+        func stored(_ changeset: LiquibaseChangeset, mode: String) async throws -> (hex: String?, mode: Set<Substring>) {
+            _ = try await session.query("SET SESSION sql_mode = '\(mode)'")
+            _ = try await session.query("DELETE FROM files")
+            let numbered = Liquibase.numbered([changeset], settings: Self.settings, first: 1, date: Date())
+            _ = try numbered[0].checkedText()
+            _ = try await Self.apply(Liquibase.changelog(numbered, delimiter: .splitStatements), on: session)
+            let row = try await session.query("SELECT HEX(path), @@SESSION.sql_mode FROM files", rowCap: 1).first?.rows
+            return (row?.string(0, 0), Set((row?.string(0, 1) ?? "").split(separator: ",")))
+        }
+        #expect(try await stored(Liquibase.changeset(change), mode: "").hex == "433A0A6577", "C:, a line feed, ew: the escape read")
+        for mode in ["", "STRICT_TRANS_TABLES,ANSI_QUOTES"] {
+            let (hex, after) = try await stored(Liquibase.changeset(change, noBackslashEscapes: true), mode: mode)
+            #expect(hex == "433A5C6E6577" && after == Set(mode.split(separator: ",")), "\(mode): \(hex ?? "none") \(after)")
+        }
+        _ = try await session.query("DROP DATABASE lane_l8b_backslashes")
+    }
+
     /// Liquibase itself applies the changelog, when a liquibase program is installed (AirSQL doesn't install one).
     @Test(.enabled(if: liquibase != nil, "runs when a liquibase program is on PATH"))
     func liquibaseAppliesTheChangelog() async throws {

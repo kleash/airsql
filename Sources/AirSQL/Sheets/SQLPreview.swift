@@ -46,8 +46,9 @@ struct SQLPreviewResult {
 /// run the SQL and, when it succeeded and the box was ticked, pass the change to the writer.
 @MainActor
 final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
-    /// Saves a change as a Liquibase changeset (L8b sets it).
-    static var changesetWriter: ((ChangeSQL) -> Void)?
+    /// Saves a change as a Liquibase changeset (L8b sets it), with the session's NO_BACKSLASH_ESCAPES its strings were
+    /// written for.
+    static var changesetWriter: ((_ change: ChangeSQL, _ noBackslashEscapes: Bool) -> Void)?
 
     private let request: SQLPreviewRequest
     private let completion: (SQLPreviewResult) -> Void
