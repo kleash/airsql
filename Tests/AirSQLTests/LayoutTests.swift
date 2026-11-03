@@ -237,6 +237,13 @@ extension AppTests {
             if let sheet = window.attachedSheet { check(sheet, "Run SQL File") }
             restore.close()
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            let copy = CopySheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            copy.show(on: window, loads: false)
+            copy.show(databases: ToolFixtures.databases())
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            if let sheet = window.attachedSheet { check(sheet, "Copy to Another Server") }
+            copy.close()
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             return problems
         }
     }

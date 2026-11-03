@@ -86,6 +86,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         form.row("Extra options", [extra])
         let grid = form.finish()
         grid.column(at: 1).width = 400
+        grid.setContentHuggingPriority(.defaultHigh, for: .vertical)
         let columns = NSStackView(views: [picker.view(height: 250), grid])
         columns.alignment = .top
         columns.spacing = 14

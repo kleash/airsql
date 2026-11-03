@@ -140,6 +140,14 @@ extension AppTests {
                 restore.close()
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
 
+                let copy = CopySheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+                copy.show(on: main.window!, loads: false)
+                copy.show(databases: ToolFixtures.databases())
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "copy-\(suffix)")
+                copy.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+
                 // Settings, every pane.
                 let settings = SettingsWindowController(model: model)
                 keptWindows.append(settings)

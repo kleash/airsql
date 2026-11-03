@@ -91,6 +91,9 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
         outline.menu?.delegate = self
         outline.setAccessibilityIdentifier("tools.objects")
         outline.toolTip = "Tick what to include; space ticks the selected rows"
+        // The rounded box draws the background: no second one inside it.
+        outline.backgroundColor = .clear
+        scroll.drawsBackground = false
         scroll.documentView = outline
         scroll.hasVerticalScroller = true
         scroll.borderType = .noBorder

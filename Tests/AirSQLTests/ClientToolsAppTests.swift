@@ -136,6 +136,36 @@ extension AppTests {
                 + "--default-character-set=utf8mb4 --batch shop", "\(command)")
         }
 
+        @Test func theCopySheetSaysWhereItCopiesAndRefusesToCopyOntoItself() async throws {
+            var replica = Fixtures.local
+            replica.id = UUID()
+            replica.name = "Local replica"
+            var locked = Fixtures.local
+            locked.id = UUID()
+            locked.name = "Locked"
+            locked.readOnly = true
+            let (main, harness) = Self.window([ToolFixtures.local, replica, locked])
+            let sheet = CopySheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            // The same server and the same name: refused; another name is fine.
+            _ = await call(harness, "set", ["id": "copy.target", "value": "Local replica"])
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("this server") == true, "\(sheet.runButton.toolTip ?? "")")
+            _ = await call(harness, "set", ["id": "copy.database", "value": "shop_copy"])
+            sheet.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            let summary = await Self.text(harness, "copy.summary")
+            #expect(summary.hasPrefix("CREATE DATABASE IF NOT EXISTS `shop_copy` …;\nUSE `shop_copy`;\nCREATE TABLE … (5 tables);"), "\(summary)")
+            // Replacing tables is marked, and said in the summary.
+            _ = await call(harness, "press", ["id": "copy.replace"])
+            #expect((await Self.text(harness, "copy.summary")).contains("DROP TABLE IF EXISTS … (5 tables);"))
+            // A read-only connection can't be copied to.
+            _ = await call(harness, "set", ["id": "copy.target", "value": "Locked"])
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("read-only") == true)
+        }
+
         @Test func thePickerTicksWithAClickADoubleClickSpaceAndItsMenu() async throws {
             let (main, harness) = Self.window()
             let sheet = Self.exportSheet(on: main)
