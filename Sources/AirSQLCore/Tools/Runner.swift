@@ -197,6 +197,43 @@ public enum Runner {
         }
     }
 
+    /// What this process writes (AirSQL's own export) going into `file`, through `filter` (gzip -c) when given: the
+    /// filter writes the file. `finish` closes the stream and waits for the filter. The caller closes `file`.
+    public final class Writer {
+        private let target: Int32
+        private let filtering: Started?
+        private let cancellation: Cancellation
+        public private(set) var bytes: Int64 = 0
+
+        public init(file: Int32, through filter: [String]?, cancellation: Cancellation) throws {
+            self.cancellation = cancellation
+            guard let filter else {
+                target = file
+                filtering = nil
+                return
+            }
+            guard let pipe = makePipe() else { throw AirSQLError(.other, "Can't start \(filter[0]): no pipe") }
+            _ = fcntl(pipe.1, F_SETNOSIGPIPE, 1)
+            filtering = Started(filter, stdin: pipe.0, stdout: file, environment: [:], cancellation: cancellation)
+            close(pipe.0)
+            target = pipe.1
+        }
+
+        public func write(_ text: String) throws {
+            var text = text
+            let ok = text.withUTF8 { writeAll(target, UnsafeRawBufferPointer($0)) }
+            guard ok else { throw AirSQLError(.other, "Can't write the file: \(String(cString: strerror(errno)))") }
+            bytes += Int64(text.utf8.count)
+        }
+
+        /// Ends the stream: the filter's status (nil without one).
+        public func finish() -> CommandResult? {
+            guard let filtering else { return nil }
+            close(target)
+            return filtering.finish(cancellation)
+        }
+    }
+
     // MARK: Internals
 
     /// Runs `work` on a thread of its own: it blocks (reading pipes, waiting for processes), so not on Dispatch's

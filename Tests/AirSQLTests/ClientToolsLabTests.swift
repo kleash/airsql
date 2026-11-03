@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Testing
 @testable import AirSQLCore
@@ -106,5 +107,32 @@ struct ClientToolsLabTests {
         #expect(!FileManager.default.fileExists(atPath: file.path))
         #expect(((try? FileManager.default.contentsOfDirectory(atPath: file.deletingLastPathComponent().path)) ?? []).isEmpty)
         #expect(((try? FileManager.default.contentsOfDirectory(atPath: OptionFile.folder.path)) ?? []).isEmpty)
+    }
+
+    /// AirSQL's own export, restored by the client, gives the same rows: every column type, both flavours.
+    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    func theBuiltInExportRestoresToTheSameRows(_ server: Lab.Server) async throws {
+        guard let (session, info, _, client) = try await Self.setUp(server) else { return }
+        let target = "lane_l6_builtin"
+        _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target))
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+        let file = URL(fileURLWithPath: try scratch() + "/builtin.sql.gz")
+        let fd = open(file.path, O_WRONLY | O_CREAT | O_TRUNC, 0o600)
+        let writer = try Runner.Writer(file: fd, through: ["/usr/bin/gzip", "-c"], cancellation: Cancellation())
+        let reader = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await reader.connect()
+        var last: SQLExport.Progress?
+        try await SQLExport.run(DumpRequest(databases: [Lab.fixture], tables: Self.tables + ["customer_order_totals"]), from: reader,
+                                into: SQLFileSink(writer), cancellation: Cancellation()) { last = $0 }
+        #expect(writer.finish()?.status == 0)
+        close(fd)
+        await reader.close()
+        #expect(last?.rows ?? 0 > 0 && writer.bytes > 10_000)
+        _ = try await ToolRun.restore(ToolCommand(tool: client, options: Self.options(server), server: info), file: file, into: target,
+                                      continueOnError: false, cancellation: Cancellation()) { _ in }
+        let expected = try await Self.checksums(session, Lab.fixture), got = try await Self.checksums(session, target)
+        #expect(got == expected, "\(server): \(got) vs \(expected)")
+        _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
+        await session.close()
     }
 }

@@ -1,3 +1,4 @@
+import CMariaDB
 import Darwin
 import Foundation
 import Testing
@@ -221,5 +222,28 @@ struct ClientToolsTests {
         plain.add(words: ["CREATE", "TABLE", "t", "(", "id", "INT", ")"], line: 1)
         plain.add(words: ["CREATE", "OR", "REPLACE", "SCHEMA", "x"], line: 2)
         #expect(plain.findings == [DumpScan.Finding(kind: .createDatabase, database: "x", line: 2)] && plain.target(picked: "p") == "p")
+    }
+
+    @Test func theBuiltInExportWritesEachValueByItsType() {
+        let store = ResultStore(columns: [
+            ResultStore.Column(name: "id", type: MYSQL_TYPE_LONG), ResultStore.Column(name: "price", type: MYSQL_TYPE_NEWDECIMAL),
+            ResultStore.Column(name: "flags", type: MYSQL_TYPE_BIT, charset: 63), ResultStore.Column(name: "raw", type: MYSQL_TYPE_BLOB, charset: 63),
+            ResultStore.Column(name: "note", type: MYSQL_TYPE_VAR_STRING), ResultStore.Column(name: "doc", type: MYSQL_TYPE_JSON),
+        ])
+        _ = store.append([Array("7".utf8), Array("12.50".utf8), [0x01, 0x05], [0x00, 0xFF, 0x27], Array("it's \\ ok\n".utf8),
+                          Array(#"{"a": "b"}"#.utf8)])
+        _ = store.append([nil, nil, nil, nil, nil, nil])
+        #expect((0..<6).map { SQLExport.literal(store, 0, $0) }
+            == ["7", "12.50", "b'100000101'", "X'00FF27'", #"'it\'s \\ ok\n'"#, #"'{\"a\": \"b\"}'"#])
+        #expect((0..<6).allSatisfy { SQLExport.literal(store, 1, $0) == "NULL" })
+        // Generated columns stay out of the INSERTs; expression defaults don't make a column generated.
+        #expect(SQLExport.isGenerated("VIRTUAL GENERATED") && SQLExport.isGenerated("STORED GENERATED") && SQLExport.isGenerated("PERSISTENT"))
+        #expect(!SQLExport.isGenerated("DEFAULT_GENERATED") && !SQLExport.isGenerated("auto_increment") && !SQLExport.isGenerated("INVISIBLE"))
+        // Views come after the views they use; routines go between DELIMITER lines in a file.
+        let views = SQLExport.ordered([("totals", "CREATE VIEW `totals` AS SELECT * FROM `paid`"), ("paid", "CREATE VIEW `paid` AS SELECT 1")])
+        #expect(views.map(\.name) == ["paid", "totals"])
+        #expect(SQLPiece.routine("CREATE PROCEDURE p() BEGIN SELECT 1; END").fileText
+            == "DELIMITER ;;\nCREATE PROCEDURE p() BEGIN SELECT 1; END ;;\nDELIMITER ;\n")
+        #expect(SQLPiece.statement("SET NAMES utf8mb4").fileText == "SET NAMES utf8mb4;\n")
     }
 }
