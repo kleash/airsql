@@ -8,8 +8,8 @@ extension DataGridView {
         return window.firstResponder === self || editor != nil
     }
 
-    /// Draws the cells AppKit asks for (only newly shown strips while scrolling): backgrounds, text, lines, focus ring.
-    override func draw(_ dirtyRect: NSRect) {
+    /// Draws the cells in a rect, for a tile or a picture: backgrounds, text, lines, focus ring.
+    func drawCells(_ dirtyRect: NSRect) {
         // Since macOS 14 a view isn't clipped to itself and the rect to draw can reach past it.
         let dirtyRect = dirtyRect.intersection(bounds)
         let content = NSColor.content.solid

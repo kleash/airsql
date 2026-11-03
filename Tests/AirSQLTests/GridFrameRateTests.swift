@@ -110,15 +110,7 @@ extension AppTests {
                 print("GRID FPS \(name) at \(Int(speed)) pt/s, grid \(Int(content.grid.visibleRect.width))×\(Int(content.grid.visibleRect.height)) pt: \(result)")
                 // Each frame drawn and committed within a refresh (Core Animation draws the views as it commits).
                 let refresh = 1000.0 / Double(screen.maximumFramesPerSecond)
-                if horizontal {
-                    // Known gap: across a wide table AppKit draws the whole visible area again on each frame (about
-                    // 11 ms here, a third of the refreshes missed). The fallback is in the spike's report.
-                    withKnownIssue("Scrolling across a wide table misses refreshes", isIntermittent: true) {
-                        #expect(result.p95 < refresh, "\(name): \(result)")
-                    }
-                } else {
-                    #expect(result.p95 < refresh, "\(name): \(result)")
-                }
+                #expect(result.p95 < refresh, "\(name): \(result)")
                 main.window?.orderOut(nil)
             }
             // The first screen of a 10,000,000-row table, from the source arriving to the frame committed.

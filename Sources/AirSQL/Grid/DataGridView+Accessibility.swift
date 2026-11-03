@@ -169,7 +169,7 @@ final class GridCellElement: NSAccessibilityElement {
 
     override func accessibilityFrame() -> NSRect {
         guard position.column < grid.columnCount else { return .zero }
-        return NSAccessibility.screenRect(fromView: grid, rect: grid.cellRect(position))
+        return NSAccessibility.screenRect(fromView: grid, rect: grid.shownRect(position))
     }
 
     /// Editable where the delegate allows editing in place: a new value is a pending change, as in the editor.

@@ -61,6 +61,12 @@ extension AppTests {
                 grid.scrollView.reflectScrolledClipView(clip)
                 wide.window?.displayIfNeeded()
                 try await save(wide.window, wideHarness, "grid-wide-\(suffix)")
+                // The key column frozen, further across.
+                grid.frozenColumns = 1
+                clip.scroll(to: NSPoint(x: grid.offsets[40] - clip.contentInsets.left, y: clip.bounds.minY))
+                grid.scrollView.reflectScrolledClipView(clip)
+                grid.selection.select(GridPosition(row: 4, column: 0))
+                try await save(wide.window, wideHarness, "grid-frozen-\(suffix)")
                 wide.window?.orderOut(nil)
 
                 // A block of cells with the focused cell, a row added with ⌘, as the key window shows them.

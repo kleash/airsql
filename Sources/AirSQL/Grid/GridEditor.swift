@@ -71,7 +71,7 @@ extension DataGridView {
         let editor = GridEditor(grid: self, position: position, text: text ?? source.value(position.row, column) ?? "",
                                 font: styles.font(source.columns[column], isNull: false))
         self.editor = editor
-        editor.place(over: cellRect(position))
+        editor.place(over: shownRect(position))
         addSubview(editor)
         window?.makeFirstResponder(editor)
         if text != nil, let field = editor.currentEditor() {

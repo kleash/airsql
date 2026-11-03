@@ -79,7 +79,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private(set) var transposed = false
     private(set) var record: Int?
     /// The grid's columns and sort as they were before Transpose or Record View, to put back after.
-    private var layout: (order: [Int], widths: [CGFloat], sort: [DataGridView.Sort])?
+    private var layout: (order: [Int], widths: [CGFloat], sort: [DataGridView.Sort], frozen: Int)?
     /// Display As, by the source's column.
     private(set) var displays: [Int: GridDisplay] = [:]
     /// Heatmaps by the source's column, and whether equal values are tinted (`GridViewer+Colours`).
@@ -199,14 +199,16 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
                 grid.columnWidths = layout.widths
                 grid.columnOrder = layout.order
                 grid.sortOrder = layout.sort
+                grid.frozenColumns = layout.frozen
             }
             layout = nil
             if let focus, let column = grid.columnOrder.firstIndex(of: focus.column) { focusCell(GridPosition(row: focus.row, column: column)) }
         } else {
             let cursor = grid.selection.cursor
             transposed = true
-            layout = (grid.columnOrder, grid.columnWidths, grid.sortOrder)
+            layout = (grid.columnOrder, grid.columnWidths, grid.sortOrder, grid.frozenColumns)
             grid.sortOrder = []
+            grid.frozenColumns = 0
             grid.source = TransposedSource(displayed ?? source, order: grid.columnOrder)
             if let cursor { focusCell(GridPosition(row: cursor.column, column: cursor.row + 1)) }
         }
@@ -215,7 +217,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         updateValuePanel()
     }
 
-    /// Record View (⌥⌘R): the focused row as a form, one line per column; ⌥↑ ⌥↓ show the row before or after.
+    /// Record View (⌥⌘R): the focused row as a form, one line per column; Previous and Next show the rows around it.
     @objc func showRecordView(_ sender: Any?) {
         if presentation != .table { present(.table) }
         if record != nil { return transposeGrid(nil) }
@@ -227,8 +229,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private func showRecord(_ row: Int, field: Int) {
         guard let source else { return }
         if layout == nil {
-            layout = (grid.columnOrder, grid.columnWidths, grid.sortOrder)
+            layout = (grid.columnOrder, grid.columnWidths, grid.sortOrder, grid.frozenColumns)
             grid.sortOrder = []
+            grid.frozenColumns = 0
         }
         let order = layout?.order ?? grid.columnOrder
         record = row
@@ -316,6 +319,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         let rank = Dictionary(settings.order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
         grid.columnOrder = names.indices.filter { !settings.hiddenColumns.contains(names[$0]) }
             .sorted { (rank[names[$0]] ?? Int.max, $0) < (rank[names[$1]] ?? Int.max, $1) }
+        grid.frozenColumns = min(settings.frozenColumns, grid.columnCount)
     }
 
     /// Keeps the columns' order, widths and hidden ones under `viewKey`.
@@ -335,6 +339,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
         settings.order = order
         settings.hiddenColumns = hidden
+        settings.frozenColumns = grid.frozenColumns
         settings.displayTypes = Dictionary(displays.map { (names[$0.key], $0.value.rawValue) }, uniquingKeysWith: { first, _ in first })
         settings.widths = Dictionary(names.indices.map { (names[$0], Double(grid.columnWidths[$0])) },
                                      uniquingKeysWith: { first, _ in first })
@@ -440,6 +445,14 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         let lines = GridAggregate.Kind.allCases.compactMap { kind in aggregate.copyText(kind).map { "\(kind.title)\t\($0)" } }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(lines.joined(separator: "\n"), forType: .string)
+    }
+
+    /// Freeze: keeps the columns up to the focused one in view while the grid scrolls across; on the last frozen column,
+    /// unfreezes them.
+    @objc func freezeColumns(_ sender: Any?) {
+        guard let column = grid.selection.cursor?.column, !transposed, record == nil else { return NSSound.beep() }
+        grid.frozenColumns = grid.frozenColumns == column + 1 ? 0 : column + 1
+        saveColumns()
     }
 
     /// Hide Column: the selected columns, or the focused cell's.
@@ -571,6 +584,11 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             item.state = record != nil ? .on : .off
             item.explain(enabled: (source?.rowCount ?? 0) > 0, reason: "There are no rows to show")
             return (source?.rowCount ?? 0) > 0
+        case #selector(freezeColumns(_:)):
+            let column = grid.selection.cursor?.column, enabled = column != nil && !transposed && record == nil
+            item.state = column.map { $0 < grid.frozenColumns } == true ? .on : .off
+            item.explain(enabled: enabled, reason: column == nil ? "Select a column first" : "Not while the rows are on their side")
+            return enabled
         case #selector(hideColumn(_:)):
             let enabled = grid.columnCount > 1 && grid.selection.cursor != nil
             item.explain(enabled: enabled, reason: grid.columnCount > 1 ? "Select a column first" : "One column stays shown")
@@ -621,7 +639,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         switch target {
         case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.columnSummary])
         case .row: menu.add([Commands.recordView, Commands.valuePanel])
-        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.columnList, Commands.heatmap])
+        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.freeze, Commands.columnList, Commands.heatmap])
         }
         if !transposed, record == nil { menu.addItem(Self.displayMenu()) }
         return menu
