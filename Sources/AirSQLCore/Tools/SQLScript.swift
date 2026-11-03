@@ -149,7 +149,7 @@ extension DumpScan {
             let word = String(decoding: text[token.range], as: UTF16.self)
             switch token.kind {
             case .comment, .hint, .codeStart, .codeEnd: return nil
-            case .quotedName: return String(word.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
+            case .quotedName: return SQLQuote.unquoted(word)
             default: return word
             }
         }

@@ -47,7 +47,7 @@ public enum SQLCompletion {
         var items: [CompletionItem] = []
 
         if words.last?.raw == ".", words.count >= 2 {
-            let qualifier = unquote(words[words.count - 2].raw)
+            let qualifier = SQLQuote.unquoted(words[words.count - 2].raw)
             if let ref = refs.first(where: { $0.name.caseInsensitiveCompare(qualifier) == .orderedSame }),
                let table = table(ref, snapshot, database) {
                 items = table.columns.map { CompletionItem(kind: .column, text: quote($0.name), label: $0.name, detail: $0.columnType) }
@@ -127,16 +127,16 @@ public enum SQLCompletion {
             index += 1
             repeat {
                 guard isName(index), !notAliases.contains(words[index].text) || words[index].kind == .quotedName else { break }
-                var ref = TableRef(database: nil, table: unquote(words[index].raw), alias: nil)
+                var ref = TableRef(database: nil, table: SQLQuote.unquoted(words[index].raw), alias: nil)
                 index += 1
                 if index + 1 < words.count, words[index].raw == ".", isName(index + 1) {
                     ref.database = ref.table
-                    ref.table = unquote(words[index + 1].raw)
+                    ref.table = SQLQuote.unquoted(words[index + 1].raw)
                     index += 2
                 }
                 if index < words.count, words[index].text == "AS" { index += 1 }
                 if isName(index), !notAliases.contains(words[index].text) || words[index].kind == .quotedName {
-                    ref.alias = unquote(words[index].raw)
+                    ref.alias = SQLQuote.unquoted(words[index].raw)
                     index += 1
                 }
                 refs.append(ref)
@@ -201,11 +201,6 @@ public enum SQLCompletion {
         let plain = !name.isEmpty && name.utf16.allSatisfy(isWordChar) && !(name.first?.isNumber ?? true)
             && !SQLWords.reserved.contains(name.uppercased())
         return plain ? name : SQLQuote.identifier(name)
-    }
-
-    static func unquote(_ name: String) -> String {
-        guard name.hasPrefix("`"), name.hasSuffix("`"), name.count >= 2 else { return name }
-        return String(name.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
     }
 
     /// A character of a name without quotes: ASCII letters and digits, _ and $, and anything beyond ASCII.
