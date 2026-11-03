@@ -129,6 +129,16 @@ enum AttackCorpus {
         "SELECT 1 /*!50000 , SLEEP(5)",
         "SELECT /*!50000 sys_exec */('id')",
         "SELECT 1 /*!50000 UNION SELECT LOAD_FILE('/etc/passwd') */",
+        // A quote in a version-gated comment whose version the server is under: the server skips the whole comment and
+        // runs what comes after its */, so the lexer must not let the quote open a string that swallows the */.
+        "SELECT 1 /*!99999 ' */, GET_LOCK('x', 0) -- ' */",
+        "SELECT 1 /*M!999999 ' */, GET_LOCK('x', 0) -- ' */",
+        "SELECT 1 AS one /*!99999 ' */, SLEEP(5) AS l -- ' */",
+        "SELECT 1 /*!99999 ' */ INTO OUTFILE '/tmp/x' -- ' */",
+        "SELECT 1 /*!99999 ' */ , LOAD_FILE('/etc/passwd') AS f -- ' */",
+        "SELECT 1 /*!99999 \" */, GET_LOCK('x', 0) -- \" */",
+        "SELECT 1 /*!99999 ` */, GET_LOCK('x', 0) -- ` */",
+        "/*!99999 ' */ SELECT SLEEP(5) -- ' */",
     ]
 
     static let hints = [
