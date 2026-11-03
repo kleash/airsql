@@ -118,10 +118,8 @@ public enum EditorText {
         return items.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
 
-    /// A name without its backticks (doubled backticks inside made single), or as it is.
+    /// A name without the spaces around it and its backticks (doubled backticks inside made single), or as it is.
     static func unquoted(_ text: String) -> String {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        guard text.count >= 2, text.hasPrefix("`"), text.hasSuffix("`") else { return text }
-        return String(text.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
+        SQLQuote.unquoted(text.trimmingCharacters(in: .whitespaces))
     }
 }

@@ -1,4 +1,3 @@
-import CMariaDB
 import Foundation
 
 /// What agents read, sized for their context: the compact schema (one line per table) and result rows as JSON or CSV.
@@ -101,7 +100,7 @@ public enum AgentFormat {
 
     /// The columns' names and types.
     static func columns(_ rows: ResultStore) -> (names: [String], types: [String]) {
-        (rows.columns.map(\.name), rows.columns.map(typeName))
+        (rows.columns.map(\.name), rows.columns.map(\.typeName))
     }
 
     /// The rows (the first `count`) as arrays of text or null.
@@ -126,34 +125,5 @@ public enum AgentFormat {
     static func csvField(_ text: String) -> String {
         guard text.isEmpty || text.contains(where: { $0 == "," || $0 == "\"" || $0 == "\r" || $0 == "\n" }) else { return text }
         return "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-    }
-
-    /// A column type's name, as the server's protocol gives it.
-    static func typeName(_ column: ResultStore.Column) -> String {
-        switch column.type {
-        case MYSQL_TYPE_TINY: return "tinyint"
-        case MYSQL_TYPE_SHORT: return "smallint"
-        case MYSQL_TYPE_INT24: return "mediumint"
-        case MYSQL_TYPE_LONG: return "int"
-        case MYSQL_TYPE_LONGLONG: return "bigint"
-        case MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL: return "decimal"
-        case MYSQL_TYPE_FLOAT: return "float"
-        case MYSQL_TYPE_DOUBLE: return "double"
-        case MYSQL_TYPE_BIT: return "bit"
-        case MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE: return "date"
-        case MYSQL_TYPE_TIME, MYSQL_TYPE_TIME2: return "time"
-        case MYSQL_TYPE_DATETIME, MYSQL_TYPE_DATETIME2: return "datetime"
-        case MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_TIMESTAMP2: return "timestamp"
-        case MYSQL_TYPE_YEAR: return "year"
-        case MYSQL_TYPE_JSON: return "json"
-        case MYSQL_TYPE_ENUM: return "enum"
-        case MYSQL_TYPE_SET: return "set"
-        case MYSQL_TYPE_GEOMETRY: return "geometry"
-        case MYSQL_TYPE_NULL: return "null"
-        case MYSQL_TYPE_TINY_BLOB, MYSQL_TYPE_MEDIUM_BLOB, MYSQL_TYPE_LONG_BLOB, MYSQL_TYPE_BLOB:
-            return column.isBinary ? "blob" : "text"
-        case MYSQL_TYPE_STRING: return column.isBinary ? "binary" : "char"
-        default: return column.isBinary ? "varbinary" : "varchar"
-        }
     }
 }

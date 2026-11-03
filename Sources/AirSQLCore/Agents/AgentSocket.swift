@@ -1,5 +1,5 @@
 // Ported from AirSCP 1.4.0: the app's agent socket (Sources/AirSCP/AgentServer.swift's init, acceptLoop and serve) and
-// the helper's side of it (Sources/AirSCPCore/Askpass.swift's exchange and unixAddress). Here a reply may come after
+// the helper's side of it (Sources/AirSCPCore/Askpass.swift's exchange). Here a reply may come after
 // progress lines, one JSON object per line.
 import Darwin
 import Foundation
@@ -37,7 +37,7 @@ public final class AgentListener: @unchecked Sendable {
         guard lstat(dir, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_uid == getuid(), chmod(dir, 0o700) == 0 else {
             throw AirSQLError(.other, "The agent folder isn't a folder of yours.")
         }
-        guard var address = AgentSocket.unixAddress(socketPath) else {
+        guard var address = Askpass.unixAddress(socketPath) else {
             throw AirSQLError(.other, AgentSocket.socketPathProblem(socketPath) ?? "")
         }
         if AgentSocket.answers(socketPath) {

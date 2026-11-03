@@ -172,7 +172,7 @@ public struct TypeSpec: Hashable {
                     value.append("'")
                     next = scalars.next()
                 } else if scalar == "\\", !noBackslashEscapes, let escaped = next {
-                    value.append(Self.unescaped(escaped))
+                    value.append(SchemaIntrospection.unescaped(escaped))
                     next = scalars.next()
                 } else {
                     value.append(scalar)
@@ -189,19 +189,6 @@ public struct TypeSpec: Hashable {
             }
         }
         return values
-    }
-
-    /// What a backslash escape in a string literal stands for.
-    static func unescaped(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
-        switch scalar {
-        case "n": return "\n"
-        case "r": return "\r"
-        case "t": return "\t"
-        case "0": return "\0"
-        case "b": return "\u{8}"
-        case "Z": return "\u{1A}"
-        default: return scalar
-        }
     }
 }
 

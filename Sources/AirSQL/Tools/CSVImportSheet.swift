@@ -117,8 +117,8 @@ final class CSVImportSheet: ToolSheet {
                 let session = DBConnection(options: options, role: .tools)
                 _ = try await session.connect()
                 self.session = session
-                let names = try await SQLExport.rows(session, PickerNode.databasesSQL).compactMap { $0[0] }
-                let tables = try await SQLExport.rows(session, PickerNode.listSQL)
+                let names = try await session.rows(PickerNode.databasesSQL).compactMap { $0[0] }
+                let tables = try await session.rows(PickerNode.listSQL)
                 show(databases: PickerNode.databases(names, tables: tables))
             } catch {
                 loading(nil)
@@ -156,7 +156,7 @@ final class CSVImportSheet: ToolSheet {
         }
         Task {
             let quote = { SQLQuote.string($0, noBackslashEscapes: session.noBackslashEscapes) }
-            let rows = (try? await SQLExport.rows(session, "SELECT COLUMN_NAME, COLUMN_TYPE, EXTRA FROM information_schema.COLUMNS "
+            let rows = (try? await session.rows("SELECT COLUMN_NAME, COLUMN_TYPE, EXTRA FROM information_schema.COLUMNS "
                 + "WHERE TABLE_SCHEMA = \(quote(database)) AND TABLE_NAME = \(quote(table)) ORDER BY ORDINAL_POSITION")) ?? []
             show(columns: rows.filter { !SQLExport.isGenerated($0[2] ?? "") }.map { ($0[0] ?? "", $0[1] ?? "") })
         }

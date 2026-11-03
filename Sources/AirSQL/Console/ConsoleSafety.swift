@@ -57,14 +57,15 @@ enum ConsoleSafety {
         SQLPreviewSheet.show(request, connection: saved, on: window) { result in answer(result.approved) }
     }
 
-    /// A name as the person types it: `my db` without its backticks.
-    static func unquoted(_ name: String) -> String {
-        name.split(separator: ".").map { part -> String in
-            var text = String(part)
-            if text.hasPrefix("`"), text.hasSuffix("`"), text.count >= 2 {
-                text = String(text.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
-            }
-            return text
-        }.joined(separator: ".")
+    /// Names as the person types them: each one without its backticks (`shop`.`my orders`, `a.b` → shop.my orders, a.b).
+    static func unquoted(_ names: String) -> String {
+        let text = Array(names.utf16)
+        var result = "", end = 0
+        for token in SQLLexer.tokens(names) where token.kind == .quotedName {
+            result += String(decoding: text[end..<token.range.lowerBound], as: UTF16.self)
+                + SQLQuote.unquoted(String(decoding: text[token.range], as: UTF16.self))
+            end = token.range.upperBound
+        }
+        return result + String(decoding: text[end...], as: UTF16.self)
     }
 }
