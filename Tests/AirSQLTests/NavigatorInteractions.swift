@@ -30,7 +30,7 @@ extension AppTests.InteractionTests {
                     },
                     menu: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Generate Liquibase Changelog…",
                            "Compare…", "Refresh", "Drop…"],
-                    enabled: ["New Database…", "Refresh", "Drop…"]),
+                    enabled: ["New Database…", "Create Table…", "Refresh", "Drop…"]),
             Surface(name: "Table or view in the tree",
                     place: { main, _ in treeRow(main, .object(id, orders))?.point },
                     clicked: { $0.selectedTab?.title == "orders" && preview($0) != nil },
@@ -39,7 +39,7 @@ extension AppTests.InteractionTests {
             Surface(name: "Routine, trigger or event",
                     place: { main, _ in treeRow(main, .object(id, procedure))?.point },
                     clicked: { preview($0) is TextContent && $0.selectedTab?.title == "add_customer" },
-                    doubleClicked: { main, _ in main.tabs.filter { $0.title == "add_customer" }.count == 2 },
+                    doubleClicked: { main, _ in main.selectedTab?.content is ObjectEditorController },
                     menu: ["Open", "Run…", "Copy CREATE", "Drop…", "Refresh"],
                     enabled: ["Open", "Copy CREATE", "Drop…", "Refresh"]),
             Surface(name: "Folder or category in the tree",
@@ -47,7 +47,7 @@ extension AppTests.InteractionTests {
                     clicked: { $0.sidebar.selectedNodes.map(\.kind) == [views] },
                     doubleClicked: { main, _ in expanded(main, views) },
                     menu: ["New…", "Refresh", "Expand All", "Collapse All"],
-                    enabled: ["Refresh", "Expand All", "Collapse All"]),
+                    enabled: ["New…", "Refresh", "Expand All", "Collapse All"]),
             Surface(name: "Table in the database view",
                     place: { main, _ in
                         guard let open = main.model.openConnection(id) else { return nil }

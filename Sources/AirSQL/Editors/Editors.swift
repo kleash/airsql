@@ -44,16 +44,19 @@ struct EditorContext {
     }
 }
 
-/// The editors' way in for the rest of the app. Whatever connects a connection (L1) sets `open`, which gives a
-/// connected connection's sessions and schema cache; the navigator (L5a) calls the `MainWindowController` entry points
-/// below for the object it is on (Open Structure, Create Table…, New…, Open, ER Diagram).
+/// The editors' way in for the rest of the app: a connected connection's context, and the `MainWindowController`
+/// entry points below, which the navigator calls for the object it is on (Open Structure, Create Table…, New…, Open,
+/// ER Diagram).
 @MainActor
 enum Editors {
-    /// A connected connection's sessions and schema cache, by its id; nil while it isn't connected.
-    static var open: (UUID) -> (sessions: Connection, schema: SchemaCache)? = { _ in nil }
+    /// A connected connection's sessions and schema cache (`AppModel.open`), by its id; nil while it isn't connected.
+    /// Tests answer from a recording.
+    static var open: (AppModel, UUID) -> (sessions: Connection, schema: SchemaCache)? = { model, id in
+        model.openConnection(id).map { ($0.connection, $0.schema) }
+    }
 
-    static func context(_ connection: SavedConnection?) -> EditorContext? {
-        guard let connection, let open = open(connection.id) else { return nil }
+    static func context(_ connection: SavedConnection?, in model: AppModel) -> EditorContext? {
+        guard let connection, let open = open(model, connection.id) else { return nil }
         return EditorContext(connection: connection, sessions: open.sessions, schema: open.schema)
     }
 }
@@ -86,18 +89,36 @@ extension MainWindowController {
         open(editor, title: editor.tabTitle, connection: context.connection.id)
     }
 
+    /// The navigator's Open Structure and Open: the table editor or the object's editor, in the tab already on it if
+    /// there is one; a sequence's CREATE statement, read-only.
+    func openEditor(_ object: DatabaseObject, of connection: OpenConnection) {
+        guard let context = Editors.context(model.connection(connection.id), in: model) else { return }
+        if object.kind == .table {
+            openTableEditor(object.name, database: object.database, context: context)
+        } else if let kind = ObjectKind(rawValue: object.kind.rawValue) {
+            openObjectEditor(kind, name: object.name, database: object.database, context: context)
+        } else {
+            open(TextContent.definition(connection, object), title: object.name, connection: connection.id)
+        }
+    }
+
     /// Shows the ER diagram of `database` (nil: the first database with tables).
     func openERDiagram(database: String?, context: EditorContext) {
         let diagram = ERDiagramController(context: context, database: database, activity: model.activity)
         open(diagram, title: diagram.tabTitle, connection: context.connection.id)
     }
 
-    // MARK: Menu commands (until the navigator handles them for the object it is on)
+    // MARK: Menu commands
 
-    /// The active connection's editor context and the database to start in: its own default database, if it has one.
+    /// The connection the editor commands act on: the tree's (its right-click menus), else the window's.
+    private var editorConnection: SavedConnection? {
+        sidebar.treeSelection.flatMap { model.connection($0.open.id) } ?? activeConnection
+    }
+
+    /// The editor context and the database to start in: the tree's, else the connection's own default database.
     private var editorTarget: (EditorContext, String?)? {
-        guard let context = Editors.context(activeConnection) else { return nil }
-        let database = activeConnection?.database ?? ""
+        guard let context = Editors.context(editorConnection, in: model) else { return nil }
+        let database = sidebar.treeSelection?.nodes.first?.database ?? context.connection.database
         return (context, database.isEmpty ? nil : database)
     }
 
@@ -126,8 +147,8 @@ extension MainWindowController {
         guard [Commands.createTable.action, Commands.erDiagram.action, Commands.createObject.action].contains(item.action) else {
             return nil
         }
-        guard let connection = activeConnection else { return (false, "Choose a connection first") }
-        guard let context = Editors.context(connection) else { return (false, "Connect to \(connection.displayName) first") }
+        guard let connection = editorConnection else { return (false, "Choose a connection first") }
+        guard let context = Editors.context(connection, in: model) else { return (false, "Connect to \(connection.displayName) first") }
         if item.action == Commands.createObject.action, context.schema.snapshot.databases.isEmpty, connection.database.isEmpty {
             return (false, "The server has no database to create it in")
         }

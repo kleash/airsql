@@ -1,8 +1,8 @@
 import AirSQLCore
 import AppKit
 
-/// Where the navigator hands over to other lanes' screens. The grid (L2, L3a) sets `tableData`; the editors (L5b) set
-/// `tableEditor` and `objectEditor`. Until then the navigator shows its own read-only stand-ins.
+/// Where the navigator hands over to the grid (L2, L3a), which sets `tableData`; until then the navigator shows its own
+/// read-only stand-in.
 @MainActor
 enum NavigatorHooks {
     /// A table's or view's rows (single click: in the preview tab; double-click and Open Data: a tab of their own),
@@ -10,10 +10,6 @@ enum NavigatorHooks {
     static var tableData: (OpenConnection, DatabaseObject, String?) -> NSViewController = { open, table, condition in
         TextContent.tablePlaceholder(open, table, where: condition)
     }
-    /// The table editor, for Open Structure; nil: the table's CREATE statement, read-only.
-    static var tableEditor: ((OpenConnection, DatabaseObject) -> NSViewController)?
-    /// A routine's, trigger's or event's editor, for Open; nil: its CREATE statement, read-only.
-    static var objectEditor: ((OpenConnection, DatabaseObject) -> NSViewController)?
 }
 
 /// The tab a single click in the tree shows things in (plan §2.12): a database's tables, a table's rows, an object's

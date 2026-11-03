@@ -102,18 +102,12 @@ extension SidebarController: NSMenuItemValidation {
 
     @objc func openStructure(_ sender: Any?) {
         guard let main, let open = treeSelection?.open else { return }
-        for table in selectedObjects where table.kind.isTableLike {
-            let content = NavigatorHooks.tableEditor?(open, table) ?? TextContent.definition(open, table)
-            main.open(content, title: table.name + " · structure", connection: open.id)
-        }
+        for table in selectedObjects where table.kind.isTableLike { main.openEditor(table, of: open) }
     }
 
     @objc func openObject(_ sender: Any?) {
         guard let main, let open = treeSelection?.open else { return }
-        for object in selectedObjects where !object.kind.isTableLike {
-            main.open(NavigatorHooks.objectEditor?(open, object) ?? TextContent.definition(open, object), title: object.name,
-                      connection: open.id)
-        }
+        for object in selectedObjects where !object.kind.isTableLike { main.openEditor(object, of: open) }
     }
 
     @objc func copyName(_ sender: Any?) {

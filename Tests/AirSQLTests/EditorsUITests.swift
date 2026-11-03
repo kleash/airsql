@@ -258,7 +258,8 @@ extension AppTests {
                                                                                             "Event…"])
             let model = testModel([Fixtures.local])
             let (main, harness) = appWindow(model)
-            defer { Editors.open = { _ in nil } }
+            let connected = Editors.open
+            defer { Editors.open = connected }
             // No connection chosen, then one that isn't connected: off, saying why.
             main.sidebar.select([])
             #expect(await call(harness, "menu", ["path": "Database > Create Table…"]).error?.contains("Choose a connection first") == true)
@@ -267,7 +268,7 @@ extension AppTests {
                     == true)
             // Connected: each opens its tab (they then read the server through it).
             let context = try await recordedEditorContext()
-            Editors.open = { $0 == Fixtures.local.id ? (context.sessions, context.schema) : nil }
+            Editors.open = { $1 == Fixtures.local.id ? (context.sessions, context.schema) : nil }
             _ = await call(harness, "menu", ["path": "Database > Create Table…"])
             #expect(main.selectedTab?.title == "New table")
             _ = await call(harness, "menu", ["path": "Database > New Object > Trigger…"])

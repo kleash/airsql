@@ -211,10 +211,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     @objc func openStructure(_ sender: Any?) {
         guard let main = view.window?.windowController as? MainWindowController else { return }
-        for object in selectedObjects {
-            main.open(NavigatorHooks.tableEditor?(open, object) ?? TextContent.definition(open, object),
-                      title: object.name + " · structure", connection: open.id)
-        }
+        for object in selectedObjects { main.openEditor(object, of: open) }
     }
 
     @objc func copyName(_ sender: Any?) {
