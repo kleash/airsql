@@ -42,6 +42,7 @@ final class TableDataController: NSViewController, TabContent {
     private(set) var source: TableDataSource?
     let grid = DataGridView()
     let bar = TableDataBar()
+    let findBar = TableFindBar()
     let notice = TableDataNotice()
     let status = TableDataStatus()
     /// The rows' estimate (information_schema) or exact count (Count Rows Exactly), with the filter it was for.
@@ -87,9 +88,10 @@ final class TableDataController: NSViewController, TabContent {
         grid.fontSize = CGFloat(model.data.settings.gridFontSize)
         grid.setAccessibilityLabel("Rows of \(tableName)")
         bar.owner = self
+        findBar.owner = self
         notice.owner = self
         status.owner = self
-        let stack = NSStackView(views: [bar, notice, grid.containerView])
+        let stack = NSStackView(views: [bar, findBar, notice, grid.containerView])
         stack.orientation = .vertical
         stack.spacing = 0
         stack.alignment = .leading

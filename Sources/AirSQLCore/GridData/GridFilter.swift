@@ -167,3 +167,39 @@ extension GridColumn {
         return SQLQuote.string(value, noBackslashEscapes: noBackslashEscapes)
     }
 }
+
+/// Find and replace in the loaded rows (grid-spec §4): text, or a regular expression, with or without case, whole words
+/// only if asked.
+public struct GridFind: Equatable {
+    public var text: String
+    public var matchCase = false
+    public var regex = false
+    public var wholeWords = false
+
+    public init(_ text: String, matchCase: Bool = false, regex: Bool = false, wholeWords: Bool = false) {
+        self.text = text
+        self.matchCase = matchCase
+        self.regex = regex
+        self.wholeWords = wholeWords
+    }
+
+    /// The expression it searches with; nil for no text or a regular expression that doesn't parse.
+    public var expression: NSRegularExpression? {
+        guard !text.isEmpty else { return nil }
+        let pattern = regex ? text : NSRegularExpression.escapedPattern(for: text)
+        return try? NSRegularExpression(pattern: wholeWords ? "\\b(?:\(pattern))\\b" : pattern,
+                                        options: matchCase ? [] : [.caseInsensitive])
+    }
+
+    public func matches(_ value: String?, _ expression: NSRegularExpression?) -> Bool {
+        guard let value, let expression else { return false }
+        return expression.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) != nil
+    }
+
+    /// `value` with every match replaced: `replacement` as it is, or as a template ($1) for a regular expression.
+    public func replacing(in value: String, with replacement: String, _ expression: NSRegularExpression?) -> String {
+        guard let expression else { return value }
+        let template = regex ? replacement : NSRegularExpression.escapedTemplate(for: replacement)
+        return expression.stringByReplacingMatches(in: value, range: NSRange(value.startIndex..., in: value), withTemplate: template)
+    }
+}

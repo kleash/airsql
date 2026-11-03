@@ -202,6 +202,31 @@ extension AppTests {
             #expect(session.statements.last?.contains(" WHERE `region` IN ('EU') ORDER BY") == true)
         }
 
+        @Test func findAndReplaceInTheLoadedRows() async throws {
+            let (_, _, tab) = try await Self.tab()
+            let replace = NSMenuItem()
+            replace.tag = NSTextFinder.Action.showReplaceInterface.rawValue
+            tab.performTextFinderAction(replace)
+            #expect(!tab.findBar.isHidden && !tab.findBar.replaceField.isHidden)
+            tab.findBar.findField.stringValue = "eu"
+            tab.findChanged()
+            #expect(tab.findBar.count.stringValue == "2 matching")
+            tab.findMatch(forward: true)
+            #expect(tab.grid.selection.cursor == GridPosition(row: 0, column: 2) && tab.findBar.count.stringValue == "1 of 2")
+            tab.findMatch(forward: true)
+            #expect(tab.grid.selection.cursor == GridPosition(row: 2, column: 2))
+            // Filter Rows hides the loaded rows without a match.
+            tab.findBar.options.item(at: 4)?.state = .on
+            tab.findChanged()
+            #expect(tab.grid.rowCount == 2 && tab.bar.scope.text == "Local · 2 of 3 loaded rows")
+            tab.findBar.replaceField.stringValue = "Europe"
+            tab.replaceMatch(all: true)
+            #expect(tab.source?.cell(0, 2) == .text("Europe") && tab.source?.mark(1, 2) == .edited)
+            #expect(tab.findBar.count.stringValue == "Replaced 2 values" && tab.source?.changes.rowCount == 2)
+            tab.findBar.close(nil)
+            #expect(tab.findBar.isHidden && tab.grid.rowCount == 3)
+        }
+
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
             let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
             #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. Views are read-only"))

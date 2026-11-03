@@ -8,10 +8,9 @@ extension TableDataController {
     /// The condition the server gets: the WHERE bar's, and the search's when it runs on the server.
     var serverFilter: String {
         let typed = GridFilter.condition(bar.filterText)
-        // A search of the loaded rows only (a local filter) stays here.
-        let search = source.flatMap {
-            $0.localFilter == nil ? GridFilter.search(bar.searchField.stringValue, in: $0.columns, noBackslashEscapes: noBackslashEscapes) : nil
-        }
+        // A search of the loaded rows only stays here.
+        let search = bar.loadedOnly.state == .on ? nil
+            : source.flatMap { GridFilter.search(bar.searchField.stringValue, in: $0.columns, noBackslashEscapes: noBackslashEscapes) }
         guard let search else { return typed }
         return typed.isEmpty ? search : "(\(typed)) AND (\(search))"
     }
@@ -23,25 +22,22 @@ extension TableDataController {
 
     func search(_ text: String, loadedOnly: Bool) {
         guard let source else { return }
-        source.localFilter = loadedOnly && !text.isEmpty ? { GridFilter.matches(text, $0) } : nil
+        bar.searchField.stringValue = text
+        bar.loadedOnly.state = loadedOnly ? .on : .off
+        updateLocalFilter()
         if !loadedOnly, !source.localSort.isEmpty {
             source.localSort = []
             grid.sortOrder = source.sort.compactMap { key in
                 source.columns.firstIndex { $0.name == key.column }.map { DataGridView.Sort(column: $0, ascending: key.ascending) }
             }
         }
-        if source.filter != serverFilter { reloadForFilter() } else { finishLocalChange() }
+        if source.filter != serverFilter { reloadForFilter() }
     }
 
     private func reloadForFilter() {
         guard let source else { return }
         source.filter = serverFilter
         if loading == nil { loadRows(more: false) } else { reloadWhenDone = true }
-    }
-
-    private func finishLocalChange() {
-        grid.reloadData()
-        updateBars()
     }
 
     // MARK: Quick filters
@@ -133,7 +129,7 @@ extension TableDataController {
 
     @objc func clearFilter(_ sender: Any?) {
         bar.searchField.stringValue = ""
-        source?.localFilter = nil
+        updateLocalFilter()
         applyFilter("")
     }
 

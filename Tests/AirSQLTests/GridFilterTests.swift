@@ -95,4 +95,19 @@ struct GridFilterTests {
         let descending = GridSorting.sorted(Array(values.indices), by: [(1, false)], columns: columns) { values[$0][$1] }
         #expect(descending == [0, 2, 1, 4, 3])
     }
+
+    @Test func findAndReplaceWithCaseRegexAndWholeWords() {
+        let plain = GridFind("an")
+        #expect(plain.matches("Joanna", plain.expression) && plain.matches("ANN", plain.expression) && !plain.matches(nil, plain.expression))
+        let cased = GridFind("an", matchCase: true)
+        #expect(!cased.matches("ANN", cased.expression))
+        let words = GridFind("an", wholeWords: true)
+        #expect(!words.matches("Joanna", words.expression) && words.matches("an apple", words.expression))
+        let regex = GridFind("(\\d+)-(\\d+)", regex: true)
+        #expect(regex.replacing(in: "10-20 and 3-4", with: "$2-$1", regex.expression) == "20-10 and 4-3")
+        // Without regex, special characters are plain text, in the pattern and the replacement.
+        let dots = GridFind("a.b")
+        #expect(!dots.matches("axb", dots.expression) && dots.replacing(in: "a.b A.B", with: "$0\\", dots.expression) == "$0\\ $0\\")
+        #expect(GridFind("(", regex: true).expression == nil && GridFind("").expression == nil)
+    }
 }
