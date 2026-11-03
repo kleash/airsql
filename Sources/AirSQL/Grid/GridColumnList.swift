@@ -84,7 +84,7 @@ final class GridColumnList: NSViewController, NSTableViewDataSource, NSTableView
         let name = label(info.name, truncates: true)
         name.lineBreakMode = .byTruncatingMiddle
         name.toolTip = info.name
-        let type = label(info.type, font: .systemFont(ofSize: 11), color: .tertiaryLabelColor)
+        let type = label(info.type, font: .systemFont(ofSize: 11), color: .quietText)
         let cell = NSStackView(views: [box, name, NSView(), type])
         cell.spacing = 6
         cell.edgeInsets = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 6)

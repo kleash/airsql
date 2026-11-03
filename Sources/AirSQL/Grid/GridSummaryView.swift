@@ -107,7 +107,7 @@ final class GridSummaryView: NSViewController {
             stack.addArrangedSubview(scroll)
             scroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
             stack.addArrangedSubview(label(origin + (summary.top.count == ColumnSummary.topLimit ? " · the 50 most frequent" : ""),
-                                           font: .systemFont(ofSize: 11), color: .tertiaryLabelColor, wraps: true))
+                                           font: .systemFont(ofSize: 11), color: .quietText, wraps: true))
         }
     }
 
