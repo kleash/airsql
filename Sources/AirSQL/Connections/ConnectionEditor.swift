@@ -57,6 +57,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: Self.width, height: 480), styleMask: [.titled],
                               backing: .buffered, defer: true)
         window.title = isNew ? "New Connection" : "Edit “\(connection.displayName)”"
+        window.autorecalculatesKeyViewLoop = true  // Tab goes through the fields of whichever tab is shown
         super.init(window: window)
         window.delegate = self
         window.contentView = makeContent()

@@ -21,9 +21,9 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
                                      target: nil, action: nil)
     private let list = LiquibaseObjectTable()
     private let author = AirSQL.textField("", placeholder: "Your Mac account's name", id: "liquibase.author",
-                                          tip: "Who the changesets are by, as Liquibase records it", width: 200)
+                                          tip: "Type who the changesets are by, as Liquibase records it", width: 200)
     private let ids = AirSQL.textField("", placeholder: "{date}-{n}-{object}", id: "liquibase.ids",
-                                       tip: "How changeset ids are made: {date}, {time}, {n} (001, 002…) and {object}", width: 200)
+                                       tip: "Type how changeset ids are made: {date}, {time}, {n} (001, 002…) and {object}", width: 200)
     private let rollback = checkbox("Add --rollback for DDL", id: "liquibase.rollback",
                                     tip: "Write the DROP that undoes each object, so liquibase rollback works", on: true, target: nil, action: nil)
     private let preconditions = checkbox("Skip what already exists", id: "liquibase.preconditions",
@@ -90,6 +90,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         bottom.row("Preconditions", [preconditions])
         bottom.row("Files", [layoutMenu])
         saveTo.setAccessibilityIdentifier("liquibase.saveTo")
+        saveTo.lineBreakMode = .byTruncatingMiddle  // a path: its file name stays in sight
         saveTo.widthAnchor.constraint(equalToConstant: 200).isActive = true
         bottom.row("Save to", [saveTo, choose])
         let left = NSStackView(views: [top.finish(), makeList(), bottom.finish()])
@@ -440,7 +441,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         case "where":
             guard item.isTable else { return nil }
             let field = AirSQL.textField(item.filter, placeholder: "every row", id: "liquibase.where." + item.object.name,
-                                         tip: "Only the rows of \(item.object.name) that match this condition, such as active = 1")
+                                         tip: "Type a condition to write only the rows of \(item.object.name) that match it, such as active = 1")
             field.isBordered = false
             field.drawsBackground = false
             field.font = .monospacedSystemFont(ofSize: 11, weight: .regular)

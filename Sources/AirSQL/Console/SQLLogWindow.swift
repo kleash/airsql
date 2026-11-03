@@ -53,7 +53,7 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
                             action: #selector(revealLog(_:)))
         let clear = button("Clear Log…", id: "sqlLog.clear", tip: Commands.clearSQLLog.tip, target: self,
                            action: #selector(clearSQLLog(_:)))
-        let bar = NSStackView(views: [filter, status, reveal, clear])
+        let bar = NSStackView(views: [filter, status, NSView(), reveal, clear])
         bar.spacing = Spacing.unit
         filter.widthAnchor.constraint(equalToConstant: 280).isActive = true
         let root = SurfaceView(.ground)
@@ -111,8 +111,9 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
     private func show() {
         let words = filter.stringValue.lowercased().split(separator: " ").map(String.init)
         let shown = words.isEmpty ? lines : lines.filter { line in words.allSatisfy { line.lowercased().contains($0) } }
-        status.stringValue = lines.isEmpty ? "Nothing has been sent yet" : words.isEmpty ? "\(lines.count.formatted()) lines"
-            : "\(shown.count.formatted()) of \(lines.count.formatted()) lines"
+        status.stringValue = lines.isEmpty ? "Nothing sent yet: statements show here once you connect"
+            : words.isEmpty ? "\(lines.count.formatted()) lines" : "\(shown.count.formatted()) of \(lines.count.formatted()) lines"
+        status.toolTip = status.stringValue  // whole, when a narrow window shortens it
         let atEnd = text.enclosingScrollView.map { $0.documentVisibleRect.maxY >= text.bounds.maxY - 20 } ?? true
         let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
         let result = NSMutableAttributedString()

@@ -40,7 +40,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         let root = SurfaceView(.content)
         root.setAccessibilityIdentifier("find")
         field.placeholderString = "Text to find"
-        field.toolTip = "The text to look for in every text column; press Return to search"
+        field.toolTip = "Type the text to look for in every text column; press Return to search"
         field.setAccessibilityIdentifier("find.text")
         field.sendsWholeSearchString = true
         field.target = self
@@ -54,7 +54,8 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityLabel("Searching")
-        status.stringValue = "Counts the rows of each table whose text columns hold the text. Every table is read in full."
+        status.stringValue = "Type the text, then press Return: AirSQL counts the rows of each table whose text columns hold it. "
+            + "Every table is read in full."
         status.toolTip = status.stringValue
         status.setAccessibilityIdentifier("find.status")
         self.go = go

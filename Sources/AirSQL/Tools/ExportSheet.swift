@@ -81,6 +81,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         saveTo.stringValue = SettingsPaneController.shown(url)
         saveTo.toolTip = url.path
         saveTo.setAccessibilityIdentifier("export.saveTo")
+        saveTo.lineBreakMode = .byTruncatingMiddle  // a path: its file name stays in sight
         saveTo.widthAnchor.constraint(equalToConstant: 300).isActive = true
         form.row("Save to", [saveTo, choose])
         form.row("Extra options", [extra])
@@ -167,7 +168,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             toolMenu.lastItem?.toolTip = tool.path
         }
         toolMenu.addItem(withTitle: "AirSQL (built in)")
-        toolMenu.lastItem?.toolTip = "AirSQL's own export: no client tools needed"
+        toolMenu.lastItem?.toolTip = "Export with AirSQL itself: no client tools needed"
         let picked = tools.firstIndex { $0.path == connection.dumpPath }
             ?? ClientTools.best(tools, for: server).flatMap { best in tools.firstIndex { $0 == best } }
         toolMenu.selectItem(at: picked ?? tools.count)

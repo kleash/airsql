@@ -149,8 +149,5 @@ private func fingerprintView(_ text: String) -> NSView {
     let field = label(text, font: .monospacedSystemFont(ofSize: 11, weight: .regular), wraps: true)
     field.isSelectable = true
     field.setAccessibilityIdentifier("trust.fingerprint")
-    field.preferredMaxLayoutWidth = 300
-    field.translatesAutoresizingMaskIntoConstraints = true
-    field.frame.size = NSSize(width: 300, height: field.fittingSize.height)
-    return field
+    return alertText([field], width: 306)
 }

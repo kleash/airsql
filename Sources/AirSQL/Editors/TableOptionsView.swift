@@ -6,24 +6,24 @@ import AppKit
 @MainActor
 final class TableOptionsView: NSView {
     weak var editor: TableEditorController?
-    let name = textField("", placeholder: "table name", id: "tableEditor.options.name", tip: "The table's name; changing it renames the table")
-    let database = popup([], selected: 0, id: "tableEditor.options.database", tip: "The database the new table goes in", target: nil,
+    let name = textField("", placeholder: "table name", id: "tableEditor.options.name", tip: "Type the table's name; changing it renames the table")
+    let database = popup([], selected: 0, id: "tableEditor.options.database", tip: "Choose the database the new table goes in", target: nil,
                          action: nil)
-    let engine = popup([], selected: 0, id: "tableEditor.options.engine", tip: "How the server stores the table: InnoDB has transactions "
+    let engine = popup([], selected: 0, id: "tableEditor.options.engine", tip: "Choose how the server stores the table: InnoDB has transactions "
                        + "and foreign keys", target: nil, action: nil)
     let collation = NSComboBox()
-    let rowFormat = popup([], selected: 0, id: "tableEditor.options.rowFormat", tip: "How rows are laid out on disk; Default leaves "
+    let rowFormat = popup([], selected: 0, id: "tableEditor.options.rowFormat", tip: "Choose how rows are laid out on disk; Default leaves "
                           + "it to the engine", target: nil, action: nil)
     let next = textField("", placeholder: "as it is", id: "tableEditor.options.autoIncrement",
-                         tip: "The number the next AUTO_INCREMENT row gets; it can't go below the largest one there")
-    let comment = textField("", placeholder: "", id: "tableEditor.options.comment", tip: "A note kept with the table")
+                         tip: "Type the number the next AUTO_INCREMENT row gets; it can't go below the largest one there")
+    let comment = textField("", placeholder: "", id: "tableEditor.options.comment", tip: "Type a note to keep with the table")
 
     init() {
         super.init(frame: .zero)
         collation.completes = true
         collation.numberOfVisibleItems = 16
         collation.placeholderString = "the database's"
-        collation.toolTip = "How the table's new text columns compare and sort; existing columns keep theirs"
+        collation.toolTip = "Choose how the table's new text columns compare and sort; existing columns keep theirs"
         collation.setAccessibilityIdentifier("tableEditor.options.collation")
         collation.translatesAutoresizingMaskIntoConstraints = false
         collation.widthAnchor.constraint(equalToConstant: 280).isActive = true
@@ -86,7 +86,7 @@ final class TableOptionsView: NSView {
         database.addItems(withTitles: databases.isEmpty ? [editor.database ?? ""] : databases)
         database.selectItem(withTitle: editor.database ?? "")
         database.isEnabled = editor.before == nil && !editor.isBusy
-        database.toolTip = database.isEnabled ? "The database the new table goes in" : "Only a new table chooses its database"
+        database.toolTip = database.isEnabled ? "Choose the database the new table goes in" : "Only a new table chooses its database"
         var engines = editor.engines
         if let current = options.engine, !engines.contains(where: { $0.caseInsensitiveCompare(current) == .orderedSame }) {
             engines.append(current)

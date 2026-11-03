@@ -303,6 +303,40 @@ extension AppTests {
             #expect(main.model.connection(Fixtures.local.id)?.colour == .test && main.model.connection(Fixtures.staging.id)?.colour == .test)
         }
 
+        /// Full keyboard use: Tab goes from field to field of what is shown, though the window's content changes.
+        @Test func tabGoesOnIntoWhatIsShown() async throws {
+            /// The ids of the views Tab reaches, `count` times from the first responder (through a field editor, as the key).
+            func tabs(_ window: NSWindow, _ count: Int) -> [String] {
+                (0..<count).map { _ in
+                    if let editor = window.firstResponder as? NSTextView, editor.isFieldEditor { editor.insertTab(nil) }
+                    else { window.selectNextKeyView(nil) }
+                    let responder = (window.firstResponder as? NSTextView).flatMap { $0.isFieldEditor ? $0.delegate as? NSView : $0 }
+                        ?? window.firstResponder as? NSView
+                    return responder?.accessibilityIdentifier() ?? ""
+                }
+            }
+            let model = testModel(Fixtures.shop)
+            let (main, harness) = appWindow(model)
+            let window = try #require(main.window)
+            // The connection editor, on a tab chosen after it opened.
+            let editor = ConnectionEditor.show(Fixtures.routed(long: false), isNew: false, model: model, on: window) { _, _ in }
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            editor.show(.route)
+            let sheet = try #require(window.attachedSheet)
+            #expect(tabs(sheet, 3) == ["editor.proxyHost", "editor.proxyPort", "editor.proxyUser"])
+            _ = await call(harness, "press", ["title": "Cancel"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            // The main window: from the sidebar into the tab's content.
+            main.openConsole(text: "SELECT 1", title: nil, connection: Fixtures.production.id)
+            window.makeFirstResponder(main.sidebar.filter)
+            let reached = tabs(window, 3)
+            #expect(reached.contains { !$0.hasPrefix("sidebar.") }, "Tab stays in the sidebar: \(reached)")
+            // The compare window: on to the list of what differs.
+            let compare = AppTests.ReconAppTests.window(AppTests.ReconAppTests.result())
+            compare.window?.makeFirstResponder(nil)
+            #expect(tabs(try #require(compare.window), 4).contains("recon.list"))
+        }
+
         private func closePopovers(_ main: MainWindowController) {
             for item in [main.statusBar.route, main.statusBar.server, main.statusBar.transaction, main.statusBar.activity,
                          main.statusBar.agent] { item.shown?.close() }

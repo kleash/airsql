@@ -16,7 +16,7 @@ final class ClientToolsPane: SettingsPaneController {
             let what = kind == .client ? "mysql or mariadb" : "mysqldump or mariadb-dump"
             let field = AirSQL.textField(model.data.settings[keyPath: Self.path(kind)], placeholder: "Found automatically",
                                          id: kind == .client ? "settings.clientPath" : "settings.dumpPath",
-                                         tip: "The \(what) program to run; empty: found automatically", width: 300)
+                                         tip: "Type the \(what) program to run; empty: found automatically", width: 300)
             field.target = self
             field.action = #selector(fieldChanged(_:))
             fields[kind] = field

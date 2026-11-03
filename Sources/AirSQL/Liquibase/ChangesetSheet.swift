@@ -59,6 +59,7 @@ final class ChangesetSheet: NSWindowController {
                             : "They go at the end of the changelog you choose, in this order, as Liquibase will read them:",
                             font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, wraps: true)
         file.setAccessibilityIdentifier("changeset.file")
+        file.lineBreakMode = .byTruncatingMiddle  // a path: its file name stays in sight
         let choose = button("Choose…", id: "changeset.choose", tip: "Choose the changelog file to add to", target: self,
                             action: #selector(chooseFile(_:)))
         let new = button("New…", id: "changeset.new", tip: "Start a new changelog file", target: self, action: #selector(newFile(_:)))

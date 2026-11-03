@@ -120,7 +120,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
                 if connection.id == active?.id { connectionPopup.select(item) }
             }
             connectionPopup.isEnabled = true
-            connectionPopup.toolTip = "The connection this window works on: choose another to show it"
+            connectionPopup.toolTip = "Choose the connection this window works on"
         }
         let open = model.openConnection(active?.id)
         // The cached databases (the current one too, when the list leaves it out), the current one chosen.

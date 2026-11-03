@@ -68,7 +68,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         code.textContainer?.widthTracksTextView = true
         code.delegate = self
         code.setAccessibilityIdentifier("objectEditor.code")
-        code.toolTip = "The \(kind.rawValue)'s CREATE statement: edit it, then Apply"
+        code.toolTip = "Edit the \(kind.rawValue)'s CREATE statement, then Apply"
         let scroll = NSScrollView()
         scroll.documentView = code
         scroll.hasVerticalScroller = true
@@ -174,7 +174,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         definer.addItem(withTitle: "Me" + (account.map { ", " + $0 } ?? ""))
         definer.selectItem(at: header?.definer == nil || written == nil ? definer.numberOfItems - 1 : 0)
         definer.isEnabled = !isBusy && header != nil
-        definer.toolTip = "Who the \(kind.rawValue) runs as (its DEFINER): as it was written, or you"
+        definer.toolTip = "Choose who the \(kind.rawValue) runs as (its DEFINER): as it was written, or you"
         let reason = applyReason
         applyButton.isEnabled = reason == nil
         applyButton.toolTip = reason ?? "Show the statements in the preview sheet, then run them on the server (⌘S)"

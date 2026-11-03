@@ -39,6 +39,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.title = "AirSQL"
+        window.autorecalculatesKeyViewLoop = true  // Tab goes on into whichever tab is shown
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified
         window.isExcludedFromWindowsMenu = true  // Window ▸ AirSQL stands for it

@@ -15,7 +15,7 @@ final class AgentsPane: SettingsPaneController {
 
     override func build() {
         form.row("", [toggle("Allow AI agents to use AirSQL", id: "settings.agentsAllowed",
-                             tip: "Off by default: lets Claude Code, Gemini CLI or another MCP client use AirSQL",
+                             tip: "Let Claude Code, Gemini CLI or another MCP client use AirSQL (off by default)",
                              \.agentsAllowed)],
                  caption: "Agents never see passwords and can't change data: they read within each connection's access "
                     + "below, and propose SQL in console tabs for you to run. Every call is listed in Agent Activity.")
