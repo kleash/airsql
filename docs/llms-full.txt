@@ -15,6 +15,10 @@ Source: https://kleash.github.io/airsql/
 
 AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages grow with it.
 
+![The AirSQL window: saved connections and a shop database's tables on the left, its newest orders in the grid](assets/screenshots/main-light.png)
+
+More pictures: the [README](https://github.com/kleash/airsql#screenshots).
+
 - [Install AirSQL](https://kleash.github.io/airsql/install.html): with Homebrew or from the download.
 - [Getting started](https://kleash.github.io/airsql/getting-started.html): add a connection, find your way around the window.
 - [Settings](https://kleash.github.io/airsql/settings.html): the look, the editor and grid, connections, safety checks, agents, client tools and

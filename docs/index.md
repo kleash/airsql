@@ -8,6 +8,10 @@ description: Step-by-step help for AirSQL, the Mac app for MySQL and MariaDB.
 
 AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages grow with it.
 
+![The AirSQL window: saved connections and a shop database's tables on the left, its newest orders in the grid](assets/screenshots/main-light.png)
+
+More pictures: the [README](https://github.com/kleash/airsql#screenshots).
+
 - [Install AirSQL](install.md): with Homebrew or from the download.
 - [Getting started](getting-started.md): add a connection, find your way around the window.
 - [Settings](settings.md): the look, the editor and grid, connections, safety checks, agents, client tools and

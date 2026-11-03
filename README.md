@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/main-light.png" width="49%" alt="AirSQL's window: saved connections and a shop database's tables on the left, its newest orders in the grid">
+  <img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/main-dark.png" width="49%" alt="The same window in dark mode">
+</p>
+
 <h1 align="center"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/icon.png" width="40" alt=""> AirSQL</h1>
 
 <p align="center"><b>A native Mac app for MySQL and MariaDB: every way to connect, a fast data grid with safe editing, and
@@ -46,14 +51,27 @@ AirSQL is in development and not ready to use yet: the plan is in [docs/dev/plan
 
 ## Screenshots
 
-To come, in light and dark, made from neutral demo data:
+<table>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/console-light.png" alt="The SQL console with a query's results"><br><b>The SQL console</b>: run a statement or a script, its results in the grid</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/explain-light.png" alt="The console's Plan tab: EXPLAIN as a tree"><br><b>EXPLAIN as a plan</b>: how the server would run the statement, without running it</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/edit-light.png" alt="Two edited cells in the grid and the sheet with the UPDATE statements Apply would run"><br><b>Safe editing</b>: the SQL first, then one transaction that checks the rows it touched</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/connection-light.png" alt="The connection editor's SSH and Proxy tab: a jump host, then an SSH host"><br><b>Every route</b>: jump hosts, SSH and proxies, ending in a private socket on your Mac</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/compare-light.png" alt="The compare window: tables that differ, a table's changed rows and the sync script"><br><b>Compare and sync</b>: structure and rows, and a script you review before it runs</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/liquibase-light.png" alt="Generate a Liquibase changelog: the database's objects and their changesets"><br><b>Liquibase</b>: a database, or any change, as formatted SQL changesets</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/agents-light.png" alt="Settings ▸ Agents: each connection's access, and adding AirSQL to Claude Code or Gemini CLI"><br><b>AI agents</b>: the access you choose for each connection, never your passwords</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/settings-light.png" alt="Settings ▸ Safety: the checks before data changes"><br><b>Safety checks</b>: what asks first, for every connection or just Production</td>
+  </tr>
+</table>
 
-- The window: connections, the database navigator and a table in the grid
-- The SQL console with results and EXPLAIN
-- Editing rows, with the SQL shown before Apply
-- A connection through an SSH host and a jump host
-- Compare and reconcile
-- Agent access: Settings ▸ Agents and the agents' activity
+A made-up shop ([scripts/demo-shop.sql](scripts/demo-shop.sql)) on MySQL 8.4; each picture is also in dark mode in
+[docs/assets/screenshots](docs/assets/screenshots).
 
 ## Install
 
