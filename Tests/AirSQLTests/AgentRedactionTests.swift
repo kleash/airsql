@@ -146,6 +146,61 @@ extension AppTests.AgentGateUITests {
         #expect(await hidden(), "the comparison shows Staging's rows too")
     }
 
+    /// What quotes a row's values hides with the rows: the console's Messages (a server's error), an EXPLAIN's tree and
+    /// the SQL preview's statements below Schema + read; the SQL log (every connection's statements) from every agent.
+    @Test func messagesPlansPreviewsAndTheSQLLogHideWithTheRows() async throws {
+        let log = SQLLog(fileURL: URL(fileURLWithPath: try scratch() + "/SQL.log"))
+        log.statement("UPDATE customers SET name = 'Nordlicht AG' WHERE id = 7", context: "Staging main:3", noBackslashEscapes: false)
+        let viewer = SQLLogWindowController.show(log)
+        keptWindows.append(viewer)
+        viewer.window?.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+        let (main, harness, service) = try await Self.agents(windows: [try #require(viewer.window)])
+        defer {
+            service.close()
+            viewer.close()
+            ConsoleViewController.openConnection = { _ in nil }
+        }
+        func text(_ reply: Reply) -> String {
+            String(decoding: (try? JSONSerialization.data(withJSONObject: reply.json)) ?? Data(), as: UTF8.self)
+        }
+        func sees(_ person: AgentServer? = nil, in scope: String? = nil) async -> String {
+            var arguments: [String: Any] = ["include": ["elements", "sheets"]]
+            if let scope { arguments["in"] = scope }
+            if let person { return text(await call(person, "snapshot", arguments)) }
+            return text(await agentCall(service, "snapshot", arguments))
+        }
+        #expect(await eventually(timeout: 5) { viewer.lines.count == 1 })
+        #expect(await sees(harness, in: "window:SQL Log").contains("Nordlicht"), "the person reads the log")
+        #expect(await !sees(in: "window:SQL Log").contains("Nordlicht"), "no agent does")
+
+        let console = try await Self.console(main, harness, on: Fixtures.production.id)  // Schema access: no data
+        console.note(.error, "A row with the same key already exists. Error 1062 (23000): Duplicate entry 'Nordlicht AG' for key 'name'")
+        #expect(await sees(harness).contains("Duplicate entry 'Nordlicht AG'"), "the person sees the message")
+        let messages = await sees()
+        #expect(messages.contains("console.messages") && !messages.contains("Nordlicht"), "\(messages)")
+        console.addPlan(table: nil, tree: "-> Filter: (customers.name = 'Nordlicht AG')", title: "Plan")
+        #expect(await sees(harness).contains("Nordlicht"), "the person sees the plan's tree")
+        #expect(await !sees().contains("Nordlicht"), "the agent doesn't")
+        let apply = SQLPreviewRequest(change: ChangeSQL(title: "Apply", statements: ["UPDATE customers SET name = 'Nordlicht AG' WHERE id = 7"],
+                                                        connection: Fixtures.production.id),
+                                      heading: "Apply 1 change to shop.customers?", caption: "It runs in one transaction.")
+        SQLPreviewSheet.show(apply, connection: Fixtures.production, on: try #require(main.window)) { _ in }
+        #expect(await call(harness, "wait", ["until": "sheet", "timeout": 10]).error == nil)
+        let preview = await sees()
+        #expect(preview.contains("Apply 1 change") && !preview.contains("Nordlicht"), "\(preview)")
+
+        // Schema + read: the agent reads them, but still not the SQL log.
+        var production = Fixtures.production
+        production.agentAccess = .schemaRead
+        service.model.save(production)
+        #expect(await sees().contains("Nordlicht"))
+        #expect(await call(harness, "press", ["id": "preview.cancel"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        console.selectResult(console.messagesTab)
+        #expect(await sees().contains("Duplicate entry 'Nordlicht AG'"))
+        #expect(await !sees(in: "window:SQL Log").contains("Nordlicht"))
+    }
+
     @Test func theUIToolsAndTheGateWorkThroughAirSQLMCP() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)

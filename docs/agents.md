@@ -56,8 +56,9 @@ Whatever that would change waits for you:
   startup SQL or safety settings, nor save files, start an export, save a password, trust a certificate, paste from
   your clipboard, quit AirSQL or press a button marked destructive (Don't Save, Disconnect with a transaction open).
   Text an agent types into a console of a Production connection is shown to you first.
-- On connections whose agent access doesn't include reading, grids and results, and the filters their values go
-  into, are hidden from the agent's snapshots and screenshots. A cell's right-click menu never shows an agent the
+- On connections whose agent access doesn't include reading, grids and results, the filters their values go into,
+  the console's messages (a server's error can quote a value) and the SQL preview's statements are hidden from the
+  agent's snapshots and screenshots; the SQL log's text always is. A cell's right-click menu never shows an agent the
   cell's value or your clipboard's text.
 
 **Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Safety tab) turns the

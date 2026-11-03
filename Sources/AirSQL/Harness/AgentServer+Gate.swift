@@ -67,12 +67,15 @@ extension AgentServer {
     /// Views that show a connection's rows: grids (table data, results, Transpose and Record View), what the grid's viewer
     /// shows of them (the value panel, View As ▸ Text and Tree, a chart, Column Summary, the status bar's figure), the
     /// filters a cell's value goes into (a result's conditions, the table tab's WHERE, Filter by Values' list, Type a
-    /// Value…'s field), the compare's rows and sync script, and the process list (other sessions' statements carry their
-    /// values).
+    /// Value…'s field), the compare's rows and sync script, the process list (other sessions' statements carry their
+    /// values), the console's Messages (a server's error quotes values: Duplicate entry '…') and an EXPLAIN's tree (its
+    /// table is a grid), the SQL preview's statements (an Apply's or a sync's carry the rows' values) and the SQL log
+    /// (every connection's statements, in a window of its own: hidden from every agent).
     static func showsData(_ view: NSView) -> Bool {
         view is DataGridView || ["valuePanel", "grid.text", "grid.tree", "grid.chart", "columnSummary", "grid.figure", "grid.set",
                                  "grid.lookup", "grid.editor.problem", "result.filter", "tableData.where", "values.list",
-                                 "quickFilter.value", "recon.rows", "recon.script", "processes.list"]
+                                 "quickFilter.value", "recon.rows", "recon.script", "processes.list", "console.messages",
+                                 "console.planTree", "preview.sql", "sqlLog.text"]
             .contains(view.accessibilityIdentifier())
     }
 

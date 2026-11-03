@@ -144,10 +144,12 @@ its own:
   shows the person the text first; single keys that would change it are refused.
 - **Data you may not read is hidden:** on connections below Schema + read, grids, query results (and the value panel,
   View As, charts, Column Summary and the status bar's figure), the filters a value goes into (`result.filter`,
-  `tableData.where`, `values.list`, `quickFilter.value`), the process list and a compare's rows and sync script are
-  covered in screenshots ("Hidden from agents") and left out of snapshots (`hidden`: no value, title or help; `set`
-  still types into a hidden field). A cell's right-click Quick Filter ▸ lists the Data menu's items for you (Equal to
-  Selection…), never the value or the clipboard's text.
+  `tableData.where`, `values.list`, `quickFilter.value`), the process list, a compare's rows and sync script, the
+  console's Messages (`console.messages`: a server's error can quote a value), an EXPLAIN's tree (`console.planTree`)
+  and the SQL preview's statements (`preview.sql`) are covered in screenshots ("Hidden from agents") and left out of
+  snapshots (`hidden`: no value, title or help; `set` still types into a hidden field). The SQL log's text
+  (`sqlLog.text`: every connection's statements) is hidden from you on every connection. A cell's right-click Quick
+  Filter ▸ lists the Data menu's items for you (Equal to Selection…), never the value or the clipboard's text.
 
 The person can turn the asking off for a connection or for all (Settings ▸ Safety); person-only things stay theirs.
 
