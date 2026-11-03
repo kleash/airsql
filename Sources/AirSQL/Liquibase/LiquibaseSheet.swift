@@ -58,6 +58,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         rollback.state = settings.rollback ? .on : .off
         layoutMenu.selectItem(at: settings.layout == .folder ? 1 : 0)
         content.selectedSegment = 0
+        content.selectedSegmentBezelColor = .selectedSegment
         content.setAccessibilityIdentifier("liquibase.content")
         content.toolTip = "Write the objects' structure (DDL), their rows (DML), or both"
         for control in [content, databaseMenu, rollback, preconditions, layoutMenu] as [NSControl] {

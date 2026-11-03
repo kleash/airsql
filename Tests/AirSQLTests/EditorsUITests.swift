@@ -130,6 +130,20 @@ extension AppTests {
             #expect(main.window?.frame.width == MainWindowController.minimumSize.width)
         }
 
+        @Test func theDiagramsBoxesHaveTheirWholeNamesInTooltipsAndForVoiceOver() throws {
+            let fixtures = ERDiagramTests()
+            let long = String(repeating: "customer_loyalty_points_", count: 3).prefix(64)
+            let view = ERDiagramView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+            view.show(ERDiagram(fixtures.database([fixtures.table(String(long)), fixtures.table("orders", pointsAt: [String(long)])])))
+            let box = try #require(view.boxes.first { $0.table.name == long })
+            let tip = view.view(view, stringForToolTip: 0, point: NSPoint(x: box.frame.midX, y: box.frame.midY), userData: nil)
+            #expect(tip.hasPrefix(long + "\n"))
+            let elements = try #require(view.accessibilityChildren() as? [NSAccessibilityElement])
+            #expect(elements.map { $0.accessibilityLabel() ?? "" } == view.boxes.map { "Table \($0.table.name), \($0.table.columns.count) columns" })
+            view.selected = "orders"
+            #expect(elements.map { $0.isAccessibilitySelected() } == view.boxes.map { $0.table.name == "orders" })
+        }
+
         @Test func columnsMoveAndOptionsChangeTheSQL() async throws {
             let (_, _, editor) = try await tableEditor("orders")
             editor.moveColumns(IndexSet(integer: 4), to: 0)

@@ -12,6 +12,9 @@ final class LineNumberRuler: NSRulerView {
         super.init(scrollView: nil, orientation: .verticalRuler)
         clientView = editor
         ruleThickness = 32
+        // Its edge line stays in its own frame: since macOS 14 views draw outside their bounds unless they clip, and the
+        // line crossed the find bar above the editor.
+        if #available(macOS 14, *) { clipsToBounds = true }
         setAccessibilityElement(false)
         NotificationCenter.default.addObserver(self, selector: #selector(changed), name: NSView.boundsDidChangeNotification,
                                                object: nil)

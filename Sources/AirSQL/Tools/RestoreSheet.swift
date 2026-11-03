@@ -9,6 +9,8 @@ import AppKit
 final class RestoreSheet: ToolSheet {
     private let fileLabel = label("No file chosen", font: .systemFont(ofSize: 12.5), color: .secondaryLabelColor, truncates: true)
     private let fileInfo = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
+    /// The file's size under it: hidden until there is one, so no blank band shows.
+    private var fileInfoRow: NSGridRow?
     private let choose = button("Choose…", id: "restore.choose", tip: "Choose the .sql or .sql.gz file to run", target: nil, action: nil)
     private let databaseMenu = popup([], selected: 0, id: "restore.database", tip: "Choose the database the file runs in",
                                      target: nil, action: nil)
@@ -41,6 +43,7 @@ final class RestoreSheet: ToolSheet {
             control.action = #selector(formChanged(_:))
         }
         fileLabel.setAccessibilityIdentifier("restore.file")
+        fileInfo.setAccessibilityIdentifier("restore.fileInfo")
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -50,7 +53,10 @@ final class RestoreSheet: ToolSheet {
     override func makeForm() -> NSView {
         let form = Form()
         form.row("File", [fileLabel, choose])
-        form.grid.addRow(with: [NSGridCell.emptyContentView, fileInfo]).topPadding = -4
+        let infoRow = form.grid.addRow(with: [NSGridCell.emptyContentView, fileInfo])
+        infoRow.topPadding = -4
+        infoRow.isHidden = fileInfo.stringValue.isEmpty
+        fileInfoRow = infoRow
         form.row("Database", [databaseMenu])
         let errors = NSStackView(views: [stopOnError, goOn])
         errors.orientation = .vertical
@@ -215,6 +221,7 @@ final class RestoreSheet: ToolSheet {
             let size = await Task.detached { (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0 }.value
             fileSize = size
             fileInfo.stringValue = Self.bytes(size) + (url.pathExtension == "gz" ? ", gzip-compressed" : "")
+            fileInfoRow?.isHidden = false
         }
         formChanged(nil)
     }

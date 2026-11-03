@@ -45,6 +45,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         field.sendsWholeSearchString = true
         field.target = self
         field.action = #selector(find(_:))
+        field.delegate = self
         field.translatesAutoresizingMaskIntoConstraints = false
         let go = button("Find", id: "find.go", tip: "Search the tables for the text (Return)", target: self, action: #selector(find(_:)))
         let stop = button("Stop", id: "find.stop", tip: "Stop searching; the matches found so far stay", target: self,
@@ -74,6 +75,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         table.delegate = self
         table.target = self
         table.doubleAction = #selector(openMatch(_:))
+        table.menu = resultMenu()
         table.setAccessibilityIdentifier("find.results")
         table.setAccessibilityLabel("Tables with matches")
         let scroll = NSScrollView()
@@ -99,8 +101,9 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
     }
 
     private func updateButtons() {
-        go?.isEnabled = search == nil
-        go?.toolTip = search == nil ? "Search the tables for the text (Return)" : "It is searching: Stop first to search again"
+        go?.isEnabled = search == nil && !field.stringValue.isEmpty
+        go?.toolTip = search != nil ? "It is searching: Stop first to search again"
+            : field.stringValue.isEmpty ? "Type the text to find first" : "Search the tables for the text (Return)"
         stopButton?.isEnabled = search != nil
         stopButton?.toolTip = search != nil ? "Stop searching; the matches found so far stay" : "Nothing is being searched"
     }
@@ -121,6 +124,8 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
     }
 
     @objc func stop(_ sender: Any?) { search?.cancel() }
+
+    func controlTextDidChange(_ notification: Notification) { updateButtons() }
 
     private func run(_ text: String, in databases: [String]) async {
         guard let model = open.model else { return }
@@ -170,11 +175,36 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         status.toolTip = status.stringValue
     }
 
+    /// The result clicked (a double- or right-click), else the selected one.
+    private var chosen: Match? { matches[safe: table.clickedRow >= 0 ? table.clickedRow : table.selectedRow] }
+
     @objc func openMatch(_ sender: Any?) {
-        guard let match = matches[safe: table.clickedRow >= 0 ? table.clickedRow : table.selectedRow],
-              let main = view.window?.windowController as? MainWindowController else { return }
+        guard let match = chosen, let main = view.window?.windowController as? MainWindowController else { return }
         let condition = NavigatorSQL.contains(searched, columns: match.columns, noBackslashEscapes: noBackslashEscapes)
         main.openTableData(match.table, of: open, condition: condition)
+    }
+
+    @objc func openData(_ sender: Any?) {
+        guard let match = chosen, let main = view.window?.windowController as? MainWindowController else { return }
+        main.openTableData(match.table, of: open)
+    }
+
+    @objc func copyName(_ sender: Any?) {
+        guard let match = chosen else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(SQLQuote.identifier(match.table.database) + "." + SQLQuote.identifier(match.table.name),
+                                       forType: .string)
+    }
+
+    /// A result's menu: its matching rows (what a double-click opens), all its rows, its name.
+    private func resultMenu() -> NSMenu {
+        let menu = NSMenu(title: "Match")
+        let matching = NSMenuItem(title: "Open Matching Rows", action: #selector(openMatch(_:)), keyEquivalent: "")
+        matching.toolTip = "Open the table's rows that hold the text"
+        menu.addItem(matching)
+        menu.add([Commands.openData, Commands.copyName])
+        for item in menu.items { item.target = self }
+        return menu
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { matches.count }

@@ -51,6 +51,29 @@ extension AppTests {
         #expect(await eventually(timeout: 10) { model.savedPassword(Fixtures.staging.id.uuidString) == "s3cret" })
     }
 
+    @Test func editorsPathLineFollowsTheRouteAndOptionsKeepTheConnectionsTools() async throws {
+        let model = testModel(Fixtures.shop)
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Staging · shop"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let sheet = try #require(await editor(main))
+        #expect(await call(harness, "press", ["title": "SSH and Proxy"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.jump0.host", "value": "bastion.example.com"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.ssh.host", "value": "gateway.example.com"]).error == nil)
+        #expect(shownText("editor.routePath", in: sheet.window)?.contains("SSH bastion.example.com → SSH gateway.example.com") == true,
+                "\(shownText("editor.routePath", in: sheet.window) ?? "")")
+        // A tool of its own, checked as Settings ▸ Client Tools checks it.
+        #expect(await call(harness, "press", ["title": "Options"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.clientPath", "value": "/nonexistent/bin/mysql"]).error == nil)
+        #expect(await eventually(timeout: 10) {
+            shownText("editor.clientFound", in: sheet.window)?.contains("isn't there or can't be run") == true
+        }, "\(shownText("editor.clientFound", in: sheet.window) ?? "")")
+        #expect(sheet.draft.clientPath == "/nonexistent/bin/mysql")
+        #expect(await call(harness, "press", ["id": "editor.save"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(model.connection(Fixtures.staging.id)?.clientPath == "/nonexistent/bin/mysql")
+    }
+
     @Test func editorSaysWhatIsMissingAndNewConnectionsGoInTheSelectedFolder() async throws {
         let folder = ConnectionFolder(name: "Clients")
         var local = Fixtures.local

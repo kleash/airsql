@@ -52,6 +52,7 @@ extension ConnectionEditor {
         let path = label(routePath, font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, wraps: true)
         path.preferredMaxLayoutWidth = 440
         path.setAccessibilityIdentifier("editor.routePath")
+        routePathLabel = path
         form.row("Path", [path], caption: draft.route == .direct || draft.route == .proxy ? nil
             : "Passwords, passphrases and codes (2FA) an SSH host asks for are asked when you connect.")
         return content(form)
@@ -90,7 +91,7 @@ extension ConnectionEditor {
     }
 
     /// The way the connection goes, from this Mac to the database.
-    private var routePath: String {
+    var routePath: String {
         let database = (draft.host.isEmpty ? "the database" : draft.host) + ":\(draft.port ?? 3306)"
         switch draft.route {
         case .direct:

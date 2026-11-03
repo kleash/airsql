@@ -16,6 +16,10 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     private var session: DBConnection?
     private var refreshing: Task<Void, Never>?
     private var timer: Task<Void, Never>?
+    private let killQuery = button("Kill Query…", id: "processes.killQuery", tip: Commands.killQuery.tip, target: nil,
+                                   action: Commands.killQuery.action)
+    private let killConnection = button("Kill Connection…", id: "processes.killConnection", tip: Commands.killConnection.tip,
+                                        target: nil, action: Commands.killConnection.action)
     static let intervals = [0, 2, 5, 10, 30]
     private static let columns: [(String, String, CGFloat)] = [("id", "Id", 50), ("user", "User", 80), ("host", "Host", 120),
         ("db", "Database", 90), ("command", "Command", 76), ("time", "Time", 50), ("state", "State", 120), ("info", "Query", 300)]
@@ -37,10 +41,6 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         interval.action = #selector(intervalChosen)
         let refreshButton = button("Refresh", id: "processes.refresh", tip: Commands.refresh.tip + " (⌘R)", target: self,
                              action: #selector(refresh(_:)))
-        let killQuery = button("Kill Query…", id: "processes.killQuery", tip: Commands.killQuery.tip, target: nil,
-                               action: Commands.killQuery.action)
-        let killConnection = button("Kill Connection…", id: "processes.killConnection", tip: Commands.killConnection.tip,
-                                    target: nil, action: Commands.killConnection.action)
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
@@ -88,9 +88,21 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
         view = root
+        updateButtons()
         refresh(nil)
         intervalChosen()
     }
+
+    /// The bar's Kill buttons, as their menu items: enabled for the selection they act on, else saying why not.
+    private func updateButtons() {
+        for (button, command) in [(killQuery, Commands.killQuery), (killConnection, Commands.killConnection)] {
+            let reason = reason(command.action)
+            button.isEnabled = reason == nil
+            button.toolTip = reason ?? command.tip
+        }
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) { updateButtons() }
 
     /// The query takes the width that is left.
     override func viewDidLayout() {
@@ -144,6 +156,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         processes = list
         table.reloadData()
         table.selectRowIndexes(IndexSet(processes.indices.filter { selected.contains(processes[$0].id) }), byExtendingSelection: false)
+        updateButtons()
         let busy = list.filter { $0.info != nil }.count
         status.stringValue = "\(list.count) connections, \(busy) running a statement · read at "
             + Date().formatted(date: .omitted, time: .standard)
@@ -229,19 +242,23 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        var reason: String?
-        switch item.action {
-        case Commands.killQuery.action?, Commands.copyQuery.action?:
-            reason = selected.contains { $0.info != nil } ? nil : "Select a process that is running a statement first"
-        case Commands.killConnection.action?:
-            reason = selected.isEmpty ? "Select a process first" : nil
-        case Commands.explain.action?:
-            reason = selected.count == 1 && selected[0].info != nil ? nil : "Select one process that is running a statement first"
-        default:
-            break
-        }
+        let reason = reason(item.action)
         item.explain(enabled: reason == nil, reason: reason)
         return reason == nil
+    }
+
+    /// Why a command can't act on the selection now (nil: it can).
+    private func reason(_ action: Selector?) -> String? {
+        switch action {
+        case Commands.killQuery.action?, Commands.copyQuery.action?:
+            return selected.contains { $0.info != nil } ? nil : "Select a process that is running a statement first"
+        case Commands.killConnection.action?:
+            return selected.isEmpty ? "Select a process first" : nil
+        case Commands.explain.action?:
+            return selected.count == 1 && selected[0].info != nil ? nil : "Select one process that is running a statement first"
+        default:
+            return nil
+        }
     }
 
     func contextMenu() -> NSMenu? {

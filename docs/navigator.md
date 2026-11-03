@@ -62,7 +62,8 @@ These open a console tab with the SQL in it, built from the names AirSQL read; n
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
 tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
-bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list to see its matching rows.
+bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list to see its matching rows;
+right-click it to open all its rows or copy its name.
 Upper and lower case match as the column's collation says (most ignore case).
 
 ## See what the server is running

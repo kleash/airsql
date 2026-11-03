@@ -76,8 +76,8 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
                     ListColumn(id: "default", title: "Default", width: 150, minimum: 80,
                                tip: "Empty for none, NULL, 'text', a number or an expression; a generated column's expression"),
                     ListColumn(id: "extra", title: "Extra", width: 190, minimum: 135, tip: "Counts up by itself, follows updates, or is generated"),
-                    ListColumn(id: "collation", title: "Collation", width: 170, minimum: 130, tip: "How text is compared and sorted; empty for the table's"),
-                    ListColumn(id: "comment", title: "Comment", width: 200, minimum: 80, tip: "A note kept with the column")]
+                    ListColumn(id: "collation", title: "Collation", width: 170, minimum: 150, tip: "How text is compared and sorted; empty for the table's"),
+                    ListColumn(id: "comment", title: "Comment", width: 200, minimum: 70, tip: "A note kept with the column")]
         case .indexes:
             return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "The index's name"),
                     ListColumn(id: "kind", title: "Kind", width: 110, tip: "Primary key, unique, plain, full-text or spatial"),

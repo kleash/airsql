@@ -152,8 +152,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
   the person's `editor.colour`, `editor.host`, `editor.port`, `editor.socket`, `editor.user`, `editor.password`,
   `editor.askPassword`, `editor.route`, `editor.ssh`, `editor.addJump`, `editor.proxyKind`, `editor.proxyHost`,
-  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.ownSafety`, `editor.agentAccess`,
-  `editor.sampleRows`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
+  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.clientPath`, `editor.dumpPath`, `editor.ownSafety`,
+  `editor.agentAccess`, `editor.sampleRows`; what the tools are `editor.clientFound`, `editor.dumpFound`, the route
+  `editor.routePath`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
 - **Status bar**: `status.route`, `status.server`, `status.transaction`, `status.activity`, `status.agent`,
   `status.sqlLog`; popovers `popover.route`, `popover.server`, `popover.transaction` (`popover.commit`,
   `popover.rollback`), `popover.agent` (`agents.setUp`, `agents.turnOff`), `activity.popover` (`activity.cancel`,
@@ -181,8 +182,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tools.timeLeft`, `tools.cancel`, `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
   `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`; Restore `restore.file`,
-  `restore.choose`, `restore.database`, `restore.tool`, `restore.stopOnError`, `restore.continue`, `restore.command`,
-  `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
+  `restore.fileInfo`, `restore.choose`, `restore.database`, `restore.tool`, `restore.stopOnError`, `restore.continue`,
+  `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
 - **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.objects`
