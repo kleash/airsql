@@ -20,6 +20,9 @@ struct SQLPreviewRequest {
     var agent: String?
     /// The caller's own options under the SQL ("Read new rows back").
     var accessory: NSView?
+    /// The session's NO_BACKSLASH_ESCAPES (`DBConnection.noBackslashEscapes`), as `SQLQuote.string` wrote the SQL: it
+    /// decides where the strings end, so the colours match what the server will read.
+    var noBackslashEscapes = false
 
     init(change: ChangeSQL, heading: String, caption: String) {
         self.change = change
@@ -148,9 +151,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         text.isEditable = false
         text.isSelectable = true
         text.drawsBackground = false
-        text.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
-        text.textColor = .labelColor
-        text.string = request.change.text
+        let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        text.textStorage?.setAttributedString(Self.coloured(request.change.text, font: font,
+                                                            noBackslashEscapes: request.noBackslashEscapes))
         text.textContainerInset = NSSize(width: 6, height: 6)
         text.setAccessibilityIdentifier("preview.sql")
         text.toolTip = "The statements that will run, in this order"
@@ -158,7 +161,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         let width = 720 - 2 * 20 - 2 * Radius.control
         text.frame = NSRect(x: 0, y: 0, width: width, height: 100)
         text.textContainer?.containerSize = NSSize(width: width - 2 * text.textContainerInset.width, height: .greatestFiniteMagnitude)
-        let line = text.layoutManager?.defaultLineHeight(for: text.font!) ?? 15
+        let line = text.layoutManager?.defaultLineHeight(for: font) ?? 15
         var used = line * 3
         if let layout = text.layoutManager, let container = text.textContainer {
             layout.ensureLayout(for: container)
@@ -171,6 +174,35 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         scroll.pin(to: box, insets: .all(Radius.control))
         box.heightAnchor.constraint(equalToConstant: ceil(height) + 2 * Radius.control).isActive = true
         return box
+    }
+
+    /// `sql` coloured as the mockups colour SQL: reserved words in semibold, calls, names, strings, numbers, and comments
+    /// in italic. Words that aren't reserved count as names, since only reserved words can't be one.
+    static func coloured(_ sql: String, font: NSFont, noBackslashEscapes: Bool) -> NSAttributedString {
+        let result = NSMutableAttributedString(string: sql, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        let semibold = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
+        let italic = NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(.italic), size: font.pointSize) ?? font
+        let text = Array(sql.utf16), tokens = SQLLexer.tokens(sql, noBackslashEscapes: noBackslashEscapes)
+        for (k, token) in tokens.enumerated() {
+            var color = NSColor.sqlIdentifier, style: NSFont?
+            switch token.kind {
+            case .comment, .hint, .codeStart, .codeEnd: (color, style) = (.sqlComment, italic)
+            case .string: color = .sqlString
+            case .number: color = .sqlNumber
+            case .quotedName: break
+            case .variable, .symbol: continue
+            case .word:
+                let next = k + 1 < tokens.count ? tokens[k + 1] : nil
+                if SQLWords.reserved.contains(String(decoding: text[token.range], as: UTF16.self).uppercased()) {
+                    (color, style) = (.sqlKeyword, semibold)
+                } else if let next, next.kind == .symbol, text[next.range.lowerBound] == 0x28 {  // a call: name(
+                    color = .sqlFunction
+                }
+            }
+            result.addAttribute(.foregroundColor, value: color, range: NSRange(token.range))
+            if let style { result.addAttribute(.font, value: style, range: NSRange(token.range)) }
+        }
+        return result
     }
 
     private func banner(_ text: String, symbol: String, color: NSColor, id: String) -> NSView {
