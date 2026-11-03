@@ -32,7 +32,7 @@ enum DBLab {
     /// CTE joined with itself where the server has them, else (MySQL 5.7) from a ten-row derived table joined with
     /// itself (MySQL 8's hash joins build that up before the first row).
     static func numbers(_ power: Int, on server: ServerInfo?) -> String {
-        if let server, server.flavor == .mariadb || server.versionNumber >= 80000 {
+        if let server, server.flavor == .mariadb || server.atLeast(8) {
             let id = (0..<power / 3).map { "t\($0).i * 1\(String(repeating: "000", count: $0))" }.joined(separator: " + ")
             return "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 999) SELECT \(id) AS id, "
                 + "CONCAT('row-', \(id)) AS label FROM " + (0..<power / 3).map { "n AS t\($0)" }.joined(separator: ", ")
