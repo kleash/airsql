@@ -1,7 +1,7 @@
 // The data grid (plan §2.5, docs/dev/grid-spec.md): a document view as tall and wide as all its cells, in an
-// NSScrollView, that draws only the cells in the rect AppKit asks for, with Core Text and no line cache (scrolling draws
-// only the strip that comes into view). The column header and the row numbers follow its scrolling beside it
-// (GridContainerView); one editor overlay edits a cell in place.
+// NSScrollView. Its cells show in tiles that Core Animation moves as it scrolls (GridTiles), each drawn with Core Text
+// once, when it comes into view or its cells change. The column header and the row numbers follow its scrolling beside
+// it (GridContainerView); one editor overlay edits a cell in place.
 import AirSQLCore
 import AppKit
 
@@ -72,6 +72,8 @@ final class DataGridView: NSView {
     let scrollView = NSScrollView()
     private(set) var header: GridHeaderView!
     private(set) var rowNumbers: GridRowNumberView!
+    /// What shows the cells: the grid itself draws nothing.
+    private(set) var tiles: GridTiles!
 
     var source: GridSource? { didSet { sourceDidChange() } }
 
@@ -94,6 +96,15 @@ final class DataGridView: NSView {
     var nullText = "NULL" { didSet { needsDisplay = true } }
     /// A colour over a cell's background (a heatmap, equal values), by row and source column; nil for none.
     var cellTint: ((Int, Int) -> NSColor?)? { didSet { needsDisplay = true } }
+    /// How many columns, from the first shown, stay in view while the grid scrolls across (Freeze).
+    var frozenColumns = 0 {
+        didSet {
+            guard frozenColumns != oldValue else { return }
+            tiles?.update()
+            needsDisplay = true
+            header?.needsDisplay = true
+        }
+    }
     var fontSize: CGFloat = 12 {
         didSet {
             styles = GridStyles(fontSize: fontSize)
@@ -126,6 +137,8 @@ final class DataGridView: NSView {
         scrollView.borderType = .noBorder
         scrollView.backgroundColor = .content
         scrollView.documentView = self
+        tiles = GridTiles(grid: self)
+        addSubview(tiles)
         header = GridHeaderView(grid: self)
         rowNumbers = GridRowNumberView(grid: self)
         containerView = GridContainerView(grid: self)
@@ -137,13 +150,29 @@ final class DataGridView: NSView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     override var isFlipped: Bool { true }
-    override var isOpaque: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+
+    // The tiles draw what the grid is asked to draw.
+    override var needsDisplay: Bool {
+        didSet { if needsDisplay { tiles?.invalidateAll() } }
+    }
+
+    override func setNeedsDisplay(_ invalidRect: NSRect) {
+        super.setNeedsDisplay(invalidRect)
+        tiles?.invalidate(invalidRect)
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        tiles?.frame = bounds
+        tiles?.update()
+    }
 
     private func sourceDidChange() {
         endEditing(commit: false)
         columnOrder = Array(0..<(source?.columns.count ?? 0))
         columnWidths = []
+        frozenColumns = 0
         selection.clear()
         reloadData()
         scrollToStart()
@@ -222,8 +251,19 @@ final class DataGridView: NSView {
         return low
     }
 
+    /// The frozen columns' width (0 when none are), and how far right of their own place they show: over the cells,
+    /// at the left of what is shown, once the grid has scrolled across.
+    var frozenWidth: CGFloat { frozenColumns > 0 ? offsets[min(frozenColumns, columnCount)] : 0 }
+    var frozenShift: CGFloat { frozenWidth > 0 ? max(0, visibleRect.minX) : 0 }
+
+    /// Where a cell shows: a frozen column's cells at the left of what is shown.
+    func shownRect(_ position: GridPosition) -> NSRect {
+        position.column < frozenColumns ? cellRect(position).offsetBy(dx: frozenShift, dy: 0) : cellRect(position)
+    }
+
     func position(at point: NSPoint) -> GridPosition? {
-        guard point.y >= 0, let column = column(atX: point.x) else { return nil }
+        let overFrozen = point.x >= frozenShift && point.x < frozenShift + frozenWidth
+        guard point.y >= 0, let column = column(atX: overFrozen ? point.x - frozenShift : point.x) else { return nil }
         let row = Int(point.y / rowHeight)
         return row < rowCount ? GridPosition(row: row, column: column) : nil
     }
@@ -239,11 +279,17 @@ final class DataGridView: NSView {
 
     /// Scrolls just enough to show `rect` (a cell).
     func reveal(_ rect: NSRect) {
-        let shown = visibleRect, clip = scrollView.contentView
+        var shown = visibleRect
+        let clip = scrollView.contentView, frozen = frozenWidth
         guard !shown.isEmpty else { return }
         var origin = clip.bounds.origin
-        if rect.minX < shown.minX { origin.x -= shown.minX - rect.minX } else if rect.maxX > shown.maxX {
-            origin.x += min(rect.maxX - shown.maxX, rect.minX - shown.minX)
+        // Frozen columns are always in view across; the cells they cover are not.
+        shown.origin.x += frozen
+        shown.size.width -= frozen
+        if frozen == 0 || rect.maxX > frozen {
+            if rect.minX < shown.minX { origin.x -= shown.minX - rect.minX } else if rect.maxX > shown.maxX {
+                origin.x += min(rect.maxX - shown.maxX, rect.minX - shown.minX)
+            }
         }
         if rect.minY < shown.minY { origin.y -= shown.minY - rect.minY } else if rect.maxY > shown.maxY {
             origin.y += rect.maxY - shown.maxY

@@ -54,11 +54,14 @@ extension AppTests {
         viewer.present(.text)
         #expect(source.values - read == GridViewer.presentedLimit * 50)
         viewer.present(.table)
-        // Drawing a screen of the grid reads about a screen of cells, whatever the row count.
+        // Drawing a screen of the grid reads a few screens of cells at most (its tiles reach past it), whatever the
+        // row count.
         let drawn = source.cells
-        viewer.grid.display()
+        viewer.grid.window?.displayIfNeeded()
+        CATransaction.flush()
         let visible = viewer.grid.rows(in: viewer.grid.visibleRect).count * viewer.grid.columns(in: viewer.grid.visibleRect).count
-        #expect(source.cells - drawn <= visible * 2 + 200)
+        print("GRID cells read for a screen: \(source.cells - drawn) (\(visible) shown)")
+        #expect(source.cells - drawn > 0 && source.cells - drawn <= visible * 6)
     }
 
     @Test func pagedTableFindsRowsAcrossAThousandPages() {

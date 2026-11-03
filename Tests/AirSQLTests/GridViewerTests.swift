@@ -131,6 +131,32 @@ extension AppTests {
         let other = ViewerContent(source, key: GridViewer.ViewKey(connection: key.connection, database: "shop", table: "other"))
         #expect(other.viewer.grid.columnOrder == Array(0..<8))
     }
+
+    @Test func freezeKeepsTheFirstColumnsInViewAndIsKeptPerTable() async throws {
+        let key = GridViewer.ViewKey(connection: UUID(), database: "shop", table: "wide \(UUID())")
+        let (main, _, content) = viewerWindow(FakeGridSource.wide(), key: key)
+        let viewer = content.viewer, grid = viewer.grid
+        grid.selection.select(GridPosition(row: 3, column: 0))
+        viewer.freezeColumns(nil)
+        #expect(grid.frozenColumns == 1)
+        // Across: the key column stays at the left of what is shown, over the cells scrolled under it.
+        grid.reveal(grid.cellRect(GridPosition(row: 3, column: 40)))
+        main.window?.displayIfNeeded()
+        let shown = grid.visibleRect, width = grid.frozenWidth
+        #expect(shown.minX > width && grid.frozenShift == shown.minX)
+        #expect(grid.position(at: NSPoint(x: shown.minX + 5, y: grid.rowHeight * 3.5)) == GridPosition(row: 3, column: 0))
+        #expect(grid.shownRect(GridPosition(row: 3, column: 0)).minX == shown.minX)
+        #expect(grid.header.column(at: NSPoint(x: 5, y: 5)) == 0)
+        // A column that went under it scrolls back out from under it.
+        let under = try #require(grid.position(at: NSPoint(x: shown.minX + width + 1, y: 1))).column
+        grid.reveal(grid.cellRect(GridPosition(row: 3, column: under - 1)))
+        #expect(grid.cellRect(GridPosition(row: 3, column: under - 1)).minX >= grid.visibleRect.minX + width)
+        // The same table again keeps it; Freeze on the last frozen column unfreezes.
+        let again = ViewerContent(FakeGridSource.wide(), key: key)
+        #expect(again.viewer.grid.frozenColumns == 1)
+        viewer.freezeColumns(nil)
+        #expect(grid.frozenColumns == 0)
+    }
 }
 
 extension AppTests {

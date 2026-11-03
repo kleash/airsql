@@ -122,6 +122,28 @@ public struct GridSelection: Equatable, Sendable {
         self = GridSelection()
     }
 
+    /// ⌥↑ (grid-spec §2): from the focused cell to its column, then its row, then everything.
+    public mutating func grow() {
+        guard let cursor else { return }
+        switch areas.last {
+        case .all: return
+        case .rows: selectAll()
+        case .columns: selectRow(cursor.row)
+        default: selectColumn(cursor.column)
+        }
+    }
+
+    /// ⌥↓: back the same way, from everything to the focused cell's row, its column, then the cell.
+    public mutating func shrink() {
+        guard let cursor else { return }
+        switch areas.last {
+        case .all: selectRow(cursor.row)
+        case .rows: selectColumn(cursor.column)
+        case .columns: select(cursor)
+        default: if areas != [.cells(rows: cursor.row...cursor.row, columns: cursor.column...cursor.column)] { select(cursor) }
+        }
+    }
+
     /// A key: moves the cursor in a grid of `rows` × `columns` (`page` rows to a page) and selects its cell; with ⇧
     /// (`extend`) selects the block, rows or columns from the anchor to it instead.
     public mutating func move(_ move: Move, extend: Bool = false, rows: Int, columns: Int, page: Int) {

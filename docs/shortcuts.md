@@ -39,6 +39,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Copy Selection Summary | ⇧⌘C |
 | Paste | ⌘V |
 | Select All | ⌘A |
+| Extend Selection | ⌥↑ |
+| Shrink Selection | ⌥↓ |
 | Find… | ⌘F |
 | Find and Replace… | ⌥⌘F |
 | Find Next | ⌘G |

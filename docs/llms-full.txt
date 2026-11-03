@@ -1279,11 +1279,17 @@ up.
   `email:120`.
 - **View ▸ Column List…** (⌘J) lists every column. Type to find one; Return (or a double-click) jumps to it; its box,
   or Space, shows or hides it; **Show All** brings back hidden columns.
+- **Edit ▸ Extend Selection** (⌥↑) grows the selection from the focused cell to its column, then its row, then
+  everything; **Shrink Selection** (⌥↓) goes back the same way.
+- Hold ⇧ to scroll a mouse wheel across, and ⌥ to scroll five times as far.
 - **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
+- **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
+  Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
-  AirSQL remembers the columns' order, widths, hidden columns and display types for each table, and for each query
-  in the console, so they open as you left them.
-- **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus.
+  AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
+  each query in the console, so they open as you left them.
+- **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
+  goes back to the size in Settings ▸ Grid.
 
 ## See a whole value
 
@@ -1372,6 +1378,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Copy Selection Summary | ⇧⌘C |
 | Paste | ⌘V |
 | Select All | ⌘A |
+| Extend Selection | ⌥↑ |
+| Shrink Selection | ⌥↓ |
 | Find… | ⌘F |
 | Find and Replace… | ⌥⌘F |
 | Find Next | ⌘G |

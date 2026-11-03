@@ -36,6 +36,7 @@ final class GridContainerView: NSView {
         if origin.x != shownOrigin.x { grid.header.needsDisplay = true }
         if origin.y != shownOrigin.y { grid.rowNumbers.needsDisplay = true }
         shownOrigin = origin
+        grid.tiles.update()
     }
 
     /// The corner, the header along the top, the row numbers down the left beside the cells, the cells in the rest.
@@ -47,6 +48,7 @@ final class GridContainerView: NSView {
         grid.scrollView.frame = NSRect(x: left, y: top, width: width, height: height)
         grid.scrollView.tile()
         grid.rowNumbers.frame = NSRect(x: 0, y: top, width: left, height: min(height, grid.scrollView.contentView.frame.height))
+        grid.tiles.update()
     }
 }
 
