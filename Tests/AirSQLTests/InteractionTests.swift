@@ -207,6 +207,26 @@ extension AppTests {
                     clicked: { _ in true },
                     doubleClicked: { _, received in received.contains("showSQLLog(_:)") },
                     menu: ["SQL Log", "Clear SQL Log"], enabled: ["SQL Log"]),
+            Surface(name: "Agent tab statement",
+                    place: { main, _ in
+                        main.model.data.settings.agentsAllowed = false  // this row's service opens no socket
+                        let service = AgentService(model: main.model, main: main, directory: FileManager.default.temporaryDirectory)
+                        let call = service.record("claude-code 2", "run_queries · SELECT 1")
+                        service.keep(["results": [["sql": "SELECT 1", "ok": true, "columns": ["1"], "rowCount": 1, "capped": false]]],
+                                     [:], call: call, client: "claude-code 2", connection: Fixtures.production.id)
+                        service.showResults(Fixtures.production.id)
+                        main.window?.layoutIfNeeded()
+                        guard let tab = main.selectedTab?.content as? AgentResultsContent else { return nil }
+                        return windowPoint(tab.table.rect(ofRow: 0), in: tab.table)
+                    },
+                    clicked: { ($0.selectedTab?.content as? AgentResultsContent)?.table.selectedRowIndexes == [0] },
+                    doubleClicked: { main, _ in
+                        // The statement in a new console; back to the Agent tab for the right-click.
+                        let opened = (main.selectedTab?.content as? ConsoleViewController)?.agentText == "SELECT 1;"
+                        if let tab = main.tabs.first(where: { $0.content is AgentResultsContent }) { main.select(tab) }
+                        return opened
+                    },
+                    menu: ["Open in New Console", "Copy"], enabled: ["Open in New Console", "Copy"]),
         ] + navigatorSurfaces
 
         /// A window in the state every row starts from: the shop's connections, Production connected, a transaction
@@ -237,7 +257,8 @@ extension AppTests {
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
         nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Table rows: cell",
                                        "Grid cell", "Grid row number", "Status bar: route", "Status bar: server", "Status bar: transaction",
-                                       "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Database in the tree",
+                                       "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Agent tab statement",
+                                       "Database in the tree",
                                        "Table or view in the tree", "Routine, trigger or event", "Folder or category in the tree",
                                        "Table in the database view", "Process list row"]
 
