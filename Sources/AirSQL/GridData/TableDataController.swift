@@ -48,6 +48,8 @@ final class TableDataController: NSViewController, TabContent {
     var total: (rows: Int, exact: Bool, filter: String)?
     /// A load under way (a page, Load All, Refresh, Apply): one at a time.
     var loading: Task<Void, Never>?
+    /// The data session's NO_BACKSLASH_ESCAPES, as filters quote their values for it (read at each load).
+    var noBackslashEscapes = false
     /// A new filter or sort came while rows were loading: load again once they are in.
     var reloadWhenDone = false
     /// What went wrong last (a filter the server refused), until the next load works.
@@ -159,6 +161,7 @@ final class TableDataController: NSViewController, TabContent {
         loading = Task {
             do {
                 let session = try await openSession()
+                noBackslashEscapes = session.noBackslashEscapes
                 let page = try await session.query(sql, rowCap: limit).first?.rows
                 if !more { source.reset() }
                 if let page { source.append(page, requested: limit) }

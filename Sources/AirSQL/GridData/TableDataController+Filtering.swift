@@ -9,7 +9,9 @@ extension TableDataController {
     var serverFilter: String {
         let typed = GridFilter.condition(bar.filterText)
         // A search of the loaded rows only (a local filter) stays here.
-        let search = source.flatMap { $0.localFilter == nil ? GridFilter.search(bar.searchField.stringValue, in: $0.columns) : nil }
+        let search = source.flatMap {
+            $0.localFilter == nil ? GridFilter.search(bar.searchField.stringValue, in: $0.columns, noBackslashEscapes: noBackslashEscapes) : nil
+        }
         guard let search else { return typed }
         return typed.isEmpty ? search : "(\(typed)) AND (\(search))"
     }
@@ -64,7 +66,7 @@ extension TableDataController {
     }
 
     private func quickFilterItems(_ condition: GridCondition, clipboard: Bool = false) -> [NSMenuItem] {
-        let sql = condition.sql()
+        let sql = condition.sql(noBackslashEscapes: noBackslashEscapes)
         let shown = sql.count > 70 ? String(sql.prefix(70)) + "…" : sql
         func item(_ title: String, adding: Bool) -> NSMenuItem {
             let item = NSMenuItem(title: title, action: #selector(applyQuickFilter(_:)), keyEquivalent: "")
@@ -92,7 +94,7 @@ extension TableDataController {
 
     private func quickFilter(_ op: GridCondition.Operator) {
         guard let (column, value, _) = focusedValues() else { return NSSound.beep() }
-        applyFilter(GridCondition(column, op, [value]).sql())
+        applyFilter(GridCondition(column, op, [value]).sql(noBackslashEscapes: noBackslashEscapes))
     }
 
     /// The focused cell's column and value, and the distinct values selected in that column.
@@ -105,6 +107,22 @@ extension TableDataController {
             if !values.contains(value) { values.append(value) }
         }
         return (source.columns[column], source.value(cursor.row, column), values)
+    }
+
+    /// Filter by Values…: the focused column's values with their counts, from the server within the current filter.
+    @objc func filterByValues(_ sender: Any?) {
+        guard let source, let column = focusedColumn(), let window = view.window else { return NSSound.beep() }
+        let info = source.columns[column], name = SQLQuote.identifier(info.name), condition = GridFilter.condition(source.filter)
+        let sql = "SELECT \(name), COUNT(*) FROM " + SQLQuote.identifier(database, tableName) + (condition.isEmpty ? "" : " WHERE " + condition)
+            + " GROUP BY \(name) ORDER BY COUNT(*) DESC LIMIT \(FilterByValuesSheet.limit)"
+        let open = openSession
+        FilterByValuesSheet.show(column: info, table: tableName, on: window, read: {
+            guard let store = try await open().query(sql, rowCap: FilterByValuesSheet.limit).first?.rows else { return [] }
+            return (0..<store.rowCount).map { [TableDataSource.text(store, $0, 0), store.string($0, 1)] }
+        }, completion: { [weak self] condition in
+            guard let self, let condition else { return }
+            self.applyFilter(GridFilter.adding(condition.sql(noBackslashEscapes: self.noBackslashEscapes), to: self.bar.filterText))
+        })
     }
 
     @objc func clearFilter(_ sender: Any?) {

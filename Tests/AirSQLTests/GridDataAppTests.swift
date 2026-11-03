@@ -35,6 +35,9 @@ final class FakeTableSession: TableSession {
             for row in values { _ = store.append(row.map { $0.map { Array($0.utf8) } }) }
             return [StatementResult(rows: store, affectedRows: 0, insertID: 0, warnings: 0, info: nil, duration: 0)]
         }
+        if sql.contains(" GROUP BY ") {
+            return result([.init(name: "v", type: MYSQL_TYPE_STRING), .init(name: "n", type: MYSQL_TYPE_LONGLONG)], [["EU", "2"], ["US", "1"]])
+        }
         if sql.hasPrefix("SELECT TABLE_ROWS") || sql.hasPrefix("SELECT COUNT(*)") {
             return result([.init(name: "n", type: MYSQL_TYPE_LONGLONG)], [[String(rows.count)]])
         }
@@ -181,6 +184,22 @@ extension AppTests {
             #expect(sql.components(separatedBy: "\n").filter { $0.hasPrefix("INSERT INTO `airsql_fixture`.`orders`") }.count == 2)
             let size = try FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent("rows.xlsx").path)[.size] as? Int
             #expect((size ?? 0) > 500)
+        }
+
+        @Test func filterByTickingValuesCountedOnTheServer() async throws {
+            let session = FakeTableSession()
+            let (main, harness, tab) = try await Self.tab(session: session)
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            tab.filterByValues(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
+            #expect(session.statements.last == "SELECT `region`, COUNT(*) FROM `airsql_fixture`.`orders` GROUP BY `region` "
+                    + "ORDER BY COUNT(*) DESC LIMIT 1000")
+            _ = await eventually(timeout: 10) { await call(harness, "press", ["title": "US  (1)"]).error == nil }
+            _ = await call(harness, "press", ["id": "values.ok"])
+            #expect(main.window?.attachedSheet == nil && tab.bar.filterText == "`region` IN ('EU')")
+            await ready { tab.loading != nil }
+            #expect(session.statements.last?.contains(" WHERE `region` IN ('EU') ORDER BY") == true)
         }
 
         @Test func viewsAreReadOnlyAndSayWhy() async throws {

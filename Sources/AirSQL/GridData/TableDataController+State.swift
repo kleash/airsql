@@ -94,6 +94,7 @@ extension TableDataController: NSMenuItemValidation {
              Commands.sortDescending.action:
             return (grid.selection.cursor != nil || focusedColumn() != nil, "Select a cell first")
         case Commands.clearSort.action: return (!source.sort.isEmpty, "The rows aren't sorted")
+        case Commands.filterByValues.action: return (focusedColumn() != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:
             return (!bar.filterText.isEmpty || !bar.searchField.stringValue.isEmpty, "The rows aren't filtered")
         case Commands.exportRows.action: return (source.rowCount > 0 || source.hasMore, "There are no rows to export")
