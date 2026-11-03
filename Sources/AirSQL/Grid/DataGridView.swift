@@ -76,6 +76,8 @@ final class DataGridView: NSView {
     /// Widths by source column; empty until the first reload measures them.
     var columnWidths: [CGFloat] = [] { didSet { layoutColumns() } }
     var nullText = "NULL" { didSet { needsDisplay = true } }
+    /// A colour over a cell's background (a heatmap, equal values), by row and source column; nil for none.
+    var cellTint: ((Int, Int) -> NSColor?)? { didSet { needsDisplay = true } }
     var fontSize: CGFloat = 12 {
         didSet {
             styles = GridStyles(fontSize: fontSize)

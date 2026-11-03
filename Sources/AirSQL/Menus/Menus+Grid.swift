@@ -17,6 +17,6 @@ extension MainMenu {
         }))
         menus.data.add([nil, Commands.loadMore, Commands.countRows])
         menus.view.add([nil, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,
-                        Commands.transpose, Commands.columnList])
+                        Commands.transpose, Commands.columnList, nil, Commands.heatmap, Commands.highlightEqual])
     }
 }

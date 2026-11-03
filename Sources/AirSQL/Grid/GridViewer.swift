@@ -69,6 +69,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private var layout: (order: [Int], widths: [CGFloat])?
     /// Display As, by the source's column.
     private(set) var displays: [Int: GridDisplay] = [:]
+    /// Heatmaps by the source's column, and whether equal values are tinted (`GridViewer+Colours`).
+    var heat: [Int: HeatScale] = [:]
+    var highlightsEqual = false
     /// The source as the grid shows it untransposed: with its display types.
     private var displayed: GridSource?
 
@@ -88,6 +91,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             displays = [:]
         }
         displayed = source.map(display)
+        heat = [:]
+        updateTint()
         grid.source = displayed
         restoreColumns()
         if transposed { transposeGrid(nil) }
@@ -156,6 +161,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// The host's rows or columns changed (a page arrived): shows them again.
     func reloadData() {
         (grid.source as? TransposedSource)?.refresh()
+        rescaleHeat()
         grid.reloadData()
         updateRecordBar()
         status.update()
@@ -380,6 +386,16 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             return status.aggregate != nil
         case #selector(goToRow(_:)): return grid.rowCount > 0
         case #selector(showColumnList(_:)): return source != nil
+        case #selector(toggleHeatmap(_:)):
+            let all = grid.selection.areas.contains(.all)
+            let columns = ((all ? source.map { Array($0.columns.indices) } : nil) ?? focusedColumns)
+                .filter { source?.columns[$0].kind == .number }
+            item.state = !columns.isEmpty && columns.allSatisfy({ heat[$0] != nil }) ? .on : .off
+            item.explain(enabled: !columns.isEmpty, reason: "Select a number column first")
+            return !columns.isEmpty
+        case #selector(highlightEqualValues(_:)):
+            item.state = highlightsEqual ? .on : .off
+            return source != nil
         case #selector(displayAs(_:)):
             let display = GridDisplay.allCases.indices.contains(item.tag) ? GridDisplay.allCases[item.tag] : .standard
             let columns = focusedColumns.compactMap { source?.columns[$0] }
@@ -415,6 +431,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     func dataGridSelectionDidChange(_ grid: DataGridView) {
         status.update()
         updateValuePanel()
+        if highlightsEqual { grid.needsDisplay = true }
         host?.dataGridSelectionDidChange(grid)
     }
 
@@ -434,7 +451,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         switch target {
         case .cells: menu.add([Commands.valuePanel, Commands.recordView])
         case .row: menu.add([Commands.recordView, Commands.valuePanel])
-        case .column: menu.add([Commands.hideColumn, Commands.columnList])
+        case .column: menu.add([Commands.hideColumn, Commands.columnList, Commands.heatmap])
         }
         if !transposed, record == nil { menu.addItem(displayMenu()) }
         return menu

@@ -251,3 +251,32 @@ extension AppTests {
         #expect(GridDisplay.choices(for: GridColumn(name: "t")) == [.standard])
     }
 }
+
+extension AppTests {
+    @Test func heatmapColoursNumbersAndEqualValuesAreTinted() async throws {
+        let source = FakeGridSource(rows: 50, columns: 10)
+        let (_, harness, content) = viewerWindow(source)
+        let viewer = content.viewer, grid = viewer.grid
+        // A word column can't have a heatmap.
+        grid.selection.selectColumn(1)
+        let refused = await call(harness, "menu", ["path": "View > Heatmap"])
+        #expect(refused.error?.contains("Select a number column first") == true)
+        grid.selection.selectColumn(9)
+        #expect(await call(harness, "menu", ["path": "View > Heatmap"]).error == nil)
+        let tint = try #require(grid.cellTint)
+        let values = (0..<50).map { Double(source.value($0, 9)!)! }
+        let low = values.firstIndex(of: values.min()!)!, high = values.firstIndex(of: values.max()!)!
+        #expect(tint(low, 9)!.alphaComponent < tint(high, 9)!.alphaComponent)
+        #expect(tint(low, 2) == nil)
+        // Again: off.
+        #expect(await call(harness, "menu", ["path": "View > Heatmap"]).error == nil)
+        #expect(grid.cellTint == nil)
+        // Equal values: the focused cell's value, wherever it is.
+        grid.selection.select(GridPosition(row: 0, column: 5))
+        #expect(await call(harness, "menu", ["path": "View > Highlight Equal Values"]).error == nil)
+        let same = (1..<50).first { source.value($0, 5) == source.value(0, 5) }
+        let other = (1..<50).first { source.value($0, 5) != source.value(0, 5) }
+        if let same { #expect(grid.cellTint?(same, 5) != nil) }
+        if let other { #expect(grid.cellTint?(other, 5) == nil) }
+    }
+}
