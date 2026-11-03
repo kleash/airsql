@@ -120,9 +120,9 @@ extension AppTests {
             #expect(unexplained(harness.openSheets(), where: "Save as changeset").isEmpty)
             // The changelog is a file on this Mac: an agent's Save is refused (the gate); the person's goes through.
             let notes = AgentGuard.Notes()
-            AgentGuard.$notes.withValue(notes) { AgentGate.$agent.withValue("Claude Code") { save.performClick(nil) } }
+            AgentGuard.$notes.withValue(notes) { AgentGate.$agent.withValue("Claude Code") { save.sendAction(save.action, to: save.target) } }
             #expect(notes.refusal?.contains("only the person at the Mac") == true && main.window?.attachedSheet != nil)
-            save.performClick(nil)
+            _ = await call(harness, "press", ["title": "Save"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             let read = try LiquibaseChangelog(String(contentsOf: file, encoding: .utf8)).changesets
             #expect(read.count == 3 && read[2].author == "deploy" && read[2].id.hasSuffix("-003-orders"))
@@ -143,7 +143,7 @@ extension AppTests {
             let root = try #require(main.window?.attachedSheet?.contentView)
             let save = try #require(descendants(of: root).compactMap { $0 as? NSButton }.first { $0.title == "Save" })
             #expect(await eventually(timeout: 10) { save.isEnabled })
-            save.performClick(nil)
+            _ = await call(harness, "press", ["title": "Save"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             let read = try LiquibaseChangelog(String(contentsOf: file, encoding: .utf8)).changesets
             #expect(read.map(\.statements) == [["CREATE TABLE `notes` (`id` int PRIMARY KEY)"]])
