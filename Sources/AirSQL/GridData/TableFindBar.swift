@@ -223,6 +223,7 @@ extension TableDataController {
         guard let expression = find.expression else { return NSSound.beep() }
         let targets = all ? matches() : grid.selection.cursor.map { [$0] } ?? []
         var replaced = 0
+        let depth = source.changes.undoDepth
         for position in targets {
             let column = grid.sourceColumn(position.column)
             guard source.canEdit(position.row, column), let value = source.value(position.row, column),
@@ -230,6 +231,7 @@ extension TableDataController {
             source.set(.text(find.replacing(in: value, with: replacement, expression)), row: position.row, column: column)
             replaced += 1
         }
+        source.changes.squashUndo(to: depth)  // one ⌘Z takes them all back
         guard replaced > 0 else { return all ? NSSound.beep() : findMatch(forward: true) }
         changesDidChange()
         if all {

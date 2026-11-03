@@ -261,19 +261,9 @@ public final class TableDataSource: GridSource {
         return store.bytes(local, column)
     }
 
-    /// A stored value as the grid's sources give it whole (export streams them this way too).
+    /// A stored value as the grid's sources give it whole (export streams them this way too): binary as all its hex.
     public static func text(_ store: ResultStore, _ row: Int, _ column: Int) -> String? {
-        guard store.columns[column].isBinary else { return store.display(row, column) }
-        return store.withBytes(row, column) { bytes in
-            let digits = Array("0123456789ABCDEF".utf8)
-            var text = Array("0x".utf8)
-            text.reserveCapacity(2 + bytes.count * 2)
-            for byte in bytes {
-                text.append(digits[Int(byte >> 4)])
-                text.append(digits[Int(byte & 0x0F)])
-            }
-            return String(decoding: text, as: UTF8.self)
-        }
+        store.display(row, column, binaryBytes: .max)
     }
 
     /// A cell's value with its pending change, whole (for editing, copying and exporting): nil for NULL.

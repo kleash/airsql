@@ -94,6 +94,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private(set) var record: Int?
     /// The grid's columns and sort as they were before Transpose or Record View, to put back after.
     private var layout: (order: [Int], widths: [CGFloat], sort: [DataGridView.Sort], frozen: Int)?
+    /// The host's sort, by its columns: the grid's, or the one kept aside while Transpose or Record View is on.
+    var sortOrder: [DataGridView.Sort] { layout?.sort ?? grid.sortOrder }
     /// Display As and its Time Zone, by the source's column.
     private(set) var displays: [Int: GridDisplay] = [:]
     private(set) var zones: [Int: GridZone] = [:]

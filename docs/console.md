@@ -73,7 +73,7 @@ nothing runs.
 
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
-  tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result).
+  tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
 - Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
@@ -106,6 +106,9 @@ unique key whose columns can't be NULL); so can an inner join's when every table
   console has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
 - After Apply, the edited rows are read back from the server, so the result shows what was stored; deleted rows go.
   New rows and pasting are for a table tab: open the table to add rows.
+- Edits not applied are never thrown away unasked: the next run keeps their result tab, and disconnecting asks first;
+  so do closing the result, closing the console and quitting, unless the connection's Safety settings don't warn on
+  close.
 - On a read-only connection nothing can be edited.
 
 ### Edit INSERT statements as a table
@@ -128,7 +131,8 @@ works out. Change them as you like, then **Apply**: it always shows the SQL firs
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
 - Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
-- Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes not yet applied.
+- Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes and result edits not yet
+  applied.
 
 On a [read-only connection](connections.md#add-or-edit-a-connection), Run, Explain and Profile refuse any statement
 AirSQL can't prove only reads (SELECT, WITH … SELECT, SHOW, DESCRIBE, EXPLAIN and USE pass), and Messages says why.

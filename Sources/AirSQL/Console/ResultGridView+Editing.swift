@@ -280,8 +280,8 @@ extension ResultGridView {
                 }
                 edits.applied(read)
                 if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, self.values.noBackslashEscapes) }
-                // Deleted rows are gone: sort what is left again.
-                if rows.order != nil { sortRows(grid.sortOrder) }
+                // Deleted rows are gone: filter and sort what is left again.
+                if rows.order != nil { reorder() }
                 updateEditing()
             } catch {
                 if let failure = error as? ApplyFailure { point(at: failure) }

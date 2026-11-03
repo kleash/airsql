@@ -197,6 +197,7 @@ public final class ResultStore {
             if info.isBinary {
                 let digits = Array("0123456789ABCDEF".utf8)
                 var text = Array("0x".utf8)
+                text.reserveCapacity(2 + min(bytes.count, binaryBytes) * 2)
                 for byte in bytes.prefix(binaryBytes) {
                     text.append(digits[Int(byte >> 4)])
                     text.append(digits[Int(byte & 0x0F)])

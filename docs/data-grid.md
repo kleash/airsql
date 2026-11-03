@@ -57,7 +57,8 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
   on a cell you can't edit opens it too.
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
   (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
-  on a row's number opens it. In a table, its values can be edited there as in the grid.
+  on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
+  console result shows the grid again, as does an Apply that deletes the row.
 - **View ▸ Transpose** (⌥⌘T) turns rows into columns, with the column names down the left: handy for comparing a few
   wide rows. A console result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.

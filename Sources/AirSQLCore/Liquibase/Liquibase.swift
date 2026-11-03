@@ -335,10 +335,11 @@ public enum Liquibase {
 
         /// What undoes an ALTER TABLE clause: ADD [COLUMN] c → DROP COLUMN c, ADD [UNIQUE|FULLTEXT|SPATIAL] KEY|INDEX k →
         /// DROP INDEX k, ADD CONSTRAINT f FOREIGN KEY → DROP FOREIGN KEY f, ADD CONSTRAINT c CHECK|UNIQUE → DROP
-        /// CONSTRAINT c / DROP INDEX c.
+        /// CONSTRAINT c / DROP INDEX c. Nil with IF NOT EXISTS (MariaDB's), which may have added nothing.
         func inverse(_ clause: Range<Int>) -> String? {
             var k = clause.lowerBound
-            guard word(k) == "ADD" else { return nil }
+            guard word(k) == "ADD", !clause.contains(where: { word($0) == "IF" && word($0 + 1) == "NOT" && word($0 + 2) == "EXISTS" })
+            else { return nil }
             k += 1
             let keyWords: Set<String> = ["INDEX", "KEY", "UNIQUE", "FULLTEXT", "SPATIAL", "PRIMARY", "FOREIGN", "CHECK", "PERIOD",
                                          "SYSTEM", "CONSTRAINT", "IF", "PARTITION", "VECTOR"]
