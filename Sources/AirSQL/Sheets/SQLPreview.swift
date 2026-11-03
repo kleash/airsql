@@ -16,8 +16,11 @@ struct SQLPreviewRequest {
     var warnings: [String] = []
     /// A name the person must type before it runs (dropping a database; a table on Production).
     var typeToConfirm: String?
-    /// The agent that asked for it (the agents' gate): it waits for the person's approval here.
+    /// The agent that asked for it (the agents' gate): it waits for the person's approval here, and agents can't press
+    /// its Run. Shown from an agent's request (`AgentGate.agent`), it is that agent's.
     var agent: String?
+    /// Text to show instead of the statements (what an agent would type into a production console).
+    var text: String?
     /// The caller's own options under the SQL ("Read new rows back").
     var accessory: NSView?
     /// The session's NO_BACKSLASH_ESCAPES (`DBConnection.noBackslashEscapes`), as `SQLQuote.string` wrote the SQL: it
@@ -54,6 +57,8 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     @discardableResult
     static func show(_ request: SQLPreviewRequest, connection: SavedConnection?, on window: NSWindow,
                      completion: @escaping (SQLPreviewResult) -> Void) -> SQLPreviewSheet {
+        var request = request
+        request.agent = request.agent ?? AgentGate.agent
         let sheet = SQLPreviewSheet(request, connection: connection, completion: completion)
         window.beginSheet(sheet.window!)
         sheet.retainUntilClosed = sheet
@@ -88,7 +93,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
                                 + "changes.", symbol: "sparkles", color: .accent, id: "preview.agent"))
         }
         if let connection, connection.colour == .production {
-            views.append(banner("This runs on \(connection.displayName), a production connection.", symbol: "exclamationmark.octagon.fill",
+            let words = request.text == nil ? "This runs on \(connection.displayName), a production connection."
+                : "\(connection.displayName) is a production connection."
+            views.append(banner(words, symbol: "exclamationmark.octagon.fill",
                                 color: ConnectionColour.production.color!, id: "preview.production"))
         }
         for warning in request.warnings {
@@ -152,7 +159,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         text.isSelectable = true
         text.drawsBackground = false
         let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
-        text.textStorage?.setAttributedString(Self.coloured(request.change.text, font: font,
+        text.textStorage?.setAttributedString(Self.coloured(request.text ?? request.change.text, font: font,
                                                             noBackslashEscapes: request.noBackslashEscapes))
         text.textContainerInset = NSSize(width: 6, height: 6)
         text.setAccessibilityIdentifier("preview.sql")
@@ -237,7 +244,8 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         runButton.keyEquivalent = "\r"
         runButton.hasDestructiveAction = request.destructive
         runButton.toolTip = request.typeToConfirm.map { "Type “\($0)” first" }
-            ?? "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : "")
+            ?? (request.text != nil ? "Put the text in the console's editor: nothing runs"
+                : "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : ""))
         runButton.isEnabled = request.typeToConfirm == nil
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -261,6 +269,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
 
     @objc private func run(_ sender: Any?) {
         guard runButton.isEnabled else { return }
+        // The gate (plan §2.8): what this sheet shows runs only when the person at the Mac says so.
+        guard !AgentGuard.refuses("Only the person at the Mac can approve what this sheet shows: ask them to check it and "
+                                  + "press \(runButton.title). Nothing has run.") else { return }
         finish(SQLPreviewResult(approved: true, saveAsChangeset: saveBox?.state == .on))
     }
 

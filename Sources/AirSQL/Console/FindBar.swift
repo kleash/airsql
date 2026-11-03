@@ -189,7 +189,7 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
     }
 
     @objc private func replaceOne(_ sender: Any?) {
-        guard let editor, let found = matches() else { return }
+        guard let editor, let found = matches(), !Self.refusesAgentText(editor) else { return }
         let selection = editor.selectedRange()
         guard found.contains(selection) else { return step(forward: true) }
         editor.replace(selection, with: replacementText(for: selection), select: NSRange(location: selection.location, length: 0))
@@ -199,6 +199,7 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
 
     @objc private func replaceAll(_ sender: Any?) {
         guard let editor, let found = matches(), !found.isEmpty else { return NSSound.beep() }
+        guard !Self.refusesAgentText(editor) else { return }
         let text = editor.string as NSString, whole = NSRange(location: 0, length: text.length)
         let result: String
         if regex.state == .on, let expression = try? NSRegularExpression(pattern: search.stringValue,
@@ -212,6 +213,12 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         editor.replace(whole, with: result, select: NSRange(location: 0, length: 0))
         count.stringValue = "Replaced \(found.count.formatted())"
         clearMarks()
+    }
+
+    /// The paste gate (plan §2.8): an agent's replacement text doesn't go into a production console unasked.
+    private static func refusesAgentText(_ editor: SQLEditorView) -> Bool {
+        AgentGuard.productionConsole(editor) != nil && AgentGuard.refuses("Replacing text in a production console needs the "
+                                                                          + "person's OK: use set console.editor, which asks them once.")
     }
 
     /// The replacement for one match: with a regular expression, its groups put in for $1, $2….

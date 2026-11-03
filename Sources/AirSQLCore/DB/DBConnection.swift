@@ -180,15 +180,18 @@ public final class DBConnection: @unchecked Sendable {
     }
 
     /// Runs one statement and reads all of its results. A result set stops at `rowCap` rows: then the statement is
-    /// stopped on the server and the store is marked `capped` ("first N rows").
+    /// stopped on the server and the store is marked `capped` ("first N rows"). What an agent's request sends passes the
+    /// agents' gate first (`AgentGate`).
     public func query(_ sql: String, rowCap: Int = 100_000) async throws -> [StatementResult] {
-        try await worker.perform { [self] in try queryHere(sql, rowCap: rowCap) }
+        try await AgentGate.check(sql, on: self)
+        return try await worker.perform { [self] in try queryHere(sql, rowCap: rowCap) }
     }
 
     /// Runs a statement and hands its rows over in batches as they arrive, keeping none: Export all's way, for results
     /// of any size. `batch` runs on the session's thread with each batch (`batchRows` rows, or fewer past 16 MB);
     /// throwing from it stops the statement on the server, as Cancel does, and the error comes back here.
     public func stream(_ sql: String, batchRows: Int = 10_000, batch: @escaping (ResultStore) throws -> Void) async throws {
+        try await AgentGate.check(sql, on: self)
         try await worker.perform { [self] in
             let mysql = try current()
             guard let server = state.locked({ _server }) else { throw AirSQLError.disconnected }

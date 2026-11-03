@@ -25,6 +25,10 @@ extension ConsoleViewController {
     }
 
     private func write(_ text: String, to url: URL, done: @escaping (Bool) -> Void) {
+        // The gate (plan §2.8): files on this Mac are the person's to write.
+        guard !AgentGuard.refuses("Saving writes a file on this Mac: only the person at the Mac can save (⌘S).") else {
+            return done(false)
+        }
         Task {
             let failure = await Task.detached { () -> String? in
                 do {

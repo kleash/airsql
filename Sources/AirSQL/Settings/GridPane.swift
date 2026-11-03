@@ -9,7 +9,11 @@ final class GridPane: SettingsPaneController {
         form.row("Rows per page", [number(\.rowsPerPage, id: "settings.rowsPerPage",
                                           tip: "How many rows a table or result loads at a time (1,000 by default)",
                                           range: 100...100_000, width: 90)],
-                 caption: "Load More (⌥⌘↓) loads the next page; Load All asks first when there are many.")
+                 caption: "Load More (⌥⌘↓) loads the next page.")
+        form.row("Load All asks above", [number(\.loadAllAsksAbove, id: "settings.loadAllAsksAbove",
+                                                tip: "Ask before loading every row of a table with more rows than this",
+                                                range: 1_000...100_000_000, width: 110), label("rows")],
+                 caption: "All the rows are held in memory while the tab is open.")
         form.row("NULL shown as", [text(\.nullText, id: "settings.nullText",
                                         tip: "How empty (NULL) values look in the grid; they are drawn in grey italics",
                                         placeholder: "NULL", width: 120)],

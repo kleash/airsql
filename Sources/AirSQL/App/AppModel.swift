@@ -12,10 +12,19 @@ let log = Logger(subsystem: "com.kleash.airsql", category: "app")
 final class AppModel: ObservableObject {
     @Published var data: AirSQLData {
         didSet {
-            guard data != oldValue else { return }
+            guard data != oldValue, !reverting else { return }
+            // What an agent's request would change here is refused (plan §2.8): the data goes back as it was (setting it
+            // here runs this again).
+            guard AgentGuard.allows(changing: oldValue, to: data) else {
+                reverting = true
+                data = oldValue
+                reverting = false
+                return
+            }
             store(data)
         }
     }
+    private var reverting = false
     /// Connections that aren't idle: connecting, connected, or failed. Set by whatever connects.
     @Published var states: [UUID: ConnectionState] = [:]
     /// The connected connections: their sessions and schema caches (`attach`, `detach`).
@@ -81,6 +90,8 @@ final class AppModel: ObservableObject {
         var copy = original
         copy.id = UUID()
         copy.name = copy.displayName + " copy"
+        guard AgentGuard.allows(changing: data, to: AirSQLData(connections: data.connections + [copy], folders: data.folders,
+                                                               settings: data.settings)) else { return nil }
         save(copy)
         let read = savedPassword, write = setSavedPassword, keys = Array(zip(original.secretKeys, copy.secretKeys))
         // The Keychain may wait for the person (a locked keychain): not on the main thread.
@@ -94,9 +105,12 @@ final class AppModel: ObservableObject {
 
     /// Forgets connections and their saved passwords and table settings.
     func delete(_ ids: Set<UUID>) {
+        var remaining = data
+        remaining.connections.removeAll { ids.contains($0.id) }
+        guard AgentGuard.allows(changing: data, to: remaining) else { return }  // and its passwords stay
         let keys = data.connections.filter { ids.contains($0.id) }.flatMap(\.secretKeys)
         for id in ids { connector.disconnect(id) }
-        data.connections.removeAll { ids.contains($0.id) }
+        data = remaining
         for id in ids {
             states[id] = nil
             detach(id)
