@@ -91,6 +91,10 @@ Nothing is written until you apply. Leaving a row writes nothing.
   over several selected cells fills them all. Cells that can't go in their column are listed first, so you can paste
   the others or nothing. **Data ▸ Paste as New Rows** adds every copied row as a new one. A cell reading `NULL` (the
   grid's NULL text) is NULL.
+- When the copied cells could be read two ways, the **Paste Format** sheet asks first, starting from AirSQL's guess:
+  what separates the cells (lines of commas or semicolons without tabs may be CSV), the decimal mark (numbers such as
+  `1,234`), and the order of day, month and year (dates such as `03/04/2026`). **Data ▸ Paste with Format…** always
+  asks.
 - **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
   the selected row; choosing one opens that table filtered to them.
 

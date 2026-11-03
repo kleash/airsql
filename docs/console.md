@@ -101,6 +101,13 @@ unique key whose columns can't be NULL); so can an inner join's when every table
   New rows and pasting are for a table tab: open the table to add rows.
 - On a read-only connection nothing can be edited.
 
+### Edit INSERT statements as a table
+
+Select one or more `INSERT … VALUES` statements of one table (or put the cursor in one) and choose **Query ▸ Edit as
+Table** (also in the editor's right-click menu). The table opens in its tab with each row as a new row, a pending
+change: strings and numbers as their values, `NULL`, `DEFAULT`, and anything else (such as `NOW()`) as SQL the server
+works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the console.
+
 ## Transactions
 
 - **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In

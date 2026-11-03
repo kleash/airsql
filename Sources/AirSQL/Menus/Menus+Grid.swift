@@ -16,7 +16,7 @@ extension MainMenu {
         menus.edit.insertItem(Commands.extendSelection.item(), at: selectAll + 1)
         menus.edit.insertItem(Commands.shrinkSelection.item(), at: selectAll + 2)
         menus.data.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.pasteAsNewRows,
-                        Commands.deleteRows, nil,
+                        Commands.pasteWithFormat, Commands.deleteRows, nil,
                         Commands.setNull, Commands.setDefault])
         menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
         menus.data.add([Commands.chooseReferencedRow, Commands.useAsLabel, Commands.addVirtualKey, Commands.removeVirtualKey])

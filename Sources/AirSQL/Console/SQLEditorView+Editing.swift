@@ -125,15 +125,15 @@ extension SQLEditorView {
         return true
     }
 
-    /// The editor's menu (plan §2.12): Run Statement, Run Selection, Explain, Format SQL, Comment Lines, Cut, Copy,
-    /// Paste. A right-click outside the selection moves the cursor there first, as a click would.
+    /// The editor's menu (plan §2.12): Run Statement, Run Selection, Explain, Format SQL, Comment Lines, Edit as Table,
+    /// Cut, Copy, Paste. A right-click outside the selection moves the cursor there first, as a click would.
     override func menu(for event: NSEvent) -> NSMenu? {
         let point = convert(event.locationInWindow, from: nil)
         let index = characterIndexForInsertion(at: point)
         if !NSLocationInRange(index, selectedRange()) { setSelectedRange(NSRange(location: index, length: 0)) }
         let menu = NSMenu(title: "SQL Editor")
         menu.add([Commands.runStatement, Commands.runSelection, Commands.explain, Commands.formatSQL, Commands.toggleComment,
-                  nil, Commands.cut, Commands.copy, Commands.paste])
+                  Commands.editAsTable, nil, Commands.cut, Commands.copy, Commands.paste])
         return menu
     }
 

@@ -102,3 +102,27 @@ struct GridEditPasteTests {
         ])
     }
 }
+
+/// What a pasted block leaves in doubt, for the Paste Format sheet.
+struct PasteDoubtTests {
+    static let decimal = cachedColumn("price", "decimal(10,2)"), date = cachedColumn("day", "date"), text = cachedColumn("note", "varchar(40)")
+
+    @Test func doubtsAreTheGuessesThatCouldGoEitherWay() {
+        func doubts(_ text: String, _ columns: [SchemaColumn]) -> Paste.Doubts {
+            Paste.doubts(text, cells: Paste.cells(text), columns: columns, separator: .auto)
+        }
+        #expect(doubts("1,234\n2,500", [Self.decimal]) == .decimalMark)
+        #expect(doubts("1,234\n2,5", [Self.decimal]).isEmpty)  // 2,5 settles it
+        #expect(doubts("1.234,50", [Self.decimal]).isEmpty)
+        #expect(doubts("03/04/2026\t1.5", [Self.date, Self.decimal]) == .dateOrder)
+        #expect(doubts("03/04/2026\n13/04/2026", [Self.date]).isEmpty && doubts("2026-03-04", [Self.date]).isEmpty)
+        #expect(doubts("05/05/2026", [Self.date]).isEmpty)  // the same either way
+        #expect(doubts("a,b\nc,d", [Self.text]) == .separator && doubts("a;b;c\nd;e;f\n", [Self.text]) == .separator)
+        #expect(doubts("a,b\nc", [Self.text]).isEmpty && doubts("one, two", [Self.text]).isEmpty && doubts("a,b\tc", [Self.text]).isEmpty)
+        // The sheet starts from the guesses, the locale's where the values say nothing.
+        let guessed = Paste.guessed([["1,5", "13/04/2026"]], columns: [Self.decimal, Self.date], format: PasteFormat(locale: Locale(identifier: "en_US")))
+        #expect(guessed.decimalSeparator == "," && guessed.dateOrder == .dayMonthYear)
+        let us = Paste.guessed([["x"]], columns: [Self.text], format: PasteFormat(locale: Locale(identifier: "en_US")))
+        #expect(us.decimalSeparator == "." && us.dateOrder == .monthDayYear)
+    }
+}

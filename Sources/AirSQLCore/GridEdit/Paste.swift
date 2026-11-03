@@ -171,6 +171,89 @@ public enum Paste {
             .map { $0 == "−" ? "-" : $0 })
     }
 
+    /// What the guesses can't settle in a pasted block, for the Paste Format sheet.
+    public struct Doubts: OptionSet, Sendable {
+        public let rawValue: Int
+        public init(rawValue: Int) { self.rawValue = rawValue }
+
+        /// Text without tabs whose lines all hold the same number of commas, or of semicolons, around words: CSV, unsaid
+        /// (numbers alone, such as 1,5 on each line, are decimals rather).
+        public static let separator = Doubts(rawValue: 1 << 0)
+        /// A DECIMAL, FLOAT or DOUBLE column whose values read either way (1,234 or 1.234) with nothing to tell.
+        public static let decimalMark = Doubts(rawValue: 1 << 1)
+        /// A date column whose days and months are all 12 or less (03/04/2026).
+        public static let dateOrder = Doubts(rawValue: 1 << 2)
+    }
+
+    /// What `text`, split into `cells` with `separator`, leaves in doubt for the columns it goes in (`columns[i]` takes
+    /// the i-th pasted column).
+    public static func doubts(_ text: String, cells: [[String]], columns: [SchemaColumn], separator: PasteFormat.Separator) -> Doubts {
+        var doubts: Doubts = []
+        if separator == .auto, !text.unicodeScalars.contains("\t") {
+            let lines = text.split(whereSeparator: \.isNewline)
+            for mark in [",", ";"] as [Character] {
+                let counts = Set(lines.map { line in line.filter { $0 == mark }.count })
+                let numbers = lines.allSatisfy { line in line.split(separator: mark).allSatisfy { Double(cleanNumber(String($0))) != nil } }
+                if lines.count > 1, counts.count == 1, counts.first ?? 0 > 0, !numbers { doubts.insert(.separator) }
+            }
+        }
+        for index in 0..<min(cells.map(\.count).max() ?? 0, columns.count) {
+            let texts = cells.map { $0[index] }.filter { !$0.isEmpty }
+            switch ColumnType(columns[index]).kind {
+            case .decimal, .float: if decimalInDoubt(texts) { doubts.insert(.decimalMark) }
+            case .date, .datetime, .timestamp: if dateInDoubt(texts) { doubts.insert(.dateOrder) }
+            default: break
+            }
+        }
+        return doubts
+    }
+
+    /// `format` with the decimal mark and the date order its columns' values suggest where it leaves them open (the
+    /// first number and date columns', else the locale's): what the Paste Format sheet starts from.
+    public static func guessed(_ cells: [[String]], columns: [SchemaColumn], format: PasteFormat) -> PasteFormat {
+        var guessed = format
+        for index in 0..<min(cells.map(\.count).max() ?? 0, columns.count) {
+            let texts = cells.map { $0[index] }
+            switch ColumnType(columns[index]).kind {
+            case .decimal, .float, .integer:
+                if guessed.decimalSeparator == nil { guessed.decimalSeparator = decimalSeparator(texts, locale: format.locale) }
+            case .date, .datetime, .timestamp:
+                if guessed.dateOrder == nil { guessed.dateOrder = dateOrder(texts, locale: format.locale) }
+            default: break
+            }
+        }
+        guessed.decimalSeparator = guessed.decimalSeparator ?? decimalSeparator([], locale: format.locale)
+        guessed.dateOrder = guessed.dateOrder ?? dateOrder([], locale: format.locale)
+        return guessed
+    }
+
+    /// No value settles the decimal mark (as `decimalSeparator` reads them) and one has a single mark before three
+    /// digits.
+    static func decimalInDoubt(_ texts: [String]) -> Bool {
+        var either = false
+        for text in texts.lazy.map(cleanNumber) {
+            let marks = text.filter { $0 == "." || $0 == "," }
+            guard let last = marks.last else { continue }
+            if marks.count > 1 { return false }
+            if text.drop(while: { $0 != last }).dropFirst().prefix(while: \.isNumber).count != 3 { return false }
+            either = true
+        }
+        return either
+    }
+
+    /// No date settles the order (as `dateOrder` reads them) and one reads differently either way.
+    static func dateInDoubt(_ texts: [String]) -> Bool {
+        var either = false
+        for text in texts {
+            let parts = text.trimmingCharacters(in: .whitespaces).prefix { $0 != " " && $0 != "T" }
+                .split(whereSeparator: { "/.-".contains($0) }).compactMap { Int($0) }
+            guard parts.count == 3, parts[0] < 100 else { continue }
+            if parts[0] > 12 || parts[1] > 12 { return false }
+            if parts[0] != parts[1] { either = true }
+        }
+        return either
+    }
+
     /// The decimal separator a column's numbers use: both "." and "," in one value make the last one decimal; one of
     /// them twice makes it grouping; one followed by other than three digits is decimal. Otherwise the locale's.
     static func decimalSeparator(_ texts: [String], locale: Locale) -> Character {

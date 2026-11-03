@@ -430,6 +430,13 @@ unique key whose columns can't be NULL); so can an inner join's when every table
   New rows and pasting are for a table tab: open the table to add rows.
 - On a read-only connection nothing can be edited.
 
+### Edit INSERT statements as a table
+
+Select one or more `INSERT … VALUES` statements of one table (or put the cursor in one) and choose **Query ▸ Edit as
+Table** (also in the editor's right-click menu). The table opens in its tab with each row as a new row, a pending
+change: strings and numbers as their values, `NULL`, `DEFAULT`, and anything else (such as `NOW()`) as SQL the server
+works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the console.
+
 ## Transactions
 
 - **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
@@ -737,6 +744,10 @@ Nothing is written until you apply. Leaving a row writes nothing.
   over several selected cells fills them all. Cells that can't go in their column are listed first, so you can paste
   the others or nothing. **Data ▸ Paste as New Rows** adds every copied row as a new one. A cell reading `NULL` (the
   grid's NULL text) is NULL.
+- When the copied cells could be read two ways, the **Paste Format** sheet asks first, starting from AirSQL's guess:
+  what separates the cells (lines of commas or semicolons without tabs may be CSV), the decimal mark (numbers such as
+  `1,234`), and the order of day, month and year (dates such as `03/04/2026`). **Data ▸ Paste with Format…** always
+  asks.
 - **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
   the selected row; choosing one opens that table filtered to them.
 
@@ -1815,7 +1826,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   (`grid.lookup.search`, `grid.lookup.rows`; Return picks); a one-column foreign key's cell shows the referenced row's
   label after its value. A column header's menu (and the Data menu) has Use as Label, Add Virtual Foreign Key… (a sheet
   with `virtualKey.table`; kept on this Mac, never in the database) and Remove Virtual Foreign Key. Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
-  Paste and Paste as New Rows are the person's (the clipboard is). Quit is the person's too: it lists pending changes
+  Paste, Paste as New Rows and Paste with Format… (its sheet `pasteFormat.separator`, `pasteFormat.decimal`,
+  `pasteFormat.dateOrder`) are the person's (the clipboard is). Query ▸ Edit as Table opens the selected INSERT
+  statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
 - **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
   every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,

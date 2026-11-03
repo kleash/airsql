@@ -202,7 +202,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   (`grid.lookup.search`, `grid.lookup.rows`; Return picks); a one-column foreign key's cell shows the referenced row's
   label after its value. A column header's menu (and the Data menu) has Use as Label, Add Virtual Foreign Key… (a sheet
   with `virtualKey.table`; kept on this Mac, never in the database) and Remove Virtual Foreign Key. Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
-  Paste and Paste as New Rows are the person's (the clipboard is). Quit is the person's too: it lists pending changes
+  Paste, Paste as New Rows and Paste with Format… (its sheet `pasteFormat.separator`, `pasteFormat.decimal`,
+  `pasteFormat.dateOrder`) are the person's (the clipboard is). Query ▸ Edit as Table opens the selected INSERT
+  statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
 - **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
   every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,

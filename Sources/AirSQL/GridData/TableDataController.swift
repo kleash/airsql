@@ -70,6 +70,9 @@ final class TableDataController: NSViewController, TabContent {
     var readingLabels: Task<Void, Never>?
     /// Each column's one-column foreign key, for its labels (nil until worked out; again after a key is added).
     var labelKeys: [SchemaForeignKey?]?
+    /// Edit as Table's rows, added once the table is read; and Apply shows the SQL first for them.
+    var waitingInserts: InsertRows?
+    var previewsApply = false
     /// A new filter or sort came while rows were loading: load again once they are in.
     var reloadWhenDone = false
     /// What went wrong last (a filter the server refused), until the next load works.
@@ -194,6 +197,7 @@ final class TableDataController: NSViewController, TabContent {
         grid.sortOrder = source.sort.compactMap { key in
             source.columns.firstIndex { $0.name == key.column }.map { DataGridView.Sort(column: $0, ascending: key.ascending) }
         }
+
     }
 
     // MARK: Loading
@@ -265,6 +269,11 @@ final class TableDataController: NSViewController, TabContent {
         if let source, viewer.source !== source, source.loadedRows > 0 || !source.hasMore { viewer.show(source) }
         viewer.reloadData()
         updateBars()
+        // Edit as Table's rows, after the loaded ones.
+        if let inserts = waitingInserts, source != nil {
+            waitingInserts = nil
+            add(inserts)
+        }
         if reloadWhenDone {
             reloadWhenDone = false
             loadRows(more: false)

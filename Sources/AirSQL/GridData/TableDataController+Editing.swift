@@ -156,7 +156,7 @@ extension TableDataController: DataGridViewDelegate {
     func changesDidChange() {
         guard let source else { return }
         PendingChangesStore.shared.save(source.changes, connection: context.connection.id, database: database, table: tableName)
-        if source.changes.isEmpty { restored = false }
+        if source.changes.isEmpty { (restored, previewsApply) = (false, false) }
         viewer.reloadData()
         updateBars()
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
@@ -207,7 +207,7 @@ extension TableDataController: DataGridViewDelegate {
             let change = ChangeSQL(title: "Apply changes to \(tableName)", statements: statements.map(\.sql), connection: context.connection.id)
             let safety = model.data.safety(for: context.connection)
             let agent = AgentGate.agent != nil && safety.askBeforeAgentChanges
-            guard preview || safety.previewBeforeApply || agent || !warnings.isEmpty else {
+            guard preview || previewsApply || safety.previewBeforeApply || agent || !warnings.isEmpty else {
                 return run(statements, on: session, change: change, saveAsChangeset: false)
             }
             guard let window = view.window else { return }

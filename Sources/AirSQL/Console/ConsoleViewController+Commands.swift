@@ -111,6 +111,9 @@ extension ConsoleViewController: NSMenuItemValidation {
             return (true, "")
         case #selector(formatSQL(_:)):
             return (hasText, "Type some SQL first")
+        case #selector(editAsTable(_:)):
+            if let reason = offline { return (false, reason) }
+            return (hasText, "Type or select INSERT statements first")
         case #selector(pinResult(_:)), #selector(renameResult(_:)), #selector(closeResult(_:)), #selector(closeOtherResults(_:)):
             if item.action == #selector(pinResult(_:)) { item.title = currentResult?.pinned == true ? "Unpin Result" : "Pin Result" }
             if item.action == #selector(closeOtherResults(_:)), currentResult != nil, resultTabs.count < 2 {

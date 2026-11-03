@@ -7,33 +7,58 @@ import AppKit
 extension TableDataController {
     @objc func paste(_ sender: Any?) { pasteCells(asNewRows: false) }
     @objc func pasteAsNewRows(_ sender: Any?) { pasteCells(asNewRows: true) }
+    /// Paste with Format…: the Paste Format sheet first, whatever the guesses.
+    @objc func pasteWithFormat(_ sender: Any?) { pasteCells(asNewRows: false, asking: true) }
+
+    /// The clipboard's text, and whether it says it is CSV.
+    private var clipboard: (text: String, csv: Bool)? {
+        let board = NSPasteboard.general
+        guard let text = board.string(forType: .string), !text.isEmpty else { return nil }
+        return (text, board.types?.contains(NSPasteboard.PasteboardType("public.comma-separated-values-text")) == true)
+    }
 
     /// The clipboard's cells: CSV when it says so, else split on tabs (what Excel, Numbers and grids copy).
     var clipboardCells: [[String]] {
-        let board = NSPasteboard.general
-        guard let text = board.string(forType: .string), !text.isEmpty else { return [] }
-        let csv = board.types?.contains(NSPasteboard.PasteboardType("public.comma-separated-values-text")) == true
-        return Paste.cells(text, separator: csv ? .comma : .auto)
+        clipboard.map { Paste.cells($0.text, separator: $0.csv ? .comma : .auto) } ?? []
     }
 
     /// Numbers and dates as the cells show them; the grid's NULL text (what its copies write for NULL) is NULL.
     private var pasteFormat: PasteFormat { PasteFormat(nullText: model.data.settings.nullText) }
 
-    private func pasteCells(asNewRows: Bool) {
+    /// Pastes as `chosen` says (the Paste Format sheet's choice); without it, from the guesses, asking first when they
+    /// leave something in doubt or when `asking`.
+    private func pasteCells(asNewRows: Bool, format chosen: PasteFormat? = nil, asking: Bool = false) {
         guard let source, editingOff == nil, !AgentGuard.refuses("The clipboard is the person's: agents can't paste. Nothing was pasted.")
         else { return NSSound.beep() }
-        let cells = clipboardCells
+        guard let (text, csv) = clipboard else { return NSSound.beep() }
+        var format = chosen ?? pasteFormat
+        if chosen == nil, csv { format.separator = .comma }
+        let cells = Paste.cells(text, separator: format.separator)
         guard !cells.isEmpty else { return NSSound.beep() }
         let shown = viewer.shownColumns, focused = viewer.focusedCell
         let first = focused.flatMap { shown.firstIndex(of: $0.column) } ?? 0
-        if !asNewRows, cells.count == 1, cells[0].count == 1, selectedCells().count > 1 {
-            // One value over several cells: each takes it as its own column reads it.
-            return setSelected { column in
-                Paste.values(cells, columns: [source.table.columns[column]], format: self.pasteFormat, context: self.values).values[0][0]
+        let single = !asNewRows && cells.count == 1 && cells[0].count == 1 && selectedCells().count > 1
+        let targets = single ? Array(Set(selectedCells().map(\.column))).sorted()
+            : Array(shown[first..<min(shown.count, first + (cells.map(\.count).max() ?? 0))])
+        if chosen == nil, let window = view.window {
+            let columns = targets.map { source.table.columns[$0] }
+            let doubts = single ? targets.reduce(into: Paste.Doubts()) { $0.formUnion(Paste.doubts(text, cells: cells, columns: [source.table.columns[$1]],
+                                                                                                    separator: format.separator)) }
+                : Paste.doubts(text, cells: cells, columns: columns, separator: format.separator)
+            if asking || !doubts.isEmpty {
+                let guessed = Paste.guessed(cells, columns: single ? Array(columns.prefix(1)) : columns, format: format)
+                return PasteFormatSheet.show(guessed, doubts: doubts, on: window) { [weak self] picked in
+                    self?.pasteCells(asNewRows: asNewRows, format: picked)
+                }
             }
         }
-        let targets = Array(shown[first..<min(shown.count, first + (cells.map(\.count).max() ?? 0))])
-        let (values, failures) = Paste.values(cells, columns: targets.map { source.table.columns[$0] }, format: pasteFormat,
+        if single {
+            // One value over several cells: each takes it as its own column reads it.
+            return setSelected { column in
+                Paste.values(cells, columns: [source.table.columns[column]], format: format, context: self.values).values[0][0]
+            }
+        }
+        let (values, failures) = Paste.values(cells, columns: targets.map { source.table.columns[$0] }, format: format,
                                               context: self.values)
         let start = asNewRows ? nil : focused?.row
         guard !failures.isEmpty, let window = view.window else { return fill(values, columns: targets, from: start) }

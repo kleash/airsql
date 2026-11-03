@@ -89,6 +89,7 @@ import AppKit
     @objc optional func duplicateRow(_ sender: Any?)
     @objc optional func duplicateRowWithoutKeys(_ sender: Any?)
     @objc optional func pasteAsNewRows(_ sender: Any?)
+    @objc optional func pasteWithFormat(_ sender: Any?)
     @objc optional func chooseReferencedRow(_ sender: Any?)
     @objc optional func useAsLabel(_ sender: Any?)
     @objc optional func addVirtualKey(_ sender: Any?)
@@ -446,6 +447,8 @@ enum Commands {
                                                  tip: "Add a copy of the selected rows, leaving their keys to the server")
     static let pasteAsNewRows = Command("Paste as New Rows", #selector(AirSQLActions.pasteAsNewRows(_:)),
                                         tip: "Add the copied cells as new rows; they are saved when you apply the changes")
+    static let pasteWithFormat = Command("Paste with Format…", #selector(AirSQLActions.pasteWithFormat(_:)),
+                                         tip: "Paste, choosing how the copied cells are separated and write decimals and dates")
     static let deleteRows = Command("Delete Rows…", #selector(AirSQLActions.deleteRows(_:)), "\u{8}",
                                     tip: "Mark the selected rows for deletion; they are deleted when you apply")
     static let setNull = Command("Set NULL", #selector(AirSQLActions.setCellNull(_:)), "n", [.command, .option],
@@ -676,10 +679,10 @@ enum Commands {
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
-        addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
+        addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
+        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,

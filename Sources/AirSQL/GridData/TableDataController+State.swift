@@ -104,7 +104,7 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.chooseReferencedRow.action:
             if !editable { return (false, readOnly) }
             return (viewer.focusedCell.map { foreignKey($0.column) != nil } ?? false, "Select a cell of a foreign key column first")
-        case Commands.pasteAsNewRows.action, #selector(paste(_:)):
+        case Commands.pasteAsNewRows.action, Commands.pasteWithFormat.action, #selector(paste(_:)):
             if !editable { return (false, readOnly) }
             return (NSPasteboard.general.string(forType: .string)?.isEmpty == false, "Copy some cells first")
         case Commands.apply.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):

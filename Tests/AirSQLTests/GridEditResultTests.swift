@@ -165,3 +165,37 @@ struct ResultEditSourceTests {
         #expect(!waiting.canEdit(0, 1) && waiting.reason(1)?.hasPrefix("AirSQL is still reading") == true)
     }
 }
+
+/// Edit as Table: INSERT statements read back into a table, its columns and rows of pending values.
+struct InsertRowsTests {
+    @Test func insertsBecomeRowsOfValues() throws {
+        let sql = """
+            INSERT INTO `shop`.`items` (`id`, name, price, made) VALUES (1, 'it''s', -2.5, NOW()), (2, "two\\nlines", NULL, DEFAULT);
+            /* the next one */ insert ignore into shop.items (id, name, price, made) value (0x0A, _utf8mb4'x', TRUE, b'101');
+            """
+        let rows = try InsertRows.parse(sql, noBackslashEscapes: false)
+        #expect(rows.database == "shop" && rows.table == "items" && rows.columns == ["id", "name", "price", "made"])
+        #expect(rows.rows == [[.text("1"), .text("it's"), .text("-2.5"), .sql("NOW()")],
+                              [.text("2"), .text("two\nlines"), .null, .default],
+                              [.text("0x0A"), .text("x"), .text("1"), .text("101")]])
+        // Without NO_BACKSLASH_ESCAPES a backslash escapes; with it, it is itself.
+        #expect(try InsertRows.parse("INSERT INTO t VALUES ('a\\\\b', 'c\\%')", noBackslashEscapes: false).rows == [[.text("a\\b"), .text("c\\%")]])
+        #expect(try InsertRows.parse("INSERT INTO t VALUES ('a\\b')", noBackslashEscapes: true).rows == [[.text("a\\b")]])
+        #expect(try InsertRows.parse("INSERT INTO t VALUES (1 + 2, CONCAT('a', ',', 'b'))", noBackslashEscapes: false).rows
+                == [[.sql("1 + 2"), .sql("CONCAT('a', ',', 'b')")]])
+    }
+
+    @Test func theStatementAtTheCursorReads() throws {
+        let text = "SELECT 1;\nINSERT INTO airsql_fixture.orders (region, number, total) VALUES ('EU', 7, 1.5), ('US', 8, DEFAULT);"
+        let statements = ConsoleScript.statements(in: text, selection: nil, caret: 20, all: false, noBackslashEscapes: false)
+        let rows = try InsertRows.parse(statements.map(\.sql).joined(separator: ";\n"), noBackslashEscapes: false)
+        #expect(rows.table == "orders" && rows.rows.count == 2, "\(statements.map(\.sql))")
+    }
+
+    @Test func otherStatementsAreRefusedSayingWhy() {
+        for sql in ["SELECT 1", "INSERT INTO t SELECT * FROM u", "INSERT INTO t SET a = 1", "INSERT INTO t VALUES (1) ON DUPLICATE KEY UPDATE a = 2",
+                    "INSERT INTO t (a, b) VALUES (1)", "INSERT INTO t VALUES (1,,2)", "INSERT INTO t VALUES (1); INSERT INTO u VALUES (2)", ""] {
+            #expect(throws: EditError.self, "\(sql)") { try InsertRows.parse(sql, noBackslashEscapes: false) }
+        }
+    }
+}

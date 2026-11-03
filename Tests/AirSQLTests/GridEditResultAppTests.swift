@@ -107,6 +107,44 @@ extension AppTests {
             #expect(grouped.viewer.valuePanel != nil)
         }
 
+        @Test func editAsTableOpensInsertsAsNewRowsThatPreviewFirst() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, harness) = appWindow(model)
+            let connected = Editors.open
+            defer { Editors.open = connected }
+            let context = try await recordedEditorContext(Fixtures.local)
+            Editors.open = { $1 == Fixtures.local.id ? (context.sessions, context.schema) : nil }
+            let console = ConsoleViewController(model: model, connection: Fixtures.local.id,
+                                                text: "SELECT 1;\nINSERT INTO airsql_fixture.orders (region, number, total) VALUES ('EU', 7, 1.5), ('US', 8, DEFAULT);")
+            main.open(console, title: "Query 1", connection: Fixtures.local.id)
+            console.editor.setSelectedRange(NSRange(location: 20, length: 0))  // in the INSERT
+            console.editAsTable(nil)
+            let tab = try #require(main.selectedTab?.content as? TableDataController)
+            let session = FakeTableSession()
+            tab.openSession = { session }
+            await ready { tab.loading != nil || tab.source == nil }
+            let inserts = tab.source?.changes.state.inserts ?? []
+            #expect(inserts.map(\.values) == [["region": .text("EU"), "number": .text("7"), "total": .text("1.5")],
+                                              ["region": .text("US"), "number": .text("8"), "total": .default]])
+            #expect(tab.grid.rowCount == 5 && tab.grid.selection.cursor?.row == 3 && tab.isEdited)
+            // Apply shows the SQL first; one undo takes both rows back.
+            tab.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let sql = shownText("preview.sql", in: main.window?.attachedSheet) ?? ""
+            #expect(sql.contains("INSERT INTO `airsql_fixture`.`orders` (`region`, `number`, `total`) VALUES ('EU', 7, 1.5);"))
+            _ = await call(harness, "press", ["title": "Cancel"])
+            #expect(!session.statements.contains("START TRANSACTION"))
+            tab.undo(nil)
+            #expect(tab.source?.changes.isEmpty == true)
+            // A statement that isn't an INSERT … VALUES says so.
+            main.select(try #require(main.tabs.first { $0.content === console }))
+            console.editor.setSelectedRange(NSRange(location: 2, length: 0))
+            console.editAsTable(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(main.window?.attachedSheet != nil)
+            _ = await call(harness, "press", ["title": "OK"])
+        }
+
         @Test func aReadOnlyConnectionsResultSaysWhy() async throws {
             let c = { Self.column("customers", "customers", $0, MYSQL_TYPE_LONG) }
             let (_, _, view) = try await Self.result("SELECT id FROM customers", [c("id")], rows: [["1"]], session: FakeTableSession(),
@@ -226,5 +264,52 @@ extension AppTests.LayoutTests {
             main.window?.orderOut(nil)
         }
         #expect(problems.isEmpty, "\(problems)")
+    }
+}
+
+extension AppTests.ScreenshotTests {
+    /// Grid editing, round 2: a console result being edited, foreign keys' labels, the virtual foreign key sheet and the
+    /// Paste Format sheet, in light and dark.
+    @Test func gridEditingRoundTwo() async throws {
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            let c = { AppTests.GridEditResultAppTests.column("customers", "customers", $0, $1) }
+            let (resultWindow, resultHarness, result) = try await AppTests.GridEditResultAppTests.result(
+                "SELECT id, email, name FROM customers", [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING), c("name", MYSQL_TYPE_VAR_STRING)],
+                rows: [["7", "ann@example.com", "Ann"], ["9", "cy@example.org", "Cy"], ["12", "di@example.net", "Di"]], session: FakeTableSession())
+            resultWindow.window?.appearance = NSAppearance(named: appearance)
+            resultWindow.window?.setContentSize(NSSize(width: 900, height: 420))
+            onScreen(resultWindow.window)
+            result.keep(.text("ann@example.net"), row: 0, column: 1)
+            result.grid.selection.selectRow(2)
+            result.deleteRows(nil)
+            result.grid.selection.select(GridPosition(row: 1, column: 2))
+            resultWindow.window?.displayIfNeeded()
+            try await save(resultHarness, "result-edit-\(suffix)")
+            resultWindow.window?.orderOut(nil)
+
+            let (main, harness, tab) = try await AppTests.GridDataAppTests.tab(size: NSSize(width: 1180, height: 600))
+            main.window?.appearance = NSAppearance(named: appearance)
+            onScreen(main.window)
+            tab.grid.columnWidths[1] = 220
+            tab.grid.needsDisplay = true
+            main.window?.displayIfNeeded()
+            await ready { tab.readingLabels != nil || tab.loading != nil }
+            tab.grid.selection.select(GridPosition(row: 0, column: 1))
+            main.window?.displayIfNeeded()
+            try await save(harness, "grid-labels-\(suffix)")
+            tab.grid.selection.select(GridPosition(row: 0, column: 3))
+            tab.addVirtualKey(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            try await save(harness, "grid-virtual-key-\(suffix)")
+            _ = await call(harness, "press", ["title": "Cancel"])
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("1,234", forType: .string)
+            tab.grid.selection.select(GridPosition(row: 0, column: 4))
+            tab.paste(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            try await save(harness, "grid-paste-format-\(suffix)")
+            _ = await call(harness, "press", ["title": "Cancel"])
+            main.window?.orderOut(nil)
+        }
     }
 }

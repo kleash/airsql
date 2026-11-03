@@ -260,6 +260,29 @@ extension AppTests {
             #expect(!tab.isLabel(4) && tab.isLabel(2))
         }
 
+        @Test func anAmbiguousPasteAsksHowToReadIt() async throws {
+            let (main, harness, tab) = try await Tab.tab()
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("1,234", forType: .string)
+            tab.grid.selection.select(GridPosition(row: 0, column: 4))
+            tab.paste(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let sheet = try #require(main.window?.attachedSheet)
+            #expect(shownText("pasteFormat.decimal", in: sheet) == nil && tab.source?.mark(0, 4) == GridMark.none)
+            let mark = try #require(find(NSPopUpButton.self, id: "pasteFormat.decimal", in: sheet.contentView!))
+            mark.selectItem(withTitle: "Point: 1.5")
+            _ = await call(harness, "press", ["title": "Paste"])
+            #expect(tab.source?.cell(0, 4) == .text("1234") && tab.source?.mark(0, 4) == .edited)
+            // Paste with Format… always asks; Cancel pastes nothing.
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("7", forType: .string)
+            tab.pasteWithFormat(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Cancel"])
+            #expect(tab.source?.cell(0, 4) == .text("1234"))
+            tab.revertAllChanges(nil)
+        }
+
         @Test func quitListsPendingChangesFirst() async throws {
             let (main, _, tab) = try await Tab.tab(session: FakeTableSession())
             #expect(main.unfinishedWork().isEmpty)
