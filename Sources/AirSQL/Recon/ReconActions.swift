@@ -55,6 +55,7 @@ extension ReconWindowController {
             caption: "Structure changes run first, each on its own (MySQL and MariaDB can't roll DDL back). Row changes then "
                 + "run in one transaction: each must change exactly its rows, or they all roll back.")
         request.actionTitle = "Run Script"
+        request.offersChangeset = true
         request.destructive = steps.contains(where: \.destructive)
         let tables = Set(steps.filter { $0.kind == .data }.map(\.object))
         request.warnings = result.objects.filter { object in

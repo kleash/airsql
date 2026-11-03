@@ -214,8 +214,7 @@ extension AppTests {
             request.agent = "Claude Code"
             request.accessory = checkbox("Read new rows back (shows the new id)", id: "preview.readBack", tip: "Read the new rows",
                                          on: true, target: nil, action: nil)
-            SQLPreviewSheet.changesetWriter = { _ in }
-            defer { SQLPreviewSheet.changesetWriter = nil }
+            request.offersChangeset = true
             SQLPreviewSheet.show(request, connection: Fixtures.production, on: window) { _ in }
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             if let sheet = window.attachedSheet { check(sheet, "SQL preview") }
