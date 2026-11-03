@@ -48,7 +48,11 @@ extension SQLEditorView {
 
     /// Asks for the suggestions at the cursor and shows them (`force`: even with nothing typed yet).
     func updateCompletion(force: Bool) {
-        guard let completions, selectedRange().length == 0 else { return }
+        // In a long script the list opens only when asked (⌥⎋), so typing never waits for it.
+        guard let completions, selectedRange().length == 0, force || (string as NSString).length <= Self.longText else {
+            completionPopup?.close()
+            return
+        }
         let caret = selectedRange().location
         // Not inside a string or a comment.
         if tokens.contains(where: { [.string, .comment, .hint].contains($0.kind) && $0.range.lowerBound < caret

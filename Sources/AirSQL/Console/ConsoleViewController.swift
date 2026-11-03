@@ -70,6 +70,8 @@ final class ConsoleViewController: NSViewController, TabContent {
     /// It said yes to closing: it isn't kept for the next launch.
     var closing = false
     private var placedDivider = false
+    /// Whether the tab bar shows the unsaved dot.
+    private var shownEdited = false
     private var observers: [AnyCancellable] = []
     /// Brings the Tx badge's minutes up to date while a transaction is open.
     private var badgeTimer: Timer?
@@ -219,7 +221,11 @@ final class ConsoleViewController: NSViewController, TabContent {
         resultsRuler?.errorLine = nil
         if findBar?.isHidden == false { findBar.update() }
         ConsoleDocuments.shared.changed(self)
-        contentChanged()
+        // The tab bar hears of it only when the unsaved dot comes or goes, not at every key.
+        if isEdited != shownEdited {
+            shownEdited = isEdited
+            contentChanged()
+        }
     }
 
     var resultsRuler: LineNumberRuler? { editorScroll?.verticalRulerView as? LineNumberRuler }
@@ -260,6 +266,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     func setFile(_ url: URL, savedText: String) {
         fileURL = url
         self.savedText = savedText
+        shownEdited = isEdited
         if let tab { mainWindow?.rename(tab, to: url.lastPathComponent) }
         ConsoleDocuments.shared.changed(self)
         contentChanged()

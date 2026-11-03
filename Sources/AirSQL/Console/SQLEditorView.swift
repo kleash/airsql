@@ -112,11 +112,22 @@ final class SQLEditorView: NSTextView {
 
     override func didChangeText() {
         super.didChangeText()
-        highlight()
+        // A long script is coloured a moment after the typing stops, so keys never wait for it.
+        if (string as NSString).length > Self.longText {
+            NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(highlightLater), object: nil)
+            perform(#selector(highlightLater), with: nil, afterDelay: 0.2)
+        } else {
+            highlight()
+        }
         clearMarks()
         (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
         onChange?()
     }
+
+    /// Past this many characters, colours and completion wait for a pause in the typing.
+    static let longText = 150_000
+
+    @objc private func highlightLater() { highlight() }
 
     /// Lexes the whole text (R19) and colours only the tokens that changed: those between the unchanged ones at the
     /// start and at the end, so typing in a long script stays quick.
