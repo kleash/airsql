@@ -91,7 +91,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         let bar = NSStackView(views: [kindLabel, definerLabel, definer, spacer, status, revertButton, applyButton,
                                       helpButton(.editors)])
         bar.spacing = Spacing.unit
-        bar.alignment = .firstBaseline
+        bar.alignment = .centerY
         bar.setCustomSpacing(Spacing.double, after: kindLabel)
         bar.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         let footer = NSStackView(views: [note])

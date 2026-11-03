@@ -42,7 +42,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         let bar = NSStackView(views: [label("Database:"), databases, summary, spacer, exportImage, exportMermaid,
                                       helpButton(.editors)])
         bar.spacing = Spacing.unit
-        bar.alignment = .firstBaseline
+        bar.alignment = .centerY
         bar.setCustomSpacing(Spacing.double, after: databases)
         bar.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         scroll.documentView = canvas

@@ -153,10 +153,11 @@ func editorLayout(bar: NSView, content: NSView, footer: NSView? = nil) -> Surfac
         above = view.bottomAnchor
     }
     above.constraint(equalTo: root.bottomAnchor).isActive = true
-    // The bar and the footer as tall as their contents (a stack view hugs by its own priority), the content the rest.
+    // The bar and the footer as tall as their contents, the content the rest. A stack view hugs each of its views by its
+    // own priority: below their own (750), or it stretches its labels (their text then sits high) and squeezes its buttons.
     for view in [bar, footer].compactMap({ $0 }) {
         view.setContentHuggingPriority(.required, for: .vertical)
-        (view as? NSStackView)?.setHuggingPriority(.required, for: .vertical)
+        (view as? NSStackView)?.setHuggingPriority(.init(749), for: .vertical)
     }
     return root
 }
