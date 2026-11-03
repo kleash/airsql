@@ -27,8 +27,14 @@ final class ResultTab {
     /// What the bar's right end says while it is shown: "38 ms · 200 rows".
     var summary: String
     /// Made once, kept while the tab is open.
-    lazy var view: NSView = makeView()
+    lazy var view: NSView = {
+        made = true
+        return makeView()
+    }()
     var makeView: () -> NSView = { NSView() }
+    private var made = false
+    /// The rows edited in its grid and not applied (none before it is first shown, without making it).
+    var pendingRows: Int { made ? (view as? ResultGridView)?.edits?.pendingRows ?? 0 : 0 }
 
     init(title: String, content: Content, summary: String) {
         self.title = title

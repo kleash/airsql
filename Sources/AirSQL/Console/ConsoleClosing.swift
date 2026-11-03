@@ -2,7 +2,8 @@ import AirSQLCore
 import AppKit
 
 /// What closing a console asks first (plan §2.6, §2.10): a statement still running (it is cancelled), the open
-/// transaction when this is the connection's last console (Commit or Roll Back), and unsaved text (Save, Don't Save).
+/// transaction when this is the connection's last console (Commit or Roll Back), results' edits not applied (Throw
+/// Away), and unsaved text (Save, Don't Save).
 @MainActor
 enum ConsoleClosing {
     static func ask(_ console: ConsoleViewController, answer: @escaping (Bool) -> Void) {
@@ -32,7 +33,7 @@ enum ConsoleClosing {
             tab.content !== console && (tab.content as? ConsoleViewController)?.connectionID == console.connectionID
         } ?? false
         guard let saved = console.connection, console.model.data.safety(for: saved).warnOnClose, !others,
-              let session = console.session, session.inTransaction else { return unsaved(console, window, answer: answer) }
+              let session = console.session, session.inTransaction else { return edits(console, window, answer: answer) }
         let changes = console.shared.changes
         alert(window, "Close “\(console.tab?.title ?? "this tab")” with a transaction open?",
               "\(changes > 0 ? "\(changes.formatted()) change\(changes == 1 ? "" : "s") on" : "Changes on") \(saved.displayName) "
@@ -42,9 +43,14 @@ enum ConsoleClosing {
             guard choice < 2 else { return answer(false) }
             console.runCommand([choice == 0 ? "COMMIT" : "ROLLBACK"]) {
                 if console.session?.inTransaction == true { return answer(false) }  // it failed: Messages says why
-                unsaved(console, window, answer: answer)
+                edits(console, window, answer: answer)
             }
         }
+    }
+
+    /// The results' edits not applied, which go with the tab.
+    private static func edits(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {
+        console.askBeforeClosing(console.resultTabs) { close in close ? unsaved(console, window, answer: answer) : answer(false) }
     }
 
     private static func unsaved(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {

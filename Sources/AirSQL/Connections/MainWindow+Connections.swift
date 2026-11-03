@@ -22,7 +22,8 @@ extension MainWindowController {
     @objc func disconnect(_ sender: Any?) {
         let ids = targetConnections.map(\.id).filter(isConnected)
         let busy = tabs.filter { tab in
-            ids.contains(tab.connectionID ?? UUID()) && (tab.tabContent?.isEdited == true || tab.tabContent?.transactionBadge != nil)
+            ids.contains(tab.connectionID ?? UUID()) && (tab.tabContent?.isEdited == true || tab.tabContent?.transactionBadge != nil
+                || (tab.content as? ConsoleViewController)?.pendingResultRows ?? 0 > 0)
         }
         guard !busy.isEmpty, let window else { return ids.forEach(model.connector.disconnect) }
         let alert = NSAlert()

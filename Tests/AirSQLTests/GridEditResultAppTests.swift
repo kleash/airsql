@@ -209,6 +209,41 @@ extension AppTests {
             view.sortAscending(nil)
             #expect(view.viewer.record == nil && view.grid.sortOrder == [DataGridView.Sort(column: 1, ascending: true)])
         }
+
+        /// A result's edits not applied are never thrown away unasked (grid-spec rule 1): the next Run keeps its tab, as
+        /// if pinned; Close Result, closing the console and Quit ask first.
+        @Test func aResultsEditsStayUntilThePersonThrowsThemAway() async throws {
+            let (main, harness, console) = try await AppTests.ConsoleAppTests.console()
+            let c = { Self.column("customers", "customers", $0, $1) }
+            let store = ResultStore(columns: [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING)])
+            for row in [["1", "ann@example.com"], ["2", "bo@example.org"]] { store.append(row.map { Array($0.utf8) }) }
+            console.addResult(store, title: "Customers", summary: "", query: "SELECT id, email FROM customers")
+            console.showResults()
+            let tab = try #require(console.resultTabs.first)
+            let view = try #require(tab.view as? ResultGridView)
+            view.editingContext = try await recordedEditorContext(SavedConnection(name: "Local", host: "127.0.0.1", user: "app"))
+            view.openSession = { FakeTableSession() }
+            view.prepareEditing(sql: "SELECT id, email FROM customers", database: "airsql_fixture", noBackslashEscapes: false)
+            await ready { view.edits?.editing == nil }
+            view.keep(.text("ann@example.net"), row: 0, column: 1)
+            #expect(view.edits?.pendingRows == 1)
+            #expect(main.unfinishedWork().contains { $0.hasPrefix("Edits to 1 row in the results of") && $0.hasSuffix("thrown away") })
+            console.dropUnpinnedResults()
+            #expect(console.resultTabs.count == 1 && !tab.pinned)
+            var closes: Bool?
+            console.shouldClose { closes = $0 }
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(main.window?.attachedSheet != nil)
+            _ = await call(harness, "press", ["title": "Cancel"])
+            await ready { closes == nil }
+            #expect(closes == false)
+            console.selectResult(tab)
+            console.closeResult(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Throw Away"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(console.resultTabs.isEmpty && main.unfinishedWork().isEmpty)
+        }
     }
 }
 

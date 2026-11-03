@@ -29,10 +29,28 @@ extension ConsoleViewController {
         showResults()
     }
 
-    /// Takes away the result tabs that aren't pinned, as a new run starts.
+    /// Takes away the result tabs that aren't pinned, as a new run starts; those with edits not applied stay, as if pinned
+    /// (grid-spec rule 1).
     func dropUnpinnedResults() {
-        resultTabs.removeAll { !$0.pinned }
+        resultTabs.removeAll { !$0.pinned && $0.pendingRows == 0 }
         if let selected = selectedResult, !selected.pinned, selected !== messagesTab { selectedResult = nil }
+    }
+
+    /// The rows edited in the results and not applied.
+    var pendingResultRows: Int { resultTabs.reduce(0) { $0 + $1.pendingRows } }
+
+    /// Asks before `tabs` close with edits not applied (unless Settings ▸ Safety doesn't warn on close), then answers
+    /// whether they may.
+    func askBeforeClosing(_ tabs: [ResultTab], answer: @escaping (Bool) -> Void) {
+        let rows = tabs.reduce(0) { $0 + $1.pendingRows }
+        guard rows > 0, connection.map({ model.data.safety(for: $0).warnOnClose }) ?? true, let window = view.window else {
+            return answer(true)
+        }
+        ConsoleClosing.alert(window, "Throw away the edits to \(rows == 1 ? "a row" : "\(rows.formatted()) rows")?",
+                             "They aren't applied yet: only Apply (⌘S with the result's rows focused) writes them, and closing "
+                                + "loses them.",
+                             buttons: [("Throw Away", "Close and lose the edits"), ("Cancel", "Keep it open to apply the edits")],
+                             destructive: 0) { answer($0 == 0) }
     }
 
     /// A result set's tab, after the others.
@@ -129,10 +147,12 @@ extension ConsoleViewController {
 
     @objc func closeResult(_ sender: Any?) {
         guard let tab = currentResult else { return }
-        let index = resultTabs.firstIndex { $0 === tab } ?? 0
-        resultTabs.removeAll { $0 === tab }
-        selectedResult = resultTabs.isEmpty ? messagesTab : resultTabs[min(index, resultTabs.count - 1)]
-        showResults()
+        askBeforeClosing([tab]) { [weak self] close in
+            guard close, let self, let index = self.resultTabs.firstIndex(where: { $0 === tab }) else { return }
+            self.resultTabs.remove(at: index)
+            self.selectedResult = self.resultTabs.isEmpty ? self.messagesTab : self.resultTabs[min(index, self.resultTabs.count - 1)]
+            self.showResults()
+        }
     }
 
     /// Export Result…: the shown result's Export Rows…, wherever the focus is.
@@ -143,8 +163,11 @@ extension ConsoleViewController {
 
     @objc func closeOtherResults(_ sender: Any?) {
         guard let tab = currentResult else { return }
-        resultTabs = [tab]
-        selectedResult = tab
-        showResults()
+        askBeforeClosing(resultTabs.filter { $0 !== tab }) { [weak self] close in
+            guard close, let self, self.resultTabs.contains(where: { $0 === tab }) else { return }
+            self.resultTabs = [tab]
+            self.selectedResult = tab
+            self.showResults()
+        }
     }
 }
