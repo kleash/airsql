@@ -257,6 +257,12 @@ extension AppTests {
             view.copyWithHeaders(nil)
             #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("INSERT INTO") == true)
             GridCopy.format = .tsv
+            // The headers sort the rows here: by spent, smallest first, then back.
+            view.dataGrid(view.grid, sortBy: 4, adding: false)
+            #expect(view.grid.sortOrder == [DataGridView.Sort(column: 4, ascending: true)] && view.rows.cell(0, 0) == .text("10475"))
+            view.dataGrid(view.grid, sortBy: 4, adding: false)
+            view.dataGrid(view.grid, sortBy: 4, adding: false)
+            #expect(view.grid.sortOrder.isEmpty && view.rows.cell(0, 0) == .text("10482"))
             let menu = try #require(view.dataGrid(view.grid, menuFor: .cells))
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) == ["Copy", "Copy with Headers", "Copy As", "Export Rows…"])
         }
