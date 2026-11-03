@@ -480,6 +480,16 @@ enum Commands {
                                         tip: "End the selected process's connection to the server")
     static let erDiagram = Command("ER Diagram", #selector(AirSQLActions.showERDiagram(_:)),
                                    tip: "Draw the database's tables and their foreign keys")
+    static let newView = Command("View…", #selector(AirSQLActions.createObject(_:)), tag: 1,
+                                 tip: "Write a new view as its CREATE statement")
+    static let newProcedure = Command("Procedure…", #selector(AirSQLActions.createObject(_:)), tag: 2,
+                                      tip: "Write a new stored procedure as its CREATE statement")
+    static let newFunction = Command("Function…", #selector(AirSQLActions.createObject(_:)), tag: 3,
+                                     tip: "Write a new stored function as its CREATE statement")
+    static let newTrigger = Command("Trigger…", #selector(AirSQLActions.createObject(_:)), tag: 4,
+                                    tip: "Write a new trigger as its CREATE statement")
+    static let newEvent = Command("Event…", #selector(AirSQLActions.createObject(_:)), tag: 5,
+                                  tip: "Write a new scheduled event as its CREATE statement")
     static let bulkEdit = Command("Bulk Table Editor…", #selector(AirSQLActions.bulkEditTables(_:)),
                                   tip: "Move tables to another database, or change their engine or collation")
 
@@ -561,7 +571,7 @@ enum Commands {
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
-        killConnection, erDiagram, bulkEdit,
+        killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal,
         export, restore, copyToServer, compare, generateLiquibase, setUpAgents, agentActivity, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
@@ -594,6 +604,7 @@ enum Commands {
         "Sort": "Sort the rows by this column, or show them in the table's own order",
         "Display As": displayAs.tip,
         "Maintenance": maintenance.tip,
+        "New Object": "Write a new view, procedure, function, trigger or event as its CREATE statement",
         "Colour": colour.tip,
         "Agents": "Let AI agents use AirSQL, see what they did, or turn them off",
     ]
