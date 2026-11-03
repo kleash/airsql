@@ -61,6 +61,8 @@ plutil -replace CFBundleVersion -string "$version" "$app/Contents/Info.plist"
 cp vendor/out/universal/lib/libmariadb.3.dylib "$app/Contents/Frameworks/"
 # The libraries' licences, and NOTICE (it says how to use another build of libmariadb).
 cp -R Resources/Licenses "$app/Contents/Resources/"
+# What agents read through the guide tool and MCP's instructions.
+cp Resources/AgentGuide.md "$app/Contents/Resources/"
 cp NOTICE "$app/Contents/Resources/Licenses/NOTICE.txt"
 
 # Inside out: the library, then the app.

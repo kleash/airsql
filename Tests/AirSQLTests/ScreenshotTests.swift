@@ -82,6 +82,24 @@ extension AppTests {
                 main.statusBar.activity.shown?.close()
                 work.end()
 
+                // The agents' popover, after a few calls.
+                model.data.settings.agentsAllowed = true
+                let agents = AgentService(model: model, main: main, directory: URL(fileURLWithPath: try scratch() + "/agent"))
+                for (summary, outcome) in [("context", "2 connections"), ("get_schema · Staging", "3 databases"),
+                                           ("describe · orders, customers", "2 objects"),
+                                           ("run_queries · SELECT COUNT(*) FROM orders WHERE status = 'paid' (+1)", "2 rows"),
+                                           ("open_in_console · “Churn risk”", "done")] {
+                    agents.finish(agents.record("claude-code 2.1", summary), outcome)
+                }
+                _ = agents.record("claude-code 2.1", "read_console · Churn risk")
+                main.refresh()
+                main.statusBar.agent.showPopover()
+                _ = await call(harness, "wait", ["until": "popover", "timeout": 5])
+                try await save(harness, "main-agents-\(suffix)")
+                main.statusBar.agent.shown?.close()
+                agents.close()
+                model.data.settings.agentsAllowed = false
+
                 // The SQL preview sheet.
                 var request = SQLPreviewRequest(change: ChangeSQL(title: "Apply", statements: [
                     "UPDATE `orders` SET `status` = 'refunded', `note` = 'Customer asked for refund on 2 Nov' WHERE `id` = 2400977",

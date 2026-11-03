@@ -1,0 +1,17 @@
+{
+  "name": "airsql",
+  "description": "AirSQL for Claude Code: the airsql skill and AirSQL's MCP server, to work with the person's MySQL and MariaDB databases through the AirSQL Mac app.",
+  "owner": {
+    "name": "kleash",
+    "url": "https://github.com/kleash"
+  },
+  "plugins": [
+    {
+      "name": "airsql",
+      "source": "./plugins/airsql",
+      "description": "Read schemas, run read-only queries, profile tables and propose SQL through the AirSQL Mac app.",
+      "category": "development",
+      "tags": ["mysql", "mariadb", "sql", "database", "macos"]
+    }
+  ]
+}

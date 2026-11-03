@@ -1,0 +1,8 @@
+#!/bin/sh
+# AirSQL's MCP server is the AirSQL app's own program: `AirSQL --mcp` speaks MCP over stdio and passes each call to the
+# running AirSQL on this Mac through a private socket. This starts it from where AirSQL is installed.
+for app in /Applications/AirSQL.app ~/Applications/AirSQL.app; do
+    if [ -x "$app/Contents/MacOS/AirSQL" ]; then exec "$app/Contents/MacOS/AirSQL" --mcp; fi
+done
+echo "AirSQL isn't installed. Install it, open it, and turn on AirSQL > Settings > Agents > Allow AI agents to use AirSQL." >&2
+exit 1
