@@ -22,6 +22,7 @@ extension AgentServer {
         if Self.pasteActions.contains(NSStringFromSelector(action)) {
             throw Failure("The clipboard is the person's: agents can't paste. Use type or set to put text in a field.")
         }
+        if action == #selector(NSApplication.terminate(_:)) { throw Failure("Only the person at the Mac can quit AirSQL.") }
         let window = (target as? NSView)?.window ?? target as? NSWindow ?? (target as? NSWindowController)?.window
             ?? (target as? NSViewController)?.view.window
         try checkAgentMayAct(in: window)
