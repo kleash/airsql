@@ -32,12 +32,6 @@ extension AppTests {
             window.orderFront(nil)
             window.displayIfNeeded()
             defer { window.orderOut(nil) }
-            return try drawnContrast(window, in: control.convert(rect(control), to: nil))
-        }
-
-        /// The contrast of the darkest and lightest pixels in `area` (points in `window`) as `window` (a popover's too)
-        /// draws as the key one.
-        func drawnContrast(_ window: NSWindow, in area: NSRect) throws -> CGFloat {
             let frame = window.frame.size
             let canvas = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(frame.width * 2), pixelsHigh: Int(frame.height * 2),
                                                        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -47,6 +41,7 @@ extension AppTests {
             NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: canvas)
             AgentServer.drawingAsKey([window]) { AgentServer.draw(window, at: .zero) }
             NSGraphicsContext.restoreGraphicsState()
+            let area = control.convert(rect(control), to: nil)
             return try pixelContrast(canvas, NSRect(x: area.minX, y: frame.height - area.maxY, width: area.width, height: area.height))
         }
 
@@ -175,34 +170,25 @@ extension AppTests {
             }
         }
 
-        /// Column List's types and Column Summary's note, in their popovers.
-        @Test func theColumnPopoversQuietTextReads() async throws {
+        /// Column List's types and Column Summary's note, drawn in a window: in their popovers, which resize to fit as they
+        /// open, a picture could catch the note moving (it measured the bar above it on CI).
+        @Test func theColumnListAndSummaryQuietTextReads() throws {
             for (appearance, theme) in themes {
-                let (main, harness) = appWindow(testModel(Fixtures.shop))
-                let window = try #require(main.window)
-                window.appearance = appearance
-                window.setFrameOrigin(NSPoint(x: 40, y: 40))  // a popover goes on a screen: so does its window
-                window.orderFront(nil)
-                defer { window.orderOut(nil) }
-                let content = ViewerContent(FakeGridSource(rows: 30, columns: 4))
-                main.open(content, title: "orders", connection: nil)
-                window.layoutIfNeeded()
-                // The popover's label whose text starts with `text`, as the popover draws it.
-                func contrast(_ text: String) async throws -> CGFloat {
-                    _ = await call(harness, "wait", ["until": "popover", "timeout": 5])
-                    defer { window.childWindows?.forEach { $0.orderOut(nil) } }
-                    let popover = try #require(window.childWindows?.first { $0.className.contains("Popover") && $0.isVisible })
-                    popover.layoutIfNeeded()
-                    let fields = descendants(of: popover.contentView ?? NSView()).compactMap { $0 as? NSTextField }
-                    let field = try #require(fields.first { $0.stringValue.hasPrefix(text) }, "\(theme): no “\(text)”")
-                    return try drawnContrast(popover, in: field.convert(field.bounds, to: nil))
+                let viewer = GridViewer(source: nil)
+                viewer.show(FakeGridSource(rows: 30, columns: 4))
+                // The label whose text starts with `text`, in points of `view` (none: an empty patch, which fails).
+                func label(_ text: String, in view: NSView) -> NSRect {
+                    let field = descendants(of: view).compactMap { $0 as? NSTextField }.first { $0.stringValue.hasPrefix(text) }
+                    return field.map { $0.convert($0.bounds, to: view) } ?? .zero
                 }
-                content.viewer.showColumnList(nil)
-                let type = try await contrast("varchar(60)")
+                let list = GridColumnList(viewer: viewer)
+                let type = try drawnContrast(list.view, size: NSSize(width: 320, height: 240), in: { label("varchar(60)", in: $0) },
+                                             appearance: appearance)
                 #expect(type >= 4.5, "\(theme): Column List's type is \(type):1")
-                content.viewer.grid.selection.select(GridPosition(row: 0, column: 1))
-                content.viewer.showColumnSummary(nil)
-                let note = try await contrast("From the 30 rows loaded")
+                let summary = GridSummaryView(column: "name_1", origin: "From the 30 rows loaded", nullText: "NULL")
+                summary.show(.success(ColumnSummary(values: (0..<30).map { "Customer \($0)" })))
+                let note = try drawnContrast(summary.view, size: summary.view.fittingSize, in: { label("From the 30 rows loaded", in: $0) },
+                                             appearance: appearance)
                 #expect(note >= 4.5, "\(theme): Column Summary's note is \(note):1")
             }
         }
