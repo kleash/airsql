@@ -90,7 +90,10 @@ final class AppModel: ObservableObject {
     /// Forgets connections and their saved passwords and table settings.
     func delete(_ ids: Set<UUID>) {
         data.connections.removeAll { ids.contains($0.id) }
-        for id in ids { states[id] = nil }
+        for id in ids {
+            states[id] = nil
+            detach(id)
+        }
         let write = setSavedPassword
         DispatchQueue.global(qos: .userInitiated).async {
             for id in ids {

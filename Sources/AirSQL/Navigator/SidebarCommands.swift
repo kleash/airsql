@@ -198,7 +198,12 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     @objc func showProcessList(_ sender: Any?) {
-        guard let open = targetOpen, let main else { return }
+        guard let main else { return }
+        guard let open = targetOpen else {
+            // The footer's Processes button isn't checked as menu items are: say why nothing opens.
+            return showError("Connect to a server first: the process list shows what a connected server is running.",
+                             title: "No connected server", on: view.window)
+        }
         if let tab = main.tabs.first(where: { ($0.content as? ProcessListContent)?.open === open }) {
             main.select(tab)
         } else {
