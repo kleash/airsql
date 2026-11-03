@@ -545,6 +545,7 @@ extension AppTests {
             tab.applyFilter("region = 'EU' OR SLEEP(5) = 0")
             #expect(session.statements.count == sent && tab.source?.filter == "" && tab.grid.rowCount == 3)
             #expect(tab.notice.text.stringValue.contains("is read-only, so nothing ran. SLEEP() isn't on the list"))
+            #expect(tab.bar.scope.text == "On server · all rows")
             // The tab's other statements keep the filter that ran.
             tab.countRows(nil)
             await ready { tab.loading != nil }
@@ -564,7 +565,8 @@ extension AppTests {
             main.select(main.open(opened, title: "orders", connection: connection.id))
             await ready { opened.loading != nil || (opened.source == nil && opened.problem == nil) }
             #expect(quiet.statements.isEmpty && opened.source?.filter == "" && opened.bar.filterText.contains("GET_LOCK"))
-            #expect(opened.notice.text.stringValue.contains("GET_LOCK() isn't on the list"))
+            #expect(opened.notice.text.stringValue.contains("GET_LOCK() isn't on the list")
+                    && opened.bar.scope.text == "On server · all rows")
             opened.applyFilter("")
             await ready { opened.loading != nil }
             #expect(opened.grid.rowCount == 3 && opened.problem == nil)
