@@ -100,6 +100,27 @@ extension AppTests {
         #expect(safety.askBeforeUnboundedWrite && safety.openTransactionMinutes == 15, "the others as Settings ▸ Safety has them")
     }
 
+    /// Unticking Own safety checks with a click while a limit is being typed in: the limit's field used to end its
+    /// editing after the checks were gone and write into them, which ended the app.
+    @Test func untickingOwnSafetyChecksWhileTypingALimit() async throws {
+        let (main, harness) = appWindow(testModel(Fixtures.shop))
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Local MariaDB 11.8"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let sheet = try #require(await editor(main))
+        #expect(await call(harness, "press", ["title": "Safety"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.ownSafety", "value": true]).error == nil)
+        let window = try #require(sheet.window), content = try #require(window.contentView)
+        let cap = try #require(find(NSTextField.self, id: "editor.safety.agentRowCap", in: content))
+        let own = try #require(find(NSButton.self, id: "editor.ownSafety", in: content))
+        window.makeFirstResponder(cap)
+        let typing = try #require(cap.currentEditor() as? NSTextView)
+        typing.insertText("500", replacementRange: NSRange(location: 0, length: typing.string.utf16.count))
+        AXNode.click(own)  // as a click does it: the field keeps the keyboard
+        #expect(sheet.draft.safety == nil && find(NSTextField.self, id: "editor.safety.agentRowCap", in: content) == nil)
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
     /// The editor's tallest tab (Safety, with the connection's own checks) scrolls within what an 800 pt high screen
     /// leaves, so the sheet fits there; on a taller screen it shows all of it.
     @Test func editorFitsAnEightHundredPointScreen() async throws {
