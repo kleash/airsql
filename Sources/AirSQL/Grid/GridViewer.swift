@@ -29,6 +29,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     var filterByValue: ((_ column: Int, _ value: String?) -> Void)?
     /// Keeps a value edited in the value panel as the host's cell's pending value (nil: the panel only shows values).
     var keepValue: ((_ row: Int, _ column: Int, _ text: String) -> Void)?
+    /// Why the host's cell can't be edited, said when it is double-clicked; nil: nothing to say.
+    var whyReadOnly: ((_ row: Int, _ column: Int) -> String?)?
     /// Where the columns are kept; nil: nowhere.
     var viewKey: ViewKey?
     private var settings = TableViewSettings()
@@ -750,9 +752,15 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         showRecordView(nil)
     }
 
-    /// A double click on a cell that can't be edited opens the value panel.
+    /// A double click on a cell that can't be edited opens the value panel, and says why when the host knows.
     func dataGridOpenValue(_ grid: DataGridView) {
         if valuePanel == nil { toggleValuePanel(nil) }
+        guard let cell = focusedCell, let cursor = grid.selection.cursor, let reason = whyReadOnly?(cell.row, cell.column) else { return }
+        let text = label("Can't edit this cell: " + reason + ".", font: .systemFont(ofSize: 12), wraps: true)
+        text.preferredMaxLayoutWidth = 320
+        let stack = NSStackView(views: [text])
+        stack.setAccessibilityIdentifier("grid.readOnlyReason")
+        popover(around: stack, behavior: .transient).show(relativeTo: grid.cellRect(cursor), of: grid, preferredEdge: .maxY)
     }
 
     func dataGridColumnsDidChange(_ grid: DataGridView) {

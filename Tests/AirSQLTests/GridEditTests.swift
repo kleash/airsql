@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import AirSQLCore
 
@@ -158,6 +159,37 @@ struct GridEditTests {
             + "ORDER BY `region`, `number` LIMIT 100")
         #expect(ForeignKeyQueries.display(label: "Ada", key: ["12"]) == "Ada (12)")
         #expect(ForeignKeyQueries.display(label: nil, key: ["EU", "7"]) == "EU, 7")
+    }
+
+    @Test func labelsAndVirtualForeignKeys() async throws {
+        let snapshot = try await Self.snapshot(SchemaFixtures.mariadb118)
+        let orders = try #require(snapshot.table("airsql_fixture", "orders"))
+        let customers = try #require(snapshot.table("airsql_fixture", "customers"))
+        let key = try #require(ForeignKeyQueries.foreignKey(of: "customer_id", in: orders))
+        #expect(ForeignKeyQueries.labels(key, referenced: customers, label: "email", values: ["7", "x", "9"], context: C.mysql)
+                == "SELECT `id`, `email` FROM `airsql_fixture`.`customers` WHERE `id` IN (7, 9)")
+        #expect(ForeignKeyQueries.labels(key, referenced: customers, label: "email", values: ["x"], context: C.mysql) == nil)
+        // A virtual key from order_lines.qty to customers: the snapshot's copy has it, Related Rows finds it both ways.
+        let virtual = SchemaForeignKey(name: "virtual qty", columns: ["qty"], referencedDatabase: "airsql_fixture",
+                                       referencedTable: "customers", referencedColumns: ["id"], onUpdate: "NO ACTION", onDelete: "NO ACTION")
+        let keyed = snapshot.adding(["airsql_fixture": ["order_lines": [virtual]]])
+        #expect(keyed.table("airsql_fixture", "order_lines")?.foreignKeys.last == virtual)
+        #expect(snapshot.table("airsql_fixture", "order_lines")?.foreignKeys.contains(virtual) == false)
+        let related = ForeignKeyQueries.referencing(database: "airsql_fixture", table: customers, row: ["id": Array("7".utf8)],
+                                                    snapshot: keyed, context: C.mysql)
+        #expect(related.contains { $0.table == "order_lines" && $0.condition == "`qty` = 7" })
+        // Kept with the table's view settings; older settings without them still read.
+        var settings = TableViewSettings()
+        settings.virtualKeys = [virtual]
+        settings.labelColumn = "email"
+        let decoded = try JSONDecoder().decode(TableViewSettings.self, from: JSONEncoder().encode(settings))
+        let older = try JSONDecoder().decode(TableViewSettings.self, from: Data("{}".utf8))
+        #expect(decoded == settings && older.virtualKeys.isEmpty && older.labelColumn == nil)
+        let store = TableViewSettingsStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("vk-\(UUID()).json"))
+        let connection = UUID()
+        store.set(settings, connection: connection, database: "airsql_fixture", table: "order_lines")
+        store.set(settings, connection: UUID(), database: "other", table: "t")
+        #expect(store.virtualKeys(connection: connection) == ["airsql_fixture": ["order_lines": [virtual]]])
     }
 
     @Test(arguments: [SchemaFixtures.mariadb118, SchemaFixtures.mysql84])

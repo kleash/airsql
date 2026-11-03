@@ -418,6 +418,32 @@ nothing runs.
   the conditions as SQL, and the search; its ⓧ or **Data ▸ Clear Filter** shows every row again. Copy and Export Rows…
   take the rows shown. The **?** at the right of the result tabs opens [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html).
 
+### Edit a result
+
+The rows of a `SELECT` from one table can be edited when the result includes the table's key (its primary key, or a
+unique key whose columns can't be NULL); so can an inner join's when every table's key is in it. The status bar says
+**Editable** or **Read-only**, with the reason in its tooltip; double-click a read-only cell to see why (an outer join,
+`GROUP BY`, `DISTINCT`, `UNION`, a subquery in `FROM`, a self-join, a column worked out by the query, or a row of the
+"one" side of a join that shows in several result rows).
+
+- Double-click a cell (or start typing) to change it; **Set NULL** (⌥⌘N) and, in a one-table result, **Delete Rows…**
+  (⌘⌫) work as in a table tab. Values are checked by their column's type as you type. Changes wait, marked in colour,
+  with a bar over the rows counting them; **Undo**, **Redo**, **Revert** and **Revert All** take them back.
+- **Apply** (⌘S while the rows have the keyboard, or the bar's button) writes them in one transaction on the
+  connection's data session, each statement checked to change exactly its row. A join's changes always show the SQL
+  first; so do changes on connections whose **Settings ▸ Safety** asks for the preview, and deletes that cascade. If the
+  console has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
+- After Apply, the edited rows are read back from the server, so the result shows what was stored; deleted rows go.
+  New rows and pasting are for a table tab: open the table to add rows.
+- On a read-only connection nothing can be edited.
+
+### Edit INSERT statements as a table
+
+Select one or more `INSERT … VALUES` statements of one table (or put the cursor in one) and choose **Query ▸ Edit as
+Table** (also in the editor's right-click menu). The table opens in its tab with each row as a new row, a pending
+change: strings and numbers as their values, `NULL`, `DEFAULT`, and anything else (such as `NOW()`) as SQL the server
+works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the console.
+
 ## Transactions
 
 - **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
@@ -713,9 +739,9 @@ Nothing is written until you apply. Leaving a row writes nothing.
   - Bytes (BINARY, BLOB, shapes) are typed as hex: `0x00FF`. BIT shows and takes every bit: `b'1010'` or `1010`.
   - A value of more than 256 characters, or of several lines, opens in the value panel (below).
   - A foreign key shows the rows of the table it refers to, each as "label (key)", the label being that table's
-    first text column. They are searched on the server as you type, by label or by key, 100 at a time, so a big table
-    is never listed whole. Return or a double click puts the key in the cell. **Data ▸ Choose Referenced Row…** opens
-    the same list.
+    first text column, or the one you chose with **Use as Label** (below). They are searched on the server as you
+    type, by label or by key, 100 at a time, so a big table is never listed whole. Return or a double click puts the
+    key in the cell. **Data ▸ Choose Referenced Row…** opens the same list.
 - **The value panel** (⇧↩) edits the selected cell too: ⌘↩ or clicking elsewhere keeps the text as a pending edit,
   Esc puts the cell's value back. A value the column refuses stays there, and the panel says why. Its **⋯** menu has
   **Format JSON** and **Compact JSON**, **Load from File…** (a file's bytes in a binary column, else its UTF-8 text)
@@ -734,8 +760,24 @@ Nothing is written until you apply. Leaving a row writes nothing.
   over several selected cells fills them all. Cells that can't go in their column are listed first, so you can paste
   the others or nothing. **Data ▸ Paste as New Rows** adds every copied row as a new one. A cell reading `NULL` (the
   grid's NULL text) is NULL.
+- When the copied cells could be read two ways, the **Paste Format** sheet asks first, starting from AirSQL's guess:
+  what separates the cells (lines of commas or semicolons without tabs may be CSV), the decimal mark (numbers such as
+  `1,234`), and the order of day, month and year (dates such as `03/04/2026`). **Data ▸ Paste with Format…** always
+  asks.
 - **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
   the selected row; choosing one opens that table filtered to them.
+
+### Foreign key labels and virtual foreign keys
+
+- A one-column foreign key's cell shows the row it refers to in grey after its value (before it, for a number): the
+  referenced table's label, read from the server for the rows on screen only. Right-click a column header of the
+  referenced table and choose **Use as Label** (also in the Data menu) to show that column instead of its first text
+  column; choose it again to go back.
+- Many schemas have no real foreign keys. Right-click a column header and choose **Add Virtual Foreign Key…** to say
+  which table's key the column holds (AirSQL guesses from the name: `customer_id` → `customers`). AirSQL keeps it on
+  this Mac with the table's view settings, never in the database. The drop-down, Related Rows (both ways), the labels
+  and the [ER diagram](https://kleash.github.io/airsql/editors.html#the-er-diagram) then follow it as a real foreign key. **Remove Virtual Foreign Key**
+  forgets it.
 - Pending changes have their colours: an edited cell amber, a new row green, a row to delete struck through in red.
   The bar under the grid bar counts them.
 - **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes (a paste or a multi-cell edit is one step);
@@ -954,7 +996,8 @@ server keeps it, to edit as text.
 
 **Database ▸ ER Diagram** draws a database's tables with their keys. Tables that point at nothing come first on the left,
 and each table sits right of the tables its foreign keys point at; lines go from a key's column to the table it points
-at. Tables with no keys come last.
+at, virtual foreign keys you added in a table's rows included ([Virtual foreign keys](https://kleash.github.io/airsql/table-data.html#foreign-key-labels-and-virtual-foreign-keys)).
+Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
 right-click it for **Open Structure** and **Copy Name**. **Export Image…** saves the diagram as a PNG, and **Export
@@ -1812,9 +1855,18 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `sort.remove.N` (N from 0, the first sort column first), `sort.add`, `sort.ok`, `sort.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
   or a double-click on an ENUM cell shows its values as a menu; on a SET cell a checklist `grid.set` (`grid.set.member`
   checkboxes, `grid.set.done`, `grid.set.cancel`); on a foreign key cell the referenced rows `grid.lookup`
-  (`grid.lookup.search`, `grid.lookup.rows`; Return picks). Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
-  Paste and Paste as New Rows are the person's (the clipboard is). Quit is the person's too: it lists pending changes
+  (`grid.lookup.search`, `grid.lookup.rows`; Return picks); a one-column foreign key's cell shows the referenced row's
+  label after its value. A column header's menu (and the Data menu) has Use as Label, Add Virtual Foreign Key… (a sheet
+  with `virtualKey.table`; kept on this Mac, never in the database) and Remove Virtual Foreign Key. Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
+  Paste, Paste as New Rows and Paste with Format… (its sheet `pasteFormat.separator`, `pasteFormat.decimal`,
+  `pasteFormat.dateOrder`) are the person's (the clipboard is). Query ▸ Edit as Table opens the selected INSERT
+  statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
+- **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
+  every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,
+  Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
+  a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
+  (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.

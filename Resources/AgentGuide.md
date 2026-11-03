@@ -205,9 +205,18 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `sort.remove.N` (N from 0, the first sort column first), `sort.add`, `sort.ok`, `sort.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
   or a double-click on an ENUM cell shows its values as a menu; on a SET cell a checklist `grid.set` (`grid.set.member`
   checkboxes, `grid.set.done`, `grid.set.cancel`); on a foreign key cell the referenced rows `grid.lookup`
-  (`grid.lookup.search`, `grid.lookup.rows`; Return picks). Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
-  Paste and Paste as New Rows are the person's (the clipboard is). Quit is the person's too: it lists pending changes
+  (`grid.lookup.search`, `grid.lookup.rows`; Return picks); a one-column foreign key's cell shows the referenced row's
+  label after its value. A column header's menu (and the Data menu) has Use as Label, Add Virtual Foreign Key… (a sheet
+  with `virtualKey.table`; kept on this Mac, never in the database) and Remove Virtual Foreign Key. Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
+  Paste, Paste as New Rows and Paste with Format… (its sheet `pasteFormat.separator`, `pasteFormat.decimal`,
+  `pasteFormat.dateOrder`) are the person's (the clipboard is). Query ▸ Edit as Table opens the selected INSERT
+  statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
+- **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
+  every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,
+  Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
+  a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
+  (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.

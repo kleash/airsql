@@ -89,6 +89,32 @@ nothing runs.
   the conditions as SQL, and the search; its ⓧ or **Data ▸ Clear Filter** shows every row again. Copy and Export Rows…
   take the rows shown. The **?** at the right of the result tabs opens [Read the data in a grid](data-grid.md).
 
+### Edit a result
+
+The rows of a `SELECT` from one table can be edited when the result includes the table's key (its primary key, or a
+unique key whose columns can't be NULL); so can an inner join's when every table's key is in it. The status bar says
+**Editable** or **Read-only**, with the reason in its tooltip; double-click a read-only cell to see why (an outer join,
+`GROUP BY`, `DISTINCT`, `UNION`, a subquery in `FROM`, a self-join, a column worked out by the query, or a row of the
+"one" side of a join that shows in several result rows).
+
+- Double-click a cell (or start typing) to change it; **Set NULL** (⌥⌘N) and, in a one-table result, **Delete Rows…**
+  (⌘⌫) work as in a table tab. Values are checked by their column's type as you type. Changes wait, marked in colour,
+  with a bar over the rows counting them; **Undo**, **Redo**, **Revert** and **Revert All** take them back.
+- **Apply** (⌘S while the rows have the keyboard, or the bar's button) writes them in one transaction on the
+  connection's data session, each statement checked to change exactly its row. A join's changes always show the SQL
+  first; so do changes on connections whose **Settings ▸ Safety** asks for the preview, and deletes that cascade. If the
+  console has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
+- After Apply, the edited rows are read back from the server, so the result shows what was stored; deleted rows go.
+  New rows and pasting are for a table tab: open the table to add rows.
+- On a read-only connection nothing can be edited.
+
+### Edit INSERT statements as a table
+
+Select one or more `INSERT … VALUES` statements of one table (or put the cursor in one) and choose **Query ▸ Edit as
+Table** (also in the editor's right-click menu). The table opens in its tab with each row as a new row, a pending
+change: strings and numbers as their values, `NULL`, `DEFAULT`, and anything else (such as `NOW()`) as SQL the server
+works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the console.
+
 ## Transactions
 
 - **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In

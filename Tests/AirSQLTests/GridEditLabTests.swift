@@ -118,6 +118,11 @@ struct GridEditLabTests {
         let lookup = try #require(try await session.query(ForeignKeyQueries.lookup(key, referenced: customers, label: label,
                                                                                  search: "a", limit: 5, context: context)).first?.rows)
         #expect(lookup.columns.map(\.name) == ["id", "name"] && (1...5).contains(lookup.rowCount))
+        // The labels the grid shows after customer_id's values: one row per key found, none for a key that isn't there.
+        let ids = (0..<lookup.rowCount).compactMap { lookup.string($0, 0) } + ["999999999"]
+        let labelsSQL = try #require(ForeignKeyQueries.labels(key, referenced: customers, label: "name", values: ids, context: context))
+        let labels = try #require(try await session.query(labelsSQL).first?.rows)
+        #expect(labels.columns.count == 2 && labels.rowCount == ids.count - 1)
 
         func row(_ sql: String) async throws -> [String: [UInt8]?] {
             let store = try #require(try await session.query(sql).first?.rows)

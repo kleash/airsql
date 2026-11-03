@@ -153,9 +153,12 @@ extension TableDataController {
 
     // MARK: Foreign keys
 
-    /// The foreign key a column is part of.
+    /// The foreign key a column is part of: the table's own, or one the person defined.
     func foreignKey(_ column: Int) -> SchemaForeignKey? {
-        source.flatMap { ForeignKeyQueries.foreignKey(of: $0.columns[column].name, in: $0.table) }
+        guard let source else { return nil }
+        var table = source.table
+        table.foreignKeys += settings.virtualKeys
+        return ForeignKeyQueries.foreignKey(of: source.columns[column].name, in: table)
     }
 
     /// Choose Referenced Row…: the focused foreign key column's drop-down.
@@ -176,7 +179,7 @@ extension TableDataController {
             }
             return
         }
-        let label = ForeignKeyQueries.defaultLabel(referenced, key: key.referencedColumns)
+        let label = labelColumn(of: referenced, database: key.referencedDatabase, key: key.referencedColumns)
         let values = self.values, open = openSession
         lookup = ForeignKeyLookup(title: key.referencedTable, keyCount: key.referencedColumns.count, read: { text in
             let sql = ForeignKeyQueries.lookup(key, referenced: referenced, label: label, search: text, context: values)
@@ -209,8 +212,9 @@ extension TableDataController {
         }, uniquingKeysWith: { first, _ in first })
         let up = foreignKey(cell.column).flatMap { try? ForeignKeyQueries.referenced(by: $0, from: source.table, row: row, context: values) }
             .map { [$0] } ?? []
-        let related = up + ForeignKeyQueries.referencing(database: database, table: source.table, row: row,
-                                                         snapshot: context.schema.snapshot, context: values)
+        let snapshot = context.schema.snapshot.adding(TableViewSettingsStore.shared.virtualKeys(connection: context.connection.id))
+        let related = up + ForeignKeyQueries.referencing(database: database, table: source.table, row: row, snapshot: snapshot,
+                                                         context: values)
         let menu = NSMenu(title: "Related Rows")
         for (index, item) in related.enumerated() {
             let pointsHere = index >= up.count

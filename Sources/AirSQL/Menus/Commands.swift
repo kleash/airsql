@@ -89,7 +89,11 @@ import AppKit
     @objc optional func duplicateRow(_ sender: Any?)
     @objc optional func duplicateRowWithoutKeys(_ sender: Any?)
     @objc optional func pasteAsNewRows(_ sender: Any?)
+    @objc optional func pasteWithFormat(_ sender: Any?)
     @objc optional func chooseReferencedRow(_ sender: Any?)
+    @objc optional func useAsLabel(_ sender: Any?)
+    @objc optional func addVirtualKey(_ sender: Any?)
+    @objc optional func removeVirtualKey(_ sender: Any?)
     @objc optional func deleteRows(_ sender: Any?)
     @objc optional func setCellNull(_ sender: Any?)
     @objc optional func setCellDefault(_ sender: Any?)
@@ -444,6 +448,8 @@ enum Commands {
                                                  tip: "Add a copy of the selected rows, leaving their keys to the server")
     static let pasteAsNewRows = Command("Paste as New Rows", #selector(AirSQLActions.pasteAsNewRows(_:)),
                                         tip: "Add the copied cells as new rows; they are saved when you apply the changes")
+    static let pasteWithFormat = Command("Paste with Format…", #selector(AirSQLActions.pasteWithFormat(_:)),
+                                         tip: "Paste, choosing how the copied cells are separated and write decimals and dates")
     static let deleteRows = Command("Delete Rows…", #selector(AirSQLActions.deleteRows(_:)), "\u{8}",
                                     tip: "Mark the selected rows for deletion; they are deleted when you apply")
     static let setNull = Command("Set NULL", #selector(AirSQLActions.setCellNull(_:)), "n", [.command, .option],
@@ -502,6 +508,12 @@ enum Commands {
     static let goToRow = Command("Go to Row…", #selector(AirSQLActions.goToRow(_:)), "l", tip: "Go to a row by its number, or to column:row")
     static let chooseReferencedRow = Command("Choose Referenced Row…", #selector(AirSQLActions.chooseReferencedRow(_:)),
                                              tip: "Pick the row this foreign key points to by its label; its key goes in the cell")
+    static let useAsLabel = Command("Use as Label", #selector(AirSQLActions.useAsLabel(_:)),
+                                    tip: "Show this column's value beside the keys that refer to this table's rows")
+    static let addVirtualKey = Command("Add Virtual Foreign Key…", #selector(AirSQLActions.addVirtualKey(_:)),
+                                       tip: "Say which table this column refers to, kept on this Mac rather than in the database")
+    static let removeVirtualKey = Command("Remove Virtual Foreign Key", #selector(AirSQLActions.removeVirtualKey(_:)),
+                                          tip: "Forget the foreign key you defined for this column")
     static let relatedRows = Command("Related Rows", #selector(AirSQLActions.showRelatedRows(_:)), down, [.command, .control],
                                      tip: "Show the rows this value refers to, or the rows that refer to it")
     static let columnSummary = Command("Column Summary…", #selector(AirSQLActions.showColumnSummary(_:)),
@@ -670,10 +682,10 @@ enum Commands {
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
-        addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
+        addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
+        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,

@@ -233,7 +233,7 @@ extension ResultGridView {
 
 extension ResultGridView: NSMenuItemValidation {
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        guard let (enabled, reason) = filterState(item) else { return true }
+        guard let (enabled, reason) = filterState(item) ?? editingState(item) else { return true }
         item.explain(enabled: enabled, reason: reason)
         return enabled
     }

@@ -10,6 +10,8 @@ import Testing
 final class FakeTableSession: TableSession {
     var noBackslashEscapes = false
     var statements: [String] = []
+    /// The labels' queries, kept apart.
+    var labels: [String] = []
     var rows: [[String?]] = [["1", "7", "EU", "100", "12.50", nil], ["2", nil, "US", "101", "99.00", "1"],
                              ["3", "9", "EU", "102", "0.10", nil]]
     var changed: (String) -> UInt64 = { _ in 1 }
@@ -48,6 +50,15 @@ final class FakeTableSession: TableSession {
         if sql.hasPrefix("SELECT @@SESSION.sql_mode") {
             return result([.init(name: "m", type: MYSQL_TYPE_VAR_STRING), .init(name: "z", type: MYSQL_TYPE_VAR_STRING)],
                           [[sqlMode, "SYSTEM"]])
+        }
+        // Foreign keys' labels as their cells are drawn (SELECT key, label … WHERE key IN …): in `labels`.
+        if let select = sql.range(of: "SELECT "), let from = sql.range(of: " FROM "), select.lowerBound == sql.startIndex {
+            let names = sql[select.upperBound..<from.lowerBound].components(separatedBy: ", ")
+            if names.count == 2, sql.contains(" WHERE \(names[0]) IN (") {
+                labels.append(sql)
+                let found = sql.contains("`customers`") ? customers : []
+                return result([.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "label", type: MYSQL_TYPE_VAR_STRING)], found)
+            }
         }
         statements.append(sql)
         if sql.contains(" GROUP BY ") {

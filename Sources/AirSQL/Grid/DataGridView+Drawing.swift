@@ -126,6 +126,17 @@ extension DataGridView {
                     NSColor.secondaryLabelColor.setFill()
                     NSRect(x: x, y: y + styles.baseline - (styles.regular.xHeight / 2).rounded(), width: width, height: pixel * 2).fill()
                 }
+                // A foreign key's label, grey, in the room the value leaves: after text, before a number.
+                if cell != .null, let suffix = cellSuffix?(row, sourceColumn) {
+                    let start = info.kind == .number ? rect.minX + GridStyles.padding : x + width + GridStyles.padding
+                    let room = info.kind == .number ? x - start - GridStyles.padding : rect.maxX - GridStyles.padding - start
+                    let words = NSAttributedString(string: suffix, attributes: [.font: styles.regular,
+                        NSAttributedString.Key(kCTForegroundColorAttributeName as String): NSColor.secondaryLabelColor.cgColor])
+                    if room > 16, let label = CTLineCreateTruncatedLine(CTLineCreateWithAttributedString(words), Double(room), .end, ellipsis) {
+                        context.textPosition = CGPoint(x: (start * scale).rounded() / scale, y: y + styles.baseline)
+                        CTLineDraw(label, context)
+                    }
+                }
             }
         }
 

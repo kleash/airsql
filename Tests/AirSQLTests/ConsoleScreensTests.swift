@@ -183,7 +183,8 @@ extension AppTests {
             let y = window.frame.height - point.y
             let right = await call(harness, "click", ["x": point.x, "y": y, "button": "right"])
             let items = right["menu"] as? [[String: Any]] ?? []
-            #expect(titles(items) == ["Run Statement", "Run Selection", "Explain", "Format SQL", "Comment Lines", "Cut", "Copy", "Paste"])
+            #expect(titles(items) == ["Run Statement", "Run Selection", "Explain", "Format SQL", "Comment Lines", "Edit as Table", "Cut",
+                                      "Copy", "Paste"])
             func walk(_ menu: NSMenu) -> [String] { menu.items.flatMap { item in [item.title] + (item.submenu.map(walk) ?? []) } }
             let bar = Set(NSApp.mainMenu.map(walk) ?? [])
             for item in items {
