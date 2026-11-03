@@ -13,6 +13,10 @@ final class SQLEditorView: NSTextView {
     var onSelectionChange: (() -> Void)?
     /// The menu's Find commands (their tag is the NSTextFinder action): the console's find bar.
     var onFind: ((NSTextFinder.Action) -> Void)?
+    /// The suggestions at a place of a text: the console's, from its connection's schema cache.
+    var completions: ((String, Int) -> (Range<Int>, [CompletionItem]))?
+    /// The completion list, once it has been shown.
+    var completionPopup: CompletionPopup?
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
     static let indentUnit = "    "

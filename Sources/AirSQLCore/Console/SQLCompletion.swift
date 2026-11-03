@@ -198,7 +198,8 @@ public enum SQLCompletion {
         return String(name.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
     }
 
-    static func isWordChar(_ c: UInt16) -> Bool {
+    /// A character of a name without quotes: ASCII letters and digits, _ and $, and anything beyond ASCII.
+    public static func isWordChar(_ c: UInt16) -> Bool {
         (0x30...0x39).contains(c) || (0x41...0x5A).contains(c) || (0x61...0x7A).contains(c) || c == 0x5F || c == 0x24 || c >= 0x80
     }
 

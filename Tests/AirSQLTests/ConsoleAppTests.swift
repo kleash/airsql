@@ -8,9 +8,10 @@ import Testing
 extension AppTests {
     @MainActor @Suite struct ConsoleAppTests {
         /// A window with the shop's connections and a new console on Production.
-        static func console(_ given: AppModel? = nil) async throws -> (MainWindowController, AgentServer, ConsoleViewController) {
+        static func console(_ given: AppModel? = nil, on connection: UUID = Fixtures.production.id) async throws
+            -> (MainWindowController, AgentServer, ConsoleViewController) {
             let (main, harness) = appWindow(given ?? testModel(Fixtures.shop))
-            main.sidebar.select([Fixtures.production.id])
+            main.sidebar.select([connection])
             let reply = await call(harness, "menu", ["path": "File > New Query"])
             #expect(reply.error == nil, "\(reply.error ?? "")")
             let console = try #require(main.selectedTab?.content as? ConsoleViewController)
@@ -94,6 +95,32 @@ extension AppTests {
             viewer.refresh()
             #expect(try await eventually(timeout: 5) { viewer.lines.isEmpty })
             viewer.close()
+        }
+
+        @Test func completionOffersJoinsAndColumnsFromTheSchemaCache() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let (_, harness, console) = try await Self.console(testModel([saved]), on: saved.id)
+            _ = await call(harness, "type", ["text": "SELECT * FROM orders o JOIN "])
+            console.editor.complete(nil)
+            let popup = try #require(console.editor.completionPopup)
+            #expect(popup.isShown && popup.selected?.text == "customers c ON c.id = o.customer_id")
+            console.editor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+            #expect(!popup.isShown && console.text == "SELECT * FROM orders o JOIN customers c ON c.id = o.customer_id")
+            // Typing a dot after an alias lists its columns; ↓ and Tab choose and insert.
+            console.editor.insertText(" WHERE c", replacementRange: console.editor.selectedRange())
+            console.editor.insertText(".", replacementRange: console.editor.selectedRange())
+            #expect(popup.isShown && popup.items.allSatisfy { $0.kind == .column })
+            console.editor.doCommand(by: #selector(NSResponder.moveDown(_:)))
+            let second = try #require(popup.selected)
+            console.editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text.hasSuffix("WHERE c." + second.text))
+            // Not inside a string.
+            console.editor.insertText(" = 'o", replacementRange: console.editor.selectedRange())
+            #expect(!popup.isShown)
         }
 
         @Test func runSaysToConnectFirst() async throws {

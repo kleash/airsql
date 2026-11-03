@@ -82,6 +82,12 @@ final class ConsoleViewController: NSViewController, TabContent {
         editorScroll = scroll
         editor.setText(initialText)
         editor.onChange = { [weak self] in self?.textChanged() }
+        editor.completions = { [weak self] text, caret in
+            guard let self else { return (caret..<caret, []) }
+            let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }
+            return SQLCompletion.suggestions(text: text, caret: caret, snapshot: snapshot, database: self.database,
+                                             noBackslashEscapes: self.editor.noBackslashEscapes)
+        }
         split.isVertical = false
         split.dividerStyle = .thin
         split.autosaveName = layoutName("Console")
@@ -134,6 +140,12 @@ final class ConsoleViewController: NSViewController, TabContent {
         guard let id = connectionID, Self.openConnection(id) != nil, let session = Self.shared[id]?.session,
               session.isConnected else { return nil }
         return session
+    }
+
+    /// The database its statements run in: the last USE on the connection's main session, else the connection's own.
+    var database: String? {
+        shared.database ?? connectionID.flatMap { Self.openConnection($0)?.options.database }
+            ?? connection.flatMap { $0.database.isEmpty ? nil : $0.database }
     }
 
     var isConnected: Bool {
