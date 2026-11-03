@@ -184,9 +184,10 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
         case .columns where row < design.columns.count:
             return state(design.columns[row].original, design.columns[row], before.columns, \.name)
         case .indexes where row < design.indexes.count:
-            return state(design.indexes[row].original, design.indexes[row], before.indexes, \.name)
+            return state(design.indexes[row].original, design.indexes[row], before.indexes.map(design.renamingColumns(of:)), \.name)
         case .foreignKeys where row < design.foreignKeys.count:
-            return state(design.foreignKeys[row].original, design.foreignKeys[row], before.foreignKeys, \.name)
+            return state(design.foreignKeys[row].original, design.foreignKeys[row],
+                         before.foreignKeys.map(design.renamingColumns(of:)), \.name)
         case .checks where row < design.checks.count:
             return state(design.checks[row].original, design.checks[row], before.checks, \.name)
         case .checks:

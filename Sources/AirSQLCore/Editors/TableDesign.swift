@@ -32,6 +32,33 @@ public struct TableDesign: Hashable {
         checks = table.checks.filter { ownChecks[$0.name] == nil }.map(CheckDesign.init)
     }
 
+    /// The columns renamed in this design: their names on the server, and now.
+    public var renamedColumns: [String: String] {
+        var renamed: [String: String] = [:]
+        for column in columns { if let original = column.original, original != column.name { renamed[original] = column.name } }
+        return renamed
+    }
+
+    /// The original's index (or key) with its columns under their new names, to compare with this design's: the server
+    /// renames a column in its keys by itself.
+    public func renamingColumns(of index: IndexDesign) -> IndexDesign {
+        let renamed = renamedColumns
+        var index = index
+        index.parts = index.parts.map { part in
+            var part = part
+            part.column = part.column.map { renamed[$0] ?? $0 }
+            return part
+        }
+        return index
+    }
+
+    public func renamingColumns(of key: ForeignKeyDesign) -> ForeignKeyDesign {
+        let renamed = renamedColumns
+        var key = key
+        key.columns = key.columns.map { renamed[$0] ?? $0 }
+        return key
+    }
+
     /// Renames a column, and its mentions in keys (not in check or generated expressions, which are SQL: the server
     /// refuses the rename when one of those needs it).
     public mutating func renameColumn(at index: Int, to name: String) {

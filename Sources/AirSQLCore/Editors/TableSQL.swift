@@ -34,24 +34,16 @@ struct TableSQL {
     // MARK: ALTER
 
     func alter(from old: TableDesign, to new: TableDesign) throws -> [String] {
-        // Old column names as they are now, for comparing keys that mention renamed columns.
-        var renamed: [String: String] = [:]
-        for column in new.columns { if let original = column.original { renamed[original] = column.name } }
-        func now(_ names: [String]) -> [String] { names.map { renamed[$0] ?? $0 } }
-
+        // Keys are compared with the old column names put as they are now: the server renames a column in its keys.
         var dropKeys: [String] = [], drops: [String] = [], changes: [String] = [], adds: [String] = []
         for key in old.foreignKeys {
-            var moved = key
-            moved.columns = now(key.columns)
             let current = new.foreignKeys.first { $0.original == key.name }
-            if current.map({ same($0, moved) }) != true { dropKeys.append("DROP FOREIGN KEY " + SQLQuote.identifier(key.name)) }
+            if current.map({ same($0, new.renamingColumns(of: key)) }) != true {
+                dropKeys.append("DROP FOREIGN KEY " + SQLQuote.identifier(key.name))
+            }
         }
         for key in new.foreignKeys {
-            let before = old.foreignKeys.first { $0.name == key.original }.map { key -> ForeignKeyDesign in
-                var moved = key
-                moved.columns = now(key.columns)
-                return moved
-            }
+            let before = old.foreignKeys.first { $0.name == key.original }.map(new.renamingColumns(of:))
             if before.map({ same(key, $0) }) != true { adds.append("ADD " + (try foreignKey(key))) }
         }
 
@@ -71,12 +63,7 @@ struct TableSQL {
         }
 
         for index in old.indexes {
-            var moved = index
-            moved.parts = index.parts.map { part in
-                var part = part
-                part.column = part.column.map { renamed[$0] ?? $0 }
-                return part
-            }
+            let moved = new.renamingColumns(of: index)
             let current = new.indexes.first { $0.original == index.name }
             if let current, same(current, moved) {
                 if current.name != index.name, current.kind != .primary {
