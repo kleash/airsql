@@ -178,7 +178,7 @@ extension TableDataController {
             self?.viewer.reloadData()
             self?.updateBars()
         }
-        guard source.loadedRows > 100_000, let window = view.window else { return apply() }
+        guard !keys.isEmpty, source.loadedRows > 100_000, let window = view.window else { return apply() }
         let alert = NSAlert()
         alert.messageText = "Sort \(source.loadedRows.formatted()) loaded rows here?"
         alert.informativeText = "Sorting this many rows takes a moment. Untick Loaded rows only to sort every row on the server."
