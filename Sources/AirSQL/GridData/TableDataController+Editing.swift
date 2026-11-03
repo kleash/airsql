@@ -5,8 +5,8 @@ import AppKit
 // until Apply runs them in one transaction on the data session; Preview SQL shows them first; Revert and undo take
 // them back. Typing over several selected cells sets them all.
 extension TableDataController: DataGridViewDelegate {
-    /// In place: not on a read-only connection, and not a value longer than the cell shows (the editor would start
-    /// from the shortened text).
+    /// In place: not on a read-only connection, and not a value longer than the cell shows (too long for the cell's
+    /// editor: the value panel shows it whole).
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool {
         guard let source, editingOff == nil, source.canEdit(row, column) else { return false }
         return (source.value(row, column)?.count ?? 0) <= TableDataSource.shownLimit
