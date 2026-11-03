@@ -615,6 +615,46 @@ extension AppTests {
             again.revertAllChanges(nil)
             PendingChangesStore.shared.flush()
         }
+
+        @Test func theStatusBarKeepsTheRowsAndPagingLinksAtEveryWidth() async throws {
+            let session = FakeTableSession()
+            // A full page: more rows to load, so Count Exactly, Load More and Load All show.
+            session.rows = (1...1_000).map { [String($0), "7", "EU", "100", "\($0).25", nil] }
+            let (main, _, tab) = try await Self.tab(session: session, size: NSSize(width: 1800, height: 720))
+            let model = main.model, id = model.data.connections[0].id
+            model.data.connections[0].host = "warehouse-primary.analytics.internal.example.com"
+            model.states[id] = .connected(server: "MariaDB 11.8.3-MariaDB-ubu2404-log")
+            let status = tab.viewer.status, bar = main.statusBar
+            status.rows.stringValue = "1,000 of about 2,348,245 rows"
+            tab.grid.selection.select(GridPosition(row: 2, column: 4))
+            tab.grid.selection.select(GridPosition(row: 40, column: 4), extend: true)
+            status.update()
+            // On the bar, whole and not overlapping another item.
+            func shown(_ views: [NSView]) -> Bool {
+                views.allSatisfy { view in
+                    guard view.window != nil, !view.isHiddenOrHasHiddenAncestor else { return false }
+                    return bar.bounds.contains(view.convert(view.bounds, to: bar).insetBy(dx: 1, dy: 1))
+                }
+            }
+            let kept = [status.rows, tab.countLink, tab.moreLink, tab.allLink], selection = [status.position, status.figure]
+            // The default window, the smallest and a wide one, then back: the figure, then the position, step out for
+            // room and come back with it; the rows and the links always stay.
+            for agent in [nil, "Claude Code · reading the schema"] {
+                model.agentStatus = agent
+                main.refresh()
+                for width in [1180.0, 900, 1800, 900, 1180] {
+                    main.window?.setFrame(NSRect(origin: NSPoint(x: -20000, y: -20000), size: NSSize(width: width, height: 720)), display: false)
+                    main.window?.layoutIfNeeded()
+                    let place = "\(Int(width)) pt\(agent == nil ? "" : " with the agents' chip")"
+                    #expect(shown(kept), "\(place)")
+                    if width == 1800 || width == 1180 && agent == nil { #expect(shown(selection), "\(place)") }
+                    let items = (kept + selection + [bar.route, bar.server, bar.agent, bar.sqlLog]).filter { shown([$0]) }
+                        .map { $0.convert($0.bounds, to: bar) }.sorted { $0.minX < $1.minX }
+                    #expect(zip(items, items.dropFirst()).allSatisfy { $0.maxX <= $1.minX + 0.5 }, "\(place): \(items)")
+                }
+            }
+            main.window?.orderOut(nil)
+        }
     }
 }
 

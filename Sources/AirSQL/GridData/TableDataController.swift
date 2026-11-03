@@ -115,7 +115,7 @@ final class TableDataController: NSViewController, TabContent {
             guard let self, let cell = viewer.hostCell(row, column) else { return nil }
             return label(cell.row, cell.column)
         }
-        for (index, link) in [countLink, moreLink, allLink].enumerated() { viewer.status.insertView(link, at: index + 1, in: .leading) }
+        for (index, link) in [countLink, moreLink, allLink].enumerated() { viewer.status.insertView(link, at: index + 1, in: .trailing) }
         grid.nullText = model.data.settings.nullText
         grid.fontSize = CGFloat(model.data.settings.gridFontSize)
         grid.setAccessibilityLabel("Rows of \(tableName)")

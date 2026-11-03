@@ -215,6 +215,19 @@ struct ClientToolsTests {
         #expect(Runner.childEnvironment(["MYSQL_PWD": "x", "MYSQL_HOST": "h", "PATH": "/bin"], [:]).keys.sorted() == ["LC_CTYPE", "PATH"])
     }
 
+    @Test func aFailureIsTheToolsOwnErrorWithoutItsWarnings() {
+        let readOnly = "unknown variable 'loose-init-command=SET SESSION TRANSACTION READ ONLY'"
+        let denied = "Got error: 1045: \"Access denied for user 'app'@'localhost' (using password: YES)\" when trying to connect"
+        for (name, warning) in [("mariadb-dump", "Warning: mariadb-dump: " + readOnly), ("mysqldump", "mysqldump: [Warning] " + readOnly)] {
+            let error = ToolRun.failure(name, CommandResult(status: 2, stderr: "\(warning)\n\(name): \(denied)\n"))
+            #expect(error.message == "\(name) stopped: \(name): \(denied)")
+            #expect(error.details == "\(name): \(denied)")
+        }
+        // A tool that only warned before it stopped.
+        let quiet = ToolRun.failure("mariadb", CommandResult(status: 1, stderr: "Warning: mariadb: \(readOnly)\n"))
+        #expect(quiet.message == "mariadb stopped: it ended with status 1." && quiet.details.isEmpty)
+    }
+
     @Test func aDumpThatWritesElsewhereIsFlagged() {
         var scan = DumpScan()
         // mysqldump --databases: CREATE DATABASE /*!32312 IF NOT EXISTS*/ `crm` …; USE `crm`; and the like.

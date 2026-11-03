@@ -38,15 +38,17 @@ final class StatusBarView: NSView {
         sqlLog.setContentCompressionResistancePriority(.required, for: .horizontal)
         accessory.spacing = 10
         accessory.translatesAutoresizingMaskIntoConstraints = false
+        accessory.setHuggingPriority(.defaultHigh, for: .horizontal)  // the room left goes to the gap, as with the items
         // One row: the route, server, transaction and work on the left, the tab's own items, the agents and the SQL log on
-        // the right. Items keep their text (or a good part of it); when the window is too narrow for all of them, the
-        // less important ones step out (they stay in the popovers and the snapshot) rather than squeeze to nothing.
+        // the right. Items keep their text (or a good part of it: cut short first, at 250), the tab's own items then fit
+        // themselves to the room (GridStatusView, 255); when the window is still too narrow for all of them, the less
+        // important ones step out (they stay in the popovers and the snapshot) rather than squeeze to nothing.
         let row = NSStackView()
         row.setViews([route, server, transaction, activity], in: .leading)
         row.setViews([accessory, agent, sqlLog], in: .trailing)
         row.spacing = 12
         row.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
-        row.setClippingResistancePriority(.defaultLow, for: .horizontal)
+        row.setClippingResistancePriority(NSLayoutConstraint.Priority(260), for: .horizontal)
         let priorities: [(NSView, Float)] = [(sqlLog, 1000), (transaction, 950), (activity, 900), (agent, 800), (accessory, 700),
                                              (route, 600), (server, 500)]
         for (view, priority) in priorities { row.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: priority), for: view) }

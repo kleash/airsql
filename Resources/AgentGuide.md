@@ -156,7 +156,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `toolbar.explain`, `toolbar.transactionMode`, `toolbar.commit`, `toolbar.rollback`, `toolbar.cancel`.
 - **Sidebar**: `sidebar.filter`, `sidebar.connections` (select with `select pane=sidebar`), `sidebar.newConnection`,
   `sidebar.processes`. With nothing open: `firstRun.addConnection`, `firstRun.setUpAgents`; a connection's summary:
-  `summary.connect`, `summary.newQuery`, `summary.edit`.
+  `summary.connect` (`summary.disconnect` once it is connecting or connected), `summary.newQuery`, `summary.edit`.
 - **Tabs**: `tabs`, `tabs.new`, each `tab` with `tab.close` (select with `select pane=tabs`), `tab.rename`.
 - **Navigator** (a connection's tree in the sidebar; double-click opens): a database `database.tables`; text views
   `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;

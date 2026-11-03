@@ -132,11 +132,12 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## Grid
 
-- **Text size**: the grid's, which ⌘+, ⌘− and ⌘0 change the same way while it has the focus.
+- **Text size**: the grid's (12 pt at first), open grids' too. ⌘+, ⌘− and ⌘0 change it the same way for the grid with
+  the focus; a grid made bigger or smaller keeps its size until ⌘0.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
 - **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
   row is then held in memory.
-- **NULL shown as**: how empty values look in the grid.
+- **NULL shown as**: how empty values look in the grid, open grids' too.
 - **Transpose results with one row**: a console result with a single row opens turned on its side, one line per
   column (on by default).
 
@@ -861,7 +862,8 @@ With cells selected, the status bar shows the focused cell (**r3 : c5**, row and
 selected, and one figure for them: their sum, or their count when they aren't numbers. Click the figure to see them
 all (count, sum, average, smallest, largest, median, distinct values) and choose the one shown. Sums of decimals are
 exact. **Edit ▸ Copy Selection Summary** (⇧⌘C) copies every figure. Selections of more than 100,000 cells aren't added
-up.
+up. In a narrow window the figure, then the focused cell, make way for the rest; a table's row count and its **Count
+Exactly**, **Load More** and **Load All** stay.
 
 ## Move around
 
@@ -1810,7 +1812,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `toolbar.explain`, `toolbar.transactionMode`, `toolbar.commit`, `toolbar.rollback`, `toolbar.cancel`.
 - **Sidebar**: `sidebar.filter`, `sidebar.connections` (select with `select pane=sidebar`), `sidebar.newConnection`,
   `sidebar.processes`. With nothing open: `firstRun.addConnection`, `firstRun.setUpAgents`; a connection's summary:
-  `summary.connect`, `summary.newQuery`, `summary.edit`.
+  `summary.connect` (`summary.disconnect` once it is connecting or connected), `summary.newQuery`, `summary.edit`.
 - **Tabs**: `tabs`, `tabs.new`, each `tab` with `tab.close` (select with `select pane=tabs`), `tab.rename`.
 - **Navigator** (a connection's tree in the sidebar; double-click opens): a database `database.tables`; text views
   `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
