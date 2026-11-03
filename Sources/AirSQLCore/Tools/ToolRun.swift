@@ -180,9 +180,7 @@ public enum ToolRun {
     /// removed by the app after two minutes, or at the next launch.
     public static func openInTerminal(_ command: ToolCommand, database: String, name: String) async throws {
         let optionFile = try OptionFile.write(user: command.options.user, password: command.options.password)
-        let argv = command.terminal(database: database, optionFile: optionFile.path)
-        let script = "#!/bin/sh\nrm -f -- \"$0\"\n(trap '' HUP; sleep 10; rm -f -- \(ToolCommand.shellWord(optionFile.path))) &\nexec "
-            + argv.map(ToolCommand.shellWord).joined(separator: " ") + "\n"
+        let script = terminalScript(command.terminal(database: database, optionFile: optionFile.path), optionFile: optionFile.path)
         let safe = String(name.map { "/:\n".contains($0) ? "-" : $0 }.prefix(60))
         let url = try OptionFile.create(Data(script.utf8), named: "\(safe) \(UUID().uuidString.prefix(6).lowercased()).command",
                                         mode: 0o700)
@@ -196,6 +194,13 @@ public enum ToolRun {
             unlink(url.path)
             throw AirSQLError(.other, "Terminal couldn't open the mysql command line.", details: result.stderr)
         }
+    }
+
+    /// Terminal's script: it removes itself, removes the option file 10 seconds on (whatever happens to the window),
+    /// and becomes the client.
+    static func terminalScript(_ argv: [String], optionFile: String) -> String {
+        "#!/bin/sh\nrm -f -- \"$0\"\n(trap '' HUP; sleep 10; rm -f -- \(ToolCommand.shellWord(optionFile))) &\nexec "
+            + argv.map(ToolCommand.shellWord).joined(separator: " ") + "\n"
     }
 
     /// The table named last in a stretch of mysqldump's output.

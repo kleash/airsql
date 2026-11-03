@@ -151,7 +151,7 @@ extension AppTests {
                 csv.show(on: main.window!, loads: false)
                 csv.show(databases: ToolFixtures.databases())
                 csv.show(columns: ToolFixtures.customerColumns)
-                let people = FileManager.default.temporaryDirectory.appendingPathComponent("customers-2026-11.csv")
+                let people = URL(fileURLWithPath: try scratch() + "/customers-2026-11.csv")
                 try "id,name,email\n1,Ada Lovelace,ada@example.com\n2,Émile Durand,\n".write(to: people, atomically: true, encoding: .utf8)
                 csv.use(people)
                 _ = await eventually(timeout: 5) { csv.runButton.isEnabled }
@@ -169,6 +169,11 @@ extension AppTests {
                 let settingsHarness = AgentServer(main: main, model: model, windows: { [window] })
                 for pane in SettingsPane.allCases {
                     settings.show(pane)
+                    if pane == .clientTools {  // the tools found, once AirSQL has looked (off the main thread)
+                        _ = await eventually(timeout: 15) {
+                            window.contentView.flatMap { find(NSTextField.self, id: "settings.dumpFound", in: $0) }?.stringValue != "Looking…"
+                        }
+                    }
                     window.layoutIfNeeded()
                     try await save(settingsHarness, "settings-\(pane.rawValue)-\(suffix)", target: "window:\(pane.title)")
                 }

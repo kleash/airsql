@@ -71,6 +71,7 @@ class ToolSheet: NSWindowController {
         window.contentView = makeContent()
         window.setContentSize(window.contentView!.fittingSize)
         window.initialFirstResponder = runButton
+        window.autorecalculatesKeyViewLoop = true  // Tab goes through every control, in order
         retained = self
         parent.beginSheet(window)
         if loads { load() }

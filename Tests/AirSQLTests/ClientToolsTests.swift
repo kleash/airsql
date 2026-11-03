@@ -318,4 +318,18 @@ struct ClientToolsTests {
             #expect(seen == size)
         }
     }
+
+    @Test func terminalsScriptRemovesItselfAndTheLoginThenBecomesTheClient() async throws {
+        let dir = try scratch()
+        let optionFile = dir + "/Application Support/1-login.cnf"
+        let script = ToolRun.terminalScript(["/opt/homebrew/bin/mysql", "--defaults-file=" + optionFile, "--protocol=TCP", "shop"],
+                                            optionFile: optionFile)
+        #expect(script == "#!/bin/sh\nrm -f -- \"$0\"\n(trap '' HUP; sleep 10; rm -f -- '\(optionFile)') &\nexec "
+            + "/opt/homebrew/bin/mysql '--defaults-file=\(optionFile)' --protocol=TCP shop\n")
+        // Run with a stand-in for mysql: the script is gone at once, and the stand-in got its words unchanged.
+        let fake = ToolRun.terminalScript(["/bin/echo", "--defaults-file=" + optionFile, "it's"], optionFile: optionFile)
+        try fake.write(toFile: dir + "/t.command", atomically: true, encoding: .utf8)
+        let (output, _) = try await run(["/bin/sh", dir + "/t.command"])
+        #expect(output == "--defaults-file=\(optionFile) it's\n" && !FileManager.default.fileExists(atPath: dir + "/t.command"))
+    }
 }
