@@ -372,6 +372,11 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         }
     }
 
+    override func close() {
+        reading?.cancel()  // a database still being read is let go
+        super.close()
+    }
+
     @objc private func copyPreview(_ sender: Any?) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString((preview.documentView as? NSTextView)?.string ?? "", forType: .string)

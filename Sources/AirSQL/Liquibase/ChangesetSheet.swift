@@ -149,18 +149,33 @@ final class ChangesetSheet: NSWindowController {
         }
     }
 
-    /// The changesets numbered after `changelog`'s, checked as Liquibase reads them.
+    /// The changesets numbered after `changelog`'s, checked as Liquibase reads them (off the main thread: a compare's
+    /// rows can make many).
     private func prepare(_ changelog: LiquibaseChangelog?) {
-        let settings = model.data.settings.liquibase
-        let numbered = Liquibase.numbered(changesets, settings: settings, first: (changelog?.changesets.count ?? 0) + 1,
-                                          taken: Set(changelog?.changesets.map(\.id) ?? []))
-        do {
-            text = try numbered.map { try $0.checkedText(settings.delimiter) }.joined(separator: "\n")
-        } catch {
-            show(numbered.map { $0.text(settings.delimiter) }.joined(separator: "\n"))
-            return fail(error.localizedDescription)
+        let settings = model.data.settings.liquibase, changesets = self.changesets, chosen = url
+        Task {
+            let made = await Task.detached { () -> Result<[String], Error> in
+                let numbered = Liquibase.numbered(changesets, settings: settings, first: (changelog?.changesets.count ?? 0) + 1,
+                                                  taken: Set(changelog?.changesets.map(\.id) ?? []))
+                return Result { try numbered.map { try $0.checkedText(settings.delimiter) } }
+            }.value
+            guard url == chosen else { return }
+            switch made {
+            case .success(let texts): ready(texts, changelog)
+            case .failure(let error): fail(error.localizedDescription)
+            }
         }
-        show(text)
+    }
+
+    /// Shows the changesets (the first 200,000 characters' worth: all of them are saved) and what Save will do.
+    private func ready(_ texts: [String], _ changelog: LiquibaseChangelog?) {
+        text = texts.joined(separator: "\n")
+        var shown = "", count = 0
+        for piece in texts where shown.utf16.count < 200_000 {
+            shown += (count == 0 ? "" : "\n") + piece
+            count += 1
+        }
+        show(count < texts.count ? shown + "\n-- … and \(texts.count - count) more changesets, saved with these\n" : shown)
         status.textColor = .secondaryLabelColor
         guard url != nil else {
             status.stringValue = "Choose the changelog to add to, or New… to start one: the ids then carry on its numbering."
@@ -169,7 +184,7 @@ final class ChangesetSheet: NSWindowController {
         status.stringValue = changelog.map { "Added after its \(ObjectPicker.count($0.changesets.count, "changeset"))." }
             ?? "A new changelog, starting with the line \(LiquibaseChangelog.header)."
         saveButton.isEnabled = true
-        saveButton.toolTip = "Add " + (numbered.count == 1 ? "the changeset" : "the \(numbered.count) changesets") + " to "
+        saveButton.toolTip = "Add " + (texts.count == 1 ? "the changeset" : "the \(texts.count) changesets") + " to "
             + (url?.lastPathComponent ?? "the changelog")
     }
 

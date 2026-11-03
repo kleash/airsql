@@ -233,8 +233,8 @@ struct LiquibaseTests {
             "CREATE PROCEDURE `p`() BEGIN SELECT '`shop`.`kept`'; END",
         ], connection: UUID())
         let routine = Liquibase.changeset(editor)
-        #expect(routine.statements == ["SET SESSION sql_mode = 'STRICT_TRANS_TABLES'", "DROP PROCEDURE IF EXISTS `p`",
-                                       "CREATE PROCEDURE `p`() BEGIN SELECT '`shop`.`kept`'; END"])
+        #expect(routine.statements == [Liquibase.sessionSave, "SET SESSION sql_mode = 'STRICT_TRANS_TABLES'", "DROP PROCEDURE IF EXISTS `p`",
+                                       "CREATE PROCEDURE `p`() BEGIN SELECT '`shop`.`kept`'; END", Liquibase.sessionTail])
         #expect(routine.rollback.isEmpty && routine.comment == "Replace procedure shop.p" && routine.object == "p")
         let table = Liquibase.changeset(ChangeSQL(title: "Change table shop.orders", statements: [
             "ALTER TABLE `shop`.`orders`\n  ADD COLUMN `paid` tinyint(1) NOT NULL DEFAULT 0 AFTER `total`;",

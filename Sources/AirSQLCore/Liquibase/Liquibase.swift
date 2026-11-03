@@ -174,6 +174,14 @@ public enum Liquibase {
         statements.removeAll { usedDatabase($0) != nil || ["START TRANSACTION", "BEGIN", "BEGIN WORK", "COMMIT", "ROLLBACK"]
             .contains($0.uppercased()) }
         if let database { statements = statements.map { unqualified($0, database: database) } }
+        // A change that sets the session's sql_mode or time zone (the object editor's) puts them back after, as later
+        // changesets run on the same session.
+        if statements.contains(where: { statement in
+            let tokens = Tokens(statement)
+            return tokens.word(0) == "SET" && (0..<tokens.count).contains { ["SQL_MODE", "TIME_ZONE"].contains(tokens.word($0) ?? "") }
+        }) {
+            statements = [sessionSave] + statements + [sessionTail]
+        }
         let undo = statements.reversed().map(rollback)
         // The first name in backticks: the table or routine the change is about.
         let object = statements.lazy.compactMap { statement in
@@ -218,10 +226,11 @@ public enum Liquibase {
     /// and no strict mode (zero dates load), and the backslash escapes its strings were written with. `sessionTail`
     /// puts the session's own settings back.
     public static func sessionHead(noBackslashEscapes: Bool = false) -> [String] {
-        ["SET @airsql_sql_mode = @@SESSION.sql_mode, @airsql_time_zone = @@SESSION.time_zone",
+        [sessionSave,
          "SET SESSION sql_mode = '" + (noBackslashEscapes ? "NO_AUTO_VALUE_ON_ZERO,NO_BACKSLASH_ESCAPES" : "NO_AUTO_VALUE_ON_ZERO")
             + "', SESSION time_zone = '+00:00'"]
     }
+    public static let sessionSave = "SET @airsql_sql_mode = @@SESSION.sql_mode, @airsql_time_zone = @@SESSION.time_zone"
     public static let sessionTail = "SET SESSION sql_mode = @airsql_sql_mode, SESSION time_zone = @airsql_time_zone"
 
     // MARK: Rollback
