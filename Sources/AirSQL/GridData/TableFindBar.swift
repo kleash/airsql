@@ -61,6 +61,7 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
         }
         options.controlSize = .small
         let row = NSStackView(views: [findField, replaceField, options, previous, next, count, NSView(), replace, replaceAll, done])
+        row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.edgeInsets = NSEdgeInsets(top: 5, left: Spacing.unit, bottom: 5, right: Spacing.unit)
         row.translatesAutoresizingMaskIntoConstraints = false

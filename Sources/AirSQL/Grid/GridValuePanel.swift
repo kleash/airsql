@@ -50,6 +50,11 @@ final class GridValuePanel: NSView {
         textScroll.hasVerticalScroller = true
         outline.setAccessibilityIdentifier("valuePanel.tree")
         image.imageScaling = .scaleProportionallyDown
+        // The picture fits the panel; it never sizes the panel (or the grid beside it).
+        for orientation in [NSLayoutConstraint.Orientation.horizontal, .vertical] {
+            image.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: orientation)
+            image.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(1), for: orientation)
+        }
         image.setAccessibilityIdentifier("valuePanel.image")
         let top = NSStackView()
         top.setViews([title], in: .leading)

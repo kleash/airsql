@@ -64,6 +64,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         recordBar.setViews([previous, recordLabel, next], in: .leading)
         recordBar.setViews([close], in: .trailing)
         recordBar.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        recordBar.setHuggingPriority(.defaultHigh, for: .vertical)
         recordBar.isHidden = true
         for part in [recordBar, body] { part.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
         status.viewer = self

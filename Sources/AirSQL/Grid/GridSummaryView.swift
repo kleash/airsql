@@ -102,7 +102,8 @@ final class GridSummaryView: NSViewController {
             scroll.drawsBackground = false
             list.translatesAutoresizingMaskIntoConstraints = false
             list.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
-            scroll.heightAnchor.constraint(equalToConstant: min(300, CGFloat(summary.top.count) * 36 + 4)).isActive = true
+            // As tall as the values (a scroll view puts a shorter list at its bottom), at most 300 points.
+            scroll.heightAnchor.constraint(equalToConstant: min(300, ceil(list.fittingSize.height))).isActive = true
             stack.addArrangedSubview(scroll)
             scroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -24).isActive = true
             stack.addArrangedSubview(label(origin + (summary.top.count == ColumnSummary.topLimit ? " · the 50 most frequent" : ""),

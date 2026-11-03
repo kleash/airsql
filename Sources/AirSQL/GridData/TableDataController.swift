@@ -102,14 +102,22 @@ final class TableDataController: NSViewController, TabContent {
         bar.owner = self
         findBar.owner = self
         notice.owner = self
-        let stack = NSStackView(views: [bar, findBar, notice, viewer])
-        stack.orientation = .vertical
-        stack.spacing = 0
-        stack.alignment = .leading
-        view.addSubview(stack)
-        stack.pin(to: view)
-        for child in stack.arrangedSubviews { child.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
-        viewer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        let bars = NSStackView(views: [bar, findBar, notice])
+        bars.orientation = .vertical
+        bars.spacing = 0
+        bars.alignment = .leading
+        for child in bars.arrangedSubviews { child.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true }
+        // The rows take all the height the bars leave, whatever the viewer shows beside them (the value panel).
+        for part in [bars, viewer] as [NSView] {
+            part.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(part)
+        }
+        NSLayoutConstraint.activate([
+            bars.topAnchor.constraint(equalTo: view.topAnchor), bars.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bars.trailingAnchor.constraint(equalTo: view.trailingAnchor), viewer.topAnchor.constraint(equalTo: bars.bottomAnchor),
+            viewer.leadingAnchor.constraint(equalTo: view.leadingAnchor), viewer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            viewer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
         self.view = view
         updateBars()
         open()

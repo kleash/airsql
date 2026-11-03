@@ -77,6 +77,19 @@ extension AppTests {
         @Test func showsTheRowsAndSaysWhereFilteringRuns() async throws {
             let session = FakeTableSession()
             let (main, _, tab) = try await Self.tab(session: session)
+            // The grid fills the tab under its bars, the value panel open or not.
+            let height = tab.viewer.frame.height
+            #expect(height > 400)
+            tab.viewer.toggleValuePanel(nil)
+            main.window?.layoutIfNeeded()
+            #expect(tab.viewer.frame.height == height && tab.viewer.valuePanel?.frame.height == height,
+                    "\(height) → \(tab.viewer.frame.height), panel \(tab.viewer.valuePanel?.frame.height ?? 0)")
+            tab.grid.selection.select(GridPosition(row: 1, column: 2))
+            tab.viewer.showRecordView(nil)
+            main.window?.layoutIfNeeded()
+            #expect(tab.viewer.frame.height == height && tab.grid.rowCount == 6 && tab.grid.visibleRect.height > 300)
+            tab.viewer.backToGrid(nil)
+            tab.viewer.toggleValuePanel(nil)
             #expect(tab.grid.rowCount == 3 && tab.source?.cell(1, 2) == .text("US"))
             #expect(tab.bar.scope.text == "On server · all rows" && tab.viewer.status.rows.stringValue == "3 rows")
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)

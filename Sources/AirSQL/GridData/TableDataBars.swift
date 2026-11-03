@@ -64,6 +64,7 @@ final class TableDataBar: NSView, NSTextFieldDelegate {
         spinner.setAccessibilityIdentifier("tableData.busy")
         spinner.toolTip = "Rows are loading from the server"
         let row = NSStackView(views: [scope, whereLabel, whereField, clearButton, recentButton, searchField, loadedOnly, spinner])
+        row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.setCustomSpacing(Spacing.half, after: whereLabel)
         row.setCustomSpacing(Spacing.half, after: whereField)
@@ -192,6 +193,7 @@ final class TableDataNotice: NSView {
         apply.keyEquivalent = ""
         for control in [preview, revert, apply] { control.controlSize = .small }
         let row = NSStackView(views: [text, preview, revert, apply])
+        row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.edgeInsets = NSEdgeInsets(top: 5, left: Spacing.double, bottom: 5, right: Spacing.unit)
         row.translatesAutoresizingMaskIntoConstraints = false
