@@ -451,7 +451,7 @@ final class SidebarCell: NSTableCellView {
         shield.image = NSImage(systemSymbolName: "shield.lefthalf.filled", accessibilityDescription: "Custom safety")?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
         shield.contentTintColor = .statusWarning
-        shield.toolTip = "Custom safety: this connection has safety settings of its own (its Options tab)"
+        shield.toolTip = "Custom safety: this connection has safety settings of its own (its Safety tab)"
         icon.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         icon.contentTintColor = .secondaryLabelColor
         spinner.style = .spinning

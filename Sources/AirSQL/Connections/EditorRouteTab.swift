@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 /// The editor's SSH and Proxy tab (mockup screen 5): the route, the proxy, the jump hosts and the SSH host, and the
-/// path the connection takes; and the Options tab's safety checks.
+/// path the connection takes; and the Safety tab.
 extension ConnectionEditor {
     func routeTab() -> NSView {
         if draft.route == .sshJump && draft.jumpHosts.isEmpty { draft.jumpHosts = [SSHHop()] }
@@ -106,11 +106,11 @@ extension ConnectionEditor {
         }
     }
 
-    // MARK: Safety (the Options tab)
+    // MARK: Safety
 
     /// The connection's own safety checks, or a note that it uses the ones that apply to it.
-    func safetyRows(_ form: Form) {
-        form.heading("Safety checks")
+    func safetyTab() -> NSView {
+        let form = Form()
         let own = checkbox("Own safety checks for this connection", id: "editor.ownSafety",
                            tip: "Use checks of its own instead of Settings ▸ Safety (or the Production preset)",
                            on: draft.safety != nil, target: nil, action: nil)
@@ -122,7 +122,7 @@ extension ConnectionEditor {
         guard draft.safety != nil else {
             form.row("", [own], caption: draft.colour == .production ? "Uses the strict Production preset."
                 : "Uses Settings ▸ Safety.")
-            return
+            return content(form)
         }
         form.row("", [own])
         let toggles: [(String, WritableKeyPath<SavedConnection, Bool>, String)] = [
@@ -152,6 +152,7 @@ extension ConnectionEditor {
                                             tip: "Warn when a transaction stays open this long; keep-alive stops for it then",
                                             range: 1...1_440),
                                       label("minutes", color: .secondaryLabelColor)])
+        return content(form)
     }
 
     /// A whole number between `range`'s ends.

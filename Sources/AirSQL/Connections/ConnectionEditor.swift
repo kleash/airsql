@@ -1,20 +1,21 @@
 import AirSQLCore
 import AppKit
 
-/// The connection editor (plan §2.3, mockup screen 5): a sheet with the tabs General, TLS, SSH and Proxy, Options and
-/// Agents over a copy of the connection, Test Connection (each hop reported), and Save or Save and Connect. Passwords
+/// The connection editor (plan §2.3, mockup screen 5): a sheet with the tabs General, TLS, SSH and Proxy, Options, Safety
+/// and Agents over a copy of the connection, Test Connection (each hop reported), and Save or Save and Connect. Passwords
 /// typed here go to the Keychain on Save, never into airsql.json.
 @MainActor
 final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     enum Tab: Int, CaseIterable {
-        case general, tls, route, options, agents
+        case general, tls, route, options, safety, agents
 
-        var title: String { ["General", "TLS", "SSH and Proxy", "Options", "Agents"][rawValue] }
+        var title: String { ["General", "TLS", "SSH and Proxy", "Options", "Safety", "Agents"][rawValue] }
         var tip: String {
             ["Show the server's address, the login and where the connection sits in the sidebar",
              "Show how the connection is encrypted and how the server proves who it is",
              "Show the route: directly, through SSH hosts, or through a proxy",
-             "Show read-only, startup SQL, the databases shown, timeouts and this connection's safety checks",
+             "Show read-only, startup SQL, the databases shown, timeouts and this connection's client tools",
+             "Show what asks first on this connection and the limits agents work within",
              "Show what AI agents may do with this connection"][rawValue]
         }
     }
@@ -142,6 +143,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         case .tls: content = tlsTab()
         case .route: content = routeTab()
         case .options: content = optionsTab()
+        case .safety: content = safetyTab()
         case .agents: content = agentsTab()
         }
         holder.addSubview(content)

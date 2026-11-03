@@ -1,7 +1,7 @@
 import Foundation
 
 /// What asks first, and the limits agents work within (plan §2.10). Settings ▸ Safety holds the defaults; a connection
-/// can have its own in its Options tab (`SavedConnection.safety`), and a Production connection starts with
+/// can have its own in its Safety tab (`SavedConnection.safety`), and a Production connection starts with
 /// `production`. Agents read the settings that apply in `context` and can never change them. Read-only is a switch of
 /// each connection (`SavedConnection.readOnly`), and sync scripts always leave out DROP and DELETE unless ticked
 /// (`syncLeavesOutDestructive`, not a setting).
