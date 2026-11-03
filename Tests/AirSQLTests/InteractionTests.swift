@@ -82,6 +82,26 @@ extension AppTests {
                     doubleClicked: { main, _ in tabButton(main, "Query 1").renameField != nil },
                     menu: ["Close Tab", "Close Other Tabs", "Duplicate Tab", "Rename Tab…", "Reveal in Finder", "Change Connection…"],
                     enabled: ["Close Tab", "Close Other Tabs", "Duplicate Tab", "Rename Tab…"]),
+            Surface(name: "Result tab",
+                    place: { main, _ in
+                        let console = ConsoleViewController(model: main.model, connection: Fixtures.production.id)
+                        main.open(console, title: "Query 1", connection: Fixtures.production.id)
+                        console.addResult(ConsoleFixtures.customers(rows: 3), title: "Top customers", summary: "38 ms · 3 rows")
+                        console.selectResult(console.messagesTab)
+                        main.window?.layoutIfNeeded()
+                        guard let button = console.results.tabButton(for: console.resultTabs[0]) else { return nil }
+                        return windowPoint(button.bounds, in: button)
+                    },
+                    clicked: { main in
+                        let console = main.selectedTab?.content as? ConsoleViewController
+                        return console.map { $0.selectedResult === $0.resultTabs.first } ?? false
+                    },
+                    doubleClicked: { main, _ in
+                        guard let console = main.selectedTab?.content as? ConsoleViewController else { return false }
+                        return console.results.tabButton(for: console.resultTabs[0])?.renameField != nil
+                    },
+                    menu: ["Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
+                    enabled: ["Pin Result", "Rename Result…", "Close Result"]),
             Surface(name: "Status bar: route",
                     place: { main, _ in statusItem(main.statusBar.route) },
                     clicked: { $0.statusBar.route.shown?.isShown == true },
@@ -134,7 +154,7 @@ extension AppTests {
         }
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
-        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Editor tab", "Status bar: route", "Status bar: server",
+        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Editor tab", "Result tab", "Status bar: route", "Status bar: server",
                                        "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log"]
 
         @Test func everyRowHasItsChecks() {
