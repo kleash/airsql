@@ -225,6 +225,22 @@ final class GridHeaderElement: NSAccessibilityElement {
         return source.columns[grid.columnOrder[column]].name
     }
 
+    /// What the header draws besides the name: its type line and its marks ("bigint unsigned · auto, primary key").
+    override func accessibilityValue() -> Any? {
+        guard column < grid.columnCount, let source = grid.source else { return nil }
+        let info = source.columns[grid.columnOrder[column]]
+        let key = info.marks.contains(.primary) ? "primary key" : info.isKey ? "key" : info.marks.contains(.unique) ? "unique key"
+            : info.marks.contains(.indexed) ? "indexed" : ""
+        return [info.typeLine, key, info.marks.contains(.foreign) ? "foreign key" : ""].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    override func accessibilitySortDirection() -> NSAccessibilitySortDirection {
+        guard column < grid.columnCount, let sort = grid.sortOrder.first(where: { $0.column == grid.columnOrder[column] }) else {
+            return .unknown
+        }
+        return sort.ascending ? .ascending : .descending
+    }
+
     override func accessibilityHelp() -> String? { "Select the column; its sort control sorts by it" }
     override func isAccessibilitySelected() -> Bool { grid.selection.containsColumn(column) }
 

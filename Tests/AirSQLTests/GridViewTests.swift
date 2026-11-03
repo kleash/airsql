@@ -302,6 +302,12 @@ extension AppTests {
         #expect(((rows.first as? GridRowElement)?.accessibilityChildren() ?? []).count == grid.columns(in: grid.visibleRect).count)
         let headers = grid.accessibilityColumnHeaderUIElements() as? [GridHeaderElement] ?? []
         #expect(headers.first?.accessibilityLabel() == "id" && headers.count == grid.columns(in: grid.visibleRect).count)
+        // What the header draws besides the name, and its sort.
+        #expect(headers.first?.accessibilityValue() as? String == "bigint unsigned, key" && headers[1].accessibilityValue() as? String == "varchar(60)")
+        #expect(headers.first?.accessibilitySortDirection() == .unknown)
+        grid.sortOrder = [DataGridView.Sort(column: 0, ascending: false)]
+        #expect(headers.first?.accessibilitySortDirection() == .descending && headers[1].accessibilitySortDirection() == .unknown)
+        grid.sortOrder = []
 
         let cell = grid.accessibilityCell(forColumn: 1, row: 3) as? GridCellElement
         #expect(cell?.accessibilityValue() as? String == "Customer 3 Dennis" && cell?.accessibilityLabel() == "name_1")
