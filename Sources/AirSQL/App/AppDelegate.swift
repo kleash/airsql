@@ -82,6 +82,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // MARK: Commands available in every window
 
+    /// AirSQL ▸ About AirSQL: the standard panel (Info.plist gives the version and the copyright) with the credits.
+    @objc func showAbout(_ sender: Any?) {
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: HelpPage.credits])
+    }
+
     @objc func showMainWindow(_ sender: Any?) { main?.showWindow(nil) }
 
     @objc func showSettings(_ sender: Any?) { showSettings(pane: nil) }
@@ -165,6 +170,25 @@ enum HelpPage: String, CaseIterable {
         let system = ProcessInfo.processInfo.operatingSystemVersion
         return ["AirSQL \(version)", "macOS \(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
                 "MariaDB Connector/C \(MariaDB.clientVersion)"].joined(separator: "\n")
+    }
+
+    /// The About panel's credits: the client library's version, AirSQL's licence, and links to the site and to NOTICE (the
+    /// app's copy, next to the licence texts it names; the repository's when AirSQL runs outside its app, as in tests).
+    static var credits: NSAttributedString {
+        let notice = Bundle.main.url(forResource: "NOTICE", withExtension: "txt", subdirectory: "Licenses")
+            ?? URL(string: "https://github.com/kleash/airsql/blob/main/NOTICE")!
+        let centred = NSMutableParagraphStyle()
+        centred.alignment = .center
+        let plain: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                                                    .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: centred]
+        let text = NSMutableAttributedString(string: "MariaDB Connector/C \(MariaDB.clientVersion)\nLicensed under the Apache "
+                                             + "License 2.0\n", attributes: plain)
+        text.append(NSAttributedString(string: "Website", attributes: plain.merging(
+            [.link: site, .toolTip: "Open AirSQL Help on the web"]) { $1 }))
+        text.append(NSAttributedString(string: " · ", attributes: plain))
+        text.append(NSAttributedString(string: "Licences", attributes: plain.merging(
+            [.link: notice, .toolTip: "Read AirSQL's licence and those of the libraries it includes"]) { $1 }))
+        return text
     }
 
     /// Opens the page in the browser: the "?" buttons' target.

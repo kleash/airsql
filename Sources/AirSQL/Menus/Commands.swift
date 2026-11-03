@@ -6,6 +6,7 @@ import AppKit
 /// implement the methods in their own responders; new commands are added here (a shared file) and in `Commands`.
 @objc protocol AirSQLActions {
     // AirSQL and Help
+    @objc optional func showAbout(_ sender: Any?)
     @objc optional func showSettings(_ sender: Any?)
     @objc optional func showHelpSite(_ sender: Any?)
     @objc optional func showGettingStarted(_ sender: Any?)
@@ -241,7 +242,7 @@ private let f9 = String(UnicodeScalar(NSF9FunctionKey)!)
 /// HeidiSQL; Commit and Rollback have none, so a slip never commits.
 enum Commands {
     // MARK: AirSQL
-    static let about = Command("About AirSQL", #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+    static let about = Command("About AirSQL", #selector(AirSQLActions.showAbout(_:)),
                                tip: "Show AirSQL's version and the licences of what it is built with")
     static let settings = Command("Settings…", #selector(AirSQLActions.showSettings(_:)), ",",
                                   tip: "Change the look, the editor and grid, safety checks, agents and client tools")
