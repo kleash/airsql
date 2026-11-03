@@ -229,3 +229,33 @@ extension AppTests {
         }
     }
 }
+extension AppTests {
+    @MainActor @Suite struct EditorsMenuTests {
+        @Test func theDatabaseMenuOpensTheEditorsOfTheActiveConnection() async throws {
+            _ = NSApplication.shared
+            let bar = MainMenu.build()
+            let database = try #require(bar.item(withTitle: "Database")?.submenu)
+            #expect(database.items.filter { $0.action == Commands.createTable.action }.count == 1)
+            #expect(database.item(withTitle: "New Object")?.submenu?.items.map(\.title) == ["View…", "Procedure…", "Function…", "Trigger…",
+                                                                                            "Event…"])
+            let model = testModel([Fixtures.local])
+            let (main, harness) = appWindow(model)
+            defer { Editors.open = { _ in nil } }
+            // No connection chosen, then one that isn't connected: off, saying why.
+            main.sidebar.select([])
+            #expect(await call(harness, "menu", ["path": "Database > Create Table…"]).error?.contains("Choose a connection first") == true)
+            main.sidebar.select([Fixtures.local.id])
+            #expect(await call(harness, "menu", ["path": "Database > ER Diagram"]).error?.contains("Connect to Local MariaDB 11.8 first")
+                    == true)
+            // Connected: each opens its tab (they then read the server through it).
+            let context = try await recordedEditorContext()
+            Editors.open = { $0 == Fixtures.local.id ? (context.sessions, context.schema) : nil }
+            _ = await call(harness, "menu", ["path": "Database > Create Table…"])
+            #expect(main.selectedTab?.title == "New table")
+            _ = await call(harness, "menu", ["path": "Database > New Object > Trigger…"])
+            #expect(main.selectedTab?.title == "New trigger")
+            _ = await call(harness, "menu", ["path": "Database > ER Diagram"])
+            #expect((main.selectedTab?.content as? ERDiagramController) != nil)
+        }
+    }
+}
