@@ -564,9 +564,9 @@ enum Commands {
     static let processList = Command("Process List", #selector(AirSQLActions.showProcessList(_:)), "p", [.command, .option],
                                      tip: "Show what every connection to the server is running, with Kill")
     static let killQuery = Command("Kill Query…", #selector(AirSQLActions.killQuery(_:)),
-                                   tip: "Stop the selected process's statement; its connection stays")
+                                   tip: "Stop the selected process's statement, not its connection; read-only allows it, as no data changes")
     static let killConnection = Command("Kill Connection…", #selector(AirSQLActions.killConnection(_:)),
-                                        tip: "End the selected process's connection to the server")
+                                        tip: "End the selected process's connection to the server; read-only allows it, as no data changes")
     static let erDiagram = Command("ER Diagram", #selector(AirSQLActions.showERDiagram(_:)),
                                    tip: "Draw the database's tables and their foreign keys")
     static let newView = Command("View…", #selector(AirSQLActions.createObject(_:)), tag: 1,
@@ -596,7 +596,7 @@ enum Commands {
     static let deleteConnection = Command("Delete…", #selector(AirSQLActions.deleteConnection(_:)),
                                           tip: "Forget the selected connections and their saved passwords (asks first)")
     static let openInTerminal = Command("Open in Terminal", #selector(AirSQLActions.openInTerminal(_:)),
-                                        tip: "Open the mysql command line in Terminal on this connection, through its route")
+                                        tip: "Open the mysql command line in Terminal on this connection, through its route; read-only if it is")
     static let newFolder = Command("New Folder…", #selector(AirSQLActions.newFolder(_:)),
                                    tip: "Make a sidebar folder for connections; the selected connections move into it")
     static let renameFolder = Command("Rename Folder…", #selector(AirSQLActions.renameFolder(_:)),

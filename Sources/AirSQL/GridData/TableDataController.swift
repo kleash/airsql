@@ -159,6 +159,8 @@ final class TableDataController: NSViewController, TabContent {
                     (TableViewSettingsStore.shared.settings(connection: connection, database: database, table: table),
                      PendingChangesStore.shared.changes(connection: connection, database: database, table: table, keyColumns: keys))
                 }.value
+                // A read-only connection checks the saved filter as the data session reads it.
+                if context.connection.readOnly { noBackslashEscapes = try await openSession().noBackslashEscapes }
                 show(TableDataSource(database: database, table: info), settings: saved, changes: left)
             } catch {
                 problem = (error as? AirSQLError)?.message ?? error.localizedDescription
@@ -166,7 +168,14 @@ final class TableDataController: NSViewController, TabContent {
                 updateBars()
             }
             loading = nil
-            if source != nil { loadRows(more: false) }
+            guard let source else { return }
+            // A saved filter the read-only check refuses stays in the bar, unused, and no rows load until it changes.
+            if refusesOnReadOnly(source) {
+                source.filter = ""
+                finishLoading()
+            } else {
+                loadRows(more: false)
+            }
         }
     }
 

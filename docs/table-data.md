@@ -1,6 +1,6 @@
 ---
 title: A table's rows
-nav_order: 17
+nav_order: 12
 ---
 
 # A table's rows
@@ -14,7 +14,7 @@ session, a session of their own, so a long query in a console never holds them u
   key order, so pages follow one another.
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
-- **Load More** (⌥⌘↓) loads the next page; **Load All** (⇧⌥⌘↓) loads every row that's left, in batches as they arrive.
+- **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
   Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
   while the tab is open. Cancel it in the status bar's activity.
 - **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
@@ -28,6 +28,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
   fine. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last 20 filters; the ⓧ, or
   **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next time the table opens.
+  On a read-only connection, the whole SELECT must pass the [read-only check](read-only-queries.md): a condition that
+  calls a function such as `SLEEP` or `GET_LOCK` isn't sent, and the bar under it says why.
 - **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
   `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
   loaded rows instead.

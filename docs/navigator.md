@@ -76,4 +76,5 @@ running, refreshed every 5 seconds (choose another interval, or Off). Double-cli
 - **Kill Connection…** ends a connection, rolling back its open transaction.
 
 Both ask first. Right before it stops anything, AirSQL checks that the process is still running what the list showed
-(on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so.
+(on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so. Both work on a
+read-only connection too: they change no data.

@@ -1,6 +1,6 @@
 ---
 title: Change tables, views and routines
-nav_order: 12
+nav_order: 14
 ---
 
 # Change tables, views and routines

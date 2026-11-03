@@ -478,6 +478,39 @@ extension AppTests {
             tab.revertAllChanges(nil)
         }
 
+        @Test func aReadOnlyConnectionSendsOnlyFiltersThatProvablyRead() async throws {
+            let session = FakeTableSession()
+            let (main, _, tab) = try await Self.tab(session: session, readOnly: true)
+            let sent = session.statements.count
+            // A condition calling a function the read-only check doesn't know is refused before it is sent; the rows stay.
+            tab.applyFilter("region = 'EU' OR SLEEP(5) = 0")
+            #expect(session.statements.count == sent && tab.source?.filter == "" && tab.grid.rowCount == 3)
+            #expect(tab.notice.text.stringValue.contains("is read-only, so nothing ran. SLEEP() isn't on the list"))
+            // The tab's other statements keep the filter that ran.
+            tab.countRows(nil)
+            await ready { tab.loading != nil }
+            #expect(session.statements.last == "SELECT COUNT(*) FROM `airsql_fixture`.`orders`")
+            // A plain condition runs, a subquery too.
+            tab.applyFilter("region = 'EU' AND customer_id IN (SELECT id FROM customers)")
+            await ready { tab.loading != nil }
+            #expect(session.statements.last?.contains(" WHERE (region = 'EU' AND customer_id IN (SELECT id FROM customers)\n)") == true)
+            #expect(tab.notice.text.stringValue.hasPrefix("Read-only. This connection is read-only"))
+
+            // A refused filter a tab opens with stays in the bar, unused, and no rows load until it changes.
+            let connection = try #require(main.model.data.connections.first)
+            let opened = TableDataController(model: main.model, context: try await recordedEditorContext(connection),
+                                             database: "airsql_fixture", table: "orders", filter: "id IN (SELECT GET_LOCK('x', 1))")
+            let quiet = FakeTableSession()
+            opened.openSession = { quiet }
+            main.select(main.open(opened, title: "orders", connection: connection.id))
+            await ready { opened.loading != nil || (opened.source == nil && opened.problem == nil) }
+            #expect(quiet.statements.isEmpty && opened.source?.filter == "" && opened.bar.filterText.contains("GET_LOCK"))
+            #expect(opened.notice.text.stringValue.contains("GET_LOCK() isn't on the list"))
+            opened.applyFilter("")
+            await ready { opened.loading != nil }
+            #expect(opened.grid.rowCount == 3 && opened.problem == nil)
+        }
+
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
             let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
             #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. A view has no key to address its rows"))
@@ -565,6 +598,17 @@ extension AppTests.ScreenshotTests {
             viewMain.window?.displayIfNeeded()
             try await save(viewHarness, "table-data-read-only-\(suffix)")
             viewMain.window?.orderOut(nil)
+
+            // A read-only connection refusing a filter, in the smallest window: the notice says why.
+            let (locked, lockedHarness, lockedTab) = try await AppTests.GridDataAppTests.tab(
+                session: session, size: MainWindowController.minimumSize, readOnly: true)
+            locked.window?.appearance = NSAppearance(named: appearance)
+            locked.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+            locked.window?.orderFront(nil)
+            lockedTab.applyFilter("region = 'EU' OR SLEEP(5) = 0")
+            locked.window?.displayIfNeeded()
+            try await save(lockedHarness, "table-data-read-only-filter-\(suffix)")
+            locked.window?.orderOut(nil)
         }
     }
 }

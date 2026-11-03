@@ -1,6 +1,6 @@
 ---
 title: AI agents
-nav_order: 15
+nav_order: 17
 ---
 
 # AI agents
@@ -11,7 +11,7 @@ allow, never your passwords, and can't change data.
 
 ## Turn agents on
 
-1. **AirSQL ▸ Settings ▸ Agents**: tick **Allow AI agents to use AirSQL**.
+1. Choose **AirSQL ▸ Settings…** (⌘,), then **Agents**, and tick **Allow AI agents to use AirSQL**.
 2. Under **Connections**, choose what agents may do with each connection. Every connection starts at **Off**.
 3. Add AirSQL to your agent:
    - **Add to Claude Code…** or **Add to Gemini CLI…**: AirSQL shows the exact change to that program's settings

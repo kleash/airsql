@@ -156,7 +156,8 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
       <p class="rec"><b>Suggested: libmariadb</b>, built by a pinned, checksummed script the way AirSCP builds FreeRDP, and linked against the OpenSSL that script already builds. It handles caching_sha2_password (MySQL 8 and 9), MariaDB ed25519, TLS, compression and multiple result sets. It is LGPL-2.1, so ship it as a dylib inside the app. A Swift protocol would need its own ed25519 code (CryptoKit only takes 32-byte seeds, and MariaDB hashes the password itself) and adds weeks of work. The mysql-nio package in the MySQLClient folder fails on caching_sha2_password and would break AirSCP's rule of no third-party Swift packages.</p>
     </div>
     <div class="decision">
-      <h3>Every route ends in a local port</h3>
+      <h3>Every route ends in a local endpoint</h3>
+      <p><b>Built as a private Unix socket</b> (plan R1), not a 127.0.0.1 port, so no other local user or process can use the tunnel.</p>
       <p>SSH routes forward with <code>ssh -L 127.0.0.1:&lt;port&gt;:db:3306</code> on AirSCP's ControlMaster session. Proxy-only routes get a small relay inside the app that listens on 127.0.0.1 and connects through SOCKS5 or HTTP CONNECT.</p>
       <p class="rec"><b>Why it matters:</b> the driver, <code>mysqldump</code>, <code>mysql</code> and "Open in Terminal" all connect to the same 127.0.0.1 port. The client tools then work over every route without any proxy support of their own. AirSCP's <code>Session</code>, <code>Askpass</code> and <code>ProxyConnect</code> code does most of the SSH part already, and both apps are Apache 2.0 under the same author.</p>
     </div>
@@ -186,7 +187,7 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
     <div class="route"><span class="name">SSH via jump hosts</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop port">127.0.0.1:41xxx</span><span class="arrow">→</span><span class="hop">jump 1</span><span class="arrow">→</span><span class="hop">jump 2</span><span class="arrow">→</span><span class="hop">ssh host</span><span class="arrow">→</span><span class="hop db">db :3306</span></div></div>
     <div class="route"><span class="name">SSH + proxy</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop port">127.0.0.1:41xxx</span><span class="arrow">→</span><span class="hop">HTTP / SOCKS5 proxy</span><span class="arrow">→</span><span class="hop">ssh host</span><span class="arrow">→</span><span class="hop db">db :3306</span></div></div>
     <div class="route"><span class="name">Proxy only (no SSH)</span><div class="hops"><span class="hop mac">Mac</span><span class="arrow">→</span><span class="hop port">127.0.0.1:41xxx relay</span><span class="arrow">→</span><span class="hop">SOCKS5 / HTTP CONNECT</span><span class="arrow">→</span><span class="hop db">db :3306</span></div></div>
-    <p class="foot">The dashed box is the local port that the driver, the client tools and Terminal share. TLS to the database works on every route.</p>
+    <p class="foot">The dashed box is the private socket that the driver, the client tools and Terminal share. TLS to the database works on every route.</p>
   </div>
   <div class="headline">
     <div class="card">
@@ -274,7 +275,7 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
 <section aria-labelledby="ms-h">
   <h2 id="ms-h">Suggested build order for 1.0</h2>
   <ol class="milestones">
-    <li><b>Connect.</b> libmariadb build script, saved connections in the Keychain, all five routes ending in a local port, TLS, navigator tree, process list. Ends with: browse any server you can reach today.</li>
+    <li><b>Connect.</b> libmariadb build script, saved connections in the Keychain, all five routes ending in a private socket, TLS, navigator tree, process list. Ends with: browse any server you can reach today.</li>
     <li><b>Grid spike (3 days)</b>, then <b>feel first.</b> Grid, tree and editor built with right-click, double-click, multi-select, shortcuts and the performance test from the first commit. Adding these later is the trap MySQLClient fell into.</li>
     <li><b>Console.</b> Editor with highlighting and completion from cached schema, run and cancel, result tabs, history, SQL log, auto-commit with Commit and Rollback, safety prompts.</li>
     <li><b>Agents.</b> <code>--mcp</code> server, schema tools, read-only <code>run_query</code>, <code>open_in_console</code>, activity list; then UI driving (snapshot, menu, press) behind the ask-first gate. This comes early because it reuses the schema cache and the console, and it is AirSQL's main difference from HeidiSQL.</li>
@@ -315,7 +316,7 @@ const GROUPS = [
   ["SSH through one or more jump hosts", "ProxyJump chain, each hop with its own login", "D", "1.0", "S"],
   ["SSH through an HTTP or SOCKS5 proxy", "AirSCP's ProxyConnect helper as ProxyCommand", "D", "1.0", "S"],
   ["Database through a SOCKS5 or HTTP CONNECT proxy, no SSH", "Small relay inside the app on 127.0.0.1", "D", "1.0", "M"],
-  ["Every route ends in a local port shared by the driver, client tools and Terminal", "See decision D2", "A", "1.0", "M"],
+  ["Every route ends in a private socket shared by the driver, client tools and Terminal", "See decision D2 (a Unix socket, plan R1)", "A", "1.0", "M"],
   ["Ask for user and password at each connect", "HeidiSQL: prompt for credentials", "H", "1.0", "S"],
   ["Read-only connection", "Refuses writes from the console, the grid and agents", "D", "1.0", "S"],
   ["Keep-alive, reconnect after sleep or network change, query timeout", "", "H", "1.0", "M"],
@@ -350,7 +351,7 @@ const GROUPS = [
   ["Export with mysqldump: databases and tables, structure and data, routines, events, triggers, gzip", "Shows the full command, progress and Cancel", "H", "1.0", "M"],
   ["Restore a .sql or .sql.gz file into a chosen database", "Progress by bytes read; stop at first error or continue", "H", "1.0", "M"],
   ["Passwords in a temporary 0600 defaults file, never on the command line", "", "A", "1.0", "S"],
-  ["Client tools work over every route through the local port", "", "A", "1.0", "S"],
+  ["Client tools work over every route through its private socket", "", "A", "1.0", "S"],
   ["Open the mysql command line in Terminal with this connection", "HeidiSQL: launch mysql.exe with the current settings", "H", "1.0", "S"],
   ["mydumper and myloader for parallel dump and restore", "For large databases", "A", "Skip", "M"],
   ["Run the dump on the server over SSH and download the file", "Avoids pulling every row through the tunnel", "A", "Later", "M"]
@@ -372,7 +373,7 @@ const GROUPS = [
   ["Save any change as a changeset: grid Apply, table editor ALTER, rename, drop, or a console statement", "Appends to a chosen changelog file; the sheet shows the changeset before saving", "A", "1.0", "M"],
   ["Contexts, labels, comments and preconditions on generated changesets", "", "A", "1.x", "S"],
   ["Agent tool to generate a changeset from objects or the console", "So an agent can hand over a migration with the SQL it wrote", "A", "1.x", "S"],
-  ["Run Liquibase update, status and rollback with your liquibase binary", "Through Settings ▸ Client tools, over the local port", "A", "Later", "M"]
+  ["Run Liquibase update, status and rollback with your liquibase binary", "Through Settings ▸ Client tools, over the private socket", "A", "Later", "M"]
  ]},
  { id: "nav", title: "Navigator", items: [
   ["Tree: databases, tables, views, procedures, functions, triggers, events", "Grouped by type, loaded when opened", "H", "1.0", "M"],

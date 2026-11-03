@@ -12,19 +12,37 @@ AI agents that never change anything without you. Free and open source.</b></p>
   <a href="https://github.com/kleash/airsql/releases/latest"><img src="https://img.shields.io/github/v/release/kleash/airsql" alt="Latest release"></a>
 </p>
 
-AirSQL is in development and not ready to use yet: the plan is in [docs/dev/plan.md](docs/dev/plan.md).
+AirSQL is in development and not ready to use yet: the plan is in [docs/dev/plan.md](docs/dev/plan.md), and
+[AirSQL Help](docs/index.md) describes each part as it is now.
 
-- **Every way in**: direct, SSH tunnels, jump hosts, HTTP and SOCKS5 proxies, each ending in a private socket on your
-  Mac. TLS is checked against the server's real name, also through a tunnel.
-- **A SQL console** with completion, formatting, EXPLAIN, history and transactions.
-- **A fast data grid** with safe editing: nothing is written until you Apply, and Apply checks that every change
-  touched exactly the rows it should.
-- **Schema tools**: tables, indexes, foreign keys, views, routines and an ER diagram.
-- **Client tools**: `mysql`, `mysqldump` and restores, with passwords kept off the command line.
-- **Compare and reconcile** two databases, structure and data, and write Liquibase changesets.
-- **AI agents over MCP**, at the level you set for each connection: their queries must pass a read-only check, their
-  changes wait for your approval, and they never see your passwords.
-- Native AppKit, light and dark, Apple silicon and Intel, macOS 13.1 or later. No account.
+- **Every way in** ([Connections and routes](docs/connections.md)): direct or a socket, SSH tunnels (password, key,
+  ssh-agent, 2FA, your `~/.ssh/config`), jump hosts, HTTP and SOCKS5 proxies, each ending in a private socket on your
+  Mac. TLS is checked against the server's real name, also through a tunnel. Folders, colours, read-only connections
+  and startup SQL.
+- **A fast data grid with safe editing** ([A table's rows](docs/table-data.md), [Read the data in a grid](docs/data-grid.md)):
+  filter and sort on the server or in the loaded rows, search every column, quick filters and filter by values; an
+  editor for each type (dates, JSON, ENUM and SET, foreign keys with search), paste from a spreadsheet, undo. Nothing
+  is written until you Apply, and Apply checks that every change touched exactly the rows it should. Transpose, record
+  view, value panel, heatmaps, charts, column summary and frozen columns; compare two results; copy and export as CSV,
+  JSON, SQL, Markdown, HTML, XML or Excel.
+- **A SQL console** ([The SQL console](docs/console.md)) with completion, formatting, EXPLAIN as a plan, profiles,
+  history, transactions, query helpers, result tabs and a log of every statement AirSQL sends.
+- **A server at a glance** ([Browse a server](docs/navigator.md)): the tree and the database view; create, rename,
+  empty, copy and drop; a bulk table editor, maintenance, text found in every table, and the process list with Kill.
+- **Schema tools** ([Change tables, views and routines](docs/editors.md)): the table editor, with its ALTER shown as you
+  type (columns, indexes, foreign keys, checks, options), views and routines as CREATE code, and an ER diagram.
+- **Client tools** ([Export, restore, copy and import](docs/client-tools.md)): your own `mysqldump` and `mysql`, with
+  passwords kept off the command line, or AirSQL's own export and runner; Terminal over any route; copies to another
+  server; CSV import.
+- **Compare and reconcile** two databases ([Compare two databases](docs/compare.md)), structure and data, with a sync
+  script you review first and a report as HTML, CSV or Markdown; **Liquibase changesets**
+  ([Liquibase changelogs](docs/liquibase.md)) of a schema or of any change.
+- **AI agents over MCP** ([AI agents](docs/agents.md)), at the level you set for each connection: their queries must
+  pass a read-only check, their changes wait for your approval, you see what they ran, and they never see your
+  passwords.
+- **A Mac app** ([Keyboard shortcuts](docs/shortcuts.md)): native AppKit, light and dark, right-click menus and a
+  shortcut for every common command, drag and drop, and no waiting on the network while you work. Apple silicon and
+  Intel, macOS 13.1 or later. No account.
 
 ## Screenshots
 

@@ -9,12 +9,18 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## General
 
-- **Appearance**: follow the Mac's light or dark mode (System), or always use Porcelain (light) or Deep Water (dark).
+- **Appearance**: **System** follows the Mac's light or dark mode; **Light** always uses Porcelain, **Dark** Deep
+  Water.
 - **Settings folder**: where your connections and settings are kept. Passwords are in your Keychain, never there.
 
-## Editor and Grid
+## Editor
 
-- The text size of the SQL editor and of the grid.
+- **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
+  moment; **Actual Size** (⌘0) goes back to this size.
+
+## Grid
+
+- **Text size**: the grid's, which ⌘+, ⌘− and ⌘0 change the same way while it has the focus.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
 - **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
   row is then held in memory.
