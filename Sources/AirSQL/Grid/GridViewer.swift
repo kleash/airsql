@@ -73,9 +73,19 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         for part in [recordBar, body] { part.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
         status.viewer = self
         status.update()
+        NotificationCenter.default.addObserver(self, selector: #selector(gridSettingsChanged(_:)), name: .gridSettingsDidChange,
+                                               object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Settings ▸ Grid changed: its NULL text, and its text size unless this grid is zoomed (⌘+ or ⌘−).
+    @objc private func gridSettingsChanged(_ notification: Notification) {
+        guard let settings = (notification.object as? AppModel)?.data.settings,
+              let old = notification.userInfo?["old"] as? AppSettings else { return }
+        grid.nullText = settings.nullText
+        if grid.fontSize == CGFloat(old.gridFontSize) { grid.fontSize = CGFloat(settings.gridFontSize) }
+    }
 
     /// The host's rows; the grid shows them, or them transposed.
     private(set) var source: GridSource?

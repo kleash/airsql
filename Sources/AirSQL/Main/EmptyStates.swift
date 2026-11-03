@@ -116,7 +116,8 @@ func selectConnectionView() -> NSView {
 }
 
 /// A selected connection's summary (a click in the sidebar shows it): where it goes, how it logs in, its colour,
-/// safety and agent access, and Connect, Edit… and New Query.
+/// safety and agent access, and Connect (Disconnect once it connects, and Return then opens a new query), Edit… and
+/// New Query.
 @MainActor
 func summaryView(_ connection: SavedConnection, data: AirSQLData, state: ConnectionState?) -> NSView {
     let dot = DotView(diameter: 12)
@@ -129,12 +130,19 @@ func summaryView(_ connection: SavedConnection, data: AirSQLData, state: Connect
     route.toolTip = "How AirSQL reaches this server"
     let titleRow = NSStackView(views: [dot, name, route])
     titleRow.spacing = Spacing.unit
-    let connect = button("Connect", id: "summary.connect", tip: Commands.connect.tip + " (⌘K)", target: nil,
-                         action: Commands.connect.action, primary: true)
-    connect.keyEquivalent = "\r"
+    // Connecting or connected: Disconnect in Connect's place, and Return opens a new query.
+    var live = false, connected = false
+    if case .connected? = state { (live, connected) = (true, true) }
+    if case .connecting? = state { live = true }
+    let connect = live
+        ? button("Disconnect", id: "summary.disconnect", tip: (connected ? Commands.disconnect.tip : "Stop connecting")
+                 + " (\(Commands.disconnect.shortcut))", target: nil, action: Commands.disconnect.action)
+        : button("Connect", id: "summary.connect", tip: Commands.connect.tip + " (⌘K)", target: nil, action: Commands.connect.action,
+                 primary: true)
     let edit = button("Edit…", id: "summary.edit", tip: Commands.editConnection.tip, target: nil, action: Commands.editConnection.action)
     let query = button("New Query", id: "summary.newQuery", tip: Commands.newQuery.tip + " (⌘T)", target: nil,
-                       action: Commands.newQuery.action)
+                       action: Commands.newQuery.action, primary: live)
+    (live ? query : connect).keyEquivalent = "\r"
     let buttons = NSStackView(views: [connect, edit, query])
     buttons.spacing = Spacing.unit
 
