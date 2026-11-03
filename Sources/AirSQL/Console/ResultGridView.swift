@@ -2,21 +2,32 @@ import AirSQLCore
 import AppKit
 
 /// A result tab's rows in the data grid (plan §2.5's embedding API: a `ResultSetSource` over the statement's
-/// `ResultStore`), read-only, in a `GridViewer` (the status bar's figures, the value panel, Record View, the grids'
-/// copy formats, columns kept per query). The headers' sort controls sort the rows here (⌥ adds a column), asking first
-/// above 100,000 rows; Export Rows… saves them.
+/// `ResultStore`, or a `DiffSource` for a compared result), read-only, in a `GridViewer` (the status bar's figures, the
+/// value panel, Record View, the grids' copy formats, columns kept per query). The headers' sort controls sort the rows
+/// here (⌥ adds a column), asking first above 100,000 rows; Export Rows… saves them.
 @MainActor
 final class ResultGridView: NSView, DataGridViewDelegate {
     let viewer: GridViewer
     var grid: DataGridView { viewer.grid }
-    let source: ResultSetSource
+    let source: GridSource
     /// The rows in the order shown.
     let rows: ReorderedSource
+    /// The table the rows come from, for the SQL formats and the export's name.
+    private let table: (database: String?, name: String)
 
     /// `viewKey`: where its columns are kept (the statement, on its connection).
     /// `transposed`: shown on its side (a result with one row).
-    init(store: ResultStore, nullText: String, fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil, transposed: Bool = false) {
-        source = ResultSetSource(store)
+    convenience init(store: ResultStore, nullText: String, fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil,
+                     transposed: Bool = false) {
+        self.init(source: ResultSetSource(store), table: Self.table(of: store.columns), nullText: nullText, fontSize: fontSize,
+                  viewKey: viewKey, transposed: transposed)
+    }
+
+    /// `legend`: a line above the rows saying what their colours mean (a diff's), and its tooltip.
+    init(source: GridSource, table: (database: String?, name: String), legend: (text: NSAttributedString, tip: String)? = nil, nullText: String,
+         fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil, transposed: Bool = false) {
+        self.source = source
+        self.table = table
         rows = ReorderedSource(source)
         viewer = GridViewer(source: nil)
         super.init(frame: .zero)
@@ -30,7 +41,24 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         viewer.show(rows, transposed: transposed)
         grid.setAccessibilityLabel("Result rows")
         addSubview(viewer)
-        viewer.pin(to: self)
+        guard let legend else {
+            viewer.pin(to: self)
+            return
+        }
+        let line = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
+        line.attributedStringValue = legend.text
+        line.toolTip = legend.tip
+        line.setAccessibilityIdentifier("grid.legend")
+        addSubview(line)
+        viewer.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            line.topAnchor.constraint(equalTo: topAnchor, constant: 5),
+            line.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
+            line.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
+            viewer.topAnchor.constraint(equalTo: line.bottomAnchor, constant: 5),
+            viewer.leadingAnchor.constraint(equalTo: leadingAnchor), viewer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            viewer.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -43,9 +71,8 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         return menu
     }
 
-    /// The table the rows come from, for the SQL formats: the one every column names, else "table".
-    private var table: (database: String?, name: String) {
-        let columns = source.store.columns
+    /// The table a result's rows come from, for the SQL formats: the one every column names, else "table".
+    static func table(of columns: [ResultStore.Column]) -> (database: String?, name: String) {
         guard let first = columns.first, !first.originalTable.isEmpty,
               columns.allSatisfy({ $0.originalTable == first.originalTable && $0.database == first.database }) else {
             return (nil, "table")
@@ -89,5 +116,26 @@ final class ResultGridView: NSView, DataGridViewDelegate {
             table: table.name, selectedCount: selected.count, selected: { selected.map(values) },
             loadedCount: rows.rowCount, loaded: { (0..<rows.rowCount).map(values) }, all: nil)
         ExportRowsSheet.show(request, activity: ActivityCenter.shared, on: window)
+    }
+}
+
+extension DiffSource: GridBytes {}
+
+extension DiffSource {
+    /// What the colours mean, with the counts ("● 3 only in Production  ● 2 only in Staging  ● 12 changed"), and the
+    /// same in words.
+    var legend: (text: NSAttributedString, tip: String) {
+        let text = NSMutableAttributedString(), font = NSFont.systemFont(ofSize: 11.5)
+        let parts = [(data.missing.count, "only in \(names.first)", NSColor.pendingInsertLine),
+                     (data.extra.count, "only in \(names.second)", NSColor.pendingDeleteLine), (data.changed.count, "changed", NSColor.pendingEditLine)]
+        for (index, (count, words, colour)) in parts.enumerated() {
+            text.append(NSAttributedString(string: (index == 0 ? "" : "    ") + "● ", attributes: [.font: font, .foregroundColor: colour]))
+            text.append(NSAttributedString(string: "\(count.formatted()) \(words)",
+                                           attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor]))
+        }
+        let key = data.key.isEmpty ? "every column" : data.key.joined(separator: ", ")
+        let tip = "Rows only in \(names.first) are green; rows only in \(names.second) are red and struck through; cells that "
+            + "differ are amber: hold the pointer over one to see both values. Rows are matched on \(key)."
+        return (text, tip)
     }
 }

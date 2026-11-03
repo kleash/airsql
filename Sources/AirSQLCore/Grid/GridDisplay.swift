@@ -102,5 +102,6 @@ public final class DisplaySource: GridSource {
 
     public func value(_ row: Int, _ column: Int) -> String? { base.value(row, column) }
     public func mark(_ row: Int, _ column: Int) -> GridMark { base.mark(row, column) }
+    public func note(_ row: Int, _ column: Int) -> String? { base.note(row, column) }
     public func prefetch(_ rows: Range<Int>) { base.prefetch(rows) }
 }

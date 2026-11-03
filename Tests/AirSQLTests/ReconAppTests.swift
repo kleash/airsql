@@ -219,17 +219,25 @@ extension AppTests {
             list.selectRowIndexes(IndexSet(integer: products), byExtendingSelection: false)
             #expect(window.results.detail.tabs.selectedSegment == 0)
             window.results.detail.show(window.results.objects[products], result: window.result!, data: true)
-            #expect(window.results.detail.rows.numberOfRows == 15)
-            // The rows that differ copy as tab-separated text under their columns' names, from their menu and with ⌘C.
-            let rows = window.results.detail.rows
-            let rowMenu = try #require(rows.menu)
-            rowMenu.delegate?.menuNeedsUpdate?(rowMenu)
-            #expect(rowMenu.items.map(\.title) == ["Copy"])
-            rows.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-            window.window?.makeFirstResponder(rows)
-            window.copy(nil)
+            // The rows that differ in the grid: the 3 only in the source (added), then the 12 changed, their price marked
+            // with both values in its tooltip.
+            let rows = try #require(window.results.detail.rows)
+            let diff = try #require(rows.source as? DiffSource)
+            #expect(rows.grid.rowCount == 15 && rows.grid.accessibilityIdentifier() == "recon.rows")
+            #expect((0..<15).map { diff.mark($0, 0) } == Array(repeating: .inserted, count: 3) + Array(repeating: .none, count: 12))
+            #expect(diff.mark(3, 2) == .edited && diff.note(3, 2) == "Staging has 17.50; Production has 19.90" && diff.note(3, 1) == nil)
+            #expect(diff.columns.map(\.isKey) == [true, false, false, false])
+            // Its menu is the grid's (copy formats, Export Rows…, the viewer's), every item in the menu bar; the
+            // selected rows copy under their columns' names.
+            let rowMenu = try #require(rows.viewer.dataGrid(rows.grid, menuFor: .row(0)))
+            #expect(["Copy", "Copy with Headers", "Export Rows…", "Record View"].allSatisfy(rowMenu.items.map(\.title).contains),
+                    "\(rowMenu.items.map(\.title))")
+            rows.grid.selection.selectRow(0)
+            window.window?.makeFirstResponder(rows.grid)
+            rows.viewer.copyWithHeaders(nil)
             let copied = NSPasteboard.general.string(forType: .string)?.components(separatedBy: "\n") ?? []
-            #expect(copied.count == 2 && copied.first?.hasPrefix("Row\t") == true, "\(copied)")
+            #expect(copied == ["id\tname\tprice\tcolour", "13\t" + String(repeating: "Long name ", count: 25) + "\t5.00\tred", ""],
+                    "\(copied)")
             let menu = try #require(list.menu)
             menu.delegate?.menuNeedsUpdate?(menu)
             #expect(menu.items.map(\.title) == ["Copy", "Copy Sync Script", "Leave Out of Next Compare"])

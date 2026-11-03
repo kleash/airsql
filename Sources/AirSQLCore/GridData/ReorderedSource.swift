@@ -16,4 +16,5 @@ public final class ReorderedSource: GridSource {
     public func cell(_ row: Int, _ column: Int) -> GridCell { base.cell(baseRow(row), column) }
     public func mark(_ row: Int, _ column: Int) -> GridMark { base.mark(baseRow(row), column) }
     public func value(_ row: Int, _ column: Int) -> String? { base.value(baseRow(row), column) }
+    public func note(_ row: Int, _ column: Int) -> String? { base.note(baseRow(row), column) }
 }
