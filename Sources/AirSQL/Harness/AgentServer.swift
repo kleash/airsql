@@ -36,13 +36,10 @@ final class AgentServer {
     /// Runs a tool: text (JSON) or an image, `isError` on failure. For an agent (`AgentGate.agent`), what the tool sets off
     /// is the agent's: the gate's checks refuse what only the person at the Mac may do (`AgentGuard`).
     func handle(_ tool: String, _ arguments: [String: Any]) async -> [String: Any] {
-        AgentGuard.refusal = nil
+        let notes = AgentGuard.Notes()
         do {
-            let reply = try await run(tool, arguments)
-            if AgentGate.agent != nil, let refusal = AgentGuard.refusal {
-                AgentGuard.refusal = nil
-                throw Failure(refusal)
-            }
+            let reply = try await AgentGuard.$notes.withValue(notes) { try await run(tool, arguments) }
+            if AgentGate.agent != nil, let refusal = notes.refusal { throw Failure(refusal) }
             return reply
         } catch let failure as Failure {
             return Self.text(["error": failure.message], isError: true, raw: failure.message)
@@ -108,11 +105,13 @@ final class AgentServer {
     /// Runs `action` from a run-loop timer and returns once it has run, or once it has opened a modal loop. It runs as
     /// the agent's whose request this is, if any (so do the tasks it starts).
     static func later(_ action: @escaping () -> Void) async {
-        let agent = AgentGate.agent
+        let agent = AgentGate.agent, notes = AgentGuard.notes
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             RunLoop.main.add(Timer(timeInterval: 0, repeats: false) { _ in
                 continuation.resume()
-                MainActor.assumeIsolated { AgentGate.$agent.withValue(agent) { action() } }
+                MainActor.assumeIsolated {
+                    AgentGate.$agent.withValue(agent) { AgentGuard.$notes.withValue(notes) { action() } }
+                }
             }, forMode: .common)
         }
     }

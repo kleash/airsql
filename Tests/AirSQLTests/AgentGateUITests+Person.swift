@@ -63,18 +63,19 @@ extension AppTests.AgentGateUITests {
             ("read-only", { $0.readOnly = true }), ("safety settings", { $0.safety = SafetySettings.production }),
             ("server, route or login", { $0.host = "elsewhere.example.com" }), ("client tools", { $0.clientPath = "/tmp/mysql" }),
         ]
-        AgentGate.$agent.withValue("Claude Code") {
+        let notes = AgentGuard.Notes()
+        AgentGuard.$notes.withValue(notes) { AgentGate.$agent.withValue("Claude Code") {
             for (what, change) in changes {
                 var changed = local
                 change(&changed)
                 model.save(changed)
-                #expect(AgentGuard.refusal?.contains(what) == true, "\(what): \(AgentGuard.refusal ?? "let through")")
+                #expect(notes.refusal?.contains(what) == true, "\(what): \(notes.refusal ?? "let through")")
             }
             model.data.settings.agentsAllowed = false
             model.data.settings.safety.askBeforeAgentChanges = false
             local.name = "Renamed"
             model.save(local)
-        }
+        } }
         #expect(model.data == before && model.data.settings.agentsAllowed)
         // With the person's "ask" off, an agent may rename; person-only things stay theirs.
         model.data.settings.safety.askBeforeAgentChanges = false

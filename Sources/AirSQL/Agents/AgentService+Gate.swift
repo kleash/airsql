@@ -6,8 +6,19 @@ import AppKit
 /// refusal is noted for the harness's reply.
 @MainActor
 enum AgentGuard {
-    /// Why the last thing an agent tried was refused; the harness reads and clears it.
-    static var refusal: String?
+    /// Where one request's refusal goes: the harness binds one per tool call (calls run side by side), and its actions
+    /// carry it along as they carry the agent.
+    @MainActor final class Notes {
+        var refusal: String?
+    }
+
+    @TaskLocal static var notes: Notes?
+
+    /// Why the request being carried out was refused, if it was.
+    static var refusal: String? {
+        get { notes?.refusal }
+        set { notes?.refusal = newValue }
+    }
 
     /// While an agent's request is carried out: notes `message` and returns true (refused); the person's own: false.
     static func refuses(_ message: @autoclosure () -> String) -> Bool {
