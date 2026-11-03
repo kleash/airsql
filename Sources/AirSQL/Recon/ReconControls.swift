@@ -93,16 +93,26 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         guard let saved = connection, let connect = ReconWindowController.connect else { return }
         spinner.startAnimation(nil)
         loading = Task { [weak self] in
-            var names: [String] = []
-            if let session = try? await connect(saved).toolsSession() {
-                names = ((try? await session.rows("SHOW DATABASES")) ?? []).compactMap { $0.first ?? nil }
-                    .filter { !["information_schema", "performance_schema"].contains($0.lowercased()) }
+            var names: [String] = [], failure: String?
+            do {
+                let session = try await connect(saved).toolsSession()
+                do {
+                    names = try await session.rows("SHOW DATABASES").compactMap { $0.first ?? nil }
+                        .filter { !["information_schema", "performance_schema"].contains($0.lowercased()) }
+                } catch {
+                    failure = error.localizedDescription
+                }
                 await session.close()
+            } catch {
+                failure = error.localizedDescription
             }
             guard let self, !Task.isCancelled else { return }
             self.spinner.stopAnimation(nil)
             self.databases.removeAllItems()
             self.databases.addItems(withObjectValues: names)
+            // Why the list is empty, where the person looks for it; a name can still be typed.
+            self.databases.toolTip = failure.map { "Couldn't list the databases: \($0)" } ?? "Choose or type the database on this connection"
+            self.databases.placeholderString = failure == nil ? "Database" : "Couldn't connect"
         }
     }
 

@@ -24,8 +24,6 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
     private let rowsScroll = NSScrollView()
     private var object: ReconObject?
     private var result: ReconResult?
-    /// The script's steps by object ("table orders"), with destructive steps ("all") and without ("safe").
-    private var steps: [String: [String: [ReconStep]]] = [:]
 
     override init() {
         super.init()
@@ -115,7 +113,6 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
     var includeDestructive: Bool { destructive.state == .on }
 
     func show(_ object: ReconObject?, result: ReconResult, data: Bool? = nil) {
-        if self.result.map({ $0.objects != result.objects }) ?? true { steps = [:] }
         self.object = object
         self.result = result
         if let data { tabs.selectedSegment = data ? 1 : 0 }
@@ -154,11 +151,10 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
             return
         }
         if showsData { showRows(object) } else { showStructure(object, result) }
-        let key = includeDestructive ? "all" : "safe"
-        if steps[key] == nil {
-            steps[key] = Dictionary(grouping: result.steps(destructive: includeDestructive)) { "\($0.objectKind) \($0.object)" }
-        }
-        let own = steps[key]?["\(object.kind) \(object.name)"] ?? []
+        // The object's own steps: its script alone, in the same order as within the whole script.
+        var alone = result
+        alone.objects = [object]
+        let own = alone.steps(destructive: includeDestructive)
         text(script).string = own.isEmpty ? "-- Nothing to sync for \(object.name)" + (object.differs && !includeDestructive
             ? ": what differs only goes away with destructive steps" : "")
             : own.prefix(200).map { $0.sql + ";" }.joined(separator: "\n\n")
