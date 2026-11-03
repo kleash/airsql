@@ -111,7 +111,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         split.splitView.autosaveName = layoutName("Sidebar")
 
         let root = NSViewController()
-        let rootView = NSView()
+        let rootView = FileDropView()
+        rootView.registerForDraggedTypes([.fileURL])
+        rootView.open = { [weak self] in self?.openFiles($0) }
         tint.translatesAutoresizingMaskIntoConstraints = false
         tint.setAccessibilityIdentifier("tint")
         rootView.addSubview(tint)
@@ -385,6 +387,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         tabBar.buttons[safe: index]?.beginRename()
     }
 
+    /// F2 where the focus has nothing to rename of its own (the tree and the database view do): the tab shown.
+    @objc func renameSelection(_ sender: Any?) { renameTab(sender) }
+
     @objc func revealInFinder(_ sender: Any?) {
         guard let url = selectedTab?.tabContent?.fileURL else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
@@ -448,12 +453,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.newQuery.action?:
             enabled = activeConnection != nil || sidebar.focusedDatabase != nil
             reason = "Select one connection in the sidebar first"
-        case Commands.closeTab.action?, Commands.renameTab.action?:
+        case Commands.closeTab.action?, Commands.renameTab.action?, Commands.renameF2.action?:
             enabled = selectedTab != nil
             reason = "No tab is open"
-            if item.action == Commands.renameTab.action, let tab = selectedTab, tab.tabContent?.canRename != true {
+            if item.action != Commands.closeTab.action, let tab = selectedTab, tab.tabContent?.canRename != true {
                 enabled = false
                 reason = "This tab is named after what it shows"
+            }
+            if item.action == Commands.renameF2.action, window?.firstResponder is DataGridView {
+                enabled = false  // F2 in a grid is the grid's: it gets the key
+                reason = "F2 edits in the grid"
             }
         case Commands.closeOtherTabs.action?:
             enabled = tabs.count > 1
@@ -511,6 +520,23 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool { true }
+}
+
+/// The window's root view: .sql files dropped anywhere on the window (the sidebar, a tab, the empty window; the
+/// console's editor takes its own) open in console tabs of the active connection.
+final class FileDropView: NSView {
+    var open: (([URL]) -> Void)?
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        SQLEditorView.sqlFiles(sender).isEmpty ? [] : .copy
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let files = SQLEditorView.sqlFiles(sender)
+        guard !files.isEmpty, let open else { return false }
+        open(files)
+        return true
+    }
 }
 
 /// The split between the sidebar and the content: Hide Sidebar collapses the sidebar (it isn't a source-list sidebar,

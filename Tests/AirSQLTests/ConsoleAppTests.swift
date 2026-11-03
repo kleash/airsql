@@ -227,6 +227,10 @@ extension AppTests {
             #expect(panel.table.numberOfRows > 2)
             #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "orders o")
             panel.table.selectRowIndexes([2], byExtendingSelection: false)
+            // Dragged into the editor, a column drops what a double-click inserts (quoted as completion quotes it).
+            let name = try #require((panel.table.view(atColumn: 0, row: 2, makeIfNecessary: true) as? NSTextField)?.stringValue)
+            let dragged = panel.tableView(panel.table, pasteboardWriterForRow: 2) as? NSPasteboardItem
+            #expect(dragged?.string(forType: .string) == SQLCompletion.quote(name) && panel.tableView(panel.table, pasteboardWriterForRow: 0) == nil)
             panel.insertSelected(nil)
             #expect(console.text.hasPrefix("SELECT customer_id FROM") || console.text.hasPrefix("SELECT id FROM"), "\(console.text)")
             panel.choice.selectedSegment = 1
@@ -234,6 +238,23 @@ extension AppTests {
             #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "Aggregate")
             #expect(await call(harness, "menu", ["path": "View > Query Helpers"]).error == nil)
             #expect(!console.helpersShown)
+        }
+
+        /// .sql files dropped anywhere on the window (the root view takes what no view under the pointer does) open in
+        /// console tabs of the active connection.
+        @Test func sqlFilesDroppedOnTheWindowOpenInConsoles() async throws {
+            let file = URL(fileURLWithPath: try scratch() + "/dropped.sql")
+            try "SELECT 'dropped';".write(to: file, atomically: true, encoding: .utf8)
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.sidebar.select([Fixtures.local.id])
+            main.sidebarSelectionChanged()
+            let root = try #require(main.window?.contentView as? FileDropView)
+            #expect(root.registeredDraggedTypes.contains(.fileURL))
+            root.open?([file])
+            #expect(await eventually(timeout: 5) { (main.selectedTab?.content as? ConsoleViewController)?.fileURL == file })
+            #expect(main.selectedTab?.connectionID == Fixtures.local.id && main.selectedTab?.title == "dropped.sql")
+            for tab in main.tabs { main.close(tab) }
         }
 
         @Test func filesOpenSaveAndTabsComeBackAfterRelaunch() async throws {

@@ -303,6 +303,44 @@ extension AppTests {
             #expect(main.model.connection(Fixtures.local.id)?.colour == .test && main.model.connection(Fixtures.staging.id)?.colour == .test)
         }
 
+        /// F2 renames what has the focus, as in HeidiSQL: the tree's table (Rename…), a folder (Rename Folder…), else the tab
+        /// shown. In a grid it is the grid's (editing the cell, the grid lanes'), so the window leaves it to the grid.
+        @Test func f2RenamesWhatHasTheFocus() async throws {
+            let (main, harness, _, work) = await Self.window()
+            defer { work.end() }
+            let window = try #require(main.window)
+            window.layoutIfNeeded()
+            func renamed(_ select: (Double, Double)?, field id: String) async throws -> String? {
+                let point = try #require(select)
+                _ = await call(harness, "click", ["x": point.0, "y": point.1])
+                #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                let sheet = try #require(window.attachedSheet?.contentView)
+                let name = find(NSTextField.self, id: id, in: sheet)?.stringValue
+                _ = await call(harness, "press", ["title": "Cancel", "in": "sheet"])
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                return name
+            }
+            let orders = DatabaseObject(.table, "airsql_fixture", "orders")
+            #expect(try await renamed(treeRow(main, .object(Fixtures.production.id, orders))?.point, field: "rename.name") == "orders")
+            #expect(try await renamed(folderRow(main, Self.folder.name), field: "folder.name") == Self.folder.name)
+
+            // In a console, the tab's name in place; in its result grid, nothing of the window's.
+            window.makeFirstResponder(nil)
+            let console = try #require(main.openConsole(text: "SELECT 1", title: nil, connection: Fixtures.production.id).content
+                                       as? ConsoleViewController)
+            #expect(await eventually(timeout: 5) { window.firstResponder === console.editor })  // as the tab appeared
+            #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+            #expect(tabButton(main, main.selectedTab?.title ?? "").renameField != nil)
+            window.makeFirstResponder(nil)
+            let grid = DataGridView()
+            console.view.addSubview(grid)
+            window.makeFirstResponder(grid)
+            let item = try #require(harness.menuItems(for: try KeyCombo("f2")).first)
+            #expect(!main.validateMenuItem(item) && tabButton(main, main.selectedTab?.title ?? "").renameField == nil)
+            grid.removeFromSuperview()
+        }
+
         /// Full keyboard use: Tab goes from field to field of what is shown, though the window's content changes.
         @Test func tabGoesOnIntoWhatIsShown() async throws {
             /// The ids of the views Tab reaches, `count` times from the first responder (through a field editor, as the key).

@@ -191,6 +191,11 @@ extension SidebarController: NSMenuItemValidation {
         NavigatorActions.rename(object, on: open, window: view.window)
     }
 
+    /// F2 in the sidebar: Rename Folder… on a folder, else Rename… on the tree's table or view.
+    @objc func renameSelection(_ sender: Any?) {
+        if selectedFolderNodeID != nil { main?.renameFolder(sender) } else { renameObject(sender) }
+    }
+
     @objc func copyTable(_ sender: Any?) {
         guard let open = treeSelection?.open, let table = selectedObjects.first else { return }
         NavigatorActions.copyTable(table, on: open, window: view.window)
@@ -237,6 +242,11 @@ extension SidebarController: NSMenuItemValidation {
             reason = open ? nil : "Select a connected connection or something in its tree first"
         case Commands.expandAll.action?, Commands.collapseAll.action?:
             reason = selectedNodes.contains { !$0.children.isEmpty } ? nil : "Select a row that has rows under it first"
+        case Commands.renameF2.action? where selectedFolderNodeID != nil:
+            reason = nil
+        case Commands.renameF2.action?:
+            reason = NavigatorActions.reason(for: Commands.rename.action, objects: selectedObjects, databases: selectedDatabases,
+                                             open: selection?.open, target: targetOpen, model: model)
         default:
             reason = NavigatorActions.reason(for: item.action, objects: selectedObjects, databases: selectedDatabases,
                                              open: selection?.open, target: targetOpen, model: model)

@@ -44,7 +44,8 @@ enum MainMenu {
         menus.app.add([nil, Commands.hide, Commands.hideOthers, Commands.showAll, nil, Commands.quit])
 
         menus.file.add([Commands.newConnection, Commands.newQuery, nil, Commands.closeTab, Commands.closeOtherTabs,
-                        Commands.closeWindow, nil, Commands.duplicateTab, Commands.renameTab, Commands.revealInFinder])
+                        Commands.closeWindow, nil, Commands.duplicateTab, Commands.renameTab, Commands.renameF2,
+                        Commands.revealInFinder])
 
         menus.edit.add([Commands.undo, Commands.redo, nil, Commands.cut, Commands.copy, Commands.paste, Commands.delete,
                         Commands.selectAll, nil])

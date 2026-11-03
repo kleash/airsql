@@ -23,6 +23,7 @@ import AppKit
     @objc optional func closeOtherTabs(_ sender: Any?)
     @objc optional func duplicateTab(_ sender: Any?)
     @objc optional func renameTab(_ sender: Any?)
+    @objc optional func renameSelection(_ sender: Any?)
     @objc optional func revealInFinder(_ sender: Any?)
     @objc optional func runSQLFile(_ sender: Any?)
     @objc optional func importCSV(_ sender: Any?)
@@ -225,7 +226,7 @@ struct Command {
         let names: [String: String] = ["\r": "↩", "\u{8}": "⌫", "\u{7f}": "⌫", "\t": "⇥", "\u{1b}": "⎋", " ": "Space",
                                        String(UnicodeScalar(NSDownArrowFunctionKey)!): "↓",
                                        String(UnicodeScalar(NSUpArrowFunctionKey)!): "↑",
-                                       String(UnicodeScalar(NSF9FunctionKey)!): "F9"]
+                                       String(UnicodeScalar(NSF9FunctionKey)!): "F9", String(UnicodeScalar(NSF2FunctionKey)!): "F2"]
         return (flags.contains(.control) ? "⌃" : "") + (flags.contains(.option) ? "⌥" : "")
             + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "") + (names[key] ?? key.uppercased())
     }
@@ -235,6 +236,7 @@ private func sel(_ name: String) -> Selector { NSSelectorFromString(name) }
 
 private let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
 private let f9 = String(UnicodeScalar(NSF9FunctionKey)!)
+private let f2 = String(UnicodeScalar(NSF2FunctionKey)!)
 
 /// Every command, by menu: the shortcut map (no shortcut is taken twice, and none that macOS keeps for itself:
 /// `CommandsTests`). Settled for every lane in P0 (plan §2.4): ⌘↩ only runs; ⌘S saves a console's file and applies
@@ -273,7 +275,12 @@ enum Commands {
                                 tip: "Save the console's text to a new .sql file")
     static let duplicateTab = Command("Duplicate Tab", #selector(AirSQLActions.duplicateTab(_:)),
                                       tip: "Open a copy of the tab shown next to it")
-    static let renameTab = Command("Rename Tab…", #selector(AirSQLActions.renameTab(_:)), tip: "Give the tab shown a name of your own")
+    static let renameTab = Command("Rename Tab…", #selector(AirSQLActions.renameTab(_:)),
+                                   tip: "Give the tab shown a name of your own (F2 outside the tree and grids)")
+    /// F2, as in HeidiSQL: renames what has the focus (the tree's table, view or folder; else the tab shown). In a grid, F2
+    /// is the grid's own (editing the cell, the grid lanes'), so the window leaves it alone there.
+    static let renameF2 = Command("Rename", #selector(AirSQLActions.renameSelection(_:)), f2, [], hidden: true,
+                                  tip: "Rename what is selected: a table, view or folder in the tree, else the tab (F2)")
     static let revealInFinder = Command("Reveal in Finder", #selector(AirSQLActions.revealInFinder(_:)),
                                         tip: "Show the tab's .sql file in Finder")
     static let runSQLFile = Command("Run SQL File…", #selector(AirSQLActions.runSQLFile(_:)),
@@ -499,7 +506,7 @@ enum Commands {
     static let truncate = Command("Truncate…", #selector(AirSQLActions.truncateTable(_:)),
                                   tip: "Delete every row of the selected tables (asks first)")
     static let rename = Command("Rename…", #selector(AirSQLActions.renameObject(_:)),
-                                tip: "Rename the selected table or view (shows the SQL first)")
+                                tip: "Rename the selected table or view, showing the SQL first (F2 in the tree)")
     static let drop = Command("Drop…", #selector(AirSQLActions.dropObject(_:)),
                               tip: "Delete the selected objects from the server (asks first and shows the SQL)")
     static let expandAll = Command("Expand All", #selector(AirSQLActions.expandAll(_:)), tip: "Open every folder under this one")
@@ -545,7 +552,7 @@ enum Commands {
     static let newFolder = Command("New Folder…", #selector(AirSQLActions.newFolder(_:)),
                                    tip: "Make a sidebar folder for connections; the selected connections move into it")
     static let renameFolder = Command("Rename Folder…", #selector(AirSQLActions.renameFolder(_:)),
-                                      tip: "Give the selected sidebar folder another name")
+                                      tip: "Give the selected sidebar folder another name (F2)")
     static let deleteFolder = Command("Delete Folder…", #selector(AirSQLActions.deleteFolder(_:)),
                                       tip: "Remove the selected folder; its connections stay, outside any folder")
 
@@ -610,7 +617,8 @@ enum Commands {
     /// Every command above, for the checks (the tab commands once).
     static let all: [Command] = [
         about, settings, hide, hideOthers, showAll, quit,
-        newConnection, newQuery, open, closeTab, closeOtherTabs, closeWindow, save, saveAs, duplicateTab, renameTab, revealInFinder,
+        newConnection, newQuery, open, closeTab, closeOtherTabs, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
+        revealInFinder,
         runSQLFile, importCSV, importSSHConfig,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,

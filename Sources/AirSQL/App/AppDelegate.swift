@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Agents' socket and tools (L7), while Settings ▸ Agents allows agents.
     private(set) var agents: AgentService?
     private var observers: [AnyCancellable] = []
+    /// .sql files asked for before the window was up (those that opened AirSQL).
+    private var filesToOpen: [URL] = []
 
     /// main.swift creates the delegate outside the main actor; everything is set up at launch.
     nonisolated override init() {
@@ -60,6 +62,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         main.showWindow(nil)
         ConsoleDocuments.shared.restore(into: main)
+        if !filesToOpen.isEmpty { main.openFiles(filesToOpen) }
+        filesToOpen = []
         NSApp.activate(ignoringOtherApps: true)
         log.log("launched with \(model.data.connections.count, privacy: .public) connection(s)")
     }
@@ -71,6 +75,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    /// .sql files opened from Finder or dropped on the Dock icon: console tabs of the active connection.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let main else { return filesToOpen += urls }
+        main.showWindow(nil)
+        main.openFiles(urls)
+    }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 

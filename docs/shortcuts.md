@@ -11,6 +11,9 @@ the pointer over a menu item to see what it does. A greyed-out item says why it 
 ⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
 Tab indents, ⌃⇥ moves on.
 
+F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar, else the tab shown
+(a console that isn't saved in a file). In a grid, F2 is the grid's.
+
 The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delete.
 
 | Command | Shortcut |
@@ -27,6 +30,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Close Window | ⇧⌘W |
 | Save | ⌘S |
 | Save As… | ⇧⌘S |
+| Rename | F2 |
 | Undo | ⌘Z |
 | Redo | ⇧⌘Z |
 | Cut | ⌘X |

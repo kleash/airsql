@@ -13,9 +13,11 @@ own session, which every console tab of that connection shares.
 - **File ▸ New Query** (⌘T), the **+** at the end of the tabs, or **New Query** on a connection's menu opens an empty
   console on the selected connection. **New Query** on a database's menu (or ⌘T while a database is selected in the
   sidebar) makes that database the current one first.
-- **File ▸ Open…** (⌘O) opens .sql files, each in a console of its own. You can also drop .sql files on the editor.
+- **File ▸ Open…** (⌘O) opens .sql files, each in a console of its own. You can also drop .sql files anywhere on the
+  window or on AirSQL's Dock icon, or open them with AirSQL from Finder: they open on the connection shown.
 - **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
+- Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
 - When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL.
 - **Query ▸ Change Connection…** runs the console's statements on another connection.
 
@@ -28,7 +30,8 @@ own session, which every console tab of that connection shares.
   ⌥⎋ opens it anywhere. It comes from what AirSQL already read of the schema: nothing is sent to the server while you
   type.
 - **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names, the
-  server's functions by kind, and the keywords. Double-click one to put it in at the cursor.
+  server's functions by kind, and the keywords. Double-click one to put it in at the cursor, or drag it into the editor
+  (a column's name comes quoted where it needs to be, as completion puts it in).
 - **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression** and **Match
   Case**. With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
