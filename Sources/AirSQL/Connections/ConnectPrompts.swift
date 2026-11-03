@@ -81,6 +81,27 @@ extension Connector {
         } }
     }
 
+    /// A dialog login's further question (a PAM code), asked on the window of the latest connect: called on the
+    /// session's thread, which waits for the answer.
+    nonisolated func askDialog(_ prompt: String, secret: Bool) -> String? {
+        let answer = DialogAnswer()
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                guard let window = self.promptWindow else {
+                    answer.done.signal()
+                    return
+                }
+                showSSHPrompt(secret ? .passphrase : .other, text: prompt, hop: nil, title: "The database server asks",
+                              canRemember: false, retry: false, on: window) { reply, _ in
+                    answer.text = reply
+                    answer.done.signal()
+                }
+            }
+        }
+        answer.done.wait()
+        return answer.text
+    }
+
     /// The hop a password or passphrase prompt is for: by its user@host, or its key file.
     static func hop(asking request: AskpassRequest, in saved: SavedConnection) -> SSHHop? {
         let hops = saved.sshHops
@@ -145,4 +166,10 @@ extension Connector {
         let details = error.details.split(whereSeparator: \.isNewline).suffix(3).joined(separator: "\n")
         showError(error.message + (details.isEmpty ? "" : "\n\n" + details), title: "Can't connect to “\(connection)”", on: window)
     }
+}
+
+/// A dialog login's answer, handed from the main thread to the session's.
+private final class DialogAnswer: @unchecked Sendable {
+    let done = DispatchSemaphore(value: 0)
+    var text: String?
 }

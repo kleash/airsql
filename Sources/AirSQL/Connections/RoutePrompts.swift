@@ -27,7 +27,7 @@ func showSSHPrompt(_ kind: PromptKind, text: String, hop: String?, title: String
     }
     let field = NSSecureTextField(frame: NSRect(x: 0, y: canRemember ? 28 : 0, width: 300, height: 22))
     field.placeholderString = kind == .passphrase ? "Passphrase" : kind == .other ? "Answer" : "Password"
-    field.toolTip = "Type the answer: it goes to ssh only, never into a log or a command line"
+    field.toolTip = "Type the answer: it goes to the server that asked only, never into a log or a command line"
     field.setAccessibilityIdentifier("prompt.answer")
     let remember = NSButton(checkboxWithTitle: "Remember in Keychain", target: nil, action: nil)
     remember.toolTip = "Save it in your Keychain once the connection works, so the next connect doesn't ask"
@@ -37,7 +37,7 @@ func showSSHPrompt(_ kind: PromptKind, text: String, hop: String?, title: String
     accessory.addSubview(field)
     if canRemember { accessory.addSubview(remember) }
     alert.accessoryView = accessory
-    alert.addButton(withTitle: "OK").toolTip = "Send the answer to ssh"
+    alert.addButton(withTitle: "OK").toolTip = "Send the answer to the server that asked"
     alert.addButton(withTitle: "Cancel").toolTip = "Don't answer: connecting stops"
     alert.window.initialFirstResponder = field
     alert.beginSheetModal(for: window) { response in

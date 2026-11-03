@@ -92,6 +92,23 @@ import Testing
         }
     }
 
+    /// A PAM account logs in with the dialog plugin, its password in plain text: only over TLS that proves the server.
+    @Test func pamLogsInOnlyOverVerifiedTLS() async throws {
+        var pam = connection(to: Lab.secure, route: .ssh, login: Lab.pam)
+        pam.cleartextLogin = true
+        let (route, session, _) = try await connect(pam, password: Lab.pam.password)
+        #expect(try await value(session, "SELECT CURRENT_USER()")?.hasPrefix("pam@") == true)
+        await session.disconnect()
+        route.close()
+        pam.tls = TLSOptions(mode: .required)
+        do {
+            _ = try await connect(pam, password: Lab.pam.password)
+            Issue.record("a PAM login went over TLS that doesn't prove the server")
+        } catch let error as AirSQLError {
+            #expect(error.kind == .loginMethodNotAllowed, "\(error.message)")
+        }
+    }
+
     /// wrongname's certificate is for another name: refused through the tunnel and through a proxy, as it would be
     /// directly.
     @Test func theWrongNameIsRefusedOnEveryRoute() async throws {

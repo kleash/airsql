@@ -44,6 +44,8 @@ final class Connector {
     var remembered: [UUID: [String: String]] = [:]
     /// The prompts a connect shows, closed when it is cancelled or fails.
     var sheets: [UUID: [NSWindow]] = [:]
+    /// The window of the latest connect, where a dialog login's further questions show (`LoginDialog`).
+    weak var promptWindow: NSWindow?
 
     init(model: AppModel) {
         self.model = model
@@ -51,6 +53,8 @@ final class Connector {
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
             [weak self] _ in MainActor.assumeIsolated { self?.closeEverything() }
         }
+        _ = LoginDialog.function
+        LoginDialog.ask = { [weak self] prompt, secret in self?.askDialog(prompt, secret: secret) }
     }
 
     func isConnecting(_ id: UUID) -> Bool { connecting[id] != nil }
@@ -62,6 +66,7 @@ final class Connector {
             self?.cancel(id)
         }
         model.states[id] = .connecting(step: "Starting")
+        promptWindow = window
         let task = Task { [weak self] in
             guard let self else { return }
             await self.run(saved, on: window, activity: activity)
@@ -183,6 +188,7 @@ final class Connector {
     func test(_ draft: SavedConnection, password: String?, proxyPassword: String?, on window: NSWindow?,
               step: @escaping (String) -> Void) async throws -> (summary: String, draft: SavedConnection) {
         var tested = draft
+        promptWindow = window
         defer {
             remembered[draft.id] = nil
             closePrompts(draft.id)
