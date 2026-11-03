@@ -65,7 +65,10 @@ extension AppTests {
         #expect(await eventually(timeout: 10) { model.savedPassword(tunnelled.secretKey(for: tunnelled.sshHost)) == Lab.bastion.password })
         let version = try await model.connector.open[tunnelled.id]?.connection.session(.main).query("SELECT VERSION()")
         #expect(version?.first?.rows?.string(0, 0)?.hasPrefix(Lab.secure.version) == true)
+        // The navigator's schema loads through the tunnel, and goes at Disconnect.
+        #expect(await eventually(timeout: 30) { model.openConnection(tunnelled.id)?.snapshot.server != nil })
         #expect(await call(harness, "menu", ["path": "Connection > Disconnect"]).error == nil)
+        #expect(model.openConnection(tunnelled.id) == nil)
         #expect(await eventually(timeout: 10) { !FileManager.default.fileExists(atPath: socket) })
     }
 }

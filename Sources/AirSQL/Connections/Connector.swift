@@ -5,7 +5,8 @@ import AppKit
 /// ending in a private Unix socket), logs in with the Keychain's password or the person's, trusts and pins a server
 /// certificate macOS doesn't know (the Trust sheet), and keeps the sessions alive. Each step shows in the connection's
 /// state and in the status bar's activity, with Cancel. A dropped route or session is reported, never re-made silently.
-/// Other parts reach a connected connection's sessions through `open[id]?.connection`.
+/// Other parts reach a connected connection's sessions through `open[id]?.connection`; once connected, its schema
+/// cache is `AppModel.open[id]` (`attach`), emptied again at Disconnect or a drop.
 @MainActor
 final class Connector {
     /// A connected connection: its sessions, what the server said at login, and the route under them.
@@ -95,6 +96,7 @@ final class Connector {
     func disconnect(_ id: UUID) {
         cancel(id)
         model.states[id] = nil
+        model.detach(id)
         guard let connected = open.removeValue(forKey: id) else { return }
         Task { await connected.close() }
     }
@@ -130,6 +132,7 @@ final class Connector {
             let connected = Open(connection: connection, server: server, route: route)
             open[id] = connected
             model.states[id] = .connected(server: Self.serverName(server))
+            model.attach(connection, to: id, includes: saved.showsDatabase)
             saveRemembered(id)
             watch(connected, id: id)
         } catch {
@@ -261,6 +264,7 @@ final class Connector {
     private func dropped(_ id: UUID, _ connected: Open?, _ message: String) {
         guard let connected, open[id] === connected else { return }
         open[id] = nil
+        model.detach(id)
         model.states[id] = .failed(message)
         Task { await connected.close() }
     }
