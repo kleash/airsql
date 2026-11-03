@@ -109,6 +109,51 @@ func textField(_ value: String, placeholder: String, id: String, tip: String, wi
     return field
 }
 
+/// A field over a title that renames in place (a tab, a result tab): its text chosen, Return keeps the new name and
+/// Escape the old one. `done` gets the new name, or nil when the name stays as it was.
+final class RenameField: NSTextField, NSTextFieldDelegate {
+    private weak var title: NSTextField?
+    private var done: ((String?) -> Void)?
+
+    /// Shows the field with `text` at `frame` in `title`'s superview, over `title` (hidden meanwhile), with the focus.
+    @discardableResult
+    static func show(_ text: String, over title: NSTextField, frame: NSRect, id: String, tip: String,
+                     done: @escaping (String?) -> Void) -> RenameField {
+        let field = RenameField(string: text)
+        field.font = title.font
+        field.focusRingType = .none
+        field.delegate = field
+        field.toolTip = tip
+        field.setAccessibilityIdentifier(id)
+        field.frame = frame
+        field.title = title
+        field.done = done
+        title.superview?.addSubview(field)
+        title.isHidden = true
+        field.window?.makeFirstResponder(field)
+        field.currentEditor()?.selectAll(nil)
+        return field
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        end(keep: false)
+        return true
+    }
+
+    func controlTextDidEndEditing(_ notification: Notification) { end(keep: true) }
+
+    private func end(keep: Bool) {
+        guard let done else { return }
+        self.done = nil
+        delegate = nil
+        removeFromSuperview()
+        title?.isHidden = false
+        let text = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        done(keep && !text.isEmpty ? text : nil)
+    }
+}
+
 /// A form: labels right-aligned in the first column, controls (with their captions under them) in the second, as
 /// System Settings' older panes and AirSCP's forms lay them out.
 final class Form {

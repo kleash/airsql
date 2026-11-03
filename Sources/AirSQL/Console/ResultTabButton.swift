@@ -4,13 +4,13 @@ import AppKit
 /// handled here, without AppKit's tracking loop: a click shows it, a double-click renames it, a right-click opens its
 /// menu.
 @MainActor
-final class ResultTabButton: NSView, NSTextFieldDelegate {
+final class ResultTabButton: NSView {
     private weak var bar: ResultsView?
     private(set) weak var tab: ResultTab?
     private let title = NSTextField(labelWithString: "")
     private let pin = NSImageView()
     private var selected = false
-    private var editor: NSTextField?
+    private var editor: RenameField?
 
     init(bar: ResultsView) {
         self.bar = bar
@@ -86,38 +86,13 @@ final class ResultTabButton: NSView, NSTextFieldDelegate {
 
     func beginRename() {
         guard editor == nil, let tab else { return }
-        let field = NSTextField(string: tab.title)
-        field.font = title.font
-        field.focusRingType = .none
-        field.delegate = self
-        field.toolTip = "Type the result's new name; Return keeps it, Escape leaves it as it was"
-        field.setAccessibilityIdentifier("console.resultRename")
-        field.frame = NSRect(x: 4, y: (bounds.height - 18) / 2, width: max(120, bounds.width - 8), height: 18)
-        addSubview(field)
-        title.isHidden = true
-        editor = field
-        window?.makeFirstResponder(field)
-        field.currentEditor()?.selectAll(nil)
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        if selector == #selector(NSResponder.cancelOperation(_:)) {
-            endRename(keep: false)
-            return true
+        let frame = NSRect(x: 4, y: (bounds.height - 18) / 2, width: max(120, bounds.width - 8), height: 18)
+        editor = RenameField.show(tab.title, over: title, frame: frame, id: "console.resultRename",
+                                  tip: "Type the result's new name; Return keeps it, Escape leaves it as it was") { [weak self] name in
+            guard let self else { return }
+            self.editor = nil
+            if let name { self.bar?.renamed(self, to: name) }
         }
-        return false
-    }
-
-    func controlTextDidEndEditing(_ notification: Notification) { endRename(keep: true) }
-
-    private func endRename(keep: Bool) {
-        guard let field = editor else { return }
-        editor = nil
-        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        field.delegate = nil
-        field.removeFromSuperview()
-        title.isHidden = false
-        if keep, !text.isEmpty { bar?.renamed(self, to: text) }
     }
 
     /// The renaming field, while it is shown (tests).
