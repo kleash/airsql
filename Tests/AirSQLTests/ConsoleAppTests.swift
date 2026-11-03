@@ -289,7 +289,7 @@ extension AppTests {
             opened.saveQuery(nil)
             #expect(await eventually(timeout: 5) { !opened.isEdited })
             #expect(try String(contentsOf: file, encoding: .utf8) == "SELECT 1;\nSELECT 2;")
-            main.openFiles([file])
+            await main.openFiles([file]).value
             #expect(main.tabs.count == 2, "a file already open shows its tab")
 
             // Quit and launch again: both come back, in order, with their text and connection.
@@ -298,12 +298,16 @@ extension AppTests {
             ConsoleDocuments.shared.saveNow()
             let (relaunched, _) = appWindow(testModel(Fixtures.shop))
             ConsoleDocuments.shared.restore(into: relaunched)
-            #expect(await eventually(timeout: 5) { relaunched.tabs.count == 2 })
+            // The file opened from Finder as AirSQL starts: its tab coming back shows, with its unsaved text, not a second.
+            await relaunched.openFiles([file]).value
             let restored = relaunched.tabs.compactMap { $0.content as? ConsoleViewController }
             #expect(relaunched.tabs.map(\.title) == ["Query 1", "top customers.sql"])
             #expect(restored.first?.text == untitled.text && restored.first?.connectionID == Fixtures.production.id)
             #expect(restored.last?.text == "SELECT 1;\nSELECT 2;\n-- not saved yet" && restored.last?.isEdited == true)
             #expect(restored.last?.fileURL == file)
+            relaunched.select(relaunched.tabs[0])
+            await relaunched.openFiles([file]).value
+            #expect(relaunched.tabs.count == 2 && relaunched.selectedTab === relaunched.tabs[1], "opened again: its tab shows")
             ConsoleDocuments.shared.fileURL = ConsoleTabStore.fileURL
         }
 

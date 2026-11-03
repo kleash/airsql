@@ -12,6 +12,9 @@ final class ConsoleDocuments {
     var fileURL = ConsoleTabStore.fileURL
     /// The window whose console tabs are kept: the one they were restored into, else the first a console is shown in.
     weak var main: MainWindowController?
+    /// The last session's consoles coming back: files opened meanwhile (from Finder, at launch) wait for them, so a file
+    /// among them shows its tab instead of a second one.
+    private(set) var restoring: Task<Void, Never>?
     private var pending: DispatchWorkItem?
     private let queue = DispatchQueue(label: "com.kleash.airsql.consoles")
 
@@ -74,7 +77,7 @@ final class ConsoleDocuments {
     func restore(into main: MainWindowController) {
         self.main = main
         let url = fileURL
-        Task {
+        restoring = Task {
             // Each console's text, and the text of its file (what was last saved).
             let saved = await Task.detached { () -> [(SavedConsole, String, String)] in
                 ConsoleTabStore.load(from: url).compactMap { console in

@@ -50,18 +50,20 @@ extension MainWindowController: AgentConsoles {
     }
 
     /// Opens each file in a console tab of the active connection (reading them off the main thread); a file already
-    /// open shows its tab.
-    func openFiles(_ urls: [URL]) {
+    /// open shows its tab, also one of the last session's tabs coming back or one opened while the file was read.
+    @discardableResult
+    func openFiles(_ urls: [URL]) -> Task<Void, Never> {
         let connection = activeConnection?.id
-        Task {
+        return Task {
+            await ConsoleDocuments.shared.restoring?.value
             for url in urls {
+                let read = await Task.detached { () -> Result<String, Error> in
+                    Result { try String(contentsOf: url, encoding: .utf8) }
+                }.value
                 if let tab = tabs.first(where: { ($0.content as? ConsoleViewController)?.fileURL == url }) {
                     select(tab)
                     continue
                 }
-                let read = await Task.detached { () -> Result<String, Error> in
-                    Result { try String(contentsOf: url, encoding: .utf8) }
-                }.value
                 switch read {
                 case .success(let text): openConsole(text: text, title: nil, connection: connection, fileURL: url)
                 case .failure(let error):
