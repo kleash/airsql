@@ -78,6 +78,7 @@ extension MainWindowController: AgentConsoles {
 extension ConsoleViewController: AgentConsole {
     var agentText: String { text }
     var agentDatabase: String? { database }
+    var agentNoBackslashEscapes: Bool { editor.noBackslashEscapes }
 
     var agentLastRun: AgentConsoleRun? {
         if let run = running, run.kind != .explain, run.statements.indices.contains(run.index),

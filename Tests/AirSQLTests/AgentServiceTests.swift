@@ -10,6 +10,7 @@ import Testing
 private final class FakeConsole: NSViewController, AgentConsole {
     var agentText = "SELECT name FROM customers"
     var agentDatabase: String? = "shop"
+    var agentNoBackslashEscapes = false
     var agentLastRun: AgentConsoleRun?
     override func loadView() { view = NSView() }
 }
@@ -145,6 +146,19 @@ extension AppTests {
         #expect(text(await service.handle("read_console", ["tab": hidden.id.uuidString], client: "test")).contains("No console tab"))
         let context = Self.structured(await service.handle("context", [:], client: "test"))
         #expect((context["consoleTabs"] as? [[String: Any]])?.compactMap { $0["title"] as? String } == ["Fix", "Report"])
+
+        // A password in the tab's text or its last run is masked before an agent sees it (plan §2.8).
+        let secret = main.open(FakeConsole(), title: "Users", connection: reports.id)
+        let secretConsole = try #require(secret.content as? FakeConsole)
+        secretConsole.agentText = "CREATE USER app@'%' IDENTIFIED BY 'S3cret-pass'"
+        secretConsole.agentLastRun = AgentConsoleRun(sql: "SET PASSWORD = 'S3cret-pass'", finished: Date(),
+                                                     error: "ALTER USER app IDENTIFIED BY 'S3cret-pass' was rejected")
+        let leak = Self.structured(await service.handle("read_console", ["tab": "Users"], client: "test"))
+        #expect((leak["text"] as? String)?.contains("S3cret-pass") == false)
+        #expect((leak["text"] as? String)?.contains("IDENTIFIED BY <secret>") == true)
+        let leakRun = try #require(leak["run"] as? [String: Any])
+        #expect((leakRun["sql"] as? String)?.contains("S3cret-pass") == false)
+        #expect((leakRun["error"] as? String)?.contains("S3cret-pass") == false)
         for tab in main.tabs { main.close(tab) }
     }
 }
