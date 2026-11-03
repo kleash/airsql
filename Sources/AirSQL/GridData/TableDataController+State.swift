@@ -62,7 +62,11 @@ extension TableDataController: NSMenuItemValidation {
         if let action = menuItem.action, !Self.instancesRespond(to: action), viewer.responds(to: action) {
             return viewer.validateMenuItem(menuItem)
         }
-        let (enabled, reason) = state(of: menuItem.action)
+        var (enabled, reason) = state(of: menuItem.action)
+        if menuItem.action == Commands.filterLess.action, GridCondition.Operator.allCases.indices.contains(menuItem.tag) {
+            reason = QuickFilter.reason(GridCondition.Operator.allCases[menuItem.tag], focusedValues())
+            enabled = reason == nil
+        }
         menuItem.explain(enabled: enabled, reason: reason)
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
         return enabled
@@ -114,7 +118,9 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.sortAscending.action,
              Commands.sortDescending.action:
             return (viewer.focusedCell != nil || focusedColumn() != nil, "Select a cell first")
-        case Commands.clearSort.action: return (!source.sort.isEmpty, "The rows aren't sorted")
+        case Commands.filterPrompt.action: return (viewer.focusedCell != nil, "Select a cell first")
+        case Commands.clearSort.action: return (!source.sort.isEmpty || !source.localSort.isEmpty, "The rows aren't sorted")
+        case Commands.sortColumns.action: return (!(grid.source is TransposedSource), "Leave Transpose or Record View first")
         case Commands.filterByValues.action: return (focusedColumn() != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:
             return (!bar.filterText.isEmpty || !bar.searchField.stringValue.isEmpty, "The rows aren't filtered")

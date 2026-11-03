@@ -153,6 +153,28 @@ extension AppTests {
                            "Value Panel", "Record View", "Column Summary…", "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set DEFAULT", "Insert Value", "Add Row",
                               "Duplicate Row", "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
+            // Near a header's left (its sort control is at the right), the column made wider than its values: a
+            // double-click fits it to them, as on its border.
+            Surface(name: "Table rows: column header",
+                    place: { main, _ in
+                        guard let tab = try? await GridDataAppTests.open(in: main, connection: Fixtures.local) else { return nil }
+                        tab.grid.columnWidths[tab.grid.columnOrder[2]] = 400
+                        main.window?.layoutIfNeeded()
+                        guard let header = tab.grid.header else { return nil }
+                        let left = header.edges(2).left
+                        return windowPoint(NSRect(x: left + 10, y: 0, width: 20, height: header.bounds.height), in: header)
+                    },
+                    clicked: { main in
+                        (main.selectedTab?.content as? TableDataController)?.grid.selection.containsColumn(2) == true
+                    },
+                    doubleClicked: { main, _ in
+                        guard let grid = (main.selectedTab?.content as? TableDataController)?.grid else { return false }
+                        return grid.columnWidths[grid.columnOrder[2]] < 400
+                    },
+                    menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
+                           "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Display As"],
+                    enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
+                              "Column Summary…", "Hide Column", "Freeze", "Column List…"]),
             Surface(name: "Grid cell",
                     place: { main, _ in
                         let grid = resultGrid(main)
@@ -257,7 +279,7 @@ extension AppTests {
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
         nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Table rows: cell",
-                                       "Grid cell", "Grid row number", "Status bar: route", "Status bar: server", "Status bar: transaction",
+                                       "Table rows: column header", "Grid cell", "Grid row number", "Status bar: route", "Status bar: server", "Status bar: transaction",
                                        "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Agent tab statement",
                                        "Database in the tree",
                                        "Table or view in the tree", "Routine, trigger or event", "Folder or category in the tree",

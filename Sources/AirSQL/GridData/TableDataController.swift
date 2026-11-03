@@ -199,6 +199,7 @@ final class TableDataController: NSViewController, TabContent {
             do {
                 let session = try await openSession()
                 noBackslashEscapes = session.noBackslashEscapes
+                bar.whereField.noBackslashEscapes = noBackslashEscapes
                 if editContext == nil { editContext = try await readEditContext(session) }
                 let page = try await session.query(sql, rowCap: limit).first?.rows
                 if !more { source.reset(keepingSaved: keepingSaved) }
