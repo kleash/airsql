@@ -109,6 +109,28 @@ struct ClientToolsLabTests {
         #expect(((try? FileManager.default.contentsOfDirectory(atPath: OptionFile.folder.path)) ?? []).isEmpty)
     }
 
+    /// A read-only connection's mysql, as Open in Terminal starts it, can't write: its session is READ ONLY. A dump
+    /// still works.
+    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    func aReadOnlyConnectionsToolsOnlyRead(_ server: Lab.Server) async throws {
+        guard let (session, info, dump, client) = try await Self.setUp(server) else { return }
+        var options = Self.options(server)
+        options.readOnly = true
+        let optionFile = try OptionFile.write(user: options.user, password: options.password)
+        let terminal = ToolCommand(tool: client, options: options, server: info).terminal(database: "", optionFile: optionFile.path)
+        let refused = await Runner.run(terminal + ["--batch", "-e", "CREATE DATABASE lane_ro_terminal"])
+        unlink(optionFile.path)
+        #expect(refused.status != 0 && refused.stderr.contains("READ ONLY"), "\(server): \(refused.stderr)")
+        let made = try await session.query("SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'lane_ro_terminal'")
+        #expect(made.first?.rows?.string(0, 0) == "0")
+        let file = URL(fileURLWithPath: try scratch() + "/read-only.sql")
+        let dumped = try await ToolRun.dump(ToolCommand(tool: dump, options: options, server: info),
+                                            DumpRequest(databases: [Lab.fixture], tables: ["customers"]), to: file, estimate: nil,
+                                            cancellation: Cancellation()) { _ in }
+        #expect(dumped.bytes > 1_000, "\(server)")
+        await session.close()
+    }
+
     /// AirSQL's own export, restored by the client, gives the same rows: every column type, both flavours.
     @Test(arguments: [Lab.mysql84, Lab.mariadb114])
     func theBuiltInExportRestoresToTheSameRows(_ server: Lab.Server) async throws {

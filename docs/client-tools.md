@@ -87,7 +87,10 @@ Empty fields become NULL unless you untick it. AirSQL sends the rows as `INSERT`
 
 ## Open the mysql command line in Terminal
 
-**Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database.
+**Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database. On a
+[read-only connection](connections.md#add-or-edit-a-connection) it starts with `SET SESSION TRANSACTION READ ONLY`, as
+AirSQL's own sessions do, so a slip can't change anything there. Exports get it too, where the dump tool knows how
+(MySQL 8.4's and later); restores, Run SQL File, CSV import and copies into a read-only connection are refused.
 
 ## Your password stays private
 

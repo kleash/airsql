@@ -28,6 +28,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
   fine. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last 20 filters; the ⓧ, or
   **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next time the table opens.
+  On a read-only connection, the whole SELECT must pass the [read-only check](read-only-queries.md): a condition that
+  calls a function such as `SLEEP` or `GET_LOCK` isn't sent, and the bar under it says why.
 - **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
   `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
   loaded rows instead.

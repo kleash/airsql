@@ -54,7 +54,9 @@ public struct ToolCommand: Sendable {
     private var family: ToolVersion.Family { tool.version?.family ?? .mysql }
 
     /// The option file, where to connect (TCP to the host, or a Unix socket: the server's own or a route's), TLS as the
-    /// connection asks for it and utf8mb4.
+    /// connection asks for it and utf8mb4. A read-only connection's tools get a READ ONLY session, as AirSQL's own
+    /// sessions do: Terminal's mysql above all. Written loose-, as mysqldump knows it only from MySQL 8.4 and
+    /// mariadb-dump not at all; the dumps only read anyway.
     public func connection(optionFile: String) -> [String] {
         var args = ["--defaults-file=" + optionFile]
         switch options.endpoint {
@@ -62,7 +64,9 @@ public struct ToolCommand: Sendable {
         case .socket(let path), .route(let path): args += ["--protocol=SOCKET", "--socket=" + path]
         }
         if case .socket = options.endpoint {} else { args += tls }
-        return args + ["--default-character-set=utf8mb4"]
+        args.append("--default-character-set=utf8mb4")
+        if options.readOnly { args.append("--loose-init-command=SET SESSION TRANSACTION READ ONLY") }
+        return args
     }
 
     /// The connection's TLS check in the tool family's own words (no loose- prefix: a tool that doesn't know one of these

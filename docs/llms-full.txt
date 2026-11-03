@@ -481,7 +481,10 @@ A **read-only** connection's sessions are read-only on the server, and AirSQL it
 prove only read: SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN (as [read-only queries](https://kleash.github.io/airsql/read-only-queries.html)
 decide), and USE. Anything else is refused before it is sent, with the reason, from the console, the navigator, a
 compare's sync script, Restore, Run SQL File and CSV import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
-it. The grid and the editors don't apply changes to it, and agents can't write to it either.
+it. A table tab's WHERE filter goes through the same check, within the whole SELECT it runs in, so a condition can't
+call a function such as `SLEEP` or `GET_LOCK` there. Open in Terminal starts `mysql` with a read-only session. The
+grid and the editors don't apply changes to it, and agents can't write to it either. The process list's Kill Query
+and Kill Connection still work: they stop a statement or a connection and change no data.
 
 **Test Connection** connects with what the editor shows, reports each hop with its time, and disconnects. **Save and
 Connect** saves and connects; **Save** only saves.
@@ -609,7 +612,8 @@ running, refreshed every 5 seconds (choose another interval, or Off). Double-cli
 - **Kill Connection…** ends a connection, rolling back its open transaction.
 
 Both ask first. Right before it stops anything, AirSQL checks that the process is still running what the list showed
-(on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so.
+(on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so. Both work on a
+read-only connection too: they change no data.
 
 
 ---
@@ -769,7 +773,10 @@ Empty fields become NULL unless you untick it. AirSQL sends the rows as `INSERT`
 
 ## Open the mysql command line in Terminal
 
-**Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database.
+**Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database. On a
+[read-only connection](https://kleash.github.io/airsql/connections.html#add-or-edit-a-connection) it starts with `SET SESSION TRANSACTION READ ONLY`, as
+AirSQL's own sessions do, so a slip can't change anything there. Exports get it too, where the dump tool knows how
+(MySQL 8.4's and later); restores, Run SQL File, CSV import and copies into a read-only connection are refused.
 
 ## Your password stays private
 
@@ -1133,6 +1140,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
   fine. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last 20 filters; the ⓧ, or
   **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next time the table opens.
+  On a read-only connection, the whole SELECT must pass the [read-only check](https://kleash.github.io/airsql/read-only-queries.html): a condition that
+  calls a function such as `SLEEP` or `GET_LOCK` isn't sent, and the bar under it says why.
 - **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
   `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
   loaded rows instead.
@@ -1674,7 +1683,9 @@ its own:
 - **Statements on the person's sessions** that what you did sends, and that aren't proven read-only (a Commit, a
   Rollback, the transaction mode, a Kill), wait in the same sheet, one by one.
 - **A read-only connection** refuses in the console (and the navigator, a sync, Restore and CSV import) any statement
-  that isn't proven read-only, a bare USE aside, before anything asks: there is nothing to approve.
+  that isn't proven read-only, a bare USE aside, before anything asks: there is nothing to approve. A table tab's WHERE
+  filter must pass the same check inside its SELECT. Open in Terminal starts a read-only session there; the process
+  list's Kill (the person's sheet) still works, as it changes no data.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
   whether agents are allowed, and the client tools AirSQL runs. Other saved data (names, folders, settings) is refused
