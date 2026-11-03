@@ -66,9 +66,16 @@ final class GridViewer: NSView, DataGridViewDelegate {
     func saveColumns() {
         guard let source, let viewKey, grid.columnWidths.count == source.columns.count else { return }
         let names = source.columns.map(\.name)
-        let shown = grid.columnOrder.map { names[$0] }
-        settings.order = shown + names.filter { !shown.contains($0) }
-        settings.hiddenColumns = names.filter { !shown.contains($0) }
+        let shown = grid.columnOrder.map { names[$0] }, hidden = names.filter { !shown.contains($0) }
+        // Hidden columns keep their place: after the column they followed before.
+        let old = settings.order.isEmpty ? names : settings.order
+        var order = shown
+        for name in hidden {
+            let before = old.prefix { $0 != name }.last { order.contains($0) }
+            order.insert(name, at: before.flatMap { order.firstIndex(of: $0) }.map { $0 + 1 } ?? 0)
+        }
+        settings.order = order
+        settings.hiddenColumns = hidden
         settings.widths = Dictionary(names.indices.map { (names[$0], Double(grid.columnWidths[$0])) },
                                      uniquingKeysWith: { first, _ in first })
         TableViewSettingsStore.shared.set(settings, connection: viewKey.connection, database: viewKey.database,
@@ -117,6 +124,18 @@ final class GridViewer: NSView, DataGridViewDelegate {
         }
     }
 
+    /// Column List… (⌘J): find a column, jump to it, show or hide columns.
+    @objc func showColumnList(_ sender: Any?) {
+        guard source != nil, window != nil else { return }
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = GridColumnList(viewer: self)
+        let container = grid.containerView!
+        // Under the header's right end (the container is flipped).
+        popover.show(relativeTo: NSRect(x: container.bounds.maxX - 60, y: 0, width: 40, height: grid.header.frame.height),
+                     of: container, preferredEdge: .maxY)
+    }
+
     @objc func zoomIn(_ sender: Any?) { grid.fontSize = min(28, grid.fontSize + 1) }
     @objc func zoomOut(_ sender: Any?) { grid.fontSize = max(9, grid.fontSize - 1) }
     @objc func zoomReset(_ sender: Any?) {
@@ -144,6 +163,7 @@ final class GridViewer: NSView, DataGridViewDelegate {
             item.explain(enabled: status.aggregate != nil, reason: "Select some cells first")
             return status.aggregate != nil
         case #selector(goToRow(_:)): return grid.rowCount > 0
+        case #selector(showColumnList(_:)): return source != nil
         case #selector(hideColumn(_:)):
             let enabled = grid.columnCount > 1 && grid.selection.cursor != nil
             item.explain(enabled: enabled, reason: grid.columnCount > 1 ? "Select a column first" : "One column stays shown")

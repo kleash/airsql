@@ -8,5 +8,6 @@ extension MainMenu {
         // L2: reading the data.
         menus.edit.add([nil, Commands.copySummary])
         menus.data.add([Commands.openTable, nil, Commands.goToRow, Commands.hideColumn, nil, Commands.loadMore, Commands.countRows])
+        menus.view.add([nil, Commands.columnList])
     }
 }

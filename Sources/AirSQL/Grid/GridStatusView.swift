@@ -8,7 +8,7 @@ import AppKit
 final class GridStatusView: NSStackView {
     weak var viewer: GridViewer?
     let rows = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
-    private let position = label("", font: .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular), color: .secondaryLabelColor)
+    let position = label("", font: .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular), color: .secondaryLabelColor)
     let figure = NSButton(title: "", target: nil, action: nil)
     /// The figure shown, for every grid.
     static var shown = GridAggregate.Kind.sum

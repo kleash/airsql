@@ -2,23 +2,28 @@ import AirSQLCore
 import AppKit
 
 /// A result tab's rows in the data grid (plan §2.5's embedding API: a `ResultSetSource` over the statement's
-/// `ResultStore`), read-only. ⌘C copies the selected cells (all of them when none are selected) as tab-separated text
-/// with the column names first; the grid lanes bring the other formats.
+/// `ResultStore`), read-only, in a `GridViewer` (the status bar's figures, columns kept per query). ⌘C copies the
+/// selected cells (all of them when none are selected) as tab-separated text with the column names first; the grid
+/// lanes bring the other formats.
 @MainActor
 final class ResultGridView: NSView, DataGridViewDelegate {
-    let grid: DataGridView
+    let viewer: GridViewer
+    var grid: DataGridView { viewer.grid }
     let source: ResultSetSource
 
-    init(store: ResultStore, nullText: String, fontSize: CGFloat) {
+    /// `viewKey`: where its columns are kept (the statement, on its connection).
+    init(store: ResultStore, nullText: String, fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil) {
         source = ResultSetSource(store)
-        grid = DataGridView(source: source)
+        viewer = GridViewer(source: nil)
         super.init(frame: .zero)
-        grid.nullText = nullText
-        grid.fontSize = fontSize
-        grid.delegate = self
+        viewer.grid.nullText = nullText
+        viewer.grid.fontSize = fontSize
+        viewer.host = self
+        viewer.viewKey = viewKey
+        viewer.show(source)
         grid.setAccessibilityLabel("Result rows")
-        addSubview(grid.containerView)
-        grid.containerView.pin(to: self)
+        addSubview(viewer)
+        viewer.pin(to: self)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
