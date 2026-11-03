@@ -1,5 +1,6 @@
 ---
 title: A table's rows
+nav_order: 16
 ---
 
 # A table's rows
