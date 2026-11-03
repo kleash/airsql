@@ -345,6 +345,36 @@ extension AppTests {
     /// The table tab's polish (plan §2.13), as `LayoutTests` checks every screen: its bars and notices with long text, the
     /// find bar, and its sheets, in light and dark, at the window's smallest and default size.
     @MainActor @Suite struct GridDataLayoutTests {
+        /// Every control of the table tab, its find bar, notices and sheets has a tooltip (as `HelpTests` checks), and
+        /// so does every item of its menus.
+        @Test func everyControlOfTheTableTabSaysWhatItDoes() async throws {
+            let session = FakeTableSession()
+            let (main, harness, tab) = try await GridDataAppTests.tab(session: session)
+            let window = try #require(main.window)
+            tab.source?.set(.text("x"), row: 0, column: 2)
+            tab.changesDidChange()
+            let replace = NSMenuItem()
+            replace.tag = NSTextFinder.Action.showReplaceInterface.rawValue
+            tab.performTextFinderAction(replace)
+            var missing = unexplained([window], where: "table tab")
+            tab.grid.selection.select(GridPosition(row: 0, column: 1))
+            for target in [DataGridView.Target.cells, .column(1), .row(0)] {
+                if let menu = tab.dataGrid(tab.grid, menuFor: target) { missing += unexplained(menu, path: ["\(target)"]) }
+            }
+            tab.exportRows(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            missing += unexplained([try #require(window.attachedSheet)], where: "Export Rows")
+            _ = await call(harness, "press", ["id": "export.cancel"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            tab.filterByValues(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await eventually(timeout: 10) { session.statements.contains { $0.contains(" GROUP BY ") } }
+            missing += unexplained([try #require(window.attachedSheet)], where: "Filter by Values")
+            _ = await call(harness, "press", ["id": "values.cancel"])
+            tab.revertAllChanges(nil)
+            #expect(missing.isEmpty, "\(missing)")
+        }
+
         @Test func tableTabIsTidyInLightAndDarkAtEverySize() async throws {
             var problems: [String] = []
             for appearance in [NSAppearance.Name.aqua, .darkAqua] {
