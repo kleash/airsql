@@ -144,7 +144,7 @@ extension AppTests {
                 _ = export.begin("Exporting shop")
                 export.progress("Writing order_items · 1.9 GB of ≈3.1 GB", done: 19, total: 31)
                 export.timeLeft.stringValue = "about 2 min left"
-                try await Task.sleep(nanoseconds: 600_000_000)  // the bar moves to its value
+                try await Task.sleep(nanoseconds: 2_000_000_000)  // the bar moves to its value (it animates, slowly on a busy Mac)
                 try await save(harness, "export-running-\(suffix)")
                 export.finish("Stopped.", failed: true)
                 export.close()
