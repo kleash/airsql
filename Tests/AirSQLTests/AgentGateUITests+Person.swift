@@ -137,6 +137,14 @@ extension AppTests.AgentGateUITests {
         #expect(await eventually(timeout: 5) { Self.preview(main) != nil })
         #expect(await call(harness, "press", ["id": "preview.run"]).error == nil)
         #expect(await setting.value.error == nil && console.editor.string == "SELECT 1")
+        // Find and Replace puts the agent's text in too: refused.
+        #expect(await agentCall(service, "menu", ["path": "Edit > Find > Find and Replace…"]).error == nil)
+        for (id, value) in [("find.search", "1"), ("find.replace", "1; DROP TABLE orders")] {
+            #expect(await agentCall(service, "set", ["id": id, "value": value]).error == nil, "\(id)")
+        }
+        let replaced = await agentCall(service, "press", ["id": "find.replaceAll"])
+        #expect(replaced.error?.contains("Replacing text in a production console") == true, "\(replaced.error ?? "let through")")
+        #expect(console.editor.string == "SELECT 1")
     }
 
     @Test func filesAreThePersons() async throws {

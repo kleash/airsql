@@ -35,19 +35,9 @@ extension AgentServer {
         try checkAgentMayAct(in: window)
     }
 
-    /// The console tab whose editor `view` is, when its connection is coloured Production.
-    func productionConsole(_ view: NSView?) -> SavedConnection? {
-        guard let editor = view as? SQLEditorView else { return nil }
-        return (main?.tabs ?? []).lazy.compactMap { tab -> SavedConnection? in
-            guard (tab.content as? ConsoleViewController)?.editor === editor, let saved = self.model.connection(tab.connectionID),
-                  saved.colour == .production else { return nil }
-            return saved
-        }.first
-    }
-
     /// Text an agent would put in a production console's editor waits for the person's OK, on the SQL preview sheet.
     func checkPersonAllows(_ text: String, into view: NSView?) async throws {
-        guard let agent = AgentGate.agent, let saved = productionConsole(view), let window = main?.window else { return }
+        guard let agent = AgentGate.agent, let saved = AgentGuard.productionConsole(view), let window = main?.window else { return }
         var request = SQLPreviewRequest(change: ChangeSQL(title: "Text from \(agent)", statements: [text], connection: saved.id),
                                         heading: "Put this text in a console of \(saved.displayName)?",
                                         caption: "\(agent) wants to type it into a production console. Nothing runs: it goes "
@@ -66,7 +56,7 @@ extension AgentServer {
         if menuItems(for: keys).contains(where: { $0.action.map { Self.pasteActions.contains(NSStringFromSelector($0)) } ?? false }) {
             throw Failure("The clipboard is the person's: agents can't paste. Use type or set to put text in a field.")
         }
-        if keys.modifiers.intersection([.command, .control]).isEmpty, productionConsole(window.firstResponder as? NSView) != nil {
+        if keys.modifiers.intersection([.command, .control]).isEmpty, AgentGuard.productionConsole(window.firstResponder as? NSView) != nil {
             throw Failure("Typing into a production console needs the person's OK: use type or set, which ask them once.")
         }
     }

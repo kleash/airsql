@@ -40,6 +40,19 @@ enum AgentGuard {
         return false
     }
 
+    /// The connection of the console whose editor `view` is, when it is coloured Production: text an agent would put
+    /// there waits for the person (the paste gate).
+    static func productionConsole(_ view: NSView?) -> SavedConnection? {
+        guard let editor = view as? SQLEditorView, let main = editor.window?.windowController as? MainWindowController else {
+            return nil
+        }
+        return main.tabs.lazy.compactMap { tab -> SavedConnection? in
+            guard (tab.content as? ConsoleViewController)?.editor === editor, let saved = main.model.connection(tab.connectionID),
+                  saved.colour == .production else { return nil }
+            return saved
+        }.first
+    }
+
     /// Asks the person at the Mac on the SQL preview sheet (its agent-gate area), on the frontmost sheet of `window`:
     /// whether they approved. Agents can't press its Run (`SQLPreviewSheet`).
     static func ask(_ request: SQLPreviewRequest, connection: SavedConnection?, on window: NSWindow) async -> Bool {
