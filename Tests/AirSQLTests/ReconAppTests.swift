@@ -108,9 +108,10 @@ extension AppTests {
                     let before = Self.window(nil, size: size, appearance: appearance)
                     check(before, "before a compare")
                     // The content takes the window's height rather than forcing its own (a stack of fixed-height views
-                    // once shrank the window to its bars).
+                    // once shrank the window to its bars). A screen lower than the window (CI's) holds it to its own height.
                     before.window?.layoutIfNeeded()
-                    #expect((before.window?.frame.height ?? 0) >= size.height - 1, "\(place): \(before.window?.frame.height ?? 0)")
+                    let room = min(size.height, NSScreen.main?.visibleFrame.height ?? size.height)
+                    #expect((before.window?.frame.height ?? 0) >= room - 1, "\(place): \(before.window?.frame.height ?? 0)")
                     let window = Self.window(Self.result(), size: size, appearance: appearance)
                     check(window, "structure")
                     for (row, object) in window.results.objects.enumerated() where ["products", "gift_cards", "paid_orders"].contains(object.name) {
