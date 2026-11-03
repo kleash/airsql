@@ -22,13 +22,15 @@ struct ResultStoreTests {
     @Test func showsBinaryAsHexAndBitsAsBits() {
         let store = ResultStore(columns: [ResultStore.Column(name: "b", type: MYSQL_TYPE_BLOB, charset: 63),
                                           ResultStore.Column(name: "bit", type: MYSQL_TYPE_BIT, charset: 63, length: 10),
-                                          ResultStore.Column(name: "n", type: MYSQL_TYPE_LONGLONG, charset: 63)])
-        store.append([[0x00, 0xAB, 0x27], [0x01, 0x05], Array("42".utf8)])
-        store.append([Array(repeating: 0xFF, count: 300), [0x00, 0x00], Array("7".utf8)])
+                                          ResultStore.Column(name: "n", type: MYSQL_TYPE_LONGLONG, charset: 63),
+                                          ResultStore.Column(name: "doc", type: MYSQL_TYPE_JSON, charset: 63)])
+        store.append([[0x00, 0xAB, 0x27], [0x01, 0x05], Array("42".utf8), Array(#"{"colour": "sage"}"#.utf8)])
+        store.append([Array(repeating: 0xFF, count: 300), [0x00, 0x00], Array("7".utf8), Array("[]".utf8)])
         #expect(store.display(0, 0) == "0x00AB27")
         #expect(store.display(0, 1) == "0100000101")
         #expect(store.display(1, 1) == "0000000000")
         #expect(store.display(0, 2) == "42")  // numbers carry the binary charset but are text
+        #expect(store.display(0, 3) == #"{"colour": "sage"}"# && !store.columns[3].isBinary)  // so does MySQL's JSON
         #expect(store.display(1, 0) == "0x" + String(repeating: "FF", count: 256) + "…")
     }
 

@@ -40,12 +40,13 @@ public final class ResultStore {
             self.decimals = decimals
         }
 
-        /// Bytes rather than text: BINARY, VARBINARY, BLOB, GEOMETRY.
+        /// Bytes rather than text: BINARY, VARBINARY, BLOB, GEOMETRY. Numbers, dates and MySQL's JSON carry the binary
+        /// character set too, and are text.
         public var isBinary: Bool {
             charset == 63 && ![MYSQL_TYPE_BIT, MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT,
                                MYSQL_TYPE_INT24, MYSQL_TYPE_LONG, MYSQL_TYPE_LONGLONG, MYSQL_TYPE_FLOAT, MYSQL_TYPE_DOUBLE,
                                MYSQL_TYPE_YEAR, MYSQL_TYPE_DATE, MYSQL_TYPE_NEWDATE, MYSQL_TYPE_TIME, MYSQL_TYPE_DATETIME,
-                               MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_NULL].contains(type)
+                               MYSQL_TYPE_TIMESTAMP, MYSQL_TYPE_NULL, MYSQL_TYPE_JSON].contains(type)
         }
     }
 
