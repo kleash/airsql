@@ -247,6 +247,28 @@ extension AppTests.HelpTests {
     }
 }
 
+extension AppTests.HelpTests {
+    /// The Add Virtual Foreign Key and Paste Format sheets say what each control does.
+    @Test func theVirtualKeyAndPasteFormatSheetsSayWhatTheyDo() async throws {
+        let (main, harness, tab) = try await AppTests.GridDataAppTests.tab()
+        main.window?.orderFront(nil)
+        var missing: [String] = []
+        tab.grid.selection.select(GridPosition(row: 0, column: 3))
+        tab.addVirtualKey(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        missing += unexplained([try #require(main.window?.attachedSheet)], where: "virtual foreign key")
+        _ = await call(harness, "press", ["title": "Cancel"])
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("7", forType: .string)
+        tab.pasteWithFormat(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        missing += unexplained([try #require(main.window?.attachedSheet)], where: "paste format")
+        _ = await call(harness, "press", ["title": "Cancel"])
+        main.window?.orderOut(nil)
+        #expect(missing.isEmpty, "\(missing)")
+    }
+}
+
 extension AppTests.LayoutTests {
     /// An edited console result's bar fits its words and buttons, in light and dark.
     @Test func anEditedResultIsTidy() async throws {
