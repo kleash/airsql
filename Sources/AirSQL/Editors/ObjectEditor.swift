@@ -21,7 +21,8 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
 
     let code = NSTextView()
     let definer = popup([], selected: 0, id: "objectEditor.definer", tip: "", target: nil, action: nil)
-    let applyButton = button("Apply", id: "objectEditor.apply", tip: "", target: nil, action: #selector(AirSQLActions.applyChanges(_:)))
+    let applyButton = button("Apply", id: "objectEditor.apply", tip: "", target: nil, action: #selector(AirSQLActions.applyChanges(_:)),
+                             primary: true)
     let revertButton = button("Revert", id: "objectEditor.revert", tip: "", target: nil, action: #selector(AirSQLActions.revertChanges(_:)))
     let note = label("", font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, truncates: true)
     let status = NSProgressIndicator()
@@ -81,7 +82,6 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         status.style = .spinning
         status.controlSize = .small
         status.isDisplayedWhenStopped = false
-        if #available(macOS 11.0, *) { applyButton.bezelColor = .accent }
         applyButton.keyEquivalent = "s"
         applyButton.keyEquivalentModifierMask = .command
         applyButton.target = self

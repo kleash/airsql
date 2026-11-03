@@ -31,7 +31,7 @@ class ToolSheet: NSWindowController {
         self.connection = connection
         self.options = options
         self.width = width
-        runButton = button(action, id: "tools.run", tip: actionTip, target: nil, action: nil)
+        runButton = button(action, id: "tools.run", tip: actionTip, target: nil, action: nil, primary: true)
         cancelButton = button("Cancel", id: "tools.cancel", tip: "Close the sheet: nothing runs", target: nil, action: nil)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 300), styleMask: [.titled], backing: .buffered,
                               defer: true)
@@ -39,7 +39,6 @@ class ToolSheet: NSWindowController {
         runButton.target = self
         runButton.action = #selector(runPressed(_:))
         runButton.keyEquivalent = "\r"
-        runButton.bezelColor = .accent
         cancelButton.target = self
         cancelButton.action = #selector(cancelPressed(_:))
         cancelButton.keyEquivalent = "\u{1b}"

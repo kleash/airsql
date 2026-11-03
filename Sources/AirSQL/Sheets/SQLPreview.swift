@@ -71,7 +71,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     private init(_ request: SQLPreviewRequest, connection: SavedConnection?, completion: @escaping (SQLPreviewResult) -> Void) {
         self.request = request
         self.completion = completion
-        runButton = button(request.actionTitle, id: "preview.run", tip: "", target: nil, action: nil)
+        runButton = button(request.actionTitle, id: "preview.run", tip: "", target: nil, action: nil, primary: !request.destructive)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 400), styleMask: [.titled], backing: .buffered,
                               defer: true)
         window.title = request.heading
@@ -250,7 +250,6 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         runButton.action = #selector(run(_:))
         runButton.keyEquivalent = "\r"
         runButton.hasDestructiveAction = request.destructive
-        if !request.destructive { runButton.bezelColor = .accent }
         runButton.toolTip = request.typeToConfirm.map { "Type “\($0)” first" }
             ?? (request.text != nil ? "Put the text in the console's editor: nothing runs"
                 : "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : ""))

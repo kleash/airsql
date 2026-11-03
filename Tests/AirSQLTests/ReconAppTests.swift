@@ -95,6 +95,26 @@ extension AppTests {
             return controller
         }
 
+        @Test func theWindowStaysAtItsMinimumSize() {
+            let controller = Self.window(Self.result(), size: ReconWindowController.minimumSize)
+            #expect(controller.window?.frame.width == ReconWindowController.minimumSize.width)
+        }
+
+        @Test func theListOpensWideEnoughForTheNames() throws {
+            let controller = Self.window(Self.result())
+            let list = controller.results.list
+            #expect(try #require(list.enclosingScrollView).frame.width >= 300)
+            for row in 0..<list.numberOfRows {
+                // The 64-character name is shortened at any sensible width (its tooltip has it).
+                guard let cell = list.view(atColumn: 0, row: row, makeIfNecessary: true) as? ReconObjectCell,
+                      !cell.name.stringValue.hasPrefix("coupons_with") else { continue }
+                cell.layoutSubtreeIfNeeded()
+                let needed = try #require(cell.name.cell).cellSize(forBounds: NSRect(x: 0, y: 0, width: .greatestFiniteMagnitude,
+                                                                                    height: cell.name.bounds.height)).width
+                #expect(needed <= cell.name.bounds.width + 1, "\(cell.name.stringValue): needs \(needed), has \(cell.name.bounds.width)")
+            }
+        }
+
         @Test func compareWindowIsTidyInLightAndDark() {
             var problems: [String] = []
             for appearance in [NSAppearance.Name.aqua, .darkAqua] {

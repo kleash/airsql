@@ -41,7 +41,7 @@ final class AgentActivityPopover: NSViewController {
         document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
         let caption = label("Agents never see passwords and can't change data: they read within each connection's access "
                             + "(Settings ▸ Agents) and propose SQL in console tabs for you to run.",
-                            font: .systemFont(ofSize: 11), color: .tertiaryLabelColor, wraps: true)
+                            font: .systemFont(ofSize: 11), color: .secondaryLabelColor, wraps: true)
         caption.preferredMaxLayoutWidth = 380
         let stack = NSStackView(views: [header, scroll, caption])
         stack.orientation = .vertical
@@ -87,7 +87,7 @@ final class AgentActivityPopover: NSViewController {
             let what = label(event.summary, font: .systemFont(ofSize: 12), truncates: true)
             what.toolTip = event.client + ": " + event.summary
             let when = label(Self.time.string(from: event.time), font: .monospacedDigitSystemFont(ofSize: 11, weight: .regular),
-                             color: .tertiaryLabelColor)
+                             color: .secondaryLabelColor)
             when.setContentCompressionResistancePriority(.required, for: .horizontal)
             let top = NSStackView(views: [what, NSView(), when])
             let outcome = event.outcome ?? "running…"
