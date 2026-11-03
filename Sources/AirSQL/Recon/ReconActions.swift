@@ -3,9 +3,13 @@ import AppKit
 import UniformTypeIdentifiers
 
 extension MainWindowController {
-    /// Tools ▸ Compare… (and a connection's menu): a compare window, the selected connection as the source.
+    /// Tools ▸ Compare… (and a connection's or a database's menu): a compare window, the selected connection, or the
+    /// tree's database, as the source.
     @objc func compareDatabases(_ sender: Any?) {
-        ReconWindowController.show(model: model, source: selectedConnections.first)
+        let compare = ReconWindowController.show(model: model, source: selectedConnections.first)
+        if let (open, nodes) = sidebar.treeSelection {
+            compare.source.choose(model.connection(open.id), database: nodes.first?.database)
+        }
     }
 }
 
