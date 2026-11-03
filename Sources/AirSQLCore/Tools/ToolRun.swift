@@ -40,8 +40,14 @@ public enum ToolRun {
         var state = ToolProgress(total: estimate)
         var tail = Data()
         let argv = command.dump(request, optionFile: optionFile.path)
-        let piped = await Runner.output(of: argv, to: part.fd, through: request.gzip ? ["/usr/bin/gzip", "-c"] : nil,
-                                        cancellation: cancellation, begun: { remove.run() }, chunk: { data in
+        let sink: Runner.Writer
+        do {
+            sink = try Runner.Writer(file: part.fd, through: request.gzip ? ["/usr/bin/gzip", "-c"] : nil, cancellation: cancellation)
+        } catch {
+            part.discard()
+            throw error
+        }
+        let piped = await Runner.output(of: argv, into: sink, cancellation: cancellation, begun: { remove.run() }, chunk: { data in
             state.bytes += Int64(data.count)
             // mysqldump's comments name each table as it starts on it ("-- Dumping data for table `orders`").
             let window = tail + data
@@ -128,21 +134,22 @@ public enum ToolRun {
     public static func restore(_ command: ToolCommand, file url: URL, into database: String, continueOnError: Bool,
                                cancellation: Cancellation, progress: @escaping (ToolProgress) -> Void) async throws -> ToolOutcome {
         let started = Date()
-        let fd = open(url.path, O_RDONLY | O_CLOEXEC)
-        guard fd >= 0 else { throw AirSQLError(.other, "Can't open \(url.lastPathComponent): \(String(cString: strerror(errno)))") }
+        let (source, fd, size) = try SQLScript.open(url, cancellation: cancellation)
         defer { close(fd) }
-        var info = stat()
-        fstat(fd, &info)
-        let compressed = isGzip(fd)
-        let optionFile = try OptionFile.write(user: command.options.user, password: command.options.password)
+        let optionFile: URL
+        do {
+            optionFile = try OptionFile.write(user: command.options.user, password: command.options.password)
+        } catch {
+            _ = source.finish()
+            throw error
+        }
         let remove = Once { unlink(optionFile.path) }
         defer { remove.run() }
         let lock = NSLock()
-        var state = ToolProgress(total: Int64(info.st_size))
+        var state = ToolProgress(total: size)
         var pending = ""
         let argv = command.restore(into: database, continueOnError: continueOnError, optionFile: optionFile.path)
-        let piped = await Runner.input(of: argv, from: fd, through: compressed ? ["/usr/bin/gzip", "-dc"] : nil,
-                                       cancellation: cancellation, begun: { remove.run() }, errorOutput: { text in
+        let piped = await Runner.input(of: argv, from: source, cancellation: cancellation, begun: { remove.run() }, errorOutput: { text in
             // "ERROR 1062 (23000) at line 52: Duplicate entry '7' for key 'PRIMARY'", one per error.
             let now = lock.locked { () -> ToolProgress in
                 pending += text
@@ -217,13 +224,6 @@ public enum ToolRun {
             }
         }
         return last?.name.replacingOccurrences(of: "``", with: "`")
-    }
-
-    /// The file starts with gzip's magic bytes (it is read from the start again afterwards).
-    private static func isGzip(_ fd: Int32) -> Bool {
-        var magic = [UInt8](repeating: 0, count: 2)
-        let count = pread(fd, &magic, 2, 0)
-        return count == 2 && magic == [0x1F, 0x8B]
     }
 
     /// A tool that ended badly, in its own words: its error output's last lines.

@@ -80,122 +80,73 @@ public enum Runner {
         }
     }
 
-    /// Runs `tool` with its standard output copied into `file` by this process, so it can be counted and looked at:
+    /// Runs `tool` with its standard output written into `sink` by this process, so it can be counted and looked at:
     /// `chunk` gets each part on a background thread, and `begun` once, at the first part (the tool has connected).
-    /// With `filter` (gzip -c), the output goes through it and the filter writes the file. The caller closes `file`.
-    public static func output(of tool: [String], to file: Int32, through filter: [String]? = nil,
-                              environment: [String: String] = [:], cancellation: Cancellation,
-                              begun: @escaping () -> Void = {}, chunk: @escaping (Data) -> Void = { _ in }) async -> Piped {
+    public static func output(of tool: [String], into sink: Writer, environment: [String: String] = [:],
+                              cancellation: Cancellation, begun: @escaping () -> Void = {},
+                              chunk: @escaping (Data) -> Void = { _ in }) async -> Piped {
         await detached {
-            var target = file
-            var filtering: Started?
-            if let filter {
-                guard let pipe = makePipe() else { return failure(tool, filter) }
-                _ = fcntl(pipe.1, F_SETNOSIGPIPE, 1)  // a filter that exits early must not take the app down
-                filtering = Started(filter, stdin: pipe.0, stdout: file, environment: environment, cancellation: cancellation)
-                close(pipe.0)
-                target = pipe.1
-            }
-            guard let out = makePipe() else {
-                if filter != nil { close(target) }
-                return failure(tool, filter)
-            }
-            let started = Started(tool, stdin: -1, stdout: out.1, environment: environment, cancellation: cancellation)
-            close(out.1)
             var piped = Piped(tool: CommandResult(status: 0), filter: nil)
-            drain(out.0) { data in
-                if piped.bytes == 0 { begun() }
-                guard !cancellation.isCancelled else { return false }
-                guard data.withUnsafeBytes({ writeAll(target, $0) }) else {
-                    piped.ioError = errno
-                    return false
+            if let out = makePipe() {
+                let started = Started(tool, stdin: -1, stdout: out.1, environment: environment, cancellation: cancellation)
+                close(out.1)
+                drain(out.0) { data in
+                    if piped.bytes == 0 { begun() }
+                    guard !cancellation.isCancelled else { return false }
+                    guard sink.write(data) else {
+                        piped.ioError = errno
+                        return false
+                    }
+                    piped.bytes += Int64(data.count)
+                    chunk(data)
+                    return true
                 }
-                piped.bytes += Int64(data.count)
-                chunk(data)
-                return true
+                piped.tool = started.finish(cancellation)
+            } else {
+                piped.tool = CommandResult(status: 127, stderr: "Can't start \(tool[0]): no pipe")
             }
-            if filter != nil { close(target) }  // the filter's end of input
-            piped.tool = started.finish(cancellation)
-            piped.filter = filtering?.finish(cancellation)
+            piped.filter = sink.finish()
             return piped
         }
     }
 
-    /// Runs `tool` with the contents of `file` copied into its standard input by this process, so it can be counted:
-    /// `progress` gets the bytes read from the file so far, on a background thread. With `filter` (gzip -dc), the file
-    /// goes through it first, and this process copies the filter's output into the tool. `begun` runs once the tool has
-    /// taken in 64 KB (so it is connected and reading), or when it ends. The tool's output is dropped; its error output
-    /// is in the result, and `errorOutput` gets it as it comes. The caller closes `file`.
-    public static func input(of tool: [String], from file: Int32, through filter: [String]? = nil,
-                             environment: [String: String] = [:], cancellation: Cancellation, begun: @escaping () -> Void = {},
+    /// Runs `tool` with what `source` reads written into its standard input by this process, so it can be counted:
+    /// `progress` gets the bytes of the file taken so far, on a background thread. `begun` runs once the tool has taken
+    /// in 64 KB (so it is connected and reading), or when it ends. The tool's output is dropped; its error output is in
+    /// the result, and `errorOutput` gets it as it comes.
+    public static func input(of tool: [String], from source: Inflow, environment: [String: String] = [:],
+                             cancellation: Cancellation, begun: @escaping () -> Void = {},
                              errorOutput: @escaping (String) -> Void = { _ in }, progress: @escaping (Int64) -> Void) async -> Piped {
         await detached {
-            guard let toolInput = makePipe() else { return failure(tool, filter) }
-            _ = fcntl(toolInput.1, F_SETNOSIGPIPE, 1)
-            let started = Started(tool, stdin: toolInput.0, stdout: -1, environment: environment, cancellation: cancellation,
-                                  errorOutput: errorOutput)
-            close(toolInput.0)
-            var piped = Piped(tool: CommandResult(status: 0), filter: nil)
-            let lock = NSLock()
-            var fed: Int64 = 0
+            var piped = Piped(tool: CommandResult(status: 127, stderr: "Can't start \(tool[0]): no pipe"), filter: nil)
             var told = false
-            // Into the tool; false once it stops taking input (it ended) or the work is cancelled.
-            func feed(_ bytes: UnsafeRawBufferPointer) -> Bool {
-                guard !cancellation.isCancelled, writeAll(toolInput.1, bytes) else { return false }
-                let tell = lock.locked { () -> Bool in
-                    fed += Int64(bytes.count)
-                    defer { if fed >= 65536 { told = true } }
-                    return fed >= 65536 && !told
+            if let input = makePipe() {
+                _ = fcntl(input.1, F_SETNOSIGPIPE, 1)  // a tool that ends early must not take the app down
+                let started = Started(tool, stdin: input.0, stdout: -1, environment: environment, cancellation: cancellation,
+                                      errorOutput: errorOutput)
+                close(input.0)
+                var fed: Int64 = 0
+                while !cancellation.isCancelled, let data = source.next(65536) {
+                    guard data.withUnsafeBytes({ writeAll(input.1, $0) }) else { break }  // the tool stopped reading
+                    fed += Int64(data.count)
+                    if fed >= 65536 && !told {
+                        told = true
+                        begun()
+                    }
+                    progress(source.fed)
                 }
-                if tell { begun() }
-                return true
+                close(input.1)
+                piped.tool = started.finish(cancellation)
             }
-            var filtering: Started?
-            var filterOutput: Int32 = -1
-            var source = toolInput.1
-            if let filter {
-                guard let into = makePipe(), let out = makePipe() else {
-                    close(toolInput.1)
-                    return failure(tool, filter)
-                }
-                _ = fcntl(into.1, F_SETNOSIGPIPE, 1)
-                filtering = Started(filter, stdin: into.0, stdout: out.1, environment: environment, cancellation: cancellation)
-                close(into.0)
-                close(out.1)
-                source = into.1
-                filterOutput = out.0
-            }
-            let copied = DispatchGroup()
-            if filterOutput >= 0 {
-                copied.enter()
-                Thread.detachNewThread {
-                    drain(filterOutput) { data in data.withUnsafeBytes { feed($0) } }
-                    copied.leave()
-                }
-            }
-            var buffer = [UInt8](repeating: 0, count: 65536)
-            while !cancellation.isCancelled {
-                let count = read(file, &buffer, buffer.count)
-                if count < 0 && errno == EINTR { continue }
-                if count < 0 { piped.ioError = errno }
-                guard count > 0 else { break }
-                let ok = buffer.withUnsafeBytes { bytes -> Bool in
-                    let part = UnsafeRawBufferPointer(rebasing: bytes[0..<count])
-                    return filter == nil ? feed(part) : writeAll(source, part)
-                }
-                guard ok else { break }
-                piped.bytes += Int64(count)
-                progress(piped.bytes)
-            }
-            if filter != nil { close(source) }  // the filter's end of input; it then ends its output
-            copied.wait()
-            close(toolInput.1)  // the tool's end of input
-            piped.tool = started.finish(cancellation)
-            piped.filter = filtering?.finish(cancellation)
-            if !lock.locked({ told }) { begun() }
+            piped.filter = source.finish()
+            piped.bytes = source.fed
+            piped.ioError = source.readError
+            if !told { begun() }
             return piped
         }
     }
+
+    // MARK: Streams this process reads or writes
 
     /// What this process writes (AirSQL's own export) going into `file`, through `filter` (gzip -c) when given: the
     /// filter writes the file. `finish` closes the stream and waits for the filter. The caller closes `file`.
@@ -220,10 +171,14 @@ public enum Runner {
         }
 
         public func write(_ text: String) throws {
-            var text = text
-            let ok = text.withUTF8 { writeAll(target, UnsafeRawBufferPointer($0)) }
-            guard ok else { throw AirSQLError(.other, "Can't write the file: \(String(cString: strerror(errno)))") }
-            bytes += Int64(text.utf8.count)
+            guard write(Data(text.utf8)) else { throw AirSQLError(.other, "Can't write the file: \(String(cString: strerror(errno)))") }
+        }
+
+        /// False when the bytes can't be written (errno says why: the disk is full, the filter ended).
+        public func write(_ data: Data) -> Bool {
+            guard data.withUnsafeBytes({ writeAll(target, $0) }) else { return false }
+            bytes += Int64(data.count)
+            return true
         }
 
         /// Ends the stream: the filter's status (nil without one).
@@ -244,6 +199,7 @@ public enum Runner {
         private let cancellation: Cancellation
         private let lock = NSLock()
         private var taken: Int64 = 0
+        private var failed: Int32?
         private let copied = DispatchGroup()
 
         public init(file: Int32, through filter: [String]?, cancellation: Cancellation) throws {
@@ -266,6 +222,7 @@ public enum Runner {
                 while !cancellation.isCancelled {
                     let count = read(file, &buffer, buffer.count)
                     if count < 0 && errno == EINTR { continue }
+                    if count < 0 { lock.locked { failed = errno } }
                     guard count > 0, buffer.withUnsafeBytes({ writeAll(into.1, UnsafeRawBufferPointer(rebasing: $0[0..<count])) })
                     else { break }
                     lock.locked { taken += Int64(count) }
@@ -277,6 +234,8 @@ public enum Runner {
 
         /// Bytes of the file taken so far.
         public var fed: Int64 { lock.locked { taken } }
+        /// The errno of a read of the file that failed: what was read is not all of it.
+        public var readError: Int32? { lock.locked { failed } }
 
         /// The next piece (up to `size` bytes), nil at the end. Blocks: call it off the main thread.
         public func next(_ size: Int = 4 << 20) -> Data? {
@@ -284,6 +243,7 @@ public enum Runner {
             while filled < size && !cancellation.isCancelled {
                 let count = data.withUnsafeMutableBytes { read(source, $0.baseAddress! + filled, size - filled) }
                 if count < 0 && errno == EINTR { continue }
+                if count < 0 && filtering == nil { lock.locked { failed = errno } }
                 guard count > 0 else { break }
                 filled += count
                 if filtering == nil { lock.locked { taken += Int64(count) } }
@@ -308,11 +268,6 @@ public enum Runner {
         await withCheckedContinuation { continuation in
             Thread.detachNewThread { continuation.resume(returning: work()) }
         }
-    }
-
-    private static func failure(_ tool: [String], _ filter: [String]?) -> Piped {
-        let result = CommandResult(status: 127, stderr: "Can't start \(tool[0]): \(String(cString: strerror(errno)))")
-        return Piped(tool: result, filter: filter == nil ? nil : result)
     }
 
     /// A started command, its error output collected (the end kept: a tool's last words say how it ended).

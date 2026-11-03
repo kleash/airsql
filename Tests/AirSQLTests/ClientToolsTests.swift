@@ -178,16 +178,18 @@ struct ClientToolsTests {
         // A tool's output through gzip into a file, counted on its way.
         let out = open(dir + "/out.gz", O_WRONLY | O_CREAT | O_TRUNC, 0o600)
         var seen = 0
-        let piped = await Runner.output(of: ["/bin/sh", "-c", "yes 'INSERT INTO t VALUES (1);' | head -n 20000"], to: out,
-                                        through: ["/usr/bin/gzip", "-c"], cancellation: Cancellation(), chunk: { seen += $0.count })
+        let gzip = try Runner.Writer(file: out, through: ["/usr/bin/gzip", "-c"], cancellation: Cancellation())
+        let piped = await Runner.output(of: ["/bin/sh", "-c", "yes 'INSERT INTO t VALUES (1);' | head -n 20000"], into: gzip,
+                                        cancellation: Cancellation(), chunk: { seen += $0.count })
         close(out)
         #expect(piped.tool.status == 0 && piped.filter?.status == 0 && piped.bytes == 20000 * 26 && seen == 20000 * 26)
         // The file back into a tool through gzip -dc, counted by what was read from the file.
         let size = try FileManager.default.attributesOfItem(atPath: dir + "/out.gz")[.size] as? Int64 ?? 0
         let input = open(dir + "/out.gz", O_RDONLY)
         var begun = false
-        let fed = await Runner.input(of: ["/bin/sh", "-c", "wc -l > '\(dir)/lines'"], from: input, through: ["/usr/bin/gzip", "-dc"],
-                                     cancellation: Cancellation(), begun: { begun = true }) { _ in }
+        let source = try Runner.Inflow(file: input, through: ["/usr/bin/gzip", "-dc"], cancellation: Cancellation())
+        let fed = await Runner.input(of: ["/bin/sh", "-c", "wc -l > '\(dir)/lines'"], from: source, cancellation: Cancellation(),
+                                     begun: { begun = true }) { _ in }
         close(input)
         #expect(fed.tool.status == 0 && fed.bytes == size && begun)
         #expect((try String(contentsOfFile: dir + "/lines")).trimmingCharacters(in: .whitespacesAndNewlines) == "20000")
@@ -195,7 +197,9 @@ struct ClientToolsTests {
         let cancellation = Cancellation()
         let devNull = open("/dev/null", O_WRONLY)
         DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { cancellation.cancel() }
-        let stopped = await Runner.output(of: ["/bin/sleep", "30"], to: devNull, cancellation: cancellation)
+        let stopped = await Runner.output(of: ["/bin/sleep", "30"], into: try Runner.Writer(file: devNull, through: nil,
+                                                                                            cancellation: cancellation),
+                                          cancellation: cancellation)
         close(devNull)
         #expect(stopped.tool.status == 128 + SIGTERM)
         // A tool that isn't there.
