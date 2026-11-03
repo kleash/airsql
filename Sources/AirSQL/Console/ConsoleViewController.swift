@@ -147,10 +147,14 @@ final class ConsoleViewController: NSViewController, TabContent {
         })
     }
 
-    /// The editor over the results, about half each, the first time the console is laid out at its size, unless the
-    /// person moved the divider before (then it is where they left it).
     override func viewDidLayout() {
         super.viewDidLayout()
+        placeDivider()
+    }
+
+    /// The editor over the results, about half each, the first time the console is laid out at its size, unless the
+    /// person moved the divider before (then it is where they left it).
+    private func placeDivider() {
         guard !placedDivider, split.bounds.height > 2 * 120 else { return }
         placedDivider = true
         if split.autosaveName == nil || UserDefaults.standard.object(forKey: "NSSplitView Subview Frames Console") == nil {
@@ -160,6 +164,9 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     override func viewDidAppear() {
         super.viewDidAppear()
+        // A new tab's first layout comes before it has its size, and none follows.
+        view.window?.layoutIfNeeded()
+        placeDivider()
         view.window?.makeFirstResponder(editor)
         syncToolbar()
     }
