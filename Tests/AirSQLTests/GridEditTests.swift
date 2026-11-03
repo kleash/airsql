@@ -109,4 +109,83 @@ struct GridEditTests {
         let weird = try #require(snapshot.table("airsql_fixture", "we`ird 'name' ✓"))
         #expect(throws: EditError.self) { try weird.readBackQuery(database: "airsql_fixture", values: [:], insertID: 1) }
     }
+
+    // MARK: Foreign keys
+
+    @Test(arguments: [SchemaFixtures.mariadb118, SchemaFixtures.mysql84])
+    func foreignKeyLookupsAreSearchedAndLimited(_ recording: String) async throws {
+        let snapshot = try await Self.snapshot(recording)
+        let orders = try #require(snapshot.table("airsql_fixture", "orders"))
+        let customers = try #require(snapshot.table("airsql_fixture", "customers"))
+        let key = try #require(ForeignKeyQueries.foreignKey(of: "customer_id", in: orders))
+        #expect(key.name == "orders_customer")
+        #expect(ForeignKeyQueries.defaultLabel(customers, key: key.referencedColumns) == "email")
+        func lookup(_ label: String?, _ search: String, _ context: EditContext = C.mysql) -> String {
+            ForeignKeyQueries.lookup(key, referenced: customers, label: label, search: search, context: context)
+        }
+        #expect(lookup("email", "") == "SELECT `id`, `email` FROM `airsql_fixture`.`customers` ORDER BY `email` LIMIT 100")
+        #expect(lookup("email", " ada_%! ") == "SELECT `id`, `email` FROM `airsql_fixture`.`customers` "
+            + "WHERE `email` LIKE '%ada!_!%!!%' ESCAPE '!' ORDER BY `email` LIMIT 100")
+        #expect(lookup("email", "12") == "SELECT `id`, `email` FROM `airsql_fixture`.`customers` "
+            + "WHERE `email` LIKE '%12%' ESCAPE '!' OR `id` = 12 ORDER BY `email` LIMIT 100")
+        #expect(lookup("status", "x").hasSuffix("ORDER BY `id` LIMIT 100"))  // no index starts with status
+        #expect(lookup("note", "x").hasSuffix("ORDER BY `id` LIMIT 100"))  // a FULLTEXT index doesn't order
+        #expect(lookup(nil, "12") == "SELECT `id` FROM `airsql_fixture`.`customers` WHERE `id` = 12 ORDER BY `id` LIMIT 100")
+        #expect(lookup(nil, "x") == "SELECT `id` FROM `airsql_fixture`.`customers` WHERE `id` LIKE '%x%' ESCAPE '!' ORDER BY `id` LIMIT 100")
+        #expect(ForeignKeyQueries.lookup(key, referenced: customers, label: "id", search: "", limit: 0, context: C.mysql)
+            == "SELECT `id` FROM `airsql_fixture`.`customers` ORDER BY `id` LIMIT 1")
+        // Whatever is searched for, the statement stays one read-only SELECT, in either backslash mode (the check refuses
+        // any NUL, which NO_BACKSLASH_ESCAPES leaves as it is inside the string).
+        for search in Hostile.values {
+            for (context, noBackslashEscapes) in [(C.mysql, false), (C.withMode("NO_BACKSLASH_ESCAPES"), true)]
+            where !(noBackslashEscapes && search.unicodeScalars.contains("\0")) {
+                let sql = lookup("email", search, context)
+                #expect(ReadOnlyClassifier.classify(sql, noBackslashEscapes: noBackslashEscapes) == .readOnly, "\(sql)")
+            }
+        }
+        // A key of two columns, and a table with no text column to label it.
+        let lines = try #require(snapshot.table("airsql_fixture", "order_lines"))
+        let linesKey = try #require(ForeignKeyQueries.foreignKey(of: "number", in: lines))
+        #expect(ForeignKeyQueries.defaultLabel(orders, key: linesKey.referencedColumns) == nil)
+        #expect(ForeignKeyQueries.lookup(linesKey, referenced: orders, label: nil, search: "EU", context: C.mysql)
+            == "SELECT `region`, `number` FROM `airsql_fixture`.`orders` WHERE `region` LIKE '%EU%' ESCAPE '!' "
+            + "ORDER BY `region`, `number` LIMIT 100")
+        #expect(ForeignKeyQueries.display(label: "Ada", key: ["12"]) == "Ada (12)")
+        #expect(ForeignKeyQueries.display(label: nil, key: ["EU", "7"]) == "EU, 7")
+    }
+
+    @Test(arguments: [SchemaFixtures.mariadb118, SchemaFixtures.mysql84])
+    func relatedRowsBothWays(_ recording: String) async throws {
+        let snapshot = try await Self.snapshot(recording)
+        let orders = try #require(snapshot.table("airsql_fixture", "orders"))
+        let customers = try #require(snapshot.table("airsql_fixture", "customers"))
+        let lines = try #require(snapshot.table("airsql_fixture", "order_lines"))
+        func bytes(_ text: String) -> [UInt8]? { Array(text.utf8) }
+        let key = try #require(ForeignKeyQueries.foreignKey(of: "customer_id", in: orders))
+        let parent = try ForeignKeyQueries.referenced(by: key, from: orders, row: ["customer_id": bytes("12")], context: C.mysql)
+        #expect(parent == .init(database: "airsql_fixture", table: "customers", foreignKey: "orders_customer",
+                                condition: "`id` = 12", sql: "SELECT * FROM `airsql_fixture`.`customers` WHERE `id` = 12"))
+        #expect(throws: EditError("customer_id is NULL, so it refers to no row")) {
+            try ForeignKeyQueries.referenced(by: key, from: orders, row: ["customer_id": nil], context: C.mysql)
+        }
+        #expect(throws: EditError.self) { try ForeignKeyQueries.referenced(by: key, from: orders, row: [:], context: C.mysql) }
+        let linesKey = try #require(ForeignKeyQueries.foreignKey(of: "region", in: lines))
+        let order = try ForeignKeyQueries.referenced(by: linesKey, from: lines, row: ["region": bytes("E'U"), "number": bytes("7")],
+                                                     context: C.mysql)
+        #expect(order.condition == "`region` = 'E\\'U' AND `number` = 7")
+
+        let buyers = ForeignKeyQueries.referencing(database: "airsql_fixture", table: customers, row: ["id": bytes("12")],
+                                                   snapshot: snapshot, context: C.mysql)
+        #expect(buyers.map(\.table) == ["refs", "orders"] && buyers.map(\.database) == ["airsql other", "airsql_fixture"])
+        #expect(buyers.map(\.condition) == ["`customer_id` = 12", "`customer_id` = 12"])
+        #expect(buyers.last?.sql == "SELECT * FROM `airsql_fixture`.`orders` WHERE `customer_id` = 12")
+        let children = ForeignKeyQueries.referencing(database: "airsql_fixture", table: orders,
+                                                     row: ["id": bytes("5"), "region": bytes("EU"), "number": bytes("7")],
+                                                     snapshot: snapshot, context: C.mysql)
+        #expect(children.map(\.foreignKey) == ["lines_order", "orders_parent"])
+        #expect(children.map(\.condition) == ["`region` = 'EU' AND `number` = 7", "`parent_id` = 5"])
+        // Without the key's values (or with NULL) a row has no children to show.
+        #expect(ForeignKeyQueries.referencing(database: "airsql_fixture", table: orders, row: ["id": nil, "region": bytes("EU")],
+                                              snapshot: snapshot, context: C.mysql).isEmpty)
+    }
 }
