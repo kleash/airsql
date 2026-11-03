@@ -84,7 +84,7 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.addRow.action: return (editable, readOnly)
         case Commands.duplicateRow.action, Commands.duplicateRowWithoutKeys.action, Commands.deleteRows.action:
             return !editable ? (false, readOnly) : (hasSelection, "Select the rows first")
-        case Commands.setNull.action, Commands.setDefault.action:
+        case Commands.setNull.action, Commands.setDefault.action, Commands.insertValue.action:
             if !editable { return (false, readOnly) }
             // The first cells tell (listing a big selection would take a while).
             let cells = viewer.selectedCells(limit: 10_000).filter { source.canEdit($0.row, $0.column) }

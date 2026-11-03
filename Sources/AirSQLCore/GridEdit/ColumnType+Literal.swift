@@ -182,7 +182,7 @@ extension ColumnType {
     }
 
     /// Hex digits, as the grid shows bytes ("0x00FF") or as X'00FF', with spaces allowed between bytes.
-    static func hexBytes(_ text: String) throws -> [UInt8] {
+    public static func hexBytes(_ text: String) throws -> [UInt8] {
         var digits = Substring(text.filter { !$0.isWhitespace })
         if digits.lowercased().hasPrefix("x'"), digits.hasSuffix("'"), digits.count >= 3 {
             digits = digits.dropFirst(2).dropLast()

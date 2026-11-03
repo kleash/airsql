@@ -89,7 +89,8 @@ extension DataGridView {
                 let limit = Int(available / (styles.regular.pointSize * 0.2)) + 1
                 if !info.isKey, text.count > limit { text = String(text.prefix(limit)) + "…" }
                 let deleted = mark == .deleted
-                let (attributes, ellipsis) = look(sourceColumn, info, isNull: cell == .null, deleted: deleted)
+                // NULL and what the server fills in at Apply (auto, default, ƒ NOW()) look alike: grey and slanted.
+                let (attributes, ellipsis) = look(sourceColumn, info, isNull: cell == .null || cell.isPlaceholder, deleted: deleted)
                 var line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
                 var width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
                 if width > available {

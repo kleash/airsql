@@ -3,12 +3,17 @@ import AppKit
 
 /// The grid's one editor overlay: a text field over the cell being edited. Return commits, Tab and ⇧Tab commit and
 /// move, Esc cancels, a click elsewhere commits. A commit goes to the grid's delegate as a pending change; nothing is
-/// written to the database here.
+/// written to the database here. A value the delegate's check refuses keeps the editor open, saying why under it;
+/// typing is never blocked. ↑ and ↓ step the part of a date or time under the cursor (the delegate's step).
 final class GridEditor: NSTextField, NSTextFieldDelegate {
     let position: GridPosition
     private unowned let grid: DataGridView
     /// Whether the text was changed: an editor closed without a change commits nothing.
     private(set) var changed = false
+    /// Esc: the editor closes whatever its text.
+    var cancelling = false
+    /// Why the text can't be kept, under the editor.
+    private var problem: NSPopover?
 
     init(grid: DataGridView, position: GridPosition, text: String, font: NSFont) {
         self.grid = grid
@@ -38,7 +43,10 @@ final class GridEditor: NSTextField, NSTextFieldDelegate {
                        width: max(20, cell.width - 2 * GridStyles.padding + 4), height: height)
     }
 
-    func controlTextDidChange(_ obj: Notification) { changed = true }
+    func controlTextDidChange(_ obj: Notification) {
+        changed = true
+        problem?.close()
+    }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         switch selector {
@@ -46,9 +54,52 @@ final class GridEditor: NSTextField, NSTextFieldDelegate {
         case #selector(insertTab(_:)): grid.endEditing(commit: true, move: .next)
         case #selector(insertBacktab(_:)): grid.endEditing(commit: true, move: .previous)
         case #selector(cancelOperation(_:)): grid.endEditing(commit: false)
+        case #selector(moveUp(_:)), #selector(moveDown(_:)):
+            let column = grid.columnOrder[position.column]
+            guard let (text, part) = grid.delegate?.dataGrid(grid, step: textView.string, at: textView.selectedRange().location,
+                                                              by: selector == #selector(moveUp(_:)) ? 1 : -1,
+                                                              row: position.row, column: column) else { return false }
+            textView.string = text
+            textView.setSelectedRange(part)
+            controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
         default: return false
         }
         return true
+    }
+
+    /// Why the text can't be kept, nil when it can (or wasn't changed).
+    var refusal: String? {
+        guard changed, !cancelling, position.row < grid.rowCount, position.column < grid.columnCount else { return nil }
+        return grid.delegate?.dataGrid(grid, check: stringValue, row: position.row, column: grid.columnOrder[position.column])
+    }
+
+    /// A click elsewhere can't take the keyboard while the text is refused: it says why instead.
+    func control(_ control: NSControl, textShouldEndEditing fieldEditor: NSText) -> Bool {
+        guard let refusal else { return true }
+        show(problem: refusal)
+        return false
+    }
+
+    /// Says under the editor why its text can't be kept, until the text changes.
+    func show(problem message: String) {
+        NSSound.beep()
+        problem?.close()
+        let text = label(message + "\nFix the value, or press Esc to leave the cell as it was.", font: .systemFont(ofSize: 12))
+        text.preferredMaxLayoutWidth = 320
+        text.setAccessibilityIdentifier("grid.editor.problem")
+        let content = NSViewController()
+        content.view = NSStackView(views: [text])
+        (content.view as? NSStackView)?.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+        let popover = NSPopover()
+        popover.contentViewController = content
+        popover.behavior = .applicationDefined
+        popover.show(relativeTo: bounds, of: self, preferredEdge: .maxY)
+        problem = popover
+    }
+
+    override func removeFromSuperview() {
+        problem?.close()
+        super.removeFromSuperview()
     }
 
     /// The field lost the keyboard some other way (a click elsewhere): keeps the edit.
@@ -67,6 +118,7 @@ extension DataGridView {
         // Typing over several selected cells keeps them selected: the host gives them all the value (multi-cell edit).
         if text == nil || !selection.contains(position) { selection.select(position) }
         reveal(cellRect(position))
+        if delegate?.dataGrid(self, edit: position.row, column: column, typed: text) == true { return }
         // The stored value, not what Display As shows (a date for a Unix time) or a new row's (auto) mark.
         let editor = GridEditor(grid: self, position: position, text: text ?? source.value(position.row, column) ?? "",
                                 font: styles.font(source.columns[column], isNull: false))
@@ -82,9 +134,16 @@ extension DataGridView {
         setNeedsDisplay(cellRect(position))
     }
 
-    /// Closes the editor: with `commit`, a changed value goes to the delegate; then the cursor moves (Tab).
-    func endEditing(commit: Bool, move: GridSelection.Move? = nil, refocus: Bool = true) {
-        guard let editor else { return }
+    /// Closes the editor: with `commit`, a changed value goes to the delegate; then the cursor moves (Tab). False when
+    /// the delegate refuses the value: the editor stays open and says why.
+    @discardableResult
+    func endEditing(commit: Bool, move: GridSelection.Move? = nil, refocus: Bool = true) -> Bool {
+        guard let editor else { return true }
+        if commit, let refusal = editor.refusal {
+            editor.show(problem: refusal)
+            return false
+        }
+        editor.cancelling = !commit
         self.editor = nil
         let text = editor.stringValue, position = editor.position
         editor.delegate = nil
@@ -93,5 +152,6 @@ extension DataGridView {
         if commit, editor.changed { self.commit(text, at: position) }
         if position.row < rowCount, position.column < columnCount { setNeedsDisplay(cellRect(position)) }
         if let move { self.move(move) }
+        return true
     }
 }

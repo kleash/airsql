@@ -86,6 +86,7 @@ import AppKit
     @objc optional func addRow(_ sender: Any?)
     @objc optional func duplicateRow(_ sender: Any?)
     @objc optional func duplicateRowWithoutKeys(_ sender: Any?)
+    @objc optional func pasteAsNewRows(_ sender: Any?)
     @objc optional func deleteRows(_ sender: Any?)
     @objc optional func setCellNull(_ sender: Any?)
     @objc optional func setCellDefault(_ sender: Any?)
@@ -420,6 +421,8 @@ enum Commands {
                                       tip: "Add a copy of the selected rows, keys included")
     static let duplicateRowWithoutKeys = Command("Duplicate Row Without Keys", #selector(AirSQLActions.duplicateRowWithoutKeys(_:)), "D",
                                                  tip: "Add a copy of the selected rows, leaving their keys to the server")
+    static let pasteAsNewRows = Command("Paste as New Rows", #selector(AirSQLActions.pasteAsNewRows(_:)),
+                                        tip: "Add the copied cells as new rows; they are saved when you apply the changes")
     static let deleteRows = Command("Delete Rows…", #selector(AirSQLActions.deleteRows(_:)), "\u{8}",
                                     tip: "Mark the selected rows for deletion; they are deleted when you apply")
     static let setNull = Command("Set NULL", #selector(AirSQLActions.setCellNull(_:)), "n", [.command, .option],
@@ -614,7 +617,7 @@ enum Commands {
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
-        addRow, duplicateRow, duplicateRowWithoutKeys, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
+        addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterByValues, clearFilter, sortAscending,
         sortDescending, clearSort, goToRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
         exportRows,

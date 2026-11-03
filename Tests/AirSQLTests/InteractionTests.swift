@@ -147,11 +147,11 @@ extension AppTests {
                         (main.selectedTab?.content as? TableDataController)?.grid.selection.cursor == GridPosition(row: 1, column: 1)
                     },
                     doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Add Row",
-                           "Duplicate Row", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel",
-                           "Record View", "Column Summary…", "Display As"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set NULL", "Set DEFAULT", "Add Row", "Duplicate Row",
-                              "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
+                           "Add Row", "Duplicate Row", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
+                           "Value Panel", "Record View", "Column Summary…", "Display As"],
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set NULL", "Set DEFAULT", "Insert Value", "Add Row",
+                              "Duplicate Row", "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
             Surface(name: "Grid cell",
                     place: { main, _ in
                         let grid = resultGrid(main)

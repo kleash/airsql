@@ -123,11 +123,19 @@ public enum GridCell: Equatable, Sendable {
     case null
     /// Its page hasn't arrived yet.
     case loading
+    /// What the server puts there when Apply runs, drawn like NULL: a new row's "auto" or "default", or a pending
+    /// expression such as "ƒ NOW()".
+    case placeholder(String)
 
-    /// The text an editor or a copy starts from: "" for NULL and for a cell still loading.
+    /// The text an editor or a copy starts from: "" for NULL, a placeholder and a cell still loading.
     public var text: String {
         if case .text(let text) = self { return text }
         return ""
+    }
+
+    public var isPlaceholder: Bool {
+        if case .placeholder = self { return true }
+        return false
     }
 }
 

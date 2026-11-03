@@ -78,8 +78,7 @@ final class GridRowNumberView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        grid.window?.makeFirstResponder(grid)
-        guard let row = row(at: event) else { return }
+        guard grid.takeKeyboard(), let row = row(at: event) else { return }
         if event.clickCount == 2 {
             dragging = false
             grid.delegate?.dataGrid(grid, openRecord: row)
@@ -102,8 +101,7 @@ final class GridRowNumberView: NSView {
 
     /// A right click on a row that isn't selected selects it first.
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let row = row(at: event) else { return nil }
-        grid.window?.makeFirstResponder(grid)
+        guard let row = row(at: event), grid.takeKeyboard() else { return nil }
         if !grid.selection.containsRow(row) { grid.selection.selectRow(row) }
         return grid.delegate?.dataGrid(grid, menuFor: .row(row))
     }

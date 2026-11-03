@@ -32,6 +32,9 @@ public final class TableDataSource: GridSource {
     public private(set) var hasMore = true
     /// The loaded rows shown while the local filter is on.
     private var shown: [Int]?
+    /// New rows Apply wrote, read back from the server with what it filled in (the AUTO_INCREMENT key, defaults):
+    /// shown after the loaded rows, where they were added, until a page brings them. Load More's offset leaves them out.
+    public private(set) var saved: [ResultStore] = []
 
     public init(database: String, table: SchemaTable) {
         self.database = database
@@ -102,8 +105,10 @@ public final class TableDataSource: GridSource {
         return "SELECT \(name), COUNT(*)" + from + " GROUP BY \(name) ORDER BY COUNT(*) DESC, \(name) LIMIT \(limit)"
     }
 
-    /// Forgets the loaded rows (a new filter or sort, Refresh); the pending changes stay.
-    public func reset() {
+    /// Forgets the loaded rows (a new filter or sort, Refresh); the pending changes stay, and with `keepingSaved` the rows
+    /// read back after Apply.
+    public func reset(keepingSaved: Bool = false) {
+        if !keepingSaved { saved = [] }
         pages = []
         pageStarts = []
         loadedRows = 0
@@ -113,6 +118,11 @@ public final class TableDataSource: GridSource {
 
     /// Adds a page that asked for `requested` rows (nil: all the rest), after the rows already loaded.
     public func append(_ page: ResultStore, requested: Int?) {
+        if !saved.isEmpty, let key, page.rowCount > 0 {
+            // A row read back after Apply that this page brings shows once, where the page has it.
+            let keys = Set((0..<page.rowCount).map { row in key.map { Self.text(page, row, $0) ?? "" } })
+            saved.removeAll { store in keys.contains(key.map { Self.text(store, 0, $0) ?? "" }) }
+        }
         if page.rowCount > 0 {
             pages.append(page)
             pageStarts.append(loadedRows)
@@ -120,6 +130,12 @@ public final class TableDataSource: GridSource {
         }
         hasMore = requested.map { page.rowCount >= $0 } ?? false || page.capped
         applyLocalFilter()
+    }
+
+    /// Adds a new row read back after Apply (one row, the table's columns in order).
+    public func addSaved(_ row: ResultStore) {
+        guard row.rowCount == 1, row.columns.count == columns.count else { return }
+        saved.append(row)
     }
 
     /// The end of Load All's stream.
@@ -142,11 +158,13 @@ public final class TableDataSource: GridSource {
         case inserted(UUID)
     }
 
-    public var shownLoadedRows: Int { shown?.count ?? loadedRows }
+    public var shownLoadedRows: Int { (shown?.count ?? loadedRows) + saved.count }
     public var rowCount: Int { shownLoadedRows + changes.state.inserts.count }
 
     public func row(_ index: Int) -> Row? {
-        if index < shownLoadedRows { return .loaded(shown?[index] ?? index) }
+        let pageRows = shown?.count ?? loadedRows
+        if index < pageRows { return .loaded(shown?[index] ?? index) }
+        if index < shownLoadedRows { return .loaded(loadedRows + index - pageRows) }  // read back after Apply
         let inserts = changes.state.inserts, new = index - shownLoadedRows
         return inserts.indices.contains(new) ? .inserted(inserts[new].id) : nil
     }
@@ -168,6 +186,7 @@ public final class TableDataSource: GridSource {
     }
 
     private func page(_ row: Int) -> (ResultStore, Int) {
+        if row >= loadedRows { return (saved[row - loadedRows], 0) }
         var low = 0, high = pageStarts.count - 1
         while low < high {
             let middle = (low + high + 1) / 2
@@ -232,10 +251,25 @@ public final class TableDataSource: GridSource {
         }
     }
 
-    /// What a new row's unset AUTO_INCREMENT or generated cell shows until Apply.
+    /// What a cell shows while the server decides its value at Apply: a pending DEFAULT or expression ("ƒ NOW()"), or a
+    /// new row's untouched column ("auto", "default", "generated"); nil for a value or NULL.
     private func placeholder(_ index: Int, _ column: Int) -> String? {
-        guard case .inserted(let id) = row(index), changes.insert(id)?.values[columns[column].name] == nil else { return nil }
-        return table.columns[column].autoIncrement ? "(auto)" : table.columns[column].generated != nil ? "(generated)" : nil
+        let name = columns[column].name, pending: PendingChanges.Value?
+        switch row(index) {
+        case .loaded: pending = changes.state.edits.isEmpty ? nil : rowKey(index).flatMap { changes.value($0, name) }
+        case .inserted(let id):
+            pending = changes.insert(id)?.values[name]
+            if pending == nil {
+                let untouched = table.columns[column].newRowValue
+                return untouched == .null || untouched == .required ? nil : untouched.placeholder
+            }
+        case nil: return nil
+        }
+        switch pending {
+        case .default?: return "default"
+        case .sql(let sql)?: return "ƒ " + sql
+        default: return nil
+        }
     }
 
     private func shownText(_ value: PendingChanges.Value) -> String? { value == .default ? "DEFAULT" : nil }
@@ -244,7 +278,8 @@ public final class TableDataSource: GridSource {
 
     public func cell(_ row: Int, _ column: Int) -> GridCell {
         guard row < rowCount else { return .loading }
-        guard let text = value(row, column) ?? placeholder(row, column) else { return .null }
+        if let shown = placeholder(row, column) { return .placeholder(shown) }
+        guard let text = value(row, column) else { return .null }
         guard !columns[column].isKey, text.count > Self.shownLimit else { return .text(text) }
         return .text(String(text.prefix(Self.shownLimit)) + "…")
     }

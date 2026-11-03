@@ -11,9 +11,11 @@ extension MainMenu {
         menus.edit.insertItem(GridCopy.copyAsItem(), at: copy + 2)
         menus.edit.insertItem(Commands.copyColumnName.item(), at: copy + 3)
         menus.edit.insertItem(Commands.copySummary.item(), at: copy + 4)
-        menus.data.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, nil,
-                        Commands.setNull, Commands.setDefault, nil, Commands.apply, Commands.previewChanges, Commands.revert, nil,
-                        Commands.filter, Commands.searchAllColumns])
+        menus.data.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.pasteAsNewRows,
+                        Commands.deleteRows, nil,
+                        Commands.setNull, Commands.setDefault])
+        menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
+        menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
         menus.data.addItem(submenu("Quick Filter", [Commands.filterEquals.item(), Commands.filterNotEquals.item()]))
         menus.data.add([Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending, Commands.clearSort, nil,
                         Commands.goToRow, Commands.columnSummary, Commands.hideColumn])
@@ -30,5 +32,21 @@ extension MainMenu {
             return item
         }))
         menus.view.add([Commands.chart])
+    }
+}
+
+/// Data ▸ Insert Value: the items for the focused cell's column of the table tab in front, made as the menu opens.
+@MainActor
+final class InsertValueMenu: NSObject, NSMenuDelegate {
+    static let shared = InsertValueMenu()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let items = (NSApp.target(forAction: Commands.insertValue.action, to: nil, from: nil) as? TableDataController)?.insertValueItems() ?? []
+        items.forEach(menu.addItem)
+        guard items.isEmpty else { return }
+        let none = NSMenuItem(title: "Select a Cell of a Table First", action: nil, keyEquivalent: "")
+        none.toolTip = "Insert Value puts a value the server works out into the selected cells of a table's rows"
+        menu.addItem(none)
     }
 }

@@ -5,11 +5,11 @@ import AppKit
 // until Apply runs them in one transaction on the data session; Preview SQL shows them first; Revert and undo take
 // them back. Typing over several selected cells sets them all.
 extension TableDataController: DataGridViewDelegate {
-    /// In place: not on a read-only connection, and not a value longer than the cell shows (too long for the cell's
-    /// editor: the value panel shows it whole).
+    /// Not on a read-only connection, nor a generated column or a row being deleted. A long value is edited in the
+    /// value panel (`dataGrid(_:edit:column:typed:)`).
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool {
-        guard let source, editingOff == nil, source.canEdit(row, column) else { return false }
-        return (source.value(row, column)?.count ?? 0) <= TableDataSource.shownLimit
+        guard let source, editingOff == nil else { return false }
+        return source.canEdit(row, column)
     }
 
     /// Why nothing can be edited here, if so: a read-only connection, or a table without a key (a view, a sequence).
@@ -20,15 +20,14 @@ extension TableDataController: DataGridViewDelegate {
         return source?.readOnlyReason
     }
 
+    /// Typing over several selected cells gives each one the value its column takes (multi-cell edit).
     func dataGrid(_ grid: DataGridView, didEditRow row: Int, column: Int, text: String) {
-        guard let source else { return }
         let cells = selectedCells()
         if cells.count > 1, cells.contains(where: { $0.row == row && $0.column == column }) {
-            for cell in cells where source.canEdit(cell.row, cell.column) { source.set(.text(text), row: cell.row, column: cell.column) }
+            setSelected { _ in .text(text) }
         } else {
-            source.set(.text(text), row: row, column: column)
+            keep(.text(text), row: row, column: column)
         }
-        changesDidChange()
     }
 
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {
@@ -46,10 +45,13 @@ extension TableDataController: DataGridViewDelegate {
             menu.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, Commands.revert])
         case .cells:
             menu.addItem(quickFilterItem())
-            menu.add([Commands.clearFilter, nil, Commands.setNull, Commands.setDefault, nil, Commands.addRow, Commands.duplicateRow,
-                      Commands.deleteRows, Commands.revert, nil, Commands.previewChanges, Commands.apply, nil, Commands.exportRows])
+            menu.add([Commands.clearFilter, nil, Commands.setNull, Commands.setDefault])
+            let values = insertValueItems()
+            if !values.isEmpty { menu.addItem(MainMenu.submenu("Insert Value", values)) }
+            menu.add([nil, Commands.addRow, Commands.duplicateRow, Commands.deleteRows, Commands.revert, nil, Commands.previewChanges,
+                      Commands.apply, nil, Commands.exportRows])
         }
-        for item in menu.items where item.target == nil { item.target = self }
+        for item in menu.items + (menu.items.compactMap(\.submenu).flatMap(\.items)) where item.target == nil { item.target = self }
         return menu
     }
 
@@ -113,16 +115,8 @@ extension TableDataController: DataGridViewDelegate {
         changesDidChange()
     }
 
-    @objc func setCellNull(_ sender: Any?) { setSelected(.null) }
-    @objc func setCellDefault(_ sender: Any?) { setSelected(.default) }
-
-    private func setSelected(_ value: PendingChanges.Value) {
-        guard let source, editingOff == nil else { return NSSound.beep() }
-        for cell in selectedCells() where source.canEdit(cell.row, cell.column) {
-            source.set(value, row: cell.row, column: cell.column)
-        }
-        changesDidChange()
-    }
+    @objc func setCellNull(_ sender: Any?) { setSelected { _ in .null } }
+    @objc func setCellDefault(_ sender: Any?) { setSelected { _ in .default } }
 
     /// Revert (⌥⌘Z): the selected rows' changes.
     @objc func revertChanges(_ sender: Any?) {
@@ -175,6 +169,9 @@ extension TableDataController: DataGridViewDelegate {
     /// it (the person approves it there once, not statement by statement), or when there is a warning (an engine that
     /// can't roll back, cascading deletes); then runs it.
     private func startApply(preview: Bool) {
+        // A value being edited is kept first; one its column refuses stays in its editor, which says why.
+        viewer.valuePanel?.keepValue(nil)
+        guard grid.endEditing(commit: true), viewer.valuePanel?.edited != true else { return }
         guard let source, !source.changes.isEmpty, loading == nil else { return NSSound.beep() }
         bar.busy = true
         loading = Task {
@@ -188,8 +185,21 @@ extension TableDataController: DataGridViewDelegate {
                                  title: "AirSQL couldn't reach the server", on: view.window)
             }
             loading = nil
-            let statements = source.changes.statements(database: database, table: tableName, columns: source.columns,
-                                                       noBackslashEscapes: session.noBackslashEscapes)
+            // Each value as SQL for its column's type, checked again as the server's sql_mode will (a value restored
+            // from before, or found and replaced, wasn't checked as it was typed).
+            let types = Dictionary(source.table.columns.map { ($0.name, ColumnType($0)) }, uniquingKeysWith: { first, _ in first })
+            let values = self.values, statements: [PendingChanges.Statement]
+            do {
+                statements = try source.changes.statements(database: database, table: tableName, columns: source.columns,
+                                                           noBackslashEscapes: session.noBackslashEscapes) { text, column in
+                    guard let type = types[column] else { throw EditError("The table has no column \(column) any more") }
+                    return try type.literal(text, values)
+                }
+            } catch {
+                if let failure = error as? ApplyFailure { point(at: failure.statement.target) }
+                return showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
+                                 title: "Nothing was applied to \(tableName)", on: view.window)
+            }
             let warnings = TableEditing.warnings(source.table, database: database, deleting: !source.changes.state.deletes.isEmpty,
                                                  in: context.schema.snapshot)
             let change = ChangeSQL(title: "Apply changes to \(tableName)", statements: statements.map(\.sql), connection: context.connection.id)
@@ -230,13 +240,23 @@ extension TableDataController: DataGridViewDelegate {
         loading = Task {
             defer { Self.applying.remove(connection) }
             do {
-                try await PendingChanges.apply(statements) { sql in try await session.query(sql, rowCap: 1).last?.affectedRows ?? 0 }
+                var insertIDs: [UInt64] = []
+                try await PendingChanges.apply(statements) { sql in
+                    let result = try await session.query(sql, rowCap: 1).last
+                    if sql.hasPrefix("INSERT ") { insertIDs.append(result?.insertID ?? 0) }
+                    return result?.affectedRows ?? 0
+                }
+                let readBack = readBackQueries(statements, insertIDs: insertIDs)
                 source.changes = PendingChanges(keyColumns: source.changes.keyColumns)
                 changesDidChange()
                 if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
+                // New rows stay where they were, with what the server filled in (their AUTO_INCREMENT key, defaults).
+                for sql in readBack {
+                    if let row = try? await session.query(sql, rowCap: 1).first?.rows, row.rowCount == 1 { source.addSaved(row) }
+                }
                 activity.end()
                 loading = nil
-                loadRows(more: false, through: source.loadedRows)
+                loadRows(more: false, through: source.loadedRows, keepingSaved: true)
             } catch {
                 activity.end()
                 loading = nil
@@ -245,6 +265,27 @@ extension TableDataController: DataGridViewDelegate {
                 showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
                           title: "Nothing was applied to \(tableName)", on: view.window)
             }
+        }
+    }
+
+    /// The SELECTs that read the new rows back after Apply, by their key: the insert ID stands in for an AUTO_INCREMENT
+    /// key left to the server. None for a row whose key the server made some other way (a DEFAULT such as UUID()), nor
+    /// past 100 new rows: the rows loading again show those.
+    private func readBackQueries(_ statements: [PendingChanges.Statement], insertIDs: [UInt64]) -> [String] {
+        guard let source, let keyColumns = source.table.editingKey else { return [] }
+        let inserts = statements.compactMap { statement -> UUID? in
+            if case .insert(let id) = statement.target { return id }
+            return nil
+        }
+        guard inserts.count == insertIDs.count, inserts.count <= 100 else { return [] }
+        return zip(inserts, insertIDs).compactMap { id, insertID in
+            guard let given = source.changes.insert(id)?.values else { return nil }
+            var literals: [String: String] = [:]
+            for name in keyColumns {
+                guard case .text(let text)? = given[name], let column = source.table.column(name) else { continue }
+                literals[name] = try? ColumnType(column).literal(text, values)
+            }
+            return try? source.table.readBackQuery(database: database, values: literals, insertID: insertID)
         }
     }
 

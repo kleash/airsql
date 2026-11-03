@@ -184,7 +184,7 @@ final class GridHeaderView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil), flags = event.modifierFlags
-        grid.window?.makeFirstResponder(grid)
+        guard grid.takeKeyboard() else { return }
         if let column = border(at: point) {
             if event.clickCount == 2 {
                 grid.autoFit(column)
@@ -272,8 +272,7 @@ final class GridHeaderView: NSView {
 
     /// A right click on a column that isn't selected selects it first.
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let column = column(at: convert(event.locationInWindow, from: nil)) else { return nil }
-        grid.window?.makeFirstResponder(grid)
+        guard let column = column(at: convert(event.locationInWindow, from: nil)), grid.takeKeyboard() else { return nil }
         if !grid.selection.containsColumn(column) { grid.selection.selectColumn(column) }
         return grid.delegate?.dataGrid(grid, menuFor: .column(grid.columnOrder[column]))
     }
