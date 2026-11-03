@@ -134,6 +134,6 @@ extension AppDelegate {
 
     /// Help ▸ AI Agents: the page of AirSQL Help about agents.
     @objc func showAgentGuide(_ sender: Any?) {
-        NSWorkspace.shared.open(URL(string: "agents.html", relativeTo: HelpPage.site)?.absoluteURL ?? HelpPage.site)
+        NSWorkspace.shared.open(HelpPage.agents.url)
     }
 }

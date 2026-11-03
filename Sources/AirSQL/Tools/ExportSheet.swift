@@ -108,8 +108,6 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
                 action: #selector(copyCommand(_:)))]
     }
 
-    override var helpPage: HelpPage { .settings }
-
     override func setFormEnabled(_ enabled: Bool) {
         let why = enabled ? nil : "It is running: wait for it, or Stop it"
         for control in [content, snapshot, hexBlob, gzip, dropTable, objects, toolMenu, choose, extra] as [NSControl] {

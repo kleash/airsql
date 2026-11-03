@@ -39,7 +39,8 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         exportMermaid.action = #selector(exportMermaid(_:))
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let bar = NSStackView(views: [label("Database:"), databases, summary, spacer, exportImage, exportMermaid])
+        let bar = NSStackView(views: [label("Database:"), databases, summary, spacer, exportImage, exportMermaid,
+                                      helpButton(.editors)])
         bar.spacing = Spacing.unit
         bar.alignment = .firstBaseline
         bar.setCustomSpacing(Spacing.double, after: databases)

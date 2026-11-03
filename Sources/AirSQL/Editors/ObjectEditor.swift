@@ -88,7 +88,8 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         revertButton.target = self
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let bar = NSStackView(views: [kindLabel, definerLabel, definer, spacer, status, revertButton, applyButton])
+        let bar = NSStackView(views: [kindLabel, definerLabel, definer, spacer, status, revertButton, applyButton,
+                                      helpButton(.editors)])
         bar.spacing = Spacing.unit
         bar.alignment = .firstBaseline
         bar.setCustomSpacing(Spacing.double, after: kindLabel)

@@ -25,7 +25,7 @@ extension TableEditorController {
         discardButton.target = self
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let bar = NSStackView(views: [sections, spacer, status, discardButton, applyButton])
+        let bar = NSStackView(views: [sections, spacer, status, discardButton, applyButton, helpButton(.editors)])
         bar.spacing = Spacing.unit
         bar.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
 

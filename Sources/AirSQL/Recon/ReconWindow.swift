@@ -78,7 +78,9 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         let arrow = label("→", font: .systemFont(ofSize: 15, weight: .medium), color: .secondaryLabelColor)
         arrow.toolTip = "The script makes the target (right) match the source (left)"
         let swap = button("Swap", id: "recon.swap", tip: "Swap source and target", target: self, action: #selector(swapSides(_:)))
-        let setup = NSStackView(views: [source.view, arrow, target.view, swap])
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        let setup = NSStackView(views: [source.view, arrow, target.view, swap, spacer, helpButton(.compare)])
         setup.spacing = Spacing.double
         setup.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         setup.setHuggingPriority(.defaultLow, for: .horizontal)

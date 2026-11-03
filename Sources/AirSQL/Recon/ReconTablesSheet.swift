@@ -76,7 +76,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         done.keyEquivalent = "\r"
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let buttons = NSStackView(views: [all, spacer, cancel, done])
+        let buttons = NSStackView(views: [helpButton(.compare), all, spacer, cancel, done])
         let stack = NSStackView(views: [heading, note, scroll, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading

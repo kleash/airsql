@@ -119,6 +119,10 @@ enum HelpPage: String, CaseIterable {
     case safety = "settings.html#safety"
     case sqlPreview = "sql-preview.html"
     case trust = "trust-a-server.html"
+    case clientTools = "client-tools.html"
+    case editors = "editors.html"
+    case compare = "compare.html"
+    case agents = "agents.html"
 
     /// The site: GitHub Pages, built from docs/.
     static let site = URL(string: "https://kleash.github.io/airsql/")!
