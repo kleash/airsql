@@ -16,6 +16,8 @@ final class TableDataViewController: NSViewController, TabContent, NSMenuItemVal
     private(set) var source: TableDataSource?
     /// The server's estimate of the rows, or their exact count once counted; nil when unknown (a filter).
     private(set) var total: (rows: Int, exact: Bool)?
+    /// The table's size on the server in bytes (Column Summary asks first above 2 GB).
+    private(set) var dataLength: Int?
     /// The statement running now, if any (one at a time).
     private(set) var running: Activity?
     private var session: DBConnection?
@@ -66,6 +68,7 @@ final class TableDataViewController: NSViewController, TabContent, NSMenuItemVal
             message.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             message.widthAnchor.constraint(lessThanOrEqualToConstant: 440),
         ])
+        viewer.serverSummary = { [weak self] column, done in self?.summarize(column, done: done) }
         updateStatus()
         reload()
     }
@@ -79,14 +82,16 @@ final class TableDataViewController: NSViewController, TabContent, NSMenuItemVal
         let query = query, pageSize = pageSize, filtered = !query.filter.trimmingCharacters(in: .whitespaces).isEmpty
         let first = source == nil
         if first { showMessage("Loading the rows of \(query.table)…", spinning: true) }
-        run("Loading the rows of \(query.table)", { session -> (Int?, ResultStore) in
-            let estimate = filtered ? nil : try await Self.rows(query.estimate(noBackslashEscapes: session.noBackslashEscapes), on: session)
-            return (estimate.flatMap(Self.number), try await Self.rows(query.page(limit: pageSize, offset: 0), on: session))
+        run("Loading the rows of \(query.table)", { session -> (ResultStore, ResultStore) in
+            let estimate = try await Self.rows(query.estimate(noBackslashEscapes: session.noBackslashEscapes), on: session)
+            return (estimate, try await Self.rows(query.page(limit: pageSize, offset: 0), on: session))
         }) { [weak self] estimate, page in
             guard let self else { return }
             let source = TableDataSource(page, table: schema, pageSize: pageSize)
             self.source = source
-            total = estimate.map { ($0, false) }
+            // A filter's rows are unknown until counted: the table's estimate says nothing about them.
+            total = filtered ? nil : Self.number(estimate).map { ($0, false) }
+            dataLength = estimate.rowCount > 0 && estimate.columns.count > 1 ? estimate.string(0, 1).flatMap { Int($0) } : nil
             viewer.show(source)
             showMessage(source.rowCount == 0 ? "\(query.table) has no rows\(filtered ? " that match the filter" : "")." : nil)
         }
@@ -107,6 +112,33 @@ final class TableDataViewController: NSViewController, TabContent, NSMenuItemVal
         let sql = query.count
         run("Counting the rows of \(query.table)", { session in Self.number(try await Self.rows(sql, on: session)) }) { [weak self] rows in
             self?.total = rows.map { ($0, true) }
+        }
+    }
+
+    /// Column Summary on the server: all rows within the filter; a table over 2 GB asks first.
+    private func summarize(_ column: Int, done: @escaping (Result<ColumnSummary, Error>) -> Void) {
+        guard let source, running == nil else { return done(.failure(AirSQLError(.other, "Wait for the rows to load, then ask again."))) }
+        let name = source.columns[column].name, query = query
+        let start: () -> Void = { [weak self] in
+            self?.run("Summing up \(name) in \(query.table)", { session in
+                (try await Self.rows(query.summary(name), on: session), try await Self.rows(query.topValues(name), on: session))
+            }) { counts, top in
+                guard counts.rowCount > 0, counts.columns.count == 5 else { return done(.failure(AirSQLError(.other, "The server sent no counts."))) }
+                func number(_ index: Int) -> Int { counts.string(0, index).flatMap { Int($0) } ?? 0 }
+                let values = (0..<top.rowCount).map { (top.string($0, 0), top.string($0, 1).flatMap { Int($0) } ?? 0) }
+                done(.success(ColumnSummary(distinct: number(0), nulls: number(1), rows: number(4), minimum: counts.string(0, 2),
+                                            maximum: counts.string(0, 3), top: values)))
+            }
+        }
+        guard let bytes = dataLength, bytes > 2 << 30, let window = view.window else { return start() }
+        let alert = NSAlert()
+        alert.messageText = "Sum up \(name) on the server?"
+        alert.informativeText = "\(query.table) holds \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)): "
+            + "Column Summary reads every row, which can take a while and load the server."
+        alert.addButton(withTitle: "Sum Up").toolTip = "Count the column's values on the server"
+        alert.addButton(withTitle: "Cancel").toolTip = "Close without counting"
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn { start() } else { done(.failure(AirSQLError(.cancelled, "Not counted."))) }
         }
     }
 

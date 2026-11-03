@@ -74,3 +74,32 @@ extension AppTests {
         #expect(rows.hasSuffix(" rows") && !rows.contains("≈"), "\(rows)")
     }
 }
+
+extension AppTests {
+    @Test func columnSummaryOfAResultCountsTheRowsInMemory() async throws {
+        let source = FakeGridSource(rows: 60, columns: 6)
+        let (_, harness, content) = viewerWindow(source)
+        content.viewer.grid.selection.selectColumn(5)
+        #expect(await call(harness, "menu", ["path": "Data > Column Summary…"]).error == nil)
+        let summary = try #require(content.viewer.summaryShown?.summary)
+        #expect(summary == ColumnSummary(values: (0..<60).map { source.value($0, 5) }))
+    }
+
+    @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+    func columnSummaryOfATableIsCountedOnTheServer() async throws {
+        let (main, harness, connection) = try await labWindow()
+        defer { ConsoleViewController.openConnection = { _ in nil } }
+        defer { Task { await connection.disconnect() } }
+        let table = main.openTableData(connection: connection, id: Fixtures.production.id, database: "fixture", table: "big")
+            .content as? TableDataViewController
+        #expect(await eventually(timeout: 30) { table?.source != nil && table?.running == nil })
+        let viewer = try #require(table?.viewer)
+        viewer.grid.selection.select(GridPosition(row: 0, column: 4))
+        #expect(await call(harness, "menu", ["path": "Data > Column Summary…"]).error == nil)
+        #expect(await eventually(timeout: 60) { viewer.summaryShown?.summary != nil })
+        let summary = try #require(viewer.summaryShown?.summary)
+        #expect(summary.distinct == 5 && summary.nulls == 0 && summary.rows == 1_000_000)
+        #expect(Set(summary.top.compactMap(\.value)) == ["red", "green", "blue", "cyan", "magenta"])
+        #expect(summary.top.map(\.count).reduce(0, +) == 1_000_000)
+    }
+}

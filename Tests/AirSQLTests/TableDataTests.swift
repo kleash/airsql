@@ -22,7 +22,7 @@ struct TableDataTests {
             #expect(query.page(limit: 1, offset: 0) == "SELECT * FROM \(quoted).\(quoted) ORDER BY \(quoted) LIMIT 1 OFFSET 0")
             for flag in [false, true] {
                 let literal = SQLQuote.string(name, noBackslashEscapes: flag)
-                #expect(query.estimate(noBackslashEscapes: flag) == "SELECT TABLE_ROWS FROM information_schema.TABLES WHERE "
+                #expect(query.estimate(noBackslashEscapes: flag) == "SELECT TABLE_ROWS, DATA_LENGTH FROM information_schema.TABLES WHERE "
                     + "TABLE_SCHEMA = \(literal) AND TABLE_NAME = \(literal)")
             }
         }
@@ -136,5 +136,28 @@ struct GridReadingTests {
         #expect(parsed("`a b` ") == ["shop", "a b"])
         #expect(parsed("orders", nil) == nil && parsed("") == nil && parsed("`open") == nil && parsed("shop.") == nil)
         #expect(parsed("a.b.c") == ["a", "b.c"])
+    }
+}
+
+/// Column Summary's statements and figures (L2).
+struct ColumnSummaryTests {
+    @Test func summaryStatementsQuoteTheColumnAndKeepTheFilter() {
+        let query = TableQuery(database: "shop", table: "orders", filter: "total > 5")
+        #expect(query.summary("st`atus") == "SELECT COUNT(DISTINCT `st``atus`), COUNT(*) - COUNT(`st``atus`), MIN(`st``atus`), "
+            + "MAX(`st``atus`), COUNT(*) FROM `shop`.`orders` WHERE (total > 5\n)")
+        #expect(query.topValues("status") == "SELECT `status`, COUNT(*) AS `count` FROM `shop`.`orders` WHERE (total > 5\n) "
+            + "GROUP BY `status` ORDER BY `count` DESC, `status` LIMIT 50")
+        for name in Hostile.names {
+            #expect(TableQuery(database: "d", table: "t").topValues(name).hasPrefix("SELECT \(SQLQuote.identifier(name)), COUNT(*)"))
+        }
+    }
+
+    @Test func summaryFromValuesInMemory() {
+        let summary = ColumnSummary(values: ["10", "9", "10", nil, "100", "10"])
+        #expect(summary.distinct == 3 && summary.nulls == 1 && summary.rows == 6)
+        #expect(summary.minimum == "9" && summary.maximum == "100")
+        #expect(summary.top.map(\.value) == ["10", nil, "100", "9"] && summary.top.map(\.count) == [3, 1, 1, 1])
+        let words = ColumnSummary(values: ["b", "a", "b"], limit: 1)
+        #expect(words.minimum == "a" && words.top.count == 1 && words.top[0].value == "b")
     }
 }

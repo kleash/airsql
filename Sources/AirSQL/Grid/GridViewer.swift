@@ -72,6 +72,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// Heatmaps by the source's column, and whether equal values are tinted (`GridViewer+Colours`).
     var heat: [Int: HeatScale] = [:]
     var highlightsEqual = false
+    /// Where Column Summary is worked out for a table (on the server, by its tab); nil: from the rows in memory.
+    var serverSummary: ((_ column: Int, _ done: @escaping (Result<ColumnSummary, Error>) -> Void) -> Void)?
+    /// The summary shown last (tests read it).
+    private(set) weak var summaryShown: GridSummaryView?
     /// View As or Chart (`GridViewer+Views`): what the body shows, and the view shown in place of the grid.
     var presentation = Presentation.table
     var presented: NSView?
@@ -367,6 +371,30 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
                      of: container, preferredEdge: .maxY)
     }
 
+    /// Column Summary…: the focused column's distinct values, NULLs, smallest and largest, and most frequent values.
+    @objc func showColumnSummary(_ sender: Any?) {
+        if presentation != .table { present(.table) }
+        if transposed || record != nil { transposeGrid(nil) }
+        guard let source, let column = focusedColumns.first, window != nil else { return NSSound.beep() }
+        let origin = serverSummary == nil ? "From the \(source.rowCount.formatted()) rows loaded" : "From the server, within the filter"
+        let content = GridSummaryView(column: source.columns[column].name, origin: origin, nullText: grid.nullText)
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = content
+        let display = grid.columnOrder.firstIndex(of: column) ?? 0
+        grid.reveal(grid.cellRect(GridPosition(row: grid.selection.cursor?.row ?? 0, column: display)))
+        let (left, right) = grid.header.edges(display), header = grid.header.bounds
+        let start = min(max(header.minX, left), header.maxX - 20)
+        popover.show(relativeTo: NSRect(x: start, y: 0, width: max(20, min(right, header.maxX) - start), height: header.height),
+                     of: grid.header, preferredEdge: .maxY)
+        summaryShown = content
+        if let serverSummary {
+            serverSummary(column) { [weak content] result in content?.show(result) }
+        } else {
+            content.show(.success(ColumnSummary(values: (0..<source.rowCount).map { source.value($0, column) })))
+        }
+    }
+
     @objc func zoomIn(_ sender: Any?) { grid.fontSize = min(28, grid.fontSize + 1) }
     @objc func zoomOut(_ sender: Any?) { grid.fontSize = max(9, grid.fontSize - 1) }
     @objc func zoomReset(_ sender: Any?) {
@@ -392,6 +420,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             item.explain(enabled: status.aggregate != nil, reason: "Select some cells first")
             return status.aggregate != nil
         case #selector(goToRow(_:)): return grid.rowCount > 0
+        case #selector(showColumnSummary(_:)):
+            item.explain(enabled: !focusedColumns.isEmpty, reason: "Select a column first")
+            return !focusedColumns.isEmpty
         case #selector(showColumnList(_:)): return source != nil
         case #selector(viewAs(_:)):
             item.state = item.tag == presentation.rawValue ? .on : .off
@@ -462,9 +493,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         let menu = host?.dataGrid(grid, menuFor: target) ?? NSMenu(title: "Grid")
         if !menu.items.isEmpty { menu.addItem(.separator()) }
         switch target {
-        case .cells: menu.add([Commands.valuePanel, Commands.recordView])
+        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.columnSummary])
         case .row: menu.add([Commands.recordView, Commands.valuePanel])
-        case .column: menu.add([Commands.hideColumn, Commands.columnList, Commands.heatmap])
+        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.columnList, Commands.heatmap])
         }
         if !transposed, record == nil { menu.addItem(displayMenu()) }
         return menu

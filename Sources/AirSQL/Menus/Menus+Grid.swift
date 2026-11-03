@@ -8,7 +8,7 @@ extension MainMenu {
     static func addGridItems(_ menus: Menus) {
         // L2: reading the data.
         menus.edit.add([nil, Commands.copySummary])
-        menus.data.add([Commands.openTable, nil, Commands.goToRow, Commands.hideColumn])
+        menus.data.add([Commands.openTable, nil, Commands.goToRow, Commands.columnSummary, Commands.hideColumn])
         menus.data.addItem(submenu("Display As", GridDisplay.allCases.enumerated().map { index, display in
             let item = Commands.displayAs.item()
             item.title = display.title

@@ -59,9 +59,9 @@ public struct TableQuery: Equatable {
     /// The exact number of rows (Count Rows Exactly).
     public var count: String { "SELECT COUNT(*)" + from }
 
-    /// The server's estimate of the table's rows (InnoDB's is a guess), for the status bar's "≈".
+    /// The server's estimate of the table's rows (InnoDB's is a guess), for the status bar's "≈", and its size in bytes.
     public func estimate(noBackslashEscapes: Bool) -> String {
-        "SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = "
+        "SELECT TABLE_ROWS, DATA_LENGTH FROM information_schema.TABLES WHERE TABLE_SCHEMA = "
             + SQLQuote.string(database, noBackslashEscapes: noBackslashEscapes) + " AND TABLE_NAME = "
             + SQLQuote.string(table, noBackslashEscapes: noBackslashEscapes)
     }
@@ -120,5 +120,60 @@ extension GridColumn {
         let first = ([name] + (type.isEmpty ? [] : [type])).joined(separator: " · ")
         return ([first] + (facts.isEmpty ? [] : [facts.joined(separator: ", ")]) + (comment.isEmpty ? [] : ["“\(comment)”"]))
             .joined(separator: "\n")
+    }
+}
+
+extension TableQuery {
+    /// Column Summary on the server: distinct values, NULLs, smallest, largest and all rows, within the filter.
+    public func summary(_ column: String) -> String {
+        let name = SQLQuote.identifier(column)
+        return "SELECT COUNT(DISTINCT \(name)), COUNT(*) - COUNT(\(name)), MIN(\(name)), MAX(\(name)), COUNT(*)" + from
+    }
+
+    /// Column Summary's most frequent values with their counts, within the filter.
+    public func topValues(_ column: String, limit: Int = ColumnSummary.topLimit) -> String {
+        let name = SQLQuote.identifier(column)
+        return "SELECT \(name), COUNT(*) AS `count`" + from + " GROUP BY \(name) ORDER BY `count` DESC, \(name) LIMIT \(limit)"
+    }
+}
+
+/// What Column Summary shows (grid-spec §3, HeidiSQL's "more values" with counts): distinct values, NULLs, smallest
+/// and largest, and the most frequent values with their counts.
+public struct ColumnSummary: Equatable {
+    public static let topLimit = 50
+
+    public var distinct: Int
+    public var nulls: Int
+    public var rows: Int
+    public var minimum: String?
+    public var maximum: String?
+    /// Most frequent first; nil is NULL.
+    public var top: [(value: String?, count: Int)]
+
+    public static func == (a: ColumnSummary, b: ColumnSummary) -> Bool {
+        a.distinct == b.distinct && a.nulls == b.nulls && a.rows == b.rows && a.minimum == b.minimum && a.maximum == b.maximum
+            && a.top.map(\.value) == b.top.map(\.value) && a.top.map(\.count) == b.top.map(\.count)
+    }
+
+    public init(distinct: Int, nulls: Int, rows: Int, minimum: String?, maximum: String?, top: [(value: String?, count: Int)]) {
+        self.distinct = distinct
+        self.nulls = nulls
+        self.rows = rows
+        self.minimum = minimum
+        self.maximum = maximum
+        self.top = top
+    }
+
+    /// Worked out from values in memory (a console result's rows); numbers compare as numbers.
+    public init(values: [String?], limit: Int = topLimit) {
+        var counts: [String?: Int] = [:]
+        for value in values { counts[value, default: 0] += 1 }
+        let present = counts.keys.compactMap { $0 }
+        let numeric = !present.isEmpty && present.allSatisfy { Double($0) != nil }
+        func less(_ a: String, _ b: String) -> Bool { numeric ? Double(a)! < Double(b)! : a < b }
+        self.init(distinct: present.count, nulls: counts[nil] ?? 0, rows: values.count, minimum: present.min(by: less),
+                  maximum: present.max(by: less),
+                  top: counts.sorted { $0.value != $1.value ? $0.value > $1.value : ($0.key ?? "") < ($1.key ?? "") }
+                    .prefix(limit).map { ($0.key, $0.value) })
     }
 }
