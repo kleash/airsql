@@ -116,6 +116,8 @@ extension AppTests {
             #expect(tab.bar.scope.text == "On server · all rows" && tab.viewer.status.rows.stringValue == "3 rows")
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)
             #expect(tab.notice.isHidden && !tab.isEdited && main.selectedTab?.title == "orders")
+            // The bar's ? opens the Data Grid page of the help.
+            #expect(find(NSButton.self, id: "help", in: tab.bar)?.identifier?.rawValue == "help:" + HelpPage.dataGrid.rawValue)
 
             tab.applyFilter("WHERE region = 'EU'")
             await ready { tab.loading != nil }
@@ -389,6 +391,22 @@ extension AppTests {
             let words = tab.bar.textView(tab.bar.whereField, completions: [], forPartialWordRange: NSRange(location: 18, length: 2),
                                          indexOfSelectedItem: &index)
             #expect(words == ["customer_id", "CURDATE()"])
+        }
+
+        /// F2 edits the focused cell, as in HeidiSQL; in a console result, which can't be edited, it shows the value panel.
+        @Test func f2EditsTheCellOrShowsItsValue() async throws {
+            let (main, harness, tab) = try await Self.tab()
+            let window = try #require(main.window)
+            window.makeFirstResponder(tab.grid)
+            tab.grid.selection.select(GridPosition(row: 1, column: 2))
+            #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+            #expect(tab.grid.editor != nil && tab.grid.editor?.position == GridPosition(row: 1, column: 2))
+            tab.grid.endEditing(commit: false)
+            let viewer = try #require(resultViewer(main))
+            window.makeFirstResponder(viewer.grid)
+            viewer.grid.selection.select(GridPosition(row: 0, column: 1))
+            #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+            #expect(viewer.grid.editor == nil && viewer.valuePanel != nil)
         }
 
         /// The condition is coloured as SQL, grows a line at a time up to eight (then scrolls), and Return applies it.

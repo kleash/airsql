@@ -152,9 +152,23 @@ final class GridCellElement: NSAccessibilityElement {
     override func isAccessibilitySelected() -> Bool { grid.selection.contains(position) }
     override func isAccessibilityFocused() -> Bool { grid.selection.cursor == position && grid.editor == nil }
 
+    /// The column's name, and what its colour shows: a pending change or a comparison's mark.
     override func accessibilityLabel() -> String? {
         guard let column, let source = grid.source, column < source.columns.count else { return nil }
-        return source.columns[column].name
+        let name = source.columns[column].name
+        guard position.row < source.rowCount else { return name }
+        switch source.mark(position.row, column) {
+        case .none: return name
+        case .edited: return name + ", changed"
+        case .inserted: return name + ", added"
+        case .deleted: return name + ", removed"
+        }
+    }
+
+    /// What the cell's tooltip says instead of its value: a comparison's other value.
+    override func accessibilityHelp() -> String? {
+        guard let column, let source = grid.source, position.row < source.rowCount, column < source.columns.count else { return nil }
+        return source.note(position.row, column)
     }
 
     /// The value as text, the NULL text for NULL, "Loading" for a page still on its way.
