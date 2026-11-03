@@ -464,8 +464,8 @@ extension AppTests {
             #expect(window.attachedSheet == nil && viewer.grid.rowCount == 4 && !(0..<4).contains { result.rows.value($0, 1) == "Ama Mensah" })
         }
 
-        /// A filter that leaves fewer rows than Record View's row number goes back to the grid (it read past the rows,
-        /// which ended the app); a row still there stays in Record View.
+        /// A filter from Record View goes back to the grid, filtered: Record View's row number would be another row's now,
+        /// or past the rows (it read past them, which ended the app).
         @Test func recordViewLeavesWhenAFilterRemovesItsRow() async throws {
             let (main, harness) = appWindow(testModel(Fixtures.shop))
             let viewer = try #require(resultViewer(main))
@@ -475,9 +475,9 @@ extension AppTests {
             viewer.grid.selection.select(GridPosition(row: 1, column: 1))
             viewer.showRecordView(nil)
             #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Not Equal to Selection"]).error == nil)
-            #expect(viewer.record == 1 && viewer.grid.columnCount == 2 && result.rows.rowCount == 4)
-            viewer.showNextRecord(nil)
-            viewer.showNextRecord(nil)
+            #expect(viewer.record == nil && viewer.grid.source is ReorderedSource && result.rows.rowCount == 4)
+            viewer.grid.selection.select(GridPosition(row: 3, column: 1))
+            viewer.showRecordView(nil)
             #expect(viewer.record == 3 && viewer.recordLabel.stringValue == "Row 4 of 4")
             #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Equal to Selection"]).error == nil)
             #expect(viewer.record == nil && viewer.grid.rowCount == 1 && viewer.grid.source is ReorderedSource)
