@@ -42,11 +42,11 @@ extension GridViewer {
         updateTint()
     }
 
-    /// The smallest and largest number in a column's loaded rows (at most a million looked at).
+    /// The smallest and largest number in a column's loaded rows (the first 100,000 looked at).
     private func scale(_ column: Int) -> HeatScale? {
         guard let source else { return nil }
         var low = Double.infinity, high = -Double.infinity
-        for row in 0..<min(source.rowCount, 1_000_000) {
+        for row in 0..<min(source.rowCount, 100_000) {
             guard let number = source.value(row, column).flatMap(Double.init), number.isFinite else { continue }
             low = min(low, number)
             high = max(high, number)

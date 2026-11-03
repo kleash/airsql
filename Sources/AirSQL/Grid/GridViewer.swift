@@ -47,8 +47,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         let previous = GridStatusView.link("‹ Previous", id: "record.previous", tip: Commands.previousRecord.tip,
                                            action: Commands.previousRecord.action)
         let next = GridStatusView.link("Next ›", id: "record.next", tip: Commands.nextRecord.tip, action: Commands.nextRecord.action)
-        let close = GridStatusView.link("Back to the Grid", id: "record.close", tip: "Show every row again (⌥⌘R)",
-                                        action: Commands.recordView.action)
+        let close = GridStatusView.link("Back to the Grid", id: "record.close", tip: "Show the rows as a grid again", action: nil)
+        close.target = self
+        close.action = #selector(backToGrid(_:))
         recordBar.setViews([previous, recordLabel, next], in: .leading)
         recordBar.setViews([close], in: .trailing)
         recordBar.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
@@ -227,6 +228,11 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         updateValuePanel()
     }
 
+    /// The record bar's Back to the Grid: out of Record View or Transpose.
+    @objc func backToGrid(_ sender: Any?) {
+        if transposed || record != nil { transposeGrid(nil) }
+    }
+
     /// The row before or after in Record View.
     @objc func showPreviousRecord(_ sender: Any?) { stepRecord(-1) }
     @objc func showNextRecord(_ sender: Any?) { stepRecord(1) }
@@ -238,10 +244,16 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         showRecord(next, field: grid.selection.cursor?.row ?? 0)
     }
 
-    /// The record bar shows in Record View, with the row's number.
+    /// The record bar shows in Record View, with the row's number, and over a transposed grid that leaves rows out.
     private func updateRecordBar() {
-        recordBar.isHidden = record == nil
-        if let record, let source { recordLabel.stringValue = "Row \((record + 1).formatted()) of \(source.rowCount.formatted())" }
+        let rows = source?.rowCount ?? 0, cut = transposed && rows > TransposedSource.limit
+        recordBar.isHidden = record == nil && !cut
+        for view in recordBar.views(in: .leading) where view !== recordLabel { view.isHidden = record == nil }
+        if let record {
+            recordLabel.stringValue = "Row \((record + 1).formatted()) of \(rows.formatted())"
+        } else if cut {
+            recordLabel.stringValue = "Transposed: the first \(TransposedSource.limit.formatted()) of \(rows.formatted()) rows"
+        }
     }
 
     private func focusCell(_ position: GridPosition) {
