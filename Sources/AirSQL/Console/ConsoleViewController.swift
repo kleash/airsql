@@ -124,8 +124,9 @@ final class ConsoleViewController: NSViewController, TabContent {
         // Find and replace across the editor and the helpers: beside the helpers it needed a wider window.
         let column = NSStackView(views: [find, outer])
         column.orientation = .vertical
+        // Filling: by its gravity areas the column hugged the split to its smallest, which held the results to 120 pt.
+        column.distribution = .fill
         column.spacing = 0
-        column.setHuggingPriority(.defaultLow, for: .vertical)
         root.addSubview(column)
         column.pin(to: root)
         for view in [find, outer] { view.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true }
