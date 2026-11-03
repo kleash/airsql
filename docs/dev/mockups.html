@@ -650,13 +650,13 @@ Edits here wait for Apply, like cells.</span></div>
 <!-- ================= 5. CONNECTIONS ================= -->
 <section id="s-conn">
   <div class="sec-head"><span class="num">Screen 5</span><h2>Connection editor: SSH, jump hosts and proxies</h2>
-  <p class="muted">Routes are real fields, not driver properties. The route strip shows the path the connection takes, ending in a local port on this Mac that the app, <code>mysqldump</code> and Terminal all share. Test Connection reports each hop. Your <code>~/.ssh/config</code> hosts can be picked by name.</p></div>
+  <p class="muted">Routes are real fields, not driver properties. The route strip shows the path the connection takes, ending in a private socket on this Mac that the app, <code>mysqldump</code> and Terminal all share. Test Connection reports each hop. Your <code>~/.ssh/config</code> hosts can be picked by name. Six tabs: the connection's own safety checks are in Safety, read-only in Options.</p></div>
   <div class="notes"><span class="note"><b>Scope:</b> connections and routes group</span><span class="note"><b>Lane:</b> L1</span></div>
   <div class="stage"><div class="win" data-t="light" style="height:560px">
     <div class="tb"><div class="lights"><i></i><i></i><i></i></div><span class="tbtn box">New Connection</span></div>
     <div class="dim"></div>
     <div class="sheet" style="width:820px">
-      <div class="stabs"><div class="seg2"><span>General</span><span>TLS</span><span class="on">SSH and Proxy</span><span>Options</span><span>Agents</span></div></div>
+      <div class="stabs"><div class="seg2"><span>General</span><span>TLS</span><span class="on">SSH and Proxy</span><span>Options</span><span>Safety</span><span>Agents</span></div></div>
       <div class="form">
         <label>Route</label><div><span class="pop-btn">SSH through a jump host</span></div>
         <label>SSH host</label><div style="display:flex;gap:8px;align-items:center"><div class="field" style="flex:1">db-gw.internal.example</div><span>Port</span><div class="field sm">22</div></div>
@@ -672,7 +672,7 @@ Edits here wait for Apply, like cells.</span></div>
       </div>
       <div class="route">
         <div class="hop mac">This Mac<small>AirSQL</small></div><span class="arr">→</span>
-        <div class="hop port">127.0.0.1:41873<small>local port</small></div><span class="arr">→</span>
+        <div class="hop port">Private socket<small>only you can open it</small></div><span class="arr">→</span>
         <div class="hop">SOCKS5 proxy<small>proxy.example.com</small></div><span class="arr">→</span>
         <div class="hop">Jump host<small>bastion.example.com</small></div><span class="arr">→</span>
         <div class="hop">SSH host<small>db-gw.internal.example</small></div><span class="arr">→</span>

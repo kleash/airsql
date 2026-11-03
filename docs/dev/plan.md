@@ -277,8 +277,8 @@ Goal: few round trips, and agents that can never change anything without the per
 
 ### 2.10 Safety settings (on by default, overridable)
 
-Settings ▸ Safety holds the defaults; each connection can override them in its Options tab; a connection coloured
-Production starts with the strict preset. Every switch says in plain words what it protects against; overrides
+Settings ▸ Safety holds the defaults; each connection can override them in the Safety tab of its editor (six tabs:
+General, TLS, SSH and Proxy, Options, Safety, Agents); a connection coloured Production starts with the strict preset. Every switch says in plain words what it protects against; overrides
 show a small "custom safety" mark on the connection; agents see the applicable settings in `context` and can never
 change them.
 
@@ -296,6 +296,12 @@ change them.
 | Ask before sorting a large table by a column without an index | on | on |
 | Read-only connection | off | user's choice |
 | Warn when closing with an open transaction or pending edits | on | on |
+
+Read-only is a switch in a connection's Options tab. AirSQL itself refuses on such a connection whatever the read-only
+check (§2.8) can't prove only reads, a bare USE aside: the console, the navigator, sync scripts, Restore, Run SQL File,
+CSV import and a table tab's WHERE (checked within its whole SELECT); the grid and the editors don't apply. Its
+sessions are READ ONLY, and so is Terminal's mysql (`--init-command`; the dumps' where they know it). The process
+list's Kill stays allowed: it changes no data, and its tooltip says so.
 
 ### 2.11 Busy indicators everywhere
 
@@ -401,7 +407,7 @@ P0-2 to P0-7 run in parallel after P0-1.
 
 | Lane | Scope rows |
 |---|---|
-| **L1 Connections and routes** | Connection editor (General, TLS, SSH and Proxy, Options, Agents tabs), all routes with sockets, jump chains, Trust sheet, logins, read-only, startup SQL, compression, database filter, `~/.ssh/config` import, connecting progress per hop |
+| **L1 Connections and routes** | Connection editor (General, TLS, SSH and Proxy, Options, Safety, Agents tabs), all routes with sockets, jump chains, Trust sheet, logins, read-only, startup SQL, compression, database filter, `~/.ssh/config` import, connecting progress per hop |
 | **L2 Grid view** | Grid "understand" group: headers, aggregates, column summary, value panel, record view, Transpose, display types, heatmap, view as text/tree, charts (pie hidden with a reason on macOS 13: `SectorMark` needs 14), `TableViewSettings`, go to row, column list, performance tests |
 | **L3a Grid data** | Filter/sort/search group, `PendingChanges` + Apply with the affected-row checks, crash persistence, all copy and export formats (shared by L6), multi-cell edit |
 | **L4 Console** | Console group, completion, run/cancel, result tabs, Tx, safety prompts, history, SQL log viewer, formatter, helpers panel, EXPLAIN table + tree, profile, tab restore, editor drag and drop |
