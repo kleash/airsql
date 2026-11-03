@@ -50,12 +50,11 @@ extension AgentServer {
         }
     }
 
-    /// Keys an agent presses into a production console's editor that would change its text: refused (type asks once).
+    /// Shortcuts of commands an agent may not choose, and keys that would change a production console's text (type asks
+    /// once): refused.
     func checkAgentMayPress(_ keys: KeyCombo, in window: NSWindow) throws {
         guard AgentGate.agent != nil else { return }
-        if menuItems(for: keys).contains(where: { $0.action.map { Self.pasteActions.contains(NSStringFromSelector($0)) } ?? false }) {
-            throw Failure("The clipboard is the person's: agents can't paste. Use type or set to put text in a field.")
-        }
+        for action in menuItems(for: keys).compactMap(\.action) { try checkAgentMayChoose(action, target: nil) }  // ⌘V, ⌘Q
         if keys.modifiers.intersection([.command, .control]).isEmpty, AgentGuard.productionConsole(window.firstResponder as? NSView) != nil {
             throw Failure("Typing into a production console needs the person's OK: use type or set, which ask them once.")
         }

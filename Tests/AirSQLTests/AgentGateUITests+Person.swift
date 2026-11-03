@@ -120,6 +120,9 @@ extension AppTests.AgentGateUITests {
             let refused = await agentCall(service, tool, arguments)
             #expect(refused.error?.contains("The clipboard is the person's") == true, "\(tool): \(refused.error ?? "let through")")
         }
+        for (tool, arguments) in [("menu", ["path": "AirSQL > Quit AirSQL"]), ("key", ["combo": "cmd+q"])] as [(String, [String: Any])] {
+            #expect(await agentCall(service, tool, arguments).error?.contains("can quit AirSQL") == true, "\(tool)")
+        }
         let keyed = await agentCall(service, "key", ["combo": "d"])
         #expect(keyed.error?.contains("needs the person's OK") == true, "\(keyed.error ?? "let through")")
 
