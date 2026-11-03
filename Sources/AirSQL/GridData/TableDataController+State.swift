@@ -17,7 +17,7 @@ extension TableDataController: NSMenuItemValidation {
         if local {
             bar.scope.style = .neutral
             bar.scope.text = "Local · " + (source.localFilter == nil ? "sorted, " : "")
-                + "\(source.shownLoadedRows.formatted()) of \(source.loadedRows.formatted()) loaded rows"
+                + "\(source.shownLoadedRows.formatted()) of \(source.keptRows.formatted()) loaded rows"
         } else {
             bar.scope.style = .accent
             let filtered = !source.filter.isEmpty, sorted = !source.sort.isEmpty
@@ -32,10 +32,10 @@ extension TableDataController: NSMenuItemValidation {
         } else {
             notice.show(.readOnly, editingOff.map { "Read-only. " + $0 + "." })
         }
-        let loaded = source.loadedRows.formatted()
+        let loaded = source.keptRows.formatted()
         let rows = viewer.status.rows
         if !source.hasMore {
-            rows.stringValue = "\(loaded) \(source.loadedRows == 1 ? "row" : "rows")"
+            rows.stringValue = "\(loaded) \(source.keptRows == 1 ? "row" : "rows")"
         } else if let total, total.filter == source.filter {
             rows.stringValue = "\(loaded) of \(total.exact ? "" : "about ")\(total.rows.formatted()) rows"
         } else {

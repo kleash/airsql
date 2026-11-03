@@ -45,6 +45,21 @@ struct TableDataSourceTests {
         #expect(plain.key == nil && plain.readOnlyReason != nil && !plain.canEdit(0, 1))
     }
 
+    @Test func applyPatchesTheLoadedRowsInPlace() {
+        let source = TableDataSource(database: "shop", table: Self.table())
+        source.append(Self.page([(1, "Ann"), (2, "Bo"), (3, "Cy")]), requested: 10)
+        #expect(source.readBackSQL([["2"], ["3"]], noBackslashEscapes: false)
+                == ["SELECT `id`, `name`, `photo`, `price` FROM `shop`.`items` WHERE `id` IN (2, 3)"])
+        // Row 2 as the server now has it; row 1 deleted.
+        #expect(source.patch([Self.page([(2, "Bob")])], deleted: [["1"]]))
+        #expect(source.rowCount == 2 && source.keptRows == 2 && source.cell(0, 1) == .text("Bob") && source.rowKey(1) == ["3"])
+        // A row that isn't loaded can't be patched in: the rows load again instead.
+        #expect(!source.patch([Self.page([(9, "Zed")])], deleted: []))
+        source.reset()
+        source.append(Self.page([(1, "Ann")]), requested: 10)
+        #expect(source.rowCount == 1 && source.cell(0, 1) == .text("Ann"))
+    }
+
     @Test func loadedPagesAndMoreToLoad() {
         let source = TableDataSource(database: "shop", table: Self.table())
         source.append(Self.page([(1, "Ann"), (2, nil)]), requested: 2)

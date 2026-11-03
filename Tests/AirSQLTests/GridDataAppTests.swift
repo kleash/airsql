@@ -18,6 +18,8 @@ final class FakeTableSession: TableSession {
     /// INSERT's insert ID, and the row a read-back SELECT (… WHERE `id` = that ID) finds.
     var insertID: UInt64 = 0
     var readBack: [String?]?
+    /// What reading edited rows back by key (… WHERE `id` IN (…)) finds.
+    var edited: [[String?]]?
     /// What a foreign key's drop-down finds in customers: id and email.
     var customers: [[String?]] = [["7", "ann@example.com"], ["9", "cy@example.org"]]
     var sqlMode = "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
@@ -58,6 +60,7 @@ final class FakeTableSession: TableSession {
             return result([.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING)], customers)
         }
         if let readBack, sql.hasPrefix("SELECT"), sql.hasSuffix("WHERE `id` = \(insertID)") { return result(columns, [readBack]) }
+        if let edited, sql.hasPrefix("SELECT"), sql.contains(" WHERE `id` IN (") { return result(columns, edited) }
         if sql.hasPrefix("SELECT") { return result(columns, rows) }
         if let error = refuse(sql) { throw error }
         let affected = ["START TRANSACTION", "COMMIT", "ROLLBACK"].contains(sql) ? 0 : changed(sql)
@@ -151,6 +154,33 @@ extension AppTests {
             await ready { tab.loading != nil }
             #expect(tab.source?.changes.isEmpty == true && tab.notice.isHidden && !tab.isEdited)
             _ = main
+        }
+
+        @Test func applyWithEveryRowLoadedReadsBackOnlyTheEditedRows() async throws {
+            let session = FakeTableSession()
+            session.edited = [["2", nil, "EU", "101", "99.00", "1"]]
+            let (_, _, tab) = try await Self.tab(session: session)
+            tab.source?.set(.text("eu"), row: 1, column: 2)
+            tab.grid.selection.selectRow(2)
+            tab.deleteRows(nil)
+            tab.applyChanges(nil)
+            await ready { tab.loading != nil }
+            #expect(session.statements.suffix(2) == ["COMMIT", "SELECT `id`, `customer_id`, `region`, `number`, `total`, `parent_id` "
+                                                      + "FROM `airsql_fixture`.`orders` WHERE `id` IN (2)"])
+            // The server's value (its collation kept the case it likes) shows, the deleted row is gone, nothing reloaded.
+            #expect(tab.grid.rowCount == 2 && tab.source?.cell(1, 2) == .text("EU") && tab.viewer.status.rows.stringValue == "2 rows")
+            #expect(!tab.bar.busy && tab.source?.changes.isEmpty == true)
+            // Refresh loads them all again.
+            var sent = session.statements.count
+            tab.refresh(nil)
+            await ready { tab.loading != nil }
+            #expect(tab.grid.rowCount == 3 && session.statements[sent...].contains { $0.hasSuffix("ORDER BY `id` ASC LIMIT 1000") })
+            // Changing a key loads the rows again.
+            tab.source?.set(.text("20"), row: 0, column: 0)
+            sent = session.statements.count
+            tab.applyChanges(nil)
+            await ready { tab.loading != nil }
+            #expect(session.statements[sent...].last?.hasSuffix("ORDER BY `id` ASC LIMIT 1000") == true)
         }
 
         @Test func aMismatchRollsBackAndPointsAtTheRow() async throws {
