@@ -122,7 +122,9 @@ struct GridEditValueTests {
     }
 
     @Test func enumAndSetTakeTheColumnsOwnMembers() {
-        #expect(ColumnType.members("enum('a','it''s','b,c','','x\\y')") == ["a", "it's", "b,c", "", "x\\y"])
+        // As the lab's MariaDB 11.4 and MySQL 8.4 write them: a quote or a backslash twice, a tab as it is.
+        #expect(ColumnType.members("enum('a','it''s','b,c','','x\\\\y','b\"c','t\tb')")
+            == ["a", "it's", "b,c", "", "x\\y", "b\"c", "t\tb"])
         let status = C.type("enum('new','active','gone')")
         #expect(C.result(status, "active") == "'active'")
         #expect(C.result(status, "ACTIVE") == "'active'")

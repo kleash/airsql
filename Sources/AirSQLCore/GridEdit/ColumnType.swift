@@ -153,18 +153,20 @@ public struct ColumnType: Hashable, Sendable {
         return type[type.index(after: open)..<close].split(separator: ",").map(String.init)
     }
 
-    /// ENUM and SET members from COLUMN_TYPE: enum('a','it''s') → ["a", "it's"]. information_schema writes a quote in a
-    /// member twice and a backslash once, whatever the sql_mode.
+    /// ENUM and SET members from COLUMN_TYPE: enum('a','it''s','x\\y') → a, it's and x\y. information_schema writes a
+    /// quote or a backslash in a member twice (other characters as they are), whatever the sql_mode.
     static func members(_ columnType: String) -> [String] {
         var members: [String] = [], current = "", inside = false
         var characters = columnType.drop { $0 != "(" }.dropFirst()[...]
         while let character = characters.popFirst() {
             if !inside {
                 if character == "'" { inside = true; current = "" } else if character == ")" { break }
-            } else if character == "'" {
-                if characters.first == "'" {
-                    current.append("'")
+            } else if character == "'" || character == "\\" {
+                if characters.first == character {
+                    current.append(character)
                     characters.removeFirst()
+                } else if character == "\\" {
+                    current.append(character)
                 } else {
                     inside = false
                     members.append(current)
