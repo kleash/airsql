@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import AirSQL
 @testable import AirSQLCore
 
 /// The agents' gate in the driver (plan §2.8, R3): while an agent's request is carried out, a statement on the person's
@@ -54,28 +55,34 @@ import Testing
             #expect(declined?.message == AgentGate.declined)
         }
     }
+}
 
-    /// The driver asks before anything reaches the server, in the tasks the agent's work starts too: a session that
-    /// isn't connected shows which statements got past the gate (they fail as not connected).
-    @Test func theDriverAsksFirstAlsoInTasksTheWorkStarts() async throws {
-        let session = Self.session(.main)
-        func failure(_ sql: String) async -> AirSQLError? {
-            do {
-                _ = try await session.query(sql)
-                return nil
-            } catch {
-                return error as? AirSQLError
+/// The driver's own check, with whatever approver the app set (none, or a service's that has closed): among the app tests,
+/// which run one at a time, so no agent service of theirs is listening meanwhile.
+extension AppTests {
+    @Suite struct AgentGateDriverTests {
+        /// The driver asks before anything reaches the server, in the tasks the agent's work starts too: a session that
+        /// isn't connected shows which statements got past the gate (they fail as not connected).
+        @Test func theDriverAsksFirstAlsoInTasksTheWorkStarts() async throws {
+            let session = AgentGateTests.session(.main)
+            func failure(_ sql: String) async -> AirSQLError? {
+                do {
+                    _ = try await session.query(sql)
+                    return nil
+                } catch {
+                    return error as? AirSQLError
+                }
             }
-        }
-        #expect(await failure("DELETE FROM t")?.kind == .disconnected, "the person's own statement goes to the server")
-        let inherited = await AgentGate.$agent.withValue("Claude Code") {
-            Task { await failure("DELETE FROM t") }
-        }.value
-        #expect(inherited != nil && inherited?.kind != .disconnected, "stopped at the gate: \(inherited?.message ?? "")")
-        let read = await AgentGate.$agent.withValue("Claude Code") { await failure("SELECT 1") }
-        #expect(read?.kind == .disconnected)
-        await #expect(throws: AirSQLError.self) {
-            try await AgentGate.$agent.withValue("Claude Code") { try await session.stream("DELETE FROM t") { _ in } }
+            #expect(await failure("DELETE FROM t")?.kind == .disconnected, "the person's own statement goes to the server")
+            let inherited = await AgentGate.$agent.withValue("Claude Code") {
+                Task { await failure("DELETE FROM t") }
+            }.value
+            #expect(inherited != nil && inherited?.kind != .disconnected, "stopped at the gate: \(inherited?.message ?? "")")
+            let read = await AgentGate.$agent.withValue("Claude Code") { await failure("SELECT 1") }
+            #expect(read?.kind == .disconnected)
+            await #expect(throws: AirSQLError.self) {
+                try await AgentGate.$agent.withValue("Claude Code") { try await session.stream("DELETE FROM t") { _ in } }
+            }
         }
     }
 }
