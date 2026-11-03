@@ -15,6 +15,7 @@ struct RoutesTests {
     }
 
     @Test func configChainsTheHopsAndIncludesTheUsersConfigLast() {
+        _ = RouteTesting.prepared  // the include the tunnel tests set, once: it can't change between the two reads below
         var jump = connection(.sshJump, hops: 3)
         jump.jumpHosts[1].login = .password
         let text = SSHConfig.text(for: jump, proxySocket: nil)
