@@ -208,6 +208,12 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     /// Edits the value as text (a long value's double click): the text gets the keyboard.
     func beginEditing() {
         guard keep != nil else { return NSSound.beep() }
+        showAsText()
+        window?.makeFirstResponder(text)
+    }
+
+    /// The value as text, the view edits happen in.
+    private func showAsText() {
         picked = .text
         if mode != .text {
             mode = .text
@@ -215,7 +221,6 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
             refresh()
         }
         textScroll.isHidden = false
-        window?.makeFirstResponder(text)
     }
 
     func textDidChange(_ notification: Notification) {
@@ -264,10 +269,18 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     @objc func formatJSON(_ sender: Any?) { reshapeJSON(JSONText.pretty) }
     @objc func compactJSON(_ sender: Any?) { reshapeJSON(JSONText.compact) }
 
-    /// The text laid out again, as an edit (undo takes it back), or why it isn't JSON.
+    /// The JSON laid out again: while its text is being edited, as one more edit (undo takes it back); otherwise kept as
+    /// the cell's pending value at once. Says why when it isn't JSON.
     private func reshapeJSON(_ reshape: (String) throws -> String) {
+        guard let keep else { return NSSound.beep() }
+        let editing = window?.firstResponder === text
+        showAsText()
         do {
             let shaped = try reshape(text.string)
+            guard editing else {
+                if let refusal = keep(shaped) { say(refusal, problem: true) }
+                return
+            }
             let all = NSRange(location: 0, length: (text.string as NSString).length)
             guard text.shouldChangeText(in: all, replacementString: shaped) else { return }
             text.replaceCharacters(in: all, with: shaped)

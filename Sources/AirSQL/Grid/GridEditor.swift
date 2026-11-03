@@ -84,15 +84,11 @@ final class GridEditor: NSTextField, NSTextFieldDelegate {
     func show(problem message: String) {
         NSSound.beep()
         problem?.close()
-        let text = label(message + "\nFix the value, or press Esc to leave the cell as it was.", font: .systemFont(ofSize: 12))
+        let text = label(message + ".\nFix the value, or press Esc to leave the cell as it was.", font: .systemFont(ofSize: 12), wraps: true)
         text.preferredMaxLayoutWidth = 320
-        text.setAccessibilityIdentifier("grid.editor.problem")
-        let content = NSViewController()
-        content.view = NSStackView(views: [text])
-        (content.view as? NSStackView)?.edgeInsets = NSEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
-        let popover = NSPopover()
-        popover.contentViewController = content
-        popover.behavior = .applicationDefined
+        let stack = NSStackView(views: [text])
+        stack.setAccessibilityIdentifier("grid.editor.problem")
+        let popover = popover(around: stack, behavior: .applicationDefined)
         popover.show(relativeTo: bounds, of: self, preferredEdge: .maxY)
         problem = popover
     }
@@ -106,6 +102,27 @@ final class GridEditor: NSTextField, NSTextFieldDelegate {
     func controlTextDidEndEditing(_ obj: Notification) {
         if grid.editor === self { grid.endEditing(commit: true, refocus: false) }
     }
+}
+
+/// A popover around `content` with margins, as large as they and the content need.
+@MainActor
+func popover(around content: NSView, behavior: NSPopover.Behavior) -> NSPopover {
+    let controller = NSViewController()
+    controller.view = NSView()
+    content.translatesAutoresizingMaskIntoConstraints = false
+    controller.view.addSubview(content)
+    NSLayoutConstraint.activate([
+        content.topAnchor.constraint(equalTo: controller.view.topAnchor, constant: 10),
+        content.bottomAnchor.constraint(equalTo: controller.view.bottomAnchor, constant: -10),
+        content.leadingAnchor.constraint(equalTo: controller.view.leadingAnchor, constant: 12),
+        content.trailingAnchor.constraint(equalTo: controller.view.trailingAnchor, constant: -12),
+    ])
+    controller.view.layoutSubtreeIfNeeded()
+    controller.preferredContentSize = controller.view.fittingSize
+    let popover = NSPopover()
+    popover.contentViewController = controller
+    popover.behavior = behavior
+    return popover
 }
 
 extension DataGridView {

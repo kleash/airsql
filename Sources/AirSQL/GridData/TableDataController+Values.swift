@@ -266,7 +266,7 @@ extension TableDataController {
 /// selected cells' pending value, Esc or a click elsewhere leaves them as they were.
 @MainActor
 final class SetChecklist: NSObject {
-    let popover = NSPopover()
+    private(set) var popover = NSPopover()
     let boxes: [NSButton]
     private let done: ([String]) -> Void
 
@@ -286,12 +286,8 @@ final class SetChecklist: NSObject {
         let stack = NSStackView(views: boxes + [NSStackView(views: [cancel, set])])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
         stack.setAccessibilityIdentifier("grid.set")
-        let content = NSViewController()
-        content.view = stack
-        popover.contentViewController = content
-        popover.behavior = .transient
+        popover = AirSQL.popover(around: stack, behavior: .transient)
     }
 
     func show(relativeTo rect: NSRect, of view: NSView) {

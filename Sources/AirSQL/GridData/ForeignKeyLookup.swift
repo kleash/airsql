@@ -6,7 +6,7 @@ import AppKit
 /// click puts the chosen key in the selected rows as a pending edit; Esc or a click elsewhere closes it.
 @MainActor
 final class ForeignKeyLookup: NSObject, NSSearchFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
-    let popover = NSPopover()
+    private(set) var popover = NSPopover()
     let search = NSSearchField()
     let table = NSTableView()
     let status = label("Loading…", font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
@@ -44,16 +44,12 @@ final class ForeignKeyLookup: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
         let stack = NSStackView(views: [search, scroll, status])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.edgeInsets = NSEdgeInsets(top: 10, left: 10, bottom: 8, right: 10)
         stack.setAccessibilityIdentifier("grid.lookup")
         NSLayoutConstraint.activate([
             scroll.widthAnchor.constraint(equalToConstant: 300), scroll.heightAnchor.constraint(equalToConstant: 220),
             search.widthAnchor.constraint(equalTo: scroll.widthAnchor), status.widthAnchor.constraint(equalTo: scroll.widthAnchor),
         ])
-        let content = NSViewController()
-        content.view = stack
-        popover.contentViewController = content
-        popover.behavior = .transient
+        popover = AirSQL.popover(around: stack, behavior: .transient)
         run("", after: 0)
     }
 

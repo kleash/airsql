@@ -159,6 +159,14 @@ extension AppTests {
             panel.keepValue(nil)
             #expect(tab.source?.cell(0, 10) == .text("{\"theme\":\"dark\"}"))
             tab.revertAllChanges(nil)
+            // Not being edited (the JSON tree shows), formatting keeps the value at once.
+            tab.viewer.toggleValuePanel(nil)
+            tab.viewer.toggleValuePanel(nil)
+            let fresh = try #require(tab.viewer.valuePanel)
+            #expect(fresh.mode == .json)
+            fresh.formatJSON(nil)
+            #expect(fresh.mode == .text && !fresh.edited && tab.source?.cell(0, 10) == .text("{\n  \"theme\": \"dark\"\n}"))
+            tab.revertAllChanges(nil)
         }
 
         @Test func aForeignKeyPicksItsRowFromADropDown() async throws {
@@ -189,5 +197,106 @@ extension AppTests {
             #expect(main.unfinishedWork() == ["orders on Local: 1 pending change, kept for the next time you open the table"])
             tab.revertAllChanges(nil)
         }
+    }
+}
+
+extension AppTests.ScreenshotTests {
+    /// Grid editing: Insert Value's ƒ NOW() and a new row's placeholders, the value panel formatting JSON, an editor
+    /// saying why it refuses a value, a SET's checklist and a foreign key's drop-down.
+    @Test func gridEditing() async throws {
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            let (main, harness, tab) = try await AppTests.GridDataAppTests.tab("customers", session: .customers(),
+                                                                             size: NSSize(width: 1180, height: 720))
+            main.window?.appearance = NSAppearance(named: appearance)
+            onScreen(main.window)
+            tab.grid.selection.select(GridPosition(row: 0, column: 8))
+            tab.insertCellValue(tab.insertValueItems()[1])
+            tab.grid.selection.select(GridPosition(row: 1, column: 6))
+            tab.grid.insertText("12.5")
+            tab.grid.endEditing(commit: true)
+            tab.addRow(nil)
+            tab.viewer.toggleValuePanel(nil)
+            tab.grid.selection.select(GridPosition(row: 0, column: 10))
+            tab.viewer.valuePanel?.formatJSON(nil)
+            main.window?.displayIfNeeded()
+            try await save(harness, "grid-edit-\(suffix)")
+            tab.viewer.valuePanel?.putBack(nil)
+            tab.viewer.toggleValuePanel(nil)
+
+            tab.grid.selection.select(GridPosition(row: 0, column: 6))
+            main.window?.makeFirstResponder(tab.grid)
+            tab.grid.insertText("12.345")
+            tab.grid.endEditing(commit: true)
+            main.window?.displayIfNeeded()
+            try await save(harness, "grid-edit-problem-\(suffix)")
+            tab.grid.endEditing(commit: false)
+
+            tab.grid.beginEditing(at: GridPosition(row: 0, column: 5))
+            try await save(harness, "grid-edit-set-\(suffix)")
+            tab.checklist?.cancel(nil)
+            tab.revertAllChanges(nil)
+            main.window?.orderOut(nil)
+
+            let (orders, ordersHarness, ordersTab) = try await AppTests.GridDataAppTests.tab(size: NSSize(width: 1180, height: 720))
+            orders.window?.appearance = NSAppearance(named: appearance)
+            onScreen(orders.window)
+            ordersTab.grid.beginEditing(at: GridPosition(row: 0, column: 1))
+            await ready { ordersTab.lookup?.rows.isEmpty == true }
+            try await save(ordersHarness, "grid-edit-lookup-\(suffix)")
+            ordersTab.lookup?.popover.close()
+            orders.window?.orderOut(nil)
+        }
+    }
+}
+
+extension AppTests.HelpTests {
+    /// The editors' popovers and the value panel's actions say what each control does.
+    @Test func everyGridEditorSaysWhatItDoes() async throws {
+        let (main, _, tab) = try await AppTests.GridDataAppTests.tab("customers", session: .customers())
+        tab.viewer.toggleValuePanel(nil)
+        tab.grid.selection.select(GridPosition(row: 0, column: 10))
+        var missing = unexplained(try #require(tab.viewer.valuePanel?.actions.menu), path: ["value panel"])
+        missing += unexplained([try #require(main.window)], where: "value panel")
+        main.window?.orderFront(nil)
+        tab.grid.beginEditing(at: GridPosition(row: 0, column: 5))
+        missing += unexplained([try #require(tab.checklist?.popover.contentViewController?.view.window)], where: "SET checklist")
+        tab.checklist?.cancel(nil)
+        missing += unexplained(tab.pickList(["new", "active"], row: 0, column: 4), path: ["ENUM"])
+        missing += unexplained(MainMenu.submenu("Insert Value", tab.insertValueItems()).submenu!, path: ["Insert Value"])
+        main.window?.orderOut(nil)
+        let (orders, _, ordersTab) = try await AppTests.GridDataAppTests.tab()
+        orders.window?.orderFront(nil)
+        ordersTab.grid.beginEditing(at: GridPosition(row: 0, column: 1))
+        await ready { ordersTab.lookup?.rows.isEmpty == true }
+        missing += unexplained([try #require(ordersTab.lookup?.popover.contentViewController?.view.window)], where: "lookup")
+        ordersTab.lookup?.popover.close()
+        orders.window?.orderOut(nil)
+        #expect(missing.isEmpty, "\(missing)")
+    }
+}
+
+extension AppTests.LayoutTests {
+    /// The editors' popovers fit their text, in light and dark.
+    @Test func gridEditorsAreTidy() async throws {
+        var problems: [String] = []
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let (main, _, tab) = try await AppTests.GridDataAppTests.tab("customers", session: .customers())
+            main.window?.appearance = NSAppearance(named: appearance)
+            main.window?.orderFront(nil)
+            tab.grid.beginEditing(at: GridPosition(row: 0, column: 5))
+            let checklist = try #require(tab.checklist?.popover.contentViewController?.view)
+            checklist.layoutSubtreeIfNeeded()
+            problems += layoutProblems(checklist, where: "\(appearance) SET checklist")
+            tab.checklist?.cancel(nil)
+            tab.grid.selection.select(GridPosition(row: 0, column: 6))
+            tab.grid.insertText("12.345")
+            tab.grid.endEditing(commit: true)
+            tab.viewer.toggleValuePanel(nil)
+            main.window?.contentView?.layoutSubtreeIfNeeded()
+            problems += layoutProblems(try #require(tab.viewer.valuePanel), where: "\(appearance) value panel")
+            tab.grid.endEditing(commit: false)
+            main.window?.orderOut(nil)
+        }
+        #expect(problems.isEmpty, "\(problems)")
     }
 }
