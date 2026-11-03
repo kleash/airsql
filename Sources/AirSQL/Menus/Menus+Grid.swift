@@ -18,7 +18,7 @@ extension MainMenu {
                         Commands.filter, Commands.searchAllColumns])
         menus.data.addItem(submenu("Quick Filter", [Commands.filterEquals.item(), Commands.filterNotEquals.item()]))
         menus.data.add([Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending, Commands.clearSort, nil,
-                        Commands.loadMore, Commands.loadAll, Commands.countRows])
+                        Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.exportRows])
         let refresh = menus.view.items.firstIndex { $0.action == Commands.refresh.action } ?? menus.view.items.count - 1
         menus.view.insertItem(submenu("Refresh Every", TableDataController.autoRefreshItems()), at: refresh + 1)
     }

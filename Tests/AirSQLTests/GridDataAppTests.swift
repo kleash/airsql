@@ -158,6 +158,31 @@ extension AppTests {
             GridCopy.format = .tsv
         }
 
+        @Test func exportsRowsToTheClipboardOrAFile() async throws {
+            let (main, harness, tab) = try await Self.tab()
+            tab.exportRows(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(main.window?.attachedSheet?.title == "Export Rows of orders")
+            _ = await call(harness, "press", ["id": "export.copy"])
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix(
+                "id,customer_id,region,number,total,parent_id\n1,7,EU,100,12.50,NULL\n2,NULL,US,101,99.00,1\n") == true)
+            #expect(main.window?.attachedSheet == nil)
+            // Excel and text files are written as the rows come.
+            let folder = URL(fileURLWithPath: try scratch())
+            let columns = try #require(tab.source?.columns)
+            for (format, name) in [(CopyFormat?.none, "rows.xlsx"), (CopyFormat?.some(.insert), "rows.sql")] {
+                let output = try ExportOutput(url: folder.appendingPathComponent(name), format: format, columns: columns,
+                                              database: "airsql_fixture", table: "orders", options: CopyOptions(headers: true))
+                try output.write([["1", nil, "EU", "1", "2.50", nil]])
+                try output.write([["2", "3", "US", "2", "1", nil]])
+                try output.finish()
+            }
+            let sql = try String(contentsOf: folder.appendingPathComponent("rows.sql"), encoding: .utf8)
+            #expect(sql.components(separatedBy: "\n").filter { $0.hasPrefix("INSERT INTO `airsql_fixture`.`orders`") }.count == 2)
+            let size = try FileManager.default.attributesOfItem(atPath: folder.appendingPathComponent("rows.xlsx").path)[.size] as? Int
+            #expect((size ?? 0) > 500)
+        }
+
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
             let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
             #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. Views are read-only"))

@@ -150,8 +150,13 @@ public final class TableDataSource: GridSource {
     /// A loaded row's value as the server sent it, whole: text, BIT as its bits, binary as "0x…"; nil for NULL.
     public func value(loaded row: Int, _ column: Int) -> String? {
         let (store, local) = page(row)
-        guard store.columns[column].isBinary else { return store.display(local, column) }
-        return store.withBytes(local, column) { bytes in
+        return Self.text(store, local, column)
+    }
+
+    /// A stored value as the grid's sources give it whole (export streams them this way too).
+    public static func text(_ store: ResultStore, _ row: Int, _ column: Int) -> String? {
+        guard store.columns[column].isBinary else { return store.display(row, column) }
+        return store.withBytes(row, column) { bytes in
             let digits = Array("0123456789ABCDEF".utf8)
             var text = Array("0x".utf8)
             text.reserveCapacity(2 + bytes.count * 2)

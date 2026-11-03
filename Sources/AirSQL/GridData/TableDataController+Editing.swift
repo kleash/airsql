@@ -41,7 +41,7 @@ extension TableDataController: DataGridViewDelegate {
             menu.addItem(.separator())
             menu.addItem(quickFilterItem())
             menu.add([Commands.clearFilter, nil, Commands.setNull, Commands.setDefault, nil, Commands.addRow, Commands.duplicateRow,
-                      Commands.deleteRows, Commands.revert, nil, Commands.previewChanges, Commands.apply])
+                      Commands.deleteRows, Commands.revert, nil, Commands.previewChanges, Commands.apply, nil, Commands.exportRows])
         }
         for item in menu.items where item.target == nil { item.target = self }
         return menu

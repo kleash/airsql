@@ -96,6 +96,7 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.clearSort.action: return (!source.sort.isEmpty, "The rows aren't sorted")
         case Commands.clearFilter.action:
             return (!bar.filterText.isEmpty || !bar.searchField.stringValue.isEmpty, "The rows aren't filtered")
+        case Commands.exportRows.action: return (source.rowCount > 0 || source.hasMore, "There are no rows to export")
         case Commands.copy.action, Commands.copyWithHeaders.action, Commands.copyAs.action, Commands.copyColumnName.action:
             return (hasSelection, "Select cells first")
         default: return (true, nil)

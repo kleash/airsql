@@ -39,6 +39,31 @@ extension TableDataController {
         }
     }
 
+    /// Export Rows…: the selected or loaded rows (with their pending changes), or every row of the table with the
+    /// filter and sort, streamed on a session of its own.
+    @objc func exportRows(_ sender: Any?) {
+        guard let source, let window = view.window else { return NSSound.beep() }
+        let order = grid.columnOrder, rows = GridCopy.covered(grid).rows, sessions = context.sessions
+        let sql = source.pageSQL(offset: 0, limit: nil)
+        let request = ExportRowsRequest(
+            title: tableName, columns: order.map { source.columns[$0] }, database: database, table: tableName,
+            selectedCount: rows.count, selected: { rows.map { row in order.map { source.value(row, $0) } } },
+            loadedCount: source.rowCount, loaded: { (0..<source.rowCount).map { row in order.map { source.value(row, $0) } } },
+            all: { write in
+                let session = try await sessions.toolsSession()
+                do {
+                    try await session.stream(sql, batchRows: 5_000) { store in
+                        try write((0..<store.rowCount).map { row in order.map { TableDataSource.text(store, row, $0) } })
+                    }
+                } catch {
+                    await session.close()
+                    throw error
+                }
+                await session.close()
+            })
+        ExportRowsSheet.show(request, activity: model.activity, on: window)
+    }
+
     /// The Refresh Every items, Off first.
     static func autoRefreshItems() -> [NSMenuItem] {
         [0, 5, 10, 30, 60].map { seconds in
