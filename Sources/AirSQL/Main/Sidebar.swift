@@ -79,6 +79,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         outline.rowHeight = 22
         outline.intercellSpacing = NSSize(width: 0, height: 0)
         outline.indentationPerLevel = 14
+        outline.autoresizesOutlineColumn = false  // deep tree rows truncate instead of widening the column past the sidebar
         outline.allowsMultipleSelection = true
         outline.allowsEmptySelection = true
         outline.floatsGroupRows = false
