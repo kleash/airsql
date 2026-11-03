@@ -91,6 +91,9 @@ nothing runs.
   once that passes the time set in Settings ▸ Safety.
 - Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
 
+On a [read-only connection](connections.md#add-or-edit-a-connection), Run, Explain and Profile refuse any statement
+AirSQL can't prove only reads (SELECT, WITH … SELECT, SHOW, DESCRIBE, EXPLAIN and USE pass), and Messages says why.
+
 ## What asks first
 
 The safety settings (Settings ▸ Safety, or a connection's own) decide which statements ask before they run. The SQL
@@ -109,7 +112,9 @@ shows in a sheet, with what it will do:
 - **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](sql-log.md).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it: as the
   server's table, or as a tree (MySQL's own tree; MariaDB's plan made into one).
-- **Query ▸ Profile** runs the statement and shows where the server spent its time, step by step, where the server keeps
-  profiles (SHOW PROFILE).
+- **Query ▸ Profile** runs the statement and shows where the server spent its time. On MySQL 8 and later it reads
+  performance_schema: the statement's stages where the server records them, else its own figures (time, lock time,
+  rows examined and sent, temporary tables, sorts and full scans). Elsewhere, and where performance_schema is off or
+  your login can't read it, it shows SHOW PROFILE's steps, with a note saying why.
 - **Query ▸ Save as Changeset…** saves the selected statements (or the one at the cursor) as a Liquibase changeset in a
   changelog you choose. See [Liquibase changelogs](liquibase.md).

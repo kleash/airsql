@@ -116,6 +116,8 @@ its own:
   proven read-only (see read-only) runs without asking.
 - **Statements on the person's sessions** that what you did sends, and that aren't proven read-only (a Commit, a
   Rollback, the transaction mode, a Kill), wait in the same sheet, one by one.
+- **A read-only connection** refuses in the console (and the navigator, a sync, Restore and CSV import) any statement
+  that isn't proven read-only, a bare USE aside, before anything asks: there is nothing to approve.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
   whether agents are allowed, and the client tools AirSQL runs. Other saved data (names, folders, settings) is refused
