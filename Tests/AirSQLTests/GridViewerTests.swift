@@ -211,3 +211,43 @@ extension AppTests {
         #expect(viewer.record == nil && grid.source === source && grid.selection.cursor == GridPosition(row: 1, column: 2))
     }
 }
+
+extension AppTests {
+    @Test func displayAsShowsUnixTimesAsDatesAndIsKeptPerTable() async throws {
+        let key = GridViewer.ViewKey(connection: UUID(), database: "shop", table: "events \(UUID())")
+        let source = FakeGridSource(rows: 20, columns: 10)
+        let (_, harness, content) = viewerWindow(source, key: key)
+        let grid = content.viewer.grid
+        grid.selection.select(GridPosition(row: 2, column: 9))
+        // Words can't be shown as dates: the item says why.
+        grid.selection.select(GridPosition(row: 2, column: 1))
+        let refused = await call(harness, "menu", ["path": "Data > Display As > Date from Unix Time (seconds)"])
+        #expect(refused.error?.contains("Not for this column's type") == true, "\(refused.error ?? "")")
+        grid.selection.select(GridPosition(row: 2, column: 9))
+        #expect(await call(harness, "menu", ["path": "Data > Display As > Date from Unix Time (seconds)"]).error == nil)
+        let seconds = try #require(source.value(2, 9).flatMap(Double.init))
+        let expected = GridDisplay.unixTime.format(String(Int(seconds)), bytes: nil)!
+        #expect(grid.source?.cell(2, 9) == .text(expected) && grid.source?.value(2, 9) == source.value(2, 9))
+        #expect(grid.source?.columns[9].type == "int as date" && grid.selection.cursor == GridPosition(row: 2, column: 9))
+        // Kept for the table.
+        let again = ViewerContent(FakeGridSource(rows: 5, columns: 10), key: key)
+        #expect(again.viewer.displays[9] == .unixTime && again.viewer.grid.source?.columns[9].kind == .date)
+        // As Stored takes it away.
+        #expect(await call(harness, "menu", ["path": "Data > Display As > As Stored"]).error == nil)
+        #expect(grid.source?.cell(2, 9) == source.cell(2, 9) && content.viewer.displays.isEmpty)
+    }
+
+    @Test func displayTypesFormatValues() {
+        let utc = TimeZone(identifier: "UTC")!
+        #expect(GridDisplay.unixTime.format("1762164000", bytes: nil, timeZone: utc) == "2025-11-03 10:00:00")
+        #expect(GridDisplay.unixMillis.format("1762164000123", bytes: nil, timeZone: utc) == "2025-11-03 10:00:00")
+        #expect(GridDisplay.unixTime.format("soon", bytes: nil) == nil && GridDisplay.unixTime.format(nil, bytes: nil) == nil)
+        let bytes: [UInt8] = [0x12, 0x3e, 0x45, 0x67, 0xe8, 0x9b, 0x12, 0xd3, 0xa4, 0x56, 0x42, 0x66, 0x14, 0x17, 0x40, 0x00]
+        #expect(GridDisplay.uuid.format(nil, bytes: bytes) == "123e4567-e89b-12d3-a456-426614174000")
+        #expect(GridDisplay.uuid.format(nil, bytes: [1, 2]) == nil)
+        #expect(GridDisplay.hex.format(nil, bytes: [0, 255]) == "0x00FF" && GridDisplay.text.format(nil, bytes: Array("héllo".utf8)) == "héllo")
+        #expect(GridDisplay.grouped.format("1234567.50", bytes: nil)?.filter(\.isNumber) == "123456750")
+        #expect(GridDisplay.choices(for: GridColumn(name: "n", kind: .number)).contains(.unixTime))
+        #expect(GridDisplay.choices(for: GridColumn(name: "t")) == [.standard])
+    }
+}

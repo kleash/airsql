@@ -67,18 +67,90 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private(set) var record: Int?
     /// The grid's columns as they were before Transpose or Record View, to put back after.
     private var layout: (order: [Int], widths: [CGFloat])?
+    /// Display As, by the source's column.
+    private(set) var displays: [Int: GridDisplay] = [:]
+    /// The source as the grid shows it untransposed: with its display types.
+    private var displayed: GridSource?
 
     /// Shows `source` with the columns as they were left under `viewKey`; `transposed` turns it on its side.
     func show(_ source: GridSource?, transposed: Bool = false) {
         self.source = source
         record = nil
         self.transposed = false
-        grid.source = source
+        layout = nil
+        if let source, let viewKey {
+            settings = TableViewSettingsStore.shared.settings(connection: viewKey.connection, database: viewKey.database,
+                                                              table: viewKey.table)
+            displays = Dictionary(source.columns.indices.compactMap { index in
+                settings.displayTypes[source.columns[index].name].flatMap(GridDisplay.init(rawValue:)).map { (index, $0) }
+            }, uniquingKeysWith: { first, _ in first })
+        } else {
+            displays = [:]
+        }
+        displayed = source.map(display)
+        grid.source = displayed
         restoreColumns()
         if transposed { transposeGrid(nil) }
         updateRecordBar()
         status.update()
         updateValuePanel()
+    }
+
+    /// `source` with the display types, when there are any.
+    private func display(_ source: GridSource) -> GridSource {
+        displays.isEmpty ? source : DisplaySource(source, displays: displays, bytes: { [weak source] row, column in
+            (source as? GridBytes)?.bytes(row, column)
+        })
+    }
+
+    /// Shows the grid's source again in another form (display types, back from Transpose), keeping the columns'
+    /// order and widths, the selection and where it is scrolled.
+    private func replaceShown(_ shown: GridSource?) {
+        let order = grid.columnOrder, widths = grid.columnWidths, selection = grid.selection
+        let origin = grid.scrollView.contentView.bounds.origin
+        grid.source = shown
+        guard let shown, widths.count == shown.columns.count else { return }
+        grid.columnWidths = widths
+        grid.columnOrder = order
+        grid.selection = selection
+        grid.scrollView.contentView.scroll(to: origin)
+        grid.scrollView.reflectScrolledClipView(grid.scrollView.contentView)
+    }
+
+    /// Display As ▸ (a menu item's tag is the `GridDisplay`'s index): the selected columns, or the focused cell's.
+    @objc func displayAs(_ sender: Any?) {
+        guard let source, let item = sender as? NSMenuItem, GridDisplay.allCases.indices.contains(item.tag) else { return }
+        if transposed || record != nil { transposeGrid(nil) }
+        let chosen = GridDisplay.allCases[item.tag]
+        for column in focusedColumns where GridDisplay.choices(for: source.columns[column]).contains(chosen) {
+            displays[column] = chosen == .standard ? nil : chosen
+        }
+        displayed = display(source)
+        replaceShown(displayed)
+        saveColumns()
+        updateValuePanel()
+    }
+
+    /// The source columns the column commands act on: the selected ones, else the focused cell's.
+    var focusedColumns: [Int] {
+        let selected = (0..<grid.columnCount).filter { grid.selection.containsColumn($0) }
+        return (selected.isEmpty ? grid.selection.cursor.map { [$0.column] } ?? [] : selected).map(grid.sourceColumn)
+    }
+
+    /// The Display As ▸ items for the focused column's kind.
+    func displayMenu() -> NSMenuItem {
+        let column = focusedColumns.first.flatMap { source?.columns[$0] }
+        let items = (column.map(GridDisplay.choices) ?? []).map { display -> NSMenuItem in
+            let item = Commands.displayAs.item()
+            item.title = display.title
+            item.tag = GridDisplay.allCases.firstIndex(of: display)!
+            item.state = (focusedColumns.first.flatMap { displays[$0] } ?? .standard) == display ? .on : .off
+            return item
+        }
+        let menu = MainMenu.submenu("Display As", items)
+        menu.isEnabled = items.count > 1
+        if items.count <= 1 { menu.toolTip = "Only numbers and bytes can be shown another way" }
+        return menu
     }
 
     /// The host's rows or columns changed (a page arrived): shows them again.
@@ -99,7 +171,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             let focus = (grid.source as? TransposedSource).flatMap { shown in grid.selection.cursor.flatMap { shown.base($0.row, grid.sourceColumn($0.column)) } }
             transposed = false
             record = nil
-            grid.source = source
+            grid.source = displayed
             if let layout, layout.widths.count == source.columns.count {
                 grid.columnWidths = layout.widths
                 grid.columnOrder = layout.order
@@ -110,7 +182,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             let cursor = grid.selection.cursor
             transposed = true
             layout = (grid.columnOrder, grid.columnWidths)
-            grid.source = TransposedSource(source, order: grid.columnOrder)
+            grid.source = TransposedSource(displayed ?? source, order: grid.columnOrder)
             if let cursor { focusCell(GridPosition(row: cursor.column, column: cursor.row + 1)) }
         }
         updateRecordBar()
@@ -131,7 +203,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         if layout == nil { layout = (grid.columnOrder, grid.columnWidths) }
         let order = layout?.order ?? grid.columnOrder
         record = row
-        grid.source = TransposedSource(source, order: order, rows: [row])
+        grid.source = TransposedSource(displayed ?? source, order: order, rows: [row])
         focusCell(GridPosition(row: min(field, max(0, order.count - 1)), column: 1))
         updateRecordBar()
         status.update()
@@ -194,9 +266,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// The order, widths and hidden columns kept under `viewKey`, by name; columns it doesn't know keep their place
     /// at the end.
     func restoreColumns() {
-        guard let source, let viewKey, grid.source === source, grid.columnWidths.count == source.columns.count else { return }
-        settings = TableViewSettingsStore.shared.settings(connection: viewKey.connection, database: viewKey.database,
-                                                          table: viewKey.table)
+        guard let source, viewKey != nil, !transposed, record == nil, grid.columnWidths.count == source.columns.count else { return }
         let names = source.columns.map(\.name)
         var widths = grid.columnWidths
         for (index, name) in names.enumerated() {
@@ -210,7 +280,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     /// Keeps the columns' order, widths and hidden ones under `viewKey`.
     func saveColumns() {
-        guard let source, let viewKey, grid.source === source, grid.columnWidths.count == source.columns.count else { return }
+        guard let source, let viewKey, !transposed, record == nil, grid.columnWidths.count == source.columns.count else { return }
         let names = source.columns.map(\.name)
         let shown = grid.columnOrder.map { names[$0] }, hidden = names.filter { !shown.contains($0) }
         // Hidden columns keep their place: after the column they followed before.
@@ -222,6 +292,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
         settings.order = order
         settings.hiddenColumns = hidden
+        settings.displayTypes = Dictionary(displays.map { (names[$0.key], $0.value.rawValue) }, uniquingKeysWith: { first, _ in first })
         settings.widths = Dictionary(names.indices.map { (names[$0], Double(grid.columnWidths[$0])) },
                                      uniquingKeysWith: { first, _ in first })
         TableViewSettingsStore.shared.set(settings, connection: viewKey.connection, database: viewKey.database,
@@ -299,9 +370,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     /// Hide Column: the selected columns, or the focused cell's.
     @objc func hideColumn(_ sender: Any?) {
-        let shown = Array(0..<grid.columnCount).filter { grid.selection.containsColumn($0) }
-        let columns = shown.isEmpty ? grid.selection.cursor.map { [$0.column] } ?? [] : shown
-        setHidden(true, columns: columns.map(grid.sourceColumn))
+        setHidden(true, columns: focusedColumns)
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
@@ -311,6 +380,13 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             return status.aggregate != nil
         case #selector(goToRow(_:)): return grid.rowCount > 0
         case #selector(showColumnList(_:)): return source != nil
+        case #selector(displayAs(_:)):
+            let display = GridDisplay.allCases.indices.contains(item.tag) ? GridDisplay.allCases[item.tag] : .standard
+            let columns = focusedColumns.compactMap { source?.columns[$0] }
+            let enabled = !columns.isEmpty && columns.allSatisfy { GridDisplay.choices(for: $0).contains(display) }
+            item.state = enabled && focusedColumns.allSatisfy({ (displays[$0] ?? .standard) == display }) ? .on : .off
+            item.explain(enabled: enabled, reason: columns.isEmpty ? "Select a column first" : "Not for this column's type")
+            return enabled
         case #selector(toggleValuePanel(_:)):
             item.state = valuePanel == nil ? .off : .on
             return true
@@ -351,8 +427,17 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         status.update()
     }
 
+    /// The host's items (Copy…), then the viewer's for what was clicked.
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
-        host?.dataGrid(grid, menuFor: target)
+        let menu = host?.dataGrid(grid, menuFor: target) ?? NSMenu(title: "Grid")
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        switch target {
+        case .cells: menu.add([Commands.valuePanel, Commands.recordView])
+        case .row: menu.add([Commands.recordView, Commands.valuePanel])
+        case .column: menu.add([Commands.hideColumn, Commands.columnList])
+        }
+        if !transposed, record == nil { menu.addItem(displayMenu()) }
+        return menu
     }
 
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {

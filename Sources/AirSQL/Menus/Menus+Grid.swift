@@ -1,3 +1,4 @@
+import AirSQLCore
 import AppKit
 
 extension MainMenu {
@@ -7,7 +8,14 @@ extension MainMenu {
     static func addGridItems(_ menus: Menus) {
         // L2: reading the data.
         menus.edit.add([nil, Commands.copySummary])
-        menus.data.add([Commands.openTable, nil, Commands.goToRow, Commands.hideColumn, nil, Commands.loadMore, Commands.countRows])
+        menus.data.add([Commands.openTable, nil, Commands.goToRow, Commands.hideColumn])
+        menus.data.addItem(submenu("Display As", GridDisplay.allCases.enumerated().map { index, display in
+            let item = Commands.displayAs.item()
+            item.title = display.title
+            item.tag = index
+            return item
+        }))
+        menus.data.add([nil, Commands.loadMore, Commands.countRows])
         menus.view.add([nil, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,
                         Commands.transpose, Commands.columnList])
     }
