@@ -389,6 +389,9 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
 
     override func run() {
         guard let schema else { return }
+        // The gate (plan §2.8): files on this Mac are the person's.
+        guard !AgentGuard.refuses("A changelog is a file on this Mac: only the person at the Mac can save one. Leave the "
+                                  + "sheet for them.") else { return }
         let (pieces, filters, _, _) = plan()
         let settings = model.data.settings.liquibase, url = self.url, options = self.options
         let needsRows = pieces.contains { if case .rows = $0 { return true } else { return false } }

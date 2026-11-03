@@ -235,6 +235,9 @@ final class ChangesetSheet: NSWindowController {
 
     @objc private func save(_ sender: Any?) {
         guard saveButton.isEnabled, let url, let window else { return }
+        // The gate (plan §2.8): files on this Mac are the person's.
+        guard !AgentGuard.refuses("A changelog is a file on this Mac: only the person at the Mac can save to one. Leave the "
+                                  + "sheet for them.") else { return }
         let text = self.text, new = startsNew
         saveButton.isEnabled = false
         Task {

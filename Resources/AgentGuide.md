@@ -119,11 +119,11 @@ its own:
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
   whether agents are allowed, and the client tools AirSQL runs. Other saved data (names, folders, settings) is refused
   too while Settings ▸ Safety ▸ Ask before agents change anything is on. The Settings window is to look at.
-- **Files, the clipboard, trust:** you can't save a console's file, start an export, save or remember a password,
-  trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or `set` for text, and
-  run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a transaction open,
-  Delete, Clear) is the person's call, and so is Quit. The connection editor opens for you, but its Save keeps nothing
-  that is the person's.
+- **Files, the clipboard, trust:** you can't save a console's file, start an export, save a Liquibase changelog, save
+  or remember a password, trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or
+  `set` for text, and run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a
+  transaction open, Delete, Clear) is the person's call, and so is Quit. The connection editor opens for you, but its
+  Save keeps nothing that is the person's.
 - **A production console's text:** `type` or `set` into the editor of a console on a connection coloured Production
   shows the person the text first; single keys that would change it are refused.
 - **Data you may not read is hidden:** on connections below Schema + read, grids, query results, the process list and
@@ -184,6 +184,12 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
+- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.objects`
+  (`liquibase.include.<name>`, `liquibase.rows.<name>`, `liquibase.where.<name>`), `liquibase.author`, `liquibase.ids`,
+  `liquibase.rollback`, `liquibase.preconditions`, `liquibase.layout`, `liquibase.saveTo`, `liquibase.choose`,
+  `liquibase.preview`, `liquibase.copy`, `tools.run` (the person's); Save as Changeset `changeset.heading`,
+  `changeset.file`, `changeset.choose`, `changeset.new`, `changeset.sql`, `changeset.status`, `changeset.copy`,
+  `changeset.cancel`, `changeset.save` (the person's).
 - **Prompts**: `password.field`, `password.remember`, `login.user`, `login.password`, `prompt.answer`,
   `prompt.remember` (remembering is the person's), `trust.fingerprint` (Trust is the person's), `help`.
 - **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`;

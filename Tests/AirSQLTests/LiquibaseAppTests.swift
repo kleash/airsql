@@ -118,6 +118,10 @@ extension AppTests {
                 #expect(layoutProblems(root, where: "Save as changeset").isEmpty)
             }
             #expect(unexplained(harness.openSheets(), where: "Save as changeset").isEmpty)
+            // The changelog is a file on this Mac: an agent's Save is refused (the gate); the person's goes through.
+            let notes = AgentGuard.Notes()
+            AgentGuard.$notes.withValue(notes) { AgentGate.$agent.withValue("Claude Code") { save.performClick(nil) } }
+            #expect(notes.refusal?.contains("only the person at the Mac") == true && main.window?.attachedSheet != nil)
             save.performClick(nil)
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             let read = try LiquibaseChangelog(String(contentsOf: file, encoding: .utf8)).changesets
