@@ -41,7 +41,7 @@ final class GridStatusView: NSStackView {
     /// Shows the selection as it is now.
     func update() {
         rows.isHidden = rows.stringValue.isEmpty
-        guard let grid = viewer?.grid, let source = grid.source, let cursor = grid.selection.cursor else {
+        guard let grid = viewer?.grid, grid.source != nil, let cursor = grid.selection.cursor else {
             position.isHidden = true
             figure.isHidden = true
             aggregate = nil
@@ -58,7 +58,15 @@ final class GridStatusView: NSStackView {
         }
         position.stringValue = "r\(cursor.row + 1) : c\(cursor.column + 1) · \(size)"
         position.isHidden = false
-        if let cells = selection.cells(rows: grid.rowCount, columns: grid.columnCount, limit: Self.limit) {
+        // A big selection is added up once it stops changing (a drag across it would lag otherwise).
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(addUp), object: nil)
+        if count <= 10_000 || count > Self.limit { addUp() } else { perform(#selector(addUp), with: nil, afterDelay: 0.2) }
+    }
+
+    /// Works out the figures for the selection now.
+    @objc private func addUp() {
+        guard let grid = viewer?.grid, let source = grid.source, grid.selection.cursor != nil else { return }
+        if let cells = grid.selection.cells(rows: grid.rowCount, columns: grid.columnCount, limit: Self.limit) {
             aggregate = GridAggregate(cells.map { source.value($0.row, grid.sourceColumn($0.column)) })
         } else {
             aggregate = nil
