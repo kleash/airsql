@@ -54,16 +54,19 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
         options.setAccessibilityIdentifier("find.options")
         count.setAccessibilityIdentifier("find.count")
         for control in [previous, next, replace, replaceAll, done] { control.controlSize = .small }
-        // 200 wide when there is room, narrower rather than widening a window at its smallest (which holds its size at
-        // 500); hidden, the bar still sets the tab's narrowest, so Replace is only there once asked for.
+        // 200 wide when there is room, down to 100 rather than widening a window at its smallest (which holds its size at
+        // 500), then the count shortens (whole in its tooltip): Find and Replace fit beside the sidebar at 900. Hidden,
+        // the bar still sets the tab's narrowest, so Replace is only there once asked for.
         for field in [findField, replaceField] {
             field.controlSize = .small
             field.translatesAutoresizingMaskIntoConstraints = false
             let preferred = field.widthAnchor.constraint(equalToConstant: 200)
             preferred.priority = .init(490)
-            NSLayoutConstraint.activate([field.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            NSLayoutConstraint.activate([field.widthAnchor.constraint(greaterThanOrEqualToConstant: 100),
                                          field.widthAnchor.constraint(lessThanOrEqualToConstant: 200), preferred])
         }
+        count.lineBreakMode = .byTruncatingTail
+        count.setContentCompressionResistancePriority(.init(495), for: .horizontal)
         for view in [replaceField, replace, replaceAll] { view.isHidden = true }
         options.controlSize = .small
         let row = NSStackView(views: [findField, replaceField, options, previous, next, count, NSView(), replace, replaceAll, done])
@@ -80,6 +83,12 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
 
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() { layer?.backgroundColor = NSColor.bar.cgColor }
+
+    /// The count beside the arrows ("3 of 12"), whole in its tooltip too: a window at its smallest shortens it.
+    func setCount(_ text: String) {
+        count.stringValue = text
+        count.toolTip = text.isEmpty ? nil : text
+    }
 
     /// Shows the bar (with the replace field when `replacing`) and puts the keyboard in the find field.
     func show(replacing: Bool) {
@@ -187,13 +196,13 @@ extension TableDataController {
     private func updateFindCount() {
         let found = matches(), cursor = grid.selection.cursor
         if findBar.findField.stringValue.isEmpty {
-            findBar.count.stringValue = ""
+            findBar.setCount("")
         } else if findBar.find.expression == nil {
-            findBar.count.stringValue = "Not a valid regular expression"
+            findBar.setCount("Not a valid regular expression")
         } else if let cursor, let index = found.firstIndex(of: cursor) {
-            findBar.count.stringValue = "\((index + 1).formatted()) of \(found.count.formatted())"
+            findBar.setCount("\((index + 1).formatted()) of \(found.count.formatted())")
         } else {
-            findBar.count.stringValue = found.isEmpty ? "No matches" : "\(found.count.formatted()) matching"
+            findBar.setCount(found.isEmpty ? "No matches" : "\(found.count.formatted()) matching")
         }
     }
 
@@ -235,7 +244,7 @@ extension TableDataController {
         guard replaced > 0 else { return all ? NSSound.beep() : findMatch(forward: true) }
         changesDidChange()
         if all {
-            findBar.count.stringValue = "Replaced \(replaced.formatted()) \(replaced == 1 ? "value" : "values")"
+            findBar.setCount("Replaced \(replaced.formatted()) \(replaced == 1 ? "value" : "values")")
         } else {
             findMatch(forward: true)
         }

@@ -635,8 +635,8 @@ extension AppTests {
             PendingChangesStore.shared.flush()
         }
 
-        /// At the window's smallest the bar's search and condition narrow, and so do Find and Replace's fields: the tab
-        /// doesn't widen the window.
+        /// At the window's smallest the bar's search and condition narrow, and so do Find and Replace's fields, then its
+        /// count (whole in its tooltip): the tab doesn't widen the window.
         @Test func theTableTabKeepsTheWindowAtItsMinimumSize() async throws {
             let (main, _, tab) = try await Self.tab(size: MainWindowController.minimumSize)
             main.window?.layoutIfNeeded()
@@ -645,8 +645,12 @@ extension AppTests {
                     "\(tab.bar.whereField.box.frame.width), \(tab.bar.searchField.frame.width)")
             for replacing in [false, true] {
                 tab.findBar.show(replacing: replacing)
-                main.window?.layoutIfNeeded()
-                #expect(main.window?.frame.width == MainWindowController.minimumSize.width, "replacing: \(replacing)")
+                for count in ["", "12,345 of 67,890", "Not a valid regular expression"] {
+                    tab.findBar.setCount(count)
+                    main.window?.layoutIfNeeded()
+                    #expect(main.window?.frame.width == MainWindowController.minimumSize.width, "replacing: \(replacing), “\(count)”")
+                }
+                #expect(tab.findBar.findField.frame.width >= 100 && tab.findBar.count.toolTip == "Not a valid regular expression")
             }
             tab.findBar.close(nil)
         }
@@ -866,6 +870,9 @@ extension AppTests.LayoutTests {
                     let target = `in` ?? window
                     target.appearance = NSAppearance(named: appearance)
                     target.contentView?.layoutSubtreeIfNeeded()
+                    // The window's own layout, which widens it if the tab needs more room: the step stays at its size.
+                    window.layoutIfNeeded()
+                    if window.frame.width != size.width { problems.append("\(place) \(what): the window is \(Int(window.frame.width)) wide") }
                     if let content = target.contentView { problems += layoutProblems(content, where: "\(place) \(what)") }
                 }
                 check("table tab")
