@@ -69,6 +69,8 @@ public struct ConnectOptions: Equatable, Sendable, CustomStringConvertible, Cust
 public struct ServerInfo: Equatable, Sendable {
     public enum Flavor: String, Sendable {
         case mysql, mariadb
+
+        public var title: String { self == .mysql ? "MySQL" : "MariaDB" }
     }
 
     public var flavor: Flavor
@@ -82,6 +84,11 @@ public struct ServerInfo: Equatable, Sendable {
     public var tls: String?
     /// The certificate the server showed, when TLS is on.
     public var certificate: TLSCertificate?
+
+    /// The server is this version or later, as `SchemaServer.atLeast` asks it.
+    public func atLeast(_ major: Int, _ minor: Int = 0, _ patch: Int = 0) -> Bool {
+        versionNumber >= major * 10_000 + minor * 100 + patch
+    }
 }
 
 /// One result of a statement: its rows, or what it changed. A procedure (CALL) gives one per result set and one for
@@ -384,7 +391,7 @@ public final class DBConnection: @unchecked Sendable {
             lockName = locked ? lock : nil
             lost = nil
         }
-        log.note("connected: \(server.flavor == .mariadb ? "MariaDB" : "MySQL") \(server.version), thread \(server.threadID)"
+        log.note("connected: \(server.flavor.title) \(server.version), thread \(server.threadID)"
                  + (server.tls.map { ", " + $0 } ?? ", no TLS"), context: context)
         connected = true
         return server
