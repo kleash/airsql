@@ -73,6 +73,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         configureStatusItems()
         refresh()
         ToolsResponder.install(on: self)
+        LiquibaseResponder.install(on: self)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }

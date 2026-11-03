@@ -94,7 +94,9 @@ enum NavigatorActions {
         let agent = AgentGate.agent != nil && safety(open).askBeforeAgentChanges
         guard ask || agent else { return run(false) }
         guard let window else { return }
-        SQLPreviewSheet.show(request, connection: saved, on: window) { result in
+        var shown = request
+        shown.offersChangeset = true
+        SQLPreviewSheet.show(shown, connection: saved, on: window) { result in
             if result.approved { run(result.saveAsChangeset) }
         }
     }

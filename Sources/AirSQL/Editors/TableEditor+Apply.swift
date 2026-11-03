@@ -22,6 +22,7 @@ extension TableEditorController {
                 : "Each statement takes effect as it runs and can't be rolled back. A large table may be copied while it changes, "
                 + "and writes to it wait until that is done.")
         request.actionTitle = creating ? "Create" : "Apply"
+        request.offersChangeset = true
         request.warnings = warnings(statements)
         request.destructive = !droppedColumns.isEmpty
         SQLPreviewSheet.show(request, connection: context.connection, on: window) { [weak self] result in

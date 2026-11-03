@@ -94,6 +94,9 @@ that could cut or refuse values (a shorter type, NOT NULL). Each destructive sta
 Rows of tables only in the source come with their `CREATE TABLE`. New columns of existing tables get their default
 values: after running the script, compare again to copy their values. After a sync, AirSQL offers to compare again.
 
+**Save as Changeset…** saves the script as [Liquibase](liquibase.md) changesets in a changelog you choose; so does
+**Query ▸ Save as Changeset…** in the “Sync script” tab.
+
 ## Export the report
 
 **Export Report…** saves what the compare found as **HTML** (to read or send), **CSV** (every difference on its own
