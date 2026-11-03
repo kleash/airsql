@@ -44,7 +44,7 @@ extension GridViewer {
             let font = NSFont.monospacedSystemFont(ofSize: grid.fontSize, weight: .regular)
             text.font = font
             // Tabs (TSV) every eight characters, past the default stops too. Long rows wrap, so only what shows is laid out: a
-            // text as wide as its longest row is laid out whole first (CI's Mac never got through 10,000 rows of it).
+            // text as wide as its longest row is laid out whole first (10,000 rows of it took CI's Mac 40 minutes).
             let tabs = NSMutableParagraphStyle()
             tabs.tabStops = []
             tabs.defaultTabInterval = 8 * ("0" as NSString).size(withAttributes: [.font: font]).width
