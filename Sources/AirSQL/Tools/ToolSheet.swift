@@ -53,6 +53,8 @@ class ToolSheet: NSWindowController {
     func makeForm() -> NSView { NSView() }
     /// The command line or SQL shown under the form (nil: none).
     func makeCodeBox() -> NSView? { nil }
+    /// The page of AirSQL Help the sheet's ? button opens.
+    var helpPage: HelpPage { .clientTools }
     /// Buttons left of the spacer, after the help button (Copy Command).
     func extraButtons() -> [NSButton] { [] }
     /// Loads what the form needs (databases, tables, tools), off the main thread; called once the sheet is shown.
@@ -116,7 +118,7 @@ class ToolSheet: NSWindowController {
     private func buttonRow() -> NSView {
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let row = NSStackView(views: [helpButton(.clientTools)] + extraButtons() + [spacer, cancelButton, runButton])
+        let row = NSStackView(views: [helpButton(helpPage)] + extraButtons() + [spacer, cancelButton, runButton])
         row.spacing = Spacing.unit
         return row
     }
