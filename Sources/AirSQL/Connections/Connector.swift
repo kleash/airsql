@@ -12,26 +12,22 @@ final class Connector {
     final class Open {
         let connection: Connection
         let server: ServerInfo
-        /// The route's private socket (nil for Direct): the client tools and Terminal connect to it too.
-        let routeSocket: String?
-        fileprivate let tunnel: Tunnel?
-        fileprivate let relay: ProxyRelay?
+        /// The route under the sessions: its private socket (nil for Direct) is where the client tools and Terminal
+        /// connect too.
+        let route: OpenRoute
         fileprivate var keepAlive: Timer?
 
-        fileprivate init(connection: Connection, server: ServerInfo, tunnel: Tunnel?, relay: ProxyRelay?) {
+        fileprivate init(connection: Connection, server: ServerInfo, route: OpenRoute) {
             self.connection = connection
             self.server = server
-            self.tunnel = tunnel
-            self.relay = relay
-            routeSocket = tunnel?.socket ?? relay?.socket
+            self.route = route
         }
 
         /// Closes the sessions, then the route.
         fileprivate func close() async {
             keepAlive?.invalidate()
             await connection.disconnect()
-            tunnel?.close()
-            relay?.close()
+            route.close()
         }
     }
 
@@ -101,10 +97,7 @@ final class Connector {
     /// Quitting: every route and session goes, now.
     private func closeEverything() {
         for id in Array(connecting.keys) { cancel(id) }
-        for connected in open.values {
-            connected.tunnel?.close()
-            connected.relay?.close()
-        }
+        for connected in open.values { connected.route.close() }
         open = [:]
         askpass?.close()
     }
@@ -120,17 +113,16 @@ final class Connector {
             model.states[id] = .connecting(step: text)
         }
         do {
-            let (connection, server, tunnel, relay) = try await establish(&saved, on: window, step: step)
+            let (connection, server, route) = try await establish(&saved, on: window, step: step)
             guard connecting[id]?.activity === activity else {
                 await connection.disconnect()
-                tunnel?.close()
-                relay?.close()
+                route.close()
                 return
             }
             connecting[id] = nil
             activity.end()
             sheets[id] = nil
-            let connected = Open(connection: connection, server: server, tunnel: tunnel, relay: relay)
+            let connected = Open(connection: connection, server: server, route: route)
             open[id] = connected
             model.states[id] = .connected(server: Self.serverName(server))
             saveRemembered(id)
@@ -160,19 +152,29 @@ final class Connector {
     /// editor's Test Connection both do. `password` and `proxyPassword`: typed in the editor (nil: the Keychain's, or
     /// asked). A pinned certificate and the user name typed at a prompt end up in `saved`.
     func establish(_ saved: inout SavedConnection, password: String? = nil, proxyPassword: String? = nil, on window: NSWindow?,
-                   step: @escaping (String) -> Void) async throws -> (Connection, ServerInfo, Tunnel?, ProxyRelay?) {
-        var route: (tunnel: Tunnel?, relay: ProxyRelay?) = (nil, nil)
+                   step: @escaping (String) -> Void) async throws -> (Connection, ServerInfo, OpenRoute) {
+        let usesProxy = saved.route == .proxy || saved.route == .sshProxy
+        let proxy = usesProxy ? try await self.proxyPassword(saved, typed: proxyPassword, on: window) : ""
+        let id = saved.id.uuidString
+        var server: AskpassServer?
+        if !saved.sshHops.isEmpty {
+            if askpass == nil { askpass = try AskpassServer(helperPath: Self.askpassHelper) }
+            server = askpass
+            server?.setHandler(sshPrompts(for: saved, on: window), for: id)
+        }
+        defer { server?.setHandler(nil, for: id) }
+        let route = try await OpenRoute.open(saved, proxyPassword: proxy, askpass: { [server] in
+            guard let server else { throw AirSQLError(.other, "No askpass for this route.") }
+            return server
+        }, progress: { text in DispatchQueue.main.async { step(text) } })
         do {
-            route = try await openRoute(saved, proxyPassword: proxyPassword, on: window, step: step)
             try Task.checkCancellation()
             step("Logging in to \(saved.host.isEmpty ? saved.socket : saved.host)")
-            let (connection, server) = try await logIn(&saved, password: password,
-                                                       routeSocket: route.tunnel?.socket ?? route.relay?.socket, on: window)
-            return (connection, server, route.tunnel, route.relay)
+            let (connection, server) = try await logIn(&saved, password: password, routeSocket: route.socket, on: window)
+            return (connection, server, route)
         } catch {
-            route.tunnel?.close()
-            route.relay?.close()
-            throw route.relay?.lastError ?? error  // the proxy's reason: the driver or ssh only saw the connection close
+            route.close()
+            throw route.relay?.lastError ?? error  // the proxy's reason: the driver only saw the connection close
         }
     }
 
@@ -185,50 +187,11 @@ final class Connector {
             remembered[draft.id] = nil
             closePrompts(draft.id)
         }
-        let (connection, server, tunnel, relay) = try await establish(&tested, password: password, proxyPassword: proxyPassword,
-                                                                      on: window, step: step)
+        let (connection, server, route) = try await establish(&tested, password: password, proxyPassword: proxyPassword,
+                                                             on: window, step: step)
         await connection.disconnect()
-        tunnel?.close()
-        relay?.close()
+        route.close()
         return (Self.serverName(server) + (server.tls.map { ", " + $0 } ?? ", no TLS"), tested)
-    }
-
-    /// The route's socket: nothing for Direct, the relay for Proxy only, ssh (behind the relay for SSH + proxy).
-    private func openRoute(_ saved: SavedConnection, proxyPassword typed: String?, on window: NSWindow?,
-                           step: @escaping (String) -> Void) async throws -> (tunnel: Tunnel?, relay: ProxyRelay?) {
-        guard saved.route != .direct else { return (nil, nil) }
-        if saved.route == .proxy || saved.route == .sshProxy {
-            guard !saved.proxy.host.trimmingCharacters(in: .whitespaces).isEmpty else {
-                throw AirSQLError(.other, "Type the proxy's address in the SSH and Proxy tab.")
-            }
-        }
-        let base = RouteFolder.base(for: saved.id)
-        if saved.route == .proxy {
-            step("Proxy \(saved.proxy.host)")
-            let password = try await proxyPassword(saved, typed: typed, on: window)
-            return (nil, try ProxyRelay(socket: base + ".sock", proxy: saved.proxy, password: password, host: saved.host,
-                                        port: saved.port ?? 3306))
-        }
-        if let problem = SSHConfig.problem(with: saved) { throw AirSQLError(.other, problem) }
-        var relay: ProxyRelay?
-        if saved.route == .sshProxy, let first = saved.sshHops.first {
-            step("Proxy \(saved.proxy.host)")
-            relay = try ProxyRelay(socket: base + ".proxy", proxy: saved.proxy, password: try await proxyPassword(saved, typed: typed, on: window),
-                                   host: first.host, port: first.port ?? 22)
-        }
-        do {
-            if askpass == nil { askpass = try AskpassServer(helperPath: Self.askpassHelper) }
-            let askpass = askpass!
-            askpass.setHandler(sshPrompts(for: saved, on: window), for: saved.id.uuidString)
-            defer { askpass.setHandler(nil, for: saved.id.uuidString) }
-            let tunnel = try await Tunnel.open(saved, askpass: askpass, proxySocket: relay?.socket) { text in
-                DispatchQueue.main.async { step(text) }
-            }
-            return (tunnel, relay)
-        } catch {
-            relay?.close()
-            throw relay?.lastError ?? error
-        }
     }
 
     /// Logs in through `routeSocket` (or directly): asks for the password when the server refuses the one it has, and
@@ -271,7 +234,7 @@ final class Connector {
     /// session: the person reconnects with Connect.
     private func watch(_ connected: Open, id: UUID) {
         let token = ObjectIdentifier(connected)
-        connected.tunnel?.onExit = { [weak self] error in
+        connected.route.tunnel?.onExit = { [weak self] error in
             DispatchQueue.main.async { self?.dropped(id, token, error.message) }
         }
         connected.keepAlive = Timer.scheduledTimer(withTimeInterval: Self.keepAliveInterval, repeats: true) { [weak self] _ in

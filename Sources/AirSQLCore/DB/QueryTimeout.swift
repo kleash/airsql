@@ -2,20 +2,28 @@ import Foundation
 
 extension DBConnection {
     /// `query`, stopped when it runs longer than `seconds` (0: no limit): a connection's query timeout
-    /// (`SavedConnection.queryTimeout`), through Cancel's own safe KILL QUERY.
+    /// (`SavedConnection.queryTimeout`), through Cancel's own safe KILL QUERY. A stopped statement throws, even one the
+    /// server ends quietly (a lone SLEEP returns 1).
     public func query(_ sql: String, rowCap: Int = 100_000, timeout seconds: Int) async throws -> [StatementResult] {
         guard seconds > 0 else { return try await query(sql, rowCap: rowCap) }
-        let started = Date()
-        let watchdog = Task { [weak self] in
+        let watchdog = Task { [weak self] () -> Bool in
             try await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
-            _ = try? await self?.cancel()
+            return (try? await self?.cancel()) == .cancelled
         }
-        defer { watchdog.cancel() }
+        var results: [StatementResult] = [], failure: Error?
         do {
-            return try await query(sql, rowCap: rowCap)
-        } catch var error as AirSQLError where error.kind == .cancelled && Date().timeIntervalSince(started) >= Double(seconds) {
-            error.message = "The statement ran longer than \(seconds) s, this connection's query timeout, and was stopped."
-            throw error
+            results = try await query(sql, rowCap: rowCap)
+        } catch {
+            failure = error
         }
+        watchdog.cancel()
+        guard (try? await watchdog.value) == true else {
+            if let failure { throw failure }
+            return results
+        }
+        var error = failure as? AirSQLError ?? AirSQLError(.cancelled, "")
+        error.kind = .cancelled
+        error.message = "The statement ran longer than \(seconds) s, this connection's query timeout, and was stopped."
+        throw error
     }
 }

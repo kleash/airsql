@@ -1,6 +1,7 @@
 // AirSQL's Docker test lab (testenv/, Compose project airsql-lab) for the tests that run with AIRSQL_LAB=1: its
 // servers, hops, logins and files. testenv/AGENT.md describes the same lab for people and agents.
 import Foundation
+@testable import AirSQLCore
 
 /// The lab as testenv/docker-compose.yml and testenv/seed set it up; test.sh starts it (testenv/up.sh) when
 /// AIRSQL_LAB=1. Everything published listens on 127.0.0.1. Lab tests only read the shared databases (`fixture` and
@@ -145,43 +146,44 @@ enum Lab {
     }()
 
     /// A forward to `server` port 3306 through the bastion (and then the jump host with `throughJump`), ending in a unix
-    /// socket as AirSQL's tunnels do: plain `ssh -N -L <socket>:<server>:3306`. Close it when done. A server the hop
-    /// can't reach still gets a socket, but each connection to it closes at once.
+    /// socket: AirSQL's own SSH tunnel (`Tunnel`), logging in with the lab key, its host keys trusted over askpass.
+    /// Close it when done. A server the hop can't reach still gets a socket, but each connection to it closes at once.
     static func forward(to server: Server, throughJump: Bool = false) async throws -> Forward {
-        let socket = try scratch() + "/db.sock"
-        let log = socket + ".log"
-        FileManager.default.createFile(atPath: log, contents: nil)
-        let ssh = Process()
-        ssh.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
-        ssh.arguments = ["-F", sshConfig, "-N", "-o", "ExitOnForwardFailure=yes", "-o", "StreamLocalBindUnlink=yes",
-                         "-L", "\(socket):\(server.name):3306", throughJump ? "lab-jump" : "lab-bastion"]
-        ssh.environment = TestEnvironment.environment
-        ssh.standardInput = FileHandle.nullDevice
-        ssh.standardOutput = FileHandle.nullDevice
-        ssh.standardError = try FileHandle(forWritingTo: URL(fileURLWithPath: log))
-        try ssh.run()
-        let forward = Forward(socket: socket, ssh: ssh)
-        guard await eventually(timeout: 30, { FileManager.default.fileExists(atPath: socket) || !ssh.isRunning }), ssh.isRunning else {
-            forward.close()
-            throw SupportError("ssh -L to \(server.name) didn't start: \((try? String(contentsOfFile: log)) ?? "")")
+        var connection = SavedConnection(name: "Lab \(server.name)", host: server.name, port: 3306,
+                                         route: throughJump ? .sshJump : .ssh)
+        let first = SSHHop(host: bastion.host, port: bastion.port, user: bastion.user, login: .keyFile, keyFile: key)
+        if throughJump {
+            connection.jumpHosts = [first]
+            connection.sshHost = SSHHop(host: jump.host, port: jump.port, user: jump.user, login: .keyFile, keyFile: key)
+        } else {
+            connection.sshHost = first
         }
-        return forward
+        let askpass = try RouteTesting.askpass(for: connection.id)
+        do {
+            return Forward(tunnel: try await Tunnel.open(connection, askpass: askpass) { _ in }, askpass: askpass)
+        } catch {
+            askpass.close()
+            throw SupportError("the tunnel to \(server.name) didn't start: \(error)")
+        }
     }
 
-    /// A running `ssh -L` (Lab.forward).
+    /// A running tunnel (Lab.forward).
     final class Forward {
         let socket: String
-        private let ssh: Process
+        private let tunnel: Tunnel
+        private let askpass: AskpassServer
 
-        init(socket: String, ssh: Process) {
-            self.socket = socket
-            self.ssh = ssh
+        init(tunnel: Tunnel, askpass: AskpassServer) {
+            socket = tunnel.socket
+            self.tunnel = tunnel
+            self.askpass = askpass
         }
 
         deinit { close() }
 
         func close() {
-            if ssh.isRunning { ssh.terminate() }
+            tunnel.close()
+            askpass.close()
         }
     }
 }
