@@ -159,12 +159,14 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
         table.scrollRowToVisible(row)
     }
 
-    /// The connection's statements again, after a call: the selection kept, or moved on to the newest statement when it
-    /// was on the newest (so the tab follows what agents do).
+    /// The connection's statements again when agents ran more: the selection kept, or moved on to the newest statement
+    /// when it was on the newest (so the tab follows what agents do).
     func reload() {
+        let latest = service.runs.filter { $0.connection == connection }
+        guard latest.map(\.id) != runs.map(\.id) else { return }  // another call, or another connection's
         let before = Set(table.selectedRowIndexes.compactMap { runs[safe: $0]?.id })
         let followed = before.isEmpty || runs.last.map { before == [$0.id] } == true
-        runs = service.runs.filter { $0.connection == connection }
+        runs = latest
         table.reloadData()
         let keep = followed ? IndexSet(runs.indices.suffix(1)) : IndexSet(runs.indices.filter { before.contains(runs[$0].id) })
         table.selectRowIndexes(keep, byExtendingSelection: false)
