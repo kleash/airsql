@@ -56,9 +56,8 @@ func firstRunView() -> NSView {
                       + "and proxies. Passwords stay in your Keychain.", font: .systemFont(ofSize: 13), color: .secondaryLabelColor,
                       wraps: true)
     let add = button("Add Connection…", id: "firstRun.addConnection", tip: Commands.newConnection.tip + " (⌘N)",
-                     target: nil, action: Commands.newConnection.action)
+                     target: nil, action: Commands.newConnection.action, primary: true)
     add.keyEquivalent = "\r"
-    add.bezelColor = .accent
     let agentsTitle = label("Set up agents", font: .systemFont(ofSize: 15, weight: .semibold))
     let agentsText = label("Let Claude Code, Gemini CLI or another MCP client read your schemas and run read-only queries, at "
                            + "the access you choose for each connection. Agents are off until you turn them on.",
@@ -131,9 +130,8 @@ func summaryView(_ connection: SavedConnection, data: AirSQLData, state: Connect
     let titleRow = NSStackView(views: [dot, name, route])
     titleRow.spacing = Spacing.unit
     let connect = button("Connect", id: "summary.connect", tip: Commands.connect.tip + " (⌘K)", target: nil,
-                         action: Commands.connect.action)
+                         action: Commands.connect.action, primary: true)
     connect.keyEquivalent = "\r"
-    connect.bezelColor = .accent
     let edit = button("Edit…", id: "summary.edit", tip: Commands.editConnection.tip, target: nil, action: Commands.editConnection.action)
     let query = button("New Query", id: "summary.newQuery", tip: Commands.newQuery.tip + " (⌘T)", target: nil,
                        action: Commands.newQuery.action)

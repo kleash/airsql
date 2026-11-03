@@ -43,6 +43,8 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         spinner.toolTip = "Reading the databases on this connection"
         for view in [popup, databases] as [NSView] { view.translatesAutoresizingMaskIntoConstraints = false }
         popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 150).isActive = true
+        // A long connection name is shortened (its menu has all of it) rather than widening the window past its minimum.
+        popup.setContentCompressionResistancePriority(.init(490), for: .horizontal)
         popup.widthAnchor.constraint(lessThanOrEqualToConstant: 240).isActive = true
         databases.widthAnchor.constraint(greaterThanOrEqualToConstant: 130).isActive = true
         databases.widthAnchor.constraint(lessThanOrEqualToConstant: 220).isActive = true

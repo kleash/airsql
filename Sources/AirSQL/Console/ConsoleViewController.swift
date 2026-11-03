@@ -114,19 +114,21 @@ final class ConsoleViewController: NSViewController, TabContent {
         let find = FindBar(editor: editor)
         findBar = find
         editor.onFind = { [weak find] action in find?.perform(action) }
-        let top = NSStackView(views: [find, scroll])
-        top.orientation = .vertical
-        top.spacing = 0
-        top.setHuggingPriority(.defaultLow, for: .vertical)
-        split.addArrangedSubview(top)
+        split.addArrangedSubview(scroll)
         split.addArrangedSubview(results)
         split.setHoldingPriority(.defaultLow - 1, forSubviewAt: 0)
         split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
         outer.isVertical = true
         outer.dividerStyle = .thin
         outer.addArrangedSubview(split)
-        root.addSubview(outer)
-        outer.pin(to: root)
+        // Find and replace across the editor and the helpers: beside the helpers it needed a wider window.
+        let column = NSStackView(views: [find, outer])
+        column.orientation = .vertical
+        column.spacing = 0
+        column.setHuggingPriority(.defaultLow, for: .vertical)
+        root.addSubview(column)
+        column.pin(to: root)
+        for view in [find, outer] { view.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true }
         NSLayoutConstraint.activate([
             scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
             results.heightAnchor.constraint(greaterThanOrEqualToConstant: ResultsView.barHeight + 90),
