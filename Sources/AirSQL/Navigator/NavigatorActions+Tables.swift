@@ -66,9 +66,11 @@ final class CharsetPicker: NSObject {
         guard let name = chosenCharset else {
             collation.addItem(withTitle: keep ?? "")
             collation.isEnabled = false
+            collation.toolTip = "Choose a character set first: the collations come with it"
             return
         }
         collation.isEnabled = true
+        collation.toolTip = "How text is compared and sorted"
         collation.addItems(withTitles: choices.collations[name] ?? [])
         let preferred = name == choices.serverCharset ? choices.serverCollation : choices.defaultCollation[name] ?? ""
         collation.selectItem(withTitle: preferred)
@@ -90,23 +92,25 @@ extension NavigatorActions {
 
     static func newDatabase(on open: OpenConnection, window: NSWindow?) {
         guard let window else { return }
-        withChoices(open, window: window) { choices in
-            let name = textField("", placeholder: "Name", id: "newDatabase.name", tip: "The new database's name", width: 260)
-            let picker = CharsetPicker(choices, id: "newDatabase")
-            let form = Form()
-            form.row("Name", [name])
-            form.row("Character set", [picker.charset])
-            form.row("Collation", [picker.collation])
-            ask("New database", "Create a database on \(open.model?.connection(open.id)?.displayName ?? "the server").",
-                field: form.finish(), action: "Create", on: window) {
-                let text = name.stringValue.trimmingCharacters(in: .whitespaces)
-                guard !text.isEmpty else { return }
-                let sql = NavigatorSQL.createDatabase(text, charset: picker.chosenCharset, collation: picker.chosenCollation)
-                let request = SQLPreviewRequest(change: ChangeSQL(title: "Create database \(text)", statements: [sql],
-                                                                  connection: open.id),
-                                                heading: "", caption: "")
-                confirmAndRun(request, on: open, window: window, ask: false, refreshing: [.database(text)])
-            }
+        withChoices(open, window: window) { newDatabase($0, on: open, window: window) }
+    }
+
+    static func newDatabase(_ choices: ServerChoices, on open: OpenConnection, window: NSWindow) {
+        let name = textField("", placeholder: "Name", id: "newDatabase.name", tip: "The new database's name", width: 260)
+        let picker = CharsetPicker(choices, id: "newDatabase")
+        let form = Form()
+        form.row("Name", [name])
+        form.row("Character set", [picker.charset])
+        form.row("Collation", [picker.collation])
+        ask("New database", "Create a database on \(open.model?.connection(open.id)?.displayName ?? "the server").",
+            field: form.finish(), action: "Create", tip: "Create the database on the server", on: window) {
+            let text = name.stringValue.trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty else { return }
+            let sql = NavigatorSQL.createDatabase(text, charset: picker.chosenCharset, collation: picker.chosenCollation)
+            let request = SQLPreviewRequest(change: ChangeSQL(title: "Create database \(text)", statements: [sql],
+                                                              connection: open.id),
+                                            heading: "", caption: "")
+            confirmAndRun(request, on: open, window: window, ask: false, refreshing: [.database(text)])
         }
     }
 
@@ -148,42 +152,45 @@ extension NavigatorActions {
     }
 
     static func bulkEdit(_ tables: [DatabaseObject], on open: OpenConnection, window: NSWindow?) {
-        guard let window, let first = tables.first else { return }
-        withChoices(open, window: window) { choices in
-            let keep = "Don’t change"
-            let databases = open.snapshot.databases.map(\.name).filter { $0 != first.database }
-            let move = popup(["Don’t move"] + databases, selected: 0, id: "bulk.database", tip: "Move the tables to this database",
-                             target: nil, action: nil)
-            let engine = popup([keep] + choices.engines, selected: 0, id: "bulk.engine", tip: "Change the tables' storage engine",
-                               target: nil, action: nil)
-            let picker = CharsetPicker(choices, keep: keep, id: "bulk")
-            let form = Form()
-            form.row("Move to", [move])
-            form.row("Engine", [engine])
-            form.row("Character set", [picker.charset])
-            form.row("Collation", [picker.collation], caption: "Converts every text column too.")
-            let what = tables.count == 1 ? first.name : "\(tables.count) tables"
-            ask("Change \(what)", "Choose what to change; the next step shows the SQL.", field: form.finish(), action: "Next…",
-                on: window) {
-                var statements: [String] = []
-                if engine.indexOfSelectedItem > 0, let name = engine.titleOfSelectedItem {
-                    statements += tables.map { NavigatorSQL.changeEngine($0, to: name) }
-                }
-                if let charset = picker.chosenCharset, let collation = picker.chosenCollation {
-                    statements += tables.map { NavigatorSQL.convert($0, charset: charset, collation: collation) }
-                }
-                var refreshed = tables.map(\.schemaObject)
-                if move.indexOfSelectedItem > 0, let database = move.titleOfSelectedItem {
-                    statements.append(NavigatorSQL.move(tables, to: database))
-                    refreshed += tables.map { SchemaObject.table(database: database, name: $0.name) }
-                }
-                guard !statements.isEmpty else { return }
-                var request = SQLPreviewRequest(change: ChangeSQL(title: "Change \(what)", statements: statements, connection: open.id),
-                                                heading: "Change \(what)?",
-                                                caption: "Each table is rebuilt; big tables take a while and are locked meanwhile.")
-                request.actionTitle = "Change"
-                confirmAndRun(request, on: open, window: window, refreshing: refreshed)
+        guard let window, !tables.isEmpty else { return }
+        withChoices(open, window: window) { bulkEdit(tables, $0, on: open, window: window) }
+    }
+
+    static func bulkEdit(_ tables: [DatabaseObject], _ choices: ServerChoices, on open: OpenConnection, window: NSWindow) {
+        guard let first = tables.first else { return }
+        let keep = "Don’t change"
+        let databases = open.snapshot.databases.map(\.name).filter { $0 != first.database }
+        let move = popup(["Don’t move"] + databases, selected: 0, id: "bulk.database", tip: "Move the tables to this database",
+                         target: nil, action: nil)
+        let engine = popup([keep] + choices.engines, selected: 0, id: "bulk.engine", tip: "Change the tables' storage engine",
+                           target: nil, action: nil)
+        let picker = CharsetPicker(choices, keep: keep, id: "bulk")
+        let form = Form()
+        form.row("Move to", [move])
+        form.row("Engine", [engine])
+        form.row("Character set", [picker.charset])
+        form.row("Collation", [picker.collation], caption: "Converts every text column too.")
+        let what = tables.count == 1 ? first.name : "\(tables.count) tables"
+        ask("Change \(what)", "Choose what to change; the next step shows the SQL.", field: form.finish(), action: "Next…",
+            on: window) {
+            var statements: [String] = []
+            if engine.indexOfSelectedItem > 0, let name = engine.titleOfSelectedItem {
+                statements += tables.map { NavigatorSQL.changeEngine($0, to: name) }
             }
+            if let charset = picker.chosenCharset, let collation = picker.chosenCollation {
+                statements += tables.map { NavigatorSQL.convert($0, charset: charset, collation: collation) }
+            }
+            var refreshed = tables.map(\.schemaObject)
+            if move.indexOfSelectedItem > 0, let database = move.titleOfSelectedItem {
+                statements.append(NavigatorSQL.move(tables, to: database))
+                refreshed += tables.map { SchemaObject.table(database: database, name: $0.name) }
+            }
+            guard !statements.isEmpty else { return }
+            var request = SQLPreviewRequest(change: ChangeSQL(title: "Change \(what)", statements: statements, connection: open.id),
+                                            heading: "Change \(what)?",
+                                            caption: "Each table is rebuilt; big tables take a while and are locked meanwhile.")
+            request.actionTitle = "Change"
+            confirmAndRun(request, on: open, window: window, refreshing: refreshed)
         }
     }
 

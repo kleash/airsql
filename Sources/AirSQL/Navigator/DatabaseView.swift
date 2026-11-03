@@ -43,7 +43,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.id))
             tableColumn.title = column.title
             tableColumn.width = column.width
-            tableColumn.minWidth = 50
+            tableColumn.minWidth = column.id == "comment" ? 120 : 50
             tableColumn.headerToolTip = column.tip + "; click to sort by it"
             tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.id, ascending: true)
             if ["rows", "data", "index"].contains(column.id) { tableColumn.headerCell.alignment = .right }
@@ -90,6 +90,12 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     @objc private func changed() { reload() }
 
+    /// The comment takes the width that is left.
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        table.sizeLastColumnToFit()
+    }
+
     /// Shows the cache's tables again, in the chosen order, keeping the selection.
     func reload() {
         let selected = Set(table.selectedRowIndexes.compactMap { rows[safe: $0]?.name })
@@ -130,6 +136,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     private func text(_ column: String, _ table: SchemaTable, _ stats: TableStatistics?) -> String {
         let bytes = ByteCountFormatter()
         bytes.countStyle = .file
+        bytes.allowsNonnumericFormatting = false  // 0 KB, not Zero KB
+        bytes.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
         switch column {
         case "name": return table.name
         case "rows": return table.kind == .view ? "view" : stats?.rows.map { $0.formatted() } ?? ""

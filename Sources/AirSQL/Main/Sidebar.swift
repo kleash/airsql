@@ -60,7 +60,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     override func loadView() {
         let root = SurfaceView(.side)
         root.setAccessibilityIdentifier("sidebar")
-        filter.placeholderString = "Filter connections"
+        filter.placeholderString = "Filter by name"
         filter.toolTip = Commands.filterSidebar.tip + " (⌥⌘J)"
         filter.setAccessibilityIdentifier("sidebar.filter")
         filter.delegate = self

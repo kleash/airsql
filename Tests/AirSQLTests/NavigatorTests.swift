@@ -93,6 +93,67 @@ extension AppTests {
             #expect(open.snapshot.database("airsql_fixture")?.table("orders")?.columns.isEmpty == false)
         }
 
+        /// Every navigator screen and dialog, light and dark, at the window's smallest and usual size: every control says
+        /// what it does, and nothing is cut, crosses a rounded edge or overlaps.
+        @Test func everyScreenIsExplainedAndTidy() async throws {
+            var problems: [String] = []
+            for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                for size in [MainWindowController.minimumSize, MainWindowController.defaultSize] {
+                    let place = "\(appearance == .aqua ? "light" : "dark") \(Int(size.width))×\(Int(size.height))"
+                    problems += try await screens(NSAppearance(named: appearance), size: size, place: place)
+                }
+            }
+            #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+        }
+
+        private func screens(_ look: NSAppearance?, size: NSSize, place: String) async throws -> [String] {
+            var problems: [String] = []
+            let model = testModel(Fixtures.shop + Fixtures.odd)
+            let (main, harness) = appWindow(model, size: size)
+            let window = try #require(main.window)
+            window.appearance = look
+            let open = await openReplayed(model, id)
+            func check(_ what: String, _ target: NSWindow) {
+                target.appearance = look
+                target.contentView?.layoutSubtreeIfNeeded()
+                if let content = target.contentView { problems += layoutProblems(content, where: "\(place) \(what)") }
+                problems += unexplained([target], where: "\(place) \(what)")
+            }
+            let database = try #require(treeRow(main, .database(id, "airsql_fixture")))
+            _ = treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "we`ird 'name' ✓")))
+            _ = await call(harness, "click", ["x": database.point.0, "y": database.point.1])
+            _ = await eventually(timeout: 10) { open.loading.isEmpty }
+            check("tree and database view", window)
+            main.open(TextContent.tablePlaceholder(open, DatabaseObject(.table, "airsql_fixture", "orders"), where: nil), title: "orders",
+                      connection: id)
+            check("table stand-in", window)
+            let list = ProcessListContent(open)
+            main.open(list, title: "Processes", connection: id)
+            _ = await eventually(timeout: 10) { !list.isRefreshing }
+            list.show([ServerProcess(id: 1_234_567, user: String(repeating: "reporting_user_", count: 3), host: "warehouse-0001.example.com:65000",
+                                     database: "analytics", command: "Query", time: 86_400, state: "Creating sort index",
+                                     info: String(repeating: "SELECT day, COUNT(*) FROM visits GROUP BY day; ", count: 6), queryID: 9)])
+            check("process list", window)
+            main.open(FindTextContent(open, database: nil), title: "Find Text", connection: id)
+            check("find text", window)
+            let orders = DatabaseObject(.table, "airsql_fixture", "orders")
+            let dialogs: [(String, () -> Void)] = [
+                ("new database", { NavigatorActions.newDatabase(AppTests.ScreenshotTests.choices, on: open, window: window) }),
+                ("copy table", { NavigatorActions.copyTable(orders, on: open, window: window) }),
+                ("bulk editor", { NavigatorActions.bulkEdit([orders], AppTests.ScreenshotTests.choices, on: open, window: window) }),
+                ("rename", { NavigatorActions.rename(orders, on: open, window: window) }),
+                ("drop", { NavigatorActions.drop([orders], on: open, window: window) }),
+            ]
+            for (name, show) in dialogs {
+                show()
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                if let sheet = window.attachedSheet { check(name, sheet) } else { problems.append("\(place) \(name): no sheet") }
+                _ = await call(harness, "press", ["title": "Cancel", "in": "sheet"])
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            }
+            return problems
+        }
+
         @Test func dropShowsTheSQLAndAsksForTheNameOnProduction() async throws {
             let model = testModel(Fixtures.shop)
             let (main, harness) = appWindow(model)
@@ -105,7 +166,7 @@ extension AppTests {
             #expect(sheet.error == nil, "\(sheet.error ?? "")")
             // Production's safety: the table's name must be typed.
             #expect(await element(harness, "preview.confirm", in: "sheet") != nil)
-            _ = await call(harness, "press", ["title": "Decline"])
+            #expect(await call(harness, "press", ["title": "Cancel", "in": "sheet"]).error == nil)
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
         }
     }

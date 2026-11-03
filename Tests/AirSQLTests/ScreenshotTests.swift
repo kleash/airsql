@@ -16,13 +16,13 @@ extension AppTests {
 
         /// On a screen while it is photographed: until a window has been shown, AppKit hasn't made the vibrancy of its
         /// toolbar's text (it came out black in Deep Water), and a popover is put on a screen anyway.
-        private func onScreen(_ window: NSWindow?) {
+        func onScreen(_ window: NSWindow?) {
             window?.setFrameOrigin(NSPoint(x: 40, y: 40))
             window?.orderFront(nil)
             window?.displayIfNeeded()
         }
 
-        private func save(_ harness: AgentServer, _ name: String, target: String = "main") async throws {
+        func save(_ harness: AgentServer, _ name: String, target: String = "main") async throws {
             let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
             let image = try #require(reply.image, "\(name): \(reply.error ?? "")")
             let png = try #require(image.representation(using: .png, properties: [:]))

@@ -19,7 +19,11 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
     private(set) var searched = ""
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
-    private var search: Task<Void, Never>?
+    private var search: Task<Void, Never>? {
+        didSet { updateButtons() }
+    }
+    private var go: NSButton?
+    private var stopButton: NSButton?
     private var noBackslashEscapes = false
 
     init(_ open: OpenConnection, database: String?) {
@@ -52,6 +56,9 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         status.stringValue = "Counts the rows of each table whose text columns hold the text. Every table is read in full."
         status.toolTip = status.stringValue
         status.setAccessibilityIdentifier("find.status")
+        self.go = go
+        stopButton = stop
+        updateButtons()
         let bar = NSStackView(views: [field, scope, go, stop, spinner])
         bar.spacing = Spacing.unit
         bar.translatesAutoresizingMaskIntoConstraints = false
@@ -92,6 +99,13 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
     }
 
     var isSearching: Bool { search != nil }
+
+    private func updateButtons() {
+        go?.isEnabled = search == nil
+        go?.toolTip = search == nil ? "Search the tables for the text (Return)" : "It is searching: Stop first to search again"
+        stopButton?.isEnabled = search != nil
+        stopButton?.toolTip = search != nil ? "Stop searching; the matches found so far stay" : "Nothing is being searched"
+    }
 
     @objc func find(_ sender: Any?) {
         let text = field.stringValue

@@ -17,8 +17,8 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     private var refreshing: Task<Void, Never>?
     private var timer: Task<Void, Never>?
     static let intervals = [0, 2, 5, 10, 30]
-    private static let columns: [(String, String, CGFloat)] = [("id", "Id", 70), ("user", "User", 100), ("host", "Host", 150),
-        ("db", "Database", 110), ("command", "Command", 80), ("time", "Time", 60), ("state", "State", 140), ("info", "Query", 400)]
+    private static let columns: [(String, String, CGFloat)] = [("id", "Id", 60), ("user", "User", 90), ("host", "Host", 130),
+        ("db", "Database", 100), ("command", "Command", 80), ("time", "Time", 56), ("state", "State", 130), ("info", "Query", 300)]
 
     init(_ open: OpenConnection) {
         self.open = open
@@ -53,7 +53,8 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
-            column.minWidth = 40
+            column.minWidth = id == "info" ? 200 : 40
+            if id == "id" || id == "time" { column.headerCell.alignment = .right }
             table.addTableColumn(column)
         }
         table.style = .inset
@@ -89,6 +90,12 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         view = root
         refresh(nil)
         intervalChosen()
+    }
+
+    /// The query takes the width that is left.
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        table.sizeLastColumnToFit()
     }
 
     @objc private func intervalChosen() {
@@ -143,6 +150,8 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     }
 
     var selected: [ServerProcess] { table.selectedRowIndexes.compactMap { processes[safe: $0] } }
+
+    var isRefreshing: Bool { refreshing != nil }
 
     // MARK: Commands
 

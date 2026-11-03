@@ -182,13 +182,19 @@ enum NavigatorActions {
     }
 
     /// An alert with one field (or other accessory), as a sheet: `done` when the person chooses `action`.
-    static func ask(_ title: String, _ message: String, field: NSView, action: String, on window: NSWindow,
+    static func ask(_ title: String, _ message: String, field: NSView, action: String,
+                    tip: String = "Go on: the next step shows the SQL before anything runs", on window: NSWindow,
                     done: @escaping () -> Void) {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = message
+        // An alert lays its accessory out by its frame: as big as its constraints want it.
+        field.layoutSubtreeIfNeeded()
+        let size = field.fittingSize
+        field.translatesAutoresizingMaskIntoConstraints = true
+        field.frame = NSRect(origin: .zero, size: size)
         alert.accessoryView = field
-        alert.addButton(withTitle: action).toolTip = "Go on: the next step shows the SQL before anything runs"
+        alert.addButton(withTitle: action).toolTip = tip
         alert.addButton(withTitle: "Cancel").toolTip = "Change nothing"
         alert.window.initialFirstResponder = field
         alert.beginSheetModal(for: window) { response in
