@@ -27,8 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
-            // File work, off the main thread: airsql.json, then the tables' view settings.
+            // File work, off the main thread: airsql.json, then the tables' view settings, and what earlier runs left
+            // in the client tools' private folder.
             let data = await Task.detached { () -> AirSQLData in
+                OptionFile.removeLeftovers()
                 TableViewSettingsStore.shared.load()
                 return Store.load()
             }.value

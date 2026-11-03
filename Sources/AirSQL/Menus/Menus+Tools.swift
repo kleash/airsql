@@ -7,6 +7,5 @@ extension MainMenu {
         menus.file.add([nil, Commands.runSQLFile, Commands.importCSV])
         let restore = menus.tools.indexOfItem(withTitle: Commands.restore.title)
         menus.tools.insertItem(Commands.copyToServer.item(), at: restore + 1)
-        ToolsResponder.installEverywhere()
     }
 }

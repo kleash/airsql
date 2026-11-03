@@ -72,6 +72,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                                                object: nil)
         configureStatusItems()
         refresh()
+        ToolsResponder.install(on: self)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }

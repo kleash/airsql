@@ -40,11 +40,10 @@ enum ToolFixtures {
 
 extension AppTests {
     @MainActor @Suite struct ClientToolsAppTests {
-        /// A window with the local connection selected and the tools' commands in its chain.
+        /// A window with the local connection selected (the tools' commands are in its chain from the start).
         static func window(_ given: [SavedConnection]? = nil) -> (MainWindowController, AgentServer) {
             let connections = given ?? [ToolFixtures.local]
             let (main, harness) = appWindow(testModel(connections + [Fixtures.staging]))
-            ToolsResponder.install(on: main)
             main.sidebar.select([connections[0].id])
             main.refresh()
             return (main, harness)

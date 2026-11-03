@@ -10,30 +10,15 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
     private weak var main: MainWindowController?
     private static var key = 0
 
-    /// Puts the commands in `main`'s responder chain, once, kept as long as the window controller.
+    /// Puts the commands in `main`'s responder chain (`MainWindowController.init` does), kept as long as the window
+    /// controller.
     static func install(on main: MainWindowController) {
-        guard objc_getAssociatedObject(main, &key) == nil else { return }
         let tools = ToolsResponder()
         tools.main = main
         tools.nextResponder = main.nextResponder
         main.nextResponder = tools
         objc_setAssociatedObject(main, &key, tools, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
-
-    /// Installs the commands in every main window as it becomes main (the window is P0's: this keeps the lane's code in
-    /// its own files), and removes what earlier runs left in the private folder.
-    static func installEverywhere() {
-        guard !watching else { return }
-        watching = true
-        DispatchQueue.global(qos: .utility).async { OptionFile.removeLeftovers() }
-        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { note in
-            MainActor.assumeIsolated {
-                if let main = (note.object as? NSWindow)?.windowController as? MainWindowController { install(on: main) }
-            }
-        }
-    }
-
-    private static var watching = false
 
     // MARK: Commands
 

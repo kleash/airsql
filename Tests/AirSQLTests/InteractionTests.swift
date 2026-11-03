@@ -121,7 +121,6 @@ extension AppTests {
             model.data.settings.agentsAllowed = true
             let (main, harness) = appWindow(model)
             let recorder = CommandRecorder()
-            ToolsResponder.install(on: main)
             recorder.nextResponder = main.nextResponder
             main.nextResponder = recorder
             model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3")

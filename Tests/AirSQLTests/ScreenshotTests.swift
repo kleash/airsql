@@ -135,7 +135,6 @@ extension AppTests {
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
 
                 // The client tools (L6): Export at work, and Restore with its file chosen.
-                ToolsResponder.install(on: main)
                 let export = ExportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
                 export.show(on: main.window!, loads: false)
                 export.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
