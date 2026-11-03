@@ -7,13 +7,14 @@
 /// calls `grid.reloadData()` when the columns or the row count change and `grid.reloadRows(_:)` when rows change or a
 /// page arrives. The grid never writes anything: edits, sorting, record view and menus go to the delegate, which
 /// decides what they mean.
-/// - Table tab: a `TableDataSource` pages `SELECT … LIMIT … OFFSET …` off the main thread on the data session; `prefetch`
-///   queues the pages about to be shown. The key columns (primary key, or a NOT NULL unique key) are fetched whole,
+/// - Table tab: a `TableDataSource` holds the pages of `SELECT … LIMIT … OFFSET …` fetched so far off the main thread on
+///   the data session (the first one, then each Load More). The key columns (primary key, or a NOT NULL unique key) are
 ///   never shortened, so an edit addresses the exact row; committed edits become pending changes that the source shows
 ///   through `mark` until Apply.
 /// - Console result tab: a `ResultSetSource` over the statement's `ResultStore` (every row in memory, so never
 ///   `.loading`); read-only unless the result comes from one table with a key.
-/// - Transpose: a `TransposedSource` wraps another source and one of its rows: a row per column, name and value.
+/// - Transpose and Record View: a `TransposedSource` wraps another source: a row per column, its name, then a column
+///   per row (the first 1,000, or Record View's one); `base(_:_:)` maps a cell back to the source's.
 /// - Diff (compare results, recon): a `DiffSource` lines up two sources by key and marks rows added (`.inserted`),
 ///   removed (`.deleted`) or changed (`.edited`, on the cells that differ).
 public protocol GridSource: AnyObject {
