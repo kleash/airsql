@@ -113,3 +113,78 @@ extension AppTests {
         }
     }
 }
+
+extension AppTests {
+    /// Console results edited against the lab (MariaDB 11.4 and 11.8, MySQL 8.4), with the column details real servers
+    /// send: a one-table result, an inner join (through the preview), and an outer join that stays read-only. Writes
+    /// only in lane_r2_edit_<server>, dropped afterwards.
+    @MainActor @Suite(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh")) struct GridEditResultAppLabTests {
+        @Test(arguments: [Lab.mariadb114, Lab.mariadb118, Lab.mysql84])
+        func consoleResultsEditOnTheServer(_ lab: Lab.Server) async throws {
+            let database = "lane_r2_edit_\(lab.name)", quoted = SQLQuote.identifier(database)
+            let connection = Connection(options: DBLab.options(lab), log: DBLab.log)
+            defer { Task { await connection.disconnect() } }
+            let admin = try await connection.session(.schema)
+            for sql in ["DROP DATABASE IF EXISTS \(quoted)", "CREATE DATABASE \(quoted)",
+                        "CREATE TABLE \(quoted).c (id INT PRIMARY KEY, email VARCHAR(40) NOT NULL)",
+                        "CREATE TABLE \(quoted).o (id INT PRIMARY KEY, customer_id INT, note VARCHAR(20))",
+                        "INSERT INTO \(quoted).c VALUES (7, 'ann@example.com'), (9, 'cy@example.org')",
+                        "INSERT INTO \(quoted).o VALUES (1, 7, 'first'), (2, 9, NULL), (3, NULL, 'lost')"] {
+                _ = try await admin.query(sql)
+            }
+            let schema = SchemaCache(source: admin, includes: { $0 == database })
+            try await schema.load()
+            let saved = SavedConnection(name: "Lab \(lab.name)", host: "127.0.0.1", user: "airsql")
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let console = try await connection.session(.main)
+            func result(_ sql: String) async throws -> ResultGridView {
+                let store = try #require(try await console.query(sql).first?.rows)
+                let view = ResultGridView(store: store, nullText: "NULL", fontSize: 12, editable: true)
+                view.editingContext = EditorContext(connection: saved, sessions: connection, schema: schema)
+                view.model = model
+                main.window?.contentView = view
+                view.prepareEditing(sql: sql, database: database, noBackslashEscapes: console.noBackslashEscapes)
+                await ready { view.edits?.editing == nil || view.edits?.editing?.isEditable == true && view.editContext == nil }
+                return view
+            }
+            func applied(_ view: ResultGridView) async {
+                _ = await eventually(timeout: 30) {
+                    try? await Task.sleep(nanoseconds: 50_000_000)
+                    return view.edits?.isEmpty == true && !TableDataController.applying.contains(saved.id)
+                }
+            }
+            func value(_ sql: String) async throws -> String? { try await admin.query(sql).first?.rows?.string(0, 0) }
+
+            // One table: an edit and a NULL, applied at once, read back.
+            let one = try await result("SELECT id, note FROM \(quoted).o ORDER BY id")
+            #expect(one.editState.stringValue == "Editable", "\(lab.name): \(one.editState.toolTip ?? "")")
+            one.keep(.text("it's \"new\""), row: 0, column: 1)
+            one.keep(.null, row: 2, column: 1)
+            one.applyChanges(nil)
+            await applied(one)
+            #expect(try await value("SELECT note FROM \(quoted).o WHERE id = 1") == "it's \"new\"", "\(lab.name)")
+            #expect(try await value("SELECT COUNT(*) FROM \(quoted).o WHERE note IS NULL") == "2", "\(lab.name)")
+            #expect(one.source.cell(0, 1) == .text("it's \"new\"") && one.source.cell(2, 1) == .null)
+
+            // An inner join: both tables' edits, after the preview.
+            let join = try await result("SELECT o.id, o.note, c.id AS cid, c.email FROM \(quoted).o JOIN \(quoted).c ON c.id = o.customer_id ORDER BY o.id")
+            #expect(join.edits?.editing?.needsPreview == true, "\(lab.name): \(join.editState.toolTip ?? "")")
+            join.keep(.text("second"), row: 1, column: 1)
+            join.keep(.text("cy@example.net"), row: 1, column: 3)
+            join.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Apply"])
+            await applied(join)
+            #expect(try await value("SELECT note FROM \(quoted).o WHERE id = 2") == "second", "\(lab.name)")
+            #expect(try await value("SELECT email FROM \(quoted).c WHERE id = 9") == "cy@example.net", "\(lab.name)")
+
+            // An outer join stays read-only, and says why.
+            let outer = try await result("SELECT o.id, c.id, c.email FROM \(quoted).o LEFT JOIN \(quoted).c ON c.id = o.customer_id")
+            #expect(outer.editState.stringValue == "Read-only" && outer.editState.toolTip?.hasPrefix("Outer joins are read-only") == true,
+                    "\(lab.name)")
+            main.window?.orderOut(nil)
+            _ = try await admin.query("DROP DATABASE \(quoted)")
+        }
+    }
+}
