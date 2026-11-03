@@ -159,12 +159,8 @@ extension ConsoleViewController {
             show(use, title: nil, run: run, session: session)
             guard use.error == nil else { return }
         }
-        switch run.kind {
-        case .explain: return await explain(run, on: session)
-        case .profile:  // profiling's switch is AirSQL's, not an agent's: the agents' gate doesn't ask about it
-            _ = await AgentGate.$agent.withValue(nil) { await runQuery("SET profiling = 1", on: session) }
-        case .run: break
-        }
+        if run.kind == .explain { return await explain(run, on: session) }
+        let profile = run.kind == .profile ? await QueryProfile.start(on: session) : nil
         let all = SQLSplitter.statements(in: run.text, noBackslashEscapes: session.noBackslashEscapes)
         var schemaChanged = false
         defer { if schemaChanged { model.openConnection(id)?.load() } }  // the navigator's tree shows the change
@@ -185,18 +181,10 @@ extension ConsoleViewController {
                 break
             }
         }
-        if run.kind == .profile {
-            // The statement's own profile: the last one profiled that isn't AirSQL's SHOW WARNINGS after it.
-            let list = await runQuery("SHOW PROFILES", on: session)?.first?.rows
-            let id = list.flatMap { rows in
-                (0..<rows.rowCount).last { !(rows.string($0, 2) ?? "").contains("SHOW WARNINGS") }.flatMap { rows.string($0, 0) }
-            }.flatMap { Int($0) }
-            if let id, let profile = await runQuery("SHOW PROFILE FOR QUERY \(id)", on: session), let rows = profile.first?.rows {
-                addResult(rows, title: "Profile", summary: "Where the server spent the time")
-            } else {
-                note(.info, "This server keeps no profile of the statement (SHOW PROFILE isn't available).")
-            }
-            _ = await AgentGate.$agent.withValue(nil) { await runQuery("SET profiling = 0", on: session) }
+        if let profile {
+            let (rows, text) = await profile.read(on: session)
+            if let rows { addResult(rows, title: "Profile", summary: "Where the server spent the time") }
+            if let text { note(.info, text) }
         }
     }
 
@@ -208,7 +196,7 @@ extension ConsoleViewController {
         return ["CREATE", "ALTER", "DROP", "RENAME"].contains(keyword)
     }
 
-    /// A statement of AirSQL's own around the person's (profiling, the plan), its errors kept quiet.
+    /// A statement of AirSQL's own around the person's (the plan's tree), its errors kept quiet.
     private func runQuery(_ sql: String, on session: DBConnection) async -> [StatementResult]? {
         try? await session.query(sql, rowCap: 10_000)
     }
