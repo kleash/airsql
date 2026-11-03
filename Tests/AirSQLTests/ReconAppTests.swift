@@ -104,11 +104,16 @@ extension AppTests {
             let controller = Self.window(Self.result())
             let list = controller.results.list
             #expect(try #require(list.enclosingScrollView).frame.width >= 300)
+            func needed(_ field: NSTextField) throws -> CGFloat {
+                try #require(field.cell).cellSize(forBounds: NSRect(x: 0, y: 0, width: .greatestFiniteMagnitude, height: field.bounds.height)).width
+            }
             for row in 0..<list.numberOfRows {
-                // The 64-character name is shortened at any sensible width (its tooltip has it).
-                guard let cell = list.view(atColumn: 0, row: row, makeIfNecessary: true) as? ReconObjectCell,
-                      !cell.name.stringValue.hasPrefix("coupons_with") else { continue }
+                guard let cell = list.view(atColumn: 0, row: row, makeIfNecessary: true) as? ReconObjectCell else { continue }
                 cell.layoutSubtreeIfNeeded()
+                // What differs stays whole beside a long name: the name gives way first.
+                #expect(try needed(cell.what) <= cell.what.bounds.width + 1, "\(cell.what.stringValue) is cut beside \(cell.name.stringValue)")
+                // The 64-character name is shortened at any sensible width (its tooltip has it).
+                guard !cell.name.stringValue.hasPrefix("coupons_with") else { continue }
                 let needed = try #require(cell.name.cell).cellSize(forBounds: NSRect(x: 0, y: 0, width: .greatestFiniteMagnitude,
                                                                                     height: cell.name.bounds.height)).width
                 #expect(needed <= cell.name.bounds.width + 1, "\(cell.name.stringValue): needs \(needed), has \(cell.name.bounds.width)")

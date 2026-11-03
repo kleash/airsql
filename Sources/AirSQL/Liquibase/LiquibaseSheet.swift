@@ -90,6 +90,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         bottom.row("Preconditions", [preconditions])
         bottom.row("Files", [layoutMenu])
         saveTo.setAccessibilityIdentifier("liquibase.saveTo")
+        saveTo.lineBreakMode = .byTruncatingMiddle  // a path: its file name stays in sight
         saveTo.widthAnchor.constraint(equalToConstant: 200).isActive = true
         bottom.row("Save to", [saveTo, choose])
         let left = NSStackView(views: [top.finish(), makeList(), bottom.finish()])

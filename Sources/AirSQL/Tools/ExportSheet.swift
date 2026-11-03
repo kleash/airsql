@@ -81,6 +81,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         saveTo.stringValue = SettingsPaneController.shown(url)
         saveTo.toolTip = url.path
         saveTo.setAccessibilityIdentifier("export.saveTo")
+        saveTo.lineBreakMode = .byTruncatingMiddle  // a path: its file name stays in sight
         saveTo.widthAnchor.constraint(equalToConstant: 300).isActive = true
         form.row("Save to", [saveTo, choose])
         form.row("Extra options", [extra])

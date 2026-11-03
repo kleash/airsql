@@ -17,19 +17,13 @@ func showTrust(server: String, fingerprint: String, details: [String], on window
                                 wraps: true)
     fingerprintText.isSelectable = true
     fingerprintText.setAccessibilityIdentifier("trust.fingerprint")
-    var views: [NSView] = [fingerprintText]
+    var views = [fingerprintText]
     for line in details {
         let text = label(line, font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, wraps: true)
         text.isSelectable = true
         views.append(text)
     }
-    let stack = NSStackView(views: views)
-    stack.orientation = .vertical
-    stack.alignment = .leading
-    stack.spacing = 6
-    for view in views { (view as? NSTextField)?.preferredMaxLayoutWidth = 280 }
-    stack.frame.size = NSSize(width: 280, height: stack.fittingSize.height)
-    alert.accessoryView = stack
+    alert.accessoryView = alertText(views, width: 286)
     alert.addButton(withTitle: "Trust").toolTip = "Remember this certificate and connect"
     alert.addButton(withTitle: "Cancel").toolTip = "Don't connect"
     addHelp(to: alert, .trust)
@@ -72,6 +66,21 @@ func showPasswordPrompt(for connection: String, user: String, retry: Bool, canRe
               canRemember && remember.state == .on && !AgentGuard.refuses("Only the person at the Mac can save a password: it was used for this login only."))
     }
     return alert
+}
+
+/// Text under an alert's message, its letters in line with the message's: AppKit puts an accessory 4 points left of the
+/// alert's text (room for fields' bezels), whose letters start 2 points into their frames.
+@MainActor
+func alertText(_ lines: [NSTextField], width: CGFloat) -> NSView {
+    let stack = NSStackView(views: lines)
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 6
+    stack.edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 0)
+    for line in lines { line.preferredMaxLayoutWidth = width - 6 }
+    stack.widthAnchor.constraint(equalToConstant: width).isActive = true  // short lines too: AppKit centres a narrower one
+    stack.frame.size = NSSize(width: width, height: stack.fittingSize.height)
+    return stack
 }
 
 /// An alert for an error: what failed (`title`) and the message in plain words.

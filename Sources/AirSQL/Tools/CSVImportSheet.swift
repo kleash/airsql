@@ -41,6 +41,7 @@ final class CSVImportSheet: ToolSheet {
             control.action = #selector(formatChanged(_:))
         }
         fileLabel.setAccessibilityIdentifier("csv.file")
+        fileLabel.lineBreakMode = .byTruncatingMiddle  // a path: its file name stays in sight
         mappingGrid.translatesAutoresizingMaskIntoConstraints = false
         mappingGrid.rowSpacing = 6
         mappingGrid.columnSpacing = 10

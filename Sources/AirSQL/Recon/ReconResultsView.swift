@@ -163,7 +163,7 @@ final class ReconObjectCell: NSTableCellView {
     let chip = ChipView("", style: .neutral)
     let name = label("", truncates: true)
     let what = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
-    /// What differs keeps all of a short text, 60 points of a long one.
+    /// What differs keeps all of its text, up to 45% of the row: the name gives way first.
     private var whatMinimum: NSLayoutConstraint!
 
     init() {
@@ -174,7 +174,7 @@ final class ReconObjectCell: NSTableCellView {
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
         what.alignment = .right
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        // The name keeps its letters first; what differs takes at most 45% of the row and gives way (its tooltip has it).
+        // What differs takes at most 45% of the row; past that it gives way (its tooltip has it).
         what.setContentCompressionResistancePriority(.defaultLow - 10, for: .horizontal)
         name.widthAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
         chip.label.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -185,6 +185,7 @@ final class ReconObjectCell: NSTableCellView {
         stack.pin(to: self, insets: NSEdgeInsets(top: 0, left: 2, bottom: 0, right: 6))
         what.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.45).isActive = true
         whatMinimum = what.widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
+        whatMinimum.priority = .defaultLow + 5  // over the name's compression resistance, under the 45%
         whatMinimum.isActive = true
         textField = name
     }
@@ -199,7 +200,7 @@ final class ReconObjectCell: NSTableCellView {
         name.toolTip = name.stringValue + (object.targetName == object.name ? "" : " → \(object.targetName)")
         name.textColor = object.differs ? .labelColor : .secondaryLabelColor
         what.stringValue = Self.what(object)
-        whatMinimum.constant = min(what.intrinsicContentSize.width, 60)
+        whatMinimum.constant = what.intrinsicContentSize.width
         what.toolTip = [what.stringValue, ReconReport.status(object, result)].filter { !$0.isEmpty }.joined(separator: ": ")
         setAccessibilityLabel("\(object.kind.rawValue) \(object.name), \(ReconReport.status(object, result))")
     }

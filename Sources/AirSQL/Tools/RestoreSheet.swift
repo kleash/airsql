@@ -43,6 +43,7 @@ final class RestoreSheet: ToolSheet {
             control.action = #selector(formChanged(_:))
         }
         fileLabel.setAccessibilityIdentifier("restore.file")
+        fileLabel.lineBreakMode = .byTruncatingMiddle  // a path: its file name stays in sight
         fileInfo.setAccessibilityIdentifier("restore.fileInfo")
     }
 
