@@ -42,7 +42,8 @@ up.
 - **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
 - **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
-- Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
+- Drag a header to move its column, drag its right edge to resize it, and double-click the edge, or the header, to fit
+  its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the console, so they open as you left them.
 - **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
@@ -65,9 +66,15 @@ up.
 **Data ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
 copying and editing use the stored value.
 
-- Numbers: **Date from Unix Time** (seconds or milliseconds), in your time zone, or **Number with Grouping**.
+- Numbers: **Number with Grouping**; **Decimal Places ▸** rounds them (half up) to none, 1, 2, 3 or 4 decimal places,
+  grouped by thousands as your Mac groups them; or **Date from Unix Time** (seconds or milliseconds), in your time zone.
+- Dates: **Short**, **Medium** or **Long Date and Time**, as your Mac writes dates (System Settings ▸ General ▸ Language
+  & Region). A DATE column shows the date only. Zero dates, TIME and YEAR stay as stored.
+- **Time Zone ▸** (DATETIME and TIMESTAMP columns) moves the values: **From UTC to This Mac's** takes them as UTC and
+  shows them in your time zone; **From This Mac's to UTC** does the reverse. A TIMESTAMP arrives in the session's time
+  zone, so choose the first one when that is UTC. The header says so (`datetime as medium date, UTC → this Mac's`).
 - Bytes: **UUID** (for `binary(16)`), **Hex**, or **Text (UTF-8)**.
-- **As Stored** shows the value as the server sent it again.
+- **As Stored** shows the value as the server sent it again. AirSQL remembers each column's choice for each table.
 
 ## Colours
 
@@ -75,6 +82,8 @@ copying and editing use the stored value.
   A column with negative and positive numbers is red below zero and green above; one of only 0 and 1 marks the 1s.
   With everything selected (⌘A), every number column gets one. Choose it again to take it away.
 - **View ▸ Highlight Equal Values** tints every cell holding the focused cell's value.
+- What a colour marks is said too: with VoiceOver, a cell says **changed**, **added** or **removed** after its column's
+  name, for pending changes and for a comparison's rows, and a compared cell's help gives the other side's value.
 
 ## Text, tree and charts
 

@@ -12,7 +12,8 @@ the pointer over a menu item to see what it does. A greyed-out item says why it 
 Tab indents, ⌃⇥ moves on.
 
 F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar, else the tab shown
-(a console that isn't saved in a file). In a grid, F2 is the grid's.
+(a console that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
+edited (a console result's) shows its value in the value panel.
 
 The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delete.
 
