@@ -179,7 +179,7 @@ struct ResultSetSourceTests {
         store.append([Array("7".utf8), Array(long.utf8), nil, Array("{}".utf8), [0x01]])
         let source = ResultSetSource(store)
         #expect(source.columns.map(\.kind) == [.number, .text, .date, .json, .binary])
-        #expect(source.columns[0].isKey && source.columns[1].type == "from t")
+        #expect(source.columns[0].isKey && source.columns.map(\.type) == ["int", "text", "datetime", "json", "blob"])
         #expect(source.rowCount == 1 && source.cell(0, 0) == .text("7") && source.cell(0, 2) == .null)
         #expect(source.cell(0, 1).text.count == ResultSetSource.shownLimit + 1 && source.cell(0, 1).text.hasSuffix("…"))
         #expect(source.value(0, 1) == long && source.value(0, 2) == nil)

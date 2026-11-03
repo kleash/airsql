@@ -21,8 +21,7 @@ public final class ResultSetSource: GridSource {
             } else {
                 kind = .text
             }
-            return GridColumn(name: column.name, type: column.table.isEmpty ? "" : "from " + column.table, kind: kind,
-                              isKey: column.flags & UInt32(PRI_KEY_FLAG) != 0)
+            return GridColumn(name: column.name, type: column.typeName, kind: kind, isKey: column.flags & UInt32(PRI_KEY_FLAG) != 0)
         }
     }
 
@@ -42,6 +41,23 @@ public final class ResultSetSource: GridSource {
 }
 
 extension ResultStore.Column {
+    /// The column's type as the header's second line shows it: "int unsigned", "varchar", "decimal", "datetime".
+    public var typeName: String {
+        let names: [enum_field_types: String] = [
+            MYSQL_TYPE_TINY: "tinyint", MYSQL_TYPE_SHORT: "smallint", MYSQL_TYPE_INT24: "mediumint", MYSQL_TYPE_LONG: "int",
+            MYSQL_TYPE_LONGLONG: "bigint", MYSQL_TYPE_DECIMAL: "decimal", MYSQL_TYPE_NEWDECIMAL: "decimal", MYSQL_TYPE_FLOAT: "float",
+            MYSQL_TYPE_DOUBLE: "double", MYSQL_TYPE_BIT: "bit", MYSQL_TYPE_DATE: "date", MYSQL_TYPE_NEWDATE: "date",
+            MYSQL_TYPE_TIME: "time", MYSQL_TYPE_DATETIME: "datetime", MYSQL_TYPE_TIMESTAMP: "timestamp", MYSQL_TYPE_YEAR: "year",
+            MYSQL_TYPE_JSON: "json", MYSQL_TYPE_ENUM: "enum", MYSQL_TYPE_SET: "set", MYSQL_TYPE_GEOMETRY: "geometry",
+            MYSQL_TYPE_VARCHAR: "varchar", MYSQL_TYPE_VAR_STRING: isBinary ? "varbinary" : "varchar",
+            MYSQL_TYPE_STRING: isBinary ? "binary" : "char", MYSQL_TYPE_TINY_BLOB: isBinary ? "tinyblob" : "tinytext",
+            MYSQL_TYPE_BLOB: isBinary ? "blob" : "text", MYSQL_TYPE_MEDIUM_BLOB: isBinary ? "mediumblob" : "mediumtext",
+            MYSQL_TYPE_LONG_BLOB: isBinary ? "longblob" : "longtext", MYSQL_TYPE_NULL: "null",
+        ]
+        let name = names[type] ?? ""
+        return isNumeric && flags & UInt32(UNSIGNED_FLAG) != 0 ? name + " unsigned" : name
+    }
+
     /// A number column, right-aligned: DECIMAL, the integers, FLOAT, DOUBLE.
     public var isNumeric: Bool {
         [MYSQL_TYPE_DECIMAL, MYSQL_TYPE_NEWDECIMAL, MYSQL_TYPE_TINY, MYSQL_TYPE_SHORT, MYSQL_TYPE_INT24, MYSQL_TYPE_LONG,
