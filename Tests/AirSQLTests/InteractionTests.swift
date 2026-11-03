@@ -138,19 +138,20 @@ extension AppTests {
                     },
                     menu: ["Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
                     enabled: ["Pin Result", "Rename Result…", "Close Result", "Export Result…"]),
+            // region: a plain text cell (a foreign key's double-click opens its drop-down, an ENUM's its list).
             Surface(name: "Table rows: cell",
                     place: { main, _ in
                         guard let tab = try? await GridDataAppTests.open(in: main, connection: Fixtures.local) else { return nil }
-                        return windowPoint(tab.grid.cellRect(GridPosition(row: 1, column: 1)), in: tab.grid)
+                        return windowPoint(tab.grid.cellRect(GridPosition(row: 1, column: 2)), in: tab.grid)
                     },
                     clicked: { main in
-                        (main.selectedTab?.content as? TableDataController)?.grid.selection.cursor == GridPosition(row: 1, column: 1)
+                        (main.selectedTab?.content as? TableDataController)?.grid.selection.cursor == GridPosition(row: 1, column: 2)
                     },
                     doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
                            "Add Row", "Duplicate Row", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
                            "Value Panel", "Record View", "Column Summary…", "Display As"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set NULL", "Set DEFAULT", "Insert Value", "Add Row",
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set DEFAULT", "Insert Value", "Add Row",
                               "Duplicate Row", "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
             Surface(name: "Grid cell",
                     place: { main, _ in

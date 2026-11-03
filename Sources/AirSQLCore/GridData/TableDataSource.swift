@@ -132,10 +132,15 @@ public final class TableDataSource: GridSource {
         applyLocalFilter()
     }
 
-    /// Adds a new row read back after Apply (one row, the table's columns in order).
-    public func addSaved(_ row: ResultStore) {
-        guard row.rowCount == 1, row.columns.count == columns.count else { return }
-        saved.append(row)
+    /// The rows read back after Apply (each one row, the table's columns in order), in place of those before.
+    public func setSaved(_ rows: [ResultStore]) {
+        saved = rows.filter { $0.rowCount == 1 && $0.columns.count == columns.count }
+    }
+
+    /// The keys of the rows read back after Apply.
+    public var savedKeys: [PendingChanges.Key] {
+        guard let key else { return [] }
+        return saved.map { store in key.map { Self.text(store, 0, $0) ?? "" } }
     }
 
     /// The end of Load All's stream.

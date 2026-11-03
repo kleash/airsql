@@ -55,7 +55,7 @@ final class FakeTableSession: TableSession {
         if sql.contains(" FROM `airsql_fixture`.`customers`"), !columns.contains(where: { $0.name == "email" }) {
             return result([.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING)], customers)
         }
-        if let readBack, sql.hasSuffix("WHERE `id` = \(insertID)") { return result(columns, [readBack]) }
+        if let readBack, sql.hasPrefix("SELECT"), sql.hasSuffix("WHERE `id` = \(insertID)") { return result(columns, [readBack]) }
         if sql.hasPrefix("SELECT") { return result(columns, rows) }
         let affected = ["START TRANSACTION", "COMMIT", "ROLLBACK"].contains(sql) ? 0 : changed(sql)
         return [StatementResult(rows: nil, affectedRows: affected, insertID: sql.hasPrefix("INSERT") ? insertID : 0, warnings: 0,

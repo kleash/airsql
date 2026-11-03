@@ -45,13 +45,15 @@ extension TableDataController {
         changesDidChange()
     }
 
-    /// Gives every selected cell that can take it `value`: each checked by its own column (a beep when one couldn't).
+    /// Gives every selected cell its column's `value` (nil: leave the cell), each checked by its column: a beep when
+    /// one refuses it.
     func setSelected(_ value: (Int) -> PendingChanges.Value?) {
         guard let source, editingOff == nil else { return NSSound.beep() }
         var refused = false
         let depth = source.changes.undoDepth
         for cell in selectedCells() where source.canEdit(cell.row, cell.column) {
-            guard let value = value(cell.column), refusal(value, column: cell.column) == nil else {
+            guard let value = value(cell.column) else { continue }
+            guard refusal(value, column: cell.column) == nil else {
                 refused = true
                 continue
             }
@@ -78,16 +80,16 @@ extension TableDataController {
     func dataGrid(_ grid: DataGridView, edit row: Int, column: Int, typed: String?) -> Bool {
         guard let source, let type = type(column) else { return false }
         if type.isBoolean {
+            let value: PendingChanges.Value
             switch typed?.lowercased() {
-            case nil, " ":
-                let value = source.value(row, column) ?? "0"
-                let on = value.contains { $0 != "0" }
-                setSelected { _ in .text(on ? "0" : "1") }
-            case "t", "1": setSelected { _ in .text("1") }
-            case "f", "0": setSelected { _ in .text("0") }
-            case "n": setSelected { _ in .null }
+            case nil, " ": value = .text(source.value(row, column)?.contains { $0 != "0" } == true ? "0" : "1")
+            case "t", "1": value = .text("1")
+            case "f", "0": value = .text("0")
+            case "n": value = .null
             default: return false
             }
+            // The selected booleans all take the focused one's new state; other selected cells stay as they are.
+            setSelected { self.type($0)?.isBoolean == true ? value : nil }
             return true
         }
         guard typed == nil else { return false }

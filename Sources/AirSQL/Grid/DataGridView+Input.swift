@@ -5,10 +5,11 @@ import AppKit
 // a block, a double click or Return or typing edits in place, a right click asks the delegate for the menu. Keys arrive
 // as AppKit's standard commands (interpretKeyEvents), so people's own key bindings apply.
 extension DataGridView {
-    /// Takes the keyboard for a click: false while an editor keeps it, its value refused (it says why instead).
+    /// Takes the keyboard for a click: false while an editor keeps it, its value refused (the cell's editor or the
+    /// value panel says why instead).
     func takeKeyboard() -> Bool {
-        window?.makeFirstResponder(self)
-        return editor == nil
+        guard let window else { return editor == nil }
+        return window.makeFirstResponder(self) && window.firstResponder === self
     }
 
     override func mouseDown(with event: NSEvent) {

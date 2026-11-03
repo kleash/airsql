@@ -247,14 +247,17 @@ extension TableDataController: DataGridViewDelegate {
                     if sql.hasPrefix("INSERT ") { insertIDs.append(result?.insertID ?? 0) }
                     return result?.affectedRows ?? 0
                 }
-                let readBack = readBackQueries(statements, insertIDs: insertIDs)
+                // New rows stay where they were, with what the server filled in (their AUTO_INCREMENT key, defaults);
+                // rows read back by an earlier Apply are read again (this one may have changed them) or dropped (deleted).
+                let readBack = savedQueries(deleted: source.changes.state.deletes) + readBackQueries(statements, insertIDs: insertIDs)
                 source.changes = PendingChanges(keyColumns: source.changes.keyColumns)
                 changesDidChange()
                 if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
-                // New rows stay where they were, with what the server filled in (their AUTO_INCREMENT key, defaults).
+                var saved: [ResultStore] = []
                 for sql in readBack {
-                    if let row = try? await session.query(sql, rowCap: 1).first?.rows, row.rowCount == 1 { source.addSaved(row) }
+                    if let row = try? await session.query(sql, rowCap: 1).first?.rows, row.rowCount == 1 { saved.append(row) }
                 }
+                source.setSaved(saved)
                 activity.end()
                 loading = nil
                 loadRows(more: false, through: source.loadedRows, keepingSaved: true)
@@ -287,6 +290,18 @@ extension TableDataController: DataGridViewDelegate {
                 literals[name] = try? ColumnType(column).literal(text, values)
             }
             return try? source.table.readBackQuery(database: database, values: literals, insertID: insertID)
+        }
+    }
+
+    /// The SELECTs that read the rows an earlier Apply read back again, by their key, but not the ones deleted.
+    private func savedQueries(deleted: Set<PendingChanges.Key>) -> [String] {
+        guard let source, let keyColumns = source.table.editingKey else { return [] }
+        let columns = Dictionary(source.columns.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        return source.savedKeys.filter { !deleted.contains($0) }.compactMap { key in
+            let literals = Dictionary(zip(keyColumns, key).map { name, text in
+                (name, (columns[name] ?? GridColumn(name: name)).literal(text, noBackslashEscapes: noBackslashEscapes))
+            }, uniquingKeysWith: { first, _ in first })
+            return try? source.table.readBackQuery(database: database, values: literals, insertID: 0)
         }
     }
 

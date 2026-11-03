@@ -82,7 +82,7 @@ extension AppTests {
 
         @Test func insertValueAndNewRowsShowWhatTheServerFillsIn() async throws {
             let session = FakeTableSession.customers()
-            let (_, _, tab) = try await Tab.tab("customers", session: session)
+            let (_, harness, tab) = try await Tab.tab("customers", session: session)
             tab.grid.selection.select(GridPosition(row: 0, column: 8))
             let items = tab.insertValueItems()
             #expect(items.map(\.title).starts(with: ["DEFAULT", "NOW()", "UTC_TIMESTAMP()"]))
@@ -107,6 +107,27 @@ extension AppTests {
             await ready { tab.loading != nil }
             #expect(tab.source?.changes.isEmpty == true && tab.source?.saved.count == 1 && tab.grid.rowCount == 3)
             #expect(tab.source?.cell(2, 0) == .text("42") && tab.source?.rowKey(2) == ["42"] && tab.source?.canEdit(2, 1) == true)
+            // Edited again, it is read again after the next Apply; deleted, it goes.
+            session.readBack?[1] = "cy@example.com"
+            tab.keep(.text("cy@example.com"), row: 2, column: 1)
+            tab.applyChanges(nil)
+            _ = await eventually(timeout: 10) {
+                try? await Task.sleep(nanoseconds: 20_000_000)
+                return tab.loading == nil && tab.source?.changes.isEmpty == true
+            }
+            #expect(session.statements.contains("UPDATE `airsql_fixture`.`customers` SET `email` = 'cy@example.com' WHERE `id` = 42"))
+            #expect(tab.source?.saved.count == 1 && tab.source?.cell(2, 1) == .text("cy@example.com") && tab.source?.mark(2, 1) == GridMark.none)
+            tab.grid.selection.selectRow(2)
+            tab.deleteRows(nil)
+            tab.applyChanges(nil)
+            // Deleting a customer sets orders' customer_id to NULL: the preview says so first.
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Apply"])
+            _ = await eventually(timeout: 10) {
+                try? await Task.sleep(nanoseconds: 20_000_000)
+                return tab.loading == nil && tab.source?.changes.isEmpty == true
+            }
+            #expect(tab.source?.saved.isEmpty == true && tab.grid.rowCount == 2, "\(session.statements.suffix(6))")
         }
 
         @Test func pasteFillsCellsFromTheFocusedOneAndAddsRows() async throws {
