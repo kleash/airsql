@@ -20,7 +20,7 @@ extension TableEditorController {
                 case "type":
                     column.type.name = ((sender as? NSPopUpButton)?.titleOfSelectedItem ?? column.type.name).lowercased()
                     let type = column.columnType
-                    if type?.length == ColumnType.Length.none { column.type.length = "" }
+                    if type?.length == EditorColumnType.Length.none { column.type.length = "" }
                     if !(type?.numeric ?? false) { column.type.unsigned = false; column.type.zerofill = false }
                     if !(type?.text ?? false) { column.collation = nil; column.charset = nil }
                     if !(type?.integer ?? false) { column.autoIncrement = false }

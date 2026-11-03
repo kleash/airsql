@@ -1,7 +1,7 @@
 import Foundation
 
 /// A column type as the table editor offers it, and what its "Length / values" field holds there.
-public struct ColumnType: Hashable {
+public struct EditorColumnType: Hashable {
     public enum Length: Hashable {
         /// DATE, TEXT, JSON: nothing goes in the field.
         case none
@@ -28,7 +28,7 @@ public struct ColumnType: Hashable {
 
 /// The column types of each flavour and version, in the order the type menu lists them.
 public enum ColumnTypes {
-    public static func all(for server: SchemaServer) -> [ColumnType] {
+    public static func all(for server: SchemaServer) -> [EditorColumnType] {
         var names = ["tinyint", "smallint", "mediumint", "int", "bigint", "decimal", "float", "double", "bit",
                      "date", "time", "datetime", "timestamp", "year",
                      "char", "varchar", "binary", "varbinary", "tinytext", "text", "mediumtext", "longtext",
@@ -49,34 +49,34 @@ public enum ColumnTypes {
     }
 
     /// The type of that name on any server (nil for one AirSQL doesn't know, such as a plugin's).
-    public static func type(_ name: String) -> ColumnType? {
+    public static func type(_ name: String) -> EditorColumnType? {
         let name = name.lowercased()
         switch name {
         case "tinyint", "smallint", "mediumint", "int", "bigint":
-            return ColumnType(name: name, length: .optional, hint: "Display width", numeric: true, text: false, integer: true)
+            return EditorColumnType(name: name, length: .optional, hint: "Display width", numeric: true, text: false, integer: true)
         case "decimal", "float", "double":
-            return ColumnType(name: name, length: .optional, hint: "Digits, decimals (12,2)", numeric: true, text: false,
+            return EditorColumnType(name: name, length: .optional, hint: "Digits, decimals (12,2)", numeric: true, text: false,
                               integer: false)
         case "bit":
-            return ColumnType(name: name, length: .optional, hint: "Bits (1 to 64)", numeric: false, text: false, integer: false)
+            return EditorColumnType(name: name, length: .optional, hint: "Bits (1 to 64)", numeric: false, text: false, integer: false)
         case "time", "datetime", "timestamp":
-            return ColumnType(name: name, length: .optional, hint: "Fraction digits (0 to 6)", numeric: false, text: false,
+            return EditorColumnType(name: name, length: .optional, hint: "Fraction digits (0 to 6)", numeric: false, text: false,
                               integer: false)
         case "char", "binary":
-            return ColumnType(name: name, length: .optional, hint: "Length", numeric: false, text: name == "char", integer: false)
+            return EditorColumnType(name: name, length: .optional, hint: "Length", numeric: false, text: name == "char", integer: false)
         case "varchar", "varbinary":
-            return ColumnType(name: name, length: .required, hint: "Length", numeric: false, text: name == "varchar",
+            return EditorColumnType(name: name, length: .required, hint: "Length", numeric: false, text: name == "varchar",
                               integer: false)
         case "vector":
-            return ColumnType(name: name, length: .required, hint: "Dimensions", numeric: false, text: false, integer: false)
+            return EditorColumnType(name: name, length: .required, hint: "Dimensions", numeric: false, text: false, integer: false)
         case "enum", "set":
-            return ColumnType(name: name, length: .values, hint: "Values: 'a','b'", numeric: false, text: true, integer: false)
+            return EditorColumnType(name: name, length: .values, hint: "Values: 'a','b'", numeric: false, text: true, integer: false)
         case "tinytext", "text", "mediumtext", "longtext":
-            return ColumnType(name: name, length: .none, hint: "", numeric: false, text: true, integer: false)
+            return EditorColumnType(name: name, length: .none, hint: "", numeric: false, text: true, integer: false)
         case "date", "year", "tinyblob", "blob", "mediumblob", "longblob", "json", "inet6", "uuid", "inet4", "geometry",
              "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon", "geometrycollection",
              "geomcollection":
-            return ColumnType(name: name, length: .none, hint: "", numeric: false, text: false, integer: false)
+            return EditorColumnType(name: name, length: .none, hint: "", numeric: false, text: false, integer: false)
         default:
             return nil
         }
@@ -136,9 +136,9 @@ public struct TypeSpec: Hashable {
             text += "(" + values.map { SQLQuote.string($0, noBackslashEscapes: noBackslashEscapes) }.joined(separator: ",") + ")"
         } else if !trimmed.isEmpty {
             let digits = trimmed.replacingOccurrences(of: " ", with: "")
-            guard known?.length != ColumnType.Length.none, digits.range(of: "^[0-9]+(,[0-9]+)?$", options: .regularExpression) != nil
+            guard known?.length != EditorColumnType.Length.none, digits.range(of: "^[0-9]+(,[0-9]+)?$", options: .regularExpression) != nil
             else {
-                throw DesignError(known?.length == ColumnType.Length.none ? "\(name.uppercased()) takes no length"
+                throw DesignError(known?.length == EditorColumnType.Length.none ? "\(name.uppercased()) takes no length"
                                   : "Write the length of \(name.uppercased()) as digits, such as 255 or 12,2")
             }
             text += "(" + digits + ")"

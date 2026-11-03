@@ -132,7 +132,7 @@ public struct ColumnDesign: Hashable {
     }
 
     /// The column's type as the editor offers it (nil for one it doesn't know).
-    public var columnType: ColumnType? { ColumnTypes.type(type.name) }
+    public var columnType: EditorColumnType? { ColumnTypes.type(type.name) }
 }
 
 public struct IndexDesign: Hashable {
