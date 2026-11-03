@@ -10,7 +10,7 @@ access level they chose, and never change anything.
 
 1. Call `context` first. It lists the connections you may use, their access level and whether they're connected.
 2. Read the schema with `get_schema` (one call per connection; keep the `hash` and pass it as `if_changed_from` next
-   time), then `describe` the tables you need.
+   time), then `describe` the tables you need. `search_columns` finds a column by name without the whole schema.
 3. Answer with `run_queries` (several statements per call, small `max_rows`), `explain` and `profile`.
 4. Never try to write. To change data or structure, write the SQL and call `open_in_console` with a clear title, tell
    the person what it does, and after they run it, `read_console`.

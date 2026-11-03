@@ -23,6 +23,7 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
   filter, a connected connection whose name doesn't match shows the objects that do, opened.
 - Drag a table or database into the SQL editor to insert its name, quoted for SQL.
+- F2 renames the selected table or view (or folder), as **Database ▸ Rename…** does.
 - **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
 
 On a server with more than 3,000 tables, AirSQL reads only the names when it connects; a database's columns, indexes and

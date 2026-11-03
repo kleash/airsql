@@ -1,4 +1,4 @@
-<h1 align="center">AirSQL</h1>
+<h1 align="center"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/icon.png" width="40" alt=""> AirSQL</h1>
 
 <p align="center"><b>A native Mac app for MySQL and MariaDB: every way to connect, a fast data grid with safe editing, and
 AI agents that never change anything without you. Free and open source.</b></p>

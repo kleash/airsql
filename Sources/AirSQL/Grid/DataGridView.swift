@@ -15,6 +15,15 @@ protocol DataGridViewDelegate: AnyObject {
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool
     /// An edit was committed (Return, Tab, a click elsewhere): keep it as a pending change. Nothing is written here.
     func dataGrid(_ grid: DataGridView, didEditRow row: Int, column: Int, text: String)
+    /// Editing is starting (Return, a double click, or typing `typed`): the host may edit the cell its own way (a
+    /// pick-list, a checkbox, a larger editor) and return true, so the grid opens no text field (default false).
+    func dataGrid(_ grid: DataGridView, edit row: Int, column: Int, typed: String?) -> Bool
+    /// Why `text` can't be kept in the cell (the editor stays open and says so), nil when it can (default nil).
+    func dataGrid(_ grid: DataGridView, check text: String, row: Int, column: Int) -> String?
+    /// ↑ or ↓ in the editor: `text` with the part at `offset` stepped by `amount`, and the part to select; nil leaves
+    /// the keys to the text field (default nil).
+    func dataGrid(_ grid: DataGridView, step text: String, at offset: Int, by amount: Int, row: Int, column: Int)
+        -> (text: String, part: NSRange)?
     /// The menu for a right click on the selected cells, a column's header or a row's number (selected first).
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu?
     /// The sort control in a column's header was clicked; with ⌥ `adding` the column to the sort.
@@ -31,6 +40,10 @@ extension DataGridViewDelegate {
     func dataGridSelectionDidChange(_ grid: DataGridView) {}
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool { false }
     func dataGrid(_ grid: DataGridView, didEditRow row: Int, column: Int, text: String) {}
+    func dataGrid(_ grid: DataGridView, edit row: Int, column: Int, typed: String?) -> Bool { false }
+    func dataGrid(_ grid: DataGridView, check text: String, row: Int, column: Int) -> String? { nil }
+    func dataGrid(_ grid: DataGridView, step text: String, at offset: Int, by amount: Int, row: Int, column: Int)
+        -> (text: String, part: NSRange)? { nil }
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? { nil }
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {}
     func dataGrid(_ grid: DataGridView, openRecord row: Int) {}

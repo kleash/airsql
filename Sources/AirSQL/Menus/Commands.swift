@@ -6,6 +6,7 @@ import AppKit
 /// implement the methods in their own responders; new commands are added here (a shared file) and in `Commands`.
 @objc protocol AirSQLActions {
     // AirSQL and Help
+    @objc optional func showAbout(_ sender: Any?)
     @objc optional func showSettings(_ sender: Any?)
     @objc optional func showHelpSite(_ sender: Any?)
     @objc optional func showGettingStarted(_ sender: Any?)
@@ -23,6 +24,7 @@ import AppKit
     @objc optional func closeOtherTabs(_ sender: Any?)
     @objc optional func duplicateTab(_ sender: Any?)
     @objc optional func renameTab(_ sender: Any?)
+    @objc optional func renameSelection(_ sender: Any?)
     @objc optional func revealInFinder(_ sender: Any?)
     @objc optional func runSQLFile(_ sender: Any?)
     @objc optional func importCSV(_ sender: Any?)
@@ -86,6 +88,8 @@ import AppKit
     @objc optional func addRow(_ sender: Any?)
     @objc optional func duplicateRow(_ sender: Any?)
     @objc optional func duplicateRowWithoutKeys(_ sender: Any?)
+    @objc optional func pasteAsNewRows(_ sender: Any?)
+    @objc optional func chooseReferencedRow(_ sender: Any?)
     @objc optional func deleteRows(_ sender: Any?)
     @objc optional func setCellNull(_ sender: Any?)
     @objc optional func setCellDefault(_ sender: Any?)
@@ -169,6 +173,8 @@ import AppKit
     @objc optional func generateLiquibase(_ sender: Any?)
     @objc optional func setUpAgents(_ sender: Any?)
     @objc optional func showAgentActivity(_ sender: Any?)
+    @objc optional func showAgentResults(_ sender: Any?)
+    @objc optional func openInNewConsole(_ sender: Any?)
     @objc optional func turnAgentsOff(_ sender: Any?)
     @objc optional func showAgentGuide(_ sender: Any?)
 
@@ -225,7 +231,7 @@ struct Command {
         let names: [String: String] = ["\r": "↩", "\u{8}": "⌫", "\u{7f}": "⌫", "\t": "⇥", "\u{1b}": "⎋", " ": "Space",
                                        String(UnicodeScalar(NSDownArrowFunctionKey)!): "↓",
                                        String(UnicodeScalar(NSUpArrowFunctionKey)!): "↑",
-                                       String(UnicodeScalar(NSF9FunctionKey)!): "F9"]
+                                       String(UnicodeScalar(NSF9FunctionKey)!): "F9", String(UnicodeScalar(NSF2FunctionKey)!): "F2"]
         return (flags.contains(.control) ? "⌃" : "") + (flags.contains(.option) ? "⌥" : "")
             + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "") + (names[key] ?? key.uppercased())
     }
@@ -236,6 +242,7 @@ private func sel(_ name: String) -> Selector { NSSelectorFromString(name) }
 private let up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
 private let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
 private let f9 = String(UnicodeScalar(NSF9FunctionKey)!)
+private let f2 = String(UnicodeScalar(NSF2FunctionKey)!)
 
 /// Every command, by menu: the shortcut map (no shortcut is taken twice, and none that macOS keeps for itself:
 /// `CommandsTests`). Settled for every lane in P0 (plan §2.4): ⌘↩ only runs; ⌘S saves a console's file and applies
@@ -244,7 +251,7 @@ private let f9 = String(UnicodeScalar(NSF9FunctionKey)!)
 /// HeidiSQL; Commit and Rollback have none, so a slip never commits.
 enum Commands {
     // MARK: AirSQL
-    static let about = Command("About AirSQL", #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+    static let about = Command("About AirSQL", #selector(AirSQLActions.showAbout(_:)),
                                tip: "Show AirSQL's version and the licences of what it is built with")
     static let settings = Command("Settings…", #selector(AirSQLActions.showSettings(_:)), ",",
                                   tip: "Change the look, the editor and grid, safety checks, agents and client tools")
@@ -274,7 +281,12 @@ enum Commands {
                                 tip: "Save the console's text to a new .sql file")
     static let duplicateTab = Command("Duplicate Tab", #selector(AirSQLActions.duplicateTab(_:)),
                                       tip: "Open a copy of the tab shown next to it")
-    static let renameTab = Command("Rename Tab…", #selector(AirSQLActions.renameTab(_:)), tip: "Give the tab shown a name of your own")
+    static let renameTab = Command("Rename Tab…", #selector(AirSQLActions.renameTab(_:)),
+                                   tip: "Give the tab shown a name of your own (F2 outside the tree and grids)")
+    /// F2, as in HeidiSQL: renames what has the focus (the tree's table, view or folder; else the tab shown). In a grid, F2
+    /// is the grid's own (editing the cell, the grid lanes'), so the window leaves it alone there.
+    static let renameF2 = Command("Rename", #selector(AirSQLActions.renameSelection(_:)), f2, [], hidden: true,
+                                  tip: "Rename what is selected: a table, view or folder in the tree, else the tab (F2)")
     static let revealInFinder = Command("Reveal in Finder", #selector(AirSQLActions.revealInFinder(_:)),
                                         tip: "Show the tab's .sql file in Finder")
     static let runSQLFile = Command("Run SQL File…", #selector(AirSQLActions.runSQLFile(_:)),
@@ -427,6 +439,8 @@ enum Commands {
                                       tip: "Add a copy of the selected rows, keys included")
     static let duplicateRowWithoutKeys = Command("Duplicate Row Without Keys", #selector(AirSQLActions.duplicateRowWithoutKeys(_:)), "D",
                                                  tip: "Add a copy of the selected rows, leaving their keys to the server")
+    static let pasteAsNewRows = Command("Paste as New Rows", #selector(AirSQLActions.pasteAsNewRows(_:)),
+                                        tip: "Add the copied cells as new rows; they are saved when you apply the changes")
     static let deleteRows = Command("Delete Rows…", #selector(AirSQLActions.deleteRows(_:)), "\u{8}",
                                     tip: "Mark the selected rows for deletion; they are deleted when you apply")
     static let setNull = Command("Set NULL", #selector(AirSQLActions.setCellNull(_:)), "n", [.command, .option],
@@ -460,6 +474,8 @@ enum Commands {
                                         tip: "Sort by this column, largest first")
     static let clearSort = Command("Clear Sort", #selector(AirSQLActions.clearSort(_:)), tip: "Show rows in the table's own order again")
     static let goToRow = Command("Go to Row…", #selector(AirSQLActions.goToRow(_:)), "l", tip: "Go to a row by its number, or to column:row")
+    static let chooseReferencedRow = Command("Choose Referenced Row…", #selector(AirSQLActions.chooseReferencedRow(_:)),
+                                             tip: "Pick the row this foreign key points to by its label; its key goes in the cell")
     static let relatedRows = Command("Related Rows", #selector(AirSQLActions.showRelatedRows(_:)), down, [.command, .control],
                                      tip: "Show the rows this value refers to, or the rows that refer to it")
     static let columnSummary = Command("Column Summary…", #selector(AirSQLActions.showColumnSummary(_:)),
@@ -504,7 +520,7 @@ enum Commands {
     static let truncate = Command("Truncate…", #selector(AirSQLActions.truncateTable(_:)),
                                   tip: "Delete every row of the selected tables (asks first)")
     static let rename = Command("Rename…", #selector(AirSQLActions.renameObject(_:)),
-                                tip: "Rename the selected table or view (shows the SQL first)")
+                                tip: "Rename the selected table or view, showing the SQL first (F2 in the tree)")
     static let drop = Command("Drop…", #selector(AirSQLActions.dropObject(_:)),
                               tip: "Delete the selected objects from the server (asks first and shows the SQL)")
     static let expandAll = Command("Expand All", #selector(AirSQLActions.expandAll(_:)), tip: "Open every folder under this one")
@@ -550,7 +566,7 @@ enum Commands {
     static let newFolder = Command("New Folder…", #selector(AirSQLActions.newFolder(_:)),
                                    tip: "Make a sidebar folder for connections; the selected connections move into it")
     static let renameFolder = Command("Rename Folder…", #selector(AirSQLActions.renameFolder(_:)),
-                                      tip: "Give the selected sidebar folder another name")
+                                      tip: "Give the selected sidebar folder another name (F2)")
     static let deleteFolder = Command("Delete Folder…", #selector(AirSQLActions.deleteFolder(_:)),
                                       tip: "Remove the selected folder; its connections stay, outside any folder")
 
@@ -577,6 +593,10 @@ enum Commands {
                                      tip: "Let Claude Code, Gemini CLI or another MCP client use AirSQL, at the access you choose")
     static let agentActivity = Command("Agent Activity", #selector(AirSQLActions.showAgentActivity(_:)),
                                        tip: "Show what agents asked AirSQL to do, newest last")
+    static let agentResults = Command("Agent Results", #selector(AirSQLActions.showAgentResults(_:)),
+                                      tip: "Show the queries agents ran on this connection and the rows they got")
+    static let openInNewConsole = Command("Open in New Console", #selector(AirSQLActions.openInNewConsole(_:)),
+                                          tip: "Open the selected statements in a new console tab, to edit and run yourself")
     static let turnAgentsOff = Command("Turn Agents Off", #selector(AirSQLActions.turnAgentsOff(_:)),
                                        tip: "Stop every agent from using AirSQL until you turn agents on again")
 
@@ -611,7 +631,8 @@ enum Commands {
     /// Every command above, for the checks (the tab commands once).
     static let all: [Command] = [
         about, settings, hide, hideOthers, showAll, quit,
-        newConnection, newQuery, open, closeTab, closeOtherTabs, closeWindow, save, saveAs, duplicateTab, renameTab, revealInFinder,
+        newConnection, newQuery, open, closeTab, closeOtherTabs, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
+        revealInFinder,
         runSQLFile, importCSV, importSSHConfig,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
@@ -621,9 +642,9 @@ enum Commands {
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
-        addRow, duplicateRow, duplicateRowWithoutKeys, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
+        addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterByValues, clearFilter, sortAscending,
-        sortDescending, clearSort, goToRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
+        sortDescending, clearSort, goToRow, chooseReferencedRow, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
@@ -631,7 +652,7 @@ enum Commands {
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder,
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
-        setUpAgents, agentActivity, turnAgentsOff,
+        setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
         help, gettingStarted, reportProblem, copyDiagnostics, agentGuide,
     ]

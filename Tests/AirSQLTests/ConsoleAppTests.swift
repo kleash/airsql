@@ -174,15 +174,15 @@ extension AppTests {
             let viewer = SQLLogWindowController.show(log)
             keptWindows.append(viewer)
             viewer.window?.setFrameOrigin(NSPoint(x: -22000, y: -22000))
-            #expect(try await eventually(timeout: 5) { viewer.lines.count == 2 })
+            #expect(await eventually(timeout: 5) { viewer.lines.count == 2 })
             #expect(viewer.lines.last?.contains("<secret>") == true && viewer.lines.last?.contains("'secret'") == false)
             log.statement("SELECT 2", context: "Shop main:3", noBackslashEscapes: false)
             viewer.refresh()
-            #expect(try await eventually(timeout: 5) { viewer.lines.count == 3 }, "follows what is added")
+            #expect(await eventually(timeout: 5) { viewer.lines.count == 3 }, "follows what is added")
             SQLLogWindowController.clear(log)
-            #expect(try await eventually(timeout: 5) { !FileManager.default.fileExists(atPath: log.fileURL.path) })
+            #expect(await eventually(timeout: 5) { !FileManager.default.fileExists(atPath: log.fileURL.path) })
             viewer.refresh()
-            #expect(try await eventually(timeout: 5) { viewer.lines.isEmpty })
+            #expect(await eventually(timeout: 5) { viewer.lines.isEmpty })
             viewer.close()
         }
 
@@ -227,6 +227,10 @@ extension AppTests {
             #expect(panel.table.numberOfRows > 2)
             #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "orders o")
             panel.table.selectRowIndexes([2], byExtendingSelection: false)
+            // Dragged into the editor, a column drops what a double-click inserts (quoted as completion quotes it).
+            let name = try #require((panel.table.view(atColumn: 0, row: 2, makeIfNecessary: true) as? NSTextField)?.stringValue)
+            let dragged = panel.tableView(panel.table, pasteboardWriterForRow: 2) as? NSPasteboardItem
+            #expect(dragged?.string(forType: .string) == SQLCompletion.quote(name) && panel.tableView(panel.table, pasteboardWriterForRow: 0) == nil)
             panel.insertSelected(nil)
             #expect(console.text.hasPrefix("SELECT customer_id FROM") || console.text.hasPrefix("SELECT id FROM"), "\(console.text)")
             panel.choice.selectedSegment = 1
@@ -234,6 +238,23 @@ extension AppTests {
             #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "Aggregate")
             #expect(await call(harness, "menu", ["path": "View > Query Helpers"]).error == nil)
             #expect(!console.helpersShown)
+        }
+
+        /// .sql files dropped anywhere on the window (the root view takes what no view under the pointer does) open in
+        /// console tabs of the active connection.
+        @Test func sqlFilesDroppedOnTheWindowOpenInConsoles() async throws {
+            let file = URL(fileURLWithPath: try scratch() + "/dropped.sql")
+            try "SELECT 'dropped';".write(to: file, atomically: true, encoding: .utf8)
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.sidebar.select([Fixtures.local.id])
+            main.sidebarSelectionChanged()
+            let root = try #require(main.window?.contentView as? FileDropView)
+            #expect(root.registeredDraggedTypes.contains(.fileURL))
+            root.open?([file])
+            #expect(await eventually(timeout: 5) { (main.selectedTab?.content as? ConsoleViewController)?.fileURL == file })
+            #expect(main.selectedTab?.connectionID == Fixtures.local.id && main.selectedTab?.title == "dropped.sql")
+            for tab in main.tabs { main.close(tab) }
         }
 
         @Test func filesOpenSaveAndTabsComeBackAfterRelaunch() async throws {
@@ -244,13 +265,13 @@ extension AppTests {
             let (main, harness, untitled) = try await Self.console()
             _ = await call(harness, "type", ["text": "SELECT 'unsaved';"])
             main.openFiles([file])
-            #expect(try await eventually(timeout: 5) { main.tabs.count == 2 })
+            #expect(await eventually(timeout: 5) { main.tabs.count == 2 })
             let opened = try #require(main.selectedTab?.content as? ConsoleViewController)
             #expect(main.selectedTab?.title == "top customers.sql" && opened.text == "SELECT 1;" && !opened.isEdited && !opened.canRename)
             _ = await call(harness, "type", ["text": "\nSELECT 2;"])
             #expect(opened.isEdited)
             opened.saveQuery(nil)
-            #expect(try await eventually(timeout: 5) { !opened.isEdited })
+            #expect(await eventually(timeout: 5) { !opened.isEdited })
             #expect(try String(contentsOf: file, encoding: .utf8) == "SELECT 1;\nSELECT 2;")
             main.openFiles([file])
             #expect(main.tabs.count == 2, "a file already open shows its tab")
@@ -261,7 +282,7 @@ extension AppTests {
             ConsoleDocuments.shared.saveNow()
             let (relaunched, _) = appWindow(testModel(Fixtures.shop))
             ConsoleDocuments.shared.restore(into: relaunched)
-            #expect(try await eventually(timeout: 5) { relaunched.tabs.count == 2 })
+            #expect(await eventually(timeout: 5) { relaunched.tabs.count == 2 })
             let restored = relaunched.tabs.compactMap { $0.content as? ConsoleViewController }
             #expect(relaunched.tabs.map(\.title) == ["Query 1", "top customers.sql"])
             #expect(restored.first?.text == untitled.text && restored.first?.connectionID == Fixtures.production.id)
@@ -278,6 +299,78 @@ extension AppTests {
             #expect(console.results.cancelButton.isHidden)
             let commit = await call(harness, "menu", ["path": "Query > Commit"])
             #expect(commit.error?.contains("No transaction is open") == true, "\(commit.error ?? "")")
+        }
+
+        /// A read-only connection's console refuses what AirSQL can't prove only reads before it sends anything: here to a
+        /// connection that can't connect (nothing listens on port 1), so a statement sent would fail there instead.
+        @Test func aReadOnlyConnectionsConsoleRefusesWhatMayWrite() async throws {
+            var saved = Fixtures.production
+            saved.readOnly = true
+            let unreachable = Connection(options: ConnectOptions(host: "127.0.0.1", port: 1, user: "nobody"))
+            ConsoleViewController.openConnection = { $0 == saved.id ? unreachable : nil }
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let (_, harness, console) = try await Self.console(testModel([saved]))
+            for (sql, command) in [("SET SESSION TRANSACTION READ WRITE;\nCREATE DATABASE lane_safety_probe;", "Run All"),
+                                   ("START TRANSACTION READ WRITE", "Run Statement"), ("UPDATE t SET a = 1", "Explain"),
+                                   ("SELECT SLEEP(1)", "Profile")] {
+                console.editor.setText(sql)
+                #expect(await call(harness, "menu", ["path": "Query > " + command]).error == nil, "\(command)")
+                #expect(console.running == nil, "\(command)")
+                #expect(console.messagesView.messages.last?.text.hasPrefix("“Production · shop” is read-only, so nothing ran.")
+                        == true, "\(command): \(console.messagesView.messages.last?.text ?? "")")
+            }
+            #expect(console.messagesView.messages.first?.text == "“Production · shop” is read-only, so nothing ran. SET isn't "
+                + "a read-only statement; only SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN are. To change anything, "
+                + "turn off Read-only in its connection settings.")
+            #expect(console.messagesView.messages.map(\.statement) == ["SET SESSION TRANSACTION READ WRITE",
+                                                                    "START TRANSACTION READ WRITE",
+                                                                    "EXPLAIN UPDATE t SET a = 1", "SELECT SLEEP(1)"])
+        }
+
+        /// The audit's probe on a read-only connection to MariaDB 11.4 and MySQL 8.4: SET SESSION TRANSACTION READ WRITE
+        /// would lift the session's own READ ONLY and let CREATE DATABASE through, so the console refuses both, and START
+        /// TRANSACTION READ WRITE; SELECT, SHOW, EXPLAIN and USE still run, and Explain and Profile too.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"), arguments: [Lab.mariadb114, Lab.mysql84])
+        func aReadOnlyConnectionRefusesTheProbeAndStillReads(_ server: Lab.Server) async throws {
+            var options = DBLab.options(server, tls: DBLab.required)
+            options.readOnly = true
+            let connection = Connection(options: options, log: DBLab.log)
+            try await connection.connect()
+            var saved = Fixtures.production
+            saved.readOnly = true
+            ConsoleViewController.openConnection = { $0 == saved.id ? connection : nil }
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let (_, harness, console) = try await Self.console(testModel([saved]))
+            func run(_ sql: String, _ command: String = "Run All") async {
+                console.editor.setText(sql)
+                #expect(await call(harness, "menu", ["path": "Query > " + command]).error == nil, "\(command)")
+                _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            }
+
+            let probe = "lane_safety_probe"
+            for sql in ["SET SESSION TRANSACTION READ WRITE;\nCREATE DATABASE \(probe);", "START TRANSACTION READ WRITE",
+                        "CREATE DATABASE \(probe)"] {
+                await run(sql)
+                #expect(console.messagesView.messages.last?.text.contains("is read-only, so nothing ran.") == true,
+                        "\(sql): \(console.messagesView.messages.map(\.text))")
+            }
+            let main = try await connection.session(.main)
+            #expect(try await main.query("SELECT @@transaction_read_only").first?.rows?.string(0, 0) == "1")
+            #expect(try await main.query("SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = '\(probe)'")
+                .first?.rows?.string(0, 0) == "0")
+
+            let before = console.messagesView.messages.count
+            await run("USE fixture;\nSELECT COUNT(*) FROM customers;\nSHOW TABLES;\nEXPLAIN SELECT * FROM customers WHERE id = 1;")
+            // MySQL's EXPLAIN adds a note (1003, the query as it rewrote it): a warning, not an error.
+            #expect(console.messagesView.messages.dropFirst(before).prefix(4).map(\.level) == [.ok, .ok, .ok, .ok]
+                    && !console.messagesView.messages.dropFirst(before).contains { $0.level == .error },
+                    "\(console.messagesView.messages.dropFirst(before).map(\.text))")
+            #expect(console.resultTabs.count == 3)
+            await run("SELECT * FROM customers WHERE id = 1", "Explain")
+            #expect(console.selectedResult?.title == "Plan")
+            await run("SELECT * FROM customers WHERE id = 1", "Profile")
+            #expect(console.resultTabs.last?.title == "Profile", "\(console.resultTabs.map(\.title))")
+            await connection.disconnect()
         }
 
         /// Run All against MariaDB 11.8: a result tab per result set (named from the comment above), Messages, Manual
@@ -334,10 +427,10 @@ extension AppTests {
             main.closeTab(nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             #expect(await call(harness, "press", ["title": "Roll Back"]).error == nil)
-            _ = try await eventually(timeout: 10) { main.window?.attachedSheet?.title != "" && console.session?.inTransaction == false }
+            _ = await eventually(timeout: 10) { main.window?.attachedSheet?.title != "" && console.session?.inTransaction == false }
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             #expect(await call(harness, "press", ["title": "Don't Save"]).error == nil)
-            #expect(try await eventually(timeout: 10) { main.tabs.isEmpty })
+            #expect(await eventually(timeout: 10) { main.tabs.isEmpty })
             let count = try await setup.query("SELECT COUNT(*) FROM \(database).t").first?.rows?.string(0, 0)
             #expect(count == "0", "rolled back")
             _ = try await setup.query("DROP DATABASE \(database)")

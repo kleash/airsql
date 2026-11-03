@@ -187,7 +187,7 @@ extension AppTests {
     }
 
     @Test func jsonTreeKeepsKeyOrder() {
-        let tree = try? #require(JSONNode.parse(#"{"z": 1, "a": [true, null, "x\"y"], "m": {"k": -1.5e3}}"#))
+        let tree = JSONNode.parse(#"{"z": 1, "a": [true, null, "x\"y"], "m": {"k": -1.5e3}}"#)
         #expect(tree?.children.map(\.key) == ["z", "a", "m"])
         #expect(tree?.value == "{3 keys}" && tree?.children[1].value == "[3 items]")
         #expect(tree?.children[1].children.map(\.value) == ["true", "null", #""x\"y""#])

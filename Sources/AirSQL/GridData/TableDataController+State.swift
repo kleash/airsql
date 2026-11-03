@@ -84,13 +84,22 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.addRow.action: return (editable, readOnly)
         case Commands.duplicateRow.action, Commands.duplicateRowWithoutKeys.action, Commands.deleteRows.action:
             return !editable ? (false, readOnly) : (hasSelection, "Select the rows first")
-        case Commands.setNull.action, Commands.setDefault.action:
+        case Commands.setNull.action, Commands.setDefault.action, Commands.insertValue.action:
             if !editable { return (false, readOnly) }
             // The first cells tell (listing a big selection would take a while).
             let cells = viewer.selectedCells(limit: 10_000).filter { source.canEdit($0.row, $0.column) }
             if cells.isEmpty { return (false, "Select cells you can edit first") }
             guard action == Commands.setNull.action else { return (true, nil) }
             return (cells.contains { source.table.columns[$0.column].nullable }, "These columns can't be NULL")
+        case Commands.relatedRows.action:
+            guard let cell = viewer.focusedCell, case .loaded = source.row(cell.row) else { return (false, "Select a cell of a loaded row first") }
+            return (true, nil)
+        case Commands.chooseReferencedRow.action:
+            if !editable { return (false, readOnly) }
+            return (viewer.focusedCell.map { foreignKey($0.column) != nil } ?? false, "Select a cell of a foreign key column first")
+        case Commands.pasteAsNewRows.action, #selector(paste(_:)):
+            if !editable { return (false, readOnly) }
+            return (NSPasteboard.general.string(forType: .string)?.isEmpty == false, "Copy some cells first")
         case Commands.apply.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
             return (pending && loading == nil, pending ? "Wait until the rows have loaded" : "No changes are pending")
         case Commands.revert.action:

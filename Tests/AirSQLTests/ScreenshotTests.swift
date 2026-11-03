@@ -1,4 +1,5 @@
 import AppKit
+import CMariaDB
 import Testing
 @testable import AirSQL
 @testable import AirSQLCore
@@ -97,6 +98,29 @@ extension AppTests {
                 _ = await call(harness, "wait", ["until": "popover", "timeout": 5])
                 try await save(harness, "main-agents-\(suffix)")
                 main.statusBar.agent.shown?.close()
+
+                // The Agent tab: what an agent ran on Production and the rows it got.
+                let rows = ResultStore(columns: [ResultStore.Column(name: "status", type: MYSQL_TYPE_VAR_STRING),
+                                                 ResultStore.Column(name: "orders", type: MYSQL_TYPE_LONGLONG),
+                                                 ResultStore.Column(name: "revenue", type: MYSQL_TYPE_NEWDECIMAL, decimals: 2)])
+                for (status, count, total) in [("paid", "48211", "3920114.50"), ("shipped", "45120", "3611092.00"),
+                                               ("refunded", "1290", "98110.25"), ("cancelled", "604", "41003.90")] {
+                    _ = rows.append([Array(status.utf8), Array(count.utf8), Array(total.utf8)])
+                }
+                let queries = agents.record("claude-code 2.1", "run_queries · SELECT status, COUNT(*) AS orders … (+2)")
+                agents.keep(["results": [
+                    ["sql": "SELECT COUNT(*) FROM orders", "ok": true, "columns": ["COUNT(*)"], "rowCount": 1, "capped": false],
+                    ["sql": "SELECT status, COUNT(*) AS orders, SUM(total) AS revenue FROM orders GROUP BY status ORDER BY orders DESC",
+                     "ok": true, "columns": ["status", "orders", "revenue"], "rowCount": 4, "capped": false],
+                    ["sql": "SELECT * FROM orders WHERE status = 'paid' FOR UPDATE", "ok": false,
+                     "error": "Refused: FOR UPDATE would lock rows, and agents only read"],
+                ]], [1: rows], call: queries, client: "claude-code 2.1", connection: Fixtures.production.id)
+                agents.finish(queries, "5 rows, 1 refused or failed")
+                agents.showResults(Fixtures.production.id, call: queries)
+                let agentTab = try #require(main.selectedTab?.content as? AgentResultsContent)
+                agentTab.table.selectRowIndexes([1], byExtendingSelection: false)
+                _ = await eventually(timeout: 5) { (agentTab.table.enclosingScrollView?.frame.height ?? 0) > 100 }  // placed
+                try await save(harness, "agent-results-\(suffix)")
                 agents.close()
                 model.data.settings.agentsAllowed = false
 
@@ -201,6 +225,33 @@ extension AppTests {
             }
         }
 
+        /// About AirSQL as the app shows it: the tests aren't AirSQL's app, so the panel is given the name, icon, version
+        /// and copyright that the app's Info.plist, VERSION and icon give it ("Copyright": AppKit's undocumented key for
+        /// NSHumanReadableCopyright, here only).
+        @Test func about() throws {
+            let root = Self.folder.deletingLastPathComponent().deletingLastPathComponent()
+            let info = try #require(NSDictionary(contentsOf: root.appendingPathComponent("Resources/AirSQL-Info.plist")))
+            let version = try String(contentsOf: root.appendingPathComponent("VERSION"), encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let icon = try #require(NSImage(contentsOf: root.appendingPathComponent("Resources/AppIcon.icns")))
+            let (_, harness) = appWindow(testModel())
+            func views(_ view: NSView?) -> [NSView] { view.map { [$0] + $0.subviews.flatMap(views) } ?? [] }
+            let credits = try #require(HelpPage.about[.credits] as? NSAttributedString).string
+            for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+                NSApp.orderFrontStandardAboutPanel(options: HelpPage.about.merging(
+                    [.applicationName: "AirSQL", .applicationIcon: icon, .applicationVersion: version,
+                     .init(rawValue: "Copyright"): info["NSHumanReadableCopyright"] ?? ""]) { $1 })
+                let panel = try #require(NSApp.windows.first { window in
+                    window.isVisible && views(window.contentView).contains { ($0 as? NSTextView)?.string == credits }
+                })
+                panel.appearance = NSAppearance(named: appearance)
+                panel.displayIfNeeded()
+                let image = try #require(harness.composite(panel, scale: 2))
+                try #require(AgentServer.png(image)).write(to: Self.folder.appendingPathComponent("about-\(suffix).png"))
+                panel.orderOut(nil)
+            }
+        }
+
         /// The editors (lane L5b) on the recorded fixture, for docs/dev/mockups.html screen 10.
         @Test func editors() async throws {
             for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
@@ -254,6 +305,12 @@ extension AppTests {
                 onScreen(window.window)
                 let (_, harness) = appWindow(window.model, windows: { [window.window!] })
                 try await save(harness, "compare-\(suffix)", target: "window:Compare Production")
+                // A table's rows that differ, in the grid.
+                let products = try #require(window.results.objects.firstIndex { $0.name == "products" })
+                window.results.list.selectRowIndexes(IndexSet(integer: products), byExtendingSelection: false)
+                window.results.detail.show(window.results.objects[products], result: try #require(window.result), data: true)
+                window.window?.displayIfNeeded()
+                try await save(harness, "compare-data-\(suffix)", target: "window:Compare Production")
                 window.window?.orderOut(nil)
             }
         }

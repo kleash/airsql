@@ -13,6 +13,12 @@ final class FakeTableSession: TableSession {
     var rows: [[String?]] = [["1", "7", "EU", "100", "12.50", nil], ["2", nil, "US", "101", "99.00", "1"],
                              ["3", "9", "EU", "102", "0.10", nil]]
     var changed: (String) -> UInt64 = { _ in 1 }
+    /// INSERT's insert ID, and the row a read-back SELECT (… WHERE `id` = that ID) finds.
+    var insertID: UInt64 = 0
+    var readBack: [String?]?
+    /// What a foreign key's drop-down finds in customers: id and email.
+    var customers: [[String?]] = [["7", "ann@example.com"], ["9", "cy@example.org"]]
+    var sqlMode = "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
 
     var columns: [ResultStore.Column] = [
         .init(name: "id", type: MYSQL_TYPE_LONGLONG), .init(name: "customer_id", type: MYSQL_TYPE_LONG),
@@ -29,21 +35,31 @@ final class FakeTableSession: TableSession {
     }
 
     func query(_ sql: String, rowCap: Int) async throws -> [StatementResult] {
-        statements.append(sql)
         func result(_ columns: [ResultStore.Column], _ values: [[String?]]) -> [StatementResult] {
             let store = ResultStore(columns: columns)
             for row in values { _ = store.append(row.map { $0.map { Array($0.utf8) } }) }
             return [StatementResult(rows: store, affectedRows: 0, insertID: 0, warnings: 0, info: nil, duration: 0)]
         }
+        // The session's sql_mode and time zone (not about the table: left out of `statements`).
+        if sql.hasPrefix("SELECT @@SESSION.sql_mode") {
+            return result([.init(name: "m", type: MYSQL_TYPE_VAR_STRING), .init(name: "z", type: MYSQL_TYPE_VAR_STRING)],
+                          [[sqlMode, "SYSTEM"]])
+        }
+        statements.append(sql)
         if sql.contains(" GROUP BY ") {
             return result([.init(name: "v", type: MYSQL_TYPE_STRING), .init(name: "n", type: MYSQL_TYPE_LONGLONG)], [["EU", "2"], ["US", "1"]])
         }
         if sql.hasPrefix("SELECT TABLE_ROWS") || sql.hasPrefix("SELECT COUNT(*)") {
             return result([.init(name: "n", type: MYSQL_TYPE_LONGLONG)], [[String(rows.count)]])
         }
+        if sql.contains(" FROM `airsql_fixture`.`customers`"), !columns.contains(where: { $0.name == "email" }) {
+            return result([.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING)], customers)
+        }
+        if let readBack, sql.hasPrefix("SELECT"), sql.hasSuffix("WHERE `id` = \(insertID)") { return result(columns, [readBack]) }
         if sql.hasPrefix("SELECT") { return result(columns, rows) }
         let affected = ["START TRANSACTION", "COMMIT", "ROLLBACK"].contains(sql) ? 0 : changed(sql)
-        return [StatementResult(rows: nil, affectedRows: affected, insertID: 0, warnings: 0, info: nil, duration: 0)]
+        return [StatementResult(rows: nil, affectedRows: affected, insertID: sql.hasPrefix("INSERT") ? insertID : 0, warnings: 0,
+                                info: nil, duration: 0)]
     }
 
     func stream(_ sql: String, batchRows: Int, batch: @escaping (ResultStore) throws -> Void) async throws {
@@ -297,7 +313,7 @@ extension AppTests {
                     == ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Value Panel", "Record View", "Column Summary…", "Display As"])
         }
 
-        @Test func readOnlyConnectionsAndLongValuesAreNotEditedInPlace() async throws {
+        @Test func readOnlyConnectionsRefuseEditsAndLongValuesOpenInTheValuePanel() async throws {
             let (_, _, readOnly) = try await Self.tab(readOnly: true)
             #expect(readOnly.notice.text.stringValue.hasPrefix("Read-only. This connection is read-only"))
             #expect(!readOnly.dataGrid(readOnly.grid, canEditRow: 0, column: 2))
@@ -306,10 +322,15 @@ extension AppTests {
             let session = FakeTableSession()
             session.rows[0][2] = String(repeating: "x", count: 1_200)
             let (_, _, tab) = try await Self.tab(session: session)
-            #expect(!tab.dataGrid(tab.grid, canEditRow: 0, column: 2) && tab.dataGrid(tab.grid, canEditRow: 1, column: 2))
+            // A value longer than a cell shows is edited in the value panel.
+            tab.grid.beginEditing(at: GridPosition(row: 0, column: 2))
+            #expect(tab.grid.editor == nil && tab.viewer.valuePanel?.keep != nil && tab.viewer.valuePanel?.text.isEditable == true)
+            tab.viewer.toggleValuePanel(nil)
             tab.grid.selection.select(GridPosition(row: 0, column: 2))
-            tab.setCellNull(nil)  // the whole value is replaced, so that's fine
-            #expect(tab.source?.cell(0, 2) == .null)
+            tab.setCellNull(nil)  // region is NOT NULL: refused, with a beep
+            #expect(tab.source?.mark(0, 2) == GridMark.none)
+            tab.setCellDefault(nil)  // the whole value is replaced, so that's fine
+            #expect(tab.source?.cell(0, 2) == .placeholder("default"))
             tab.revertAllChanges(nil)
         }
 

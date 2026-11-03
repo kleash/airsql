@@ -138,20 +138,21 @@ extension AppTests {
                     },
                     menu: ["Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
                     enabled: ["Pin Result", "Rename Result…", "Close Result", "Export Result…"]),
+            // region: a plain text cell (a foreign key's double-click opens its drop-down, an ENUM's its list).
             Surface(name: "Table rows: cell",
                     place: { main, _ in
                         guard let tab = try? await GridDataAppTests.open(in: main, connection: Fixtures.local) else { return nil }
-                        return windowPoint(tab.grid.cellRect(GridPosition(row: 1, column: 1)), in: tab.grid)
+                        return windowPoint(tab.grid.cellRect(GridPosition(row: 1, column: 2)), in: tab.grid)
                     },
                     clicked: { main in
-                        (main.selectedTab?.content as? TableDataController)?.grid.selection.cursor == GridPosition(row: 1, column: 1)
+                        (main.selectedTab?.content as? TableDataController)?.grid.selection.cursor == GridPosition(row: 1, column: 2)
                     },
                     doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Add Row",
-                           "Duplicate Row", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel",
-                           "Record View", "Column Summary…", "Display As"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set NULL", "Set DEFAULT", "Add Row", "Duplicate Row",
-                              "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
+                           "Add Row", "Duplicate Row", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
+                           "Value Panel", "Record View", "Column Summary…", "Display As"],
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set DEFAULT", "Insert Value", "Add Row",
+                              "Duplicate Row", "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
             Surface(name: "Grid cell",
                     place: { main, _ in
                         let grid = resultGrid(main)
@@ -207,6 +208,26 @@ extension AppTests {
                     clicked: { _ in true },
                     doubleClicked: { _, received in received.contains("showSQLLog(_:)") },
                     menu: ["SQL Log", "Clear SQL Log"], enabled: ["SQL Log"]),
+            Surface(name: "Agent tab statement",
+                    place: { main, _ in
+                        main.model.data.settings.agentsAllowed = false  // this row's service opens no socket
+                        let service = AgentService(model: main.model, main: main, directory: FileManager.default.temporaryDirectory)
+                        let call = service.record("claude-code 2", "run_queries · SELECT 1")
+                        service.keep(["results": [["sql": "SELECT 1", "ok": true, "columns": ["1"], "rowCount": 1, "capped": false]]],
+                                     [:], call: call, client: "claude-code 2", connection: Fixtures.production.id)
+                        service.showResults(Fixtures.production.id)
+                        main.window?.layoutIfNeeded()
+                        guard let tab = main.selectedTab?.content as? AgentResultsContent else { return nil }
+                        return windowPoint(tab.table.rect(ofRow: 0), in: tab.table)
+                    },
+                    clicked: { ($0.selectedTab?.content as? AgentResultsContent)?.table.selectedRowIndexes == [0] },
+                    doubleClicked: { main, _ in
+                        // The statement in a new console; back to the Agent tab for the right-click.
+                        let opened = (main.selectedTab?.content as? ConsoleViewController)?.agentText == "SELECT 1;"
+                        if let tab = main.tabs.first(where: { $0.content is AgentResultsContent }) { main.select(tab) }
+                        return opened
+                    },
+                    menu: ["Open in New Console", "Copy"], enabled: ["Open in New Console", "Copy"]),
         ] + navigatorSurfaces
 
         /// A window in the state every row starts from: the shop's connections, Production connected, a transaction
@@ -237,7 +258,8 @@ extension AppTests {
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
         nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Table rows: cell",
                                        "Grid cell", "Grid row number", "Status bar: route", "Status bar: server", "Status bar: transaction",
-                                       "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Database in the tree",
+                                       "Status bar: activity", "Status bar: agents", "Status bar: SQL log", "Agent tab statement",
+                                       "Database in the tree",
                                        "Table or view in the tree", "Routine, trigger or event", "Folder or category in the tree",
                                        "Table in the database view", "Process list row"]
 
@@ -301,6 +323,44 @@ extension AppTests {
             // The menu acts on all of the selection.
             #expect(await call(harness, "menu", ["path": "context > Colour > Test"]).error == nil)
             #expect(main.model.connection(Fixtures.local.id)?.colour == .test && main.model.connection(Fixtures.staging.id)?.colour == .test)
+        }
+
+        /// F2 renames what has the focus, as in HeidiSQL: the tree's table (Rename…), a folder (Rename Folder…), else the tab
+        /// shown. In a grid it is the grid's (editing the cell, the grid lanes'), so the window leaves it to the grid.
+        @Test func f2RenamesWhatHasTheFocus() async throws {
+            let (main, harness, _, work) = await Self.window()
+            defer { work.end() }
+            let window = try #require(main.window)
+            window.layoutIfNeeded()
+            func renamed(_ select: (Double, Double)?, field id: String) async throws -> String? {
+                let point = try #require(select)
+                _ = await call(harness, "click", ["x": point.0, "y": point.1])
+                #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                let sheet = try #require(window.attachedSheet?.contentView)
+                let name = find(NSTextField.self, id: id, in: sheet)?.stringValue
+                _ = await call(harness, "press", ["title": "Cancel", "in": "sheet"])
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                return name
+            }
+            let orders = DatabaseObject(.table, "airsql_fixture", "orders")
+            #expect(try await renamed(treeRow(main, .object(Fixtures.production.id, orders))?.point, field: "rename.name") == "orders")
+            #expect(try await renamed(folderRow(main, Self.folder.name), field: "folder.name") == Self.folder.name)
+
+            // In a console, the tab's name in place; in its result grid, nothing of the window's.
+            window.makeFirstResponder(nil)
+            let console = try #require(main.openConsole(text: "SELECT 1", title: nil, connection: Fixtures.production.id).content
+                                       as? ConsoleViewController)
+            #expect(await eventually(timeout: 5) { window.firstResponder === console.editor })  // as the tab appeared
+            #expect(await call(harness, "key", ["combo": "f2"]).error == nil)
+            #expect(tabButton(main, main.selectedTab?.title ?? "").renameField != nil)
+            window.makeFirstResponder(nil)
+            let grid = DataGridView()
+            console.view.addSubview(grid)
+            window.makeFirstResponder(grid)
+            let item = try #require(harness.menuItems(for: try KeyCombo("f2")).first)
+            #expect(!main.validateMenuItem(item) && tabButton(main, main.selectedTab?.title ?? "").renameField == nil)
+            grid.removeFromSuperview()
         }
 
         /// Full keyboard use: Tab goes from field to field of what is shown, though the window's content changes.

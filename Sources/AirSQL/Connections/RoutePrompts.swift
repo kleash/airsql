@@ -57,8 +57,8 @@ func showHostKeyTrust(host: String, fingerprint: String, prompt: String, on wind
         + "administrator gave you, trust it: ssh then remembers the key (in known_hosts) and warns if it ever changes."
     let type = prompt.components(separatedBy: "\n").first { $0.contains(" key fingerprint is ") }?
         .components(separatedBy: " key fingerprint is ").first
-    alert.accessoryView = fingerprintView((type.map { "\($0) key fingerprint:\n" } ?? "Key fingerprint:\n")
-                                          + (fingerprint.isEmpty ? prompt : fingerprint))
+    let title = type.map { "\($0) key fingerprint:" } ?? "Key fingerprint:"
+    alert.accessoryView = fingerprint.isEmpty ? fingerprintView(title + "\n" + prompt) : fingerprintView(title, fingerprint)
     alert.addButton(withTitle: "Trust").toolTip = "Remember this key and connect"
     alert.addButton(withTitle: "Cancel").toolTip = "Don't connect"
     addHelp(to: alert, .trust)
@@ -77,8 +77,8 @@ func showChangedCertificate(server: String, certificate: TLSCertificate, on wind
     alert.informativeText = "This server shows another certificate than the one you trusted. Someone may be intercepting "
         + "the connection, or the server got a new certificate. Trust the new one only if its administrator told you it "
         + "changed and this fingerprint matches."
-    alert.accessoryView = fingerprintView("New SHA-256 fingerprint:\n" + certificate.fingerprint
-                                          + "\n\n" + certificateDetails(certificate).joined(separator: "\n"))
+    alert.accessoryView = fingerprintView("New SHA-256 fingerprint:", certificate.fingerprint,
+                                          details: certificateDetails(certificate))
     let trust = alert.addButton(withTitle: "Trust the New Certificate")
     trust.toolTip = "Remember the new certificate instead of the old one and connect"
     trust.hasDestructiveAction = true
@@ -143,7 +143,17 @@ func certificateDetails(_ certificate: TLSCertificate) -> [String] {
     return lines
 }
 
-/// A fingerprint as the Trust sheets show it: monospaced, selectable, wrapping within the alert.
+/// A fingerprint as the Trust sheets show it: what it is, then the fingerprint (`fingerprintField`) and the details.
+@MainActor
+private func fingerprintView(_ title: String, _ fingerprint: String, details: [String] = []) -> NSView {
+    let field = fingerprintField(fingerprint)
+    let lines = [label(title, font: .systemFont(ofSize: NSFont.smallSystemFontSize)), field] + details.map {
+        label($0, font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, wraps: true)
+    }
+    return alertText(lines, width: field.preferredMaxLayoutWidth + 6)
+}
+
+/// ssh's own words when it named no fingerprint: monospaced, selectable, wrapping within the alert.
 @MainActor
 private func fingerprintView(_ text: String) -> NSView {
     let field = label(text, font: .monospacedSystemFont(ofSize: 11, weight: .regular), wraps: true)

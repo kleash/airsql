@@ -244,6 +244,9 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         if let first = selectedObjects.first { NavigatorActions.rename(first, on: open, window: view.window) }
     }
 
+    /// F2: Rename… the selected table or view.
+    @objc func renameSelection(_ sender: Any?) { renameObject(sender) }
+
     @objc func dropObject(_ sender: Any?) { NavigatorActions.drop(selectedObjects, on: open, window: view.window) }
 
     @objc func refresh(_ sender: Any?) {
@@ -253,8 +256,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let reason = item.action == Commands.refresh.action ? nil
-            : NavigatorActions.reason(for: item.action, objects: selectedObjects, databases: [], open: open, target: open,
-                                      model: open.model)
+            : NavigatorActions.reason(for: item.action == Commands.renameF2.action ? Commands.rename.action : item.action,
+                                      objects: selectedObjects, databases: [], open: open, target: open, model: open.model)
         item.explain(enabled: reason == nil, reason: reason)
         return reason == nil
     }

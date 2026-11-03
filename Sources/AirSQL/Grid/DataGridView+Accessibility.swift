@@ -161,7 +161,7 @@ final class GridCellElement: NSAccessibilityElement {
     override func accessibilityValue() -> Any? {
         guard let column, let source = grid.source, position.row < source.rowCount else { return nil }
         switch source.cell(position.row, column) {
-        case .text(let text): return text
+        case .text(let text), .placeholder(let text): return text
         case .null: return grid.nullText
         case .loading: return "Loading"
         }

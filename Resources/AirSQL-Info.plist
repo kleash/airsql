@@ -5,8 +5,26 @@
 	<!-- build.sh sets CFBundleShortVersionString and CFBundleVersion from VERSION. -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<!-- .sql files open in console tabs: from Finder's Open With, and dropped on the Dock icon. -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>SQL File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>org.iso.sql</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>AirSQL</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.kleash.airsql</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -15,6 +33,9 @@
 	<string>AirSQL</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Shown in About AirSQL and in the Finder's Get Info. -->
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright 2026 kleash</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
@@ -26,5 +47,27 @@
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!-- The type other apps (Xcode among them) give .sql files, for a Mac where none of them is installed. -->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.iso.sql</string>
+			<key>UTTypeDescription</key>
+			<string>SQL File</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+				<string>public.source-code</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>sql</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

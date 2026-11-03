@@ -16,8 +16,10 @@
 ///   `.loading`); read-only unless the result comes from one table with a key.
 /// - Transpose and Record View: a `TransposedSource` wraps another source: a row per column, its name, then a column
 ///   per row (the first 1,000, or Record View's one); `base(_:_:)` maps a cell back to the source's.
-/// - Diff (compare results, recon): a `DiffSource` lines up two sources by key and marks rows added (`.inserted`),
-///   removed (`.deleted`) or changed (`.edited`, on the cells that differ).
+/// - Diff (the compare window's rows that differ, a console result compared with another result or a table): a
+///   `DiffSource` shows a `ReconTableData`, rows matched by key: those only the first side has (`.inserted`), those only
+///   the second has (`.deleted`), then those both have with other values (`.edited` on the cells that differ, whose
+///   `note` gives the second side's value).
 public protocol GridSource: AnyObject {
     /// The columns in the source's order; the grid keeps its own display order and widths.
     var columns: [GridColumn] { get }
@@ -33,6 +35,8 @@ public protocol GridSource: AnyObject {
     /// The cell's whole value, never shortened (copy, the value panel, the selection's sum): nil for NULL and while
     /// loading.
     func value(_ row: Int, _ column: Int) -> String?
+    /// What the cell's tooltip says instead of its value: a diff's other value for a changed cell; nil for nothing.
+    func note(_ row: Int, _ column: Int) -> String?
 }
 
 public extension GridSource {
@@ -42,6 +46,7 @@ public extension GridSource {
         if case .text(let text) = cell(row, column) { return text }
         return nil
     }
+    func note(_ row: Int, _ column: Int) -> String? { nil }
 }
 
 /// A column as the grid shows it.
@@ -88,6 +93,12 @@ public struct GridColumn: Equatable, Sendable {
 }
 
 extension GridColumn {
+    /// TINYINT(1), BOOLEAN and BIT(1): drawn and edited as a checkbox.
+    public var isBoolean: Bool {
+        let type = type.lowercased()
+        return type.hasPrefix("tinyint(1)") || type.hasPrefix("bit(1)") || type == "boolean" || type == "bool"
+    }
+
     /// The header's second line: the type, then "auto", "default" or "generated", then "null" when NULL is allowed.
     public var typeLine: String {
         var words = type.isEmpty ? [] : [type]
@@ -123,11 +134,19 @@ public enum GridCell: Equatable, Sendable {
     case null
     /// Its page hasn't arrived yet.
     case loading
+    /// What the server puts there when Apply runs, drawn like NULL: a new row's "auto" or "default", or a pending
+    /// expression such as "ƒ NOW()".
+    case placeholder(String)
 
-    /// The text an editor or a copy starts from: "" for NULL and for a cell still loading.
+    /// The text an editor or a copy starts from: "" for NULL, a placeholder and a cell still loading.
     public var text: String {
         if case .text(let text) = self { return text }
         return ""
+    }
+
+    public var isPlaceholder: Bool {
+        if case .placeholder = self { return true }
+        return false
     }
 }
 

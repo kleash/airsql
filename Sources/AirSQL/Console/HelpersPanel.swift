@@ -3,8 +3,8 @@ import AppKit
 
 /// The query helpers beside the editor (plan §2.6, View ▸ Query Helpers): the columns of the tables the statement at
 /// the cursor names (else the database's tables), the server's functions by kind, and the keywords; the filter
-/// narrows them. A click selects one, a double-click puts it in the editor at the cursor, a right-click inserts or
-/// copies it.
+/// narrows them. A click selects one, a double-click puts it in the editor at the cursor (as dragging it there does), a
+/// right-click inserts or copies it.
 @MainActor
 final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSMenuDelegate {
     private enum Row {
@@ -46,6 +46,7 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
         table.doubleAction = #selector(insertSelected(_:))
         table.menu = NSMenu(title: "Helper")
         table.menu?.delegate = self
+        table.setDraggingSourceOperationMask(.copy, forLocal: false)
         table.setAccessibilityIdentifier("helpers.list")
         let scroll = NSScrollView()
         scroll.documentView = table
@@ -122,6 +123,14 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
     }
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { !self.tableView(tableView, isGroupRow: row) }
+
+    /// Dragging an item into the editor drops what a double-click inserts: a column's name quoted as completion quotes it.
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard case .item(_, _, let text) = rows[row] else { return nil }
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        return item
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         switch rows[row] {

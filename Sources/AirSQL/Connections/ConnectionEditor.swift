@@ -1,20 +1,21 @@
 import AirSQLCore
 import AppKit
 
-/// The connection editor (plan §2.3, mockup screen 5): a sheet with the tabs General, TLS, SSH and Proxy, Options and
-/// Agents over a copy of the connection, Test Connection (each hop reported), and Save or Save and Connect. Passwords
+/// The connection editor (plan §2.3, mockup screen 5): a sheet with the tabs General, TLS, SSH and Proxy, Options, Safety
+/// and Agents over a copy of the connection, Test Connection (each hop reported), and Save or Save and Connect. Passwords
 /// typed here go to the Keychain on Save, never into airsql.json.
 @MainActor
 final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     enum Tab: Int, CaseIterable {
-        case general, tls, route, options, agents
+        case general, tls, route, options, safety, agents
 
-        var title: String { ["General", "TLS", "SSH and Proxy", "Options", "Agents"][rawValue] }
+        var title: String { ["General", "TLS", "SSH and Proxy", "Options", "Safety", "Agents"][rawValue] }
         var tip: String {
             ["Show the server's address, the login and where the connection sits in the sidebar",
              "Show how the connection is encrypted and how the server proves who it is",
              "Show the route: directly, through SSH hosts, or through a proxy",
-             "Show read-only, startup SQL, the databases shown, timeouts and this connection's safety checks",
+             "Show read-only, startup SQL, the databases shown, timeouts and this connection's client tools",
+             "Show what asks first on this connection and the limits agents work within",
              "Show what AI agents may do with this connection"][rawValue]
         }
     }
@@ -142,16 +143,48 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         case .tls: content = tlsTab()
         case .route: content = routeTab()
         case .options: content = optionsTab()
+        case .safety: content = safetyTab()
         case .agents: content = agentsTab()
         }
-        holder.addSubview(content)
-        content.pin(to: holder)
+        // In a scroll view: a tab can be taller than a small screen leaves room for (Options, with the connection's own
+        // safety checks).
+        let document = FlippedView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(content)
+        content.pin(to: document)
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = document
+        holder.addSubview(scroll)
+        scroll.pin(to: holder)
+        let height = scroll.heightAnchor.constraint(equalToConstant: 0)
+        NSLayoutConstraint.activate([
+            document.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            document.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            document.topAnchor.constraint(equalTo: scroll.contentView.topAnchor), height,
+        ])
+        tabContent = content
+        tabHeight = height
         fitWindow()
     }
+
+    /// What the tab shows, and its height: all of it, or `tabLimit` of the screen.
+    private weak var tabContent: NSView?
+    private(set) var tabHeight: NSLayoutConstraint?
+
+    /// The most of a screen `height` points high (under the menu bar) a tab may take: its window's toolbar and the
+    /// sheet's own rows take about 280 pt, so the sheet fits an 800 pt high screen.
+    static func tabLimit(screen height: CGFloat) -> CGFloat { max(300, height - 280) }
 
     /// The sheet as tall as what the tab shows now.
     func fitWindow() {
         guard let window, let root = window.contentView else { return }
+        if let tabContent, let tabHeight {
+            let screen = (window.sheetParent?.screen ?? NSScreen.main)?.visibleFrame.height ?? 775
+            tabHeight.constant = min(tabContent.fittingSize.height, Self.tabLimit(screen: screen))
+        }
         root.layoutSubtreeIfNeeded()
         let size = root.fittingSize
         var frame = window.frame

@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Agents' socket and tools (L7), while Settings ▸ Agents allows agents.
     private(set) var agents: AgentService?
     private var observers: [AnyCancellable] = []
+    /// .sql files asked for before the window was up (those that opened AirSQL).
+    private var filesToOpen: [URL] = []
 
     /// main.swift creates the delegate outside the main actor; everything is set up at launch.
     nonisolated override init() {
@@ -60,6 +62,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         main.showWindow(nil)
         ConsoleDocuments.shared.restore(into: main)
+        if !filesToOpen.isEmpty { main.openFiles(filesToOpen) }
+        filesToOpen = []
         NSApp.activate(ignoringOtherApps: true)
         log.log("launched with \(model.data.connections.count, privacy: .public) connection(s)")
     }
@@ -72,15 +76,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    /// .sql files opened from Finder or dropped on the Dock icon: console tabs of the active connection.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let main else { return filesToOpen += urls }
+        main.showWindow(nil)
+        main.openFiles(urls)
+    }
+
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ notification: Notification) {
         agents?.close()
         Store.flush()
         TableViewSettingsStore.shared.flush()
+        PendingChangesStore.shared.flush()
     }
 
     // MARK: Commands available in every window
+
+    /// AirSQL ▸ About AirSQL: the standard panel (Info.plist gives the version and the copyright).
+    @objc func showAbout(_ sender: Any?) { NSApp.orderFrontStandardAboutPanel(options: HelpPage.about) }
 
     @objc func showMainWindow(_ sender: Any?) { main?.showWindow(nil) }
 
@@ -136,6 +151,7 @@ enum HelpPage: String, CaseIterable {
     case clientTools = "client-tools.html"
     case editors = "editors.html"
     case compare = "compare.html"
+    case compareResults = "compare.html#compare-two-results-or-a-result-with-a-table"
     case agents = "agents.html"
     case connections = "connections.html"
     case tableData = "table-data.html"
@@ -165,6 +181,26 @@ enum HelpPage: String, CaseIterable {
         let system = ProcessInfo.processInfo.operatingSystemVersion
         return ["AirSQL \(version)", "macOS \(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
                 "MariaDB Connector/C \(MariaDB.clientVersion)"].joined(separator: "\n")
+    }
+
+    /// The About panel's options. Its credits: the client library's version, AirSQL's licence, and links to the site and
+    /// to NOTICE (the app's copy, next to the licence texts it names; the repository's outside the app, as in tests). No
+    /// build number: build.sh makes it the version, which the panel shows already.
+    static var about: [NSApplication.AboutPanelOptionKey: Any] {
+        let notice = Bundle.main.url(forResource: "NOTICE", withExtension: "txt", subdirectory: "Licenses")
+            ?? URL(string: "https://github.com/kleash/airsql/blob/main/NOTICE")!
+        let centred = NSMutableParagraphStyle()
+        centred.alignment = .center
+        let plain: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                                                    .foregroundColor: NSColor.labelColor, .paragraphStyle: centred]
+        let text = NSMutableAttributedString(string: "MariaDB Connector/C \(MariaDB.clientVersion)\nLicensed under the Apache "
+                                             + "License 2.0\n", attributes: plain)
+        text.append(NSAttributedString(string: "Website", attributes: plain.merging(
+            [.link: site, .toolTip: "Open AirSQL Help on the web"]) { $1 }))
+        text.append(NSAttributedString(string: " · ", attributes: plain))
+        text.append(NSAttributedString(string: "Licences", attributes: plain.merging(
+            [.link: notice, .toolTip: "Read AirSQL's licence and those of the libraries it includes"]) { $1 }))
+        return [.credits: text, .version: ""]
     }
 
     /// Opens the page in the browser: the "?" buttons' target.

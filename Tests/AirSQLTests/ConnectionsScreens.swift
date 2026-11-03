@@ -26,6 +26,10 @@ enum ConnectionsScreens {
             editor.show(tab)
             try await look(try await shown(), "editor-" + tab.title.lowercased().replacingOccurrences(of: " ", with: "-"))
         }
+        // The tallest tab: Safety with the connection's own checks, which scrolls on a small screen.
+        editor.draft.safety = editor.draft.safety(defaults: SafetySettings())
+        editor.show(.safety)
+        try await look(try await shown(), "editor-safety-own")
         await dismiss()
 
         showTrust(server: "db.example.com", fingerprint: certificateFingerprint,

@@ -7,13 +7,23 @@ final class ResultTab {
     enum Content {
         case rows(ResultStore)
         case plan(table: ResultStore?, tree: String)
+        /// A result compared with another result or a table (Compare With…): the rows that differ.
+        case diff(DiffSource)
         case messages
+
+        /// A result's rows, which can be compared.
+        var store: ResultStore? {
+            if case .rows(let store) = self { return store }
+            return nil
+        }
     }
 
     let id = UUID()
     var title: String
     var pinned = false
     let content: Content
+    /// A comparison with another connection's result: agents see its rows only if they may read that connection's too.
+    var otherConnection: UUID?
     /// What the bar's right end says while it is shown: "38 ms · 200 rows".
     var summary: String
     /// Made once, kept while the tab is open.
@@ -28,10 +38,11 @@ final class ResultTab {
 
     /// The label on its button: its name and, for rows, their size ("Result 1 · 200 × 5").
     var label: String {
-        if case .rows(let store) = content {
-            return title + " · \(store.rowCount.formatted())\(store.capped ? "+" : "") × \(store.columns.count)"
+        switch content {
+        case .rows(let store): return title + " · \(store.rowCount.formatted())\(store.capped ? "+" : "") × \(store.columns.count)"
+        case .diff(let diff): return title + " · \(diff.rowCount.formatted()) × \(diff.columns.count)"
+        case .plan, .messages: return title
         }
-        return title
     }
 }
 
@@ -41,6 +52,8 @@ final class ResultTab {
 @MainActor
 final class ResultsView: NSView, NSTextFieldDelegate {
     private let strip = NSStackView()
+    /// The tabs, scrolled sideways when more are open than fit.
+    private let tabsScroll = NSScrollView()
     private let summary = label("", font: .systemFont(ofSize: 11.5), color: .tertiaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
     let cancelButton = AirSQL.button("Cancel", id: "console.cancel", tip: Commands.cancelQuery.tip + " (⌘.)", target: nil,
@@ -62,6 +75,11 @@ final class ResultsView: NSView, NSTextFieldDelegate {
         strip.spacing = Spacing.half
         strip.setHuggingPriority(.defaultHigh, for: .horizontal)
         strip.translatesAutoresizingMaskIntoConstraints = false
+        tabsScroll.drawsBackground = false
+        tabsScroll.hasHorizontalScroller = false
+        tabsScroll.verticalScrollElasticity = .none
+        tabsScroll.documentView = strip
+        tabsScroll.translatesAutoresizingMaskIntoConstraints = false
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
@@ -71,7 +89,7 @@ final class ResultsView: NSView, NSTextFieldDelegate {
         summary.setAccessibilityIdentifier("console.summary")
         holder.translatesAutoresizingMaskIntoConstraints = false
         for view in [bar, topLine, line, holder] { addSubview(view) }
-        for view in [strip, spinner, summary, cancelButton] { bar.addSubview(view) }
+        for view in [tabsScroll, spinner, summary, cancelButton] { bar.addSubview(view) }
         NSLayoutConstraint.activate([
             topLine.topAnchor.constraint(equalTo: topAnchor), topLine.heightAnchor.constraint(equalToConstant: 1),
             topLine.leadingAnchor.constraint(equalTo: leadingAnchor), topLine.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -81,9 +99,11 @@ final class ResultsView: NSView, NSTextFieldDelegate {
             line.leadingAnchor.constraint(equalTo: leadingAnchor), line.trailingAnchor.constraint(equalTo: trailingAnchor),
             holder.topAnchor.constraint(equalTo: line.bottomAnchor), holder.leadingAnchor.constraint(equalTo: leadingAnchor),
             holder.trailingAnchor.constraint(equalTo: trailingAnchor), holder.bottomAnchor.constraint(equalTo: bottomAnchor),
-            strip.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: Spacing.unit),
-            strip.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            spinner.leadingAnchor.constraint(greaterThanOrEqualTo: strip.trailingAnchor, constant: Spacing.unit),
+            tabsScroll.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: Spacing.unit),
+            tabsScroll.topAnchor.constraint(equalTo: bar.topAnchor), tabsScroll.bottomAnchor.constraint(equalTo: bar.bottomAnchor),
+            strip.leadingAnchor.constraint(equalTo: tabsScroll.contentView.leadingAnchor),
+            strip.centerYAnchor.constraint(equalTo: tabsScroll.contentView.centerYAnchor),
+            spinner.leadingAnchor.constraint(greaterThanOrEqualTo: tabsScroll.trailingAnchor, constant: Spacing.unit),
             spinner.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             summary.leadingAnchor.constraint(equalTo: spinner.trailingAnchor, constant: Spacing.half),
             summary.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
@@ -91,9 +111,14 @@ final class ResultsView: NSView, NSTextFieldDelegate {
             cancelButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -Spacing.unit),
             cancelButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
         ])
-        // The summary gives way to the tabs, never the other way round.
+        // The summary gives way to the tabs, down to a readable part of it; past that the tabs scroll.
         summary.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         summary.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let fits = tabsScroll.widthAnchor.constraint(equalTo: strip.widthAnchor)
+        fits.priority = .defaultLow + 5
+        let readable = summary.widthAnchor.constraint(greaterThanOrEqualToConstant: 80)
+        readable.priority = .defaultLow + 10
+        NSLayoutConstraint.activate([fits, readable])
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -111,6 +136,10 @@ final class ResultsView: NSView, NSTextFieldDelegate {
             strip.addArrangedSubview(button)
         }
         for (button, tab) in zip(buttons, tabs) { button.update(tab, selected: tab === selected) }
+        if let button = buttons.first(where: { $0.tab === selected }) {
+            layoutSubtreeIfNeeded()
+            strip.scrollToVisible(button.frame)
+        }
         let view = selected?.view ?? empty
         if view !== shown {
             shown?.removeFromSuperview()

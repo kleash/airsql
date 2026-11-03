@@ -145,6 +145,17 @@ extension StatementCheck {
         guard name.kind == .quotedName else { return name.kind == .word ? name.raw : nil }
         return SQLQuote.unquoted(name.raw)
     }
+
+    /// Why a read-only connection doesn't run `sql`: nil when the read-only check proves it only reads, or it is a bare
+    /// USE (it only picks the default database). AirSQL refuses the rest itself, because SET SESSION TRANSACTION READ
+    /// WRITE or START TRANSACTION READ WRITE lifts the session's own READ ONLY.
+    public static func readOnlyRefusal(_ sql: String, on connection: String, noBackslashEscapes: Bool) -> String? {
+        guard case .refused(let reason) = ReadOnlyClassifier.classify(sql, noBackslashEscapes: noBackslashEscapes),
+              codeWords(sql, noBackslashEscapes: noBackslashEscapes).count != 2
+                || usedDatabase(sql, noBackslashEscapes: noBackslashEscapes) == nil else { return nil }
+        return "“\(connection)” is read-only, so nothing ran. \(reason). To change anything, turn off Read-only in its "
+            + "connection settings."
+    }
 }
 
 extension SQLStatement {

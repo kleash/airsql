@@ -101,8 +101,11 @@ extension SQLEditorView {
     // MARK: Drag and drop
 
     /// .sql files dropped on the editor open in console tabs of their own; names and text dropped from elsewhere (the
-    /// tree, other apps) go in where they are dropped, as text.
-    private func droppedFiles(_ info: NSDraggingInfo) -> [URL] {
+    /// tree, the helpers, other apps) go in where they are dropped, as text.
+    private func droppedFiles(_ info: NSDraggingInfo) -> [URL] { Self.sqlFiles(info) }
+
+    /// The .sql (and .txt) files being dragged: the editor's and the main window's drops open them in console tabs.
+    static func sqlFiles(_ info: NSDraggingInfo) -> [URL] {
         let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
         return (urls ?? []).filter { ["sql", "txt"].contains($0.pathExtension.lowercased()) }
     }

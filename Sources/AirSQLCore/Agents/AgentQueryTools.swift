@@ -9,8 +9,10 @@ extension AgentTarget {
     /// Where agents' exports go: inside AirSQL's folder, so macOS asks nothing (R18). Shown in Settings ▸ Agents.
     public static var exportFolder: URL { Store.directory.appendingPathComponent("Agent Exports", isDirectory: true) }
 
+    /// `kept` gets each statement's rows (its index in `queries`, the rows as the agent got them), for the Agent tab.
     public func runQueries(_ arguments: [String: Any], exports: URL = exportFolder,
-                           progress: @escaping AgentProgress = { _, _, _ in }) async throws -> [String: Any] {
+                           progress: @escaping AgentProgress = { _, _, _ in },
+                           kept: (Int, ResultStore) -> Void = { _, _ in }) async throws -> [String: Any] {
         try require(.schemaRead)
         let queries = (arguments["queries"] as? [Any] ?? []).compactMap { item -> (sql: String, rows: Int?)? in
             if let sql = item as? String { return (sql, nil) }
@@ -35,7 +37,9 @@ extension AgentTarget {
                         entry.merge(try await export(query.sql, runner, csv: csv, folder: exports, index: index)) { $1 }
                     } else {
                         let cap = min(max(1, query.rows ?? Self.defaultRows), rowCap)
-                        entry.merge(Self.result(try await runner.run(query.sql, written: true, rowCap: cap), csv: csv)) { $1 }
+                        let result = try await runner.run(query.sql, written: true, rowCap: cap)
+                        if let rows = result?.rows { kept(index, rows) }
+                        entry.merge(Self.result(result, csv: csv)) { $1 }
                     }
                     entry["ok"] = true
                 } catch {

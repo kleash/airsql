@@ -285,7 +285,9 @@ final class CSVImportSheet: ToolSheet {
     override func updateRunButton() {
         guard !running else { return }
         var reason: String?
-        if file == nil {
+        if connection.readOnly {
+            reason = "\(connection.displayName) is read-only: turn that off in the connection's settings to write to it"
+        } else if file == nil {
             reason = "Choose the CSV file first"
         } else if records.isEmpty {
             reason = "The file has no rows AirSQL can read"

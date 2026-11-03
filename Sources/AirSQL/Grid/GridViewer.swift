@@ -27,6 +27,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     var highlight: ((_ row: Int, _ column: Int) -> Bool)? { didSet { updateTint() } }
     /// Filters the host's rows by a column's value (Column Summary's values); nil: the values can't be clicked.
     var filterByValue: ((_ column: Int, _ value: String?) -> Void)?
+    /// Keeps a value edited in the value panel as the host's cell's pending value (nil: the panel only shows values).
+    var keepValue: ((_ row: Int, _ column: Int, _ text: String) -> Void)?
     /// Where the columns are kept; nil: nowhere.
     var viewKey: ViewKey?
     private var settings = TableViewSettings()
@@ -297,11 +299,32 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
     }
 
+    /// The panel shows the focused cell, editable where the host lets it be edited (`keepValue`); text being edited
+    /// there stays until it is kept or put back.
     private func updateValuePanel() {
-        guard let valuePanel else { return }
+        guard let valuePanel, !valuePanel.edited else { return }
         // The host's cell, also in Transpose and Record View (the names down their left show nothing).
-        guard let source, let (row, column) = focusedCell else { return valuePanel.show(column: nil, value: nil, bytes: nil) }
+        guard let source, let (row, column) = focusedCell else {
+            valuePanel.keep = nil
+            return valuePanel.show(column: nil, value: nil, bytes: nil)
+        }
+        if let keepValue, host?.dataGrid(grid, canEditRow: row, column: column) == true {
+            valuePanel.keep = { [weak self] text in
+                guard let self else { return nil }
+                if let refusal = host?.dataGrid(grid, check: text, row: row, column: column) { return refusal }
+                keepValue(row, column, text)
+                return nil
+            }
+        } else {
+            valuePanel.keep = nil
+        }
         valuePanel.show(column: source.columns[column], value: source.value(row, column), bytes: (source as? GridBytes)?.bytes(row, column))
+    }
+
+    /// Edits the focused cell's value in the value panel, opening it first (a long or multi-line value).
+    func editInValuePanel() {
+        if valuePanel == nil { toggleValuePanel(nil) }
+        valuePanel?.beginEditing()
     }
 
     // MARK: Columns kept
@@ -616,6 +639,22 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         guard let cell = hostCell(row, column) else { return }
         host?.dataGrid(grid, didEditRow: cell.row, column: cell.column, text: text)
         status.update()
+    }
+
+    func dataGrid(_ grid: DataGridView, edit row: Int, column: Int, typed: String?) -> Bool {
+        guard let cell = hostCell(row, column) else { return false }
+        return host?.dataGrid(grid, edit: cell.row, column: cell.column, typed: typed) ?? false
+    }
+
+    func dataGrid(_ grid: DataGridView, check text: String, row: Int, column: Int) -> String? {
+        guard let cell = hostCell(row, column) else { return nil }
+        return host?.dataGrid(grid, check: text, row: cell.row, column: cell.column)
+    }
+
+    func dataGrid(_ grid: DataGridView, step text: String, at offset: Int, by amount: Int, row: Int, column: Int)
+        -> (text: String, part: NSRange)? {
+        guard let cell = hostCell(row, column) else { return nil }
+        return host?.dataGrid(grid, step: text, at: offset, by: amount, row: cell.row, column: cell.column)
     }
 
     /// Copy first, then the host's items, then the viewer's for what was clicked.

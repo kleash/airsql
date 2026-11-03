@@ -13,17 +13,14 @@ func showTrust(server: String, fingerprint: String, details: [String], on window
     alert.informativeText = "macOS doesn't trust this server's certificate: it is self-signed or from a private certificate "
         + "authority. If this fingerprint is the one its administrator gave you, trust it: AirSQL then remembers it and "
         + "warns if it ever changes."
-    let fingerprintText = label("SHA-256 fingerprint:\n" + fingerprint, font: .monospacedSystemFont(ofSize: 11, weight: .regular),
-                                wraps: true)
-    fingerprintText.isSelectable = true
-    fingerprintText.setAccessibilityIdentifier("trust.fingerprint")
-    var views = [fingerprintText]
+    let fingerprintText = fingerprintField(fingerprint)
+    var views = [label("SHA-256 fingerprint:", font: .systemFont(ofSize: NSFont.smallSystemFontSize)), fingerprintText]
     for line in details {
         let text = label(line, font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, wraps: true)
         text.isSelectable = true
         views.append(text)
     }
-    alert.accessoryView = alertText(views, width: 286)
+    alert.accessoryView = alertText(views, width: fingerprintText.preferredMaxLayoutWidth + 6)
     alert.addButton(withTitle: "Trust").toolTip = "Remember this certificate and connect"
     alert.addButton(withTitle: "Cancel").toolTip = "Don't connect"
     addHelp(to: alert, .trust)
@@ -66,6 +63,25 @@ func showPasswordPrompt(for connection: String, user: String, retry: Bool, canRe
               canRemember && remember.state == .on && !AgentGuard.refuses("Only the person at the Mac can save a password: it was used for this login only."))
     }
     return alert
+}
+
+/// A SHA-256 fingerprint ("AB:CD:…") as the Trust sheets show it: monospaced and selectable, in two lines of 16 pairs
+/// that the field's width breaks, so the text copied is the fingerprint as it is, nothing put in. Another shape (ssh's
+/// SHA256:base64) stays on one line. Its width is its `preferredMaxLayoutWidth`.
+@MainActor
+func fingerprintField(_ fingerprint: String) -> NSTextField {
+    let font = NSFont.monospacedSystemFont(ofSize: 10.5, weight: .regular)
+    let field = label(fingerprint, font: font, wraps: true)
+    field.lineBreakMode = .byCharWrapping
+    field.isSelectable = true
+    field.setAccessibilityIdentifier("trust.fingerprint")
+    // Lines of 48 characters ("AB:" 16 times): AppKit wraps the label within this width as it sizes it, then draws it
+    // in the size that gave, so half a character more than 48 keeps the 49th on the next line.
+    let pairs = fingerprint.split(separator: ":").allSatisfy { $0.count == 2 }
+    let characters = CGFloat(pairs ? 48 : min(max(48, fingerprint.count), 60))
+    let advance = ("0" as NSString).size(withAttributes: [.font: font]).width
+    field.preferredMaxLayoutWidth = ((characters + 0.5) * advance).rounded(.down)
+    return field
 }
 
 /// Text under an alert's message, its letters in line with the message's: AppKit puts an accessory 4 points left of the

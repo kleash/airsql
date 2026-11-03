@@ -108,4 +108,27 @@ struct ConsoleLabTests {
         await console.close()
         await other.close()
     }
+
+    /// Query ▸ Profile: performance_schema on MySQL 8.4 (whose stages are off by default, so the statement's own figures),
+    /// SHOW PROFILE on MariaDB 11.4, and on MySQL 8.0, whose performance_schema the lab turns off, SHOW PROFILE saying so.
+    @Test(arguments: [Lab.mysql84, Lab.mariadb114, Lab.mysql80])
+    func profileReadsPerformanceSchemaOnMySQL8(_ server: Lab.Server) async throws {
+        let session = DBConnection(options: DBLab.options(server, tls: DBLab.required), role: .main, log: DBLab.log)
+        try await session.connect()
+        let profile = await QueryProfile.start(on: session)
+        // A warning, so AirSQL's SHOW WARNINGS follows the statement, as in the console.
+        #expect(await run("SELECT COUNT(*), CAST('abc' AS SIGNED) FROM fixture.customers", on: session).warnings.isEmpty == false)
+        let (rows, note) = await profile.read(on: session)
+        let columns = rows?.columns.map(\.name) ?? []
+        if server.name == "mysql84" {
+            #expect(columns.first == "Duration (s)" && columns.contains("Rows examined"), "\(columns)")
+            #expect(rows?.string(0, columns.firstIndex(of: "Rows sent") ?? 0) == "1")
+            #expect(note?.contains("events_stages_history_long consumer is off") == true, "\(note ?? "")")
+        } else {
+            #expect(columns == ["Status", "Duration"] && (rows?.rowCount ?? 0) > 3, "\(columns)")
+            #expect(note == (server.name == "mysql80" ? "This profile comes from SHOW PROFILE, which MySQL has deprecated: "
+                + "performance_schema is off on this server." : nil), "\(note ?? "")")
+        }
+        await session.close()
+    }
 }

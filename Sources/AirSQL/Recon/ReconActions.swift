@@ -50,6 +50,11 @@ extension ReconWindowController {
         let steps = result.steps(destructive: destructive)
         let change = ChangeSQL(title: "Sync \(result.target.name) · \(result.target.database) with \(result.source.name)",
                                statements: result.script(destructive: destructive), connection: saved.id)
+        if model.connection(saved.id)?.readOnly == true, let refusal = change.statements.lazy.compactMap({
+            StatementCheck.readOnlyRefusal($0, on: saved.displayName, noBackslashEscapes: result.target.noBackslashEscapes)
+        }).first {
+            return showError(refusal, title: "The sync script didn't run", on: window)
+        }
         var request = SQLPreviewRequest(
             change: change, heading: "Make \(result.target.name) · \(result.target.database) match \(result.source.name)?",
             caption: "Structure changes run first, each on its own (MySQL and MariaDB can't roll DDL back). Row changes then "
@@ -146,9 +151,8 @@ extension ReconWindowController {
                             model: model, on: window)
     }
 
-    /// Copies the selected objects' names, or the rows chosen in the rows that differ.
+    /// Copies the selected objects' names (the grid of rows that differ copies its own cells).
     @objc func copy(_ sender: Any?) {
-        if window?.firstResponder === results.detail.rows { return results.detail.copy(sender) }
         put(results.selected.map(\.name).joined(separator: "\n"))
     }
 

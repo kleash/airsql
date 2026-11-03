@@ -188,7 +188,9 @@ final class RestoreSheet: ToolSheet {
     override func updateRunButton() {
         guard !running else { return }
         var reason: String?
-        if databaseMenu.numberOfItems == 0 {
+        if connection.readOnly {
+            reason = "\(connection.displayName) is read-only: turn that off in the connection's settings to write to it"
+        } else if databaseMenu.numberOfItems == 0 {
             reason = "AirSQL couldn't read the databases yet"
         } else if file == nil {
             reason = "Choose the file to run first"

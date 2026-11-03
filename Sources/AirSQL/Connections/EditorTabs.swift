@@ -162,10 +162,7 @@ extension ConnectionEditor {
                                      tip: "Choose your client certificate (PEM), for a server that asks for one"))
         form.row("Key", file(\.tls.keyFile, placeholder: "none", id: "editor.keyFile",
                              tip: "Choose the client certificate's key (PEM)"))
-        let pinned = label(draft.tls.pinnedFingerprint ?? "None", font: .monospacedSystemFont(ofSize: 10.5, weight: .regular),
-                           color: draft.tls.pinnedFingerprint == nil ? .secondaryLabelColor : .labelColor, wraps: true)
-        pinned.preferredMaxLayoutWidth = 380
-        pinned.isSelectable = true
+        let pinned = draft.tls.pinnedFingerprint.map(fingerprintField) ?? label("None", color: .secondaryLabelColor)
         pinned.setAccessibilityIdentifier("editor.pinned")
         var views: [NSView] = [pinned]
         if draft.tls.pinnedFingerprint != nil {
@@ -189,7 +186,7 @@ extension ConnectionEditor {
     func optionsTab() -> NSView {
         let form = Form()
         form.row("", [toggle("Read-only", \.readOnly, id: "editor.readOnly",
-                             tip: "Refuse writes from the console, the grid and agents on this connection")])
+                             tip: "Refuse anything but reads on this connection, from every window and from agents")])
         form.row("", [toggle("Compressed protocol", \.compress, id: "editor.compress",
                              tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
         let timeout = textField(draft.queryTimeout == 0 ? "" : String(draft.queryTimeout), placeholder: "none",
@@ -224,7 +221,6 @@ extension ConnectionEditor {
         sql.autoresizingMask = [.width]
         form.row("Startup SQL", [scroll], caption: "Runs in every session after it logs in (SET sql_mode, time_zone…).")
         for kind in [ClientTool.Kind.client, .dump] { toolRow(form, kind) }
-        safetyRows(form)
         return content(form)
     }
 
