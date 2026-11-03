@@ -2,13 +2,18 @@ import AirSQLCore
 import AppKit
 import Combine
 
-/// A row of the sidebar's outline. The navigator (L5) adds the schema tree's kinds under a connected connection.
+/// A row of the sidebar's outline: the connections in their folders and, under a connected one, the navigator's tree
+/// (its databases, each object kind's group, the objects, and a message while it loads).
 @MainActor
 final class SidebarNode: NSObject {
-    enum Kind: Equatable {
+    enum Kind: Hashable {
         case header
         case folder(UUID)
         case connection(UUID)
+        case database(UUID, String)
+        case category(UUID, String, DatabaseObject.Kind)
+        case object(UUID, DatabaseObject)
+        case message(UUID, String)
     }
 
     let kind: Kind
@@ -36,6 +41,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     private let header = SidebarNode(.header)
     private var folders: [UUID: SidebarNode] = [:]
     private var connections: [UUID: SidebarNode] = [:]
+    /// The tree's rows by kind, kept across reloads so they stay selected and expanded.
+    private(set) var treeNodes: [SidebarNode.Kind: SidebarNode] = [:]
+    /// Connections whose tree has been opened once since they connected.
+    private var treeShown: Set<UUID> = []
     private var observers: [AnyCancellable] = []
     private var reloading = false
     /// Called when the selected connections change.
@@ -51,7 +60,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     override func loadView() {
         let root = SurfaceView(.side)
         root.setAccessibilityIdentifier("sidebar")
-        filter.placeholderString = "Filter connections"
+        filter.placeholderString = "Filter by name"
         filter.toolTip = Commands.filterSidebar.tip + " (⌥⌘J)"
         filter.setAccessibilityIdentifier("sidebar.filter")
         filter.delegate = self
@@ -135,51 +144,97 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         observers.append(model.$states.sink { [weak self] _ in
             DispatchQueue.main.async { self?.refreshRows() }
         })
+        observers.append(model.$open.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.reload() }
+        })
+        NotificationCenter.default.addObserver(self, selector: #selector(openConnectionChanged), name: .openConnectionDidChange,
+                                               object: nil)
+        outline.setDraggingSourceOperationMask(.copy, forLocal: false)
         reload()
     }
 
     // MARK: Contents
 
-    /// Rebuilds the rows from the model and the filter, keeping the selection.
+    /// Rebuilds the rows from the model and the filter, keeping the selection and what is expanded. While filtering, a
+    /// connected connection whose name doesn't match shows the objects that do, expanded.
     func reload() {
         let selected = selectedNodes.map(\.kind)
-        var expandedFolders = Set(folders.compactMap { id, node in outline.isItemExpanded(node) ? id : nil })
+        let expanded = Set((0..<outline.numberOfRows).compactMap { row -> SidebarNode.Kind? in
+            guard let node = outline.item(atRow: row) as? SidebarNode, outline.isItemExpanded(node) else { return nil }
+            return node.kind
+        })
         let firstLoad = folders.isEmpty && connections.isEmpty
+        let text = filter.stringValue.trimmingCharacters(in: .whitespaces)
+        let named = Set(model.sections(filter: text).flatMap { $0.connections.map(\.id) })
+        var fresh: [SidebarNode.Kind: SidebarNode] = [:]
+        func node(_ kind: SidebarNode.Kind) -> SidebarNode {
+            let node = fresh[kind] ?? treeNodes[kind] ?? SidebarNode(kind)
+            fresh[kind] = node
+            return node
+        }
         header.children = []
         var newFolders: [UUID: SidebarNode] = [:], newConnections: [UUID: SidebarNode] = [:]
-        for section in model.sections(filter: filter.stringValue) {
-            let rows = section.connections.map { connection -> SidebarNode in
-                let node = connections[connection.id] ?? SidebarNode(.connection(connection.id))
-                newConnections[connection.id] = node
-                return node
+        var open: [SidebarNode] = []
+        for section in model.sections(filter: "") {
+            let rows = section.connections.compactMap { connection -> SidebarNode? in
+                let tree = tree(connection.id, matching: named.contains(connection.id) ? "" : text, node: node)
+                guard named.contains(connection.id) || !tree.isEmpty else { return nil }
+                let row = connections[connection.id] ?? SidebarNode(.connection(connection.id))
+                row.children = tree
+                newConnections[connection.id] = row
+                if !tree.isEmpty { open.append(row) }
+                return row
             }
             if let folder = section.folder {
-                let node = folders[folder.id] ?? SidebarNode(.folder(folder.id))
-                node.children = rows
-                newFolders[folder.id] = node
-                header.children.append(node)
-                if firstLoad || !filter.stringValue.isEmpty { expandedFolders.insert(folder.id) }
+                guard !rows.isEmpty || text.isEmpty else { continue }
+                let row = folders[folder.id] ?? SidebarNode(.folder(folder.id))
+                row.children = rows
+                newFolders[folder.id] = row
+                header.children.append(row)
             } else {
                 header.children += rows
             }
         }
         folders = newFolders
         connections = newConnections
+        treeNodes = fresh
+        treeShown.formIntersection(model.open.keys)
         reloading = true
         outline.reloadData()
         outline.expandItem(header)
-        for (id, node) in folders where expandedFolders.contains(id) { outline.expandItem(node) }
-        // The same rows stay selected, folders too.
-        let rows = selected.compactMap { kind -> SidebarNode? in
-            switch kind {
-            case .connection(let id): return connections[id]
-            case .folder(let id): return folders[id]
-            case .header: return nil
+        for (id, row) in folders where firstLoad || !text.isEmpty || expanded.contains(.folder(id)) { outline.expandItem(row) }
+        // A tree opens the first time it shows (with the connection's database), keeps what was open, and opens all of
+        // a filtered one.
+        for row in open {
+            guard let id = row.connectionID else { continue }
+            let filtered = !text.isEmpty && !named.contains(id)
+            let first = !treeShown.contains(id)
+            treeShown.insert(id)
+            guard first || filtered || expanded.contains(row.kind) else { continue }
+            outline.expandItem(row)
+            for database in row.children {
+                let current = first && database.database == model.openConnection(id)?.currentDatabase
+                guard filtered || current || expanded.contains(database.kind) else { continue }
+                outline.expandItem(database)
+                for group in database.children where filtered || expanded.contains(group.kind) { outline.expandItem(group) }
             }
-        }.map { outline.row(forItem: $0) }.filter { $0 >= 0 }
-        outline.selectRowIndexes(IndexSet(rows), byExtendingSelection: false)
-        if let first = rows.first { outline.scrollRowToVisible(first) }
+        }
+        let rows = IndexSet(selected.compactMap { kind -> Int? in
+            let row: SidebarNode?
+            switch kind {
+            case .connection(let id): row = connections[id]
+            case .folder(let id): row = folders[id]
+            default: row = treeNodes[kind]
+            }
+            return row.map { outline.row(forItem: $0) }.flatMap { $0 >= 0 ? $0 : nil }
+        })
+        outline.selectRowIndexes(rows, byExtendingSelection: false)
         reloading = false
+    }
+
+    @objc private func openConnectionChanged(_ notification: Notification) {
+        guard let open = notification.object as? OpenConnection, model.open[open.id] === open else { return }
+        reload()
     }
 
     /// Redraws the rows (a connection's state changed).
@@ -211,10 +266,35 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard !reloading else { return }
         onSelect?()
+        showSelectedObject()
     }
 
     func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
-        (item as? SidebarNode)?.kind != .header
+        guard let node = item as? SidebarNode else { return false }
+        if case .message = node.kind { return false }
+        return node.kind != .header
+    }
+
+    func outlineViewItemDidExpand(_ notification: Notification) {
+        guard let node = notification.userInfo?["NSObject"] as? SidebarNode, case .database(let id, let name) = node.kind else { return }
+        model.openConnection(id)?.loadDetails(name)
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, typeSelectStringFor tableColumn: NSTableColumn?, item: Any) -> String? {
+        guard let node = item as? SidebarNode else { return nil }
+        switch node.kind {
+        case .connection(let id): return model.connection(id)?.displayName
+        case .folder(let id): return model.data.folders.first { $0.id == id }?.name
+        default: return node.name
+        }
+    }
+
+    /// Dragging tree rows puts their names, quoted for SQL, on the pasteboard (into the editor).
+    func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
+        guard let node = item as? SidebarNode, let text = node.quotedName else { return nil }
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        return item
     }
 
     @objc private func doubleClicked(_ sender: Any?) {
@@ -227,6 +307,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         case .connection:
             // Connect (or show it when connected): whatever connects implements it.
             outline.sendCommand(Commands.connect.action)
+        case .database, .category, .object:
+            treeDoubleClicked(node)
+        case .message:
+            break
         }
     }
 
@@ -240,6 +324,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
                       Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compare, nil])
             menu.addItem(ConnectionMenus.colourMenu())
             menu.add([nil, Commands.deleteConnection])
+        } else if nodes.allSatisfy({ $0.connectionOfTree != nil }) {
+            return treeMenu(nodes)
         } else {
             menu.add([Commands.newConnection, Commands.newFolder, nil, Commands.renameFolder, Commands.deleteFolder])
         }
@@ -286,7 +372,11 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             let folder = model.data.folders.first { $0.id == id }
             cell.showFolder(folder?.name ?? "", count: node.children.count)
         case .connection(let id):
-            if let connection = model.connection(id) { cell.show(connection, state: model.states[id]) }
+            if let connection = model.connection(id) {
+                cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true)
+            }
+        case .database, .category, .object, .message:
+            return treeCell(node, in: outlineView)
         }
         return cell
     }
@@ -311,7 +401,11 @@ final class SidebarOutlineView: NSOutlineView {
         case 36, 76:  // Return, Enter: as a double-click
             if let action = doubleAction { NSApp.sendAction(action, to: target, from: self) }
         case 51, 117:  // Delete, Forward Delete
-            if sidebar?.selectedConnectionIDs.isEmpty == false { sendCommand(Commands.deleteConnection.action) }
+            if sidebar?.selectedConnectionIDs.isEmpty == false {
+                sendCommand(Commands.deleteConnection.action)
+            } else if sidebar?.selectedNodes.contains(where: { $0.connectionOfTree != nil }) == true {
+                sendCommand(Commands.drop.action)
+            }
         default:
             super.keyDown(with: event)
         }
@@ -339,6 +433,7 @@ final class SidebarCell: NSTableCellView {
     private let state = DotView(diameter: 6)
     private let badge = NSTextField(labelWithString: "")
     private let icon = NSImageView()
+    private let spinner = NSProgressIndicator()
 
     init() {
         super.init(frame: .zero)
@@ -357,7 +452,11 @@ final class SidebarCell: NSTableCellView {
         shield.toolTip = "Custom safety: this connection has safety settings of its own (its Options tab)"
         icon.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         icon.contentTintColor = .secondaryLabelColor
-        let stack = NSStackView(views: [icon, dot, name, shield, state, badge])
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        spinner.setAccessibilityLabel("Loading the schema")
+        let stack = NSStackView(views: [icon, dot, name, shield, spinner, state, badge])
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
@@ -369,12 +468,17 @@ final class SidebarCell: NSTableCellView {
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
             icon.widthAnchor.constraint(equalToConstant: 15),
+            spinner.widthAnchor.constraint(equalToConstant: 12),
+            spinner.heightAnchor.constraint(equalToConstant: 12),
         ])
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func show(_ connection: SavedConnection, state connectionState: ConnectionState?) {
+    /// `busy`: its schema is loading (the spinner shows).
+    func show(_ connection: SavedConnection, state connectionState: ConnectionState?, busy: Bool = false) {
+        spinner.isHidden = !busy
+        if busy { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
         icon.isHidden = true
         dot.isHidden = false
         dot.color = connection.colour.color ?? .tertiaryLabelColor
@@ -398,6 +502,7 @@ final class SidebarCell: NSTableCellView {
     }
 
     func showFolder(_ title: String, count: Int) {
+        spinner.isHidden = true
         icon.isHidden = false
         dot.isHidden = true
         name.stringValue = title
@@ -411,6 +516,7 @@ final class SidebarCell: NSTableCellView {
     }
 
     func showHeader(_ title: String) {
+        spinner.isHidden = true
         icon.isHidden = true
         dot.isHidden = true
         name.stringValue = title

@@ -18,6 +18,8 @@ final class AppModel: ObservableObject {
     }
     /// Connections that aren't idle: connecting, connected, or failed. Set by whatever connects.
     @Published var states: [UUID: ConnectionState] = [:]
+    /// The connected connections: their sessions and schema caches (`attach`, `detach`).
+    @Published var open: [UUID: OpenConnection] = [:]
     /// What the status bar's agent chip says ("Claude Code · reading schema"); nil hides it. Set by agent access.
     @Published var agentStatus: String?
     let activity: ActivityCenter
@@ -95,7 +97,10 @@ final class AppModel: ObservableObject {
         let keys = data.connections.filter { ids.contains($0.id) }.flatMap(\.secretKeys)
         for id in ids { connector.disconnect(id) }
         data.connections.removeAll { ids.contains($0.id) }
-        for id in ids { states[id] = nil }
+        for id in ids {
+            states[id] = nil
+            detach(id)
+        }
         let write = setSavedPassword
         DispatchQueue.global(qos: .userInitiated).async {
             for key in keys { write(key, nil) }
