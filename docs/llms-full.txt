@@ -26,6 +26,8 @@ AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages gro
 - [Connections and routes](https://kleash.github.io/airsql/connections.html): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, table commands, find text and the process list.
 - [A table's rows](https://kleash.github.io/airsql/table-data.html): load, filter, search, sort, edit, apply, copy and export a table's rows.
+- [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html): the status bar's figures, the value panel, Record View, Transpose, Display
+  As, heatmaps, View As, charts and Column Summary, in a table's rows and a console's results.
 - [Change tables, views and routines](https://kleash.github.io/airsql/editors.html): the table editor, views and routines as CREATE code, and the ER
   diagram.
 - [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
