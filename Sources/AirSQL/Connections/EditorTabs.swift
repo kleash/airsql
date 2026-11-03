@@ -66,8 +66,9 @@ extension ConnectionEditor {
     }
 
     /// A file's path and a Choose… button (an open panel on the editor); `set` gets each new path.
-    func file(_ value: String, placeholder: String, id: String, tip: String, set: @escaping (String) -> Void) -> [NSView] {
-        let field = textField(value, placeholder: placeholder, id: id, tip: tip, width: 300)
+    func file(_ value: String, placeholder: String, id: String, width: CGFloat = 300, tip: String,
+              set: @escaping (String) -> Void) -> [NSView] {
+        let field = textField(value, placeholder: placeholder, id: id, tip: tip, width: width)
         bind(field) { set(field.stringValue.trimmingCharacters(in: .whitespaces)) }
         let choose = button("Choose…", id: id + ".choose", tip: "Pick the file in a Finder window", target: nil, action: nil)
         bind(choose) { [weak self] in

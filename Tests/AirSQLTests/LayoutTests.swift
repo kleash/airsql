@@ -212,6 +212,7 @@ extension AppTests {
             if let sheet = window.attachedSheet { check(sheet, "SQL preview") }
             _ = await call(harness, "press", ["title": "Decline"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            try await connectionScreens(main, harness, check: check)
             return problems
         }
     }

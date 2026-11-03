@@ -5,13 +5,12 @@ import AppKit
 /// path the connection takes; and the Options tab's safety checks.
 extension ConnectionEditor {
     func routeTab() -> NSView {
+        if draft.route == .sshJump && draft.jumpHosts.isEmpty { draft.jumpHosts = [SSHHop()] }
         let form = Form()
         let routes: [(String, Route)] = [("Direct", .direct), ("SSH tunnel", .ssh), ("SSH through jump hosts", .sshJump),
                                          ("SSH through a proxy", .sshProxy), ("Proxy, no SSH", .proxy)]
         form.row("Route", [choice(\.route, routes, id: "editor.route", tip: "Choose how AirSQL reaches the server") { [weak self] in
-            guard let self else { return }
-            if self.draft.route == .sshJump && self.draft.jumpHosts.isEmpty { self.draft.jumpHosts = [SSHHop()] }
-            self.refreshTab()
+            self?.refreshTab()
         }], caption: "Every route but Direct ends in a private socket on this Mac, which only you can use: AirSQL, the "
             + "client tools and Terminal all connect through it.")
         if draft.route == .proxy || draft.route == .sshProxy {
@@ -21,8 +20,7 @@ extension ConnectionEditor {
                                text(\.proxy.host, placeholder: "proxy.example.com", id: "editor.proxyHost",
                                     tip: "Type the proxy's host name or address", width: 190),
                                label("Port"), number(\.proxy.port, placeholder: String(draft.proxy.kind.defaultPort),
-                                                     id: "editor.proxyPort", tip: "Type the proxy's port")],
-                     caption: draft.route == .proxy ? "It connects to the database host for AirSQL." : "It connects to the first SSH host.")
+                                                     id: "editor.proxyPort", tip: "Type the proxy's port")])
             let password = NSSecureTextField(string: proxyPassword)
             password.placeholderString = isNew ? "none" : "unchanged"
             password.toolTip = "Type the proxy's password: it is saved in your Keychain"
@@ -54,16 +52,20 @@ extension ConnectionEditor {
         let path = label(routePath, font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, wraps: true)
         path.preferredMaxLayoutWidth = 440
         path.setAccessibilityIdentifier("editor.routePath")
-        form.row("Path", [path])
+        form.row("Path", [path], caption: draft.route == .direct || draft.route == .proxy ? nil
+            : "Passwords, passphrases and codes (2FA) an SSH host asks for are asked when you connect.")
         return content(form)
     }
 
-    /// An SSH host's rows: its address, user, how it logs in and its key file.
+    /// An SSH host's two rows: its address, port and user; how it logs in (and its key file).
     private func hopRows(_ form: Form, _ hop: WritableKeyPath<SavedConnection, SSHHop>, id: String, removable index: Int?) {
         var address: [NSView] = [text(hop.appending(path: \.host), placeholder: "host, or a Host of ~/.ssh/config", id: id + ".host",
-                                      tip: "Type the SSH host's name or address, or a Host from your ~/.ssh/config", width: 230),
+                                      tip: "Type the SSH host's name or address, or a Host from your ~/.ssh/config", width: 200),
                                  label("Port"), number(hop.appending(path: \.port), placeholder: "22", id: id + ".port",
-                                                       tip: "Type the SSH port (22, or what ~/.ssh/config says)")]
+                                                       tip: "Type the SSH port (22, or what ~/.ssh/config says)", width: 52),
+                                 label("User"), text(hop.appending(path: \.user), placeholder: "yours", id: id + ".user",
+                                                     tip: "Type the SSH user name; empty: ~/.ssh/config's, or your Mac's",
+                                                     width: 110)]
         if let index {
             let remove = button("Remove", id: id + ".remove", tip: "Go to the next host without this one", target: nil, action: nil)
             bind(remove) { [weak self] in
@@ -75,19 +77,16 @@ extension ConnectionEditor {
             address.append(remove)
         }
         form.row("Host", address)
-        form.row("User", [text(hop.appending(path: \.user), placeholder: "from ~/.ssh/config, or this Mac's", id: id + ".user",
-                               tip: "Type the SSH user name", width: 230)])
         let logins: [(String, SSHHop.Login)] = [("ssh-agent or ~/.ssh keys", .agent), ("Key file", .keyFile), ("Password", .password)]
-        form.row("Log in with", [choice(hop.appending(path: \.login), logins, id: id + ".login",
-                                        tip: "Choose how ssh logs in to this host") { [weak self] in self?.refreshTab() }],
-                 caption: draft[keyPath: hop].login == .keyFile ? nil
-                    : "Passwords and codes a server asks for (2FA) are asked when you connect.")
+        var login: [NSView] = [choice(hop.appending(path: \.login), logins, id: id + ".login",
+                                      tip: "Choose how ssh logs in to this host") { [weak self] in self?.refreshTab() }]
         if draft[keyPath: hop].login == .keyFile {
-            form.row("Key file", file(draft[keyPath: hop].keyFile, placeholder: "~/.ssh/id_ed25519", id: id + ".keyFile",
-                                      tip: "Choose the private key ssh logs in with; a passphrase is asked when you connect") {
+            login += file(draft[keyPath: hop].keyFile, placeholder: "~/.ssh/id_ed25519", id: id + ".keyFile", width: 220,
+                          tip: "Choose the private key ssh logs in with; a passphrase is asked when you connect") {
                 [weak self] in self?.draft[keyPath: hop.appending(path: \.keyFile)] = $0
-            })
+            }
         }
+        form.row("Log in with", login)
     }
 
     /// The way the connection goes, from this Mac to the database.

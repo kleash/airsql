@@ -35,7 +35,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     /// What the current tab's controls need kept: their targets (`bind`), the startup SQL's delegate.
     var bindings: [NSObject] = []
     private var retainUntilClosed: ConnectionEditor?
-    static let width: CGFloat = 640
+    static let width: CGFloat = 720
 
     /// Shows the editor on `window`; `done` gets the saved connection and whether to connect now.
     @discardableResult
