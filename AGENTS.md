@@ -1,8 +1,9 @@
 # AirSQL for AI agents
 
-AirSQL is a Mac app for MySQL and MariaDB, in development (0.1.0): there is nothing to install or drive yet. Agent
-access over MCP is planned ([docs/dev/plan.md](docs/dev/plan.md), §2.8): schemas and read-only queries at the access
-level the person at the Mac sets for each connection, and no change without their approval.
+AirSQL is a Mac app for MySQL and MariaDB, in development (0.1.0). Agents reach it over MCP (`AirSQL --mcp`, set up
+in Settings ▸ Agents): schemas and read-only queries on the connections the person has connected, at the access level
+they set for each one, and no change without their approval. [Resources/AgentGuide.md](Resources/AgentGuide.md) lists
+the tools; [docs/agents.md](docs/agents.md) is the person's side.
 
 ## Working on this repository
 
