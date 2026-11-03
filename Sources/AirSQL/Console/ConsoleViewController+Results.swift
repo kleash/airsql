@@ -78,6 +78,8 @@ extension ConsoleViewController {
         let menu = NSMenu(title: "Result")
         menu.add([Commands.pinResult, Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, nil,
                   Commands.exportResult, Commands.compareResult])
+        // The console's own commands go to it wherever the focus is; Export and Compare to whatever handles them.
+        for item in menu.items where item.action.map(responds(to:)) == true { item.target = self }
         return menu
     }
 
