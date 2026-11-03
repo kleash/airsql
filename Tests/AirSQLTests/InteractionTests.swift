@@ -105,17 +105,18 @@ extension AppTests {
                     clicked: { _ in true },
                     doubleClicked: { _, received in received.contains("showSQLLog(_:)") },
                     menu: ["SQL Log", "Clear SQL Log"], enabled: ["SQL Log"]),
-        ]
+        ] + navigatorSurfaces
 
         /// A window in the state every row starts from: the shop's connections, Production connected, a transaction
         /// open in its tab, an agent at work and an export running.
-        static func window() -> (MainWindowController, AgentServer, CommandRecorder, Activity) {
+        static func window() async -> (MainWindowController, AgentServer, CommandRecorder, Activity) {
             let model = testModel(Fixtures.shop)
             model.data.settings.agentsAllowed = true
             let (main, harness) = appWindow(model)
             let recorder = CommandRecorder()
             main.nextResponder = recorder
             model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3")
+            await openReplayed(model, Fixtures.production.id)
             let content = FixtureContent()
             content.badge = "Transaction open · 2 changes"
             main.open(content, title: "Top customers.sql", connection: Fixtures.production.id)
@@ -127,7 +128,9 @@ extension AppTests {
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
         nonisolated static let rows = ["Connection in the sidebar", "Editor tab", "Status bar: route", "Status bar: server",
-                                       "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log"]
+                                       "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log",
+                                       "Database in the tree", "Table or view in the tree", "Routine, trigger or event",
+                                       "Folder or category in the tree", "Table in the database view", "Process list row"]
 
         @Test func everyRowHasItsChecks() {
             #expect(Self.surfaces.map(\.name) == Self.rows)
@@ -136,7 +139,7 @@ extension AppTests {
         @Test(arguments: InteractionTests.rows)
         func surfaceAnswersEveryClick(_ row: String) async throws {
             let surface = try #require(Self.surfaces.first { $0.name == row })
-            let (main, harness, recorder, work) = Self.window()
+            let (main, harness, recorder, work) = await Self.window()
             defer { work.end() }
             let window = try #require(main.window)
             window.layoutIfNeeded()
@@ -174,7 +177,7 @@ extension AppTests {
         }
 
         @Test func rightClickSelectsTheRowUnderThePointerAndKeepsAMultipleSelection() async throws {
-            let (main, harness, _, work) = Self.window()
+            let (main, harness, _, work) = await Self.window()
             defer { work.end() }
             let staging = try #require(sidebarRow(main, "Staging · shop"))
             let local = try #require(sidebarRow(main, "Local MariaDB 11.8"))

@@ -131,7 +131,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         }
     }
 
-    private func show(_ list: [ServerProcess]) {
+    func show(_ list: [ServerProcess]) {
         let selected = Set(table.selectedRowIndexes.compactMap { processes[safe: $0]?.id })
         processes = list
         table.reloadData()
