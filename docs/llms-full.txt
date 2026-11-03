@@ -428,7 +428,9 @@ tabs:
 - **SSH and Proxy**: the route (below).
 - **Options**: read-only (writes from the console, the grid and agents are refused), the compressed protocol, a query
   timeout, the databases shown (names or patterns such as `shop, reports_*`), startup SQL that runs after each login
-  (for example `SET time_zone = '+00:00';`), and safety checks of the connection's own.
+  (for example `SET time_zone = '+00:00';`), the connection's own client tools (empty: Settings ▸ Client Tools'
+  choice; each says which program and version it is, or why it can't be used), and safety checks of the connection's
+  own.
 - **Agents**: what AI agents may do with this connection.
 
 **Test Connection** connects with what the editor shows, reports each hop with its time, and disconnects. **Save and
@@ -530,7 +532,8 @@ A read-only connection offers none of these.
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
 tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
-bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list to see its matching rows.
+bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list to see its matching rows;
+right-click it to open all its rows or copy its name.
 Upper and lower case match as the column's collation says (most ignore case).
 
 ## See what the server is running
@@ -633,7 +636,8 @@ installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for e
 
 Each sheet says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
 older version than the server), or why it can't be used (not there, too old: AirSQL needs MySQL 5.7 or MariaDB 10.3
-tools or newer). The tool you pick in a sheet is remembered for that connection.
+tools or newer). The tool you pick in a sheet is remembered for that connection: it shows, and can be changed, in the
+connection editor's Options tab.
 
 No tools at all? Install MySQL's or MariaDB's client tools (for example `brew install mysql-client`), then choose
 **Find Again**. Until then, Export and Run SQL File use AirSQL's own code.
@@ -773,8 +777,9 @@ though, so the same view on MySQL and on MariaDB can still show as different.
 
 After a first compare, **Tables…** lists the source's tables. Untick a table to leave it out, give the target table
 it should be compared with when it was renamed there, list columns whose values shouldn't count (such as
-`updated_at`), or add a WHERE condition for its rows on both sides. **Leave Out of Next Compare** in an object's
-menu unticks it too.
+`updated_at`), or add a WHERE condition for its rows on both sides. Double-click a table to tick or untick it, or
+right-click the selected tables for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
+too.
 
 ## How the data compare stays fast
 
@@ -1358,8 +1363,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
   the person's `editor.colour`, `editor.host`, `editor.port`, `editor.socket`, `editor.user`, `editor.password`,
   `editor.askPassword`, `editor.route`, `editor.ssh`, `editor.addJump`, `editor.proxyKind`, `editor.proxyHost`,
-  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.ownSafety`, `editor.agentAccess`,
-  `editor.sampleRows`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
+  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.clientPath`, `editor.dumpPath`, `editor.ownSafety`,
+  `editor.agentAccess`, `editor.sampleRows`; what the tools are `editor.clientFound`, `editor.dumpFound`, the route
+  `editor.routePath`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
 - **Status bar**: `status.route`, `status.server`, `status.transaction`, `status.activity`, `status.agent`,
   `status.sqlLog`; popovers `popover.route`, `popover.server`, `popover.transaction` (`popover.commit`,
   `popover.rollback`), `popover.agent` (`agents.setUp`, `agents.turnOff`), `activity.popover` (`activity.cancel`,
@@ -1387,8 +1393,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tools.timeLeft`, `tools.cancel`, `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
   `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`; Restore `restore.file`,
-  `restore.choose`, `restore.database`, `restore.tool`, `restore.stopOnError`, `restore.continue`, `restore.command`,
-  `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
+  `restore.fileInfo`, `restore.choose`, `restore.database`, `restore.tool`, `restore.stopOnError`, `restore.continue`,
+  `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
 - **Prompts**: `password.field`, `password.remember`, `login.user`, `login.password`, `prompt.answer`,

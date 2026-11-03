@@ -54,8 +54,9 @@ though, so the same view on MySQL and on MariaDB can still show as different.
 
 After a first compare, **Tables…** lists the source's tables. Untick a table to leave it out, give the target table
 it should be compared with when it was renamed there, list columns whose values shouldn't count (such as
-`updated_at`), or add a WHERE condition for its rows on both sides. **Leave Out of Next Compare** in an object's
-menu unticks it too.
+`updated_at`), or add a WHERE condition for its rows on both sides. Double-click a table to tick or untick it, or
+right-click the selected tables for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
+too.
 
 ## How the data compare stays fast
 

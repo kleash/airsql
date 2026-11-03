@@ -18,7 +18,8 @@ installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for e
 
 Each sheet says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
 older version than the server), or why it can't be used (not there, too old: AirSQL needs MySQL 5.7 or MariaDB 10.3
-tools or newer). The tool you pick in a sheet is remembered for that connection.
+tools or newer). The tool you pick in a sheet is remembered for that connection: it shows, and can be changed, in the
+connection editor's Options tab.
 
 No tools at all? Install MySQL's or MariaDB's client tools (for example `brew install mysql-client`), then choose
 **Find Again**. Until then, Export and Run SQL File use AirSQL's own code.
