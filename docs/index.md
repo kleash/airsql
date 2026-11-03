@@ -6,7 +6,7 @@ description: Step-by-step help for AirSQL, the Mac app for MySQL and MariaDB.
 
 # AirSQL Help
 
-AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages grow with it.
+AirSQL is a Mac app for MySQL and MariaDB.
 
 ![The AirSQL window: saved connections and a shop database's tables on the left, its newest orders in the grid](assets/screenshots/main-light.png)
 

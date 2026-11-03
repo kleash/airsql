@@ -17,8 +17,7 @@ AI agents that never change anything without you. Free and open source.</b></p>
   <a href="https://github.com/kleash/airsql/releases/latest"><img src="https://img.shields.io/github/v/release/kleash/airsql" alt="Latest release"></a>
 </p>
 
-AirSQL is in development and not ready to use yet: the plan is in [docs/dev/plan.md](docs/dev/plan.md), and
-[AirSQL Help](docs/index.md) describes each part as it is now.
+[AirSQL Help](docs/index.md) describes each part; [Install](#install) gets it.
 
 - **Every way in** ([Connections and routes](docs/connections.md)): direct or a socket, SSH tunnels (password, key,
   ssh-agent, 2FA, your `~/.ssh/config`), jump hosts, HTTP and SOCKS5 proxies, each ending in a private socket on your

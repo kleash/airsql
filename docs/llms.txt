@@ -5,7 +5,7 @@
 - Install: `brew install --cask kleash/tap/airsql` (or the zip from https://github.com/kleash/airsql/releases).
 
 ## AirSQL Help
-- [Home](https://kleash.github.io/airsql/): AirSQL is a Mac app for MySQL and MariaDB. It is in development: these pages grow with it.
+- [Home](https://kleash.github.io/airsql/): AirSQL is a Mac app for MySQL and MariaDB.
 - [Install AirSQL](https://kleash.github.io/airsql/install.html): AirSQL needs macOS 13.1 or later, on Apple silicon or Intel. It is free, and it needs no account.
 - [Getting started](https://kleash.github.io/airsql/getting-started.html)
 - [Settings](https://kleash.github.io/airsql/settings.html): Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.

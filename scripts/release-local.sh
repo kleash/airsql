@@ -12,7 +12,8 @@
 # One-time setup: Xcode ▸ Settings ▸ Accounts ▸ Manage Certificates ▸ + ▸ Developer ID Application, then
 #   xcrun notarytool store-credentials airsql-notary --apple-id <Apple ID> --team-id <team ID>
 # release.yml runs this too, with the identity in a temporary keychain and an App Store Connect API key instead of the
-# profile (NOTARY_KEY_PATH, NOTARY_KEY_ID, NOTARY_ISSUER). AIRSQL_SIGN_IDENTITY picks an identity by name.
+# profile (NOTARY_KEY_PATH, NOTARY_KEY_ID, NOTARY_ISSUER). AIRSQL_SIGN_IDENTITY picks an identity by name,
+# AIRSQL_NOTARY_PROFILE another notarytool profile (the same Apple account's AirSCP one works).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -50,7 +51,7 @@ else
         exit 1
     fi
     timestamp=--timestamp
-    notary=(--keychain-profile airsql-notary)
+    notary=(--keychain-profile "${AIRSQL_NOTARY_PROFILE:-airsql-notary}")
     if [ -n "${NOTARY_KEY_ID:-}" ]; then notary=(--key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER"); fi
 fi
 

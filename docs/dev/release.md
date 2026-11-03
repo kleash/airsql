@@ -72,7 +72,7 @@ has no Pages site, no secrets and no release, and `kleash/homebrew-tap` has no `
 | What | How |
 |---|---|
 | Developer ID certificate | Xcode ▸ Settings ▸ Accounts ▸ Manage Certificates ▸ + ▸ Developer ID Application (the one AirSCP uses works). |
-| Notary credentials on the Mac | `xcrun notarytool store-credentials airsql-notary --apple-id <Apple ID> --team-id <team ID>` |
+| Notary credentials on the Mac | `xcrun notarytool store-credentials airsql-notary --apple-id <Apple ID> --team-id <team ID>`, or another profile of the same Apple account: `AIRSQL_NOTARY_PROFILE=airscp-notary scripts/release-local.sh` |
 | `TAP_TOKEN` secret | A fine-grained token with **Contents: Read and write** on `kleash/homebrew-tap` only: `gh secret set TAP_TOKEN -R kleash/airsql`. Without it, release.yml puts the filled cask in the run's summary instead. |
 | CI signing (optional) | The secrets AirSCP's release uses: `DEVELOPER_ID_P12` (`base64 -i DeveloperID.p12`), `DEVELOPER_ID_P12_PASSWORD`, `NOTARY_KEY` (`base64 -i AuthKey_XXXX.p8`, an App Store Connect API key), `NOTARY_KEY_ID`, `NOTARY_ISSUER`. Then a tag alone releases. |
 | GitHub Pages | Settings ▸ Pages ▸ Deploy from a branch ▸ `main` / `/docs` (the help site: `docs/`, Just the Docs as a remote theme). |

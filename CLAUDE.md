@@ -3,7 +3,7 @@
 AirSQL is a native macOS app (Swift, AppKit; SwiftUI only for Swift Charts; macOS 13.1+) for MySQL and MariaDB:
 connections over every route (direct, SSH tunnel, jump hosts, proxies, each ending in a private Unix socket), a SQL
 console, a custom data grid with safe editing, schema tools, client tools, compare and reconcile, Liquibase, and agent
-access over MCP behind a gate that fails closed. It is in development (0.1.0). It follows AirSCP (`../porter`, Apache
+access over MCP behind a gate that fails closed. It follows AirSCP (`../porter`, Apache
 2.0, same author): ported files keep AirSCP's type names and a first line naming the AirSCP file and version.
 
 The source of truth is [docs/dev/plan.md](docs/dev/plan.md): architecture, phases and lanes, and these rules in full.
