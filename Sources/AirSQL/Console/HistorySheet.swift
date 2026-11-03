@@ -11,6 +11,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     private let table = NSTableView()
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private var entries: [HistoryEntry] = []
+    private let empty = label("", font: .systemFont(ofSize: 12.5), color: .secondaryLabelColor, wraps: true)
     private var loading: Task<Void, Never>?
     private lazy var insertButton = button("Insert", id: "history.insert", tip: "Put the selected statement in the editor at the cursor",
                                            target: self, action: #selector(insertSelected(_:)))
@@ -37,7 +38,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         search.delegate = self
         search.sendsSearchStringImmediately = true
         search.translatesAutoresizingMaskIntoConstraints = false
-        for (identifier, title, width) in [("time", "Run", 150.0), ("sql", "Statement", 420.0), ("result", "Result", 140.0)] {
+        for (identifier, title, width) in [("time", "When", 150.0), ("sql", "Statement", 420.0), ("result", "Result", 140.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.title = title
             column.width = width
@@ -70,8 +71,11 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         let buttons = NSStackView(views: [clear, status, spacer, cancel, insertButton])
         buttons.spacing = Spacing.unit
         buttons.translatesAutoresizingMaskIntoConstraints = false
+        empty.alignment = .center
+        empty.setAccessibilityIdentifier("history.empty")
+        insertButton.isEnabled = false
         let root = SurfaceView(.ground)
-        for view in [search, scroll, buttons] { root.addSubview(view) }
+        for view in [search, scroll, buttons, empty] { root.addSubview(view) }
         NSLayoutConstraint.activate([
             root.widthAnchor.constraint(equalToConstant: 760), root.heightAnchor.constraint(equalToConstant: 440),
             search.topAnchor.constraint(equalTo: root.topAnchor, constant: 16),
@@ -84,6 +88,8 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             buttons.leadingAnchor.constraint(equalTo: search.leadingAnchor),
             buttons.trailingAnchor.constraint(equalTo: search.trailingAnchor),
             buttons.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16),
+            empty.centerXAnchor.constraint(equalTo: scroll.centerXAnchor), empty.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
+            empty.widthAnchor.constraint(lessThanOrEqualTo: scroll.widthAnchor, constant: -40),
         ])
         view = root
         load()
@@ -104,8 +110,10 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             self.entries = found
             self.table.reloadData()
             if !found.isEmpty { self.table.selectRowIndexes([0], byExtendingSelection: false) }
-            self.status.stringValue = found.isEmpty ? (words.isEmpty ? "Nothing has run on this connection yet" : "No statement has these words")
-                : "\(found.count.formatted()) statement\(found.count == 1 ? "" : "s")"
+            self.status.stringValue = found.isEmpty ? "" : "\(found.count.formatted()) statement\(found.count == 1 ? "" : "s")"
+            self.empty.stringValue = words.isEmpty ? "Nothing has run on this connection yet: statements you run in a console show here."
+                : "No statement has these words."
+            self.empty.isHidden = !found.isEmpty
             self.insertButton.isEnabled = !found.isEmpty
         }
     }
@@ -140,9 +148,9 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         case "sql":
             field.stringValue = entry.sql.split(whereSeparator: \.isNewline).joined(separator: " ")
             field.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
-            field.toolTip = String(entry.sql.prefix(1_000))
+            field.toolTip = field.stringValue.count > 2_000 ? String(field.stringValue.prefix(2_000)) + "…" : field.stringValue
         default:
-            field.stringValue = entry.error.map { "Failed: " + $0 } ?? entry.rows.map { "\($0.formatted()) rows" } ?? "Done"
+            field.stringValue = entry.error.map { "Failed: " + $0 } ?? entry.rows.map { "\($0.formatted()) row\($0 == 1 ? "" : "s")" } ?? "Done"
             field.textColor = entry.error == nil ? .secondaryLabelColor : .statusBad
             field.toolTip = field.stringValue
         }
@@ -175,10 +183,15 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     }
 
     @objc private func clearHistory(_ sender: Any?) {
-        QueryHistory.shared.clear(connection)
-        entries = []
-        table.reloadData()
-        load()
+        guard let window = view.window else { return }
+        ConsoleClosing.alert(window, "Forget the statements run on this connection?",
+                             "The history of this connection is removed from this Mac. The statements' results on the server stay.",
+                             buttons: [("Clear", "Forget every statement in this history"), ("Cancel", "Keep the history")],
+                             destructive: 0) { [weak self] choice in
+            guard choice == 0, let self else { return }
+            QueryHistory.shared.clear(self.connection)
+            self.load()
+        }
     }
 
     @objc private func close(_ sender: Any?) {

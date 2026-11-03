@@ -85,7 +85,7 @@ final class SQLEditorView: NSTextView {
         font = .monospacedSystemFont(ofSize: size, weight: .regular)
         typingAttributes = [.font: font!, .foregroundColor: NSColor.labelColor]
         highlightAll()
-        enclosingScrollView?.verticalRulerView?.needsDisplay = true
+        (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
     }
 
     var fontSize: CGFloat { font?.pointSize ?? 13 }
@@ -114,7 +114,7 @@ final class SQLEditorView: NSTextView {
         super.didChangeText()
         highlight()
         clearMarks()
-        enclosingScrollView?.verticalRulerView?.needsDisplay = true
+        (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
         onChange?()
     }
 

@@ -69,6 +69,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     var lastOutcome: ConsoleOutcome?
     /// It said yes to closing: it isn't kept for the next launch.
     var closing = false
+    private var placedDivider = false
     private var observers: [AnyCancellable] = []
     /// Brings the Tx badge's minutes up to date while a transaction is open.
     private var badgeTimer: Timer?
@@ -143,9 +144,12 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        if split.subviews.count == 2, split.subviews[1].frame.height < 150 {
-            split.setPosition(max(120, split.bounds.height * 0.5), ofDividerAt: 0)
+        // The editor over the results, about half each, until the person moves the divider (then it is remembered).
+        if !placedDivider, UserDefaults.standard.object(forKey: "NSSplitView Subview Frames Console") == nil || split.autosaveName == nil {
+            view.layoutSubtreeIfNeeded()
+            split.setPosition(max(120, (split.bounds.height * 0.45).rounded()), ofDividerAt: 0)
         }
+        placedDivider = true
         view.window?.makeFirstResponder(editor)
         syncToolbar()
     }

@@ -11,7 +11,7 @@ final class LineNumberRuler: NSRulerView {
         self.editor = editor
         super.init(scrollView: nil, orientation: .verticalRuler)
         clientView = editor
-        ruleThickness = 40
+        ruleThickness = 32
         setAccessibilityElement(false)
         NotificationCenter.default.addObserver(self, selector: #selector(changed), name: NSView.boundsDidChangeNotification,
                                                object: nil)
@@ -20,6 +20,16 @@ final class LineNumberRuler: NSRulerView {
     }
 
     required init(coder: NSCoder) { fatalError("not used") }
+
+    /// As wide as the largest line number needs (after a change of the text or its size).
+    func fitWidth() {
+        guard let editor else { return }
+        let font = NSFont.monospacedDigitSystemFont(ofSize: max(9, editor.fontSize - 2), weight: .regular)
+        let lines = editor.string.utf16.reduce(1) { $0 + ($1 == 0x0A ? 1 : 0) }
+        let width = max(32, ceil(("\(lines)" as NSString).size(withAttributes: [.font: font]).width) + 18)
+        if abs(width - ruleThickness) > 0.5 { ruleThickness = width }
+        needsDisplay = true
+    }
 
     @objc private func changed(_ notification: Notification) {
         if notification.name == NSView.boundsDidChangeNotification,
@@ -35,13 +45,6 @@ final class LineNumberRuler: NSRulerView {
         bounds.fill()
         let text = editor.string as NSString
         let font = NSFont.monospacedDigitSystemFont(ofSize: max(9, editor.fontSize - 2), weight: .regular)
-        // As wide as the largest number needs.
-        let lines = max(1, text.length == 0 ? 1 : (editor.string.utf16.reduce(1) { $0 + ($1 == 0x0A ? 1 : 0) }))
-        let width = ceil(("\(lines)" as NSString).size(withAttributes: [.font: font]).width) + 18
-        if abs(width - ruleThickness) > 0.5 {
-            ruleThickness = max(32, width)
-            return
-        }
         let visible = editor.visibleRect
         let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
         let firstChar = layout.characterIndexForGlyph(at: glyphs.location)

@@ -16,6 +16,7 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
     private let filter = NSSearchField()
     let table = NSTableView()
     private var rows: [Row] = []
+    private let empty = label("", font: .systemFont(ofSize: 12), color: .secondaryLabelColor, wraps: true)
     /// What the panel shows for the statement at the cursor: its tables' columns, and the server.
     var source: (() -> (columns: [(table: String, columns: [SchemaColumn])], server: SchemaServer?))?
     /// Puts text in the editor at the cursor.
@@ -55,7 +56,14 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
             addSubview(view)
         }
         background.pin(to: self)
+        empty.alignment = .center
+        empty.translatesAutoresizingMaskIntoConstraints = false
+        empty.setAccessibilityIdentifier("helpers.empty")
+        addSubview(empty)
         NSLayoutConstraint.activate([
+            empty.topAnchor.constraint(equalTo: filter.bottomAnchor, constant: Spacing.double),
+            empty.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.double),
+            empty.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.double),
             choice.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.unit),
             choice.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
             choice.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
@@ -98,6 +106,9 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
             rows = SQLCompletion.keywords.filter(keep).map { .item(label: $0, detail: "", insert: $0) }
         }
         table.reloadData()
+        empty.isHidden = !rows.isEmpty
+        empty.stringValue = !words.isEmpty ? "Nothing has this name."
+            : choice.selectedSegment == 0 ? "Put the cursor in a statement that names tables: their columns show here." : ""
     }
 
     func controlTextDidChange(_ notification: Notification) { reload() }

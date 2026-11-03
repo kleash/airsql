@@ -8,7 +8,7 @@ extension SQLEditorView {
     func setText(_ text: String) {
         string = text
         highlightAll()
-        enclosingScrollView?.verticalRulerView?.needsDisplay = true
+        (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
     }
 
     /// Replaces `range` with `text` as an edit the person made: undoable, coloured, reported. Selects `select` after.
