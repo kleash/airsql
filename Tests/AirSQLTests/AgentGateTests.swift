@@ -84,5 +84,22 @@ extension AppTests {
                 try await AgentGate.$agent.withValue("Claude Code") { try await session.stream("DELETE FROM t") { _ in } }
             }
         }
+
+        /// A statement under a query timeout is asked about once, before its time starts.
+        @Test func aTimedStatementIsAskedAboutOnce() async throws {
+            let asked = AgentGateTests.Asked(), before = AgentGate.approve
+            AgentGate.approve = { asked.add($0) }
+            defer { AgentGate.approve = before }
+            let failure = await AgentGate.$agent.withValue("Claude Code") { () async -> AirSQLError? in
+                do {
+                    _ = try await AgentGateTests.session(.main).query("DELETE FROM t", timeout: 30)
+                    return nil
+                } catch {
+                    return error as? AirSQLError
+                }
+            }
+            #expect(asked.all.map(\.sql) == ["DELETE FROM t"])
+            #expect(failure?.kind == .disconnected, "approved, it went on to the server: \(failure?.message ?? "")")
+        }
     }
 }

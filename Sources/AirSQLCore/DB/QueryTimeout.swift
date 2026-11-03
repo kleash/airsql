@@ -6,13 +6,15 @@ extension DBConnection {
     /// server ends quietly (a lone SLEEP returns 1).
     public func query(_ sql: String, rowCap: Int = 100_000, timeout seconds: Int) async throws -> [StatementResult] {
         guard seconds > 0 else { return try await query(sql, rowCap: rowCap) }
+        // The agents' gate asks first (and not again below): the person's time to answer isn't the statement's.
+        try await AgentGate.check(sql, on: self)
         let watchdog = Task { [weak self] () -> Bool in
             try await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
             return (try? await self?.cancel()) == .cancelled
         }
         var results: [StatementResult] = [], failure: Error?
         do {
-            results = try await query(sql, rowCap: rowCap)
+            results = try await AgentGate.$agent.withValue(nil) { try await query(sql, rowCap: rowCap) }
         } catch {
             failure = error
         }
