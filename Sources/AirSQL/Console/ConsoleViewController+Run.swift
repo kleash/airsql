@@ -146,6 +146,8 @@ extension ConsoleViewController {
         case .run: break
         }
         let all = SQLSplitter.statements(in: run.text, noBackslashEscapes: session.noBackslashEscapes)
+        var schemaChanged = false
+        defer { if schemaChanged { model.openConnection(id)?.load() } }  // the navigator's tree shows the change
         for (index, statement) in run.statements.enumerated() {
             guard !run.cancelled else { break }
             run.index = index
@@ -156,6 +158,7 @@ extension ConsoleViewController {
             let title = statement.range.isEmpty ? nil
                 : ConsoleScript.title(of: statement, in: run.text, after: previous, noBackslashEscapes: session.noBackslashEscapes)
             show(outcome, title: title, run: run, session: session)
+            if outcome.error == nil, Self.changesSchema(statement.sql) { schemaChanged = true }
             if outcome.error != nil || run.cancelled {
                 let left = run.statements.count - index - 1
                 if left > 0 { note(.info, "Stopped: the \(left) statement\(left == 1 ? "" : "s") after it didn't run.") }
@@ -175,6 +178,14 @@ extension ConsoleViewController {
             }
             _ = await runQuery("SET profiling = 0", on: session)
         }
+    }
+
+    /// Whether `sql` changes the schema: CREATE, ALTER, DROP or RENAME.
+    static func changesSchema(_ sql: String) -> Bool {
+        let text = Array(sql.utf16)
+        guard let word = SQLLexer.tokens(sql).first(where: { $0.kind == .word }) else { return false }
+        let keyword = String(utf16CodeUnits: Array(text[word.range]), count: word.range.count).uppercased()
+        return ["CREATE", "ALTER", "DROP", "RENAME"].contains(keyword)
     }
 
     /// A statement of AirSQL's own around the person's (profiling, the plan), its errors kept quiet.
