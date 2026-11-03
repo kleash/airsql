@@ -100,27 +100,23 @@ extension AppTests {
         #expect(safety.askBeforeUnboundedWrite && safety.openTransactionMinutes == 15, "the others as Settings ▸ Safety has them")
     }
 
-    /// Unticking the connection's own checks while a limit is still being typed (a click on a checkbox leaves the
-    /// keyboard in the field without full keyboard access) keeps the editor open, back on Settings ▸ Safety's checks.
-    @Test func ownSafetyChecksCanBeTurnedOffWhileALimitIsTyped() async throws {
-        let model = testModel(Fixtures.shop)
-        let (main, harness) = appWindow(model)
-        let editor = ConnectionEditor.show(Fixtures.local, isNew: false, model: model, on: try #require(main.window)) { _, _ in }
-        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-        editor.show(.safety)
-        let sheet = try #require(editor.window)
-        let content = try #require(sheet.contentView)
+    /// Unticking Own safety checks with a click while a limit is being typed in: the limit's field used to end its
+    /// editing after the checks were gone and write into them, which ended the app.
+    @Test func untickingOwnSafetyChecksWhileTypingALimit() async throws {
+        let (main, harness) = appWindow(testModel(Fixtures.shop))
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Local MariaDB 11.8"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let sheet = try #require(await editor(main))
+        #expect(await call(harness, "press", ["title": "Safety"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.ownSafety", "value": true]).error == nil)
+        let window = try #require(sheet.window), content = try #require(window.contentView)
+        let cap = try #require(find(NSTextField.self, id: "editor.safety.agentRowCap", in: content))
         let own = try #require(find(NSButton.self, id: "editor.ownSafety", in: content))
-        own.state = .on
-        own.sendAction(own.action, to: own.target)
-        let field = try #require(find(NSTextField.self, id: "editor.safety.agentRowCap", in: content))
-        #expect(sheet.makeFirstResponder(field))
-        field.currentEditor()?.selectAll(nil)
-        field.currentEditor()?.insertText("500")
-        let off = try #require(find(NSButton.self, id: "editor.ownSafety", in: content))
-        off.state = .off
-        off.sendAction(off.action, to: off.target)
-        #expect(editor.draft.safety == nil && find(NSTextField.self, id: "editor.safety.agentRowCap", in: content) == nil)
+        window.makeFirstResponder(cap)
+        let typing = try #require(cap.currentEditor() as? NSTextView)
+        typing.insertText("500", replacementRange: NSRange(location: 0, length: typing.string.utf16.count))
+        AXNode.click(own)  // as a click does it: the field keeps the keyboard
+        #expect(sheet.draft.safety == nil && find(NSTextField.self, id: "editor.safety.agentRowCap", in: content) == nil)
         _ = await call(harness, "press", ["id": "editor.cancel"])
         _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
     }

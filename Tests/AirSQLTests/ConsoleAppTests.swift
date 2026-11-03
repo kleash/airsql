@@ -78,6 +78,22 @@ extension AppTests {
             #expect(main.selectedTab?.title == "Query 2")
         }
 
+        /// A new console gives its editor and its results about half the split each, at the window's usual and smallest
+        /// size (the column that holds the find bar once held the results to their smallest).
+        @Test func aNewConsoleSplitsItsEditorAndResultsAboutHalfEach() async throws {
+            for size in [MainWindowController.defaultSize, MainWindowController.minimumSize] {
+                let model = testModel(Fixtures.shop)
+                model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3")
+                let (main, harness) = appWindow(model, size: size)
+                main.sidebar.select([Fixtures.production.id])
+                #expect(await call(harness, "menu", ["path": "File > New Query"]).error == nil)
+                let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+                main.window?.layoutIfNeeded()
+                let split = console.split, results = split.arrangedSubviews[1].frame.height
+                #expect(abs(results - split.bounds.height * 0.55) < 24, "\(size): results \(results) of \(split.bounds.height)")
+            }
+        }
+
         /// The bracket marks look at the text being edited, whose tokens are a moment old: deleting where an old token
         /// ended the text, or putting a shorter text in place, mustn't read past its end.
         @Test func editsThatShortenTheTextNextToABracketKeepTheEditor() async throws {

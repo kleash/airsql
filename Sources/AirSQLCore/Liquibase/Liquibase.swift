@@ -162,27 +162,31 @@ public enum Liquibase {
     /// A change AirSQL previewed and ran (Save as Changeset): one changeset titled as the change, with a rollback when
     /// every statement has one. Statements Liquibase handles itself are left out (USE, and the transaction around
     /// them: each changeset runs in a transaction of its own), and so is the database the change names its objects
-    /// with, so the changeset runs in whichever database Liquibase updates.
-    public static func changeset(_ change: ChangeSQL, rollback wanted: Bool = true) -> LiquibaseChangeset {
-        changeset(title: change.title, statements: change.statements, rollback: wanted)
+    /// with, so the changeset runs in whichever database Liquibase updates. `noBackslashEscapes`: the session's
+    /// NO_BACKSLASH_ESCAPES, which the change's strings were written for.
+    public static func changeset(_ change: ChangeSQL, noBackslashEscapes: Bool = false,
+                                 rollback wanted: Bool = true) -> LiquibaseChangeset {
+        changeset(title: change.title, statements: change.statements, noBackslashEscapes: noBackslashEscapes, rollback: wanted)
     }
 
     /// Statements run elsewhere (the console's) as one changeset, as `changeset(_:)` makes one of a previewed change.
-    public static func changeset(title: String, statements: [String], rollback wanted: Bool = true) -> LiquibaseChangeset {
+    public static func changeset(title: String, statements: [String], noBackslashEscapes: Bool = false,
+                                 rollback wanted: Bool = true) -> LiquibaseChangeset {
         var statements = statements.map(trimmed)
         let database = statements.lazy.compactMap(usedDatabase).first ?? statements.first.flatMap(namedDatabase)
         statements.removeAll { usedDatabase($0) != nil || ["START TRANSACTION", "BEGIN", "BEGIN WORK", "COMMIT", "ROLLBACK"]
             .contains($0.uppercased()) }
         if let database { statements = statements.map { unqualified($0, database: database) } }
+        let undo = statements.reversed().map(rollback)
         // A change that sets the session's sql_mode or time zone (the object editor's) puts them back after, as later
-        // changesets run on the same session.
-        if statements.contains(where: { statement in
+        // changesets run on the same session. One written for NO_BACKSLASH_ESCAPES turns it on first: Liquibase's session
+        // would read its strings' backslashes as escapes and store other values.
+        if noBackslashEscapes || statements.contains(where: { statement in
             let tokens = Tokens(statement)
             return tokens.word(0) == "SET" && (0..<tokens.count).contains { ["SQL_MODE", "TIME_ZONE"].contains(tokens.word($0) ?? "") }
         }) {
-            statements = [sessionSave] + statements + [sessionTail]
+            statements = [sessionSave] + (noBackslashEscapes ? [keepBackslashes] : []) + statements + [sessionTail]
         }
-        let undo = statements.reversed().map(rollback)
         // The first name in backticks: the table or routine the change is about; else the one a statement typed without
         // backticks starts with (the console's).
         let object = statements.lazy.compactMap { statement in
@@ -234,6 +238,8 @@ public enum Liquibase {
             + "', SESSION time_zone = '+00:00'"]
     }
     public static let sessionSave = "SET @airsql_sql_mode = @@SESSION.sql_mode, @airsql_time_zone = @@SESSION.time_zone"
+    /// Backslashes in strings read as themselves, the session's other modes kept (after `sessionSave`).
+    public static let keepBackslashes = "SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES')"
     public static let sessionTail = "SET SESSION sql_mode = @airsql_sql_mode, SESSION time_zone = @airsql_time_zone"
 
     // MARK: Rollback

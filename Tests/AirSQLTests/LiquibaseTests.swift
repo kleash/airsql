@@ -267,6 +267,22 @@ struct LiquibaseTests {
         #expect(throws: LiquibaseChangelog.Problem.self) { try numbered.checkedText() }
     }
 
+    /// A change written for NO_BACKSLASH_ESCAPES (its backslashes bare) turns that on for its statements, keeping their
+    /// rollback; Liquibase's session would read `C:\new` as C:, a line feed and ew.
+    @Test func aChangeWrittenWithoutBackslashEscapesTurnsThemOff() throws {
+        let update = "UPDATE `shop`.`files` SET `path` = " + SQLQuote.string("C:\\new", noBackslashEscapes: true) + " WHERE `id` = 7"
+        #expect(update.hasSuffix("'C:\\new' WHERE `id` = 7"))
+        let change = ChangeSQL(title: "Apply changes to files", statements: [update], connection: UUID())
+        let saved = Liquibase.changeset(change, noBackslashEscapes: true)
+        #expect(saved.statements == [Liquibase.sessionSave, Liquibase.keepBackslashes, "UPDATE `files` SET `path` = 'C:\\new' WHERE `id` = 7",
+                                     Liquibase.sessionTail])
+        #expect(Liquibase.changeset(change).statements == ["UPDATE `files` SET `path` = 'C:\\new' WHERE `id` = 7"], "written for escapes")
+        let table = Liquibase.changeset(title: "Query 1", statements: ["CREATE TABLE t (path VARCHAR(9) DEFAULT 'a\\b')"],
+                                        noBackslashEscapes: true)
+        #expect(table.statements.count == 4 && table.rollback == ["DROP TABLE t"])
+        _ = try Liquibase.numbered([saved, table], settings: Self.settings, first: 1, date: Self.date).map { try $0.checkedText() }
+    }
+
     @Test func aCompareBecomesChangesetsPerStepAndTableRun() throws {
         var customers = ReconObject(kind: .table, name: "customers", status: .onlyInSource)
         customers.sourceDDL = "CREATE TABLE `customers` (\n  `id` int(11) NOT NULL,\n  PRIMARY KEY (`id`)\n) ENGINE=InnoDB"

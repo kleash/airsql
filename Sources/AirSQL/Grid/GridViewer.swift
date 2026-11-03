@@ -223,8 +223,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     /// The host's rows or columns changed (a page arrived): shows them again.
     func reloadData() {
-        // Record View's row went (an Apply deleted it): the grid again, as the row can't be shown.
-        if let record, record >= source?.rowCount ?? 0 { transposeGrid(nil) }
+        // Record View's row is gone (a filter or an Apply left fewer rows): back to the grid rather than read past the end.
+        if let record, record >= source?.rowCount ?? 0 { backToGrid(nil) }
         (grid.source as? TransposedSource)?.refresh()
         rescaleHeat()
         if presentation != .table { present(presentation) }

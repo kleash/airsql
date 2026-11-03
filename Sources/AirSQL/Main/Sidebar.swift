@@ -436,6 +436,14 @@ final class SidebarCell: NSTableCellView {
     private let badge = NSTextField(labelWithString: "")
     private let icon = NSImageView()
     private let spinner = NSProgressIndicator()
+    /// The name's colour off the selection (the heading's is quieter).
+    private var nameColour = NSColor.labelColor
+
+    /// On the selection's accent: the accent's own text colour, as the mockups give it (AppKit's white is 2.4:1 on Deep
+    /// Water's petrol).
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { colour() }
+    }
 
     init() {
         super.init(frame: .zero)
@@ -445,7 +453,6 @@ final class SidebarCell: NSTableCellView {
         name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
         badge.font = .systemFont(ofSize: 11)
-        badge.textColor = .tertiaryLabelColor
         badge.setContentCompressionResistancePriority(.required, for: .horizontal)
         badge.setContentHuggingPriority(.required, for: .horizontal)
         shield.image = NSImage(systemSymbolName: "shield.lefthalf.filled", accessibilityDescription: "Custom safety")?
@@ -453,7 +460,6 @@ final class SidebarCell: NSTableCellView {
         shield.contentTintColor = .statusWarning
         shield.toolTip = "Custom safety: this connection has safety settings of its own (its Safety tab)"
         icon.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
-        icon.contentTintColor = .secondaryLabelColor
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
@@ -486,7 +492,8 @@ final class SidebarCell: NSTableCellView {
         dot.color = connection.colour.color ?? .tertiaryLabelColor
         name.stringValue = connection.displayName.isEmpty ? "Untitled" : connection.displayName
         name.font = .systemFont(ofSize: 13)
-        name.textColor = .labelColor
+        nameColour = .labelColor
+        colour()
         shield.isHidden = !connection.hasCustomSafety
         badge.isHidden = false
         badge.stringValue = connection.routeBadge
@@ -509,7 +516,8 @@ final class SidebarCell: NSTableCellView {
         dot.isHidden = true
         name.stringValue = title
         name.font = .systemFont(ofSize: 13)
-        name.textColor = .labelColor
+        nameColour = .labelColor
+        colour()
         shield.isHidden = true
         state.color = nil
         badge.isHidden = false
@@ -523,10 +531,18 @@ final class SidebarCell: NSTableCellView {
         dot.isHidden = true
         name.stringValue = title
         name.font = .systemFont(ofSize: 11, weight: .semibold)
-        name.textColor = .tertiaryLabelColor
+        nameColour = .tertiaryLabelColor
+        colour()
         shield.isHidden = true
         state.color = nil
         badge.isHidden = true
         toolTip = nil
+    }
+
+    private func colour() {
+        let selected = backgroundStyle == .emphasized
+        name.textColor = selected ? .onAccent : nameColour
+        badge.textColor = selected ? .onAccent : .tertiaryLabelColor
+        icon.contentTintColor = selected ? .onAccent : .secondaryLabelColor
     }
 }

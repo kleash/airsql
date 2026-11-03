@@ -464,6 +464,25 @@ extension AppTests {
             #expect(window.attachedSheet == nil && viewer.grid.rowCount == 4 && !(0..<4).contains { result.rows.value($0, 1) == "Ama Mensah" })
         }
 
+        /// A filter that leaves fewer rows than Record View's row number goes back to the grid (it read past the rows,
+        /// which ended the app); a row still there stays in Record View.
+        @Test func recordViewLeavesWhenAFilterRemovesItsRow() async throws {
+            let (main, harness) = appWindow(testModel(Fixtures.shop))
+            let viewer = try #require(resultViewer(main))
+            let result = try #require(viewer.superview as? ResultGridView)
+            try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the console's editor took the focus
+            main.window?.makeFirstResponder(viewer.grid)
+            viewer.grid.selection.select(GridPosition(row: 1, column: 1))
+            viewer.showRecordView(nil)
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Not Equal to Selection"]).error == nil)
+            #expect(viewer.record == 1 && viewer.grid.columnCount == 2 && result.rows.rowCount == 4)
+            viewer.showNextRecord(nil)
+            viewer.showNextRecord(nil)
+            #expect(viewer.record == 3 && viewer.recordLabel.stringValue == "Row 4 of 4")
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Equal to Selection"]).error == nil)
+            #expect(viewer.record == nil && viewer.grid.rowCount == 1 && viewer.grid.source is ReorderedSource)
+        }
+
         /// F2 edits the focused cell, as in HeidiSQL; in a console result, which can't be edited, it shows the value panel.
         @Test func f2EditsTheCellOrShowsItsValue() async throws {
             let (main, harness, tab) = try await Self.tab()

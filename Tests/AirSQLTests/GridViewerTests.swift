@@ -19,6 +19,9 @@ final class ViewerContent: NSViewController, TabContent {
 
     override func loadView() { view = viewer }
     var statusAccessory: NSView? { viewer.status }
+    /// The transaction badge, as a console with a result shows it.
+    var badge: String?
+    var transactionBadge: String? { badge }
 }
 
 /// Lane L2's reading tools on a grid: the status bar's figures, Go to Row, the column list and columns kept per table.
@@ -31,6 +34,50 @@ extension AppTests {
         main.window?.layoutIfNeeded()
         main.window?.makeFirstResponder(content.viewer.grid)
         return (main, harness, content)
+    }
+
+    /// A grid's tab with an open transaction while an agent works, at the window's usual and smallest size: the
+    /// transaction's badge keeps all its text and the grid's status stays; the agents' chip, the route and the server
+    /// give way first, and still do after the chip went and came back, and after the window was wider.
+    @Test func theStatusBarKeepsTheTransactionAndTheGridsStatus() async throws {
+        for size in [MainWindowController.defaultSize, MainWindowController.minimumSize] {
+            let (main, _) = appWindow(testModel(Fixtures.shop), size: size)
+            let window = try #require(main.window)
+            main.model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3-MariaDB-ubu2404")
+            main.model.agentStatus = "Claude Code · reading schema"
+            let content = ViewerContent(FakeGridSource(rows: 1_000, columns: 6))
+            content.badge = "Transaction open · 2 changes · 17 min"
+            main.open(content, title: "Top customers.sql", connection: Fixtures.production.id)
+            let grid = content.viewer.grid, status = content.viewer.status
+            status.rows.stringValue = "1,000 of ≈2,348,245 rows"
+            grid.selection.select(GridPosition(row: 2, column: 2))
+            grid.selection.select(GridPosition(row: 6, column: 2), extend: true)
+            status.update()
+            let bar = main.statusBar
+            let row = try #require(bar.subviews.compactMap { $0 as? NSStackView }.first)
+            let badge = try #require(find(NSTextField.self, in: bar.transaction))
+            func check(_ when: String) {
+                main.refresh()
+                window.layoutIfNeeded()
+                #expect(!row.detachedViews.contains(bar.accessory) && !row.detachedViews.contains(bar.transaction),
+                        "\(size) \(when): \(row.detachedViews.map { $0.accessibilityIdentifier() })")
+                #expect(badge.frame.width >= badge.intrinsicContentSize.width - 0.5,
+                        "\(size) \(when): the badge has \(badge.frame.width) of \(badge.intrinsicContentSize.width)")
+            }
+            check("at first")
+            check("refreshed again")
+            main.model.agentStatus = nil
+            check("without the agent")
+            main.model.agentStatus = "Claude Code · reading schema"
+            check("with the agent back")
+            window.setContentSize(NSSize(width: 1600, height: size.height))
+            main.refresh()
+            window.layoutIfNeeded()
+            #expect(row.detachedViews.filter { !$0.isHidden || $0 === bar.route || $0 === bar.server }.isEmpty,
+                    "\(size) at 1600: \(row.detachedViews.map { $0.accessibilityIdentifier() })")
+            window.setContentSize(size)
+            check("back at its size")
+        }
     }
 
     @Test func statusShowsThePositionAndAFigureForTheSelection() async throws {

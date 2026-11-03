@@ -180,6 +180,14 @@ final class TreeCell: NSTableCellView {
     private let name = NSTextField(labelWithString: "")
     private let count = NSTextField(labelWithString: "")
     private let spinner = NSProgressIndicator()
+    /// The name's colour off the selection (a message's is quieter).
+    private var nameColour = NSColor.labelColor
+
+    /// On the selection's accent: the accent's own text colour, as the mockups give it (AppKit's white is 2.4:1 on Deep
+    /// Water's petrol).
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { colour() }
+    }
 
     init() {
         super.init(frame: .zero)
@@ -189,7 +197,6 @@ final class TreeCell: NSTableCellView {
         name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
         count.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        count.textColor = .tertiaryLabelColor
         count.setContentCompressionResistancePriority(.required, for: .horizontal)
         count.setContentHuggingPriority(.required, for: .horizontal)
         spinner.style = .spinning
@@ -221,7 +228,8 @@ final class TreeCell: NSTableCellView {
         icon.image = image
         name.stringValue = text
         name.font = .systemFont(ofSize: 13, weight: bold ? .semibold : .regular)
-        name.textColor = .labelColor
+        nameColour = .labelColor
+        colour()
         count.stringValue = value
         count.isHidden = value.isEmpty
         setBusy(busy)
@@ -233,11 +241,18 @@ final class TreeCell: NSTableCellView {
         icon.isHidden = true
         name.stringValue = text
         name.font = .systemFont(ofSize: 12)
-        name.textColor = .secondaryLabelColor
+        nameColour = .secondaryLabelColor
+        colour()
         count.isHidden = true
         setBusy(busy)
         toolTip = text
         setAccessibilityLabel(text)
+    }
+
+    private func colour() {
+        let selected = backgroundStyle == .emphasized
+        name.textColor = selected ? .onAccent : nameColour
+        count.textColor = selected ? .onAccent : .tertiaryLabelColor
     }
 
     private func setBusy(_ busy: Bool) {

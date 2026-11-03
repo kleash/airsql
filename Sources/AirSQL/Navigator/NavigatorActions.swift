@@ -96,7 +96,7 @@ enum NavigatorActions {
             Task {
                 do {
                     let results = try await open.run(request.change.statements, title: request.change.title, refreshing: objects)
-                    if changeset { SQLPreviewSheet.changesetWriter?(request.change) }
+                    if changeset { SQLPreviewSheet.changesetWriter?(request.change, request.noBackslashEscapes) }
                     done?(results)
                 } catch {
                     let message = (error as? AirSQLError)?.message ?? error.localizedDescription

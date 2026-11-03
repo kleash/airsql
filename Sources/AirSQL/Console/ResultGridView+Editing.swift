@@ -279,7 +279,7 @@ extension ResultGridView {
                     }
                 }
                 edits.applied(read)
-                if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change) }
+                if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, self.values.noBackslashEscapes) }
                 // Deleted rows are gone: filter and sort what is left again.
                 if rows.order != nil { reorder() }
                 updateEditing()

@@ -116,7 +116,7 @@ extension ConnectionEditor {
                            on: draft.safety != nil, target: nil, action: nil)
         bind(own) { [weak self] in
             guard let self else { return }
-            // A limit being typed is kept first, while the checks it goes in are still there.
+            // A limit being typed in keeps its text first: once the checks are gone, there is nowhere to keep it.
             self.window?.makeFirstResponder(nil)
             self.draft.safety = own.state == .on ? self.draft.safety(defaults: self.model.data.settings.safety) : nil
             self.refreshTab()

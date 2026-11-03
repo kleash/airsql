@@ -23,9 +23,10 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
         objc_setAssociatedObject(main, &key, responder, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         // A change has run and the person ticked "Save as Liquibase changeset": the editors and the tree that run them are
         // in the main window.
-        SQLPreviewSheet.changesetWriter = { [weak main] change in
+        SQLPreviewSheet.changesetWriter = { [weak main] change, noBackslashEscapes in
             guard let main, let window = main.window else { return }
-            ChangesetSheet.show([Liquibase.changeset(change, rollback: main.model.data.settings.liquibase.rollback)],
+            ChangesetSheet.show([Liquibase.changeset(change, noBackslashEscapes: noBackslashEscapes,
+                                                     rollback: main.model.data.settings.liquibase.rollback)],
                                 heading: "Save “\(change.title)” as a changeset", model: main.model, on: window)
         }
     }
@@ -61,7 +62,8 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
             return console.note(.info, "There is no statement here to save: type one, or put the cursor in one.")
         }
         let title = main.selectedTab?.title ?? "Console"
-        let changeset = Liquibase.changeset(title: title, statements: statements, rollback: main.model.data.settings.liquibase.rollback)
+        let changeset = Liquibase.changeset(title: title, statements: statements, noBackslashEscapes: console.editor.noBackslashEscapes,
+                                            rollback: main.model.data.settings.liquibase.rollback)
         ChangesetSheet.show([changeset], heading: "Save " + (statements.count == 1 ? "the statement" : "\(statements.count) statements")
                             + " as a changeset", model: main.model, on: window)
     }

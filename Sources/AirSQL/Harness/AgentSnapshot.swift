@@ -8,7 +8,8 @@ import AppKit
 @MainActor
 struct AXNode {
     let object: NSObject
-    /// Data an agent may not read (`AgentServer.hidesData`): no value, no children.
+    /// Data an agent may not read (`AgentServer.hidesData`): no value, title, help or children (a status figure's title
+    /// is a sum, a filter's tooltip its condition).
     var hidden = false
 
     private func get(_ key: String) -> Any? {
@@ -29,10 +30,11 @@ struct AXNode {
                    view?.identifier?.rawValue]
         return ids.compactMap { $0 }.first { !$0.isEmpty && !$0.hasPrefix("_NS:") } ?? ""
     }
-    var title: String { text("accessibilityTitle") ?? text("accessibilityLabel") ?? "" }
+    var title: String { hidden ? "" : text("accessibilityTitle") ?? text("accessibilityLabel") ?? "" }
     var placeholder: String { text("accessibilityPlaceholderValue") ?? "" }
     /// Its help text (a tooltip): a disabled button's often says why. A segment says what its control says.
     var help: String? {
+        guard !hidden else { return nil }
         if let help = text("accessibilityHelp") ?? view?.toolTip.flatMap({ $0.isEmpty ? nil : $0 }) { return help }
         guard role == "radiobutton", let parent = get("accessibilityParent") as? NSObject else { return nil }
         return AXNode(object: parent).text("accessibilityHelp")
@@ -112,7 +114,8 @@ struct AXNode {
         var result: [AXNode] = []
         func walk(_ node: AXNode, _ depth: Int) {
             guard depth == 0 || !(node.object is NSWindow) else { return }
-            if let view = node.object as? NSView, hiding?(view) == true { return result.append(AXNode(object: view, hidden: true)) }
+            // AppKit lists some controls by their cell (a button, a label): hidden with the control.
+            if let view = node.view, hiding?(view) == true { return result.append(AXNode(object: view, hidden: true)) }
             result.append(node)
             guard depth < 40 else { return }
             guard ["table", "outline", "list", "browser", "grid"].contains(node.role) else { return node.children.forEach { walk($0, depth + 1) } }

@@ -23,7 +23,9 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
   All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
 - **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to
-  cancel), what agents are doing, and the SQL log. Click an item for details; right-click it to copy it.
+  cancel), what agents are doing, and the SQL log. Click an item for details; right-click it to copy it. When the
+  window is narrow, the server's version, the route and then the agents' item make room first; an open transaction's
+  warning keeps all its text, and a grid's row count stays.
 
 ## Tips
 
