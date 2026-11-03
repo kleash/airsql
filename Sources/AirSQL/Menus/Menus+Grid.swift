@@ -1,8 +1,9 @@
 import AppKit
 
 extension MainMenu {
-    /// The grid (lanes L2 and L3a): the Data menu (editing, Apply, filters, sorting, going to a row, Column Summary,
-    /// Display As, paging, Export Rows…), Edit ▸ Copy with Headers, Copy As, Copy Column Name, Copy Selection Summary,
+    /// The grid (lanes L2 and L3a): the Data menu (editing, Apply, filters with each quick filter of a cell's menu, sorting
+    /// by one or several columns, going to a row, Column Summary, Display As, paging, Export Rows…), Edit ▸ Copy with
+    /// Headers, Copy As, Copy Column Name, Copy Selection Summary,
     /// Extend Selection and Shrink Selection, and View ▸ Refresh Every, Value Panel, Record View, Transpose, Column List…,
     /// Heatmap, View As and Chart. Every command is in `Commands` already, with its shortcut.
     static func addGridItems(_ menus: Menus) {
@@ -20,8 +21,12 @@ extension MainMenu {
         menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
         menus.data.add([Commands.chooseReferencedRow])
         menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
-        menus.data.addItem(submenu("Quick Filter", [Commands.filterEquals.item(), Commands.filterNotEquals.item()]))
-        menus.data.add([Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending, Commands.clearSort, nil,
+        let filters: [Command?] = [Commands.filterEquals, Commands.filterNotEquals, Commands.filterLess, Commands.filterGreater,
+                                   Commands.filterStartsWith, Commands.filterEndsWith, Commands.filterContains, Commands.filterIn,
+                                   Commands.filterNotIn, Commands.filterNull, Commands.filterNotNull, nil, Commands.filterPrompt]
+        menus.data.addItem(submenu("Quick Filter", filters.map { $0?.item() ?? .separator() }))
+        menus.data.add([Commands.filterByValues, Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending,
+                        Commands.sortColumns, Commands.clearSort, nil,
                         Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn, Commands.freeze])
         menus.data.addItem(GridViewer.displayMenu())
         menus.data.add([nil, Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.exportRows])

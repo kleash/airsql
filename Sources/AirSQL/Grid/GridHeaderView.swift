@@ -207,6 +207,8 @@ final class GridHeaderView: NSView {
             grid.delegate?.dataGrid(grid, sortBy: grid.columnOrder[column], adding: flags.contains(.option))
             return
         }
+        // A double click on the header fits the column to its values, as one on its border does (HeidiSQL's too).
+        if event.clickCount == 2 { return grid.autoFit(column) }
         grid.selection.selectColumn(column, extend: flags.contains(.shift), add: flags.contains(.command))
         drag = .move(column: column, startX: point.x)
     }
@@ -266,7 +268,7 @@ final class GridHeaderView: NSView {
             toolTip = "Drag to resize the column; double-click to fit its values"
         } else if let column, let info = grid.source?.columns[grid.columnOrder[column]] {
             toolTip = isInSortControl(point, column) ? "Sort by \(info.name); ⌥-click to add it to the sort"
-                : "Select the column; drag to move it\n" + info.details
+                : "Select the column; drag to move it; double-click to fit its values\n" + info.details
         } else {
             toolTip = nil
         }

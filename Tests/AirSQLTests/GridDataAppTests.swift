@@ -252,6 +252,53 @@ extension AppTests {
             #expect(session.statements.last?.contains(" WHERE (`region` IN ('EU')\n) ORDER BY") == true)
         }
 
+        /// Data ▸ Quick Filter has each operator of a cell's menu, and Type a Value…; Sort by Columns… sorts by several.
+        @Test func quickFiltersFromTheMenuBarATypedValueAndASortByColumns() async throws {
+            let session = FakeTableSession()
+            let (main, harness, tab) = try await Self.tab(session: session)
+            let window = try #require(main.window)
+            window.makeFirstResponder(tab.grid)
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Contains Selection"]).error == nil)
+            #expect(tab.bar.filterText == "`region` LIKE '%EU%'")
+            await ready { tab.loading != nil }
+            tab.applyFilter("")
+            await ready { tab.loading != nil }
+            // IN takes every value selected in the column; it waits for several.
+            let into = Commands.filterIn.item()
+            #expect(!tab.validateMenuItem(into) && into.toolTip == "Select several values of this column first")
+            tab.grid.selection.select(GridPosition(row: 1, column: 2), extend: true)
+            #expect(tab.validateMenuItem(into))
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > In Selected Values"]).error == nil)
+            #expect(tab.bar.filterText == "`region` IN ('EU', 'US')")
+            await ready { tab.loading != nil }
+
+            // A value typed in, added to the filter there is.
+            tab.grid.selection.select(GridPosition(row: 1, column: 2))
+            #expect(await call(harness, "menu", ["path": "Data > Quick Filter > Type a Value…"]).error == nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(await call(harness, "set", ["id": "quickFilter.operator", "value": "Not equal to (<>)"]).error == nil)
+            #expect(await call(harness, "set", ["id": "quickFilter.value", "value": "U'S"]).error == nil)
+            #expect(await call(harness, "set", ["id": "quickFilter.add", "value": true]).error == nil)
+            #expect(await call(harness, "press", ["title": "Filter", "in": "sheet"]).error == nil)
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(tab.bar.filterText == "(`region` IN ('EU', 'US')) AND `region` <> 'U\\'S'")
+            await ready { tab.loading != nil }
+
+            // Two columns, the second one descending.
+            #expect(await call(harness, "menu", ["path": "Data > Sort by Columns…"]).error == nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(await call(harness, "set", ["id": "sort.column.0", "value": "region"]).error == nil)
+            #expect(await call(harness, "press", ["id": "sort.add"]).error == nil)
+            #expect(await call(harness, "set", ["id": "sort.direction.1", "value": "Descending"]).error == nil)
+            #expect(await call(harness, "press", ["id": "sort.up.1"]).error == nil)
+            #expect(await call(harness, "press", ["id": "sort.ok"]).error == nil)
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            await ready { tab.loading != nil }
+            #expect(session.statements.last?.contains("ORDER BY `id` DESC, `region` ASC LIMIT") == true, "\(session.statements.last ?? "")")
+            #expect(tab.grid.sortOrder.map(\.column) == [0, 2] && tab.settings.sort.count == 2)
+        }
+
         @Test func findAndReplaceInTheLoadedRows() async throws {
             let (_, _, tab) = try await Self.tab()
             let replace = NSMenuItem()
