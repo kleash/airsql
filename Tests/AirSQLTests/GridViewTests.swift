@@ -272,6 +272,24 @@ extension AppTests {
         #expect(grid.selection.areas == [.columns(3...3)])
     }
 
+    /// VoiceOver hears what a cell's colour shows (a pending change, a comparison's mark) and a diff's other value.
+    @Test func cellsTellVoiceOverWhatTheirColourShows() {
+        final class Marked: GridSource {
+            let columns = [GridColumn(name: "id", kind: .number), GridColumn(name: "name")]
+            let rowCount = 4
+            func cell(_ row: Int, _ column: Int) -> GridCell { .text("\(row)") }
+            func mark(_ row: Int, _ column: Int) -> GridMark { column == 0 ? .none : [.none, .edited, .inserted, .deleted][row] }
+            func note(_ row: Int, _ column: Int) -> String? { row == 1 && column == 1 ? "Staging has Ann" : nil }
+        }
+        let (_, _, content) = gridWindow(Marked())
+        func element(_ row: Int, _ column: Int) -> GridCellElement? {
+            content.grid.accessibilityCell(forColumn: column, row: row) as? GridCellElement
+        }
+        #expect((0..<4).map { element($0, 1)?.accessibilityLabel() } == ["name", "name, changed", "name, added", "name, removed"])
+        #expect(element(1, 0)?.accessibilityLabel() == "id" && element(1, 1)?.accessibilityHelp() == "Staging has Ann")
+        #expect(element(2, 1)?.accessibilityHelp() == nil)
+    }
+
     @Test func gridIsAnAccessibilityTable() {
         let (main, _, content) = gridWindow(FakeGridSource.large())
         let grid = content.grid
