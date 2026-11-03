@@ -641,7 +641,7 @@ extension AppTests {
             let (main, _, tab) = try await Self.tab(size: MainWindowController.minimumSize)
             main.window?.layoutIfNeeded()
             #expect(main.window?.frame.width == MainWindowController.minimumSize.width)
-            #expect(tab.bar.whereField.box.frame.width >= 80 && tab.bar.searchField.frame.width >= 120,
+            #expect(tab.bar.whereField.box.frame.width >= 80 && tab.bar.searchField.frame.width >= 150,
                     "\(tab.bar.whereField.box.frame.width), \(tab.bar.searchField.frame.width)")
             for replacing in [false, true] {
                 tab.findBar.show(replacing: replacing)

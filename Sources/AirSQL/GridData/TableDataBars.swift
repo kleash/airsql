@@ -85,7 +85,7 @@ final class TableDataBar: NSView, NSTextViewDelegate {
             // The bar grows with the condition's lines, keeping a margin round it.
             whereField.box.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor, constant: 4),
             row.bottomAnchor.constraint(greaterThanOrEqualTo: whereField.box.bottomAnchor, constant: 4),
-            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 150),  // its placeholder whole
             searchField.widthAnchor.constraint(lessThanOrEqualToConstant: 190),
         ])
         // In a window at its smallest the search narrows first, then the condition, rather than the bar widening the
