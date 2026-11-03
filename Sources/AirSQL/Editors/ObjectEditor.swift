@@ -131,6 +131,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
                 self.account = account
                 self.definition = definition
                 code.string = original
+                colourCode()
                 code.undoManager?.removeAllActions()
                 isBusy = false
                 overlay.hide()
@@ -146,8 +147,21 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     @objc private func retry(_ sender: Any?) { load() }
 
     func textDidChange(_ notification: Notification) {
+        colourCode()
         updateControls()
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
+    }
+
+    /// Colours the code as the SQL preview does, in place (the caret and the undo stay).
+    func colourCode() {
+        guard let storage = code.textStorage else { return }
+        let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+        let coloured = SQLPreviewSheet.coloured(code.string, font: font, noBackslashEscapes: server.noBackslashEscapes)
+        storage.beginEditing()
+        coloured.enumerateAttributes(in: NSRange(location: 0, length: coloured.length)) { attributes, range, _ in
+            storage.setAttributes(attributes, range: range)
+        }
+        storage.endEditing()
     }
 
     /// The definer pop-up, Apply, Revert and the note, for the code as it is now.
@@ -207,6 +221,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         self.name = name
         if let definition { self.definition = definition }
         code.string = original
+        colourCode()
         code.undoManager?.removeAllActions()
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
         guard let main = view.window?.windowController as? MainWindowController,
@@ -220,7 +235,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         let changed = ObjectCode.settingDefiner(code.string, to: mine ? nil : written.map(ObjectCode.quotedAccount))
         guard changed != code.string, code.shouldChangeText(in: NSRange(location: 0, length: code.string.utf16.count),
                                                             replacementString: changed) else { return }
-        code.string = changed
+        code.textStorage?.replaceCharacters(in: NSRange(location: 0, length: code.string.utf16.count), with: changed)
         code.didChangeText()
     }
 }

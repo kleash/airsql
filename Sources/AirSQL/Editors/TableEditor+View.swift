@@ -159,11 +159,10 @@ extension TableEditorController {
             text = "-- Fix this first: " + error.message
             color = .statusWarning
         }
-        sqlText.string = text
-        sqlText.textColor = color
-        if let first = text.range(of: "\n").map({ NSRange(text.startIndex..<$0.lowerBound, in: text) }), color == .labelColor {
-            sqlText.textStorage?.addAttribute(.foregroundColor, value: NSColor.sqlComment, range: first)
-        }
+        let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        sqlText.textStorage?.setAttributedString(color == .labelColor
+            ? SQLPreviewSheet.coloured(text, font: font, noBackslashEscapes: server.noBackslashEscapes)
+            : NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color]))
         updateButtons()
     }
 

@@ -39,7 +39,7 @@ extension ObjectEditorController {
         guard revertButton.isEnabled else { return }
         let text = original
         guard code.shouldChangeText(in: NSRange(location: 0, length: code.string.utf16.count), replacementString: text) else { return }
-        code.string = text
+        code.textStorage?.replaceCharacters(in: NSRange(location: 0, length: code.string.utf16.count), with: text)
         code.didChangeText()
     }
 
