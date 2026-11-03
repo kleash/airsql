@@ -17,8 +17,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     private static let columns: [(id: String, title: String, width: CGFloat, minimum: CGFloat, tip: String)] = [
         ("name", "Name", 180, 120, "The table's name"), ("rows", "Rows", 80, 60, "About how many rows (InnoDB estimates it)"),
         ("data", "Data", 72, 60, "Space its rows take"), ("index", "Indexes", 72, 60, "Space its indexes take"),
-        ("engine", "Engine", 70, 60, "Its storage engine"), ("collation", "Collation", 130, 110, "How its text compares and sorts"),
-        ("updated", "Updated", 130, 120, "When its rows last changed, where the engine keeps it"),
+        ("engine", "Engine", 70, 60, "Its storage engine"), ("collation", "Collation", 140, 130, "How its text compares and sorts"),
+        ("updated", "Updated", 140, 135, "When its rows last changed, where the engine keeps it"),
         ("comment", "Comment", 200, 80, "Its comment"),
     ]
 

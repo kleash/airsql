@@ -126,6 +126,10 @@ final class StatusItemView: NSView {
         }
         let stack = NSStackView(views: views)
         stack.spacing = 4
+        // As wide as its text: the room between the bar's two ends goes to the gap, not to an item (a wide route pushed the
+        // server over to the SQL log).
+        stack.setHuggingPriority(.defaultHigh, for: .horizontal)
+        (chip?.label ?? text).setContentHuggingPriority(.defaultHigh, for: .horizontal)
         addSubview(stack)
         stack.pin(to: self)
         heightAnchor.constraint(equalToConstant: 18).isActive = true

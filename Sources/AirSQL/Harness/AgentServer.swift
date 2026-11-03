@@ -783,17 +783,6 @@ final class AgentServer {
                 rect.fill()
                 continue
             }
-            // A popover's background is a backdrop (left out of the drawing): a plain one keeps its text readable.
-            if other.className.contains("Popover"), let content = other.contentView {
-                let bubble = content.convert(content.bounds, to: nil).offsetBy(dx: origin.x, dy: origin.y)
-                other.effectiveAppearance.performAsCurrentDrawingAppearance {
-                    let path = NSBezierPath(roundedRect: bubble, xRadius: Radius.card + 2, yRadius: Radius.card + 2)
-                    NSColor.windowBackgroundColor.setFill()
-                    path.fill()
-                    NSColor.separatorColor.setStroke()
-                    path.stroke()
-                }
-            }
             Self.draw(other, at: origin)
             // A sheet's glass background comes out in the window's colour: its edge shows where it is.
             if other.sheetParent === window {
@@ -892,10 +881,12 @@ final class AgentServer {
         CATransaction.setDisableActions(true)
         let opacities = vibrant.map(\.layer.opacity)
         vibrant.forEach { $0.layer.opacity = 0 }
-        draw(view, in: NSRect(origin: origin, size: window.frame.size), opaque: true)
+        // A popover's window is see-through around its bubble, which it draws itself, edge and arrow included.
+        let opaque = !window.className.contains("Popover")
+        draw(view, in: NSRect(origin: origin, size: window.frame.size), opaque: opaque)
         // Once the window has lost the focus (to a popover or a sheet), the frame's picture of itself on macOS 26 can carry
         // a stale, upside-down copy of a toolbar item into the content: the (opaque) content is drawn again over it.
-        if let content = window.contentView, content !== view, !content.bounds.isEmpty { place(content, opaque: true) }
+        if let content = window.contentView, content !== view, !content.bounds.isEmpty { place(content, opaque: opaque) }
         // Liquid Glass (macOS 26): the window server draws what is inside a glass container in the content, so the
         // cached image has only the platter. What it holds is drawn again on top, and the title bar over that. Not the
         // toolbar's platters: the cached image has their items, and drawing them again put a mirrored copy in a corner.

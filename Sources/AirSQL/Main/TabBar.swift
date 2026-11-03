@@ -68,7 +68,8 @@ final class TabBarView: NSView {
     private let plus = NSButton()
     private(set) var buttons: [TabButton] = []
     static let height: CGFloat = 32
-    static let minimumTabWidth: CGFloat = 96
+    /// Wide enough for a dozen letters of a title (the tooltip has all of it); more tabs scroll sideways.
+    static let minimumTabWidth: CGFloat = 140
     static let maximumTabWidth: CGFloat = 220
 
     override init(frame: NSRect) {

@@ -5,7 +5,7 @@ import AppKit
 /// and each foreign key a straight line from the child's key column to the parent (R15: no routing). A click selects a
 /// table, a double-click opens it in the table editor, a right-click opens its menu; the arrow keys move between tables.
 @MainActor
-final class ERDiagramView: NSView {
+final class ERDiagramView: NSView, NSViewToolTipOwner {
     struct Box {
         let table: SchemaTable
         let frame: NSRect
@@ -15,7 +15,16 @@ final class ERDiagramView: NSView {
 
     private(set) var boxes: [Box] = []
     private var links: [ERDiagram.Link] = []
-    var selected: String? { didSet { needsDisplay = true; setAccessibilityValue(selected) } }
+    /// A table's box for VoiceOver (the canvas is their group; its value is the selected table).
+    private var elements: [NSAccessibilityElement] = []
+    var selected: String? {
+        didSet {
+            needsDisplay = true
+            setAccessibilityValue(selected)
+            for (box, element) in zip(boxes, elements) { element.setAccessibilitySelected(box.table.name == selected) }
+            NSAccessibility.post(element: self, notification: .valueChanged)
+        }
+    }
     /// Double-click or Return on a table.
     var onOpen: ((String) -> Void)?
 
@@ -65,6 +74,28 @@ final class ERDiagramView: NSView {
         content = NSSize(width: max(x - Self.columnGap + Self.margin, 320), height: max(height, 200))
         fit(visibleRect.size)
         needsDisplay = true
+        // A box may cut a long name or line short: its tooltip and its accessibility element have them whole.
+        removeAllToolTips()
+        elements = boxes.map { box in
+            addToolTip(box.frame, owner: self, userData: nil)
+            let element = NSAccessibilityElement()
+            element.setAccessibilityParent(self)
+            element.setAccessibilityRole(.group)
+            element.setAccessibilityLabel("Table \(box.table.name), \(box.table.columns.count) columns")
+            element.setAccessibilityFrameInParentSpace(box.frame)
+            element.setAccessibilitySelected(box.table.name == selected)
+            return element
+        }
+    }
+
+    override func accessibilityChildren() -> [Any]? { elements }
+
+    /// A box's tooltip: its table's name and column lines, whole.
+    func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+        guard let box = boxes.first(where: { $0.frame.contains(point) }) else { return "" }
+        let more = box.table.columns.count - box.shown.count
+        return ([box.table.name] + box.shown.map { line($0, in: box.table) } + (more > 0 ? ["+ \(more) more"] : []))
+            .joined(separator: "\n")
     }
 
     /// The diagram's own size.

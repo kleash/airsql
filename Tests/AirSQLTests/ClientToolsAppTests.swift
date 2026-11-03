@@ -133,8 +133,13 @@ extension AppTests {
             sheet.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["crm", "shop"])
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the file to run first")
+            // The file's size has a line of its own once there is a file, and none before (no blank band).
+            let content = try #require(sheet.window?.contentView)
+            let info = try #require(find(NSTextField.self, id: "restore.fileInfo", in: content))
+            #expect(info.isHiddenOrHasHiddenAncestor)
             sheet.use(URL(fileURLWithPath: "/Volumes/Backups/shop-2026-11-03.sql.gz"))
             #expect(sheet.runButton.isEnabled)
+            #expect(await eventually(timeout: 5) { !info.isHiddenOrHasHiddenAncestor })
             let command = await Self.text(harness, "restore.command")
             #expect(command == "/usr/bin/gzip -dc /Volumes/Backups/shop-2026-11-03.sql.gz | /opt/homebrew/opt/mariadb/bin/mariadb "
                 + "--defaults-file=‹private temporary file› --protocol=SOCKET --socket=/tmp/mysql.sock "
@@ -194,6 +199,22 @@ extension AppTests {
             _ = await call(harness, "set", ["id": "csv.map.name", "value": "Leave out (its default)"])
             _ = await call(harness, "set", ["id": "csv.map.email", "value": "Leave out (its default)"])
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the field at least one column takes")
+        }
+
+        @Test func theCSVFormSaysWhyItIsOffWhileItRuns() async throws {
+            let (main, _) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            sheet.show(columns: ToolFixtures.customerColumns)
+            let content = try #require(sheet.window?.contentView)
+            let separator = try #require(find(NSPopUpButton.self, id: "csv.separator", in: content))
+            let tip = separator.toolTip
+            sheet.setFormEnabled(false)
+            #expect(!separator.isEnabled && separator.toolTip == "It is running: wait for it, or Stop it")
+            sheet.setFormEnabled(true)
+            #expect(separator.isEnabled && separator.toolTip == tip)
         }
 
         @Test func thePickerTicksWithAClickADoubleClickSpaceAndItsMenu() async throws {

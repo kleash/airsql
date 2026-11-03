@@ -196,6 +196,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
                 header.children += rows
             }
         }
+        // Nothing matches: say so, and how to see every connection again.
+        if !text.isEmpty && header.children.isEmpty {
+            header.children = ["Nothing matches “\(text)”", "Esc in the filter shows everything"].map { SidebarNode(.message(UUID(), $0)) }
+        }
         folders = newFolders
         connections = newConnections
         treeNodes = fresh

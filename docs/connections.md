@@ -24,7 +24,9 @@ tabs:
 - **SSH and Proxy**: the route (below).
 - **Options**: read-only (writes from the console, the grid and agents are refused), the compressed protocol, a query
   timeout, the databases shown (names or patterns such as `shop, reports_*`), startup SQL that runs after each login
-  (for example `SET time_zone = '+00:00';`), and safety checks of the connection's own.
+  (for example `SET time_zone = '+00:00';`), the connection's own client tools (empty: Settings ▸ Client Tools'
+  choice; each says which program and version it is, or why it can't be used), and safety checks of the connection's
+  own.
 - **Agents**: what AI agents may do with this connection.
 
 **Test Connection** connects with what the editor shows, reports each hop with its time, and disconnects. **Save and

@@ -88,6 +88,45 @@ extension AppTests {
         #expect(main.tabs.map(\.title).filter { $0 == "Top customers" }.count == 2)
     }
 
+    @Test func manyTabsKeepAReadableTitleAndScroll() throws {
+        let model = testModel()
+        let (main, _) = appWindow(model)
+        for index in 1...12 { main.open(FixtureContent(), title: index == 12 ? "Agent update" : "Query \(index)", connection: nil) }
+        main.tabBar.layoutSubtreeIfNeeded()
+        let buttons = main.tabBar.buttons
+        #expect(buttons.allSatisfy { $0.frame.width >= TabBarView.minimumTabWidth })
+        // The last tab opened is selected and scrolled into view, its title whole.
+        let last = try #require(buttons.last)
+        #expect(!last.visibleRect.isEmpty)
+        let title = try #require(find(NSTextField.self, in: last))
+        let cell = try #require(title.cell)
+        let needed = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: CGFloat.greatestFiniteMagnitude, height: 20)).width
+        #expect(title.stringValue == "Agent update" && needed <= title.frame.width + 1, "needs \(needed), has \(title.frame.width)")
+    }
+
+    @Test func statusItemsStayInOrderWhateverTheWidth() {
+        let model = testModel(Fixtures.shop)
+        let (main, _) = appWindow(model, size: MainWindowController.minimumSize)
+        model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3")
+        model.agentStatus = "Claude Code · reading schema"
+        let content = FixtureContent()
+        content.badge = "Transaction open · 2 changes"
+        main.open(content, title: "Query", connection: Fixtures.production.id)
+        let work = model.activity.start("Exporting shop with mariadb-dump", connection: Fixtures.production.id) {}
+        defer { work.end() }
+        main.refresh()
+        let bar = main.statusBar
+        // Narrow (the server steps out), then wide: the route keeps its own width and the server follows it, far from
+        // the SQL log.
+        for width in [1180, MainWindowController.minimumSize.width, 1500] {
+            main.window?.setFrame(NSRect(origin: main.window!.frame.origin, size: NSSize(width: width, height: 720)), display: false)
+            main.window?.layoutIfNeeded()
+        }
+        #expect(bar.route.frame.width <= bar.route.fittingSize.width + 1, "the route is \(bar.route.frame.width) wide")
+        #expect(abs(bar.server.frame.minX - bar.route.frame.maxX - 12) < 1)
+        #expect(bar.sqlLog.frame.minX - bar.server.frame.maxX > 300)
+    }
+
     @Test func statusBarShowsRouteTransactionWorkAndAgents() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)

@@ -62,6 +62,18 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         table.usesAlternatingRowBackgroundColors = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.setAccessibilityIdentifier("reconTables.list")
+        // A double-click ticks or unticks the row's Compare; a right-click offers both.
+        table.target = self
+        table.doubleAction = #selector(toggleClicked(_:))
+        let menu = NSMenu(title: "Table")
+        for (title, tip, action) in [("Compare", "Compare the selected tables in the next compare", #selector(includeChosen(_:))),
+                                     ("Leave Out", "Leave the selected tables out of the next compare", #selector(leaveOutChosen(_:)))] {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = self
+            item.toolTip = tip
+            menu.addItem(item)
+        }
+        table.menu = menu
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
@@ -138,6 +150,28 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         guard rows.indices.contains(sender.tag) else { return }
         rows[sender.tag].choice.included = sender.state == .on
     }
+
+    /// The rows a menu command acts on: the clicked one, with the rest of the selection when it is part of it.
+    private var chosenRows: IndexSet {
+        let clicked = table.clickedRow
+        guard clicked >= 0 else { return table.selectedRowIndexes }
+        return table.selectedRowIndexes.contains(clicked) ? table.selectedRowIndexes : IndexSet(integer: clicked)
+    }
+
+    private func include(_ rows: IndexSet, _ included: Bool) {
+        for row in rows where self.rows.indices.contains(row) { self.rows[row].choice.included = included }
+        table.reloadData(forRowIndexes: rows, columnIndexes: IndexSet(integer: 0))
+    }
+
+    @objc func toggleClicked(_ sender: Any?) {
+        let row = table.clickedRow >= 0 ? table.clickedRow : table.selectedRow
+        guard rows.indices.contains(row) else { return }
+        include(IndexSet(integer: row), !rows[row].choice.included)
+    }
+
+    @objc func includeChosen(_ sender: Any?) { include(chosenRows, true) }
+
+    @objc func leaveOutChosen(_ sender: Any?) { include(chosenRows, false) }
 
     @objc private func tickAll(_ sender: Any?) {
         for index in rows.indices { rows[index].choice.included = true }
