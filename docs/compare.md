@@ -32,9 +32,9 @@ its rows when they differ.
   side has marked.
 - **Data:** the rows of every table both sides have, matched on the primary key, or on a unique key whose columns
   are all NOT NULL. The **Data** tab lists rows **missing** from the target, **extra** in it, and **changed** rows,
-  with the cells that differ marked (hold the pointer over one to see the target's value). Tables without such a key
-  are still checked as a whole, but their rows can't be matched or synced. Generated columns are left out: their
-  values follow from the others.
+  with the cells that differ marked (hold the pointer over one to see the target's value); ⌘C or a right-click copies
+  the selected rows as tab-separated text. Tables without such a key are still checked as a whole, but their rows
+  can't be matched or synced. Generated columns are left out: their values follow from the others.
 
 MySQL and MariaDB write the same thing differently, and the compare reads them alike: `int(11)` and `int`, MariaDB's
 JSON (a LONGTEXT with a check) and MySQL's, `CURRENT_TIMESTAMP` and `current_timestamp()`, `NO ACTION` and
