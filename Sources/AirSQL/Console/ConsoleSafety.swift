@@ -38,7 +38,10 @@ enum ConsoleSafety {
                 break
             }
         }
-        guard !warnings.isEmpty || (writes && safety.askBeforeConsoleWrite) else { return answer(true) }
+        // What an agent set off asks unless every statement is proven read-only (the agents' gate, plan §2.8).
+        let agent = AgentGate.agent != nil && safety.askBeforeAgentChanges
+            && statements.contains { !AgentGate.isReadOnly($0.sql, noBackslashEscapes: noBackslashEscapes) }
+        guard !warnings.isEmpty || (writes && safety.askBeforeConsoleWrite) || agent else { return answer(true) }
         let count = statements.count
         let change = ChangeSQL(title: "Console", statements: statements.map(\.sql), connection: saved.id)
         var request = SQLPreviewRequest(

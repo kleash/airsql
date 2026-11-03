@@ -12,10 +12,19 @@ let log = Logger(subsystem: "com.kleash.airsql", category: "app")
 final class AppModel: ObservableObject {
     @Published var data: AirSQLData {
         didSet {
-            guard data != oldValue else { return }
+            guard data != oldValue, !reverting else { return }
+            // What an agent's request would change here is refused (plan §2.8): the data goes back as it was (setting it
+            // here runs this again).
+            guard AgentGuard.allows(changing: oldValue, to: data) else {
+                reverting = true
+                data = oldValue
+                reverting = false
+                return
+            }
             store(data)
         }
     }
+    private var reverting = false
     /// Connections that aren't idle: connecting, connected, or failed. Set by whatever connects.
     @Published var states: [UUID: ConnectionState] = [:]
     /// What the status bar's agent chip says ("Claude Code · reading schema"); nil hides it. Set by agent access.
@@ -76,6 +85,8 @@ final class AppModel: ObservableObject {
         let original = copy.id
         copy.id = UUID()
         copy.name = copy.displayName + " copy"
+        guard AgentGuard.allows(changing: data, to: AirSQLData(connections: data.connections + [copy], folders: data.folders,
+                                                               settings: data.settings)) else { return nil }
         save(copy)
         let read = savedPassword, write = setSavedPassword, key = copy.id.uuidString
         // The Keychain may wait for the person (a locked keychain): not on the main thread.
@@ -87,7 +98,10 @@ final class AppModel: ObservableObject {
 
     /// Forgets connections and their saved passwords and table settings.
     func delete(_ ids: Set<UUID>) {
-        data.connections.removeAll { ids.contains($0.id) }
+        var remaining = data
+        remaining.connections.removeAll { ids.contains($0.id) }
+        guard AgentGuard.allows(changing: data, to: remaining) else { return }  // and its passwords stay
+        data = remaining
         for id in ids { states[id] = nil }
         let write = setSavedPassword
         DispatchQueue.global(qos: .userInitiated).async {

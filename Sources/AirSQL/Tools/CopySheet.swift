@@ -218,7 +218,9 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
                 preview.warnings = ["Tables of the same name on \(target.displayName) are dropped first: their rows are lost."]
             }
             // The other server is written to: the preview asks when that drops tables or the server is production.
-            guard request.addDropTable || target.colour == .production else {
+            // And when an agent set it off: then it waits for the person (plan §2.8).
+            let agent = AgentGate.agent != nil && model.data.safety(for: target).askBeforeAgentChanges
+            guard agent || request.addDropTable || target.colour == .production else {
                 start(request, names: names, source: options, target: targetOptions, to: target)
                 return
             }

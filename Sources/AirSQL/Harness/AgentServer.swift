@@ -33,28 +33,39 @@ final class AgentServer {
 
     static let tools = ["snapshot", "screenshot", "menu", "press", "set", "select", "key", "type", "click", "wait"]
 
-    /// Runs a tool: text (JSON) or an image, `isError` on failure.
+    /// Runs a tool: text (JSON) or an image, `isError` on failure. For an agent (`AgentGate.agent`), what the tool sets off
+    /// is the agent's: the gate's checks refuse what only the person at the Mac may do (`AgentGuard`).
     func handle(_ tool: String, _ arguments: [String: Any]) async -> [String: Any] {
+        AgentGuard.refusal = nil
         do {
-            switch tool {
-            case "snapshot":
-                if let spec = arguments["in"] as? String { _ = try scopes(spec) }  // a window that isn't there says so
-                return Self.text(snapshot(arguments))
-            case "screenshot": return try screenshot(arguments)
-            case "menu": return Self.text(try await menu(arguments))
-            case "press": return Self.text(try await press(arguments))
-            case "set": return Self.text(try await set(arguments))
-            case "select": return Self.text(try await select(arguments))
-            case "key": return Self.text(try await key(arguments))
-            case "type": return Self.text(try await type(arguments))
-            case "click": return Self.text(try await click(arguments))
-            case "wait": return Self.text(try await wait(arguments))
-            default: throw Failure("AirSQL has no tool “\(tool)”. Tools: " + Self.tools.joined(separator: ", "))
+            let reply = try await run(tool, arguments)
+            if AgentGate.agent != nil, let refusal = AgentGuard.refusal {
+                AgentGuard.refusal = nil
+                throw Failure(refusal)
             }
+            return reply
         } catch let failure as Failure {
             return Self.text(["error": failure.message], isError: true, raw: failure.message)
         } catch {
             return Self.text(["error": error.localizedDescription], isError: true, raw: error.localizedDescription)
+        }
+    }
+
+    private func run(_ tool: String, _ arguments: [String: Any]) async throws -> [String: Any] {
+        switch tool {
+        case "snapshot":
+            if let spec = arguments["in"] as? String { _ = try scopes(spec) }  // a window that isn't there says so
+            return Self.text(snapshot(arguments))
+        case "screenshot": return try screenshot(arguments)
+        case "menu": return Self.text(try await menu(arguments))
+        case "press": return Self.text(try await press(arguments))
+        case "set": return Self.text(try await set(arguments))
+        case "select": return Self.text(try await select(arguments))
+        case "key": return Self.text(try await key(arguments))
+        case "type": return Self.text(try await type(arguments))
+        case "click": return Self.text(try await click(arguments))
+        case "wait": return Self.text(try await wait(arguments))
+        default: throw Failure("AirSQL has no tool “\(tool)”. Tools: " + Self.tools.joined(separator: ", "))
         }
     }
 
@@ -94,12 +105,14 @@ final class AgentServer {
         return await acted()
     }
 
-    /// Runs `action` from a run-loop timer and returns once it has run, or once it has opened a modal loop.
+    /// Runs `action` from a run-loop timer and returns once it has run, or once it has opened a modal loop. It runs as
+    /// the agent's whose request this is, if any (so do the tasks it starts).
     static func later(_ action: @escaping () -> Void) async {
+        let agent = AgentGate.agent
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             RunLoop.main.add(Timer(timeInterval: 0, repeats: false) { _ in
                 continuation.resume()
-                MainActor.assumeIsolated { action() }
+                MainActor.assumeIsolated { AgentGate.$agent.withValue(agent) { action() } }
             }, forMode: .common)
         }
     }
@@ -160,6 +173,7 @@ final class AgentServer {
         guard check.enabled, let target = check.target else {
             throw Failure("“\(path)” is disabled now" + (check.reason.map { ": " + $0 } ?? "."))
         }
+        try checkAgentMayChoose(action, target: target)
         if parts.first.map(normalized) == "context" { contextMenu = nil }
         return await perform { NSApp.sendAction(action, to: target, from: item) }
     }
@@ -267,7 +281,7 @@ final class AgentServer {
         guard id != nil || title != nil else { throw Failure("press needs an id or a title.") }
         let windows = try scopes(arguments["in"] as? String)
         for window in windows {
-            let nodes = AXNode.flatten(window)
+            let nodes = self.nodes(window)
             let match = id.flatMap { id in nodes.first { $0.id == id && ($0.isPressable || $0.view != nil) } }
                 ?? title.flatMap { title in
                     nodes.first { $0.isPressable && $0.title == title }
@@ -277,9 +291,11 @@ final class AgentServer {
             if match == nil, let id, let button = Self.views(NSButton.self, in: window.contentView?.superview ?? window.contentView)
                 .first(where: { $0.accessibilityIdentifier() == id && !$0.isHiddenOrHasHiddenAncestor }) {
                 guard button.isEnabled else { throw Failure("“\(id)” is disabled now" + (button.toolTip.map { ": " + $0 } ?? ".")) }
+                try checkAgentMayAct(in: window)
                 return await perform { self.pressButton(button) }
             }
             guard let node = match else { continue }
+            try checkAgentMayAct(in: window)
             guard node.enabled else {
                 throw Failure("“\(id ?? title ?? "")” is disabled now" + (node.help.map { ": " + $0 } ?? "."))
             }
@@ -304,8 +320,10 @@ final class AgentServer {
             throw Failure("set needs an id or a title (a label, title or placeholder).")
         }
         for window in try scopes(arguments["in"] as? String) where !(window is NSSavePanel) {
-            guard let node = field(query, in: AXNode.flatten(window)) else { continue }
+            guard let node = field(query, in: nodes(window)) else { continue }
             guard node.enabled else { throw Failure("“\(query)” is disabled now" + (node.help.map { ": " + $0 } ?? ".")) }
+            try checkAgentMayAct(in: window)
+            if let text = value as? String { try await checkPersonAllows(text, into: node.view) }
             try set(node, to: value)
             return await acted()
         }
@@ -423,7 +441,7 @@ final class AgentServer {
             return await acted()
         default:
             for window in try scopes(arguments["in"] as? String) {
-                for table in Self.views(NSTableView.self, in: window.contentView) {
+                for table in Self.views(NSTableView.self, in: window.contentView) where !hidesData(table) {
                     let rows = none ? IndexSet() : IndexSet((0..<table.numberOfRows).filter { row in
                         (0..<table.numberOfColumns).contains { column in
                             let cell = table.view(atColumn: column, row: row, makeIfNecessary: true)
@@ -431,6 +449,7 @@ final class AgentServer {
                         }
                     })
                     if none || !rows.isEmpty {
+                        try checkAgentMayAct(in: window)
                         table.selectRowIndexes(rows, byExtendingSelection: false)
                         return await acted(["selected": rows.count])
                     }
@@ -462,6 +481,8 @@ final class AgentServer {
         guard let combo = arguments["combo"] as? String else { throw Failure("key needs a combo, e.g. \"cmd+shift+n\".") }
         let keys = try KeyCombo(combo)
         let window = try keyWindow(arguments["in"] as? String)
+        try checkAgentMayAct(in: window)
+        try checkAgentMayPress(keys, in: window)
         (window.sheetParent ?? window).orderFront(nil)
         return await perform { self.sendKey(keys, to: window) }
     }
@@ -497,7 +518,7 @@ final class AgentServer {
     }
 
     /// The menu-bar items with this shortcut, in menu order (the first enabled one acts, as in AppKit).
-    private func menuItems(for keys: KeyCombo) -> [NSMenuItem] {
+    func menuItems(for keys: KeyCombo) -> [NSMenuItem] {
         func walk(_ menu: NSMenu) -> [NSMenuItem] {
             menu.items.flatMap { item -> [NSMenuItem] in
                 (item.submenu.map(walk) ?? []) + (Self.matches(item.keyEquivalent, item.keyEquivalentModifierMask, keys) ? [item] : [])
@@ -519,7 +540,9 @@ final class AgentServer {
     private func type(_ arguments: [String: Any]) async throws -> [String: Any] {
         guard let text = arguments["text"] as? String else { throw Failure("type needs text.") }
         let window = try keyWindow(arguments["in"] as? String)
+        try checkAgentMayAct(in: window)
         if let editor = window.firstResponder as? NSTextView {
+            try await checkPersonAllows(text, into: editor)
             editor.insertText(text, replacementRange: editor.selectedRange())
             return await acted()
         }
@@ -544,6 +567,7 @@ final class AgentServer {
         let base = try (arguments["in"] as? String).map { try scopes($0).last! } ?? mainWindow
         let point = NSPoint(x: base.frame.minX + x, y: base.frame.maxY - y)
         let window = (openSheets() + popovers(of: base)).reversed().first { $0.frame.contains(point) } ?? base
+        try checkAgentMayAct(in: window)
         window.layoutIfNeeded()  // as AppKit lays a window out before it handles an event
         let location = NSPoint(x: point.x - window.frame.minX, y: point.y - window.frame.minY)
         guard let frameView = window.contentView?.superview ?? window.contentView, let hit = frameView.hitTest(location) else {
@@ -629,7 +653,7 @@ final class AgentServer {
             guard let text, !text.isEmpty else { throw Failure("wait text needs text.") }
             check = { [self] in
                 let windows = appWindows.flatMap { [$0] + sheets(of: $0) + popovers(of: $0) }
-                let strings = windows.flatMap { AXNode.flatten($0) }.compactMap { $0.value as? String ?? ($0.title.isEmpty ? nil : $0.title) }
+                let strings = windows.flatMap { nodes($0) }.compactMap { $0.value as? String ?? ($0.title.isEmpty ? nil : $0.title) }
                 return strings.contains { $0.contains(text) } ? ["found": text] : nil
             }
         default:
@@ -659,7 +683,7 @@ final class AgentServer {
             window = try scopes(target).last!
         } else if target.hasPrefix("element:") {
             let id = String(target.dropFirst("element:".count))
-            guard let node = ([window] + sheets(of: window)).flatMap({ AXNode.flatten($0) }).first(where: { $0.id == id }) else {
+            guard let node = ([window] + sheets(of: window)).flatMap({ nodes($0) }).first(where: { $0.id == id }) else {
                 throw Failure("No element “\(id)”.")
             }
             crop = NSRect(x: node.frame.minX - window.frame.minX, y: node.frame.minY - window.frame.minY,
@@ -710,7 +734,12 @@ final class AgentServer {
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
         defer { NSGraphicsContext.restoreGraphicsState() }
-        Self.drawingAsKey([window] + overlays) { draw(window, overlays, size: size, in: context) }
+        Self.drawingAsKey([window] + overlays) {
+            draw(window, overlays, size: size, in: context)
+            for shown in [window] + overlays {
+                coverHidden(in: shown, at: NSPoint(x: shown.frame.minX - window.frame.minX, y: shown.frame.minY - window.frame.minY))
+            }
+        }
         return canvas.cgImage
     }
 

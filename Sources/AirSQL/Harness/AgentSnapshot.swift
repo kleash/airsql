@@ -8,6 +8,8 @@ import AppKit
 @MainActor
 struct AXNode {
     let object: NSObject
+    /// Data an agent may not read (`AgentServer.hidesData`): no value, no children.
+    var hidden = false
 
     private func get(_ key: String) -> Any? {
         object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
@@ -41,15 +43,15 @@ struct AXNode {
     }
     /// Screen coordinates (origin bottom left).
     var frame: NSRect { (get("accessibilityFrame") as? NSValue)?.rectValue ?? .zero }
-    var children: [AXNode] { (get("accessibilityChildren") as? [Any] ?? []).compactMap { ($0 as? NSObject).map(AXNode.init) } }
-    var parent: AXNode? { (get("accessibilityParent") as? NSObject).map(AXNode.init) }
+    var children: [AXNode] { (get("accessibilityChildren") as? [Any] ?? []).compactMap { ($0 as? NSObject).map { AXNode(object: $0) } } }
+    var parent: AXNode? { (get("accessibilityParent") as? NSObject).map { AXNode(object: $0) } }
     /// The AppKit control behind the node, if any.
     var view: NSView? { object as? NSView ?? (object as? NSCell)?.controlView }
     var isSecure: Bool { subrole == "securetextfield" || view is NSSecureTextField }
 
     /// The value as shown; a password field's as "•••(n)".
     var value: Any? {
-        guard let value = get("accessibilityValue") else { return nil }
+        guard !hidden, let value = get("accessibilityValue") else { return nil }
         if isSecure { return "•••(\((value as? String)?.count ?? 0))" }
         switch value {
         case let text as String: return text.isEmpty ? nil : text
@@ -105,11 +107,12 @@ struct AXNode {
     }
 
     /// The nodes under `root`, depth first. A sheet on it is a window of its own (flattened by itself). A short list's
-    /// rows (up to 200 cells) are walked from its table.
-    static func flatten(_ root: NSObject) -> [AXNode] {
+    /// rows (up to 200 cells) are walked from its table. Views `hiding` names come without their value and children.
+    static func flatten(_ root: NSObject, hiding: ((NSView) -> Bool)? = nil) -> [AXNode] {
         var result: [AXNode] = []
         func walk(_ node: AXNode, _ depth: Int) {
             guard depth == 0 || !(node.object is NSWindow) else { return }
+            if let view = node.object as? NSView, hiding?(view) == true { return result.append(AXNode(object: view, hidden: true)) }
             result.append(node)
             guard depth < 40 else { return }
             guard ["table", "outline", "list", "browser", "grid"].contains(node.role) else { return node.children.forEach { walk($0, depth + 1) } }
@@ -130,6 +133,7 @@ struct AXNode {
         if !id.isEmpty { json["id"] = id }
         if !title.isEmpty { json["title"] = title }
         if let value { json["value"] = value }
+        if hidden { json["hidden"] = AgentServer.hiddenNote }
         if !placeholder.isEmpty { json["placeholder"] = placeholder }
         if let help { json["help"] = help }
         if let reference {
@@ -161,7 +165,7 @@ extension AgentServer {
         if include.contains("elements"), let window = (arguments["in"] as? String).flatMap({ try? scopes($0).last }) ?? main?.window {
             let windows = [window] + sheets(of: window) + popovers(of: window)
             windows.forEach { $0.layoutIfNeeded() }  // the places a click will find, not those before a pending layout
-            result["elements"] = windows.flatMap { AXNode.flatten($0) }
+            result["elements"] = windows.flatMap { nodes($0) }
                 .filter { !["group", "splitgroup", "scrollarea", "unknown"].contains($0.role) || !$0.id.isEmpty }
                 .map { $0.json(relativeTo: window) }
         }
@@ -224,7 +228,7 @@ extension AgentServer {
     }
 
     private func sheetTitle(_ sheet: NSWindow) -> String {
-        AXNode.flatten(sheet).first { $0.role == "statictext" }.flatMap { $0.value as? String } ?? sheet.title
+        nodes(sheet).first { $0.role == "statictext" }.flatMap { $0.value as? String } ?? sheet.title
     }
 
     func sheetsJSON() -> [[String: Any]] {
@@ -235,7 +239,7 @@ extension AgentServer {
         if sheet is NSSavePanel {
             return ["kind": "panel", "title": sheet.title, "note": "Open and Save panels can't be driven: press Cancel."]
         }
-        let nodes = AXNode.flatten(sheet)
+        let nodes = self.nodes(sheet)
         var texts: [String] = [], fields: [[String: Any]] = [], buttons: [[String: Any]] = []
         for node in nodes {
             if node.role == "statictext", let text = node.value as? String {
