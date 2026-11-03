@@ -145,7 +145,6 @@ final class TableDataController: NSViewController, TabContent {
             restored = true
         }
         self.source = source
-        grid.source = source
         grid.sortOrder = source.sort.compactMap { key in
             source.columns.firstIndex { $0.name == key.column }.map { DataGridView.Sort(column: $0, ascending: key.ascending) }
         }
@@ -209,6 +208,8 @@ final class TableDataController: NSViewController, TabContent {
     private func finishLoading() {
         loading = nil
         bar.busy = false
+        // The grid gets the source with its first rows, so it sizes the columns to their values, not only their names.
+        if let source, grid.source !== source, source.loadedRows > 0 || !source.hasMore { grid.source = source }
         grid.reloadData()
         updateBars()
         if reloadWhenDone {
