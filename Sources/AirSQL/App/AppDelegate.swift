@@ -48,6 +48,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         self.main = main
         agents = AgentService(model: model, main: main)
         agents?.consoles = main
+        // The console's sessions, schema and query timeout: the connected connection's.
+        ConsoleViewController.openConnection = { [weak model] in model?.openConnection($0)?.connection }
+        ConsoleViewController.schemaCache = { [weak model] in model?.openConnection($0)?.schema }
+        ConsoleViewController.queryTimeout = { [weak model] in model?.connection($0)?.queryTimeout ?? 0 }
         // The compare window works on connected connections, on tools sessions of its own.
         ReconWindowController.connect = { [weak model] saved in
             guard let connection = model?.openConnection(saved.id)?.connection else {

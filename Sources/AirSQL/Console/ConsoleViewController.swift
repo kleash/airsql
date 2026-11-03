@@ -14,9 +14,8 @@ extension Notification.Name {
 /// toolbar and the status bar).
 @MainActor
 final class ConsoleViewController: NSViewController, TabContent {
-    // What lanes not yet in this build give the console: a connected connection's sessions (connections, L1), its
-    // schema cache (navigator, L5a) and its query timeout in seconds (L1's connection setting). Until then a connection
-    // counts as not connected.
+    // A connected connection's sessions, its schema cache and its query timeout in seconds: the app sets them to the
+    // connected connections (`AppModel.open`), tests to their own. Nil: not connected.
     static var openConnection: (UUID) -> Connection? = { _ in nil }
     static var schemaCache: (UUID) -> SchemaCache? = { _ in nil }
     static var queryTimeout: (UUID) -> Int = { _ in 0 }
