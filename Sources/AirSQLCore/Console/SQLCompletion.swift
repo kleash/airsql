@@ -32,7 +32,7 @@ public enum SQLCompletion {
         let utf16 = Array(text.utf16)
         let caret = min(max(0, caret), utf16.count)
         var start = caret
-        while start > 0, isWordChar(utf16[start - 1]) { start -= 1 }
+        while start > 0, SQLLexer.isNameChar(utf16[start - 1]) { start -= 1 }
         if start > 0, utf16[start - 1] == 0x60 { start -= 1 }  // an opening backtick
         let prefix = String(decoding: utf16[start..<caret], as: UTF16.self).replacingOccurrences(of: "`", with: "").lowercased()
         // The statement around the caret, and what comes before the word.
@@ -198,14 +198,9 @@ public enum SQLCompletion {
 
     /// A name as it can be typed: bare when it is a plain word that isn't reserved, else in backticks.
     public static func quote(_ name: String) -> String {
-        let plain = !name.isEmpty && name.utf16.allSatisfy(isWordChar) && !(name.first?.isNumber ?? true)
+        let plain = !name.isEmpty && name.utf16.allSatisfy(SQLLexer.isNameChar) && !(name.first?.isNumber ?? true)
             && !SQLWords.reserved.contains(name.uppercased())
         return plain ? name : SQLQuote.identifier(name)
-    }
-
-    /// A character of a name without quotes: ASCII letters and digits, _ and $, and anything beyond ASCII.
-    public static func isWordChar(_ c: UInt16) -> Bool {
-        (0x30...0x39).contains(c) || (0x41...0x5A).contains(c) || (0x61...0x7A).contains(c) || c == 0x5F || c == 0x24 || c >= 0x80
     }
 
     /// Keywords offered: the reserved words and the common others.

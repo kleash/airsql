@@ -443,7 +443,7 @@ struct SchemaIntrospection {
     }
 
     /// What a backslash escape in a string literal stands for.
-    private static func unescaped(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
+    static func unescaped(_ scalar: Unicode.Scalar) -> Unicode.Scalar {
         switch scalar {
         case "n": return "\n"
         case "r": return "\r"
