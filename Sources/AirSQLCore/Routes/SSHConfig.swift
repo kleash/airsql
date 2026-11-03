@@ -31,6 +31,11 @@ public enum SSHConfig {
                 lines.append("  ProxyJump " + value(hops[index - 1].host))
             } else if let proxySocket {
                 lines.append("  ProxyCommand /usr/bin/nc -U " + value(proxySocket.replacingOccurrences(of: "%", with: "%%")))
+            } else {
+                // 15 s to reach the first hop directly. The hops behind it (and a first hop behind the relay, which
+                // has its own) get no timeout: it would also run while the person answers the first hop's
+                // questions, its host key and password (as in AirSCP).
+                lines.append("  ConnectTimeout 15")
             }
         }
         lines += ["", "Host *",
@@ -38,8 +43,8 @@ public enum SSHConfig {
                   "  ControlMaster no", "  ControlPath none",
                   // A socket it can't make ends it (ExitOnForwardFailure); one left by an earlier ssh is replaced.
                   "  ExitOnForwardFailure yes", "  StreamLocalBindUnlink yes", "  StreamLocalBindMask 0177",
-                  // A dead network is noticed within a minute, and a server that never answers within 15 s.
-                  "  ServerAliveInterval 15", "  ServerAliveCountMax 3", "  ConnectTimeout 15",
+                  // A dead network is noticed within a minute.
+                  "  ServerAliveInterval 15", "  ServerAliveCountMax 3",
                   // "Authenticated to <hop>" lines: the connect's progress, hop by hop.
                   "  LogLevel VERBOSE",
                   "  BatchMode no", "  PermitLocalCommand no"]

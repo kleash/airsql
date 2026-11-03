@@ -18,7 +18,8 @@ struct RoutesTests {
         var jump = connection(.sshJump, hops: 3)
         jump.jumpHosts[1].login = .password
         let text = SSHConfig.text(for: jump, proxySocket: nil)
-        #expect(text.contains("Host jump0.example.com\n  User j0\nHost jump1.example.com\n  User j1\n"
+        // Only the first hop, reached directly, has a connect timeout: the others' would run while the first one asks.
+        #expect(text.contains("Host jump0.example.com\n  User j0\n  ConnectTimeout 15\nHost jump1.example.com\n  User j1\n"
                               + "  PreferredAuthentications keyboard-interactive,password\n  ProxyJump jump0.example.com\n"
                               + "Host db-gw.example.com\n  Port 2222\n  User deploy\n"
                               + "  IdentityFile \"~/keys dir/id 100%%\"\n  IdentitiesOnly yes\n"
@@ -29,6 +30,7 @@ struct RoutesTests {
         // SSH + proxy: the first hop through the relay; a plain SSH tunnel ignores jump hosts left in the list.
         let proxied = SSHConfig.text(for: connection(.sshProxy, hops: 2), proxySocket: "/tmp/airsql-1/ab.proxy")
         #expect(proxied.contains("Host jump0.example.com\n  User j0\n  ProxyCommand /usr/bin/nc -U /tmp/airsql-1/ab.proxy\n"))
+        #expect(text.components(separatedBy: "ConnectTimeout").count == 2 && !proxied.contains("ConnectTimeout"))
         let plain = SSHConfig.text(for: connection(.ssh, hops: 2), proxySocket: nil)
         #expect(!plain.contains("jump0") && !plain.contains("ProxyJump"))
     }
