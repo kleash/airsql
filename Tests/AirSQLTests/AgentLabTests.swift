@@ -104,7 +104,8 @@ struct AgentLabTests {
         let text = ((schema["databases"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
         #expect(text.contains("customers: id int") && text.contains("UNIQUE(email)"), "\(text.prefix(500))")
         let ddl = try await target.getSchema(["format": "ddl"])
-        #expect((((ddl["databases"] as? [[String: Any]])?.first?["text"] as? String) ?? "").contains("CREATE TABLE `customers`"))
+        let ddlText = ((ddl["databases"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+        #expect(ddlText.contains("CREATE TABLE `customers`"))
 
         let described = try await target.describe(["objects": ["customers", "fixture.orders", "nope"]])
         let objects = try #require(described["objects"] as? [[String: Any]])
