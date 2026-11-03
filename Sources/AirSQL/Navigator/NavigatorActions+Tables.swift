@@ -14,22 +14,22 @@ struct ServerChoices {
         let session = try await open.connection.session(.schema)
         func rows(_ sql: String) async throws -> [[String?]] { try await session.rows(sql) }
         var choices = ServerChoices()
-        for row in try await rows("SHOW CHARACTER SET") where row.count > 2 {
+        for row in try await rows(NavigatorSQL.characterSets) where row.count > 2 {
             guard let name = row[0] else { continue }
             choices.charsets.append(name)
             choices.defaultCollation[name] = row[2]
         }
         choices.charsets.sort()
-        for row in try await rows("SHOW COLLATION") where row.count > 1 {
+        for row in try await rows(NavigatorSQL.collations) where row.count > 1 {
             guard let name = row[0], let charset = row[1] else { continue }
             choices.collations[charset, default: []].append(name)
         }
         for key in choices.collations.keys { choices.collations[key]?.sort() }
-        if let row = try await rows("SELECT @@character_set_server, @@collation_server").first, row.count == 2 {
+        if let row = try await rows(NavigatorSQL.serverCharset).first, row.count == 2 {
             choices.serverCharset = row[0] ?? ""
             choices.serverCollation = row[1] ?? ""
         }
-        choices.engines = try await rows("SHOW ENGINES").compactMap { row in
+        choices.engines = try await rows(NavigatorSQL.engines).compactMap { row in
             row.count > 1 && (row[1] == "YES" || row[1] == "DEFAULT") ? row[0] : nil
         }.sorted()
         return choices

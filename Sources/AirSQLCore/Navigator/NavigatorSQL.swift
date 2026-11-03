@@ -126,4 +126,11 @@ public enum NavigatorSQL {
     public static func showCreate(_ object: DatabaseObject) -> String {
         "SHOW CREATE \(object.kind.keyword) " + object.quoted
     }
+
+    /// What New Database and the bulk editor offer: the server's character sets (name, description, default collation),
+    /// collations (name, character set), its own character set and collation, and its storage engines (name, support).
+    public static let characterSets = "SHOW CHARACTER SET"
+    public static let collations = "SHOW COLLATION"
+    public static let serverCharset = "SELECT @@character_set_server, @@collation_server"
+    public static let engines = "SHOW ENGINES"
 }

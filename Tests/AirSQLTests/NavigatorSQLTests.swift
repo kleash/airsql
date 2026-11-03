@@ -66,6 +66,26 @@ struct NavigatorSQLTests {
         }
     }
 
+    /// What the navigator reads (on the schema session, or Find Text's and the process list's own) passes the read-only
+    /// check, whatever the names, so the agents' gate never asks about it.
+    @Test(arguments: [false, true])
+    func itsReadsAreReadOnly(noBackslashEscapes: Bool) {
+        var reads = [NavigatorSQL.characterSets, NavigatorSQL.collations, NavigatorSQL.serverCharset, NavigatorSQL.engines,
+                     NavigatorSQL.processList(mariaDB: true), NavigatorSQL.processList(mariaDB: false)]
+        for name in Hostile.names {
+            let process = ServerProcess(id: 7, user: name, host: name, database: name, command: "Query", time: 1, state: nil,
+                                        info: name, queryID: 9)
+            reads += DatabaseObject.Kind.allCases.map { NavigatorSQL.showCreate(DatabaseObject($0, name, name)) }
+            reads += [NavigatorSQL.stillRunning(process, noBackslashEscapes: noBackslashEscapes),
+                      NavigatorSQL.stillConnected(process, noBackslashEscapes: noBackslashEscapes),
+                      NavigatorSQL.countContaining(name, in: DatabaseObject(.table, name, name), columns: [name, "b"],
+                                                   noBackslashEscapes: noBackslashEscapes)]
+        }
+        for sql in reads {
+            #expect(ReadOnlyClassifier.classify(sql, noBackslashEscapes: noBackslashEscapes) == .readOnly, "\(sql)")
+        }
+    }
+
     @Test func processListAndKill() {
         #expect(NavigatorSQL.processList(mariaDB: true).contains("QUERY_ID FROM information_schema.PROCESSLIST"))
         #expect(!NavigatorSQL.processList(mariaDB: false).contains("QUERY_ID"))
