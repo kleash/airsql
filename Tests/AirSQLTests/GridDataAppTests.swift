@@ -152,6 +152,21 @@ extension AppTests {
             #expect(tab.source?.changes.rowCount == 2)
         }
 
+        @Test func anAgentsApplyWaitsForThePersonInThePreview() async throws {
+            let session = FakeTableSession()
+            let (main, harness, tab) = try await Self.tab(session: session)
+            tab.source?.set(.text("x"), row: 0, column: 2)
+            tab.changesDidChange()
+            // An agent pressing Apply gets the preview, whatever Settings ▸ Safety says about previews: the person
+            // approves the whole change there once.
+            AgentGate.$agent.withValue("test agent") { tab.applyChanges(nil) }
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(shownText("preview.heading", in: main.window?.attachedSheet) == "Apply 1 change to airsql_fixture.orders?")
+            #expect(!session.statements.contains("START TRANSACTION"))
+            _ = await call(harness, "press", ["title": "Decline"])
+            #expect(tab.source?.changes.rowCount == 1)
+        }
+
         @Test func copyAsBecomesTheCopyFormat() async throws {
             let (_, _, tab) = try await Self.tab()
             tab.grid.selection.select(GridPosition(row: 0, column: 0))

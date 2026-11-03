@@ -129,6 +129,9 @@ final class ExportRowsSheet: NSWindowController {
     }
 
     @objc private func saveRows(_ sender: Any?) {
+        // The gate (plan §2.8): a file on this Mac is the person's to write.
+        guard !AgentGuard.refuses("Export Rows writes a file on this Mac: only the person at the Mac can save one. Copy the rows "
+                                  + "instead, or leave the sheet for them.") else { return }
         guard let parent = window?.sheetParent else { return }
         let format = chosenFormat, options = options, request = request, activity = activity
         let which = scope.indexOfSelectedItem

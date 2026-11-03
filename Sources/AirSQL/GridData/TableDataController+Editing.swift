@@ -184,8 +184,9 @@ extension TableDataController: DataGridViewDelegate {
     @objc func applyChanges(_ sender: Any?) { startApply(preview: false) }
     @objc func previewChanges(_ sender: Any?) { startApply(preview: true) }
 
-    /// Shows the SQL first when asked, when Settings ▸ Safety wants it (Production connections), or when there is a
-    /// warning (an engine that can't roll back, cascading deletes); then runs it.
+    /// Shows the SQL first when asked, when Settings ▸ Safety wants it (Production connections), when an agent asked for
+    /// it (the person approves it there once, not statement by statement), or when there is a warning (an engine that
+    /// can't roll back, cascading deletes); then runs it.
     private func startApply(preview: Bool) {
         guard let source, !source.changes.isEmpty, loading == nil else { return NSSound.beep() }
         bar.busy = true
@@ -205,7 +206,9 @@ extension TableDataController: DataGridViewDelegate {
             let warnings = TableEditing.warnings(source.table, database: database, deleting: !source.changes.state.deletes.isEmpty,
                                                  in: context.schema.snapshot)
             let change = ChangeSQL(title: "Apply changes to \(tableName)", statements: statements.map(\.sql), connection: context.connection.id)
-            guard preview || model.data.safety(for: context.connection).previewBeforeApply || !warnings.isEmpty else {
+            let safety = model.data.safety(for: context.connection)
+            let agent = AgentGate.agent != nil && safety.askBeforeAgentChanges
+            guard preview || safety.previewBeforeApply || agent || !warnings.isEmpty else {
                 return run(statements, on: session, change: change, saveAsChangeset: false)
             }
             guard let window = view.window else { return }
