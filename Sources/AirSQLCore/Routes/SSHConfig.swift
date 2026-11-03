@@ -5,8 +5,9 @@ import Foundation
 /// before it (ProxyJump), the first through the proxy relay when there is one; then the tunnel's own settings for every
 /// hop, then the person's ~/.ssh/config for whatever these leave open (ssh takes the first value it finds).
 public enum SSHConfig {
-    /// The person's own config, included last. Tests point it at a config of theirs (never the real ~/.ssh).
-    public static var include: String? = "~/.ssh/config"
+    /// The person's own config, included last; a throwaway instance's `$AIRSQL_SSH_DIR/config` instead, which keeps its
+    /// ssh away from the real ~/.ssh (testenv/AGENT.md). Tests point it at a config of theirs.
+    public static var include: String? = Env.value("SSH_DIR").flatMap { $0.isEmpty ? nil : $0 + "/config" } ?? "~/.ssh/config"
 
     /// The file's text. `proxySocket`: the relay to the first hop (SSH + proxy).
     public static func text(for connection: SavedConnection, proxySocket: String? = nil) -> String {

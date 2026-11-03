@@ -100,6 +100,11 @@ A server runs seed/ once, when its data folder is new. After changing seed/, run
   change the lab's accounts, server settings or containers from a test.
 - Keep ssh away from `~/.ssh`: use `Lab.sshConfig` (or `-F` with a config of your own) with the lab key, a throwaway
   known_hosts and `IdentityAgent none`.
+- A throwaway AirSQL app (its own `AIRSQL_SUPPORT_DIR`) on an SSH route needs `AIRSQL_SSH_DIR` too: its tunnels then
+  include `$AIRSQL_SSH_DIR/config` instead of `~/.ssh/config`. Make it first: `mkdir -p $T/ssh && chmod 700 $T/ssh &&
+  printf 'UserKnownHostsFile %s/ssh/known_hosts\nIdentityAgent none\nIdentityFile none\n' "$T" > $T/ssh/config`, then
+  `open -n build/AirSQL.app --env AIRSQL_SUPPORT_DIR=$T/support --env AIRSQL_SSH_DIR=$T/ssh`. Without it, trusting the
+  bastion's host key writes the user's `~/.ssh/known_hosts`.
 - The passwords here are throwaway values for a lab that listens only on 127.0.0.1 and internal networks: never use them
   anywhere else, and never put real credentials into the lab.
 - `down.sh` removes only `airsql-lab`. Leave other projects' containers alone (`porter-lab-*`, `mysqlmacclient-test-*`
