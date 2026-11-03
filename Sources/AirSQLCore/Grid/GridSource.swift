@@ -88,6 +88,12 @@ public struct GridColumn: Equatable, Sendable {
 }
 
 extension GridColumn {
+    /// TINYINT(1), BOOLEAN and BIT(1): drawn and edited as a checkbox.
+    public var isBoolean: Bool {
+        let type = type.lowercased()
+        return type.hasPrefix("tinyint(1)") || type.hasPrefix("bit(1)") || type == "boolean" || type == "bool"
+    }
+
     /// The header's second line: the type, then "auto", "default" or "generated", then "null" when NULL is allowed.
     public var typeLine: String {
         var words = type.isEmpty ? [] : [type]

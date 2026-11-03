@@ -15,10 +15,11 @@ extension MainMenu {
                         Commands.deleteRows, nil,
                         Commands.setNull, Commands.setDefault])
         menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
+        menus.data.add([Commands.chooseReferencedRow])
         menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
         menus.data.addItem(submenu("Quick Filter", [Commands.filterEquals.item(), Commands.filterNotEquals.item()]))
         menus.data.add([Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending, Commands.clearSort, nil,
-                        Commands.goToRow, Commands.columnSummary, Commands.hideColumn])
+                        Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn])
         menus.data.addItem(GridViewer.displayMenu())
         menus.data.add([nil, Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.exportRows])
         let refresh = menus.view.items.firstIndex { $0.action == Commands.refresh.action } ?? menus.view.items.count - 1

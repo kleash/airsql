@@ -60,8 +60,9 @@ final class TableDataController: NSViewController, TabContent {
     var noBackslashEscapes = false
     /// The data session's sql_mode and time zone, which decide what a value may be (read with the first page).
     var editContext: EditContext?
-    /// A SET column's checklist while it shows.
+    /// A SET column's checklist, or a foreign key's drop-down, while it shows.
     var checklist: SetChecklist?
+    var lookup: ForeignKeyLookup?
     /// A new filter or sort came while rows were loading: load again once they are in.
     var reloadWhenDone = false
     /// What went wrong last (a filter the server refused), until the next load works.

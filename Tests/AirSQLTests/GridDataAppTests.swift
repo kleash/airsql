@@ -13,6 +13,11 @@ final class FakeTableSession: TableSession {
     var rows: [[String?]] = [["1", "7", "EU", "100", "12.50", nil], ["2", nil, "US", "101", "99.00", "1"],
                              ["3", "9", "EU", "102", "0.10", nil]]
     var changed: (String) -> UInt64 = { _ in 1 }
+    /// INSERT's insert ID, and the row a read-back SELECT (… WHERE `id` = that ID) finds.
+    var insertID: UInt64 = 0
+    var readBack: [String?]?
+    /// What a foreign key's drop-down finds in customers: id and email.
+    var customers: [[String?]] = [["7", "ann@example.com"], ["9", "cy@example.org"]]
     var sqlMode = "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"
 
     var columns: [ResultStore.Column] = [
@@ -47,9 +52,14 @@ final class FakeTableSession: TableSession {
         if sql.hasPrefix("SELECT TABLE_ROWS") || sql.hasPrefix("SELECT COUNT(*)") {
             return result([.init(name: "n", type: MYSQL_TYPE_LONGLONG)], [[String(rows.count)]])
         }
+        if sql.contains(" FROM `airsql_fixture`.`customers`"), !columns.contains(where: { $0.name == "email" }) {
+            return result([.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING)], customers)
+        }
+        if let readBack, sql.hasSuffix("WHERE `id` = \(insertID)") { return result(columns, [readBack]) }
         if sql.hasPrefix("SELECT") { return result(columns, rows) }
         let affected = ["START TRANSACTION", "COMMIT", "ROLLBACK"].contains(sql) ? 0 : changed(sql)
-        return [StatementResult(rows: nil, affectedRows: affected, insertID: 0, warnings: 0, info: nil, duration: 0)]
+        return [StatementResult(rows: nil, affectedRows: affected, insertID: sql.hasPrefix("INSERT") ? insertID : 0, warnings: 0,
+                                info: nil, duration: 0)]
     }
 
     func stream(_ sql: String, batchRows: Int, batch: @escaping (ResultStore) throws -> Void) async throws {

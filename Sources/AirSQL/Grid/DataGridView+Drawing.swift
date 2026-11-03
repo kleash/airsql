@@ -32,6 +32,17 @@ extension DataGridView {
         let selectedRow = focused ? NSColor.selectedRow.solid : selected
         let marks: [GridMark: NSColor] = [.edited: NSColor.pendingEdit.solid, .inserted: NSColor.pendingInsert.solid,
                                           .deleted: NSColor.pendingDelete.solid]
+        // Booleans (TINYINT(1), BIT(1)) as checkboxes: ticked in the accent, empty in grey; made when one shows.
+        let booleans = Set(columns.map { columnOrder[$0] }.filter { source.columns[$0].isBoolean })
+        var boxes: [Bool: NSImage] = [:]
+        func checkbox(_ on: Bool) -> NSImage? {
+            if let image = boxes[on] { return image }
+            let size = NSImage.SymbolConfiguration(pointSize: styles.regular.pointSize + 2, weight: .regular)
+            let colours = NSImage.SymbolConfiguration(paletteColors: on ? [.white, .accent] : [.secondaryLabelColor])
+            boxes[on] = NSImage(systemSymbolName: on ? "checkmark.square.fill" : "square", accessibilityDescription: nil)?
+                .withSymbolConfiguration(size.applying(colours))
+            return boxes[on]
+        }
         // Attributes and "…" for each look, made once per draw.
         var looks: [Int: (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine)] = [:]
         func look(_ column: Int, _ info: GridColumn, isNull: Bool, deleted: Bool) -> (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine) {
@@ -80,6 +91,13 @@ extension DataGridView {
                     NSColor.dataNull.withAlphaComponent(0.25).setFill()
                     NSBezierPath(roundedRect: NSRect(x: rect.minX + GridStyles.padding, y: y + (rowHeight - 8) / 2,
                                                      width: max(0, min(available, 64)), height: 8), xRadius: 4, yRadius: 4).fill()
+                    continue
+                }
+                if booleans.contains(sourceColumn), case .text(let value) = cell, value == "0" || value == "1", let image = checkbox(value == "1") {
+                    let size = image.size
+                    image.draw(in: NSRect(x: rect.minX + GridStyles.padding, y: y + ((rowHeight - size.height) / 2).rounded(),
+                                          width: size.width, height: size.height),
+                               from: .zero, operation: .sourceOver, fraction: mark == .deleted ? 0.4 : 1, respectFlipped: true, hints: nil)
                     continue
                 }
                 var text = GridStyles.text(cell, nullText: nullText)

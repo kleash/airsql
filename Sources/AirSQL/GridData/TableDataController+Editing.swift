@@ -48,6 +48,7 @@ extension TableDataController: DataGridViewDelegate {
             menu.add([Commands.clearFilter, nil, Commands.setNull, Commands.setDefault])
             let values = insertValueItems()
             if !values.isEmpty { menu.addItem(MainMenu.submenu("Insert Value", values)) }
+            if let column = viewer.focusedCell?.column, foreignKey(column) != nil { menu.add([Commands.chooseReferencedRow]) }
             menu.add([nil, Commands.addRow, Commands.duplicateRow, Commands.deleteRows, Commands.revert, nil, Commands.previewChanges,
                       Commands.apply, nil, Commands.exportRows])
         }

@@ -91,6 +91,10 @@ extension TableDataController {
             return true
         }
         guard typed == nil else { return false }
+        if foreignKey(column) != nil {
+            showLookup(row: row, column: column)
+            return true
+        }
         switch type.kind {
         case .enumeration(let members):
             showPickList(members, row: row, column: column)
@@ -105,7 +109,7 @@ extension TableDataController {
     }
 
     /// The cell being edited, on screen.
-    private var editedRect: NSRect {
+    var editedRect: NSRect {
         grid.selection.cursor.map { grid.cellRect($0) } ?? .zero
     }
 
@@ -143,6 +147,89 @@ extension TableDataController {
             self?.setSelected { _ in .text(type.setText(picked)) }
         }
         checklist?.show(relativeTo: editedRect, of: grid)
+    }
+
+    // MARK: Foreign keys
+
+    /// The foreign key a column is part of.
+    func foreignKey(_ column: Int) -> SchemaForeignKey? {
+        source.flatMap { ForeignKeyQueries.foreignKey(of: $0.columns[column].name, in: $0.table) }
+    }
+
+    /// Choose Referenced Row…: the focused foreign key column's drop-down.
+    @objc func chooseReferencedRow(_ sender: Any?) {
+        guard let cell = viewer.focusedCell else { return NSSound.beep() }
+        showLookup(row: cell.row, column: cell.column)
+    }
+
+    /// The referenced table's rows under the cell, searched on the data session; the one chosen gives the selected rows
+    /// its key. Another database's table is read into the schema cache first.
+    func showLookup(row: Int, column: Int) {
+        guard editingOff == nil, let key = foreignKey(column) else { return NSSound.beep() }
+        let schema = context.schema
+        guard let referenced = schema.snapshot.table(key.referencedDatabase, key.referencedTable) else {
+            Task {
+                try? await schema.loadDetails([key.referencedDatabase])
+                if schema.snapshot.table(key.referencedDatabase, key.referencedTable) != nil { showLookup(row: row, column: column) } else { NSSound.beep() }
+            }
+            return
+        }
+        let label = ForeignKeyQueries.defaultLabel(referenced, key: key.referencedColumns)
+        let values = self.values, open = openSession
+        lookup = ForeignKeyLookup(title: key.referencedTable, keyCount: key.referencedColumns.count, read: { text in
+            let sql = ForeignKeyQueries.lookup(key, referenced: referenced, label: label, search: text, context: values)
+            return try await open().query(sql, rowCap: 100).first?.rows
+        }, pick: { [weak self] picked in self?.setForeignKey(key, to: picked) })
+        lookup?.show(relativeTo: editedRect, of: grid)
+    }
+
+    /// The selected rows' foreign key columns take the chosen row's key (all of a composite key's), one step for undo.
+    private func setForeignKey(_ key: SchemaForeignKey, to picked: [String]) {
+        guard let source else { return }
+        let depth = source.changes.undoDepth
+        for row in Set(selectedCells().map(\.row)).sorted() {
+            for (name, value) in zip(key.columns, picked) {
+                guard let column = source.columns.firstIndex(where: { $0.name == name }), source.canEdit(row, column),
+                      refusal(.text(value), column: column) == nil else { continue }
+                source.set(.text(value), row: row, column: column)
+            }
+        }
+        source.changes.squashUndo(to: depth)
+        changesDidChange()
+    }
+
+    /// Related Rows (⌃⌘↓): the row the focused cell's foreign key points to, and the rows of other tables that point at
+    /// this row, as a menu; each opens in a table tab filtered to them.
+    @objc func showRelatedRows(_ sender: Any?) {
+        guard let source, let cell = viewer.focusedCell, case .loaded = source.row(cell.row) else { return NSSound.beep() }
+        let row = Dictionary(source.columns.indices.map { column in
+            (source.columns[column].name, source.bytes(cell.row, column) ?? source.value(cell.row, column).map { Array($0.utf8) })
+        }, uniquingKeysWith: { first, _ in first })
+        let up = foreignKey(cell.column).flatMap { try? ForeignKeyQueries.referenced(by: $0, from: source.table, row: row, context: values) }
+            .map { [$0] } ?? []
+        let related = up + ForeignKeyQueries.referencing(database: database, table: source.table, row: row,
+                                                         snapshot: context.schema.snapshot, context: values)
+        let menu = NSMenu(title: "Related Rows")
+        for (index, item) in related.enumerated() {
+            let pointsHere = index >= up.count
+            let entry = NSMenuItem(title: "\(item.table): " + (pointsHere ? "rows pointing to this one (\(item.foreignKey))" : "the row it points to"),
+                                   action: #selector(openRelated(_:)), keyEquivalent: "")
+            entry.representedObject = [item.database, item.table, item.condition]
+            entry.target = self
+            entry.toolTip = "Open \(item.table) filtered to \(item.condition)"
+            menu.addItem(entry)
+        }
+        if related.isEmpty {
+            menu.addItem(withTitle: "No foreign key leads to or from this row", action: nil, keyEquivalent: "").toolTip =
+                "Related Rows follows the table's foreign keys and those of tables that refer to it"
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: editedRect.minX, y: editedRect.maxY), in: grid)
+    }
+
+    @objc func openRelated(_ sender: NSMenuItem) {
+        guard let parts = sender.representedObject as? [String], parts.count == 3,
+              let main = view.window?.windowController as? MainWindowController else { return }
+        _ = main.openTableData(parts[1], database: parts[0], context: context, condition: parts[2])
     }
 
     // MARK: Insert Value

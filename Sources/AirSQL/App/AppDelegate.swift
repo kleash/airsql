@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         agents?.close()
         Store.flush()
         TableViewSettingsStore.shared.flush()
+        PendingChangesStore.shared.flush()
     }
 
     // MARK: Commands available in every window
