@@ -8,6 +8,8 @@ protocol AgentConsole: AnyObject {
     var agentText: String { get }
     /// The database its statements run in.
     var agentDatabase: String? { get }
+    /// The session's NO_BACKSLASH_ESCAPES, so credentials are masked where its strings really end.
+    var agentNoBackslashEscapes: Bool { get }
     /// What the person ran last and how it ended; nil: nothing yet.
     var agentLastRun: AgentConsoleRun? { get }
 }
@@ -98,11 +100,15 @@ extension AgentService {
         guard let (tab, console, saved) = found else {
             throw AirSQLError(.notFound, wanted.isEmpty ? "No console tab is open." : "No console tab “\(wanted)”: context lists them.")
         }
-        var reply: [String: Any] = ["tab": tab.id.uuidString, "title": tab.title, "text": console.agentText,
+        // Agents never receive passwords (plan §2.8): mask the editor's text and the last run's SQL and error, as the
+        // SQL log and query history already are, in case a CREATE USER … IDENTIFIED BY or SET PASSWORD is in them.
+        let noBackslashEscapes = console.agentNoBackslashEscapes
+        func masked(_ sql: String) -> String { SQLLog.mask(sql, noBackslashEscapes: noBackslashEscapes) }
+        var reply: [String: Any] = ["tab": tab.id.uuidString, "title": tab.title, "text": masked(console.agentText),
                                     "connection": saved?.displayName ?? NSNull()]
         if let last = console.agentLastRun {
-            var run: [String: Any] = ["sql": last.sql, "state": last.finished == nil ? "running" : last.error == nil ? "done" : "failed"]
-            if let error = last.error { run["error"] = error }
+            var run: [String: Any] = ["sql": masked(last.sql), "state": last.finished == nil ? "running" : last.error == nil ? "done" : "failed"]
+            if let error = last.error { run["error"] = masked(error) }
             if let affected = last.affectedRows { run["affectedRows"] = Int(affected) }
             if let rows = last.rows {
                 run["rowCount"] = rows.rowCount
