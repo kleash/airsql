@@ -139,6 +139,11 @@ extension NavigatorActions {
                 // The columns to copy (generated ones are made again by the server): load them where they aren't yet.
                 try? await open.schema.loadDetails([table.database])
                 let columns = open.schema.snapshot.table(table.database, table.name)?.columns.filter { $0.generated == nil }.map(\.name)
+                if withRows, columns?.isEmpty != false {
+                    showError("AirSQL couldn't read the columns of \(table.name), so it can't copy its rows. Refresh and try again.",
+                              title: "Couldn't copy the rows", on: window)
+                    return
+                }
                 let statements = NavigatorSQL.copyTable(table, to: database, name: copy, columns: withRows ? columns ?? [] : nil,
                                                         where: filter)
                 var request = SQLPreviewRequest(change: ChangeSQL(title: "Copy \(table.name)", statements: statements,

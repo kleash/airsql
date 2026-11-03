@@ -105,8 +105,9 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         timer = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
-                guard !Task.isCancelled, let self, self.view.window != nil else { continue }
-                self.refresh(nil)
+                guard let self else { return }
+                // Only while it shows: a tab behind another isn't refreshed.
+                if !Task.isCancelled, self.view.window != nil { self.refresh(nil) }
             }
         }
     }

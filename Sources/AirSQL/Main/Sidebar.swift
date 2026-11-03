@@ -372,7 +372,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             let folder = model.data.folders.first { $0.id == id }
             cell.showFolder(folder?.name ?? "", count: node.children.count)
         case .connection(let id):
-            if let connection = model.connection(id) { cell.show(connection, state: model.states[id]) }
+            if let connection = model.connection(id) {
+                cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true)
+            }
         case .database, .category, .object, .message:
             return treeCell(node, in: outlineView)
         }
@@ -431,6 +433,7 @@ final class SidebarCell: NSTableCellView {
     private let state = DotView(diameter: 6)
     private let badge = NSTextField(labelWithString: "")
     private let icon = NSImageView()
+    private let spinner = NSProgressIndicator()
 
     init() {
         super.init(frame: .zero)
@@ -449,7 +452,11 @@ final class SidebarCell: NSTableCellView {
         shield.toolTip = "Custom safety: this connection has safety settings of its own (its Options tab)"
         icon.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         icon.contentTintColor = .secondaryLabelColor
-        let stack = NSStackView(views: [icon, dot, name, shield, state, badge])
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        spinner.setAccessibilityLabel("Loading the schema")
+        let stack = NSStackView(views: [icon, dot, name, shield, spinner, state, badge])
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
@@ -461,12 +468,17 @@ final class SidebarCell: NSTableCellView {
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
             icon.widthAnchor.constraint(equalToConstant: 15),
+            spinner.widthAnchor.constraint(equalToConstant: 12),
+            spinner.heightAnchor.constraint(equalToConstant: 12),
         ])
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func show(_ connection: SavedConnection, state connectionState: ConnectionState?) {
+    /// `busy`: its schema is loading (the spinner shows).
+    func show(_ connection: SavedConnection, state connectionState: ConnectionState?, busy: Bool = false) {
+        spinner.isHidden = !busy
+        if busy { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
         icon.isHidden = true
         dot.isHidden = false
         dot.color = connection.colour.color ?? .tertiaryLabelColor
@@ -490,6 +502,7 @@ final class SidebarCell: NSTableCellView {
     }
 
     func showFolder(_ title: String, count: Int) {
+        spinner.isHidden = true
         icon.isHidden = false
         dot.isHidden = true
         name.stringValue = title
@@ -503,6 +516,7 @@ final class SidebarCell: NSTableCellView {
     }
 
     func showHeader(_ title: String) {
+        spinner.isHidden = true
         icon.isHidden = true
         dot.isHidden = true
         name.stringValue = title

@@ -31,6 +31,9 @@ extension AppTests {
             let writer = sidebar.outlineView(sidebar.outline, pasteboardWriterForItem: weird) as? NSPasteboardItem
             #expect(writer?.string(forType: .string) == "`we``ird 'name' ✓`")
             #expect(sidebar.outlineView(sidebar.outline, typeSelectStringFor: nil, item: weird) == "we`ird 'name' ✓")
+            // New Database, Find Text and Process List reach the sidebar from anywhere in the window.
+            #expect(main.supplementalTarget(forAction: Commands.processList.action, sender: nil) as AnyObject? === sidebar)
+            #expect(main.supplementalTarget(forAction: Commands.drop.action, sender: nil) == nil)
             // Disconnect empties it.
             model.detach(id)
             _ = await eventually(timeout: 5) { sidebar.treeNodes.isEmpty }

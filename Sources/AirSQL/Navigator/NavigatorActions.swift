@@ -90,7 +90,8 @@ enum NavigatorActions {
                 }
             }
         }
-        guard ask, let window else { return run(false) }
+        guard ask else { return run(false) }
+        guard let window else { return }
         SQLPreviewSheet.show(request, connection: saved, on: window) { result in
             if result.approved { run(result.saveAsChangeset) }
         }
