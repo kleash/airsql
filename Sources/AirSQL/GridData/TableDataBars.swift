@@ -33,7 +33,8 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         translatesAutoresizingMaskIntoConstraints = false
         scope.setAccessibilityIdentifier("tableData.scope")
         scope.toolTip = "Where the filter and the sort run: on the server for every row, or here on the loaded rows"
-        let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .tertiaryLabelColor)
+        scope.label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)  // the search and WHERE narrow first
+        let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .quietText)
         whereField.placeholder = "for example status = 'paid'"
         whereField.toolTip = "Type a WHERE condition and press Return to filter every row on the server (⌥↩ starts a new line, "
             + "⌥⎋ completes column names)"
@@ -80,12 +81,20 @@ final class TableDataBar: NSView, NSTextViewDelegate {
             row.topAnchor.constraint(equalTo: topAnchor), row.bottomAnchor.constraint(equalTo: hairline.topAnchor),
             hairline.leadingAnchor.constraint(equalTo: leadingAnchor), hairline.trailingAnchor.constraint(equalTo: trailingAnchor),
             hairline.bottomAnchor.constraint(equalTo: bottomAnchor), hairline.heightAnchor.constraint(equalToConstant: 1),
-            whereField.box.widthAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            whereField.box.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             // The bar grows with the condition's lines, keeping a margin round it.
             whereField.box.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor, constant: 4),
             row.bottomAnchor.constraint(greaterThanOrEqualTo: whereField.box.bottomAnchor, constant: 4),
-            searchField.widthAnchor.constraint(equalToConstant: 190),
+            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            searchField.widthAnchor.constraint(lessThanOrEqualToConstant: 190),
         ])
+        // In a window at its smallest the search narrows first, then the condition, rather than the bar widening the
+        // window (which holds its size at 500).
+        let searchWidth = searchField.widthAnchor.constraint(equalToConstant: 190)
+        searchWidth.priority = .init(480)
+        let whereWidth = whereField.box.widthAnchor.constraint(greaterThanOrEqualToConstant: 160)
+        whereWidth.priority = .init(490)
+        NSLayoutConstraint.activate([searchWidth, whereWidth])
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -205,7 +214,7 @@ final class TableDataNotice: NSView {
         self.kind = kind
         isHidden = message == nil
         text.stringValue = message ?? ""
-        text.textColor = kind == .problem ? .statusBad : kind == .readOnly ? .secondaryLabelColor : .labelColor
+        text.textColor = kind == .problem ? NSColor.statusBad.asTextOnItsTint : kind == .readOnly ? .secondaryLabelColor : .labelColor
         for control in [preview, revert, apply] { control.isHidden = kind != .pending }
         needsDisplay = true
     }

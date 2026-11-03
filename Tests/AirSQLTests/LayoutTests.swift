@@ -53,6 +53,10 @@ func layoutProblems(_ root: NSView, where place: String) -> [String] {
             if needed > button.bounds.width + 1 {
                 problems.append("\(place): \(name(button)) is cut: needs \(Int(needed)) points wide, has \(Int(button.bounds.width))")
             }
+        } else if let segments = view as? NSSegmentedControl, segments.trackingMode == .selectOne,
+                  segments.selectedSegmentBezelColor != .selectedSegment {
+            // AppKit's blue under the selected segment's white label is under 4.5:1.
+            problems.append("\(place): \(name(segments)) draws its selection in AppKit's blue, not the theme's")
         }
         // Content crossing a rounded parent's inset (its corners), or outside it.
         let radius: CGFloat = (view as? SurfaceView)?.radius ?? (view is ChipView ? view.bounds.height / 2

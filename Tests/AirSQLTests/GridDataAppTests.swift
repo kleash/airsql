@@ -626,6 +626,22 @@ extension AppTests {
             PendingChangesStore.shared.flush()
         }
 
+        /// At the window's smallest the bar's search and condition narrow, and so do Find and Replace's fields: the tab
+        /// doesn't widen the window.
+        @Test func theTableTabKeepsTheWindowAtItsMinimumSize() async throws {
+            let (main, _, tab) = try await Self.tab(size: MainWindowController.minimumSize)
+            main.window?.layoutIfNeeded()
+            #expect(main.window?.frame.width == MainWindowController.minimumSize.width)
+            #expect(tab.bar.whereField.box.frame.width >= 80 && tab.bar.searchField.frame.width >= 120,
+                    "\(tab.bar.whereField.box.frame.width), \(tab.bar.searchField.frame.width)")
+            for replacing in [false, true] {
+                tab.findBar.show(replacing: replacing)
+                main.window?.layoutIfNeeded()
+                #expect(main.window?.frame.width == MainWindowController.minimumSize.width, "replacing: \(replacing)")
+            }
+            tab.findBar.close(nil)
+        }
+
         @Test func theStatusBarKeepsTheRowsAndPagingLinksAtEveryWidth() async throws {
             let session = FakeTableSession()
             // A full page: more rows to load, so Count Exactly, Load More and Load All show.

@@ -134,6 +134,41 @@ extension AppTests {
             }
         }
 
+        /// A grid's quieter text on its bars: the header's type line and the row numbers; and the table tab's WHERE label
+        /// and its problem notice (a server's error on its red fill).
+        @Test func theGridsQuietTextReads() throws {
+            for (appearance, theme) in themes {
+                let viewer = GridViewer(source: nil)
+                viewer.show(FakeGridSource(rows: 30, columns: 4))
+                let grid = viewer.grid, size = NSSize(width: 640, height: 320)
+                // The second column's type line, under its name (left of the sort control); the second row's number.
+                let typeLine = try drawnContrast(viewer, size: size, in: { view in
+                    let header = grid.header!, (left, right) = header.edges(1)
+                    let nameFont = NSFont.systemFont(ofSize: grid.fontSize, weight: .semibold)
+                    let nameHeight = ceil(nameFont.ascender - nameFont.descender)
+                    let rect = NSRect(x: left + 8, y: 4 + nameHeight, width: right - left - 8 - GridHeaderView.sortWidth - 4,
+                                      height: header.bounds.height - 6 - nameHeight)
+                    return header.convert(rect, to: view)
+                }, appearance: appearance)
+                #expect(typeLine >= 4.5, "\(theme): the type line is \(typeLine):1")
+                let rowNumber = try drawnContrast(viewer, size: size, in: { view in
+                    grid.rowNumbers.convert(NSRect(x: 0, y: grid.rowHeight, width: grid.rowNumbers.bounds.width, height: grid.rowHeight), to: view)
+                }, appearance: appearance)
+                #expect(rowNumber >= 4.5, "\(theme): a row number is \(rowNumber):1")
+
+                let bar = TableDataBar()
+                let whereLabel = try #require(descendants(of: bar).compactMap { $0 as? NSTextField }.first { $0.stringValue == "WHERE" })
+                let label = try drawnContrast(bar, size: NSSize(width: 760, height: 36), in: { whereLabel.convert(whereLabel.bounds, to: $0) },
+                                              appearance: appearance)
+                #expect(label >= 4.5, "\(theme): the WHERE label is \(label):1")
+                let notice = TableDataNotice()
+                notice.show(.problem, "Table 'airsql_fixture.orders' doesn't exist")
+                let problem = try drawnContrast(notice, size: NSSize(width: 520, height: 28), in: { notice.text.convert(notice.text.bounds, to: $0) },
+                                                appearance: appearance)
+                #expect(problem >= 4.5, "\(theme): the problem notice is \(problem):1")
+            }
+        }
+
         /// The navigator's selected rows, a connection and a database: their name and count on the accent, in the
         /// accent's own text colour (the mockups' `.tr.sel`), not AppKit's white.
         @Test func theNavigatorsSelectionReadsOnTheAccent() throws {

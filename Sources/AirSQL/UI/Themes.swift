@@ -102,6 +102,16 @@ extension NSColor {
     /// Text and symbols on a pill.
     static let onPill = NSColor(name: nil) { $0.isDark ? hex(0x06181C) : .controlBackgroundColor }
 
+    /// Quieter text that still reads (the agents' popover, a grid's types and row numbers): secondaryLabelColor 40 % of
+    /// the way to the text colour, 4.5:1 or more on bars and popovers in both themes (the plain colour is 3.9:1 there).
+    static let quietText = NSColor(name: nil) { appearance in
+        var color = NSColor.secondaryLabelColor
+        appearance.performAsCurrentDrawingAppearance {
+            color = NSColor.secondaryLabelColor.blended(withFraction: 0.4, of: .textColor) ?? color
+        }
+        return color
+    }
+
     // MARK: Data, pending changes, SQL
 
     static let dataNumber = pair(0x1F5FBF, 0x7FB0F5)
@@ -141,6 +151,16 @@ extension NSColor {
     func contrast(with other: NSColor) -> CGFloat {
         let (first, second) = (luminance, other.luminance)
         return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
+
+    /// This colour as text on its own tint (a chip, a notice): a third of the way to black (Porcelain) or white (Deep
+    /// Water), as the colour itself is 3.3 to 4.2:1 there, under WCAG AA's 4.5:1.
+    var asTextOnItsTint: NSColor {
+        NSColor(name: nil) { appearance in
+            var color = self
+            appearance.performAsCurrentDrawingAppearance { color = self.blended(withFraction: 0.35, of: .textColor) ?? self }
+            return color
+        }
     }
 
     private static func washes(_ appearance: NSAppearance) -> Bool {
@@ -284,8 +304,7 @@ final class DotView: NSView {
 }
 
 /// A status in a capsule (11 pt semibold): tinted (its colour at 16 % behind it), the accent's fill, or neutral grey.
-/// The radius is half its height; the text is inset by at least that. The text is its colour a third of the way to
-/// black (Porcelain) or white (Deep Water): the colour itself is 3.3 to 4.2:1 on its own tint, under WCAG AA's 4.5:1.
+/// The radius is half its height; the text is inset by at least that, in its colour as text on its tint.
 final class ChipView: NSView {
     enum Style { case tinted(NSColor), accent, neutral }
 
@@ -325,11 +344,7 @@ final class ChipView: NSView {
         case .accent: hue = .accent
         case .neutral: hue = .secondaryLabelColor
         }
-        label.textColor = NSColor(name: nil) { appearance in
-            var color = hue
-            appearance.performAsCurrentDrawingAppearance { color = hue.blended(withFraction: 0.35, of: .textColor) ?? hue }
-            return color
-        }
+        label.textColor = hue.asTextOnItsTint
     }
 
     /// The capsule's colour in `appearance`.

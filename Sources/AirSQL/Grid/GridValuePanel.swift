@@ -46,6 +46,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         modes.action = #selector(pick(_:))
         modes.segmentStyle = .rounded
         modes.controlSize = .small
+        modes.selectedSegmentBezelColor = .selectedSegment
         modes.toolTip = "Show the value as text, a JSON tree, hex or an image"
         modes.setAccessibilityIdentifier("valuePanel.mode")
         wrap.target = self

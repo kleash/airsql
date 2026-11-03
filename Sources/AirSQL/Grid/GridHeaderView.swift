@@ -109,7 +109,7 @@ final class GridHeaderView: NSView {
             CTLineDraw(line, context)
         }
         draw(info.name, nameFont, .labelColor, x: x, baseline: 4 + nameFont.ascender)
-        draw(info.typeLine, typeFont, .tertiaryLabelColor, x: rect.minX + 8, baseline: 4 + nameHeight + typeFont.ascender)
+        draw(info.typeLine, typeFont, .quietText, x: rect.minX + 8, baseline: 4 + nameHeight + typeFont.ascender)
     }
 
     /// The symbols before a column's name: a gold key for the key that addresses rows (the primary key), a grey one
@@ -121,7 +121,7 @@ final class GridHeaderView: NSView {
         } else if column.marks.contains(.unique) {
             icons.append(("key.fill", .secondaryLabelColor))
         } else if column.marks.contains(.indexed) {
-            icons.append(("key", .tertiaryLabelColor))
+            icons.append(("key", .secondaryLabelColor))
         }
         if column.marks.contains(.foreign) { icons.append(("arrow.up.right", .accent)) }
         return icons

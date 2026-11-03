@@ -48,7 +48,7 @@ final class GridRowNumberView: NSView {
                 selectedFill.setFill()
                 NSRect(x: 0, y: top, width: bounds.width, height: grid.rowHeight).fill()
             }
-            var color = selected ? NSColor.labelColor : .tertiaryLabelColor
+            var color = selected ? NSColor.labelColor : .quietText
             if let source = grid.source, let first = grid.columnOrder.first {
                 let mark = source.mark(row, first)
                 if let line = mark == .inserted ? NSColor.pendingInsertLine : mark == .deleted ? NSColor.pendingDeleteLine : nil {

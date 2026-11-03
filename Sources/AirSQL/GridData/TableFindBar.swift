@@ -41,7 +41,7 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
         findField.target = self
         findField.action = #selector(goNext(_:))
         replaceField.placeholderString = "Replace with"
-        replaceField.toolTip = "The text that replaces each match"
+        replaceField.toolTip = "Type the text that replaces each match"
         replaceField.setAccessibilityIdentifier("find.replaceText")
         options.addItem(withTitle: "Options")
         for (title, tip) in zip(Self.optionTitles, Self.optionTips) {
@@ -54,11 +54,17 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
         options.setAccessibilityIdentifier("find.options")
         count.setAccessibilityIdentifier("find.count")
         for control in [previous, next, replace, replaceAll, done] { control.controlSize = .small }
+        // 200 wide when there is room, narrower rather than widening a window at its smallest (which holds its size at
+        // 500); hidden, the bar still sets the tab's narrowest, so Replace is only there once asked for.
         for field in [findField, replaceField] {
             field.controlSize = .small
             field.translatesAutoresizingMaskIntoConstraints = false
-            field.widthAnchor.constraint(equalToConstant: 200).isActive = true
+            let preferred = field.widthAnchor.constraint(equalToConstant: 200)
+            preferred.priority = .init(490)
+            NSLayoutConstraint.activate([field.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+                                         field.widthAnchor.constraint(lessThanOrEqualToConstant: 200), preferred])
         }
+        for view in [replaceField, replace, replaceAll] { view.isHidden = true }
         options.controlSize = .small
         let row = NSStackView(views: [findField, replaceField, options, previous, next, count, NSView(), replace, replaceAll, done])
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
