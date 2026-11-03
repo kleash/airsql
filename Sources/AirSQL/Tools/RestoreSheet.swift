@@ -149,10 +149,10 @@ final class RestoreSheet: ToolSheet {
             stopOnError.state = radio === goOn ? .off : .on
             goOn.state = radio === goOn ? .on : .off
         }
-        if sender as? NSPopUpButton === toolMenu, let tool, connection.clientPath != tool.path {
-            var changed = connection
-            changed.clientPath = tool.path
-            model.save(changed)
+        // The tool chosen is kept for the connection (its latest version: nothing else of it is touched).
+        if sender as? NSPopUpButton === toolMenu, let tool, var latest = model.connection(connection.id), latest.clientPath != tool.path {
+            latest.clientPath = tool.path
+            model.save(latest)
         }
         if let tool {
             let fitness = ClientTools.fit(tool, server: server)

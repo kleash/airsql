@@ -106,8 +106,11 @@ struct ClientToolsTests {
                 .split(separator: "\n").map(String.init)
             #expect(lines == ["--user=app user", "--password=" + password])
         }
+        // At launch, what other runs left goes; this run's files stay.
+        let other = folder.appendingPathComponent("1-left.cnf")
+        FileManager.default.createFile(atPath: other.path, contents: Data("x".utf8))
         OptionFile.removeLeftovers(in: folder)
-        #expect(!FileManager.default.fileExists(atPath: folder.path))
+        #expect(!FileManager.default.fileExists(atPath: other.path) && FileManager.default.fileExists(atPath: url.path))
     }
 
     @Test func commandLinesConnectAsTheConnectionDoesAndNeverHoldTheSecret() throws {

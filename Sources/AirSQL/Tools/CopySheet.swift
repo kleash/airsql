@@ -237,6 +237,12 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
             do {
                 _ = try await reader.connect()
                 _ = try await writer.connect()
+                // Another saved connection may reach this very server (another name for the host): never onto itself.
+                let identity = "SELECT @@hostname, @@port, @@datadir"
+                if try await SQLExport.rows(reader, identity) == SQLExport.rows(writer, identity),
+                   names.contains(where: { $0.key == $0.value }) {
+                    throw AirSQLError(.other, "\(saved.displayName) is this same server: copy into another database.")
+                }
                 try await SQLExport.run(request, from: reader, into: SQLServerSink(writer), names: names,
                                         cancellation: cancellation) { done in
                     updates.send {

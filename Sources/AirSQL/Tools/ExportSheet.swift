@@ -185,10 +185,10 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
     }
 
     @objc private func formChanged(_ sender: Any?) {
-        if sender as? NSPopUpButton === toolMenu, let tool, connection.dumpPath != tool.path {
-            var changed = connection
-            changed.dumpPath = tool.path
-            model.save(changed)
+        // The tool chosen is kept for the connection (its latest version: nothing else of it is touched).
+        if sender as? NSPopUpButton === toolMenu, let tool, var latest = model.connection(connection.id), latest.dumpPath != tool.path {
+            latest.dumpPath = tool.path
+            model.save(latest)
         }
         let wantsGzip = gzip.state == .on, name = url.lastPathComponent
         if wantsGzip != name.hasSuffix(".gz") {

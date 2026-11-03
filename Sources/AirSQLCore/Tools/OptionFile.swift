@@ -14,8 +14,10 @@ public enum OptionFile {
         return try create(Data(text.utf8), named: UUID().uuidString + ".cnf", mode: 0o600, in: folder)
     }
 
-    /// Creates `name` in `folder` (made private first) with `data`, failing if it exists or is a link.
+    /// Creates `name` in `folder` (made private first) with `data`, failing if it exists or is a link. The name starts
+    /// with this process's id, so `removeLeftovers` keeps what a running AirSQL still needs.
     public static func create(_ data: Data, named name: String, mode: mode_t, in folder: URL = folder) throws -> URL {
+        let name = "\(getpid())-" + name
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
         guard chmod(folder.path, 0o700) == 0 else { throw posixError("Can't protect \(folder.path)") }
@@ -31,9 +33,12 @@ public enum OptionFile {
         return url
     }
 
-    /// Removes what runs that ended with the app left behind (at launch). File work.
+    /// Removes what other runs of AirSQL left behind (at launch): every file not of this process. File work.
     public static func removeLeftovers(in folder: URL = folder) {
-        try? FileManager.default.removeItem(at: folder)
+        let mine = "\(getpid())-"
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] where !name.hasPrefix(mine) {
+            unlink(folder.appendingPathComponent(name).path)
+        }
     }
 
     /// `text` as an option file value the tools read back exactly: in double quotes (so # and spaces at the ends stay),
