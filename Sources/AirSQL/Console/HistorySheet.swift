@@ -14,7 +14,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     private let empty = label("", font: .systemFont(ofSize: 12.5), color: .secondaryLabelColor, wraps: true)
     private var loading: Task<Void, Never>?
     private lazy var insertButton = button("Insert", id: "history.insert", tip: "Put the selected statement in the editor at the cursor",
-                                           target: self, action: #selector(insertSelected(_:)))
+                                           target: self, action: #selector(insertSelected(_:)), primary: true)
     private static let time: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
@@ -65,7 +65,6 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
                             target: self, action: #selector(close(_:)))
         cancel.keyEquivalent = "\u{1b}"
         insertButton.keyEquivalent = "\r"
-        insertButton.bezelColor = .accent
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let buttons = NSStackView(views: [clear, status, spacer, cancel, insertButton])

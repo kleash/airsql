@@ -70,6 +70,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
             tabs.setToolTip(tab.tip, forSegment: tab.rawValue)
         }
         tabs.trackingMode = .selectOne
+        tabs.selectedSegmentBezelColor = .selectedSegment
         tabs.target = self
         tabs.action = #selector(tabChosen(_:))
         tabs.toolTip = "Choose which settings of the connection to show"
@@ -108,9 +109,8 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         let save = button("Save", id: "editor.save", tip: "Save the connection without connecting", target: self,
                           action: #selector(save(_:)))
         let connect = button("Save and Connect", id: "editor.saveAndConnect", tip: "Save the connection and connect to it",
-                             target: self, action: #selector(saveAndConnect(_:)))
+                             target: self, action: #selector(saveAndConnect(_:)), primary: true)
         connect.keyEquivalent = "\r"
-        connect.bezelColor = .accent
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let row = NSStackView(views: [helpButton(.connections), testButton, spacer, cancel, save, connect])

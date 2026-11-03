@@ -7,6 +7,7 @@ extension TableEditorController {
     func buildView() -> NSView {
         sections.segmentStyle = .rounded
         sections.trackingMode = .selectOne
+        sections.selectedSegmentBezelColor = .selectedSegment
         sections.segmentCount = Section.allCases.count
         sections.selectedSegment = 0
         sections.target = self
@@ -18,7 +19,6 @@ extension TableEditorController {
         status.controlSize = .small
         status.isDisplayedWhenStopped = false
         status.toolTip = "Applying the changes on the server"
-        if #available(macOS 11.0, *) { applyButton.bezelColor = .accent }
         applyButton.keyEquivalent = "s"
         applyButton.keyEquivalentModifierMask = .command
         applyButton.target = self

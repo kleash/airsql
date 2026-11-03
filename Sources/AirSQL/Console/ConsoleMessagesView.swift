@@ -150,6 +150,7 @@ final class PlanView: NSView {
         self.tree = scroll
         super.init(frame: .zero)
         choice.selectedSegment = tree.isEmpty ? 0 : 1
+        choice.selectedSegmentBezelColor = .selectedSegment
         choice.target = self
         choice.action = #selector(switched(_:))
         choice.toolTip = "Show the plan as the server's table, or as a tree of steps"
