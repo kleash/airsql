@@ -104,7 +104,7 @@ extension AppTests {
                 // The editor over a cell, after typing.
                 content.editable = true
                 content.grid.selection.select(GridPosition(row: 4, column: 1))
-                content.grid.beginEditing(at: GridPosition(row: 4, column: 1), text: "Customer 4 Barbara Liskov")
+                content.grid.beginEditing(at: GridPosition(row: 4, column: 1), text: "Customer 4 Barbara Lane")
                 window.displayIfNeeded()
                 try await save(window, focusedHarness, "grid-editor-\(suffix)", target: "window:Grid")
                 content.grid.endEditing(commit: false)

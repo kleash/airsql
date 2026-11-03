@@ -3,9 +3,10 @@
 /// `cell` answers from memory; a source that fetches shows `.loading` until its page arrives.
 ///
 /// How a screen hosts a grid (the embedding API): it makes a source and a `DataGridView` (the app's `Grid` folder), sets
-/// the grid's `source` and `delegate` and adds `grid.scrollView` to its own view. It calls `grid.reloadData()` when the
-/// columns or the row count change and `grid.reloadRows(_:)` when a page arrives. The grid never writes anything:
-/// edits, sorting, record view and menus go to the delegate, which decides what they mean.
+/// the grid's `source` and `delegate` and adds `grid.containerView` (cells, header and row numbers) to its own view. It
+/// calls `grid.reloadData()` when the columns or the row count change and `grid.reloadRows(_:)` when rows change or a
+/// page arrives. The grid never writes anything: edits, sorting, record view and menus go to the delegate, which
+/// decides what they mean.
 /// - Table tab: a `TableDataSource` pages `SELECT … LIMIT … OFFSET …` off the main thread on the data session; `prefetch`
 ///   queues the pages about to be shown. The key columns (primary key, or a NOT NULL unique key) are fetched whole,
 ///   never shortened, so an edit addresses the exact row; committed edits become pending changes that the source shows
