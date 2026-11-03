@@ -202,7 +202,8 @@ extension AppTests {
         }
 
         /// About AirSQL as the app shows it: the tests aren't AirSQL's app, so the panel is given the name, icon, version
-        /// and copyright that the app's Info.plist, VERSION and icon give it.
+        /// and copyright that the app's Info.plist, VERSION and icon give it ("Copyright": AppKit's undocumented key for
+        /// NSHumanReadableCopyright, here only).
         @Test func about() throws {
             let root = Self.folder.deletingLastPathComponent().deletingLastPathComponent()
             let info = try #require(NSDictionary(contentsOf: root.appendingPathComponent("Resources/AirSQL-Info.plist")))
