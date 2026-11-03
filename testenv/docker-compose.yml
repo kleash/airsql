@@ -1,0 +1,217 @@
+# AirSQL's Docker test lab. Start it with testenv/up.sh (it seeds the servers a few at a time: all at once need more
+# memory than Docker's VM may have), remove it with testenv/down.sh; testenv/AGENT.md says how tests and agents use
+# it. Published ports listen on 127.0.0.1 only, in 44300-44399.
+# Networks: "direct" holds the servers the Mac reaches on their own ports; "edge" holds the hops (SSH bastion,
+# proxies). "inner" and "deep" are internal, with no way in or out: their servers answer only through the bastion or
+# a proxy (inner), or through the bastion and then the jump host (deep).
+name: airsql-lab
+
+# Small caches: the lab shares Docker's memory with other projects. oom_score_adj makes a lab server the first thing
+# the kernel stops if that memory runs out, never another project's container.
+x-mysql: &mysql
+  environment: {MYSQL_ROOT_PASSWORD: airsql-root}
+  volumes: ["./seed:/docker-entrypoint-initdb.d:ro"]
+  command: [--innodb-buffer-pool-size=32M, --innodb-log-buffer-size=4M, --performance-schema=OFF]
+  # The server takes TCP connections only after the seed has run (mysqladmin ping succeeds even when refused).
+  healthcheck: &mysql-health
+    test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root --silent"]
+    interval: 30s
+    timeout: 10s
+    start_period: 900s
+    start_interval: 2s
+  mem_limit: 512m
+  oom_score_adj: 1000
+  networks: [direct]
+
+x-mariadb: &mariadb
+  environment: {MARIADB_ROOT_PASSWORD: airsql-root}
+  volumes: ["./seed:/docker-entrypoint-initdb.d:ro"]
+  command: [--innodb-buffer-pool-size=32M, --innodb-log-buffer-size=4M, --plugin-load-add=auth_ed25519]
+  healthcheck:
+    <<: *mysql-health
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+  mem_limit: 384m
+  oom_score_adj: 1000
+  networks: [direct]
+
+services:
+  # The servers on their own ports, each seeded with seed/ (the fixture and a login per method).
+  mysql57:
+    <<: *mysql
+    # Oracle publishes MySQL 5.7 for x86-64 only: emulated on Apple silicon.
+    image: mysql:5.7.44@sha256:4bc6bc963e6d8443453676cae56536f4b8156d78bae03c0145cbe47c2aad73bb
+    platform: linux/amd64
+    hostname: mysql57
+    ports: ["127.0.0.1:44357:3306"]
+
+  mysql80:
+    <<: *mysql
+    image: mysql:8.0.46@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
+    hostname: mysql80
+    ports: ["127.0.0.1:44380:3306"]
+
+  # performance_schema stays on here (MySQL's default) for the query profile, with smaller connection and table caches,
+  # which it sizes its own by (about 130 MB, not 300); mysql_native_password, off by default since 8.4, is on for the
+  # native login.
+  mysql84:
+    <<: *mysql
+    image: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+    hostname: mysql84
+    command: [--innodb-buffer-pool-size=32M, --innodb-log-buffer-size=4M, --mysql-native-password=ON,
+              --max-connections=100, --table-open-cache=400, --table-definition-cache=400]
+    mem_limit: 768m
+    ports: ["127.0.0.1:44384:3306"]
+
+  mysql97:
+    <<: *mysql
+    image: mysql:9.7.4@sha256:86b390ef642f89a0157d6215dee33ddc928b8b0ecab173117f56f6c40cb24eab
+    hostname: mysql97
+    ports: ["127.0.0.1:44397:3306"]
+
+  mariadb105:
+    <<: *mariadb
+    image: mariadb:10.5.29@sha256:a530aeeefd82f4fa5150f391b6c75462140904780338766f6b03acecb1cca3ce
+    hostname: mariadb105
+    ports: ["127.0.0.1:44305:3306"]
+
+  mariadb106:
+    <<: *mariadb
+    image: mariadb:10.6.28@sha256:f1c56f035ed268a0d7c2c2e06dc879f6319b997cb434cf822a4cfd72a7aa184d
+    hostname: mariadb106
+    ports: ["127.0.0.1:44306:3306"]
+
+  mariadb1011:
+    <<: *mariadb
+    image: mariadb:10.11.19@sha256:d769e37960821dfdcf096954f6e7ac89f747e116c1bba98e48edd265dfc7deae
+    hostname: mariadb1011
+    ports: ["127.0.0.1:44311:3306"]
+
+  mariadb114:
+    <<: *mariadb
+    image: mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620
+    hostname: mariadb114
+    ports: ["127.0.0.1:44314:3306"]
+
+  mariadb118:
+    <<: *mariadb
+    image: mariadb:11.8.9@sha256:c4124d1afa875e47f2892edf26b482fa54f796e2f342d3717a04ca091a22a9bd
+    hostname: mariadb118
+    ports: ["127.0.0.1:44318:3306"]
+
+  # The fixture plus a database of 5,000 tables (seed/30-many-tables.sql makes them on the host named "many"), for the
+  # schema cache's large-server paths.
+  many:
+    <<: *mariadb
+    image: mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620
+    hostname: many
+    mem_limit: 512m
+    ports: ["127.0.0.1:44350:3306"]
+
+  # Two hops in front of servers above: ProxySQL (Cancel can't trust a thread id it gets through it), and added
+  # latency (tc netem delays every packet the relay sends by 50 ms: about 100 ms more per round trip).
+  proxysql:
+    image: proxysql/proxysql:3.0.11@sha256:a504b3624312497f493a37426329af8efa044373906b8f9733c111b510285844
+    hostname: proxysql
+    # --initial: the configuration is always proxysql.cnf's, never what an earlier run saved.
+    command: [proxysql, -f, --idle-threads, -D, /var/lib/proxysql, --initial]
+    volumes: ["./proxysql/proxysql.cnf:/etc/proxysql.cnf:ro"]
+    depends_on: {mariadb114: {condition: service_healthy}}
+    healthcheck:
+      <<: *mysql-health
+      test: ["CMD-SHELL", "MYSQL_PWD=airsql-pass mysql -h 127.0.0.1 -P 6033 -u airsql -e 'SELECT 1'"]
+    mem_limit: 256m
+    oom_score_adj: 1000
+    ports: ["127.0.0.1:44333:6033"]
+    networks: [direct]
+
+  slow:
+    build: netem
+    hostname: slow
+    init: true
+    cap_add: [NET_ADMIN]
+    command: ["sh", "-c", "tc qdisc add dev eth0 root netem delay 50ms && exec socat TCP-LISTEN:3306,fork,reuseaddr TCP:mysql84:3306"]
+    depends_on: {mysql84: {condition: service_healthy}}
+    ports: ["127.0.0.1:44340:3306"]
+    networks: [direct]
+
+  # SSH: the bastion (from the Mac) and a second jump host behind it (only on the internal networks). Both forward TCP
+  # and take the lab key (testenv/.keys/id_lab) as well as their passwords.
+  bastion:
+    build:
+      context: sshd
+      additional_contexts: {keys: .keys}
+      args: {LAB_USER: bastion, LAB_PASSWORD: airsql-bastion}
+    hostname: bastion
+    init: true
+    ports: ["127.0.0.1:44322:22"]
+    networks: [edge, inner]
+
+  jump:
+    build:
+      context: sshd
+      additional_contexts: {keys: .keys}
+      args: {LAB_USER: jump, LAB_PASSWORD: airsql-jump}
+    hostname: jump
+    init: true
+    networks: [inner, deep]
+
+  # Proxies into the inner network (user airsql, password airsql-proxy), for SSH (port 22) and databases (3306).
+  proxy:
+    build: proxy
+    hostname: proxy
+    init: true
+    ports: ["127.0.0.1:44328:8888"]
+    networks: [edge, inner]
+
+  digestproxy:
+    build: digestproxy
+    hostname: digestproxy
+    init: true
+    ports: ["127.0.0.1:44329:8888"]
+    networks: [edge, inner]
+
+  socksproxy:
+    build: socksproxy
+    hostname: socksproxy
+    init: true
+    ports: ["127.0.0.1:44310:1080"]
+    networks: [edge, inner]
+
+  # Inside the lab only. secure's certificate (lab CA, testenv/.certs) names it "secure", the name its clients use
+  # through the bastion or a proxy; it also has the PAM login (testenv/pam) and the client-certificate one.
+  secure:
+    <<: *mariadb
+    image: mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620
+    hostname: secure
+    volumes:
+      - ./seed:/docker-entrypoint-initdb.d:ro
+      - ./.certs:/tls:ro
+      - ./pam/airsql:/etc/pam.d/airsql:ro
+      - ./pam/check:/etc/airsql/pam-check:ro
+    command: [--innodb-buffer-pool-size=32M, --innodb-log-buffer-size=4M, --plugin-load-add=auth_ed25519,
+              --plugin-load-add=auth_pam, --ssl-ca=/tls/ca.pem, --ssl-cert=/tls/secure.pem, --ssl-key=/tls/secure-key.pem]
+    networks: [inner]
+
+  # A certificate from the lab CA for another name (elsewhere.invalid): verifying it as "wrongname" must fail.
+  wrongname:
+    <<: *mysql
+    image: mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
+    hostname: wrongname
+    volumes: ["./seed:/docker-entrypoint-initdb.d:ro", "./.certs:/tls:ro"]
+    command: [--innodb-buffer-pool-size=32M, --innodb-log-buffer-size=4M, --performance-schema=OFF,
+              --mysql-native-password=ON, --ssl-ca=/tls/ca.pem, --ssl-cert=/tls/wrongname.pem,
+              --ssl-key=/tls/wrongname-key.pem]
+    networks: [inner]
+
+  # Only on "deep": the bastion can't reach it, the jump host can.
+  deep:
+    <<: *mariadb
+    image: mariadb:11.4.13@sha256:d1891ede5a559f1086f55053bb8cc1569b0298338c4d72d71725a7f74f6ba620
+    hostname: deep
+    networks: [deep]
+
+networks:
+  direct: {}
+  edge: {}
+  inner: {internal: true}
+  deep: {internal: true}
