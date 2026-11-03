@@ -21,6 +21,15 @@ extension AppTests {
             return (main, harness, console)
         }
 
+        /// A closed session (Disconnect) takes its last USE with it: the console's database is the connection's again.
+        @Test func aClosedSessionsDatabaseIsForgotten() async throws {
+            let (_, _, console) = try await Self.console()
+            let closed = DBConnection(options: ConnectOptions(host: "127.0.0.1", user: "app"), role: .main)
+            ConsoleViewController.shared[Fixtures.production.id] = .init(database: "old", session: closed)
+            defer { ConsoleViewController.shared[Fixtures.production.id] = nil }
+            #expect(console.database == "shop")
+        }
+
         @Test func newQueryStartsConnectingADisconnectedConnection() async throws {
             let closed = SavedConnection(name: "Closed port", host: "127.0.0.1", port: 1, user: "nobody")
             let model = testModel([closed])

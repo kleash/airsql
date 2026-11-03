@@ -174,7 +174,12 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     var text: String { editor?.string ?? initialText }
     var connection: SavedConnection? { model.connection(connectionID) }
-    var shared: Shared { connectionID.flatMap { Self.shared[$0] } ?? Shared() }
+    /// What the connection's consoles share; nothing once its session is closed (Disconnect), as the last USE, the
+    /// isolation level and the transaction went with it.
+    var shared: Shared {
+        guard let id = connectionID, let value = Self.shared[id], value.session?.isConnected != false else { return Shared() }
+        return value
+    }
 
     /// The connection's main session as it stands, if a console has used it and it is still connected.
     var session: DBConnection? {
@@ -197,7 +202,7 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     func changeShared(_ change: (inout Shared) -> Void) {
         guard let id = connectionID else { return }
-        var value = Self.shared[id] ?? Shared()
+        var value = shared
         change(&value)
         Self.shared[id] = value
         NotificationCenter.default.post(name: .consoleSessionDidChange, object: id)
