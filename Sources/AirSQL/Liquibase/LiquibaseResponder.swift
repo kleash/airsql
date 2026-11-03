@@ -4,8 +4,8 @@ import ObjectiveC
 
 /// The Liquibase commands (lane L8b): Tools ▸ Generate Liquibase Changelog… for the connection the window is about,
 /// and Query ▸ Save as Changeset… for the console's selected statements (the console leaves the command to this). It
-/// sits in the main window's responder chain after the window controller (`install`), and gives the SQL preview sheet
-/// its "Save as Liquibase changeset" writer.
+/// sits in the main window's responder chain after the window controller and the client tools (`install`), and gives
+/// the SQL preview sheet its "Save as Liquibase changeset" writer.
 @MainActor
 final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
     private weak var main: MainWindowController?
@@ -16,8 +16,10 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
     static func install(on main: MainWindowController) {
         let responder = LiquibaseResponder()
         responder.main = main
-        responder.nextResponder = main.nextResponder
-        main.nextResponder = responder
+        // After the client tools' responder, which comes right after the window controller.
+        let after: NSResponder = main.nextResponder as? ToolsResponder ?? main
+        responder.nextResponder = after.nextResponder
+        after.nextResponder = responder
         objc_setAssociatedObject(main, &key, responder, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         let model = main.model
         // A change has run and the person ticked "Save as Liquibase changeset": shown on the window it ran from.
