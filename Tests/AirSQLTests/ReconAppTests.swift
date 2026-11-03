@@ -161,6 +161,48 @@ extension AppTests {
     }
 }
 
+extension AppTests.ReconAppTests {
+    /// The whole path against the lab: both sides' databases listed, Compare with its activity, the result shown, and
+    /// the sync script in the SQL preview, which runs nothing until approved.
+    @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests")) func comparesThroughTheWindow() async throws {
+        let setup = try await ReconLabTests.session(Lab.mariadb114)
+        try await ReconLabTests.database(setup, "lane_l8a_ui_src", ReconLabTests.shopSource)
+        try await ReconLabTests.database(setup, "lane_l8a_ui_dst", ReconLabTests.shopTarget)
+        let lab = SavedConnection(name: "Lab MariaDB", host: "127.0.0.1", port: try #require(Lab.mariadb114.port), user: "airsql")
+        ReconWindowController.connect = { saved in
+            Connection(options: ConnectOptions(name: saved.name, host: saved.host, port: saved.port ?? 3306, user: saved.user,
+                                               password: Lab.airsql.password, tls: TLSOptions(mode: .off)),
+                       log: ReconLabTests.log)
+        }
+        defer { ReconWindowController.connect = nil }
+        let model = testModel([lab])
+        let controller = ReconWindowController(model: model)
+        keptWindows.append(controller)
+        controller.window?.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+        controller.source.choose(lab, database: "lane_l8a_ui_src")
+        controller.target.choose(lab, database: "lane_l8a_ui_dst")
+        let listed = Date() + 10
+        while controller.source.databases.numberOfItems == 0, Date() < listed { try await Task.sleep(nanoseconds: 50_000_000) }
+        #expect((0..<controller.source.databases.numberOfItems).contains {
+            controller.source.databases.itemObjectValue(at: $0) as? String == "lane_l8a_ui_dst"
+        })
+        #expect(controller.compareBlocked == nil)
+        controller.refresh(nil)
+        #expect(controller.isRunning && !model.activity.isIdle)
+        let done = Date() + 60
+        while controller.isRunning, Date() < done { try await Task.sleep(nanoseconds: 50_000_000) }
+        let result = try #require(controller.result)
+        #expect(model.activity.isIdle)
+        #expect(controller.results.objects.first?.name == "gift_cards")
+        #expect(result.object(.table, "customers")?.data?.differenceCount == 4)
+        controller.showSyncScript(nil)
+        let sheet = try #require(controller.window?.attachedSheet)
+        controller.window?.endSheet(sheet)
+        try await ReconLabTests.run(setup, ["DROP DATABASE lane_l8a_ui_src", "DROP DATABASE lane_l8a_ui_dst"])
+        await setup.close()
+    }
+}
+
 extension AppTests.ScreenshotTests {
     @Test func compareWindow() async throws {
         for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
