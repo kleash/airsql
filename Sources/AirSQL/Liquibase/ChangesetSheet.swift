@@ -36,7 +36,7 @@ final class ChangesetSheet: NSWindowController {
     private init(_ changesets: [LiquibaseChangeset], heading: String, model: AppModel) {
         self.model = model
         self.changesets = changesets
-        saveButton = button("Save", id: "changeset.save", tip: "Choose a changelog first", target: nil, action: nil)
+        saveButton = button("Save", id: "changeset.save", tip: "Choose a changelog first", target: nil, action: nil, primary: true)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 480), styleMask: [.titled], backing: .buffered,
                               defer: true)
         window.title = heading
@@ -111,7 +111,6 @@ final class ChangesetSheet: NSWindowController {
         saveButton.target = self
         saveButton.action = #selector(save(_:))
         saveButton.keyEquivalent = "\r"
-        saveButton.bezelColor = .accent
         saveButton.isEnabled = false
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
