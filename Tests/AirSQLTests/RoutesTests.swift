@@ -49,6 +49,12 @@ struct RoutesTests {
         var noKey = connection(.ssh)
         noKey.sshHost.keyFile = ""
         #expect(SSHConfig.problem(with: noKey) != nil)
+        // A key path with a quote, newline or control character would inject ssh_config lines; a path with spaces is fine.
+        for key in ["~/keys/id\nIdentityFile /etc/evil", "~/keys/id\r", "a\"b", "~/keys/id\u{0}"] {
+            var badKey = connection(.ssh)
+            badKey.sshHost.keyFile = key
+            #expect(SSHConfig.problem(with: badKey) != nil, "\(key.debugDescription)")
+        }
     }
 
     @Test func startupSQLIsSentAStatementAtATime() {

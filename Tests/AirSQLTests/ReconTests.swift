@@ -335,6 +335,10 @@ struct ReconTests {
         }
         #expect(same("0.1", "0.10", .float) && same("1e300", "1E+300", .float) && !same("0.1", "0.2", .float))
         #expect(same("1.50", "1.5", .decimal) && same("007", "7", .integer) && !same("1.5", "1.51", .decimal))
+        #expect(same("-0", "0.000", .decimal) && same("+12.3", "12.30", .decimal))
+        // DECIMAL(65,0) differing in the last digit, past Foundation Decimal's 38 significant digits.
+        let big = String(repeating: "9", count: 64)
+        #expect(!same(big + "1", big + "2", .decimal) && same(big + "1", big + "1", .decimal))
         #expect(same(#"{"a": 1, "b": [true, null]}"#, #"{"b":[true,null],"a":1}"#, .json))
         #expect(!same(#"{"a": 1}"#, #"{"a": "1"}"#, .json))
         #expect(!same("a", "A", .text) && !same("a", "a ", .text) && !same("", nil, .text) && same(nil, nil, .text))

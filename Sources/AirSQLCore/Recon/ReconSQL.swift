@@ -171,9 +171,9 @@ struct ReconTableSQL {
             guard let x = Double(a), let y = Double(b) else { return false }
             return x == y
         case .decimal, .integer:
-            guard let x = Decimal(string: a, locale: Locale(identifier: "en_US_POSIX")),
-                  let y = Decimal(string: b, locale: Locale(identifier: "en_US_POSIX")),
-                  isNumber(a), isNumber(b) else { return false }
+            // Not through Foundation's Decimal: it keeps 38 significant digits, so two DECIMAL(65) values that differ
+            // beyond the 38th would compare equal. Compare the digits exactly, written the one way.
+            guard let x = normalizedDecimal(a), let y = normalizedDecimal(b) else { return false }
             return x == y
         case .json:
             let options: JSONSerialization.ReadingOptions = [.fragmentsAllowed]
@@ -185,5 +185,24 @@ struct ReconTableSQL {
         case .bit, .binary, .blob, .text, .longText, .temporal:
             return false
         }
+    }
+
+    /// A plain decimal (no exponent) written the one way, so two equal values match whatever their scale or padding:
+    /// sign (none for zero), integer digits without leading zeros, fraction digits without trailing zeros. nil when
+    /// `text` isn't a plain decimal, which for a DECIMAL or integer column means the values aren't equal as numbers.
+    static func normalizedDecimal(_ text: String) -> String? {
+        guard isNumber(text), !text.contains(where: { $0 == "e" || $0 == "E" }) else { return nil }
+        var rest = Substring(text)
+        let negative = rest.first == "-"
+        if rest.first == "-" || rest.first == "+" { rest = rest.dropFirst() }
+        var whole = rest, fraction: Substring = ""
+        if let dot = rest.firstIndex(of: ".") {
+            whole = rest[..<dot]
+            fraction = rest[rest.index(after: dot)...]
+        }
+        while whole.first == "0" { whole = whole.dropFirst() }
+        while fraction.last == "0" { fraction = fraction.dropLast() }
+        let digits = (whole.isEmpty ? "0" : String(whole)) + (fraction.isEmpty ? "" : "." + fraction)
+        return (negative && digits != "0" ? "-" : "") + digits
     }
 }
