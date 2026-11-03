@@ -1526,8 +1526,10 @@ It needs macOS 13.1 or later. Downloads from the releases page and Homebrew are 
 ## Report a problem
 
 **Help ▸ Report a Problem** opens a form on GitHub with your AirSQL and macOS versions filled in. **Help ▸ Copy
-Diagnostics** copies those versions and the client library's (no names, hosts or paths). The [SQL log](https://kleash.github.io/airsql/sql-log.html)
-shows exactly what AirSQL sent: read it before you share any of it, because it holds your queries.
+Diagnostics** copies those versions and the client library's (no names, hosts or paths). **AirSQL ▸ About AirSQL**
+shows AirSQL's version and the client library's, with links to this site and to the licences of AirSQL and the
+libraries in it. The [SQL log](https://kleash.github.io/airsql/sql-log.html) shows exactly what AirSQL sent: read it before you share any of it, because
+it holds your queries.
 
 
 ---

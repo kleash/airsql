@@ -176,3 +176,30 @@ extension AppTests {
         }
     }
 }
+
+/// About AirSQL: AppDelegate answers the command with the standard panel, whose credits give the client library's
+/// version, AirSQL's licence and links to the site and to NOTICE; Info.plist gives the copyright and the icon.
+@MainActor
+struct AboutTests {
+    @Test func aboutGivesTheVersionsTheLicenceAndWhereToReadMore() throws {
+        #expect(AppDelegate().responds(to: Commands.about.action))
+        let credits = try #require(HelpPage.about[.credits] as? NSAttributedString)
+        #expect(HelpPage.about[.version] as? String == "")
+        #expect(credits.string == "MariaDB Connector/C \(MariaDB.clientVersion)\nLicensed under the Apache License 2.0\nWebsite · Licences")
+        var links: [String: URL] = [:]
+        credits.enumerateAttribute(.link, in: NSRange(location: 0, length: credits.length)) { value, range, _ in
+            guard let url = value as? URL else { return }
+            let title = (credits.string as NSString).substring(with: range)
+            links[title] = url
+            #expect(credits.attribute(.toolTip, at: range.location, effectiveRange: nil) != nil, "\(title) has no tooltip")
+        }
+        // Outside the app (here) NOTICE is the repository's; the app links its own copy, Licenses/NOTICE.txt.
+        #expect(links == ["Website": HelpPage.site, "Licences": URL(string: "https://github.com/kleash/airsql/blob/main/NOTICE")!])
+
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let info = try #require(NSDictionary(contentsOf: root.appendingPathComponent("Resources/AirSQL-Info.plist")))
+        #expect(info["NSHumanReadableCopyright"] as? String == "Copyright 2026 kleash")
+        #expect(info["CFBundleIconFile"] as? String == "AppIcon")
+        #expect(NSImage(contentsOf: root.appendingPathComponent("Resources/AppIcon.icns"))?.representations.count == 10)
+    }
+}
