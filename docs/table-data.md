@@ -75,9 +75,9 @@ says why; so are views. Generated columns can't be edited.
   number (someone else changed or deleted the row since it was loaded) or the server refuses one, everything is rolled
   back, nothing is applied, and the grid selects the row. Reload it, then apply again.
 - **Preview SQL…** shows the statements first, in the [SQL preview](sql-preview.md). The preview also comes first on
-  connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection), and whenever
-  there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes that also
-  change other tables through `ON DELETE CASCADE` or `SET NULL`.
+  connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection),
+  and whenever there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes
+  that also change other tables through `ON DELETE CASCADE` or `SET NULL`.
 - After Apply the rows load again, so new rows show their real ids.
 
 ## Copy and export
