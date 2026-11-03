@@ -63,6 +63,13 @@ extension AppTests {
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
                            "Compare…", "Colour", "Delete…"],
                     enabled: ["Duplicate", "Colour", "Delete…"]),
+            Surface(name: "Direct connection in the sidebar",
+                    place: { main, _ in sidebarRow(main, "Local MariaDB 11.8") },
+                    clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.local.id] && $0.contentKind == "summary" },
+                    doubleClicked: { _, received in received.contains("connect(_:)") },
+                    menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
+                           "Compare…", "Colour", "Delete…"],
+                    enabled: ["Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour", "Delete…"]),
             Surface(name: "Editor tab",
                     place: { main, _ in
                         main.open(FixtureContent(), title: "Query 1", connection: Fixtures.production.id)
@@ -114,6 +121,8 @@ extension AppTests {
             model.data.settings.agentsAllowed = true
             let (main, harness) = appWindow(model)
             let recorder = CommandRecorder()
+            ToolsResponder.install(on: main)
+            recorder.nextResponder = main.nextResponder
             main.nextResponder = recorder
             model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3")
             let content = FixtureContent()
@@ -126,7 +135,7 @@ extension AppTests {
         }
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
-        nonisolated static let rows = ["Connection in the sidebar", "Editor tab", "Status bar: route", "Status bar: server",
+        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Editor tab", "Status bar: route", "Status bar: server",
                                        "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log"]
 
         @Test func everyRowHasItsChecks() {

@@ -116,6 +116,50 @@ extension AppTests {
                 _ = await call(harness, "press", ["title": "Cancel"])
                 _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
 
+                // The client tools (L6): Export at work, and Restore with its file chosen.
+                ToolsResponder.install(on: main)
+                let export = ExportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+                export.show(on: main.window!, loads: false)
+                export.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "export-\(suffix)")
+                _ = export.begin("Exporting shop")
+                export.progress("Writing order_items · 1.9 GB of ≈3.1 GB", done: 19, total: 31)
+                export.timeLeft.stringValue = "about 2 min left"
+                try await Task.sleep(nanoseconds: 600_000_000)  // the bar moves to its value
+                try await save(harness, "export-running-\(suffix)")
+                export.finish("Stopped.", failed: true)
+                export.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                let restore = RestoreSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: false)
+                restore.show(on: main.window!, loads: false)
+                restore.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["crm", "shop"])
+                restore.use(URL(fileURLWithPath: "/Users/Shared/Backups/shop-2026-11-03-0912.sql.gz"))
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "restore-\(suffix)")
+                restore.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+
+                let copy = CopySheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+                copy.show(on: main.window!, loads: false)
+                copy.show(databases: ToolFixtures.databases())
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "copy-\(suffix)")
+                copy.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                let csv = CSVImportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
+                csv.show(on: main.window!, loads: false)
+                csv.show(databases: ToolFixtures.databases())
+                csv.show(columns: ToolFixtures.customerColumns)
+                let people = URL(fileURLWithPath: try scratch() + "/customers-2026-11.csv")
+                try "id,name,email\n1,Ada Lovelace,ada@example.com\n2,Émile Durand,\n".write(to: people, atomically: true, encoding: .utf8)
+                csv.use(people)
+                _ = await eventually(timeout: 5) { csv.runButton.isEnabled }
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                try await save(harness, "csv-import-\(suffix)")
+                csv.close()
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+
                 // Settings, every pane.
                 let settings = SettingsWindowController(model: model)
                 keptWindows.append(settings)
@@ -125,6 +169,11 @@ extension AppTests {
                 let settingsHarness = AgentServer(main: main, model: model, windows: { [window] })
                 for pane in SettingsPane.allCases {
                     settings.show(pane)
+                    if pane == .clientTools {  // the tools found, once AirSQL has looked (off the main thread)
+                        _ = await eventually(timeout: 15) {
+                            window.contentView.flatMap { find(NSTextField.self, id: "settings.dumpFound", in: $0) }?.stringValue != "Looking…"
+                        }
+                    }
                     window.layoutIfNeeded()
                     try await save(settingsHarness, "settings-\(pane.rawValue)-\(suffix)", target: "window:\(pane.title)")
                 }

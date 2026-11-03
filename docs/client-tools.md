@@ -1,0 +1,102 @@
+---
+title: Export, restore, copy and import
+---
+
+# Export, restore, copy and import
+
+AirSQL backs up and moves data with your own `mysqldump` and `mysql` (or MariaDB's `mariadb-dump` and `mariadb`)
+when you have them, and with its own code when you don't. Every command here is in the **Tools** and **File** menus
+and in a connection's right-click menu in the sidebar.
+
+## Which programs AirSQL uses
+
+**Settings ▸ Client Tools** shows the programs AirSQL found and their versions. It looks in Homebrew's folders
+(`/opt/homebrew/opt/mysql-client/bin` and the like, on Apple silicon and Intel), `/usr/local/mysql/bin` (MySQL's
+installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
+(MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
+
+Each sheet says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
+older version than the server), or why it can't be used (not there, too old: AirSQL needs MySQL 5.7 or MariaDB 10.3
+tools or newer). The tool you pick in a sheet is remembered for that connection.
+
+No tools at all? Install MySQL's or MariaDB's client tools (for example `brew install mysql-client`), then choose
+**Find Again**. Until then, Export and Run SQL File use AirSQL's own code.
+
+## Export a database
+
+**Tools ▸ Export…** (or right-click a connection ▸ Export…).
+
+1. Tick the databases or tables to export. Space ticks the selected rows; right-click for Include All, Include None and
+   Include Only These. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
+   databases export whole, each with its own name.
+2. Choose the content (structure and data, structure only, data only) and the options: one consistent snapshot
+   (`--single-transaction`), binary as hex, gzip, `DROP TABLE` before each table, and views, routines, triggers and
+   events.
+3. Pick the tool, where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
+4. The box under the form shows the exact command line. **Copy Command** copies it.
+5. **Export**. The sheet shows the table being written, the bytes so far and the time left. **Stop** ends it.
+
+The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
+or failed export never leaves half a file.
+
+**AirSQL (built in)** in the Tool menu writes the SQL itself, through a connection of its own: the tables' `CREATE`
+statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
+consistent snapshot. Its files restore with `mysql` or with Run SQL File.
+
+## Restore a dump, or run a .sql file
+
+**Tools ▸ Restore…** runs a `.sql` or `.sql.gz` file with your `mysql` or `mariadb`; **File ▸ Run SQL File…** opens the
+same sheet with AirSQL's own runner, which splits the file into statements as `mysql` does (`DELIMITER` included) and
+runs them one at a time. Compressed files are read through `/usr/bin/gzip`.
+
+1. Choose the file and the database it runs in.
+2. Choose what happens on an error: stop at the first one (what ran before it stays), or go on and count them
+   (`--force`).
+3. **Restore** (or **Run**).
+
+Before anything runs, AirSQL reads the whole file for the statements that decide where it writes: `USE`,
+`CREATE DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED`. When the file switches to another database than the one you
+chose, drops a database, or sets GTID_PURGED, or when the database it writes to has tables already, the SQL preview
+sheet says so and asks first (Settings ▸ Safety ▸ *Ask before Restore…*). On a production connection it always asks.
+Progress is the share of the file read, so it is real for compressed files too.
+
+## Copy to another server
+
+**Tools ▸ Copy to Another Server…** copies databases or tables straight from one connection to another, through a
+session on each: no file in between.
+
+- **To** and **Database**: the connection and the database the copy goes into (made if it isn't there). One database
+  can take another name; views and routines follow the new name.
+- **Replace tables that are there** drops the other server's tables of the same name first. It is off unless you tick
+  it, and the SQL preview asks before it runs. Copies to a production connection always ask.
+- If a statement fails, the copy stops; what was copied before it stays.
+
+## Import a CSV file
+
+**File ▸ Import CSV…**
+
+1. Choose the file. AirSQL guesses the separator (comma, semicolon, tab or bar) and shows each field's first value.
+2. Choose the table. Each column takes a field of the file, matched by name when the first row names the columns, by
+   position when it doesn't, or **Leave out** to take its default.
+3. **Import**. The rows go in one transaction: if one fails (a duplicate key, a value the column refuses), none of the
+   file stays, and the message says which records.
+
+Empty fields become NULL unless you untick it. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+
+## Open the mysql command line in Terminal
+
+**Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database.
+
+## Your password stays private
+
+The client tools get the login from a temporary option file that only you can read (file mode 0600, in a private
+folder in AirSQL's Application Support folder), passed as `--defaults-file`, so `~/.my.cnf` and `/etc/my.cnf` don't
+change where they connect. The password is never on the command line, in the environment, or in the command shown.
+AirSQL removes the file as soon as the tool has read it: once a dump has started writing, once a restore is reading
+its input, ten seconds after Terminal starts `mysql`; and anything left behind at the next launch.
+
+Over TCP the tools check TLS the way the connection asks: MySQL's with `--ssl-mode`, MariaDB's with `--ssl` and
+`--ssl-verify-server-cert`. MySQL's tools check certificates only against a CA file; for a connection without one, or
+with a pinned certificate, the sheet says so and AirSQL's own export and runner (which check it as AirSQL does) remain.
+
+Client tools reach SSH and proxy routes through the connection's private socket once AirSQL is connected through them.

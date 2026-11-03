@@ -49,4 +49,7 @@ but never change them.
 ## Client Tools
 
 The `mysql` (or `mariadb`) and `mysqldump` (or `mariadb-dump`) programs AirSQL runs. Leave them empty to let AirSQL
-find them.
+find them: it looks in Homebrew's folders, `/usr/local/mysql/bin`, MAMP and your `PATH`, and picks for each server the
+tools of its family and version. Under each field the pane says which program and version it found, or why there is
+none or it can't be used; **Found** lists every tool on this Mac, and **Find Again** looks again after you install or
+update some. See [Export, restore, copy and import](client-tools.md).

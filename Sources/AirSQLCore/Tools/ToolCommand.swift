@@ -1,0 +1,210 @@
+import Darwin
+import Foundation
+
+/// What to dump (Export with mysqldump or mariadb-dump).
+public struct DumpRequest: Equatable, Sendable {
+    public enum Content: String, CaseIterable, Sendable {
+        case structureAndData, structure, data
+
+        public var title: String {
+            switch self {
+            case .structureAndData: return "Structure and data"
+            case .structure: return "Structure only"
+            case .data: return "Data only"
+            }
+        }
+    }
+
+    /// One database: its tables (`tables`, empty for all) and no CREATE DATABASE, so it restores into any database.
+    /// Several: each whole, with CREATE DATABASE and USE.
+    public var databases: [String]
+    public var tables: [String] = []
+    public var content = Content.structureAndData
+    /// Views, routines, triggers and events.
+    public var objects = true
+    /// One consistent snapshot (--single-transaction).
+    public var singleTransaction = true
+    /// Binary as hex (--hex-blob).
+    public var hexBlob = true
+    public var addDropTable = false
+    public var gzip = false
+    /// The person's own options, already split into words (`ToolCommand.words`).
+    public var extra: [String] = []
+
+    public init(databases: [String], tables: [String] = []) {
+        self.databases = databases
+        self.tables = tables
+    }
+}
+
+/// The client tools' command lines for a connection (plan §2.9). The login goes in an option file only this user can
+/// read, passed first as --defaults-file so ~/.my.cnf and /etc/my.cnf aren't read at all; where to connect and how
+/// to check TLS follow on the command line, which never holds a secret.
+public struct ToolCommand: Sendable {
+    public var tool: ClientTool
+    public var options: ConnectOptions
+    public var server: ServerInfo?
+
+    public init(tool: ClientTool, options: ConnectOptions, server: ServerInfo?) {
+        self.tool = tool
+        self.options = options
+        self.server = server
+    }
+
+    private var family: ToolVersion.Family { tool.version?.family ?? .mysql }
+
+    /// The option file, where to connect (TCP to the host, or a Unix socket: the server's own or a route's), TLS as the
+    /// connection asks for it and utf8mb4.
+    public func connection(optionFile: String) -> [String] {
+        var args = ["--defaults-file=" + optionFile]
+        switch options.endpoint {
+        case .tcp: args += ["--protocol=TCP", "--host=" + options.host, "--port=\(options.port)"]
+        case .socket(let path), .route(let path): args += ["--protocol=SOCKET", "--socket=" + path]
+        }
+        if case .socket = options.endpoint {} else { args += tls }
+        return args + ["--default-character-set=utf8mb4"]
+    }
+
+    /// The connection's TLS check in the tool family's own words (no loose- prefix: a tool that doesn't know one of these
+    /// must stop rather than connect without TLS). Through a route the tools see a local socket, so MySQL's tools check
+    /// the certificate's authority there but not its name; MariaDB's have no such middle ground.
+    private var tls: [String] {
+        var args: [String]
+        let mode = options.tls.mode
+        if family == .mysql {
+            let routed: Bool
+            if case .route = options.endpoint { routed = true } else { routed = false }
+            switch mode {
+            case .off: args = ["--ssl-mode=DISABLED"]
+            case .required: args = ["--ssl-mode=REQUIRED"]
+            case .verifyCA: args = ["--ssl-mode=VERIFY_CA"]
+            case .verifyIdentity: args = [routed ? "--ssl-mode=VERIFY_CA" : "--ssl-mode=VERIFY_IDENTITY"]
+            }
+        } else {
+            switch mode {
+            case .off: args = ["--skip-ssl"]
+            case .required: args = ["--ssl", "--skip-ssl-verify-server-cert"]
+            case .verifyCA, .verifyIdentity: args = ["--ssl", "--ssl-verify-server-cert"]
+            }
+        }
+        guard mode != .off else { return args }
+        if let file = options.tls.caFile, !file.isEmpty { args.append("--ssl-ca=" + file) }
+        if let file = options.tls.certFile, !file.isEmpty { args.append("--ssl-cert=" + file) }
+        if let file = options.tls.keyFile, !file.isEmpty { args.append("--ssl-key=" + file) }
+        return args
+    }
+
+    /// Why the tools can't connect as safely as AirSQL does, if they can't: a pinned certificate (the tools can't pin),
+    /// or MySQL's tools asked to check a certificate without a CA file (they don't read macOS's trusted certificates).
+    public var tlsProblem: String? {
+        if case .socket = options.endpoint { return nil }
+        let tls = options.tls
+        guard tls.mode != .off else { return nil }
+        if let pin = tls.pinnedFingerprint, !pin.isEmpty {
+            return "The client tools can't check this server's pinned certificate. AirSQL's built-in export and Run SQL File can."
+        }
+        if family == .mysql && (tls.mode == .verifyCA || tls.mode == .verifyIdentity) && (tls.caFile ?? "").isEmpty {
+            return "MySQL's tools check certificates only against a CA file, and this connection has none. Add one in the "
+                + "connection's TLS settings, or use AirSQL's built-in export and Run SQL File."
+        }
+        return nil
+    }
+
+    /// mysqldump or mariadb-dump for `request`, writing the dump to its standard output.
+    public func dump(_ request: DumpRequest, optionFile: String) -> [String] {
+        var args = [tool.path] + connection(optionFile: optionFile)
+        if request.singleTransaction { args.append("--single-transaction") }
+        if request.hexBlob { args.append("--hex-blob") }
+        switch request.content {
+        case .structureAndData: break
+        case .structure: args.append("--no-data")
+        case .data: args.append("--no-create-info")
+        }
+        args += request.objects && request.content != .data ? ["--routines", "--events", "--triggers"] : ["--skip-triggers"]
+        args.append(request.addDropTable ? "--add-drop-table" : "--skip-add-drop-table")
+        // MySQL 8's tools read column statistics only MySQL 8 has (written loose-: only MySQL's tools know it).
+        if family == .mysql, (tool.version?.majorMinor ?? 0) >= 800,
+           let server, server.flavor == .mariadb || server.versionNumber < 80000 {
+            args.append("--loose-column-statistics=0")
+        }
+        args += request.extra
+        if request.databases.count == 1 {
+            args += request.databases + request.tables
+        } else {
+            args += ["--databases"] + request.databases
+        }
+        return args
+    }
+
+    /// mysql or mariadb running the SQL on its standard input in `database`: stopping at the first error, or going on
+    /// past errors (--force).
+    public func restore(into database: String, continueOnError: Bool, optionFile: String) -> [String] {
+        var args = [tool.path] + connection(optionFile: optionFile) + ["--batch"]
+        if continueOnError { args.append("--force") }
+        return database.isEmpty ? args : args + [database]
+    }
+
+    /// mysql or mariadb for Terminal, in `database` when given.
+    public func terminal(database: String, optionFile: String) -> [String] {
+        let args = [tool.path] + connection(optionFile: optionFile)
+        return database.isEmpty ? args : args + [database]
+    }
+
+    /// The command line to show and copy: each word quoted for a shell, the option file's path left out.
+    public static func display(_ argv: [String], optionFile: String) -> String {
+        argv.map { word in
+            word == "--defaults-file=" + optionFile ? "--defaults-file=‹private temporary file›" : shellWord(word)
+        }.joined(separator: " ")
+    }
+
+    /// `word` as a shell reads it back: as is when it is plain, else in single quotes.
+    public static func shellWord(_ word: String) -> String {
+        let plain = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./=:,@%+")
+        if !word.isEmpty && word.unicodeScalars.allSatisfy(plain.contains) { return word }
+        return "'" + word.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// The person's extra options split into words as a shell would (quotes and backslashes), or why they can't be
+    /// used: a password on the command line, other option files, or another output file.
+    public static func words(_ text: String) throws -> [String] {
+        var words: [String] = [], word = "", inWord = false, quote: Character?
+        var escaped = false
+        for character in text {
+            if escaped {
+                word.append(character)
+                escaped = false
+            } else if character == "\\" && quote != "'" {
+                escaped = true
+                inWord = true
+            } else if let open = quote {
+                if character == open { quote = nil } else { word.append(character) }
+            } else if character == "'" || character == "\"" {
+                quote = character
+                inWord = true
+            } else if character.isWhitespace {
+                if inWord { words.append(word) }
+                word = ""
+                inWord = false
+            } else {
+                word.append(character)
+                inWord = true
+            }
+        }
+        if quote != nil { throw AirSQLError(.other, "A quote in the extra options isn't closed.") }
+        if inWord { words.append(word) }
+        for word in words {
+            let name = word.split(separator: "=", maxSplits: 1).first.map(String.init) ?? word
+            if name.hasPrefix("--password") || (word.hasPrefix("-p") && !word.hasPrefix("--")) {
+                throw AirSQLError(.other, "Leave the password out of the extra options: AirSQL passes it in a private file, "
+                    + "never on the command line.")
+            }
+            if name.hasPrefix("--defaults") || name == "--no-defaults" || name.hasPrefix("--login-path") {
+                throw AirSQLError(.other, "\(name) can't be used here: AirSQL gives the tool its own option file.")
+            }
+            if name == "--result-file" || word.hasPrefix("-r") && !word.hasPrefix("--") {
+                throw AirSQLError(.other, "\(name) can't be used here: AirSQL writes the file you chose in Save to.")
+            }
+        }
+        return words
+    }
+}
