@@ -52,6 +52,34 @@ extension AppTests {
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
         }
 
+        @Test func theHistoryRowsShareABaselineAndShowTheirResult() async throws {
+            let (main, harness, console) = try await Self.window()
+            let error = "The table 'orders_archive_2025' doesn't exist in the database 'shop', so nothing was read from it"
+            QueryHistory.shared.add(HistoryEntry(sql: "SELECT * FROM orders_archive_2025", connection: Fixtures.production.id, error: error))
+            QueryHistory.shared.flush()
+            console.showHistory(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "wait", ["until": "text", "text": "statements", "timeout": 5])
+            let sheet = try #require(main.window?.attachedSheet)
+            let content = try #require(sheet.contentView)
+            content.layoutSubtreeIfNeeded()
+            let table = try #require(find(NSTableView.self, id: "history.list", in: content))
+            let row = try #require((0..<table.numberOfRows).first { row in
+                (table.view(atColumn: 2, row: row, makeIfNecessary: true) as? NSTableCellView)?.textField?.toolTip == "Failed: " + error
+            })
+            let fields = try (0..<3).map { column in
+                try #require((table.view(atColumn: column, row: row, makeIfNecessary: true) as? NSTableCellView)?.textField)
+            }
+            fields.forEach { $0.superview?.layoutSubtreeIfNeeded() }
+            let baselines = fields.map { $0.convert(NSPoint(x: 0, y: $0.firstBaselineOffsetFromTop), to: nil).y }
+            #expect(baselines.allSatisfy { abs($0 - baselines[0]) < 0.5 }, "\(baselines)")
+            // The Result column ends inside the list, so its text isn't cut off by the edge.
+            let scroll = try #require(table.enclosingScrollView)
+            #expect(table.rect(ofColumn: 2).maxX <= scroll.contentView.bounds.maxX + 1)
+            _ = await call(harness, "press", ["title": "Cancel"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        }
+
         @Test func findAndTheHelpersKeepTheWindowAtItsMinimumSize() async throws {
             let (main, _, console) = try await Self.window(size: MainWindowController.minimumSize)
             console.findBar.show(replace: true)

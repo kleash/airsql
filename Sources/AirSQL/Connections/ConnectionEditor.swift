@@ -20,7 +20,9 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     }
 
     /// The connection as edited (saved on Save).
-    var draft: SavedConnection
+    var draft: SavedConnection { didSet { routePathLabel?.stringValue = routePath } }
+    /// The SSH and Proxy tab's Path line, which follows the draft as it is edited.
+    weak var routePathLabel: NSTextField?
     let isNew: Bool
     let model: AppModel
     /// Typed in the General and SSH and Proxy tabs; empty: keep what the Keychain has.
@@ -143,6 +145,11 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         }
         holder.addSubview(content)
         content.pin(to: holder)
+        fitWindow()
+    }
+
+    /// The sheet as tall as what the tab shows now.
+    func fitWindow() {
         guard let window, let root = window.contentView else { return }
         root.layoutSubtreeIfNeeded()
         let size = root.fittingSize

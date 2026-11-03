@@ -133,8 +133,13 @@ extension AppTests {
             sheet.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["crm", "shop"])
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the file to run first")
+            // The file's size has a line of its own once there is a file, and none before (no blank band).
+            let content = try #require(sheet.window?.contentView)
+            let info = try #require(find(NSTextField.self, id: "restore.fileInfo", in: content))
+            #expect(info.isHiddenOrHasHiddenAncestor)
             sheet.use(URL(fileURLWithPath: "/Volumes/Backups/shop-2026-11-03.sql.gz"))
             #expect(sheet.runButton.isEnabled)
+            #expect(await eventually(timeout: 5) { !info.isHiddenOrHasHiddenAncestor })
             let command = await Self.text(harness, "restore.command")
             #expect(command == "/usr/bin/gzip -dc /Volumes/Backups/shop-2026-11-03.sql.gz | /opt/homebrew/opt/mariadb/bin/mariadb "
                 + "--defaults-file=‹private temporary file› --protocol=SOCKET --socket=/tmp/mysql.sock "

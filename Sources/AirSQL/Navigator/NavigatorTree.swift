@@ -106,6 +106,11 @@ extension SidebarController {
     /// The cell of a tree row.
     func treeCell(_ node: SidebarNode, in outlineView: NSOutlineView) -> NSView? {
         let cell = (outlineView.makeView(withIdentifier: TreeCell.identifier, owner: nil) as? TreeCell) ?? TreeCell()
+        // A message shows without its connection's schema (the filter's "nothing matches" has none).
+        if case .message(let id, let text) = node.kind {
+            cell.showMessage(text, busy: model.openConnection(id)?.loading.contains(.schema) ?? false)
+            return cell
+        }
         guard let id = node.connectionOfTree, let open = model.openConnection(id) else { return cell }
         switch node.kind {
         case .database(_, let name):
@@ -127,8 +132,6 @@ extension SidebarController {
             cell.show(TreeIcon.of(object.kind), object.name, count: count, busy: false,
                       tip: "\(object.name), a \(object.kind.noun): click to see \(action), double-click to open it in a tab, "
                         + "right-click for more")
-        case .message(_, let text):
-            cell.showMessage(text, busy: open.loading.contains(.schema))
         default:
             break
         }

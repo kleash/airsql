@@ -63,6 +63,20 @@ extension AppTests {
             #expect(main.sidebar.treeNodes[.object(id, DatabaseObject(.table, "airsql_fixture", "customers"))] != nil)
         }
 
+        @Test func aFilterThatMatchesNothingSaysSoAndHowToClearIt() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            main.sidebar.filter.stringValue = "zzz-nothing"
+            main.sidebar.reload()
+            let outline = main.sidebar.outline
+            let rows = (0..<outline.numberOfRows).compactMap { outline.view(atColumn: 0, row: $0, makeIfNecessary: true) }
+            let texts = rows.compactMap { find(NSTextField.self, in: $0)?.stringValue }
+            #expect(texts == ["CONNECTIONS", "Nothing matches “zzz-nothing”", "Esc in the filter shows everything"], "\(texts)")
+            main.sidebar.filter.stringValue = ""
+            main.sidebar.reload()
+            #expect(outline.numberOfRows > 3)
+        }
+
         @Test func aClickOnADatabaseShowsItsTablesWithTheirSizes() async throws {
             let model = testModel(Fixtures.shop)
             let (main, harness) = appWindow(model)

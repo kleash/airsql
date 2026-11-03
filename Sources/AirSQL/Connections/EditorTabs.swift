@@ -223,8 +223,35 @@ extension ConnectionEditor {
         scroll.heightAnchor.constraint(equalToConstant: 72).isActive = true
         sql.autoresizingMask = [.width]
         form.row("Startup SQL", [scroll], caption: "Runs in every session after it logs in (SET sql_mode, time_zone…).")
+        form.heading("Client tools")
+        for kind in [ClientTool.Kind.client, .dump] { toolRow(form, kind) }
         safetyRows(form)
         return content(form)
+    }
+
+    /// The connection's own mysql or mysqldump (empty: Settings ▸ Client Tools' choice), with what it is or why it can't
+    /// be used, as Settings ▸ Client Tools says it. Export and Restore keep the tool chosen in their Tool pop-up here.
+    private func toolRow(_ form: Form, _ kind: ClientTool.Kind) {
+        let path: WritableKeyPath<SavedConnection, String> = kind == .client ? \.clientPath : \.dumpPath
+        let what = kind == .client ? "mysql or mariadb" : "mysqldump or mariadb-dump"
+        let note = caption("Looking…", width: 400)
+        note.setAccessibilityIdentifier(kind == .client ? "editor.clientFound" : "editor.dumpFound")
+        let fallback = model.data.settings[keyPath: kind == .client ? \AppSettings.clientPath : \AppSettings.dumpPath]
+        let check: (String) -> Void = { [weak self] chosen in
+            Task {
+                let tools = await ClientTools.find(kind, chosen: chosen.isEmpty ? fallback : chosen)
+                (note.stringValue, note.textColor) = ClientToolsPane.note(tools, kind: kind, chosen: chosen.isEmpty ? fallback : chosen)
+                self?.fitWindow()
+            }
+        }
+        form.row(kind == .client ? "Client" : "Dump tool",
+                 file(draft[keyPath: path], placeholder: "Settings ▸ Client Tools", id: kind == .client ? "editor.clientPath" : "editor.dumpPath",
+                      tip: "Type or choose the \(what) program for this connection; empty: Settings ▸ Client Tools' choice") { [weak self] in
+                     self?.draft[keyPath: path] = $0
+                     check($0)
+                 })
+        form.grid.addRow(with: [NSGridCell.emptyContentView, note]).topPadding = -4
+        check(draft[keyPath: path])
     }
 
     /// Keeps the startup SQL in the draft as it is typed.

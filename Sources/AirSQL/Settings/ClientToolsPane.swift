@@ -95,20 +95,19 @@ final class ClientToolsPane: SettingsPaneController {
 
     private func show(_ tools: [ClientTool], kind: ClientTool.Kind, chosen: String) {
         guard let note = notes[kind] else { return }
+        (note.stringValue, note.textColor) = Self.note(tools, kind: kind, chosen: chosen)
+    }
+
+    /// What a tool's field gets (`tools` as `ClientTools.find` gives them for `chosen`): the program found or chosen and
+    /// its version, or why there is none or it can't be used. The connection editor says the same of a connection's own.
+    static func note(_ tools: [ClientTool], kind: ClientTool.Kind, chosen: String) -> (String, NSColor) {
         let names = kind == .client ? "mysql or mariadb" : "mysqldump or mariadb-dump"
         guard let tool = chosen.isEmpty ? ClientTools.best(tools, for: nil) : tools.first else {
-            note.stringValue = "No \(names) found. Install MySQL's or MariaDB's client tools (for example with Homebrew) and choose "
-                + "Find Again, or choose the program." + (kind == .dump ? " Until then Export uses AirSQL's own." : "")
-            note.textColor = .statusBad
-            return
+            return ("No \(names) found. Install MySQL's or MariaDB's client tools (for example with Homebrew) and choose "
+                + "Find Again, or choose the program." + (kind == .dump ? " Until then Export uses AirSQL's own." : ""), .statusBad)
         }
-        if case .unusable(let why) = ClientTools.fit(tool, server: nil) {
-            note.stringValue = why
-            note.textColor = .statusBad
-        } else {
-            note.stringValue = (chosen.isEmpty ? "Found: " : "✓ ") + tool.title + (chosen.isEmpty ? " · " + tool.path : "")
-                + " (\(tool.version?.family.title ?? ""))"
-            note.textColor = chosen.isEmpty ? .secondaryLabelColor : .statusOK
-        }
+        if case .unusable(let why) = ClientTools.fit(tool, server: nil) { return (why, .statusBad) }
+        return ((chosen.isEmpty ? "Found: " : "✓ ") + tool.title + (chosen.isEmpty ? " · " + tool.path : "")
+            + " (\(tool.version?.family.title ?? ""))", chosen.isEmpty ? .secondaryLabelColor : .statusOK)
     }
 }

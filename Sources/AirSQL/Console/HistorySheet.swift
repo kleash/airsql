@@ -38,12 +38,17 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         search.delegate = self
         search.sendsSearchStringImmediately = true
         search.translatesAutoresizingMaskIntoConstraints = false
-        for (identifier, title, width) in [("time", "When", 150.0), ("sql", "Statement", 420.0), ("result", "Result", 140.0)] {
+        // The statement and the result share what the time leaves; a long error is shortened, whole in its tooltip.
+        for (identifier, title, width, minimum) in [("time", "When", 150.0, 150.0), ("sql", "Statement", 360.0, 160.0),
+                                                    ("result", "Result", 200.0, 100.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.title = title
             column.width = width
+            column.minWidth = minimum
+            if identifier == "time" { column.resizingMask = .userResizingMask }
             table.addTableColumn(column)
         }
+        table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.style = .inset
         table.usesAlternatingRowBackgroundColors = true
         table.rowHeight = 22
@@ -97,6 +102,11 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     override func viewDidAppear() {
         super.viewDidAppear()
         view.window?.makeFirstResponder(search)
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        table.sizeToFit()
     }
 
     private func load() {
@@ -153,7 +163,19 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             field.textColor = entry.error == nil ? .secondaryLabelColor : .statusBad
             field.toolTip = field.stringValue
         }
-        return field
+        // On one baseline across the columns (their fonts differ), with the capitals centred in the row.
+        let cell = NSTableCellView()
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        cell.addSubview(field)
+        cell.textField = field
+        NSLayoutConstraint.activate([
+            field.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+            field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+            field.firstBaselineAnchor.constraint(equalTo: cell.topAnchor,
+                                                 constant: ((tableView.rowHeight + NSFont.systemFont(ofSize: NSFont.systemFontSize).capHeight) / 2).rounded()),
+        ])
+        return cell
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
