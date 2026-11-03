@@ -100,7 +100,11 @@ final class ResultsView: NSView, NSTextFieldDelegate {
 
     /// Shows `tabs` on the bar, `selected` under it (`empty` when there is none).
     func show(_ tabs: [ResultTab], selected: ResultTab?, empty: NSView) {
-        while buttons.count > tabs.count { strip.removeArrangedSubview(buttons.removeLast().removedFromSuperview()) }
+        while buttons.count > tabs.count {
+            let button = buttons.removeLast()
+            strip.removeArrangedSubview(button)
+            button.removeFromSuperview()
+        }
         while buttons.count < tabs.count {
             let button = ResultTabButton(bar: self)
             buttons.append(button)
@@ -158,12 +162,5 @@ extension ResultTab.Content {
     var isRenamable: Bool {
         if case .messages = self { return false }
         return true
-    }
-}
-
-private extension NSView {
-    func removedFromSuperview() -> NSView {
-        removeFromSuperview()
-        return self
     }
 }
