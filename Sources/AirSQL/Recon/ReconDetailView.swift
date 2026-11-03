@@ -122,8 +122,20 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         update()
     }
 
+    /// Before the first compare: what to do.
+    func showStart() {
+        for segment in 0..<2 { tabs.setEnabled(false, forSegment: segment) }
+        structure.isHidden = true
+        rowsScroll.isHidden = true
+        message.stringValue = "Choose a database on each side, then Compare (⌘R). The script it makes changes the target only "
+            + "when you run it."
+        message.isHidden = false
+        scriptTitle.stringValue = "Sync script · review before running"
+    }
+
     func update() {
         guard let result else { return }
+        tabs.setEnabled(true, forSegment: 0)
         let rules = result.options.ignore
         let ignored = [rules.autoIncrement ? "AUTO_INCREMENT" : nil, rules.definer ? "DEFINER" : nil,
                        rules.collation ? "collations" : nil, rules.whitespace ? "whitespace" : nil].compactMap { $0 }
@@ -158,8 +170,9 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         rightTitle.stringValue = "\(result.target.name) · \(result.target.database).\(object.targetName)"
         leftTitle.toolTip = leftTitle.stringValue
         rightTitle.toolTip = rightTitle.stringValue
-        if object.status == .same, object.sourceDDL == nil {
-            message.stringValue = "\(object.name) has the same structure on both sides."
+        if object.sourceDDL == nil, object.targetDDL == nil {
+            message.stringValue = object.status == .same ? "\(object.name) has the same structure on both sides."
+                : "Compare Structure and Data to see both definitions side by side."
             message.isHidden = false
             structure.isHidden = true
             return

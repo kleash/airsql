@@ -83,7 +83,8 @@ struct ReconScriptBuilder {
             if let create = create(view) { steps.append(step(.structure, view, create)) }
         }
         for table in tables {
-            var keys = table.parts.filter { $0.kind == .foreignKey && $0.change != .dropped }.map { "ADD " + $0.definition }
+            var keys = table.parts.filter { $0.kind == .foreignKey && $0.change != .dropped && !$0.definition.isEmpty }
+                .map { "ADD " + $0.definition }
             if table.status == .onlyInSource, let create = table.sourceDDL.flatMap(ReconCreateTable.init) {
                 keys = create.foreignKeys.map { "ADD " + $0 }
             }
@@ -123,6 +124,8 @@ struct ReconScriptBuilder {
     /// ALTER TABLE clauses that keep everything the target has: new and changed (dropped, then added again) columns,
     /// keys and checks, widened columns, table options. Foreign keys come in their own steps.
     private func safeClauses(_ part: ReconPart) -> [String] {
+        // Without the source's definition (its SHOW CREATE TABLE couldn't be read) there is nothing to add.
+        guard !part.definition.isEmpty else { return [] }
         switch (part.kind, part.change) {
         case (.column, .added): return ["ADD COLUMN \(part.definition) " + (part.after.map { "AFTER " + q($0) } ?? "FIRST")]
         case (.column, .changed): return part.narrowing ? [] : ["MODIFY COLUMN \(part.definition)"]
@@ -140,7 +143,7 @@ struct ReconScriptBuilder {
     private func destructiveClauses(_ part: ReconPart) -> [String] {
         switch (part.kind, part.change) {
         case (.column, .dropped): return ["DROP COLUMN " + q(part.name)]
-        case (.column, .changed): return part.narrowing ? ["MODIFY COLUMN \(part.definition)"] : []
+        case (.column, .changed): return part.narrowing && !part.definition.isEmpty ? ["MODIFY COLUMN \(part.definition)"] : []
         case (.index, .dropped): return [dropIndex(part.name)]
         case (.check, .dropped): return [dropCheck(part.name)]
         default: return []

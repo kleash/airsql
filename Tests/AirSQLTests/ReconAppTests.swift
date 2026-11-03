@@ -108,7 +108,12 @@ extension AppTests {
                         // each other.
                         problems += layoutProblems(content, where: "\(place) \(what)").filter { !$0.hasSuffix("NSScroller and NSScroller overlap") }
                     }
-                    check(Self.window(nil, size: size, appearance: appearance), "before a compare")
+                    let before = Self.window(nil, size: size, appearance: appearance)
+                    check(before, "before a compare")
+                    // The content takes the window's height rather than forcing its own (a stack of fixed-height views
+                    // once shrank the window to its bars).
+                    before.window?.layoutIfNeeded()
+                    #expect((before.window?.frame.height ?? 0) >= size.height - 1, "\(place): \(before.window?.frame.height ?? 0)")
                     let window = Self.window(Self.result(), size: size, appearance: appearance)
                     check(window, "structure")
                     for (row, object) in window.results.objects.enumerated() where ["products", "gift_cards", "paid_orders"].contains(object.name) {

@@ -9,8 +9,6 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     let summary = NSStackView()
     let list = NSTableView()
     let detail = ReconDetailView()
-    let empty = label("Choose a database on each side, then Compare (⌘R). The script it makes changes the target only when you run it.",
-                      color: .secondaryLabelColor, wraps: true)
     private(set) var objects: [ReconObject] = []
     private let split = NSSplitView()
 
@@ -55,23 +53,20 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         for view in stack.arrangedSubviews { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
         view.addSubview(stack)
         stack.pin(to: view)
-        view.addSubview(empty)
-        empty.preferredMaxLayoutWidth = 520
-        NSLayoutConstraint.activate([
-            empty.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            empty.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            empty.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
-        ])
         view.translatesAutoresizingMaskIntoConstraints = false
         show(nil)
     }
 
-    /// Shows a result: the differences first (only on one side, structure, data), then what matches.
+    /// Shows a result: the differences first (only on one side, structure, data), then what matches. Before the first
+    /// compare the details say what to do.
     func show(_ result: ReconResult?) {
         summary.isHidden = result == nil
-        split.isHidden = result == nil
-        empty.isHidden = result != nil
-        guard let result else { return }
+        guard let result else {
+            objects = []
+            list.reloadData()
+            detail.showStart()
+            return
+        }
         objects = result.objects.sorted { Self.rank($0) < Self.rank($1) }
         // Only on the target, and views and the like that differ, when there are any (the mockup's five boxes otherwise).
         let tints = [NSColor.statusOK, .statusWarning, .statusBad, .statusBad, .statusWarning, .statusWarning]
