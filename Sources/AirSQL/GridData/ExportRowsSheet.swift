@@ -29,7 +29,7 @@ final class ExportRowsSheet: NSWindowController {
     private let headers = checkbox("Column names first", id: "export.headers", tip: "Write the column names as the first line",
                                    on: true, target: nil, action: nil)
     private let nullText = popup(["NULL", "\\N", "Empty"], selected: 0, id: "export.null",
-                                 tip: "How NULL values are written in CSV, TSV, Markdown and HTML", target: nil, action: nil)
+                                 tip: "Choose how NULL values are written in CSV, TSV, Markdown and HTML", target: nil, action: nil)
     private let crlf = checkbox("Windows line endings", id: "export.crlf", tip: "End lines with CR LF, as Windows apps expect",
                                 on: false, target: nil, action: nil)
     private var copyButton: NSButton!
@@ -51,7 +51,7 @@ final class ExportRowsSheet: NSWindowController {
         scope = popup(scopes, selected: request.selectedCount > 1 ? 0 : 1, id: "export.rows",
                       tip: "Export the selected rows, the rows loaded so far, or every row of the table", target: nil, action: nil)
         format = popup(Self.formats.map { $0?.title ?? "Excel (.xlsx)" }, selected: 0, id: "export.format",
-                       tip: "The file's format: CSV and Excel for spreadsheets, JSON, SQL statements, Markdown, HTML or XML",
+                       tip: "Choose the file's format: CSV and Excel for spreadsheets, JSON, SQL statements, Markdown, HTML or XML",
                        target: nil, action: nil)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 260), styleMask: [.titled], backing: .buffered,
                               defer: true)

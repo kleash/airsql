@@ -86,6 +86,11 @@ extension AppTests {
         #expect(await call(harness, "press", ["title": "Safety"]).error == nil)
         #expect(await call(harness, "set", ["id": "editor.ownSafety", "value": true]).error == nil)
         #expect(sheet.draft.safety?.agentRowCap == 7_777)
+        // Each switch says what it protects against, as Settings ▸ Safety's does.
+        let switches = descendants(of: try #require(sheet.window?.contentView)).compactMap { $0 as? NSButton }
+            .filter { $0.accessibilityIdentifier().hasPrefix("editor.safety.") }
+        #expect(switches.count == 9 && Set(switches.compactMap(\.toolTip)).count == 9, "\(switches.map { $0.toolTip ?? "" })")
+        #expect(switches.allSatisfy { $0.toolTip == SafetyPane.tips[$0.accessibilityIdentifier().replacingOccurrences(of: "editor.safety.", with: "")] })
         let changes: [(String, Any)] = [("editor.safety.restore", false), ("editor.safety.unindexedSort", false),
                                         ("editor.safety.warnOnClose", false), ("editor.safety.agentRowCap", "500"),
                                         ("editor.safety.agentTimeout", "20")]

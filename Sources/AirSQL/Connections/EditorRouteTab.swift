@@ -139,7 +139,7 @@ extension ConnectionEditor {
             ("Ask before agents change anything", \.safety!.askBeforeAgentChanges, "agentChanges"),
         ]
         for (title, path, id) in toggles {
-            form.row("", [toggle(title, path, id: "editor.safety." + id, tip: "Turn this check on or off for this connection")])
+            form.row("", [toggle(title, path, id: "editor.safety." + id, tip: SafetyPane.tips[id] ?? "")])
         }
         form.row("Agents' queries", [label("At most", color: .secondaryLabelColor),
                                      count(\.safety!.agentRowCap, id: "editor.safety.agentRowCap",
