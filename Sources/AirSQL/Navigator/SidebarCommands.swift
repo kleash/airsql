@@ -41,6 +41,15 @@ extension SidebarController: NSMenuItemValidation {
         return model.openConnection(main?.activeConnection?.id)
     }
 
+    /// The database of the selected tree rows while the tree has the focus, so its menus' New Query, Export… and
+    /// Restore… start there: their connection and database, when they are all in one.
+    var focusedDatabase: (open: OpenConnection, name: String)? {
+        guard view.window?.firstResponder === outline, let (open, nodes) = treeSelection else { return nil }
+        let names = Set(nodes.compactMap(\.database))
+        guard names.count == 1, let name = names.first else { return nil }
+        return (open, name)
+    }
+
     /// A single click shows the row in the preview tab: a database's tables, a table's rows, an object's definition.
     func showSelectedObject() {
         guard let main, let (open, nodes) = treeSelection, nodes.count == 1 else { return }
@@ -108,6 +117,20 @@ extension SidebarController: NSMenuItemValidation {
     @objc func openObject(_ sender: Any?) {
         guard let main, let open = treeSelection?.open else { return }
         for object in selectedObjects where !object.kind.isTableLike { main.openEditor(object, of: open) }
+    }
+
+    @objc func generateSelect(_ sender: Any?) { generate(.select) }
+    @objc func generateInsert(_ sender: Any?) { generate(.insert) }
+    @objc func generateUpdate(_ sender: Any?) { generate(.update) }
+
+    private func generate(_ kind: NavigatorActions.Generated) {
+        guard let open = treeSelection?.open else { return }
+        NavigatorActions.generate(kind, selectedObjects, on: open, main: main)
+    }
+
+    @objc func runRoutine(_ sender: Any?) {
+        guard let open = treeSelection?.open, let routine = selectedObjects.first else { return }
+        NavigatorActions.runRoutine(routine, on: open, main: main)
     }
 
     @objc func copyName(_ sender: Any?) {

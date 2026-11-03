@@ -66,13 +66,14 @@ extension ReconWindowController {
     private func sync(_ result: ReconResult, destructive: Bool, change: ChangeSQL, saveAsChangeset: Bool,
                       on saved: SavedConnection) {
         guard let connect = Self.connect else { return }
+        let window = self.window
         let total = result.runnable(destructive: destructive).count
         let work = model.activity.start("Running the sync script on \(saved.displayName) · \(result.target.database)",
                                         connection: saved.id, cancel: nil)
         Task { [weak self] in
             var failure: Error?
             do {
-                let session = try await connect(saved).toolsSession()
+                let session = try await connect(saved, window).toolsSession()
                 do {
                     try await result.apply(destructive: destructive, on: session) { done in
                         DispatchQueue.main.async {

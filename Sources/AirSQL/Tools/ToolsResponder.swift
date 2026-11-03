@@ -54,9 +54,19 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         }
     }
 
+    /// The connection the sheets work on: the window's, or, from the navigator (a database's or table's menu, or while
+    /// the tree has the focus), the tree's, starting in the selected rows' database.
+    private var connection: SavedConnection? {
+        guard let main, let (open, database) = main.sidebar.focusedDatabase, var saved = main.model.connection(open.id) else {
+            return main?.activeConnection
+        }
+        saved.database = database
+        return saved
+    }
+
     /// Asks for the password if need be, then shows the sheet `make` builds on the main window.
     private func open(_ make: @escaping (AppModel, SavedConnection, ConnectOptions) -> ToolSheet) {
-        guard let main, let window = main.window, window.attachedSheet == nil, let saved = main.activeConnection else { return }
+        guard let main, let window = main.window, window.attachedSheet == nil, let saved = connection else { return }
         Task {
             guard let options = await Self.options(for: saved, model: main.model, on: window), window.attachedSheet == nil else { return }
             make(main.model, saved, options).show(on: window)
@@ -77,7 +87,7 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         // Copy to Another Server only reads this connection: its sheet checks the one it writes to.
         let writes = [#selector(restoreDatabase(_:)), #selector(runSQLFile(_:)), #selector(importCSV(_:))]
         if main.window?.attachedSheet != nil { return (false, "A sheet is open: answer it first") }
-        guard let connection = main.activeConnection else {
+        guard let connection else {
             return (false, main.selectedConnections.count > 1 ? "Select only one connection" : "Select a connection in the sidebar first")
         }
         if connection.route != .direct, main.model.openConnection(connection.id) == nil {

@@ -17,12 +17,13 @@ extension NSToolbarItem.Identifier {
 /// Cancel. Its buttons send their commands through the responder chain and are enabled only where something can
 /// handle them, saying why not when they can't.
 @MainActor
-final class MainToolbar: NSObject, NSToolbarDelegate {
+final class MainToolbar: NSObject, NSToolbarDelegate, NSMenuDelegate {
     let model: AppModel
     weak var main: MainWindowController?
     let connectionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    let databasePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    let transactionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// Pull-downs: the title (their first item) shows the state, the menu the choices, ticked by their handler.
+    let databasePopup = NSPopUpButton(frame: .zero, pullsDown: true)
+    let transactionPopup = NSPopUpButton(frame: .zero, pullsDown: true)
     /// The pop-ups' toolbar items (a toolbar item's tooltip is its view's).
     private var popupItems: [NSPopUpButton: NSToolbarItem] = [:]
 
@@ -36,13 +37,18 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         databasePopup.setAccessibilityIdentifier("toolbar.database")
         databasePopup.setAccessibilityLabel("Database")
         databasePopup.addItem(withTitle: "No Database")
+        databasePopup.menu?.delegate = self  // the databases are listed as it opens
         transactionPopup.setAccessibilityIdentifier("toolbar.transactionMode")
         transactionPopup.setAccessibilityLabel("Transaction mode")
-        for command in [Commands.autoCommit, Commands.manualCommit] {
-            let item = command.item()
-            item.title = "Tx: " + command.title
-            transactionPopup.menu?.addItem(item)
-        }
+        transactionPopup.addItem(withTitle: "Tx: " + Commands.autoCommit.title)
+        transactionPopup.menu?.add([Commands.autoCommit, Commands.manualCommit, nil])
+        let levels = NSMenuItem(title: "Isolation Level", action: nil, keyEquivalent: "")
+        levels.toolTip = Commands.isolation.tip
+        transactionPopup.menu?.addItem(levels)
+        MainMenu.isolationItems().forEach { transactionPopup.menu?.addItem($0) }
+        // The database a double-click in the navigator makes current, and the schema's databases, show at once.
+        NotificationCenter.default.addObserver(self, selector: #selector(openConnectionChanged), name: .openConnectionDidChange,
+                                               object: nil)
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -113,20 +119,51 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
             connectionPopup.isEnabled = true
             connectionPopup.toolTip = "The connection this window works on: choose another to show it"
         }
-        databasePopup.isEnabled = false
+        let open = model.openConnection(active?.id)
+        databasePopup.item(at: 0)?.title = open?.currentDatabase ?? "No Database"
+        databasePopup.isEnabled = open?.snapshot.databases.isEmpty == false
         databasePopup.toolTip = active == nil ? "Choose a connection first"
-            : model.openConnection(active?.id) == nil ? "Connect to choose the database the console uses"
-            : "Change the console's database with USE in the console"
+            : open == nil ? "Connect first: the list shows the server's databases"
+            : open?.snapshot.databases.isEmpty != false ? "No databases to choose: the schema is loading, or none can be shown"
+            : "Choose the database the console's statements run in (USE); the sidebar shows it in bold"
         validateResponders()
         for (popup, item) in popupItems { item.toolTip = popup.toolTip }
     }
 
-    /// What depends on where the focus is (the toolbar validates as it changes): the transaction mode.
+    /// What depends on where the focus is (the toolbar validates as it changes): the shown console's transaction mode,
+    /// asked as the menu bar asks (the console ticks its mode and isolation level, or says why they can't change).
     func validateResponders() {
-        let canSetMode = NSApp.target(forAction: Commands.autoCommit.action, to: nil, from: transactionPopup) != nil
+        let manual = Commands.manualCommit.item()
+        let (canSetMode, why) = Commands.manualCommit.availability(from: transactionPopup, item: manual,
+                                                                   otherwise: "Open a console tab to choose how it commits")
+        transactionPopup.item(at: 0)?.title = "Tx: " + (manual.state == .on ? Commands.manualCommit : Commands.autoCommit).title
         transactionPopup.isEnabled = canSetMode
-        transactionPopup.toolTip = canSetMode ? Commands.autoCommit.tip : "Open a console tab to choose how it commits"
+        transactionPopup.toolTip = canSetMode ? "Choose Auto-commit or Manual, and how the console's transactions see others' "
+            + "changes (the isolation level)" : why
         popupItems[transactionPopup]?.toolTip = transactionPopup.toolTip
+    }
+
+    @objc private func openConnectionChanged() { update() }
+
+    /// The database pop-up's menu as it opens: the window's connection's databases, the current one ticked.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        while menu.items.count > 1 { menu.removeItem(at: 1) }
+        guard let open = model.openConnection(main?.activeConnection?.id) else { return }
+        for database in open.snapshot.databases.map(\.name) {
+            let item = NSMenuItem(title: database, action: #selector(databaseChosen(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = database
+            item.state = database == open.currentDatabase ? .on : .off
+            item.toolTip = "Run the console's statements in \(database) from now on"
+            menu.addItem(item)
+        }
+    }
+
+    /// Makes the database current for the connection: the navigator shows it in bold, and its consoles USE it before
+    /// their next statement (`ConsoleViewController.perform`).
+    @objc private func databaseChosen(_ sender: NSMenuItem) {
+        guard let database = sender.representedObject as? String else { return }
+        model.openConnection(main?.activeConnection?.id)?.currentDatabase = database
     }
 
     @objc private func connectionChosen(_ sender: NSPopUpButton) {
@@ -146,7 +183,8 @@ final class PopupToolbarItem: NSToolbarItem {
 }
 
 /// A command's button in the toolbar: its symbol and title, its tooltip (with its shortcut), enabled only while
-/// something in the responder chain handles its action, and then saying why not (`reason`).
+/// something in the responder chain can do it now, as its menu item would be, and otherwise saying why not (the
+/// handler's reason, else `reason`).
 final class CommandToolbarItem: NSToolbarItem {
     let command: Command
     let reason: String
@@ -180,9 +218,23 @@ final class CommandToolbarItem: NSToolbarItem {
     }
 
     override func validate() {
-        let enabled = NSApp.target(forAction: command.action, to: nil, from: button) != nil
+        let (enabled, why) = command.availability(from: button, otherwise: reason)
         button.isEnabled = enabled
-        button.toolTip = enabled ? tip : reason
+        button.toolTip = enabled ? tip : why
         isEnabled = enabled
+    }
+}
+
+extension Command {
+    /// Whether the responder chain (from `sender`) can do the command now, asked as the menu bar asks its item (the
+    /// target's validateMenuItem or validateUserInterfaceItem), and why not: the target's reason, else `otherwise`.
+    /// `item`: the menu item to ask with (its state is what the target ticks), else a new one.
+    @MainActor
+    func availability(from sender: Any?, item probe: NSMenuItem? = nil, otherwise: String) -> (Bool, String) {
+        guard let target = NSApp.target(forAction: action, to: nil, from: sender) else { return (false, otherwise) }
+        let probe = probe ?? item()
+        let enabled = (target as? NSMenuItemValidation)?.validateMenuItem(probe)
+            ?? (target as? NSUserInterfaceValidations)?.validateUserInterfaceItem(probe) ?? true
+        return (enabled, enabled || probe.toolTip == tip ? otherwise : probe.toolTip ?? otherwise)
     }
 }

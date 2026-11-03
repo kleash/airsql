@@ -16,17 +16,21 @@ extension MainMenu {
         menus.view.add([nil, Commands.helpers, Commands.bigger, Commands.smaller, Commands.actualSize])
 
         insert(Commands.runSelection, after: Commands.runStatement, in: menus.query)
-        let levels = IsolationLevel.allCases.enumerated().map { index, level -> NSMenuItem in
+        let mode = menus.query.items.firstIndex { $0.title == "Transaction Mode" } ?? menus.query.items.count - 1
+        menus.query.insertItem(submenu("Isolation Level", isolationItems()), at: mode + 1)
+        menus.query.add([nil, Commands.formatSQL, Commands.history, Commands.profile, nil, Commands.pinResult,
+                         Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, Commands.exportResult,
+                         Commands.compareResult])
+    }
+
+    /// One item per isolation level (the menu bar's and the toolbar's Tx pop-up), told apart by their tags.
+    static func isolationItems() -> [NSMenuItem] {
+        IsolationLevel.allCases.enumerated().map { index, level in
             let item = Commands.isolation.item()
             item.title = level.title
             item.tag = index
             return item
         }
-        let mode = menus.query.items.firstIndex { $0.title == "Transaction Mode" } ?? menus.query.items.count - 1
-        menus.query.insertItem(submenu("Isolation Level", levels), at: mode + 1)
-        menus.query.add([nil, Commands.formatSQL, Commands.history, Commands.profile, nil, Commands.pinResult,
-                         Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, Commands.exportResult,
-                         Commands.compareResult])
     }
 
     /// Puts `command`'s item right after `anchor`'s (at the end when it isn't there).

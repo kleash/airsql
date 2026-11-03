@@ -173,7 +173,7 @@ extension AppTests.ReconAppTests {
         try await ReconLabTests.database(setup, "lane_l8a_ui_src", ReconLabTests.shopSource)
         try await ReconLabTests.database(setup, "lane_l8a_ui_dst", ReconLabTests.shopTarget)
         let lab = SavedConnection(name: "Lab MariaDB", host: "127.0.0.1", port: Lab.mariadb114.port, user: "airsql")
-        ReconWindowController.connect = { saved in
+        ReconWindowController.connect = { saved, _ in
             Connection(options: ConnectOptions(name: saved.name, host: saved.host, port: saved.port ?? 3306, user: saved.user,
                                                password: Lab.airsql.password, tls: TLSOptions(mode: .off)),
                        log: ReconLabTests.log)

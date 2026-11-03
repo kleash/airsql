@@ -470,7 +470,8 @@ enum Commands {
     static let openStructure = Command("Open Structure", #selector(AirSQLActions.openStructure(_:)),
                                        tip: "Open the table's columns, indexes and keys in the table editor")
     static let openObject = Command("Open", #selector(AirSQLActions.openObject(_:)), tip: "Open the routine, trigger or event in its editor")
-    static let runRoutine = Command("Run…", #selector(AirSQLActions.runRoutine(_:)), tip: "Run the procedure, asking for its parameters")
+    static let runRoutine = Command("Run…", #selector(AirSQLActions.runRoutine(_:)),
+                                    tip: "Put a CALL of the procedure, or a SELECT of the function, in a console tab to fill in")
     static let generateSelect = Command("Generate SELECT", #selector(AirSQLActions.generateSelect(_:)),
                                         tip: "Put a SELECT of this table's columns in a console tab")
     static let generateInsert = Command("Generate INSERT", #selector(AirSQLActions.generateInsert(_:)),

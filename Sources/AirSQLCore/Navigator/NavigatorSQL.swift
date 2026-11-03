@@ -127,6 +127,72 @@ public enum NavigatorSQL {
         "SHOW CREATE \(object.kind.keyword) " + object.quoted
     }
 
+    // MARK: Generate SELECT, INSERT, UPDATE and Run… (console text the person fills in: `?` marks each value to write)
+
+    /// Every column of the table, by name (`*` while its columns aren't known).
+    public static func select(_ table: DatabaseObject, _ columns: [SchemaColumn]) -> String {
+        let list = columns.isEmpty ? "*" : columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ")
+        return "SELECT \(list)\nFROM \(table.quoted);"
+    }
+
+    /// A row's values: the columns the server doesn't fill itself (generated and auto-increment ones are left out).
+    public static func insert(_ table: DatabaseObject, _ columns: [SchemaColumn]) -> String {
+        let given = columns.filter { $0.generated == nil && !$0.autoIncrement }
+        return "INSERT INTO \(table.quoted) (\(given.map { SQLQuote.identifier($0.name) }.joined(separator: ", ")))\n"
+            + "VALUES (\(given.map { _ in "?" }.joined(separator: ", ")));"
+    }
+
+    /// The columns that aren't the key or generated (all that aren't generated, when the key is all there is), in the row
+    /// its key (`SchemaTable.editingKey`) names; without a key, the condition is left to write.
+    public static func update(_ table: DatabaseObject, _ schema: SchemaTable) -> String {
+        let key = schema.editingKey ?? []
+        let editable = schema.columns.filter { $0.generated == nil }
+        let others = editable.filter { !key.contains($0.name) }
+        let set = others.isEmpty ? editable : others
+        let condition = key.isEmpty ? "?" : key.map { SQLQuote.identifier($0) + " = ?" }.joined(separator: " AND ")
+        return "UPDATE \(table.quoted)\nSET \(set.map { SQLQuote.identifier($0.name) + " = ?" }.joined(separator: ", "))\n"
+            + "WHERE \(condition);"
+    }
+
+    /// A routine's parameter as `information_schema.PARAMETERS` lists it.
+    public struct Parameter: Equatable {
+        /// IN, OUT or INOUT (a function's are IN).
+        public var mode: String
+        public var name: String
+        /// Such as "int" or "varchar(50)".
+        public var type: String
+
+        public init(mode: String, name: String, type: String) {
+            self.mode = mode
+            self.name = name
+            self.type = type
+        }
+    }
+
+    /// A routine's parameters in order (mode, name, type), leaving out a function's return value.
+    public static func parameters(_ routine: DatabaseObject, noBackslashEscapes: Bool) -> String {
+        "SELECT PARAMETER_MODE, PARAMETER_NAME, DTD_IDENTIFIER FROM information_schema.PARAMETERS WHERE SPECIFIC_SCHEMA = "
+            + SQLQuote.string(routine.database, noBackslashEscapes: noBackslashEscapes) + " AND SPECIFIC_NAME = "
+            + SQLQuote.string(routine.name, noBackslashEscapes: noBackslashEscapes) + " AND ROUTINE_TYPE = "
+            + SQLQuote.string(routine.kind.keyword, noBackslashEscapes: false) + " AND ORDINAL_POSITION > 0 ORDER BY ORDINAL_POSITION"
+    }
+
+    /// Runs a procedure (CALL) or function (SELECT): `?` for each value it takes, with its name and type beside it; OUT
+    /// and INOUT parameters in user variables (an INOUT one set first), read back after the CALL.
+    public static func run(_ routine: DatabaseObject, _ parameters: [Parameter]) -> String {
+        func variable(_ parameter: Parameter) -> String { "@" + SQLQuote.identifier(parameter.name) }
+        func blank(_ parameter: Parameter) -> String { "? /* \(comment(parameter.name)) \(comment(parameter.type)) */" }
+        let arguments = parameters.map { $0.mode == "IN" || routine.kind == .function ? blank($0) : variable($0) }
+        guard routine.kind == .procedure else { return "SELECT \(routine.quoted)(\(arguments.joined(separator: ", ")));" }
+        let back = parameters.filter { $0.mode != "IN" }
+        return (back.filter { $0.mode == "INOUT" }.map { "SET \(variable($0)) = \(blank($0));\n" }.joined())
+            + "CALL \(routine.quoted)(\(arguments.joined(separator: ", ")));"
+            + (back.isEmpty ? "" : "\nSELECT \(back.map(variable).joined(separator: ", "));")
+    }
+
+    /// Text that can't end the comment it is put in.
+    private static func comment(_ text: String) -> String { text.replacingOccurrences(of: "*/", with: "* /") }
+
     /// What New Database and the bulk editor offer: the server's character sets (name, description, default collation),
     /// collations (name, character set), its own character set and collation, and its storage engines (name, support).
     public static let characterSets = "SHOW CHARACTER SET"

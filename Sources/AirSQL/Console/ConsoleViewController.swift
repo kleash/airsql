@@ -24,7 +24,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     struct Shared {
         /// The console running a statement on it: one at a time, so each Cancel stops its own statement.
         var runner: UUID?
-        /// The current database: the connection's own, then the last USE.
+        /// The database the session is in: the last USE on it (nil: the connection's own).
         var database: String?
         /// Rows changed in the open transaction.
         var changes: UInt64 = 0
@@ -188,9 +188,12 @@ final class ConsoleViewController: NSViewController, TabContent {
         return session
     }
 
-    /// The database its statements run in: the last USE on the connection's main session, else the connection's own.
+    /// The database its statements run in: the connection's current one (the navigator's bold one, chosen there, in the
+    /// toolbar or by a USE here, and made current on the session before the next statement), else the last USE on the
+    /// connection's main session, else the connection's own.
     var database: String? {
-        shared.database ?? connectionID.flatMap { Self.openConnection($0)?.options.database }
+        model.openConnection(connectionID)?.currentDatabase ?? shared.database
+            ?? connectionID.flatMap { Self.openConnection($0)?.options.database }
             ?? connection.flatMap { $0.database.isEmpty ? nil : $0.database }
     }
 

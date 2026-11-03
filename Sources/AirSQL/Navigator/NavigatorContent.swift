@@ -193,4 +193,12 @@ extension OpenConnection {
         else { throw AirSQLError(.notFound, "The server didn't show how \(object.name) is made.") }
         return rows.string(0, column) ?? ""
     }
+
+    /// A routine's parameters in order, read through the schema session.
+    func parameters(_ routine: DatabaseObject) async throws -> [NavigatorSQL.Parameter] {
+        let session = try await connection.session(.schema)
+        return try await session.rows(NavigatorSQL.parameters(routine, noBackslashEscapes: session.noBackslashEscapes)).map {
+            NavigatorSQL.Parameter(mode: $0[0] ?? "IN", name: $0[1] ?? "", type: $0[2] ?? "")
+        }
+    }
 }

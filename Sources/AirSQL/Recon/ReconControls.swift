@@ -92,10 +92,11 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         loading?.cancel()
         guard let saved = connection, let connect = ReconWindowController.connect else { return }
         spinner.startAnimation(nil)
+        let window = popup.window
         loading = Task { [weak self] in
             var names: [String] = [], failure: String?
             do {
-                let session = try await connect(saved).toolsSession()
+                let session = try await connect(saved, window).toolsSession()
                 do {
                     names = try await session.rows("SHOW DATABASES").compactMap { $0.first ?? nil }
                         .filter { !["information_schema", "performance_schema"].contains($0.lowercased()) }

@@ -52,12 +52,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ConsoleViewController.openConnection = { [weak model] in model?.openConnection($0)?.connection }
         ConsoleViewController.schemaCache = { [weak model] in model?.openConnection($0)?.schema }
         ConsoleViewController.queryTimeout = { [weak model] in model?.connection($0)?.queryTimeout ?? 0 }
-        // The compare window works on connected connections, on tools sessions of its own.
-        ReconWindowController.connect = { [weak model] saved in
-            guard let connection = model?.openConnection(saved.id)?.connection else {
-                throw AirSQLError(.disconnected, "Connect to \(saved.displayName) first, in the main window")
-            }
-            return connection
+        // The compare window connects a connection that isn't, as the main window does (its prompts on the compare
+        // window), then works on tools sessions of its own.
+        ReconWindowController.connect = { [weak model] saved, window in
+            guard let model else { throw AirSQLError.disconnected }
+            return try await model.connector.connection(saved.id, on: window)
         }
         main.showWindow(nil)
         ConsoleDocuments.shared.restore(into: main)
