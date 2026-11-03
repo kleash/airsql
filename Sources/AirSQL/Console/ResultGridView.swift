@@ -12,7 +12,8 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     let source: ResultSetSource
 
     /// `viewKey`: where its columns are kept (the statement, on its connection).
-    init(store: ResultStore, nullText: String, fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil) {
+    /// `transposed`: shown on its side (a result with one row).
+    init(store: ResultStore, nullText: String, fontSize: CGFloat, viewKey: GridViewer.ViewKey? = nil, transposed: Bool = false) {
         source = ResultSetSource(store)
         viewer = GridViewer(source: nil)
         super.init(frame: .zero)
@@ -20,7 +21,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         viewer.grid.fontSize = fontSize
         viewer.host = self
         viewer.viewKey = viewKey
-        viewer.show(source)
+        viewer.show(source, transposed: transposed)
         grid.setAccessibilityLabel("Result rows")
         addSubview(viewer)
         viewer.pin(to: self)

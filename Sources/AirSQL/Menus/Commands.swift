@@ -120,6 +120,8 @@ import AppKit
     @objc optional func createObject(_ sender: Any?)
     @objc optional func openData(_ sender: Any?)
     @objc optional func openTable(_ sender: Any?)
+    @objc optional func showPreviousRecord(_ sender: Any?)
+    @objc optional func showNextRecord(_ sender: Any?)
     @objc optional func openStructure(_ sender: Any?)
     @objc optional func openObject(_ sender: Any?)
     @objc optional func runRoutine(_ sender: Any?)
@@ -319,6 +321,10 @@ enum Commands {
                                     tip: "Show or hide the selected cell's full value beside the grid: text, JSON, hex")
     static let recordView = Command("Record View", #selector(AirSQLActions.showRecordView(_:)), "r", [.command, .option],
                                     tip: "Show the selected row as a form, one field per column")
+    static let previousRecord = Command("Previous Record", #selector(AirSQLActions.showPreviousRecord(_:)),
+                                        tip: "Show the row before this one in Record View")
+    static let nextRecord = Command("Next Record", #selector(AirSQLActions.showNextRecord(_:)),
+                                    tip: "Show the row after this one in Record View")
     static let transpose = Command("Transpose", #selector(AirSQLActions.transposeGrid(_:)), "t", [.command, .option],
                                    tip: "Turn rows into columns to compare a few wide rows side by side")
     static let viewAs = Command("View As", #selector(AirSQLActions.viewAs(_:)),
@@ -589,7 +595,7 @@ enum Commands {
         runSQLFile, importCSV, importSSHConfig,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
-        toggleSidebar, filterSidebar, valuePanel, recordView, transpose, viewAs, chart, columnList, sqlLog, clearSQLLog, activity,
+        toggleSidebar, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, transpose, viewAs, chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,

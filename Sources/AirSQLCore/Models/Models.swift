@@ -179,6 +179,8 @@ public struct AppSettings: Codable, Equatable {
     /// automatically.
     public var clientPath = ""
     public var dumpPath = ""
+    /// Settings ▸ Grid: a console result with one row opens transposed (its columns down the left).
+    public var transposeSingleRow = true
 
     public init() {}
 
@@ -199,6 +201,7 @@ public struct AppSettings: Codable, Equatable {
         agentsAllowed = try value(.agentsAllowed, defaults.agentsAllowed)
         clientPath = try value(.clientPath, defaults.clientPath)
         dumpPath = try value(.dumpPath, defaults.dumpPath)
+        transposeSingleRow = try value(.transposeSingleRow, defaults.transposeSingleRow)
     }
 }
 

@@ -6,7 +6,7 @@ import AppKit
 /// `LIMIT … OFFSET …`. The status bar shows the rows loaded of the server's estimate until Count Rows Exactly counts
 /// them. Read-only here: editing, the WHERE bar and sorting on the server come with lane L3a.
 @MainActor
-final class TableDataViewController: NSViewController, TabContent {
+final class TableDataViewController: NSViewController, TabContent, NSMenuItemValidation {
     let connectionID: UUID
     private let connection: Connection
     private let model: AppModel
@@ -103,7 +103,7 @@ final class TableDataViewController: NSViewController, TabContent {
         run("Loading more rows of \(query.table)", { session in try await Self.rows(sql, on: session) }) { [weak self] page in
             guard let self, self.source === source else { return }
             source.append(page, pageSize: pageSize)
-            viewer.grid.reloadData()
+            viewer.reloadData()
         }
     }
 

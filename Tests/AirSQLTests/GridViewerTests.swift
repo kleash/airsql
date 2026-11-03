@@ -172,3 +172,42 @@ extension AppTests {
         #expect(GridValuePanel.hexDump(Array("AirSQL".utf8)) == "00000000  41 69 72 53 51 4C" + String(repeating: " ", count: 30) + "  AirSQL")
     }
 }
+
+extension AppTests {
+    @Test func transposeTurnsRowsIntoColumnsAndBack() async throws {
+        let source = FakeGridSource(rows: 30, columns: 6)
+        let (_, harness, content) = viewerWindow(source)
+        let viewer = content.viewer, grid = viewer.grid
+        grid.columnOrder = [0, 2, 1, 3, 4, 5]
+        grid.selection.select(GridPosition(row: 4, column: 1))
+        #expect(await call(harness, "menu", ["path": "View > Transpose"]).error == nil)
+        let shown = try #require(grid.source as? TransposedSource)
+        #expect(grid.rowCount == 6 && grid.columnCount == 31)
+        #expect(shown.cell(1, 0) == .text("amount_2") && shown.cell(1, 5) == source.cell(4, 2))
+        #expect(shown.base(1, 5)! == (4, 2) && shown.base(1, 0) == nil)
+        // The focused cell follows: row 4 of amount_2 is now line 1, column 5.
+        #expect(grid.selection.cursor == GridPosition(row: 1, column: 5))
+        #expect(await call(harness, "key", ["combo": "cmd+alt+t"]).error == nil)
+        #expect(grid.source === source && grid.columnOrder == [0, 2, 1, 3, 4, 5])
+        #expect(grid.selection.cursor == GridPosition(row: 4, column: 1))
+    }
+
+    @Test func recordViewShowsOneRowAndStepsThroughThem() async throws {
+        let source = FakeGridSource(rows: 3, columns: 5)
+        let (_, harness, content) = viewerWindow(source)
+        let viewer = content.viewer, grid = viewer.grid
+        grid.selection.select(GridPosition(row: 1, column: 2))
+        #expect(await call(harness, "menu", ["path": "View > Record View"]).error == nil)
+        #expect(viewer.record == 1 && grid.columnCount == 2 && grid.rowCount == 5)
+        #expect(grid.source?.columns.map(\.name) == ["Column", "Value"] && grid.source?.cell(2, 1) == source.cell(1, 2))
+        #expect(viewer.recordLabel.stringValue == "Row 2 of 3" && grid.selection.cursor == GridPosition(row: 2, column: 1))
+        #expect(await call(harness, "menu", ["path": "View > Next Record"]).error == nil)
+        #expect(viewer.record == 2 && grid.source?.cell(2, 1) == source.cell(2, 2))
+        let last = await call(harness, "menu", ["path": "View > Next Record"])
+        #expect(last.error?.contains("There is no row after this one") == true)
+        #expect(await call(harness, "press", ["id": "record.previous"]).error == nil)
+        #expect(viewer.record == 1)
+        #expect(await call(harness, "press", ["id": "record.close"]).error == nil)
+        #expect(viewer.record == nil && grid.source === source && grid.selection.cursor == GridPosition(row: 1, column: 2))
+    }
+}

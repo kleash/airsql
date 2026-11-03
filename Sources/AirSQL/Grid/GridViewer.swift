@@ -6,7 +6,7 @@ import AppKit
 /// per query). The screen that shows it (a table tab, a console result) is its `host`: the grid's edits, sorting and
 /// the first items of its menus stay the host's.
 @MainActor
-final class GridViewer: NSView, DataGridViewDelegate {
+final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// Where a grid's columns are remembered: a table, or a query (its text as `table`).
     struct ViewKey: Equatable {
         var connection: UUID
@@ -23,8 +23,12 @@ final class GridViewer: NSView, DataGridViewDelegate {
     private var settings = TableViewSettings()
     /// The grid (or what View As shows) on the left, the value panel on the right when it is open.
     private let split = NSSplitView()
-    let content = NSView()
+    /// The record bar (Record View only) over the body, which holds the grid or what View As shows.
+    private let content = NSStackView()
+    let body = NSView()
     private(set) var valuePanel: GridValuePanel?
+    private let recordBar = NSStackView()
+    let recordLabel = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
 
     init(source: GridSource?) {
         grid = DataGridView(source: source)
@@ -35,22 +39,126 @@ final class GridViewer: NSView, DataGridViewDelegate {
         split.addArrangedSubview(content)
         addSubview(split)
         split.pin(to: self)
-        content.addSubview(grid.containerView)
-        grid.containerView.pin(to: content)
+        content.orientation = .vertical
+        content.spacing = 0
+        content.setViews([recordBar, body], in: .top)
+        body.addSubview(grid.containerView)
+        grid.containerView.pin(to: body)
+        let previous = GridStatusView.link("‹ Previous", id: "record.previous", tip: Commands.previousRecord.tip,
+                                           action: Commands.previousRecord.action)
+        let next = GridStatusView.link("Next ›", id: "record.next", tip: Commands.nextRecord.tip, action: Commands.nextRecord.action)
+        let close = GridStatusView.link("Back to the Grid", id: "record.close", tip: "Show every row again (⌥⌘R)",
+                                        action: Commands.recordView.action)
+        recordBar.setViews([previous, recordLabel, next], in: .leading)
+        recordBar.setViews([close], in: .trailing)
+        recordBar.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        recordBar.isHidden = true
+        for part in [recordBar, body] { part.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true }
         status.viewer = self
         status.update()
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    var source: GridSource? { grid.source }
+    /// The host's rows; the grid shows them, or them transposed.
+    private(set) var source: GridSource?
+    /// Transpose (⌥⌘T) or Record View (⌥⌘R, the row shown) is on: the grid shows a `TransposedSource`.
+    private(set) var transposed = false
+    private(set) var record: Int?
+    /// The grid's columns as they were before Transpose or Record View, to put back after.
+    private var layout: (order: [Int], widths: [CGFloat])?
 
-    /// Shows `source` with the columns as they were left under `viewKey`.
-    func show(_ source: GridSource?) {
+    /// Shows `source` with the columns as they were left under `viewKey`; `transposed` turns it on its side.
+    func show(_ source: GridSource?, transposed: Bool = false) {
+        self.source = source
+        record = nil
+        self.transposed = false
         grid.source = source
         restoreColumns()
+        if transposed { transposeGrid(nil) }
+        updateRecordBar()
         status.update()
         updateValuePanel()
+    }
+
+    /// The host's rows or columns changed (a page arrived): shows them again.
+    func reloadData() {
+        (grid.source as? TransposedSource)?.refresh()
+        grid.reloadData()
+        updateRecordBar()
+        status.update()
+        updateValuePanel()
+    }
+
+    // MARK: Transpose and Record View
+
+    /// Transpose (⌥⌘T): rows become columns, the column names down the left; again to turn back.
+    @objc func transposeGrid(_ sender: Any?) {
+        guard let source else { return }
+        if transposed || record != nil {
+            let focus = (grid.source as? TransposedSource).flatMap { shown in grid.selection.cursor.flatMap { shown.base($0.row, grid.sourceColumn($0.column)) } }
+            transposed = false
+            record = nil
+            grid.source = source
+            if let layout, layout.widths.count == source.columns.count {
+                grid.columnWidths = layout.widths
+                grid.columnOrder = layout.order
+            }
+            layout = nil
+            if let focus, let column = grid.columnOrder.firstIndex(of: focus.column) { focusCell(GridPosition(row: focus.row, column: column)) }
+        } else {
+            let cursor = grid.selection.cursor
+            transposed = true
+            layout = (grid.columnOrder, grid.columnWidths)
+            grid.source = TransposedSource(source, order: grid.columnOrder)
+            if let cursor { focusCell(GridPosition(row: cursor.column, column: cursor.row + 1)) }
+        }
+        updateRecordBar()
+        status.update()
+        updateValuePanel()
+    }
+
+    /// Record View (⌥⌘R): the focused row as a form, one line per column; ⌥↑ ⌥↓ show the row before or after.
+    @objc func showRecordView(_ sender: Any?) {
+        if record != nil { return transposeGrid(nil) }
+        guard let source, source.rowCount > 0 else { return NSSound.beep() }
+        if transposed { transposeGrid(nil) }
+        showRecord(grid.selection.cursor?.row ?? 0, field: grid.selection.cursor?.column ?? 0)
+    }
+
+    private func showRecord(_ row: Int, field: Int) {
+        guard let source else { return }
+        if layout == nil { layout = (grid.columnOrder, grid.columnWidths) }
+        let order = layout?.order ?? grid.columnOrder
+        record = row
+        grid.source = TransposedSource(source, order: order, rows: [row])
+        focusCell(GridPosition(row: min(field, max(0, order.count - 1)), column: 1))
+        updateRecordBar()
+        status.update()
+        updateValuePanel()
+    }
+
+    /// The row before or after in Record View.
+    @objc func showPreviousRecord(_ sender: Any?) { stepRecord(-1) }
+    @objc func showNextRecord(_ sender: Any?) { stepRecord(1) }
+
+    private func stepRecord(_ step: Int) {
+        guard let record, let source else { return }
+        let next = record + step
+        guard next >= 0, next < source.rowCount else { return NSSound.beep() }
+        showRecord(next, field: grid.selection.cursor?.row ?? 0)
+    }
+
+    /// The record bar shows in Record View, with the row's number.
+    private func updateRecordBar() {
+        recordBar.isHidden = record == nil
+        if let record, let source { recordLabel.stringValue = "Row \((record + 1).formatted()) of \(source.rowCount.formatted())" }
+    }
+
+    private func focusCell(_ position: GridPosition) {
+        guard position.row < grid.rowCount, position.column < grid.columnCount else { return }
+        grid.selection.select(position)
+        grid.reveal(grid.cellRect(position))
     }
 
     // MARK: Value panel
@@ -86,7 +194,7 @@ final class GridViewer: NSView, DataGridViewDelegate {
     /// The order, widths and hidden columns kept under `viewKey`, by name; columns it doesn't know keep their place
     /// at the end.
     func restoreColumns() {
-        guard let source, let viewKey, grid.columnWidths.count == source.columns.count else { return }
+        guard let source, let viewKey, grid.source === source, grid.columnWidths.count == source.columns.count else { return }
         settings = TableViewSettingsStore.shared.settings(connection: viewKey.connection, database: viewKey.database,
                                                           table: viewKey.table)
         let names = source.columns.map(\.name)
@@ -102,7 +210,7 @@ final class GridViewer: NSView, DataGridViewDelegate {
 
     /// Keeps the columns' order, widths and hidden ones under `viewKey`.
     func saveColumns() {
-        guard let source, let viewKey, grid.columnWidths.count == source.columns.count else { return }
+        guard let source, let viewKey, grid.source === source, grid.columnWidths.count == source.columns.count else { return }
         let names = source.columns.map(\.name)
         let shown = grid.columnOrder.map { names[$0] }, hidden = names.filter { !shown.contains($0) }
         // Hidden columns keep their place: after the column they followed before.
@@ -123,6 +231,7 @@ final class GridViewer: NSView, DataGridViewDelegate {
     /// Shows or hides source columns (the column list, Hide Column), keeping the rest in their order.
     func setHidden(_ hidden: Bool, columns: [Int]) {
         guard let source else { return }
+        if transposed || record != nil { transposeGrid(nil) }
         var order = grid.columnOrder
         if hidden {
             order.removeAll { columns.contains($0) }
@@ -205,6 +314,18 @@ final class GridViewer: NSView, DataGridViewDelegate {
         case #selector(toggleValuePanel(_:)):
             item.state = valuePanel == nil ? .off : .on
             return true
+        case #selector(transposeGrid(_:)):
+            item.state = transposed ? .on : .off
+            return source != nil
+        case #selector(showPreviousRecord(_:)), #selector(showNextRecord(_:)):
+            let step = item.action == #selector(showNextRecord(_:)) ? 1 : -1
+            let enabled = record.map { (0..<(source?.rowCount ?? 0)).contains($0 + step) } ?? false
+            item.explain(enabled: enabled, reason: record == nil ? "Open Record View first (⌥⌘R)" : "There is no row \(step > 0 ? "after" : "before") this one")
+            return enabled
+        case #selector(showRecordView(_:)):
+            item.state = record != nil ? .on : .off
+            item.explain(enabled: (source?.rowCount ?? 0) > 0, reason: "There are no rows to show")
+            return (source?.rowCount ?? 0) > 0
         case #selector(hideColumn(_:)):
             let enabled = grid.columnCount > 1 && grid.selection.cursor != nil
             item.explain(enabled: enabled, reason: grid.columnCount > 1 ? "Select a column first" : "One column stays shown")

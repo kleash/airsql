@@ -40,7 +40,8 @@ extension ConsoleViewController {
         let settings = model.data.settings
         let key = connectionID.flatMap { id in query.map { GridViewer.ViewKey(connection: id, database: database ?? "", table: $0) } }
         tab.makeView = {
-            ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize), viewKey: key)
+            ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize), viewKey: key,
+                           transposed: settings.transposeSingleRow && store.rowCount == 1 && store.columns.count > 1)
         }
         resultTabs.append(tab)
         if selectedResult == nil || selectedResult === messagesTab { selectedResult = tab }
