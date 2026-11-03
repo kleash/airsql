@@ -28,8 +28,7 @@ func recordedEditorContext(_ connection: SavedConnection = Fixtures.local) async
 /// The text of the view with this accessibility id in `window` (a label's or a text view's).
 @MainActor
 func shownText(_ id: String, in window: NSWindow?) -> String? {
-    func find(_ view: NSView) -> NSView? { view.accessibilityIdentifier() == id ? view : view.subviews.lazy.compactMap(find).first }
-    guard let view = window?.contentView.flatMap(find) else { return nil }
+    guard let view = window?.contentView.flatMap({ find(NSView.self, id: id, in: $0) }) else { return nil }
     return (view as? NSTextView)?.string ?? (view as? NSTextField)?.stringValue
 }
 

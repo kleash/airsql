@@ -71,7 +71,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         // Only on the target, and views and the like that differ, when there are any (the mockup's five boxes otherwise).
         let tints = [NSColor.statusOK, .statusWarning, .statusBad, .statusBad, .statusWarning, .statusWarning]
         summary.setViews(ReconReport.summary(result).enumerated().filter { $0.offset < 3 || $0.offset == 4 || $0.element.value != "0" }
-            .map { index, item in Self.box(item.value, item.label, tint: tints[index], zero: item.value == "0") } + [Self.box(Self.duration(result.duration), "\(result.rowsChecked.formatted()) rows checked, "
+            .map { index, item in Self.box(item.value, item.label, tint: tints[index], zero: item.value == "0") } + [Self.box(ActivityPopover.elapsed(result.duration), "\(result.rowsChecked.formatted()) rows checked, "
                       + Self.share(result.rowsFetched, of: result.rowsChecked) + " fetched", tint: .labelColor, zero: false)],
                          in: .leading)
         list.reloadData()
@@ -92,10 +92,6 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         case .same: group = object.data?.differs == true ? 3 : 4
         }
         return (group, ReconObject.Kind.allCases.firstIndex(of: object.kind) ?? 0, object.name.lowercased())
-    }
-
-    private static func duration(_ seconds: TimeInterval) -> String {
-        seconds < 60 ? String(format: seconds < 10 ? "%.1f s" : "%.0f s", seconds) : "\(Int(seconds) / 60) min \(Int(seconds) % 60) s"
     }
 
     private static func share(_ part: Int, of whole: Int) -> String {

@@ -16,9 +16,9 @@ public enum AgentSetup {
 
         /// The same in the client's own command line.
         public func command(program: String, supportDir: String?) -> String {
-            let env = supportDir.map { "-e AIRSQL_SUPPORT_DIR=" + AgentSetup.shellWord($0) + " " } ?? ""
-            return self == .claudeCode ? "claude mcp add --scope user " + env + "airsql -- " + AgentSetup.shellWord(program) + " --mcp"
-                : "gemini mcp add --scope user " + env + "airsql " + AgentSetup.shellWord(program) + " --mcp"
+            let env = supportDir.map { "-e AIRSQL_SUPPORT_DIR=" + ToolCommand.shellWord($0) + " " } ?? ""
+            return self == .claudeCode ? "claude mcp add --scope user " + env + "airsql -- " + ToolCommand.shellWord(program) + " --mcp"
+                : "gemini mcp add --scope user " + env + "airsql " + ToolCommand.shellWord(program) + " --mcp"
         }
     }
 
@@ -80,11 +80,5 @@ public enum AgentSetup {
                                                                                      .withoutEscapingSlashes])
         else { return String(describing: value) }
         return String(decoding: data, as: UTF8.self)
-    }
-
-    /// A word for the shell: as it is when it is plain, else in single quotes.
-    static func shellWord(_ text: String) -> String {
-        let plain = !text.isEmpty && text.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "/._-+=:@%".contains($0)) }
-        return plain ? text : "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

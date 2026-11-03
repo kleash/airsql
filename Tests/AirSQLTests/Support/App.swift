@@ -74,6 +74,14 @@ func titles(_ items: Any?) -> [String] {
     (items as? [[String: Any]] ?? []).compactMap { $0["title"] as? String }
 }
 
+/// The first view of `type` under `view` (with the accessibility id `id`, when given).
+@MainActor
+func find<T: NSView>(_ type: T.Type, id: String? = nil, in view: NSView) -> T? {
+    if let match = view as? T, id == nil || match.accessibilityIdentifier() == id { return match }
+    for subview in view.subviews { if let match = find(type, id: id, in: subview) { return match } }
+    return nil
+}
+
 /// The element with `id` in a snapshot's elements, and its frame's middle (points from the window's top left).
 @MainActor
 func element(_ server: AgentServer, _ id: String, in spec: String? = nil) async -> (json: [String: Any], center: (Double, Double))? {

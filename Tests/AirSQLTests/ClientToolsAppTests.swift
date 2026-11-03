@@ -217,11 +217,3 @@ extension AppTests {
         }
     }
 }
-
-/// The first view of `type` under `view` (with the accessibility id `id`, when given).
-@MainActor
-func find<T: NSView>(_ type: T.Type, id: String? = nil, in view: NSView) -> T? {
-    if let match = view as? T, id == nil || match.accessibilityIdentifier() == id { return match }
-    for subview in view.subviews { if let match = find(type, id: id, in: subview) { return match } }
-    return nil
-}

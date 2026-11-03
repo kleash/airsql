@@ -181,7 +181,7 @@ class ToolSheet: NSWindowController {
         status.stringValue = text
         activity?.detail = text
         guard let total, total > 0 else {
-            timeLeft.stringValue = Self.duration(Date().timeIntervalSince(started)) + " so far"
+            timeLeft.stringValue = ActivityPopover.elapsed(Date().timeIntervalSince(started)) + " so far"
             return
         }
         let share = min(Double(done) / Double(total), 0.99)
@@ -190,7 +190,7 @@ class ToolSheet: NSWindowController {
         activity?.progress = share
         let elapsed = Date().timeIntervalSince(started)
         if share > 0.02, elapsed > 2 {
-            timeLeft.stringValue = "about " + Self.duration(elapsed / share - elapsed) + " left"
+            timeLeft.stringValue = "about " + ActivityPopover.elapsed(elapsed / share - elapsed) + " left"
         }
     }
 
@@ -204,7 +204,7 @@ class ToolSheet: NSWindowController {
         bar.isIndeterminate = false
         bar.doubleValue = failed ? bar.doubleValue : 1
         bar.isHidden = failed
-        timeLeft.stringValue = failed ? "" : "in " + Self.duration(Date().timeIntervalSince(started))
+        timeLeft.stringValue = failed ? "" : "in " + ActivityPopover.elapsed(Date().timeIntervalSince(started))
         status.stringValue = message
         status.textColor = failed ? .statusBad : .labelColor
         setFormEnabled(true)
@@ -260,12 +260,5 @@ class ToolSheet: NSWindowController {
 
     static func bytes(_ count: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: count, countStyle: .file)
-    }
-
-    static func duration(_ seconds: TimeInterval) -> String {
-        let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = seconds >= 3600 ? [.hour, .minute] : seconds >= 60 ? [.minute, .second] : [.second]
-        formatter.unitsStyle = .abbreviated
-        return formatter.string(from: max(1, seconds.rounded())) ?? "\(Int(seconds)) s"
     }
 }
