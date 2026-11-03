@@ -69,6 +69,7 @@ extension TableDataController: NSMenuItemValidation {
         }
         menuItem.explain(enabled: enabled, reason: reason)
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
+        if menuItem.action == Commands.useAsLabel.action { menuItem.state = isLabel(focusedColumn()) ? .on : .off }
         return enabled
     }
 
@@ -98,6 +99,8 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.relatedRows.action:
             guard let cell = viewer.focusedCell, case .loaded = source.row(cell.row) else { return (false, "Select a cell of a loaded row first") }
             return (true, nil)
+        case Commands.useAsLabel.action, Commands.addVirtualKey.action, Commands.removeVirtualKey.action:
+            return keyState(of: action)
         case Commands.chooseReferencedRow.action:
             if !editable { return (false, readOnly) }
             return (viewer.focusedCell.map { foreignKey($0.column) != nil } ?? false, "Select a cell of a foreign key column first")

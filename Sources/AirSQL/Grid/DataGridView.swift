@@ -96,6 +96,8 @@ final class DataGridView: NSView {
     var nullText = "NULL" { didSet { needsDisplay = true } }
     /// A colour over a cell's background (a heatmap, equal values), by row and source column; nil for none.
     var cellTint: ((Int, Int) -> NSColor?)? { didSet { needsDisplay = true } }
+    /// Grey words after a cell's value (a foreign key's referenced label), by row and source column; nil for none.
+    var cellSuffix: ((Int, Int) -> String?)?
     /// How many columns, from the first shown, stay in view while the grid scrolls across (Freeze).
     var frozenColumns = 0 {
         didSet {

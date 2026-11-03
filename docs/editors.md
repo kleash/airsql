@@ -61,7 +61,8 @@ server keeps it, to edit as text.
 
 **Database ▸ ER Diagram** draws a database's tables with their keys. Tables that point at nothing come first on the left,
 and each table sits right of the tables its foreign keys point at; lines go from a key's column to the table it points
-at. Tables with no keys come last.
+at, virtual foreign keys you added in a table's rows included ([Virtual foreign keys](table-data.md#foreign-key-labels-and-virtual-foreign-keys)).
+Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
 right-click it for **Open Structure** and **Copy Name**. **Export Image…** saves the diagram as a PNG, and **Export

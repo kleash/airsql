@@ -171,6 +171,17 @@ public struct SchemaForeignKey: Hashable, Codable {
     /// RESTRICT, CASCADE, SET NULL, NO ACTION or SET DEFAULT.
     public var onUpdate: String
     public var onDelete: String
+
+    public init(name: String, columns: [String], referencedDatabase: String, referencedTable: String, referencedColumns: [String],
+                onUpdate: String, onDelete: String) {
+        self.name = name
+        self.columns = columns
+        self.referencedDatabase = referencedDatabase
+        self.referencedTable = referencedTable
+        self.referencedColumns = referencedColumns
+        self.onUpdate = onUpdate
+        self.onDelete = onDelete
+    }
 }
 
 /// A check constraint. MariaDB names a column's own check after the column (and its JSON columns have one); MySQL names

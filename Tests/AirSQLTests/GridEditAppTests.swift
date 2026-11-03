@@ -206,7 +206,7 @@ extension AppTests {
             await ready { lookup.rows.isEmpty }
             #expect(lookup.rows.map(\.key) == [["7"], ["9"]] && lookup.rows.map(\.label) == ["ann@example.com", "cy@example.org"])
             // Ordered by the label, which an index starts with; never the whole table.
-            #expect(session.statements.last == "SELECT `id`, `email` FROM `airsql_fixture`.`customers` ORDER BY `email` LIMIT 100")
+            #expect(session.statements.contains("SELECT `id`, `email` FROM `airsql_fixture`.`customers` ORDER BY `email` LIMIT 100"))
             lookup.table.selectRowIndexes([1], byExtendingSelection: false)
             lookup.choose(nil)
             #expect(tab.source?.cell(0, 1) == .text("9") && tab.source?.mark(0, 1) == .edited)
@@ -215,6 +215,49 @@ extension AppTests {
             await ready { session.statements.last?.contains("LIKE") != true }
             #expect(session.statements.last?.contains("WHERE `email` LIKE '%cy%' ESCAPE '!' ORDER BY `email`") == true)
             tab.revertAllChanges(nil)
+        }
+
+        @Test func foreignKeysShowTheirRowsLabelAndVirtualOnesLeadToRows() async throws {
+            let session = FakeTableSession()
+            let (main, harness, tab) = try await Tab.tab(session: session)
+            // customer_id's cells ask for their labels as they're drawn: one query for the values on screen (and one for
+            // parent_id's, which refers to orders).
+            tab.grid.needsDisplay = true
+            tab.grid.displayIfNeeded()
+            _ = (tab.label(0, 1), tab.label(2, 1))
+            await ready { tab.readingLabels != nil || tab.loading != nil }
+            #expect(tab.label(0, 1) == "ann@example.com" && tab.label(2, 1) == "cy@example.org")
+            #expect(tab.label(1, 1) == nil && tab.label(0, 2) == nil)
+            #expect(session.labels.filter { $0.hasPrefix("SELECT `id`, `email` FROM `airsql_fixture`.`customers` WHERE `id` IN (") }.count == 1,
+                    "\(session.labels)")
+            tab.grid.needsDisplay = true
+            tab.grid.displayIfNeeded()
+
+            // number becomes a virtual foreign key to a table's key: a drop-down and Related Rows follow it.
+            let column = 3, store = TableViewSettingsStore.shared
+            tab.grid.selection.select(GridPosition(row: 0, column: column))
+            #expect(tab.foreignKey(column) == nil && tab.keyState(of: Commands.removeVirtualKey.action).0 == false)
+            tab.addVirtualKey(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let sheet = try #require(main.window?.attachedSheet)
+            let popup = try #require(find(NSPopUpButton.self, id: "virtualKey.table", in: sheet.contentView!))
+            popup.selectItem(withTitle: "customers (id)")
+            _ = await call(harness, "press", ["title": "Add"])
+            let key = try #require(tab.foreignKey(column))
+            #expect(key.referencedTable == "customers" && key.referencedColumns == ["id"] && key.name == "virtual number")
+            #expect(store.virtualKeys(connection: tab.context.connection.id)["airsql_fixture"]?["orders"] == [key])
+            #expect(tab.keyState(of: Commands.removeVirtualKey.action).0 && tab.keyState(of: Commands.addVirtualKey.action).0)
+            tab.removeVirtualKey(nil)
+            #expect(tab.foreignKey(column) == nil && tab.settings.virtualKeys.isEmpty)
+
+            // Use as Label on a column picks what the keys referring to the table show (its first text column until then).
+            #expect(tab.isLabel(2))
+            tab.grid.selection.select(GridPosition(row: 0, column: 4))
+            tab.useAsLabel(nil)
+            #expect(tab.isLabel(4) && !tab.isLabel(2))
+            #expect(store.settings(connection: tab.context.connection.id, database: "airsql_fixture", table: "orders").labelColumn == "total")
+            tab.useAsLabel(nil)
+            #expect(!tab.isLabel(4) && tab.isLabel(2))
         }
 
         @Test func quitListsPendingChangesFirst() async throws {

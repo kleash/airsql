@@ -172,10 +172,12 @@ extension AppTests {
                         guard let grid = (main.selectedTab?.content as? TableDataController)?.grid else { return false }
                         return grid.columnWidths[grid.columnOrder[2]] < 400
                     },
+                    // region: not a key (Use as Label) nor a foreign key (Add Virtual Foreign Key…).
                     menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
-                           "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Display As"],
+                           "Clear Filter", "Use as Label", "Add Virtual Foreign Key…", "Remove Virtual Foreign Key", "Column Summary…",
+                           "Hide Column", "Freeze", "Column List…", "Heatmap", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
-                              "Column Summary…", "Hide Column", "Freeze", "Column List…"]),
+                              "Use as Label", "Add Virtual Foreign Key…", "Column Summary…", "Hide Column", "Freeze", "Column List…"]),
             Surface(name: "Grid cell",
                     place: { main, _ in
                         let grid = resultGrid(main)

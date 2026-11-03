@@ -109,6 +109,19 @@ public enum ForeignKeyQueries {
         return related
     }
 
+    /// The labels of the referenced rows whose one-column key has these values: `SELECT key, label … WHERE key IN (…)`.
+    /// Nil for a composite key, or when no value fits the key's type.
+    public static func labels(_ key: SchemaForeignKey, referenced: SchemaTable, label: String, values: [String],
+                              context: EditContext) -> String? {
+        guard key.referencedColumns.count == 1, let column = referenced.column(key.referencedColumns[0]) else { return nil }
+        let type = ColumnType(column)
+        let literals = values.compactMap { try? type.literal($0, context) }
+        guard !literals.isEmpty else { return nil }
+        let name = SQLQuote.identifier(column.name)
+        return "SELECT \(name), \(SQLQuote.identifier(label)) FROM " + SQLQuote.identifier(key.referencedDatabase, key.referencedTable)
+            + " WHERE \(name) IN (" + literals.joined(separator: ", ") + ")"
+    }
+
     /// Text for a LIKE pattern with ESCAPE '!': the wildcards % and _, and ! itself, match only themselves. ('!' rather
     /// than a backslash, which NO_BACKSLASH_ESCAPES would turn into an ordinary character.)
     static func likeEscaped(_ text: String) -> String {
@@ -118,5 +131,20 @@ public enum ForeignKeyQueries {
             escaped.append(character)
         }
         return escaped
+    }
+}
+
+extension SchemaSnapshot {
+    /// A copy with virtual foreign keys (by database and table) added to its tables' own.
+    public func adding(_ virtualKeys: [String: [String: [SchemaForeignKey]]]) -> SchemaSnapshot {
+        guard !virtualKeys.isEmpty else { return self }
+        var copy = self
+        for index in copy.databases.indices {
+            guard let tables = virtualKeys[copy.databases[index].name] else { continue }
+            for table in copy.databases[index].tables.indices {
+                copy.databases[index].tables[table].foreignKeys += tables[copy.databases[index].tables[table].name] ?? []
+            }
+        }
+        return copy
     }
 }

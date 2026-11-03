@@ -19,7 +19,7 @@ extension MainMenu {
                         Commands.deleteRows, nil,
                         Commands.setNull, Commands.setDefault])
         menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
-        menus.data.add([Commands.chooseReferencedRow])
+        menus.data.add([Commands.chooseReferencedRow, Commands.useAsLabel, Commands.addVirtualKey, Commands.removeVirtualKey])
         menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
         let filters: [Command?] = [Commands.filterEquals, Commands.filterNotEquals, Commands.filterLess, Commands.filterGreater,
                                    Commands.filterStartsWith, Commands.filterEndsWith, Commands.filterContains, Commands.filterIn,

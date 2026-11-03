@@ -36,12 +36,15 @@ extension AppTests {
 
         @Test func aOneTableResultEditsAndAppliesLikeATable() async throws {
             let session = FakeTableSession()
-            session.columns = [.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING)]
-            session.edited = [["1", "ANN@EXAMPLE.NET"]]
+            session.columns = [.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING),
+                               .init(name: "name", type: MYSQL_TYPE_VAR_STRING)]
+            session.edited = [["1", "ANN@EXAMPLE.NET", "Ann"]]
             let c = { Self.column("customers", "customers", $0, $1) }
-            let (main, harness, view) = try await Self.result("SELECT id, email, NOW() AS at FROM customers",
-                                                     [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING), Self.column("", "", "at")],
-                                                     rows: [["1", "ann@example.com", "x"], ["2", "bo@example.org", "y"]], session: session)
+            let (main, harness, view) = try await Self.result("SELECT id, email, NOW() AS at, name FROM customers",
+                                                     [c("id", MYSQL_TYPE_LONG), c("email", MYSQL_TYPE_VAR_STRING), Self.column("", "", "at"),
+                                                      c("name", MYSQL_TYPE_VAR_STRING)],
+                                                     rows: [["1", "ann@example.com", "x", "Ann"], ["2", "bo@example.org", "y", "Bo"]],
+                                                     session: session)
             #expect(view.editState.stringValue == "Editable" && !view.editState.isHidden && view.notice.isHidden)
             #expect(view.dataGrid(view.grid, canEditRow: 0, column: 1) && !view.dataGrid(view.grid, canEditRow: 0, column: 2))
             #expect(view.whyReadOnly(0, 2) == "Worked out by the query, not a column of a table")
@@ -67,7 +70,7 @@ extension AppTests {
             await ready { view.edits?.isEmpty == false }
             #expect(session.statements == ["START TRANSACTION", "DELETE FROM `airsql_fixture`.`customers` WHERE `id` IN (2)",
                                            "UPDATE `airsql_fixture`.`customers` SET `email` = 'ann@example.net' WHERE `id` = 1", "COMMIT",
-                                           "SELECT `id`, `email` FROM `airsql_fixture`.`customers` WHERE `id` IN (1)"])
+                                           "SELECT `id`, `email`, `name` FROM `airsql_fixture`.`customers` WHERE `id` IN (1)"])
             // What the server kept shows; the deleted row is gone.
             #expect(view.grid.rowCount == 1 && view.source.cell(0, 1) == .text("ANN@EXAMPLE.NET") && view.notice.isHidden)
             #expect(!view.responds(to: save.action))

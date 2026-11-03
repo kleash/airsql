@@ -68,9 +68,9 @@ Nothing is written until you apply. Leaving a row writes nothing.
   - Bytes (BINARY, BLOB, shapes) are typed as hex: `0x00FF`. BIT shows and takes every bit: `b'1010'` or `1010`.
   - A value of more than 256 characters, or of several lines, opens in the value panel (below).
   - A foreign key shows the rows of the table it refers to, each as "label (key)", the label being that table's
-    first text column. They are searched on the server as you type, by label or by key, 100 at a time, so a big table
-    is never listed whole. Return or a double click puts the key in the cell. **Data ▸ Choose Referenced Row…** opens
-    the same list.
+    first text column, or the one you chose with **Use as Label** (below). They are searched on the server as you
+    type, by label or by key, 100 at a time, so a big table is never listed whole. Return or a double click puts the
+    key in the cell. **Data ▸ Choose Referenced Row…** opens the same list.
 - **The value panel** (⇧↩) edits the selected cell too: ⌘↩ or clicking elsewhere keeps the text as a pending edit,
   Esc puts the cell's value back. A value the column refuses stays there, and the panel says why. Its **⋯** menu has
   **Format JSON** and **Compact JSON**, **Load from File…** (a file's bytes in a binary column, else its UTF-8 text)
@@ -91,6 +91,18 @@ Nothing is written until you apply. Leaving a row writes nothing.
   grid's NULL text) is NULL.
 - **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
   the selected row; choosing one opens that table filtered to them.
+
+### Foreign key labels and virtual foreign keys
+
+- A one-column foreign key's cell shows the row it refers to in grey after its value (before it, for a number): the
+  referenced table's label, read from the server for the rows on screen only. Right-click a column header of the
+  referenced table and choose **Use as Label** (also in the Data menu) to show that column instead of its first text
+  column; choose it again to go back.
+- Many schemas have no real foreign keys. Right-click a column header and choose **Add Virtual Foreign Key…** to say
+  which table's key the column holds (AirSQL guesses from the name: `customer_id` → `customers`). AirSQL keeps it on
+  this Mac with the table's view settings, never in the database. The drop-down, Related Rows (both ways), the labels
+  and the [ER diagram](editors.md#the-er-diagram) then follow it as a real foreign key. **Remove Virtual Foreign Key**
+  forgets it.
 - Pending changes have their colours: an edited cell amber, a new row green, a row to delete struck through in red.
   The bar under the grid bar counts them.
 - **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes (a paste or a multi-cell edit is one step);

@@ -28,6 +28,11 @@ public struct TableViewSettings: Codable, Equatable {
     public var order: [String] = []
     /// How many columns, from the first shown, stay in view while the grid scrolls across (Freeze).
     public var frozenColumns = 0
+    /// Foreign keys the person defined for the table, which the database doesn't have: the drop-down, Related Rows, the
+    /// labels and the ER diagram follow them. Kept on this Mac, never written to the server.
+    public var virtualKeys: [SchemaForeignKey] = []
+    /// The column a row is shown by beside a key that refers to it ("Ada Lovelace" after 12); nil: the first text column.
+    public var labelColumn: String?
 
     public static let recentLimit = 20
 
@@ -53,6 +58,8 @@ public struct TableViewSettings: Codable, Equatable {
         displayTypes = try container.decodeIfPresent([String: String].self, forKey: .displayTypes) ?? [:]
         order = try container.decodeIfPresent([String].self, forKey: .order) ?? []
         frozenColumns = try container.decodeIfPresent(Int.self, forKey: .frozenColumns) ?? 0
+        virtualKeys = try container.decodeIfPresent([SchemaForeignKey].self, forKey: .virtualKeys) ?? []
+        labelColumn = try container.decodeIfPresent(String.self, forKey: .labelColumn)
     }
 }
 
@@ -101,6 +108,19 @@ public final class TableViewSettingsStore {
         all = loaded().filter { !$0.key.hasPrefix(prefix) }
         lock.unlock()
         saveLater()
+    }
+
+    /// The virtual foreign keys of a connection's tables, by database and table.
+    public func virtualKeys(connection: UUID) -> [String: [String: [SchemaForeignKey]]] {
+        lock.lock()
+        defer { lock.unlock() }
+        var keys: [String: [String: [SchemaForeignKey]]] = [:]
+        for (key, settings) in loaded() where !settings.virtualKeys.isEmpty {
+            let parts = key.split(separator: "\u{1F}", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 3, parts[0] == connection.uuidString else { continue }
+            keys[parts[1], default: [:]][parts[2]] = settings.virtualKeys
+        }
+        return keys
     }
 
     /// Reads the file now (off the main thread), so later calls don't.

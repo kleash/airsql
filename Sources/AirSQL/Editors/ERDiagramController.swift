@@ -87,7 +87,12 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
                 let database = self.database ?? context.firstDatabase(withTables: true)
                 guard let database else { throw DesignError("The server has no database to draw") }
                 try await context.schema.loadDetails([database])
-                guard let schema = context.schema.snapshot.database(database) else { throw DesignError("\(database) isn't on the server any more") }
+                // With the foreign keys the person defined (virtual: kept on this Mac, not in the database).
+                let id = context.connection.id
+                let virtual = await Task.detached { TableViewSettingsStore.shared.virtualKeys(connection: id) }.value
+                guard let schema = context.schema.snapshot.adding(virtual).database(database) else {
+                    throw DesignError("\(database) isn't on the server any more")
+                }
                 self.database = database
                 show(ERDiagram(schema), databases: names)
             } catch {

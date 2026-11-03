@@ -63,6 +63,13 @@ final class TableDataController: NSViewController, TabContent {
     /// A SET column's checklist, or a foreign key's drop-down, while it shows.
     var checklist: SetChecklist?
     var lookup: ForeignKeyLookup?
+    /// Foreign keys' labels shown after their values (by column, value → label; "" for none), the values on screen
+    /// still to read, and the read under way.
+    var labels: [Int: [String: String]] = [:]
+    var wantedLabels: [Int: Set<String>] = [:]
+    var readingLabels: Task<Void, Never>?
+    /// Each column's one-column foreign key, for its labels (nil until worked out; again after a key is added).
+    var labelKeys: [SchemaForeignKey?]?
     /// A new filter or sort came while rows were loading: load again once they are in.
     var reloadWhenDone = false
     /// What went wrong last (a filter the server refused), until the next load works.
@@ -101,6 +108,10 @@ final class TableDataController: NSViewController, TabContent {
         viewer.serverSummary = { [weak self] column, done in self?.summarize(column, done: done) }
         viewer.filterByValue = { [weak self] column, value in self?.filter(column, by: value) }
         viewer.keepValue = { [weak self] row, column, text in self?.keep(.text(text), row: row, column: column) }
+        grid.cellSuffix = { [weak self] row, column in
+            guard let self, let cell = viewer.hostCell(row, column) else { return nil }
+            return label(cell.row, cell.column)
+        }
         for (index, link) in [countLink, moreLink, allLink].enumerated() { viewer.status.insertView(link, at: index + 1, in: .leading) }
         grid.nullText = model.data.settings.nullText
         grid.fontSize = CGFloat(model.data.settings.gridFontSize)
@@ -193,7 +204,10 @@ final class TableDataController: NSViewController, TabContent {
                 bar.whereField.noBackslashEscapes = noBackslashEscapes
                 if editContext == nil { editContext = try await readEditContext(session) }
                 let page = try await session.query(sql, rowCap: limit).first?.rows
-                if !more { source.reset(keepingSaved: keepingSaved) }
+                if !more {
+                    source.reset(keepingSaved: keepingSaved)
+                    labels = [:]
+                }
                 if let page { source.append(page, requested: limit) }
                 problem = nil
                 if !more { remember() }
@@ -237,6 +251,7 @@ final class TableDataController: NSViewController, TabContent {
     private func finishLoading() {
         loading = nil
         bar.busy = false
+        if !wantedLabels.isEmpty { readLabels() }
         // The grid gets the source with its first rows, so it sizes the columns to their values, not only their names.
         if let source, viewer.source !== source, source.loadedRows > 0 || !source.hasMore { viewer.show(source) }
         viewer.reloadData()

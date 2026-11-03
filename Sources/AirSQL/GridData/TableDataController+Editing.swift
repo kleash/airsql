@@ -40,7 +40,8 @@ extension TableDataController: DataGridViewDelegate {
         switch target {
         case .column:
             menu.add([Commands.sortAscending, Commands.sortDescending, Commands.sortColumns, Commands.clearSort, nil,
-                      Commands.filterByValues, Commands.clearFilter])
+                      Commands.filterByValues, Commands.clearFilter, nil, Commands.useAsLabel, Commands.addVirtualKey,
+                      Commands.removeVirtualKey])
         case .row:
             menu.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, Commands.revert])
         case .cells:
