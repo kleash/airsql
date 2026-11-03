@@ -57,23 +57,13 @@ enum ReconNormal {
         return text.replacingOccurrences(of: "now(", with: "current_timestamp(")
     }
 
-    /// Parentheses in `text` pair up (outside quotes), so the outer pair around it can go.
+    /// Parentheses in `text` pair up (outside quotes and comments), so the outer pair around it can go.
     private static func balanced(_ text: Substring) -> Bool {
+        let text = String(text), units = Array(text.utf16)
         var depth = 0
-        var quote: Character?
-        for character in text {
-            if let open = quote {
-                if character == open { quote = nil }
-                continue
-            }
-            switch character {
-            case "'", "\"", "`": quote = character
-            case "(": depth += 1
-            case ")":
-                depth -= 1
-                if depth < 0 { return false }
-            default: break
-            }
+        for token in SQLLexer.tokens(text) where token.kind == .symbol && token.range.count == 1 {
+            depth += units[token.range.lowerBound] == 0x28 ? 1 : units[token.range.lowerBound] == 0x29 ? -1 : 0
+            if depth < 0 { return false }
         }
         return depth == 0
     }
@@ -131,79 +121,28 @@ enum ReconNormal {
         return String(text[..<range.lowerBound] + text[end...])
     }
 
-    /// The text without whitespace that doesn't matter: outside quotes and comments, a run of whitespace becomes one
-    /// space between two word characters and nothing elsewhere; a line comment keeps its line break. `lowercase`
-    /// lowercases outside quotes too.
+    /// The text without whitespace that doesn't matter, read with the console's lexer: between two tokens, one space
+    /// where both are words or numbers, nothing elsewhere; a line comment keeps its line break; quoted text and comments
+    /// stay as they are. `lowercase` lowercases words, numbers and symbols too.
     static func compact(_ text: String, lowercase: Bool) -> String {
-        let scalars = Array(text.unicodeScalars)
-        var result = String.UnicodeScalarView()
-        var index = 0
-        var pendingSpace = false
-        func isWord(_ scalar: Unicode.Scalar?) -> Bool {
-            guard let scalar else { return false }
-            return scalar == "_" || scalar == "$" || scalar.properties.isAlphabetic || scalar.properties.numericType != nil
-        }
-        func emit(_ scalar: Unicode.Scalar) {
-            if pendingSpace, isWord(result.last), isWord(scalar) { result.append(" ") }
-            pendingSpace = false
-            result.append(scalar)
-        }
-        while index < scalars.count {
-            let scalar = scalars[index]
-            let next = index + 1 < scalars.count ? scalars[index + 1] : nil
-            if scalar.properties.isWhitespace {
-                pendingSpace = !result.isEmpty
-                index += 1
-            } else if scalar == "'" || scalar == "\"" || scalar == "`" {
-                // Quoted text as it is, with doubled quotes and (outside backticks) backslash escapes.
-                emit(scalar)
-                index += 1
-                while index < scalars.count {
-                    let inner = scalars[index]
-                    result.append(inner)
-                    index += 1
-                    if inner == "\\", scalar != "`", index < scalars.count {
-                        result.append(scalars[index])
-                        index += 1
-                    } else if inner == scalar {
-                        guard index < scalars.count, scalars[index] == scalar else { break }
-                        result.append(scalars[index])
-                        index += 1
-                    }
+        let units = Array(text.utf16)
+        func wordish(_ token: SQLToken) -> Bool { [.word, .number, .variable].contains(token.kind) }
+        var result = ""
+        var previous: SQLToken?
+        for token in SQLLexer.tokens(text) {
+            var piece = String(decoding: units[token.range], as: UTF16.self)
+            if lowercase, [.word, .number, .symbol].contains(token.kind) { piece = piece.lowercased() }
+            if let previous {
+                let first = units[previous.range.lowerBound]
+                if previous.kind == .comment, first == 0x23 || first == 0x2D {  // # or -- (a line comment)
+                    result += "\n"
+                } else if previous.range.upperBound < token.range.lowerBound, wordish(previous), wordish(token) {
+                    result += " "
                 }
-            } else if scalar == "#" || scalar == "-" && next == "-"
-                        && (index + 2 == scalars.count || scalars[index + 2].properties.isWhitespace) {
-                emit(scalar)
-                index += 1
-                while index < scalars.count, scalars[index] != "\n" {
-                    result.append(scalars[index])
-                    index += 1
-                }
-                if index < scalars.count { result.append("\n") }
-                index += 1
-            } else if scalar == "/" && next == "*" {
-                emit(scalar)
-                result.append("*")
-                index += 2
-                while index < scalars.count {
-                    if scalars[index] == "*", index + 1 < scalars.count, scalars[index + 1] == "/" {
-                        result.append("*")
-                        result.append("/")
-                        index += 2
-                        break
-                    }
-                    result.append(scalars[index])
-                    index += 1
-                }
-            } else {
-                if lowercase {
-                    for lower in String(scalar).lowercased().unicodeScalars { emit(lower) }
-                } else {
-                    emit(scalar)
-                }
-                index += 1
             }
+            result += piece
+            previous = token
         }
-        return String(result)
+        return result
     }
 }
