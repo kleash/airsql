@@ -75,6 +75,23 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var agentAccess = AgentAccess.off
     /// Agents may see sample rows (a separate switch from the access level).
     public var agentSampleRows = false
+    /// The TLS tab. Off for the server's own socket, which never leaves this Mac (`connectOptions`).
+    public var tls = TLSOptions()
+    /// A PAM or LDAP account, whose login sends the password as plain text: allowed only over TLS that proves the server.
+    public var cleartextLogin = false
+    /// The compressed protocol.
+    public var compress = false
+    /// SQL each session runs after logging in (SET sql_mode, time_zone…), statements ended by semicolons.
+    public var startupSQL = ""
+    /// The databases shown: names or patterns with * and ?, separated by commas; empty: all (`showsDatabase`).
+    public var databaseFilter = ""
+    /// Seconds a statement may run before it is cancelled; 0: no limit.
+    public var queryTimeout = 0
+    /// SSH routes: the SSH server that reaches the database, and the jump hosts on the way to it, first hop first.
+    public var sshHost = SSHHop()
+    public var jumpHosts: [SSHHop] = []
+    /// Proxy routes: the proxy to the database (Proxy only) or to the first SSH host (SSH + proxy).
+    public var proxy = ProxySettings()
 
     public init(id: UUID = UUID(), name: String = "", host: String = "", port: Int? = nil, user: String = "",
                 colour: ConnectionColour = .none, route: Route = .direct) {
@@ -110,6 +127,15 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         safety = try container.decodeIfPresent(SafetySettings.self, forKey: .safety)
         agentAccess = try value(.agentAccess, defaults.agentAccess)
         agentSampleRows = try value(.agentSampleRows, defaults.agentSampleRows)
+        tls = try value(.tls, defaults.tls)
+        cleartextLogin = try value(.cleartextLogin, defaults.cleartextLogin)
+        compress = try value(.compress, defaults.compress)
+        startupSQL = try value(.startupSQL, defaults.startupSQL)
+        databaseFilter = try value(.databaseFilter, defaults.databaseFilter)
+        queryTimeout = try value(.queryTimeout, defaults.queryTimeout)
+        sshHost = try value(.sshHost, defaults.sshHost)
+        jumpHosts = try value(.jumpHosts, defaults.jumpHosts)
+        proxy = try value(.proxy, defaults.proxy)
     }
 
     /// The name, else user@host:port (or the socket).

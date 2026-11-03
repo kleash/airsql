@@ -9,6 +9,12 @@ if CommandLine.arguments.dropFirst().first == "--version" {
     exit(0)
 }
 
+// ssh runs AirSQL as its askpass program (`SSH_ASKPASS`, with AIRSQL_ASKPASS_SOCK set): the prompt goes to the running
+// AirSQL, which asks the person or answers from the Keychain, and the answer is printed for ssh.
+if Env.value("ASKPASS_SOCK") != nil, CommandLine.arguments.count > 1 {
+    exit(Askpass.runHelper(prompt: CommandLine.arguments[1]))
+}
+
 let delegate = AppDelegate()
 NSApplication.shared.delegate = delegate
 NSApplication.shared.setActivationPolicy(.regular)
