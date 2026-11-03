@@ -110,7 +110,7 @@ struct LiquibaseLabTests {
         defer { Task { await target.close() } }
         try await ReconLabTests.database(target, "lane_l8b_liquibase", [])
         let process = Process()
-        process.executableURL = try #require(Self.liquibase)
+        process.executableURL = Self.liquibase  // the test runs only when there is one
         process.currentDirectoryURL = url.deletingLastPathComponent()
         process.arguments = ["--changelog-file=" + url.lastPathComponent, "--url=jdbc:mariadb://127.0.0.1:\(Lab.mariadb114.port ?? 0)/lane_l8b_liquibase",
                              "--username=" + Lab.airsql.user, "update"]
