@@ -42,6 +42,17 @@ func sidebarRow(_ main: MainWindowController, _ name: String) -> (Double, Double
     return nil
 }
 
+/// The middle of the sidebar row of the folder named `name`.
+@MainActor
+func folderRow(_ main: MainWindowController, _ name: String) -> (Double, Double)? {
+    guard let id = main.model.data.folders.first(where: { $0.name == name })?.id else { return nil }
+    let outline = main.sidebar.outline
+    for row in 0..<outline.numberOfRows where (outline.item(atRow: row) as? SidebarNode)?.kind == .folder(id) {
+        return windowPoint(outline.rect(ofRow: row), in: outline)
+    }
+    return nil
+}
+
 /// The tab button showing `title`.
 @MainActor
 func tabButton(_ main: MainWindowController, _ title: String) -> TabButton {
@@ -56,13 +67,18 @@ func statusItem(_ item: StatusItemView) -> (Double, Double)? {
 extension AppTests {
     @MainActor @Suite struct InteractionTests {
         static let surfaces: [Surface] = [
+            // Production is connected: a double-click shows it (its tab) rather than connecting again.
             Surface(name: "Connection in the sidebar",
-                    place: { main, _ in sidebarRow(main, "Staging · shop") },
-                    clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.staging.id] && $0.contentKind == "summary" },
-                    doubleClicked: { _, received in received.contains("connect(_:)") },
+                    place: { main, _ in sidebarRow(main, "Production · shop") },
+                    clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.production.id]
+                        && $0.selectedTab?.connectionID == Fixtures.production.id },
+                    doubleClicked: { main, _ in
+                        main.window?.attachedSheet == nil && main.selectedTab?.connectionID == Fixtures.production.id
+                            && main.model.states[Fixtures.production.id] == .connected(server: "MariaDB 11.8.3")
+                    },
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
                            "Compare…", "Colour", "Delete…"],
-                    enabled: ["Duplicate", "Colour", "Delete…"]),
+                    enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Colour", "Delete…"]),
             Surface(name: "Direct connection in the sidebar",
                     place: { main, _ in sidebarRow(main, "Local MariaDB 11.8") },
                     clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.local.id] && $0.contentKind == "summary" },
@@ -70,6 +86,14 @@ extension AppTests {
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
                            "Compare…", "Colour", "Delete…"],
                     enabled: ["Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour", "Delete…"]),
+            Surface(name: "Folder in the sidebar",
+                    place: { main, _ in folderRow(main, "Clients") },
+                    clicked: { $0.sidebar.selectedFolderNodeID == InteractionTests.folder.id },
+                    doubleClicked: { main, _ in
+                        main.sidebar.outline.isItemExpanded(main.sidebar.selectedNodes.first) == false
+                    },
+                    menu: ["New Connection…", "New Folder…", "Rename Folder…", "Delete Folder…"],
+                    enabled: ["New Connection…", "New Folder…", "Rename Folder…", "Delete Folder…"]),
             Surface(name: "Editor tab",
                     place: { main, _ in
                         main.open(FixtureContent(), title: "Query 1", connection: Fixtures.production.id)
@@ -116,8 +140,13 @@ extension AppTests {
 
         /// A window in the state every row starts from: the shop's connections, Production connected, a transaction
         /// open in its tab, an agent at work and an export running.
+        /// The folder the local connection sits in.
+        static let folder = ConnectionFolder(name: "Clients")
+
         static func window() -> (MainWindowController, AgentServer, CommandRecorder, Activity) {
-            let model = testModel(Fixtures.shop)
+            var local = Fixtures.local
+            local.folderID = folder.id
+            let model = testModel([Fixtures.production, Fixtures.staging, local, Fixtures.replica], folders: [folder])
             model.data.settings.agentsAllowed = true
             let (main, harness) = appWindow(model)
             let recorder = CommandRecorder()
@@ -134,7 +163,8 @@ extension AppTests {
         }
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
-        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Editor tab", "Status bar: route", "Status bar: server",
+        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Folder in the sidebar", "Editor tab",
+                                       "Status bar: route", "Status bar: server",
                                        "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log"]
 
         @Test func everyRowHasItsChecks() {

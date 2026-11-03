@@ -4,7 +4,7 @@ import Foundation
 import Security
 
 /// A connection's TLS settings.
-public struct TLSOptions: Codable, Equatable, Sendable {
+public struct TLSOptions: Codable, Hashable, Sendable {
     public enum Mode: String, Codable, Sendable {
         /// No TLS (a server on this Mac, or a network you trust end to end).
         case off

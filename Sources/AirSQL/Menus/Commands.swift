@@ -143,6 +143,9 @@ import AppKit
     @objc optional func setConnectionColour(_ sender: Any?)
     @objc optional func deleteConnection(_ sender: Any?)
     @objc optional func openInTerminal(_ sender: Any?)
+    @objc optional func newFolder(_ sender: Any?)
+    @objc optional func renameFolder(_ sender: Any?)
+    @objc optional func deleteFolder(_ sender: Any?)
 
     // Tools
     @objc optional func exportDatabase(_ sender: Any?)
@@ -513,6 +516,12 @@ enum Commands {
                                           tip: "Forget the selected connections and their saved passwords (asks first)")
     static let openInTerminal = Command("Open in Terminal", #selector(AirSQLActions.openInTerminal(_:)),
                                         tip: "Open the mysql command line in Terminal on this connection, through its route")
+    static let newFolder = Command("New Folder…", #selector(AirSQLActions.newFolder(_:)),
+                                   tip: "Make a sidebar folder for connections; the selected connections move into it")
+    static let renameFolder = Command("Rename Folder…", #selector(AirSQLActions.renameFolder(_:)),
+                                      tip: "Give the selected sidebar folder another name")
+    static let deleteFolder = Command("Delete Folder…", #selector(AirSQLActions.deleteFolder(_:)),
+                                      tip: "Remove the selected folder; its connections stay, outside any folder")
 
     // MARK: Tools
     static let export = Command("Export…", #selector(AirSQLActions.exportDatabase(_:)),
@@ -587,7 +596,8 @@ enum Commands {
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
         killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
-        connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal,
+        connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
+        renameFolder, deleteFolder,
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
