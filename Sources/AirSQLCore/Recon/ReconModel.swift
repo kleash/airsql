@@ -197,6 +197,9 @@ public struct ReconTableData: Equatable {
 
     public init(outcome: Outcome) { self.outcome = outcome }
 
+    /// More differing rows than this and a table is reported as having too many to list.
+    public static var maxDifferences: Int { ReconDataCompare.maxDifferences }
+
     public var differs: Bool {
         switch outcome {
         case .same, .notCompared: return false

@@ -12,8 +12,8 @@ public enum ReconReport {
     public static let rowsShown = 1_000
 
     /// One difference, as each format writes it.
-    struct Line {
-        var kind: String, object: String, status: String, difference: String, item: String, detail: String
+    public struct Line {
+        public var kind: String, object: String, status: String, difference: String, item: String, detail: String
     }
 
     public static func text(_ result: ReconResult, format: Format) -> String {
@@ -38,7 +38,8 @@ public enum ReconReport {
                  "\(others.filter { $0.status == .different }.count)")]
     }
 
-    static func status(_ object: ReconObject, _ result: ReconResult) -> String {
+    /// How an object compares, in plain words: "different structure and data", "only in Production".
+    public static func status(_ object: ReconObject, _ result: ReconResult) -> String {
         switch object.status {
         case .same: return object.data?.differs == true ? "different data" : "same"
         case .different: return object.data?.differs == true ? "different structure and data" : "different structure"
@@ -48,7 +49,7 @@ public enum ReconReport {
     }
 
     /// Every difference of an object: its structure parts, then its rows (at most `limit`).
-    static func lines(_ object: ReconObject, _ result: ReconResult, limit: Int = .max) -> [Line] {
+    public static func lines(_ object: ReconObject, _ result: ReconResult, limit: Int = .max) -> [Line] {
         let status = self.status(object, result)
         func line(_ difference: String, _ item: String, _ detail: String) -> Line {
             Line(kind: object.kind.rawValue, object: object.name, status: status, difference: difference, item: item,
@@ -158,5 +159,36 @@ public enum ReconReport {
             </body></html>
 
             """
+    }
+}
+
+/// Two texts side by side, line by line: equal lines on both sides, a line only one side has against a gap (nil), as
+/// the compare window shows two CREATE statements.
+public enum ReconLines {
+    public static func aligned(_ left: String, _ right: String) -> [(left: String?, right: String?)] {
+        let a = left.components(separatedBy: "\n"), b = right.components(separatedBy: "\n")
+        // The longest common subsequence of lines (definitions are at most a few thousand lines).
+        var lengths = [[Int]](repeating: [Int](repeating: 0, count: b.count + 1), count: a.count + 1)
+        for i in stride(from: a.count - 1, through: 0, by: -1) {
+            for j in stride(from: b.count - 1, through: 0, by: -1) {
+                lengths[i][j] = a[i] == b[j] ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
+            }
+        }
+        var rows: [(left: String?, right: String?)] = []
+        var i = 0, j = 0
+        while i < a.count || j < b.count {
+            if i < a.count, j < b.count, a[i] == b[j] {
+                rows.append((a[i], b[j]))
+                i += 1
+                j += 1
+            } else if j == b.count || i < a.count && lengths[i + 1][j] >= lengths[i][j + 1] {
+                rows.append((a[i], nil))
+                i += 1
+            } else {
+                rows.append((nil, b[j]))
+                j += 1
+            }
+        }
+        return rows
     }
 }

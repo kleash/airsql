@@ -370,4 +370,10 @@ struct ReconTests {
         #expect(markdown.contains("<b>\\|") && markdown.contains("## Table orders: different structure"))
         #expect(ReconReport.summary(result).first { $0.label == "only in Staging" }?.value == "1")
     }
+
+    @Test func linesAlignSideBySide() {
+        let rows = ReconLines.aligned("a\nb\nc\nd", "a\nc\nx\nd")
+        #expect(rows.map { "\($0.left ?? "-")\($0.right ?? "-")" } == ["aa", "b-", "cc", "-x", "dd"])
+        #expect(ReconLines.aligned("", "").count == 1)
+    }
 }
