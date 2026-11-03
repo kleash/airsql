@@ -49,8 +49,8 @@ final class CharsetPicker: NSObject {
         self.choices = choices
         self.keep = keep
         charset = popup((keep.map { [$0] } ?? []) + choices.charsets, selected: 0, id: id + ".charset",
-                        tip: "The character set: which characters it can hold (utf8mb4 holds them all)", target: nil, action: nil)
-        collation = popup([], selected: 0, id: id + ".collation", tip: "How text is compared and sorted", target: nil, action: nil)
+                        tip: "Choose the character set: which characters it can hold (utf8mb4 holds them all)", target: nil, action: nil)
+        collation = popup([], selected: 0, id: id + ".collation", tip: "Choose how text is compared and sorted", target: nil, action: nil)
         super.init()
         charset.target = self
         charset.action = #selector(charsetChosen)
@@ -70,7 +70,7 @@ final class CharsetPicker: NSObject {
             return
         }
         collation.isEnabled = true
-        collation.toolTip = "How text is compared and sorted"
+        collation.toolTip = "Choose how text is compared and sorted"
         collation.addItems(withTitles: choices.collations[name] ?? [])
         let preferred = name == choices.serverCharset ? choices.serverCollation : choices.defaultCollation[name] ?? ""
         collation.selectItem(withTitle: preferred)
@@ -96,7 +96,7 @@ extension NavigatorActions {
     }
 
     static func newDatabase(_ choices: ServerChoices, on open: OpenConnection, window: NSWindow) {
-        let name = textField("", placeholder: "Name", id: "newDatabase.name", tip: "The new database's name", width: 260)
+        let name = textField("", placeholder: "Name", id: "newDatabase.name", tip: "Type the new database's name", width: 260)
         let picker = CharsetPicker(choices, id: "newDatabase")
         let form = Form()
         form.row("Name", [name])
@@ -118,12 +118,12 @@ extension NavigatorActions {
         guard let window else { return }
         let databases = open.snapshot.databases.map(\.name)
         let target = popup(databases, selected: databases.firstIndex(of: table.database) ?? 0, id: "copyTable.database",
-                           tip: "The database the copy goes in", target: nil, action: nil)
-        let name = textField(table.name + "_copy", placeholder: "Name", id: "copyTable.name", tip: "The copy's name", width: 260)
+                           tip: "Choose the database the copy goes in", target: nil, action: nil)
+        let name = textField(table.name + "_copy", placeholder: "Name", id: "copyTable.name", tip: "Type the copy's name", width: 260)
         let rows = checkbox("Copy the rows", id: "copyTable.rows", tip: "Copy the rows too, not only the table's definition", on: true,
                             target: nil, action: nil)
         let condition = textField("", placeholder: "All rows", id: "copyTable.where",
-                                  tip: "Only the rows where this holds, as SQL after WHERE (empty: every row)", width: 260)
+                                  tip: "Type a condition to copy only the rows where it holds, as SQL after WHERE (empty: every row)", width: 260)
         let form = Form()
         form.row("Into", [target])
         form.row("Name", [name])

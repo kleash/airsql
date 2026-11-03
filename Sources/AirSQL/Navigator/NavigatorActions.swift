@@ -165,7 +165,7 @@ enum NavigatorActions {
 
     static func rename(_ object: DatabaseObject, on open: OpenConnection, window: NSWindow?) {
         guard let window else { return }
-        let field = textField(object.name, placeholder: "New name", id: "rename.name", tip: "The \(object.kind.noun)’s new name",
+        let field = textField(object.name, placeholder: "New name", id: "rename.name", tip: "Type the \(object.kind.noun)’s new name",
                               width: 280)
         ask("Rename \(object.name)", "Give \(object.database).\(object.name) a new name.", field: field, action: "Next…",
             on: window) {

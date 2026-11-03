@@ -134,7 +134,7 @@ final class RestoreSheet: ToolSheet {
             toolMenu.lastItem?.toolTip = tool.path
         }
         toolMenu.addItem(withTitle: "AirSQL (built in)")
-        toolMenu.lastItem?.toolTip = "AirSQL runs the statements itself: no client tools needed"
+        toolMenu.lastItem?.toolTip = "Run the statements in AirSQL itself: no client tools needed"
         let picked = tools.firstIndex { $0.path == connection.clientPath }
             ?? ClientTools.best(tools, for: server).flatMap { best in tools.firstIndex { $0 == best } }
         toolMenu.selectItem(at: builtInFirst ? tools.count : picked ?? tools.count)

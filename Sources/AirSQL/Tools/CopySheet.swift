@@ -11,7 +11,7 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
     private let targetMenu = popup([], selected: 0, id: "copy.target", tip: "Choose the connection to copy to", target: nil,
                                    action: nil)
     private let databaseField = AirSQL.textField("", placeholder: "Database name", id: "copy.database",
-                                                 tip: "The database the copy goes into on the other server (made if it isn't there)")
+                                                 tip: "Type the database the copy goes into on the other server (made if it isn't there)")
     private let content = popup(DumpRequest.Content.allCases.map(\.title), selected: 0, id: "copy.content",
                                 tip: "Choose what to copy: the tables' structure, their rows, or both", target: nil, action: nil)
     private let replace = checkbox("Replace tables that are there (DROP TABLE first)", id: "copy.replace",
@@ -78,7 +78,7 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
         picker.isEnabled = enabled
         let why = "It is running: wait for it, or Stop it"
         targetMenu.toolTip = enabled ? "Choose the connection to copy to" : why
-        databaseField.toolTip = enabled ? "The database the copy goes into on the other server (made if it isn't there)" : why
+        databaseField.toolTip = enabled ? "Type the database the copy goes into on the other server (made if it isn't there)" : why
     }
 
     // MARK: Loading

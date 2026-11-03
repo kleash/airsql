@@ -40,7 +40,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         let root = SurfaceView(.content)
         root.setAccessibilityIdentifier("find")
         field.placeholderString = "Text to find"
-        field.toolTip = "The text to look for in every text column; press Return to search"
+        field.toolTip = "Type the text to look for in every text column; press Return to search"
         field.setAccessibilityIdentifier("find.text")
         field.sendsWholeSearchString = true
         field.target = self

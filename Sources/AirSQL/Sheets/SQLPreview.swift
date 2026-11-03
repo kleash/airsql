@@ -120,7 +120,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         var options: [NSView] = []
         if request.offersChangeset {
             let box = checkbox("Save as Liquibase changeset", id: "preview.saveChangeset",
-                               tip: "Once it has run, save these statements as a changeset in your changelog", on: false,
+                               tip: "Save these statements as a changeset in your changelog once they have run", on: false,
                                target: nil, action: nil)
             saveBox = box
             options.append(box)

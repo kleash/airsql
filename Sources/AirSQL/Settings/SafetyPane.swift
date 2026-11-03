@@ -9,22 +9,22 @@ final class SafetyPane: SettingsPaneController {
     override func build() {
         form.heading("Changing data")
         form.row("", [toggle("Ask before UPDATE or DELETE without WHERE", id: "settings.safety.unboundedWrite",
-                             tip: "On by default: protects against changing or deleting every row of a table by mistake",
+                             tip: "Protect against changing or deleting every row of a table by mistake (on by default)",
                              \.safety.askBeforeUnboundedWrite)])
         form.row("", [toggle("Ask before any write from the console", id: "settings.safety.consoleWrite",
-                             tip: "Off by default: every INSERT, UPDATE, DELETE or change of structure you run asks first",
+                             tip: "Ask first at every INSERT, UPDATE, DELETE or change of structure you run (off by default)",
                              \.safety.askBeforeConsoleWrite)])
         form.row("", [toggle("Show the SQL before the grid's Apply", id: "settings.safety.previewApply",
-                             tip: "Off by default: shows exactly what Apply will run before it runs",
+                             tip: "Show exactly what Apply will run before it runs (off by default)",
                              \.safety.previewBeforeApply)])
         form.row("", [toggle("Ask before DROP or TRUNCATE", id: "settings.safety.drop",
-                             tip: "On by default: dropping or emptying a table asks first; a database's name must be typed",
+                             tip: "Ask before dropping or emptying a table; a database's name must be typed (on by default)",
                              \.safety.askBeforeDrop)])
         form.row("", [toggle("Type a table's name to drop or empty it", id: "settings.safety.typeTableName",
-                             tip: "Off by default (on for Production): protects against dropping the wrong table",
+                             tip: "Protect against dropping the wrong table (off by default, on for Production)",
                              \.safety.typeNameForTables)])
         form.row("", [toggle("Ask before restoring into a database that has tables", id: "settings.safety.restore",
-                             tip: "On by default: also asks when the dump would write to another database than the one chosen",
+                             tip: "Ask also when the dump would write to another database than the one chosen (on by default)",
                              \.safety.askBeforeRiskyRestore)])
         let sync = checkbox("Leave DROP and DELETE out of sync scripts unless ticked", id: "settings.safety.sync",
                             tip: "Always on: a sync script never removes tables or rows you didn't tick",
@@ -34,13 +34,13 @@ final class SafetyPane: SettingsPaneController {
 
         form.heading("Agents")
         form.row("", [toggle("Ask before agents change anything", id: "settings.safety.agentChanges",
-                             tip: "On by default: what an agent would change through AirSQL's windows waits for you",
+                             tip: "Hold what an agent would change through AirSQL's windows until you allow it (on by default)",
                              \.safety.askBeforeAgentChanges)])
         form.row("Rows per query", [number(\.safety.agentRowCap, id: "settings.safety.agentRowCap",
-                                           tip: "The most rows an agent's query returns (10,000 by default; 1,000 for Production)",
+                                           tip: "Type the most rows an agent's query returns (10,000 by default; 1,000 for Production)",
                                            range: 1...1_000_000, width: 90)])
         form.row("Time limit", [number(\.safety.agentTimeout, id: "settings.safety.agentTimeout",
-                                       tip: "How long an agent's query may run (30 s by default; 15 s for Production)",
+                                       tip: "Type how long an agent's query may run (30 s by default; 15 s for Production)",
                                        range: 1...3_600),
                                 label("seconds", color: .secondaryLabelColor)])
 
@@ -52,10 +52,10 @@ final class SafetyPane: SettingsPaneController {
                                       label("minutes", color: .secondaryLabelColor)],
                  caption: "Keep-alive stops for it then, so a forgotten transaction can't hold its locks for ever.")
         form.row("", [toggle("Ask before sorting a large table by a column without an index", id: "settings.safety.unindexedSort",
-                             tip: "On by default: sorting millions of rows without an index can slow the server down",
+                             tip: "Ask first: sorting millions of rows without an index can slow the server down (on by default)",
                              \.safety.askBeforeUnindexedSort)])
         form.row("", [toggle("Warn when closing with an open transaction or pending edits", id: "settings.safety.warnOnClose",
-                             tip: "On by default: closing a tab or quitting asks first, so nothing is lost",
+                             tip: "Ask before closing a tab or quitting, so nothing is lost (on by default)",
                              \.safety.warnOnClose)])
         form.row("", [action("Restore Defaults", id: "settings.safety.restoreDefaults",
                              tip: "Put every switch and limit on this pane back to AirSQL's defaults") { [weak self] in

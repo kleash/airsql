@@ -107,9 +107,12 @@ extension AppTests {
             func needed(_ field: NSTextField) throws -> CGFloat {
                 try #require(field.cell).cellSize(forBounds: NSRect(x: 0, y: 0, width: .greatestFiniteMagnitude, height: field.bounds.height)).width
             }
+            var starts: Set<CGFloat> = []
+            defer { #expect(starts.count == 1, "the names line up: \(starts)") }
             for row in 0..<list.numberOfRows {
                 guard let cell = list.view(atColumn: 0, row: row, makeIfNecessary: true) as? ReconObjectCell else { continue }
                 cell.layoutSubtreeIfNeeded()
+                starts.insert(cell.name.frame.minX)
                 // What differs stays whole beside a long name: the name gives way first.
                 #expect(try needed(cell.what) <= cell.what.bounds.width + 1, "\(cell.what.stringValue) is cut beside \(cell.name.stringValue)")
                 // The 64-character name is shortened at any sensible width (its tooltip has it).

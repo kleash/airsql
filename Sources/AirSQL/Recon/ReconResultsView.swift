@@ -205,9 +205,9 @@ final class ReconObjectCell: NSTableCellView {
         setAccessibilityLabel("\(object.kind.rawValue) \(object.name), \(ReconReport.status(object, result))")
     }
 
-    /// The widest chip's width: its text and the chip's insets.
+    /// The widest chip's width: its text, its label's 2-point margins and the chip's 9-point insets.
     static let chipWidth = ["only left", "only right", "structure", "data", "match"].map {
-        NSAttributedString(string: $0, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width.rounded(.up) + 18
+        NSAttributedString(string: $0, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width.rounded(.up) + 22
     }.max() ?? 0
 
     static func chip(_ object: ReconObject) -> (String, ChipView.Style) {
