@@ -15,8 +15,6 @@ if [[ ! $version =~ Swift\ version\ ([0-9]+)[0-9.]* ]] || (( BASH_REMATCH[1] < 6
 fi
 # libmariadb, as build.sh gets it: when vendor/out is missing or was made by another version of its script.
 [ "$(cat vendor/out/stamp 2>/dev/null)" = "$(shasum -a 256 scripts/build-mariadb.sh | cut -d' ' -f1)" ] || scripts/build-mariadb.sh
-# One lab serves every checkout: used as it is while every service of it runs, else started by testenv/up.sh (which
-# refuses in a worktree).
 if [[ ${AIRSQL_LAB:-} == 1 ]]; then
     docker=/Applications/Docker.app/Contents/Resources/bin/docker
     [[ -x $docker ]] || docker=docker

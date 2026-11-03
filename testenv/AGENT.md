@@ -20,10 +20,10 @@ out of memory anyway, the kernel stops a lab server first, never another project
 
 One lab serves every checkout of the repository, and only the main checkout (git's first worktree, the parent of
 `git rev-parse --git-common-dir`) starts it: in another worktree `up.sh` refuses, as it would make a new key and CA
-there and point the lab's containers at that worktree's files, which go when the worktree does. `AIRSQL_LAB=1
-./test.sh` uses the lab as it is while every service of it runs, and runs `up.sh` only when one isn't running (in a
-worktree it then stops and says what to run in the main checkout). The tests in any worktree use the main checkout's
-key and certificates (`Lab.testenv`).
+there and point the lab's containers at that worktree's files, which go when the worktree does.
+`AIRSQL_LAB=1 ./test.sh` uses the lab as it is while every service of it runs, and runs `up.sh` only when one isn't
+running (in a worktree it then stops and says what to run in the main checkout). The tests in any worktree use the
+main checkout's key and certificates (`Lab.testenv`).
 
 ## Servers
 
