@@ -73,10 +73,16 @@ extension ConsoleViewController {
     /// What the results show before anything has run.
     func emptyResults() -> NSView {
         let view = NSView()
-        let connected = isConnected
-        let name = connection?.displayName ?? "a connection"
-        let text = connected ? "Run the statement at the cursor with ⌘↩, or every statement with ⇧⌘↩: the results show here."
-            : "Connect to “\(name)” to run SQL: double-click it in the sidebar."
+        let text: String
+        if isConnected {
+            text = "Run the statement at the cursor with ⌘↩, or every statement with ⇧⌘↩: the results show here."
+        } else if let connection {
+            text = "Connect to “\(connection.displayName)” to run SQL: double-click it in the sidebar."
+        } else if model.data.connections.isEmpty {
+            text = "Add a connection with File ▸ New Connection… (⌘N) to run SQL."
+        } else {
+            text = "Choose a connection for this console with Query ▸ Change Connection… to run SQL."
+        }
         let words = label(text, font: .systemFont(ofSize: 12.5), color: .secondaryLabelColor, wraps: true)
         words.alignment = .center
         words.setAccessibilityIdentifier("console.empty")

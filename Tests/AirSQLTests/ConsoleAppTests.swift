@@ -317,6 +317,23 @@ extension AppTests {
             #expect(commit.error?.contains("No transaction is open") == true, "\(commit.error ?? "")")
         }
 
+        /// A console without a connection says how to give it one: with Change Connection, or by adding the first.
+        @Test func aConsoleWithoutAConnectionSaysHowToGetOne() async throws {
+            func empty(_ main: MainWindowController) -> String? {
+                main.window?.layoutIfNeeded()
+                return main.selectedTab.flatMap { find(NSTextField.self, id: "console.empty", in: $0.content.view)?.stringValue }
+            }
+            let (main, _) = appWindow(testModel(Fixtures.shop))
+            main.openConsole(text: "SELECT 1", title: "orders.sql", connection: nil)
+            #expect(empty(main) == "Choose a connection for this console with Query ▸ Change Connection… to run SQL.")
+            let model = testModel()
+            let (first, _) = appWindow(model)
+            first.openConsole(text: "SELECT 1", title: "orders.sql", connection: nil)
+            #expect(empty(first) == "Add a connection with File ▸ New Connection… (⌘N) to run SQL.")
+            model.data.connections.append(Fixtures.local)
+            #expect(await eventually(timeout: 5) { empty(first)?.hasPrefix("Choose a connection") == true })
+        }
+
         /// A read-only connection's console refuses what AirSQL can't prove only reads before it sends anything: here to a
         /// connection that can't connect (nothing listens on port 1), so a statement sent would fail there instead.
         @Test func aReadOnlyConnectionsConsoleRefusesWhatMayWrite() async throws {

@@ -143,8 +143,12 @@ final class ConsoleViewController: NSViewController, TabContent {
         messagesView.onOpen = { [weak self] message in self?.reveal(message) }
         view = root
         showResults()
-        // Connecting or disconnecting changes what the results say; Settings ▸ Editor the text size.
+        // Connecting or disconnecting, or the first connection saved, changes what the results say; Settings ▸ Editor the
+        // text size.
         observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.showResults() } })
+        observers.append(model.$data.map(\.connections.isEmpty).removeDuplicates().dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.showResults() }
+        })
         observers.append(model.$data.map(\.settings.editorFontSize).removeDuplicates().dropFirst().sink { [weak self] size in
             guard let self, self.zoomedSize == nil else { return }
             self.editor.setFontSize(CGFloat(size))
