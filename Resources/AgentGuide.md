@@ -132,8 +132,9 @@ its own:
   list's Kill (the person's sheet) still works, as it changes no data.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
-  whether agents are allowed, and the client tools AirSQL runs. Other saved data (names, folders, settings) is refused
-  too while Settings ▸ Safety ▸ Ask before agents change anything is on. The Settings window is to look at.
+  whether agents are allowed, the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
+  rows per page, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
+  Ask before agents change anything is on. The Settings window is to look at.
 - **Files, the clipboard, trust:** you can't save a console's file, start an export, save a Liquibase changelog, save
   or remember a password, trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or
   `set` for text, and run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a

@@ -402,7 +402,7 @@ nothing runs.
 
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
-  tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result).
+  tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
 - Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](https://kleash.github.io/airsql/compare.html#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
@@ -435,6 +435,8 @@ unique key whose columns can't be NULL); so can an inner join's when every table
   console has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
 - After Apply, the edited rows are read back from the server, so the result shows what was stored; deleted rows go.
   New rows and pasting are for a table tab: open the table to add rows.
+- Edits not applied are never thrown away unasked: the next run keeps their result tab, and closing it, closing the
+  console, disconnecting or quitting asks first (unless the connection's Safety settings don't warn on close).
 - On a read-only connection nothing can be edited.
 
 ### Edit INSERT statements as a table
@@ -457,7 +459,8 @@ works out. Change them as you like, then **Apply**: it always shows the SQL firs
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
 - Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
-- Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes not yet applied.
+- Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes and result edits not yet
+  applied.
 
 On a [read-only connection](https://kleash.github.io/airsql/connections.html#add-or-edit-a-connection), Run, Explain and Profile refuse any statement
 AirSQL can't prove only reads (SELECT, WITH … SELECT, SHOW, DESCRIBE, EXPLAIN and USE pass), and Messages says why.
@@ -886,7 +889,8 @@ up.
   on a cell you can't edit opens it too.
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
   (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
-  on a row's number opens it. In a table, its values can be edited there as in the grid.
+  on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
+  console result shows the grid again, as does an Apply that deletes the row.
 - **View ▸ Transpose** (⌥⌘T) turns rows into columns, with the column names down the left: handy for comparing a few
   wide rows. A console result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.
@@ -1782,8 +1786,9 @@ its own:
   list's Kill (the person's sheet) still works, as it changes no data.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
-  whether agents are allowed, and the client tools AirSQL runs. Other saved data (names, folders, settings) is refused
-  too while Settings ▸ Safety ▸ Ask before agents change anything is on. The Settings window is to look at.
+  whether agents are allowed, the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
+  rows per page, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
+  Ask before agents change anything is on. The Settings window is to look at.
 - **Files, the clipboard, trust:** you can't save a console's file, start an export, save a Liquibase changelog, save
   or remember a password, trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or
   `set` for text, and run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a

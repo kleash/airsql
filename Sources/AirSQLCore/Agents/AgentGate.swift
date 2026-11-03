@@ -57,7 +57,10 @@ extension AgentGate {
     public static func personOnlyChange(from old: AirSQLData, to new: AirSQLData) -> String? {
         if old.settings.safety != new.settings.safety { return "the safety settings" }
         if old.settings.agentsAllowed != new.settings.agentsAllowed { return "whether agents may use AirSQL" }
-        if personsPart(old.settings) != personsPart(new.settings) { return "the client tools AirSQL runs" }
+        if old.settings.clientPath != new.settings.clientPath || old.settings.dumpPath != new.settings.dumpPath {
+            return "the client tools AirSQL runs"
+        }
+        if personsPart(old.settings) != personsPart(new.settings) { return "these settings" }
         for connection in new.connections {
             let before = old.connection(connection.id) ?? SavedConnection(id: connection.id)
             if before.agentAccess != connection.agentAccess || before.agentSampleRows != connection.agentSampleRows {

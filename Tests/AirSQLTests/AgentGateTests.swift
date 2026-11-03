@@ -55,6 +55,21 @@ import Testing
             #expect(declined?.message == AgentGate.declined)
         }
     }
+
+    /// A refused settings change names what it was: the client tools for their paths, the settings for the rest; the
+    /// look of the app is anyone's.
+    @Test func personOnlySettingsSayWhatTheyAre() {
+        func change(_ edit: (inout AppSettings) -> Void) -> String? {
+            var new = AirSQLData()
+            edit(&new.settings)
+            return AgentGate.personOnlyChange(from: AirSQLData(), to: new)
+        }
+        #expect(change { $0.clientPath = "/usr/local/bin/mysql" } == "the client tools AirSQL runs")
+        #expect(change { $0.dumpPath = "/usr/local/bin/mysqldump" } == "the client tools AirSQL runs")
+        #expect(change { $0.liquibase.author = "someone" } == "these settings")
+        #expect(change { $0.transposeSingleRow.toggle() } == "these settings")
+        #expect(change { $0.gridFontSize = 15 } == nil)
+    }
 }
 
 /// The driver's own check, with whatever approver the app set (none, or a service's that has closed): among the app tests,
