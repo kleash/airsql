@@ -164,4 +164,48 @@ extension DataGridView {
         guard rowCount > 0, columnCount > 0 else { return }
         selection.selectAll()
     }
+
+    /// ⌥↑: the focused cell's column, then its row, then everything.
+    @objc func extendSelection(_ sender: Any?) { selection.grow() }
+    /// ⌥↓: back from everything to the row, the column and the cell.
+    @objc func shrinkSelection(_ sender: Any?) { selection.shrink() }
+
+    override func scrollWheel(with event: NSEvent) {
+        super.scrollWheel(with: Self.scroll(event))
+    }
+
+    /// ⇧ scrolls a mouse wheel across; ⌥ scrolls five times as far (grid-spec §2).
+    static func scroll(_ event: NSEvent) -> NSEvent {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags == .shift || flags == .option, let changed = event.cgEvent?.copy() else { return event }
+        // Lines, then points last: setting the lines works the points out again.
+        let axes: [(down: CGEventField, across: CGEventField)] = [
+            (.scrollWheelEventDeltaAxis1, .scrollWheelEventDeltaAxis2),
+            (.scrollWheelEventFixedPtDeltaAxis1, .scrollWheelEventFixedPtDeltaAxis2),
+            (.scrollWheelEventPointDeltaAxis1, .scrollWheelEventPointDeltaAxis2),
+        ]
+        let deltas = axes.map { (changed.getDoubleValueField($0.down), changed.getDoubleValueField($0.across)) }
+        for (axis, delta) in zip(axes, deltas) {
+            var (down, across) = delta
+            if flags == .shift, across == 0 { (down, across) = (0, down) }  // unless macOS turned it already
+            if flags == .option { (down, across) = (down * 5, across * 5) }
+            changed.setDoubleValueField(axis.down, value: down)
+            changed.setDoubleValueField(axis.across, value: across)
+        }
+        return NSEvent(cgEvent: changed) ?? event
+    }
+}
+
+extension DataGridView: NSMenuItemValidation {
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(extendSelection(_:)), #selector(shrinkSelection(_:)):
+            // Not while a cell is edited: there ⌥↑ and ⌥↓ move in the text.
+            let enabled = window?.firstResponder === self && selection.cursor != nil
+            item.explain(enabled: enabled, reason: "Select a cell in the grid first")
+            return enabled
+        default:
+            return true
+        }
+    }
 }

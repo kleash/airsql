@@ -46,9 +46,10 @@ final class GridHeaderView: NSView {
         return ceil(max(name, type)) + 8 + 4 + Self.sortWidth
     }
 
-    /// A display column's left and right edges here.
+    /// A display column's left and right edges here (frozen columns stay where they are).
     func edges(_ column: Int) -> (left: CGFloat, right: CGFloat) {
-        (grid.offsets[column] - scrolled, grid.offsets[column + 1] - scrolled)
+        let shift = column < grid.frozenColumns ? 0 : scrolled
+        return (grid.offsets[column] - shift, grid.offsets[column + 1] - shift)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -57,13 +58,17 @@ final class GridHeaderView: NSView {
         dirtyRect.fill()
         let pixel = 1 / (window?.backingScaleFactor ?? 2)
         if let source = grid.source {
-            let focused = grid.isFocused
-            for column in grid.columns(in: dirtyRect.offsetBy(dx: scrolled, dy: 0)) {
+            let focused = grid.isFocused, frozen = min(grid.frozenColumns, grid.columnCount)
+            // The frozen columns last, over the ones scrolled under them.
+            for column in grid.columns(in: dirtyRect.offsetBy(dx: scrolled, dy: 0)).filter({ $0 >= frozen }) + Array(0..<frozen) {
                 let (left, right) = edges(column)
                 let rect = NSRect(x: left, y: 0, width: right - left, height: bounds.height)
                 let sourceColumn = grid.columnOrder[column], info = source.columns[sourceColumn]
                 if grid.selection.containsColumn(column) {
                     (focused ? NSColor.selectedRow : .unemphasizedSelectedContentBackgroundColor).solid.setFill()
+                    rect.fill()
+                } else if column < frozen {
+                    NSColor.bar.solid.setFill()
                     rect.fill()
                 }
                 drawLabels(info, in: rect)
@@ -170,11 +175,15 @@ final class GridHeaderView: NSView {
     }
 
     /// The display column under a point.
-    func column(at point: NSPoint) -> Int? { grid.column(atX: point.x + scrolled) }
+    func column(at point: NSPoint) -> Int? {
+        point.x < grid.frozenWidth ? grid.column(atX: point.x) : grid.column(atX: point.x + scrolled)
+    }
 
     /// The display column whose right border is within 4 points of a point.
     func border(at point: NSPoint) -> Int? {
-        grid.columns(in: NSRect(x: point.x + scrolled - 4, y: 0, width: 8, height: 1)).first { abs(edges($0).right - point.x) <= 4 }
+        let frozen = Array(0..<min(grid.frozenColumns, grid.columnCount))
+        let near = !frozen.isEmpty && point.x < grid.frozenWidth + 4 ? frozen : Array(grid.columns(in: NSRect(x: point.x + scrolled - 4, y: 0, width: 8, height: 1)))
+        return near.first { abs(edges($0).right - point.x) <= 4 }
     }
 
     private func isInSortControl(_ point: NSPoint, _ column: Int) -> Bool {

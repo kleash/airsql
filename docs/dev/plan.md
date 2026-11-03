@@ -170,10 +170,11 @@ P0 builds and freezes, so lanes plug in instead of inventing:
 - **Spike outcome (P0-6):** the grid is the scroll view's document view, as big as all its cells, drawing only the
   rect AppKit asks for; no line or glyph cache (one was built and changed nothing, R19). The header and row numbers
   are plain views beside the scroll view (a screen adds `grid.containerView`), not rulers, which macOS 26 lays over
-  the cells and redraws on every frame. Scrolling down meets 120 Hz for 1,000,000 × 50 and for 300 columns;
-  scrolling across 300 columns doesn't (about 11 ms a frame: AppKit draws the visible text again on each step). The
-  fallback, for L3 to evaluate with its 300-column tables: redraw the visible area each frame from a `CTLine` cache
-  (a median 2.9 ms a frame at full screen in the spike), or a tiled `CALayer` document.
+  the cells and redraws on every frame. Scrolling down met 120 Hz for 1,000,000 × 50 and for 300 columns;
+  scrolling across 300 columns didn't (about 11 ms a frame: AppKit renders the visible part again on each step). The
+  fallback taken: a tiled `CALayer` document (`GridTiles`): the cells show in 512 × 128 pt layers drawn once,
+  asynchronously, and moved as the grid scrolls; every direction now meets 120 Hz (numbers in grid-spec §8). A
+  `CTLine` cache redrawing the visible area each frame was measured too and dropped (7 ms a frame).
 
 ### 2.6 Console
 
@@ -459,7 +460,7 @@ wave.
 
 | Risk | Mitigation |
 |---|---|
-| Custom grid misses targets | Spike gate in P0; scrolling across 300 columns missed it, fallback in §2.5 for L3 |
+| Custom grid misses targets | Spike gate in P0; scrolling across 300 columns missed it until the grid drew in tiles (§2.5) |
 | TLS verification through tunnels | P0-2 proves the callback or adds a small patch; lab certificates test both outcomes |
 | libmariadb build with Command Line Tools | P0-1 first; CMake pinned like AirSCP's FreeRDP script; vendor cache shared by worktrees |
 | Agent writes or reads beyond access | Fail-closed gate in `DBConnection`, person-only settings, redaction, attack corpus |

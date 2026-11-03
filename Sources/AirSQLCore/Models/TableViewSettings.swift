@@ -26,6 +26,8 @@ public struct TableViewSettings: Codable, Equatable {
     public var displayTypes: [String: String] = [:]
     /// The columns' order on screen, by name, as last arranged (hidden ones too); [] for the table's own order.
     public var order: [String] = []
+    /// How many columns, from the first shown, stay in view while the grid scrolls across (Freeze).
+    public var frozenColumns = 0
 
     public static let recentLimit = 20
 
@@ -50,6 +52,7 @@ public struct TableViewSettings: Codable, Equatable {
         widths = try container.decodeIfPresent([String: Double].self, forKey: .widths) ?? [:]
         displayTypes = try container.decodeIfPresent([String: String].self, forKey: .displayTypes) ?? [:]
         order = try container.decodeIfPresent([String].self, forKey: .order) ?? []
+        frozenColumns = try container.decodeIfPresent(Int.self, forKey: .frozenColumns) ?? 0
     }
 }
 
