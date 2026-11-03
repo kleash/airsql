@@ -10,7 +10,7 @@ a few options. Passwords go in your Keychain, never in AirSQL's files.
 
 ## Add or edit a connection
 
-Choose **File ▸ New Connection…** (⌘N), or select a connection and choose **Connection ▸ Edit…**. The editor has five
+Choose **File ▸ New Connection…** (⌘N), or select a connection and choose **Connection ▸ Edit…**. The editor has six
 tabs:
 
 - **General**: a name, the sidebar folder, a colour (Production also turns on the strict safety checks), the host and
@@ -22,12 +22,19 @@ tabs:
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
-- **Options**: read-only (writes from the console, the grid and agents are refused), the compressed protocol, a query
-  timeout, the databases shown (names or patterns such as `shop, reports_*`), startup SQL that runs after each login
-  (for example `SET time_zone = '+00:00';`), the connection's own client tools (empty: Settings ▸ Client Tools'
-  choice; each says which program and version it is, or why it can't be used), and safety checks of the connection's
-  own.
+- **Options**: read-only (below), the compressed protocol, a query timeout, the databases shown (names or patterns
+  such as `shop, reports_*`), startup SQL that runs after each login (for example `SET time_zone = '+00:00';`), and the
+  connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
+  why it can't be used).
+- **Safety**: safety checks of the connection's own: every switch and limit of [Settings ▸ Safety](settings.md#safety),
+  starting from the ones that applied, with a shield beside its name in the sidebar.
 - **Agents**: what AI agents may do with this connection.
+
+A **read-only** connection's sessions are read-only on the server, and AirSQL itself runs on it only statements it can
+prove only read: SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN (as [read-only queries](read-only-queries.md)
+decide), and USE. Anything else is refused before it is sent, with the reason, from the console, the navigator, a
+compare's sync script, Restore, Run SQL File and CSV import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
+it. The grid and the editors don't apply changes to it, and agents can't write to it either.
 
 **Test Connection** connects with what the editor shows, reports each hop with its time, and disconnects. **Save and
 Connect** saves and connects; **Save** only saves.

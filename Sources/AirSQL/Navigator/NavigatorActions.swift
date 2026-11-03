@@ -85,6 +85,12 @@ enum NavigatorActions {
     static func confirmAndRun(_ request: SQLPreviewRequest, on open: OpenConnection, window: NSWindow?, ask: Bool = true,
                               refreshing objects: [SchemaObject], done: (([[StatementResult]]) -> Void)? = nil) {
         let saved = open.model?.connection(open.id)
+        // A read-only connection runs only what only reads, whatever a menu let through.
+        if let saved, saved.readOnly, let refusal = request.change.statements.lazy.compactMap({
+            StatementCheck.readOnlyRefusal($0, on: saved.displayName, noBackslashEscapes: request.noBackslashEscapes)
+        }).first {
+            return showError(refusal, title: "Couldn't \(request.actionTitle.lowercased())", on: window)
+        }
         // The change is saved as a changeset only once it has run (the preview's box).
         let run: (Bool) -> Void = { changeset in
             Task {

@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 /// The editor's SSH and Proxy tab (mockup screen 5): the route, the proxy, the jump hosts and the SSH host, and the
-/// path the connection takes; and the Options tab's safety checks.
+/// path the connection takes; and the Safety tab.
 extension ConnectionEditor {
     func routeTab() -> NSView {
         if draft.route == .sshJump && draft.jumpHosts.isEmpty { draft.jumpHosts = [SSHHop()] }
@@ -106,11 +106,11 @@ extension ConnectionEditor {
         }
     }
 
-    // MARK: Safety (the Options tab)
+    // MARK: Safety
 
     /// The connection's own safety checks, or a note that it uses the ones that apply to it.
-    func safetyRows(_ form: Form) {
-        form.heading("Safety checks")
+    func safetyTab() -> NSView {
+        let form = Form()
         let own = checkbox("Own safety checks for this connection", id: "editor.ownSafety",
                            tip: "Use checks of its own instead of Settings ▸ Safety (or the Production preset)",
                            on: draft.safety != nil, target: nil, action: nil)
@@ -122,7 +122,7 @@ extension ConnectionEditor {
         guard draft.safety != nil else {
             form.row("", [own], caption: draft.colour == .production ? "Uses the strict Production preset."
                 : "Uses Settings ▸ Safety.")
-            return
+            return content(form)
         }
         form.row("", [own])
         let toggles: [(String, WritableKeyPath<SavedConnection, Bool>, String)] = [
@@ -131,21 +131,34 @@ extension ConnectionEditor {
             ("Show the SQL before the grid's Apply", \.safety!.previewBeforeApply, "previewApply"),
             ("Ask before DROP or TRUNCATE", \.safety!.askBeforeDrop, "drop"),
             ("Type a table's name to drop or empty it", \.safety!.typeNameForTables, "typeTableName"),
+            ("Ask before restoring into a database that has tables", \.safety!.askBeforeRiskyRestore, "restore"),
+            ("Ask before sorting a large table by a column without an index", \.safety!.askBeforeUnindexedSort, "unindexedSort"),
+            ("Warn when closing with an open transaction or pending edits", \.safety!.warnOnClose, "warnOnClose"),
             ("Ask before agents change anything", \.safety!.askBeforeAgentChanges, "agentChanges"),
         ]
         for (title, path, id) in toggles {
             form.row("", [toggle(title, path, id: "editor.safety." + id, tip: "Turn this check on or off for this connection")])
         }
+        form.row("Agents' queries", [label("At most", color: .secondaryLabelColor),
+                                     count(\.safety!.agentRowCap, id: "editor.safety.agentRowCap",
+                                           tip: "Type the most rows an agent's query returns on this connection",
+                                           range: 1...1_000_000, width: 90),
+                                     label("rows and", color: .secondaryLabelColor),
+                                     count(\.safety!.agentTimeout, id: "editor.safety.agentTimeout",
+                                           tip: "Type how many seconds an agent's query may run on this connection", range: 1...3_600),
+                                     label("seconds", color: .secondaryLabelColor)])
         form.row("Open transaction", [label("Warn after", color: .secondaryLabelColor),
                                       count(\.safety!.openTransactionMinutes, id: "editor.safety.openTransaction",
                                             tip: "Warn when a transaction stays open this long; keep-alive stops for it then",
                                             range: 1...1_440),
                                       label("minutes", color: .secondaryLabelColor)])
+        return content(form)
     }
 
     /// A whole number between `range`'s ends.
-    private func count(_ path: WritableKeyPath<SavedConnection, Int>, id: String, tip: String, range: ClosedRange<Int>) -> NSTextField {
-        let field = textField(String(draft[keyPath: path]), placeholder: String(range.lowerBound), id: id, tip: tip, width: 64)
+    private func count(_ path: WritableKeyPath<SavedConnection, Int>, id: String, tip: String, range: ClosedRange<Int>,
+                       width: CGFloat = 64) -> NSTextField {
+        let field = textField(String(draft[keyPath: path]), placeholder: String(range.lowerBound), id: id, tip: tip, width: width)
         field.alignment = .right
         bind(field) { [weak self] in
             guard let self else { return }

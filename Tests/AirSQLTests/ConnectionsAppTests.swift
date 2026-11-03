@@ -74,8 +74,34 @@ extension AppTests {
         #expect(model.connection(Fixtures.staging.id)?.clientPath == "/nonexistent/bin/mysql")
     }
 
-    /// The editor's tallest tab (Options with the connection's own safety checks) scrolls within what an 800 pt high
-    /// screen leaves, so the sheet fits there; on a taller screen it shows all of it.
+    /// A connection's own safety checks start from the settings that applied (Settings ▸ Safety, its row cap changed
+    /// here) and cover every switch and limit there: the restore, sort and close prompts and the agents' limits too.
+    @Test func ownSafetyChecksStartFromSettingsAndCoverEverySwitch() async throws {
+        let model = testModel(Fixtures.shop)
+        model.data.settings.safety.agentRowCap = 7_777
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Local MariaDB 11.8"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let sheet = try #require(await editor(main))
+        #expect(await call(harness, "press", ["title": "Safety"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.ownSafety", "value": true]).error == nil)
+        #expect(sheet.draft.safety?.agentRowCap == 7_777)
+        let changes: [(String, Any)] = [("editor.safety.restore", false), ("editor.safety.unindexedSort", false),
+                                        ("editor.safety.warnOnClose", false), ("editor.safety.agentRowCap", "500"),
+                                        ("editor.safety.agentTimeout", "20")]
+        for (id, value) in changes {
+            #expect(await call(harness, "set", ["id": id, "value": value]).error == nil, "\(id)")
+        }
+        #expect(await call(harness, "press", ["id": "editor.save"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        let safety = try #require(model.connection(Fixtures.local.id)?.safety)
+        #expect(!safety.askBeforeRiskyRestore && !safety.askBeforeUnindexedSort && !safety.warnOnClose)
+        #expect(safety.agentRowCap == 500 && safety.agentTimeout == 20)
+        #expect(safety.askBeforeUnboundedWrite && safety.openTransactionMinutes == 15, "the others as Settings ▸ Safety has them")
+    }
+
+    /// The editor's tallest tab (Safety, with the connection's own checks) scrolls within what an 800 pt high screen
+    /// leaves, so the sheet fits there; on a taller screen it shows all of it.
     @Test func editorFitsAnEightHundredPointScreen() async throws {
         var connection = Fixtures.routed(long: true)
         connection.safety = connection.safety(defaults: SafetySettings())
@@ -83,7 +109,7 @@ extension AppTests {
         let (main, harness) = appWindow(model)
         let editor = ConnectionEditor.show(connection, isNew: false, model: model, on: try #require(main.window)) { _, _ in }
         _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-        editor.show(.options)
+        editor.show(.safety)
         let window = try #require(editor.window)
         let tab = try #require(editor.tabHeight).constant
         // 775 pt under the menu bar, the main window's 52 pt title bar and toolbar above the sheet.

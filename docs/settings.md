@@ -29,8 +29,8 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## Safety
 
-What asks first before data changes. These are the defaults; a connection can have its own, and a connection
-coloured Production starts with a strict preset.
+What asks first before data changes. These are the defaults; a connection can have its own (every switch and limit
+below, in its Safety tab), and a connection coloured Production starts with a strict preset.
 
 | Setting | Default | Production |
 |---|---|---|

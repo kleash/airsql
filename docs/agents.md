@@ -59,7 +59,7 @@ Whatever that would change waits for you:
 - On connections whose agent access doesn't include reading, grids and results are hidden from the agent's snapshots
   and screenshots.
 
-**Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Options tab) turns the
+**Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Safety tab) turns the
 asking off; what is yours alone stays yours.
 
 ## See what agents did

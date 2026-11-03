@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 /// Settings ▸ Safety (plan §2.10): what asks first, on by default. These are the defaults: a connection can have its
-/// own in its Options tab, and one coloured Production starts with the strict preset. Agents can never change them.
+/// own in its Safety tab, and one coloured Production starts with the strict preset. Agents can never change them.
 final class SafetyPane: SettingsPaneController {
     override var helpPage: HelpPage { .safety }
 
@@ -61,7 +61,7 @@ final class SafetyPane: SettingsPaneController {
                              tip: "Put every switch and limit on this pane back to AirSQL's defaults") { [weak self] in
             self?.model.data.settings.safety = SafetySettings()
             self?.reloadPane()
-        }], caption: "A connection can override these in its Options tab. One coloured Production starts strict: console writes "
+        }], caption: "A connection can override these in its Safety tab. One coloured Production starts strict: console writes "
             + "ask, Apply shows its SQL, tables need their names typed, agents get 1,000 rows and 15 seconds. Read-only is a "
             + "switch of each connection.")
     }
