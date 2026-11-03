@@ -41,6 +41,9 @@ extension AppTests {
     @Test func agentsSeeOnlyWhatEachConnectionAllows() async throws {
         let model = testModel(Self.agentConnections())
         let service = AgentService(model: model, main: nil, directory: URL(fileURLWithPath: try scratch() + "/agent"))
+        #expect(text(await service.handle("context", [:], client: "test 1")).contains("agents are off"))
+        model.data.settings.agentsAllowed = true
+        defer { service.close() }
         let context = Self.structured(await service.handle("context", [:], client: "test 1"))
         let names = (context["connections"] as? [[String: Any]])?.compactMap { $0["connection"] as? String }
         #expect(names == ["Reports", "Staging"] && context["hiddenConnections"] as? Int == 1)
@@ -58,7 +61,7 @@ extension AppTests {
 
         #expect(service.events.count == 5 && service.events.filter(\.failed).count == 4)
         #expect(service.events.first?.summary == "context" && service.events[2].summary.hasPrefix("run_queries · SELECT 1"))
-        #expect(model.agentStatus == nil || model.agentStatus == "Agents off", "agents are off in Settings")
+        #expect(model.agentStatus?.hasPrefix("test 1 · describe") == true)
     }
 
     @Test func theSocketFollowsTheSetting() async throws {
@@ -79,10 +82,37 @@ extension AppTests {
         #expect(!FileManager.default.fileExists(atPath: folder + "/sock") && model.agentStatus == "Agents off")
     }
 
+    @Test func agentsReachTheAppThroughAirSQLMCP() async throws {
+        let model = testModel(Self.agentConnections())
+        let support = try scratch()
+        let service = AgentService(model: model, main: nil, directory: URL(fileURLWithPath: support + "/agent"))
+        model.data.settings.agentsAllowed = true
+        #expect(await eventually(timeout: 5) { service.isListening })
+        let messages = try await mcp([
+            request(1, "initialize", ["protocolVersion": "2025-06-18", "clientInfo": ["name": "claude-code", "version": "2"]]),
+            request(2, "tools/call", ["name": "context", "arguments": [:]]),
+            request(3, "tools/call", ["name": "get_schema", "arguments": ["connection": "Production"]]),
+            request(4, "tools/call", ["name": "run_queries", "arguments": ["connection": "Staging", "queries": [["sql": "SELECT 1"]]]]),
+            request(5, "resources/list"),
+        ], support: support)
+        let context = try #require(result(messages, 2))
+        let structured = try #require(context["structuredContent"] as? [String: Any])
+        #expect((structured["connections"] as? [[String: Any]])?.count == 2 && context["isError"] as? Bool == false)
+        #expect(text(context) == AgentJSON.text(structured), "the same JSON as text")
+        #expect(result(messages, 3)?["isError"] as? Bool == true && result(messages, 3)?["structuredContent"] == nil)
+        #expect(text(try #require(result(messages, 4))).contains("needs Schema + read"))
+        #expect((result(messages, 5)?["resources"] as? [Any])?.isEmpty == true, "nothing is connected")
+        #expect(service.events.map(\.client).allSatisfy { $0 == "claude-code 2" })
+        model.data.settings.agentsAllowed = false
+        #expect(await eventually(timeout: 5) { !service.isListening })
+    }
+
     @Test func consoleTabsTakeProposalsAndShowWhatRan() async throws {
         let model = testModel(Self.agentConnections())
         let (main, _) = appWindow(model)
         let service = AgentService(model: model, main: main, directory: URL(fileURLWithPath: try scratch() + "/agent"))
+        model.data.settings.agentsAllowed = true
+        defer { service.close() }
         let refused = await service.handle("open_in_console", ["sql": "UPDATE t SET a = 1"], client: "test")
         #expect(text(refused).contains("no console yet"))
 

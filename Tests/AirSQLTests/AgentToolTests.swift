@@ -36,7 +36,7 @@ struct AgentToolTests {
     }
 
     @Test func agentsSQLIsRefusedUntilTheClassifierIsInTheBuild() {
-        #expect(AgentReadOnly.untilClassifier("SELECT 1") != nil)
+        #expect(AgentReadOnly.untilClassifier("SELECT 1", false) != nil)
     }
 
     @Test func limitsFollowTheSafetySettingsAndAnalytics() {

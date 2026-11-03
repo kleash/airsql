@@ -6,7 +6,7 @@ import Foundation
 /// app's agent socket (`AgentSocket`), whose progress lines become `notifications/progress`. The tool list and the
 /// guide live here, so an MCP client sees them even when AirSQL starts after it.
 public enum AgentBridge {
-    static let offMessage = "AirSQL isn't running, or agents are off (AirSQL ▸ Settings ▸ Agents ▸ Allow AI agents to "
+    public static let offMessage = "AirSQL isn't running, or agents are off (AirSQL ▸ Settings ▸ Agents ▸ Allow AI agents to "
         + "use AirSQL)."
     static let busyMessage = "AirSQL didn't answer: it may be busy or quitting. Try again."
 

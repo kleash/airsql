@@ -73,6 +73,7 @@ public enum AgentReply {
     }
 
     public static func message(_ error: Error) -> String {
+        if error is CancellationError { return "Cancelled by the person at the Mac." }
         guard let error = error as? AirSQLError else { return error.localizedDescription }
         return error.details.isEmpty || error.message == error.details ? error.message : error.message + " " + error.details
     }

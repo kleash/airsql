@@ -78,6 +78,7 @@ final class AgentService {
 
     func handle(_ tool: String, _ arguments: [String: Any], client: String,
                 progress: @escaping AgentProgress = { _, _, _ in }) async -> [String: Any] {
+        guard model.data.settings.agentsAllowed else { return AgentBridge.failure(AgentBridge.offMessage) }
         if tool == "resources/list" { return ["resources": resources()] }
         let index = record(client, summary(tool, arguments))
         do {
@@ -103,11 +104,16 @@ final class AgentService {
             default: throw AirSQLError(.other, "AirSQL has no tool “\(tool)”.")
             }
             finish(index, Self.outcome(tool, structured))
-            return AgentReply.success(structured)
+            return await Self.reply(structured)
         } catch {
             finish(index, AgentReply.message(error), failed: true)
             return tool == "resources/read" ? ["error": AgentReply.message(error)] : AgentReply.failure(error)
         }
+    }
+
+    /// The result with its JSON text, made off the main thread (a big result takes a while).
+    nonisolated private static func reply(_ structured: [String: Any]) async -> [String: Any] {
+        AgentReply.success(structured)
     }
 
     /// Runs database work for a call, listed in Activity with Cancel (which stops the agent session's statement).
@@ -171,14 +177,14 @@ final class AgentService {
 
     // MARK: The activity list
 
-    private func record(_ client: String, _ summary: String) -> Int {
+    func record(_ client: String, _ summary: String) -> Int {
         events.append(AgentEvent(time: Date(), client: client, summary: summary))
         if events.count > Self.eventLimit { events.removeFirst(events.count - Self.eventLimit) }
         updateStatus()
         return events.count - 1
     }
 
-    private func finish(_ index: Int, _ outcome: String, failed: Bool = false) {
+    func finish(_ index: Int, _ outcome: String, failed: Bool = false) {
         guard events.indices.contains(index) else { return }
         events[index].outcome = outcome
         events[index].failed = failed

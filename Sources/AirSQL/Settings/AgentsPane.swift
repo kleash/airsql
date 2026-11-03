@@ -12,8 +12,6 @@ final class AgentsPane: SettingsPaneController {
     static var supportDir: String? { Env.value("SUPPORT_DIR").flatMap { $0.isEmpty ? nil : $0 } }
     /// Where Claude Code's and Gemini CLI's settings are; tests use a scratch folder.
     var home = FileManager.default.homeDirectoryForCurrentUser
-    /// Keeps the access rows' targets alive.
-    private var accessBindings: [Binding] = []
 
     override func build() {
         form.row("", [toggle("Allow AI agents to use AirSQL", id: "settings.agentsAllowed",
@@ -58,62 +56,90 @@ final class AgentsPane: SettingsPaneController {
 
     // MARK: Access per connection
 
-    /// A row per connection, by name: its access level and the sample rows switch.
+    /// The connections, by name, each with its access level and sample rows switch: a table, so a thousand stay quick.
     private func accessList() -> NSView {
-        let connections = model.data.connections.sorted {
-            $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
-        }
-        guard !connections.isEmpty else {
+        guard !model.data.connections.isEmpty else {
             return caption("No connections yet: add one, then choose here what agents may do with it.")
         }
-        let grid = NSGridView(numberOfColumns: 3, rows: 0)
-        grid.rowSpacing = 6
-        grid.columnSpacing = 10
-        grid.rowAlignment = .firstBaseline
-        for connection in connections {
-            let name = label(connection.displayName, truncates: true)
-            name.toolTip = connection.displayName
-            name.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
-            let level = popup(AgentAccess.allCases.map(\.title),
-                              selected: AgentAccess.allCases.firstIndex(of: connection.agentAccess) ?? 0,
-                              id: "settings.agentAccess", tip: "Choose what agents may do with \(connection.displayName)",
-                              target: nil, action: nil)
-            let samples = checkbox("Sample rows", id: "settings.agentSampleRows",
-                                   tip: "Let describe show agents a few rows of \(connection.displayName)'s tables",
-                                   on: connection.agentSampleRows, target: nil, action: nil)
-            samples.isEnabled = connection.agentAccess != .off
-            let id = connection.id
-            let binding = Binding { [weak self] _ in
-                guard let self, var saved = self.model.connection(id), level.indexOfSelectedItem >= 0 else { return }
-                saved.agentAccess = AgentAccess.allCases[level.indexOfSelectedItem]
-                saved.agentSampleRows = samples.state == .on
-                samples.isEnabled = saved.agentAccess != .off
-                self.model.save(saved)
-            }
-            accessBindings.append(binding)
-            for control in [level, samples] as [NSControl] {
-                control.target = binding
-                control.action = #selector(Binding.act(_:))
-            }
-            grid.addRow(with: [name, level, samples])
+        let table = NSTableView()
+        table.dataSource = accessTable
+        table.delegate = accessTable
+        accessTable.model = model
+        for (id, title, width) in [("name", "Connection", 180.0), ("access", "Access", 190.0), ("samples", "Sample rows", 90.0)] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
+            column.title = title
+            column.width = width
+            table.addTableColumn(column)
         }
-        grid.translatesAutoresizingMaskIntoConstraints = false
-        grid.layoutSubtreeIfNeeded()
-        let size = grid.fittingSize
-        guard size.height > 150 else { return grid }
-        // Many connections: they scroll.
+        table.rowHeight = 24
+        table.usesAlternatingRowBackgroundColors = true
+        table.allowsColumnReordering = false
+        table.setAccessibilityIdentifier("settings.agentAccessList")
         let scroll = NSScrollView()
-        scroll.documentView = grid
+        scroll.documentView = table
         scroll.hasVerticalScroller = true
-        scroll.drawsBackground = false
+        scroll.borderType = .bezelBorder
         scroll.translatesAutoresizingMaskIntoConstraints = false
+        let rows = CGFloat(min(model.data.connections.count, 6))
         NSLayoutConstraint.activate([
-            scroll.widthAnchor.constraint(equalToConstant: size.width + 16),
-            scroll.heightAnchor.constraint(equalToConstant: 150),
-            grid.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
-            grid.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            scroll.widthAnchor.constraint(equalToConstant: 400),
+            scroll.heightAnchor.constraint(equalToConstant: rows * 26 + 28),
         ])
         return scroll
+    }
+
+    private let accessTable = AccessTable()
+
+    /// The access table's rows: made as they scroll into view; each change is saved at once.
+    @MainActor final class AccessTable: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+        weak var model: AppModel?
+
+        private var connections: [SavedConnection] {
+            (model?.data.connections ?? []).sorted {
+                $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+            }
+        }
+
+        func numberOfRows(in tableView: NSTableView) -> Int { connections.count }
+
+        func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
+            let connection = connections[row]
+            switch column?.identifier.rawValue {
+            case "name":
+                let name = label(connection.displayName, truncates: true)
+                name.toolTip = connection.displayName
+                return name
+            case "access":
+                let level = popup(AgentAccess.allCases.map(\.title),
+                                  selected: AgentAccess.allCases.firstIndex(of: connection.agentAccess) ?? 0,
+                                  id: "settings.agentAccess", tip: "Choose what agents may do with \(connection.displayName)",
+                                  target: self, action: #selector(changed(_:)))
+                level.controlSize = .small
+                level.tag = row
+                return level
+            default:
+                let samples = checkbox("", id: "settings.agentSampleRows",
+                                       tip: "Let describe show agents a few rows of \(connection.displayName)'s tables",
+                                       on: connection.agentSampleRows, target: self, action: #selector(changed(_:)))
+                samples.isEnabled = connection.agentAccess != .off
+                samples.tag = row
+                return samples
+            }
+        }
+
+        /// A row's pop-up or checkbox changed: saves that connection.
+        @objc func changed(_ sender: NSControl) {
+            guard let model, connections.indices.contains(sender.tag) else { return }
+            var saved = connections[sender.tag]
+            if let level = sender as? NSPopUpButton, level.indexOfSelectedItem >= 0 {
+                saved.agentAccess = AgentAccess.allCases[level.indexOfSelectedItem]
+            } else if let box = sender as? NSButton {
+                saved.agentSampleRows = box.state == .on
+            }
+            model.save(saved)
+            (sender.enclosingScrollView?.documentView as? NSTableView)?
+                .reloadData(forRowIndexes: [sender.tag], columnIndexes: [2])
+        }
     }
 
     // MARK: Setup

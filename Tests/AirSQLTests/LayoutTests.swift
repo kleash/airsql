@@ -178,6 +178,14 @@ extension AppTests {
             defer { work.end() }
             main.select(main.tabs[0])
             check(window, "tabs and status")
+            let agents = AgentService(model: model, main: main, directory: URL(fileURLWithPath: try scratch() + "/agent"))
+            for (index, summary) in ["context", "get_schema · Production · shop", "describe · orders, customers, order_items, "
+                                     + "payments, shipments, returns", "run_queries · SELECT c.id, c.name, COUNT(o.id) AS orders "
+                                     + "FROM customers c JOIN orders o … (+3)"].enumerated() {
+                let event = agents.record("claude-code 2.1.31", summary)
+                if index < 3 { agents.finish(event, index == 2 ? String(repeating: "No connection is open to agents ", count: 3) : "done",
+                                             failed: index == 2) }
+            }
             for item in [main.statusBar.route, main.statusBar.server, main.statusBar.transaction, main.statusBar.activity,
                          main.statusBar.agent] where !item.isHidden {
                 if let popover = item.popover?() {

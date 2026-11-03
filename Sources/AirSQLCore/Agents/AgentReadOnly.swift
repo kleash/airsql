@@ -6,18 +6,19 @@ import Foundation
 /// statement timeout (max_execution_time, MariaDB's max_statement_time) and a watchdog that cancels at the timeout.
 /// One agent call at a time per session, so no call's statement runs inside another's transaction.
 public enum AgentReadOnly {
-    /// Why an agent's statement may not run (nil: it may): the read-only classifier's verdict.
-    public static var refusal: (String) -> String? = untilClassifier
+    /// Why an agent's statement may not run (nil: it may): the read-only classifier's verdict, for a session whose
+    /// sql_mode has NO_BACKSLASH_ESCAPES or not (it decides where strings end).
+    public static var refusal: (_ sql: String, _ noBackslashEscapes: Bool) -> String? = untilClassifier
 
     /// The SQL core (P0-4) isn't in this build yet, so nothing an agent writes may run: this fails closed until the
     /// classifier is wired.
-    static let untilClassifier: (String) -> String? = { _ in
+    static let untilClassifier: (String, Bool) -> String? = { _, _ in
         "Refused: this AirSQL build can't yet prove a statement read-only, so it runs no SQL an agent wrote."
     }
 
     /// The refusal of a statement an agent's SQL ended up in, as an error.
-    static func check(_ sql: String) throws {
-        if let reason = refusal(sql) { throw AirSQLError(.readOnly, reason) }
+    static func check(_ sql: String, on session: DBConnection) throws {
+        if let reason = refusal(sql, session.noBackslashEscapes) { throw AirSQLError(.readOnly, reason) }
     }
 
     /// Runs `body` with the session to itself, its statement timeout set to `timeout` seconds.
@@ -54,8 +55,9 @@ public enum AgentReadOnly {
         /// are, on the read-only session.
         func run(_ sql: String, written: Bool, rowCap: Int = 1_000,
                  batch: ((ResultStore) throws -> Void)? = nil) async throws -> StatementResult? {
+            try Task.checkCancellation()  // the person cancelled the call, or turned agents off
             if written {
-                try AgentReadOnly.check(sql)
+                try AgentReadOnly.check(sql, on: session)
                 try await checkReadOnly()
                 _ = try await session.query("START TRANSACTION READ ONLY")
             }

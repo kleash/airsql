@@ -24,7 +24,7 @@ struct AgentLabTests {
     }
 
     /// Accepts what the classifier will accept, roughly: enough to test everything after it.
-    static let testClassifier: (String) -> String? = { sql in
+    static let testClassifier: (String, Bool) -> String? = { sql, _ in
         let word = sql.trimmingCharacters(in: .whitespaces).split(separator: " ").first?.uppercased() ?? ""
         return ["SELECT", "WITH", "SHOW", "EXPLAIN", "DESCRIBE"].contains(word) ? nil : "not read-only"
     }
@@ -66,7 +66,7 @@ struct AgentLabTests {
         #expect((csv.first?["csv"] as? String)?.hasPrefix("id,name\r\n1,") == true)
 
         // Even SQL the classifier wrongly let through can't write: the transaction and the session are read-only.
-        AgentReadOnly.refusal = { _ in nil }
+        AgentReadOnly.refusal = { _, _ in nil }
         let writes = Self.results(try await target.runQueries(["queries": ["UPDATE customers SET id = id WHERE 1 = 0",
                                                                            "DELETE FROM customers WHERE 1 = 0"]]))
         #expect(writes.allSatisfy { $0["ok"] as? Bool == false }, "\(writes)")

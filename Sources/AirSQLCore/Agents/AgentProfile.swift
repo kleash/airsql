@@ -93,10 +93,10 @@ extension AgentTarget {
         var sql = (arguments["sql"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         while sql.hasSuffix(";") { sql = String(sql.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines) }
         guard !sql.isEmpty else { throw AirSQLError(.other, "explain needs sql: one statement.") }
-        try AgentReadOnly.check(sql)
         let statement = (arguments["format"] as? String == "json" ? "EXPLAIN FORMAT=JSON " : "EXPLAIN ") + sql
         let database = (arguments["database"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? self.database
         return try await AgentReadOnly.session(try await session(), timeout: timeout) { runner in
+            try AgentReadOnly.check(sql, on: runner.session)  // the statement itself, not only its EXPLAIN
             if let database { _ = try await runner.run("USE " + SQLQuote.identifier(database), written: false) }
             guard let rows = try await runner.run(statement, written: true, rowCap: 1_000)?.rows else {
                 throw AirSQLError(.other, "The server returned no plan.")
