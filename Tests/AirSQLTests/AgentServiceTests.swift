@@ -192,7 +192,7 @@ extension AppTests {
         // A click shows the first one's rows in the result grid.
         tab.table.selectRowIndexes([0], byExtendingSelection: false)
         let grid = try #require(find(ResultGridView.self, in: tab.view))
-        #expect(grid.source.store === rows && grid.grid.source?.value(0, 0) == "Ada")
+        #expect((grid.source as? ResultSetSource)?.store === rows && grid.grid.source?.value(0, 0) == "Ada")
 
         // One tab per connection: the menu shows it again; Agent Activity's double-click opens it at the call.
         main.select(main.openConsole(text: "", title: nil, connection: reports.id))
