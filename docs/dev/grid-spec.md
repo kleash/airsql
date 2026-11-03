@@ -53,7 +53,7 @@ Legend: **H** from HeidiSQL, **D** from DataGrip, **A** AirSQL's own or a fix of
 | View as Table / Text (in the current copy format) / Tree (JSON) | D | |
 | Chart of the results: bar, line, area, pie, scatter, histogram; save as PNG | D | Native drawing (Swift Charts on 13+) |
 | Unix-timestamp column: show as local date/time, copy the raw number; binary(16) as UUID; binary as hex or text | H+D | Per-column display type, remembered per table |
-| Number display: grouping, max decimal zeros, lowercase hex; dates in a chosen format and time zone | H+D | |
+| Number display: grouping, max decimal zeros, lowercase hex; dates in a chosen format and time zone | H+D | Display As: Decimal Places 0–4 (half up, grouped), the Mac's short/medium/long date styles, Time Zone ▸ from UTC to this Mac's or back (DATETIME, TIMESTAMP); per column, kept per table |
 | Compare two result grids (or a grid with a table): changed, added, removed rows | D | Shares the recon diff engine |
 
 ## 4. Filter, sort and search
@@ -64,7 +64,7 @@ Legend: **H** from HeidiSQL, **D** from DataGrip, **A** AirSQL's own or a fix of
 | Recent filters: last 20 per table; filter, sort, hidden columns and widths remembered per table | H | ⌥↓ in the bar | Fixes "widths forgotten" (#434) for results too |
 | Search all columns box: builds `col LIKE '%x%' OR …` over every column (exact `=` where LIKE makes no sense); option "loaded rows only"; highlights matches | H | ⇧⌘E | |
 | Quick filter from a cell or selection: = , ≠, <, >, LIKE x%, LIKE %x, LIKE %x%, IN/NOT IN (selected values), IS NULL, IS NOT NULL; = / ≠ / LIKE from a prompt or the clipboard; captions show the SQL; ⌥-click ANDs onto the current filter | H+D | ⌃⌘1 =, ⌃⌘2 ≠ | |
-| Local column filter: tick values in the header's funnel menu (values from the server with counts for table data, from loaded rows for results) | D | | |
+| Local column filter: tick values in the header's funnel menu (values from the server with counts for table data, from loaded rows for results) | D | | Results: quick filters, Filter by Values, Search All Columns and Sort by Columns… on the rows in memory; a bar shows the conditions while one is on |
 | Local find: ⌘F highlights matches in loaded rows; "Filter rows" hides the rest; regex, case, whole word; "X of Y matching" | H+D | ⌘F, ⌘G / ⇧⌘G | |
 | Find and replace in loaded rows, in the selection or everywhere; replacements become pending edits | H | ⌥⌘F | |
 | Sort: a header click selects the column; the sort control at the header's right (on hover and when sorted) steps ASC → DESC → off; ⌥-click on it adds a secondary sort; table data sorts on the server (asks first on a table over 1 M rows when the column has no index), results locally (asks above 100,000 rows); sort dialog for many columns | H+D | | |

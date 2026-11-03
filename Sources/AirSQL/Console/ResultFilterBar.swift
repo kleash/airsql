@@ -94,16 +94,7 @@ final class ResultFilterBar: NSView, NSSearchFieldDelegate {
 // Column Summary's values add conditions (⌥ or Add keeps those there are), Search All Columns keeps the rows with its
 // text, and the sort orders what is left; all of it on the rows in memory, with no query.
 extension ResultGridView {
-    /// The focused cell's column and value, and the distinct values selected in its column (the first 1,000 cells).
-    func focusedValues() -> QuickFilter.Focus? {
-        guard let (row, column) = viewer.focusedCell else { return nil }
-        var values: [String?] = []
-        for cell in viewer.selectedCells(limit: 1_000) where cell.column == column {
-            let value = rows.value(cell.row, column)
-            if !values.contains(value) { values.append(value) }
-        }
-        return (source.columns[column], rows.value(row, column), values)
-    }
+    func focusedValues() -> QuickFilter.Focus? { QuickFilter.focus(viewer, columns: source.columns, value: rows.value) }
 
     func quickFilterItem() -> NSMenuItem {
         QuickFilter.menuItem(focusedValues(), noBackslashEscapes: false, target: self, action: #selector(applyQuickFilter(_:)))
@@ -145,7 +136,7 @@ extension ResultGridView {
 
     /// Filter by Values…: the focused column's values in the rows shown, with their counts.
     @objc func filterByValues(_ sender: Any?) {
-        guard let column = focusedColumn(), let window else { return NSSound.beep() }
+        guard let column = viewer.focusedColumn, let window else { return NSSound.beep() }
         let rows = rows
         FilterByValuesSheet.show(column: source.columns[column], table: "the result", onServer: false, on: window, read: {
             var counts: [String?: Int] = [:], order: [String?] = []
@@ -178,7 +169,7 @@ extension ResultGridView {
     @objc func clearSort(_ sender: Any?) { sortRows([]) }
 
     private func sortFocused(ascending: Bool) {
-        guard let column = focusedColumn() else { return NSSound.beep() }
+        guard let column = viewer.focusedColumn else { return NSSound.beep() }
         sortRows([DataGridView.Sort(column: column, ascending: ascending)])
     }
 
@@ -189,16 +180,6 @@ extension ResultGridView {
                        on: window) { [weak self] keys in
             self?.sortRows(keys.map { DataGridView.Sort(column: $0.column, ascending: $0.ascending) })
         }
-    }
-
-    /// The source column of the focused cell or of the selected header.
-    func focusedColumn() -> Int? {
-        if let cell = viewer.focusedCell { return cell.column }
-        guard !(grid.source is TransposedSource) else { return nil }
-        for case .columns(let columns) in grid.selection.areas where columns.lowerBound < grid.columnCount {
-            return grid.sourceColumn(columns.lowerBound)
-        }
-        return nil
     }
 
     /// The rows shown: those meeting every condition and holding the search's text, in the sort's order; matches tinted.
@@ -234,12 +215,12 @@ extension ResultGridView {
         switch item.action {
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.filterPrompt.action:
             return (focus, "Select a cell first")
-        case Commands.filterLess.action:
+        case Commands.quickFilter.action:
             let reason = GridCondition.Operator.allCases.indices.contains(item.tag)
                 ? QuickFilter.reason(GridCondition.Operator.allCases[item.tag], focusedValues()) : "Select a cell first"
             return (reason == nil, reason)
         case Commands.filterByValues.action, Commands.sortAscending.action, Commands.sortDescending.action:
-            return (focusedColumn() != nil, "Select a cell or a column first")
+            return (viewer.focusedColumn != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:
             return (!conditions.isEmpty || !filterBar.searchField.stringValue.isEmpty, "The rows aren't filtered")
         case Commands.clearSort.action: return (!grid.sortOrder.isEmpty, "The rows aren't sorted")
