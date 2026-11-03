@@ -83,6 +83,20 @@ extension AppTests {
             #expect(main.tabs.count == 2 && main.selectedTab?.content is TextContent)
         }
 
+        @Test func theDatabaseViewsColumnsFitTheWindowAtItsDefaultSize() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let view = DatabaseViewController(open, "airsql_fixture")
+            main.open(view, title: "airsql_fixture", connection: id)
+            main.window?.layoutIfNeeded()
+            let visible = try #require(view.table.enclosingScrollView).contentView.bounds.width
+            #expect(view.table.frame.width <= visible + 1, "the table is \(view.table.frame.width) wide in \(visible)")
+            for column in view.table.tableColumns {
+                #expect(column.width >= column.minWidth - 0.5, "\(column.title): \(column.width) < \(column.minWidth)")
+            }
+        }
+
         @Test func aBigServerLoadsADatabasesDetailsWhenItOpens() async throws {
             let model = testModel(Fixtures.shop)
             model.data.settings.detailsTableThreshold = 5

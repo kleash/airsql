@@ -15,6 +15,8 @@ extension TableEditorController {
         sections.setAccessibilityIdentifier("tableEditor.sections")
         sections.toolTip = "Show the table's columns, indexes, foreign keys, checks or options"
         sections.translatesAutoresizingMaskIntoConstraints = false
+        // Squeezed (a long count, the spinner while applying) rather than widening the window past its minimum.
+        sections.setContentCompressionResistancePriority(.init(490), for: .horizontal)
         status.style = .spinning
         status.controlSize = .small
         status.isDisplayedWhenStopped = false
@@ -178,6 +180,7 @@ extension TableEditorController {
         removeButton.toolTip = removeButton.isEnabled ? "Remove the selected rows from the design; they go when you apply"
             : "Select a row first"
         if isBusy { status.startAnimation(nil) } else { status.stopAnimation(nil) }
+        status.isHidden = !isBusy  // out of the bar's width while idle
     }
 
     /// Why Apply can't run now (nil: it can).

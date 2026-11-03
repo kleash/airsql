@@ -111,6 +111,25 @@ extension AppTests {
             #expect(list.numberOfRows == 5 && editor.sqlText.string.contains("DROP COLUMN `total`"))
         }
 
+        @Test func everyListSectionFitsTheEditorAtTheDefaultSize() async throws {
+            let (main, _, editor) = try await tableEditor("orders")
+            for section in TableEditorController.Section.allCases where section != .options {
+                editor.sections.selectedSegment = section.rawValue
+                editor.sectionChosen(editor.sections)
+                main.window?.layoutIfNeeded()
+                let visible = editor.listScroll.contentView.bounds.width
+                #expect(editor.list.frame.width <= visible + 1, "\(section): the list is \(editor.list.frame.width) wide in \(visible)")
+                for column in editor.list.tableColumns {
+                    #expect(column.width >= column.minWidth - 0.5, "\(section) \(column.title): \(column.width) < \(column.minWidth)")
+                }
+            }
+        }
+
+        @Test func theTableEditorKeepsTheWindowAtItsMinimumSize() async throws {
+            let (main, _, _) = try await tableEditor("orders", size: MainWindowController.minimumSize)
+            #expect(main.window?.frame.width == MainWindowController.minimumSize.width)
+        }
+
         @Test func columnsMoveAndOptionsChangeTheSQL() async throws {
             let (_, _, editor) = try await tableEditor("orders")
             editor.moveColumns(IndexSet(integer: 4), to: 0)

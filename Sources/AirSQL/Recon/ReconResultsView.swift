@@ -12,6 +12,12 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     private(set) var objects: [ReconObject] = []
     private let split = NSSplitView()
 
+    /// The list's first width, wide enough for names, when nothing is remembered (the window calls it once laid out).
+    func placeDivider() {
+        guard UserDefaults.standard.object(forKey: "NSSplitView Subview Frames " + (split.autosaveName ?? "")) == nil else { return }
+        split.setPosition(320, ofDividerAt: 0)
+    }
+
     override init() {
         super.init()
         summary.spacing = Spacing.unit
@@ -39,7 +45,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         scroll.hasVerticalScroller = true
         split.isVertical = true
         split.dividerStyle = .thin
-        split.autosaveName = "Compare split"
+        split.autosaveName = layoutName("Compare split")
         split.addArrangedSubview(scroll)
         split.addArrangedSubview(detail.view)
         scroll.widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
@@ -157,6 +163,8 @@ final class ReconObjectCell: NSTableCellView {
     let chip = ChipView("", style: .neutral)
     let name = label("", truncates: true)
     let what = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
+    /// What differs keeps all of a short text, 60 points of a long one.
+    private var whatMinimum: NSLayoutConstraint!
 
     init() {
         super.init(frame: .zero)
@@ -166,13 +174,18 @@ final class ReconObjectCell: NSTableCellView {
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
         what.alignment = .right
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        // What differs keeps its words up to 45% of the row; a long name gives way first (its tooltip has it whole).
-        what.setContentCompressionResistancePriority(.defaultLow + 10, for: .horizontal)
+        // The name keeps its letters first; what differs takes at most 45% of the row and gives way (its tooltip has it).
+        what.setContentCompressionResistancePriority(.defaultLow - 10, for: .horizontal)
         name.widthAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
         chip.label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        // Every chip as wide as the widest, so the names line up.
+        chip.label.alignment = .center
+        chip.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.chipWidth).isActive = true
         addSubview(stack)
         stack.pin(to: self, insets: NSEdgeInsets(top: 0, left: 2, bottom: 0, right: 6))
         what.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.45).isActive = true
+        whatMinimum = what.widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
+        whatMinimum.isActive = true
         textField = name
     }
 
@@ -186,9 +199,15 @@ final class ReconObjectCell: NSTableCellView {
         name.toolTip = name.stringValue + (object.targetName == object.name ? "" : " → \(object.targetName)")
         name.textColor = object.differs ? .labelColor : .secondaryLabelColor
         what.stringValue = Self.what(object)
+        whatMinimum.constant = min(what.intrinsicContentSize.width, 60)
         what.toolTip = [what.stringValue, ReconReport.status(object, result)].filter { !$0.isEmpty }.joined(separator: ": ")
         setAccessibilityLabel("\(object.kind.rawValue) \(object.name), \(ReconReport.status(object, result))")
     }
+
+    /// The widest chip's width: its text and the chip's insets.
+    static let chipWidth = ["only left", "only right", "structure", "data", "match"].map {
+        NSAttributedString(string: $0, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width.rounded(.up) + 18
+    }.max() ?? 0
 
     static func chip(_ object: ReconObject) -> (String, ChipView.Style) {
         switch object.status {
