@@ -151,20 +151,14 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         return (selected.isEmpty ? grid.selection.cursor.map { [$0.column] } ?? [] : selected).map(grid.sourceColumn)
     }
 
-    /// The Display As ▸ items for the focused column's kind.
-    func displayMenu() -> NSMenuItem {
-        let column = focusedColumns.first.flatMap { source?.columns[$0] }
-        let items = (column.map(GridDisplay.choices) ?? []).map { display -> NSMenuItem in
+    /// Display As ▸, as in the Data menu: the ways the focused column's kind can be shown are on.
+    static func displayMenu() -> NSMenuItem {
+        MainMenu.submenu("Display As", GridDisplay.allCases.enumerated().map { index, display in
             let item = Commands.displayAs.item()
             item.title = display.title
-            item.tag = GridDisplay.allCases.firstIndex(of: display)!
-            item.state = (focusedColumns.first.flatMap { displays[$0] } ?? .standard) == display ? .on : .off
+            item.tag = index
             return item
-        }
-        let menu = MainMenu.submenu("Display As", items)
-        menu.isEnabled = items.count > 1
-        if items.count <= 1 { menu.toolTip = "Only numbers and bytes can be shown another way" }
-        return menu
+        })
     }
 
     /// The host's rows or columns changed (a page arrived): shows them again.
@@ -509,7 +503,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         case .row: menu.add([Commands.recordView, Commands.valuePanel])
         case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.columnList, Commands.heatmap])
         }
-        if !transposed, record == nil { menu.addItem(displayMenu()) }
+        if !transposed, record == nil { menu.addItem(Self.displayMenu()) }
         return menu
     }
 
@@ -517,8 +511,16 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         host?.dataGrid(grid, sortBy: column, adding: adding)
     }
 
+    /// A double click on a row's number: Record View of that row.
     func dataGrid(_ grid: DataGridView, openRecord row: Int) {
-        host?.dataGrid(grid, openRecord: row)
+        guard !transposed, record == nil else { return }
+        grid.selection.select(GridPosition(row: row, column: grid.selection.cursor?.column ?? 0))
+        showRecordView(nil)
+    }
+
+    /// A double click on a cell that can't be edited opens the value panel.
+    func dataGridOpenValue(_ grid: DataGridView) {
+        if valuePanel == nil { toggleValuePanel(nil) }
     }
 
     func dataGridColumnsDidChange(_ grid: DataGridView) {

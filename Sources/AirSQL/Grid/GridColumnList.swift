@@ -77,13 +77,15 @@ final class GridColumnList: NSViewController, NSTableViewDataSource, NSTableView
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let viewer, let source = viewer.source, rows.indices.contains(row) else { return nil }
         let info = source.columns[rows[row]]
-        let box = checkbox(info.name, id: "columnList.\(info.name)", tip: "Show or hide \(info.name) (Space)",
+        let box = checkbox("", id: "columnList.\(info.name)", tip: "Show or hide \(info.name) (Space)",
                            on: viewer.grid.columnOrder.contains(rows[row]), target: self, action: #selector(toggle(_:)))
         box.tag = rows[row]
-        box.lineBreakMode = .byTruncatingMiddle
-        box.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        box.setAccessibilityLabel(info.name)
+        let name = label(info.name, truncates: true)
+        name.lineBreakMode = .byTruncatingMiddle
+        name.toolTip = info.name
         let type = label(info.type, font: .systemFont(ofSize: 11), color: .tertiaryLabelColor)
-        let cell = NSStackView(views: [box, NSView(), type])
+        let cell = NSStackView(views: [box, name, NSView(), type])
         cell.spacing = 6
         cell.edgeInsets = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 6)
         return cell

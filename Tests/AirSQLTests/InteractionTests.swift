@@ -48,6 +48,23 @@ func tabButton(_ main: MainWindowController, _ title: String) -> TabButton {
     main.tabBar.buttons[main.tabs.firstIndex { $0.title == title } ?? 0]
 }
 
+/// The viewer of a console result showing a few customers (opened the first time).
+@MainActor
+func resultViewer(_ main: MainWindowController) -> GridViewer? {
+    if let console = main.selectedTab?.content as? ConsoleViewController, let view = console.resultTabs.first?.view as? ResultGridView {
+        return view.viewer
+    }
+    let console = ConsoleViewController(model: main.model, connection: Fixtures.production.id)
+    main.open(console, title: "Query 1", connection: Fixtures.production.id)
+    console.addResult(ConsoleFixtures.customers(rows: 5), title: "Top customers", summary: "38 ms · 5 rows")
+    console.showResults()
+    main.window?.layoutIfNeeded()
+    return (console.resultTabs.first?.view as? ResultGridView)?.viewer
+}
+
+@MainActor
+func resultGrid(_ main: MainWindowController) -> DataGridView { resultViewer(main)!.grid }
+
 @MainActor
 func statusItem(_ item: StatusItemView) -> (Double, Double)? {
     item.isHidden ? nil : windowPoint(item.bounds, in: item)
@@ -102,6 +119,26 @@ extension AppTests {
                     },
                     menu: ["Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
                     enabled: ["Pin Result", "Rename Result…", "Close Result"]),
+            Surface(name: "Grid cell",
+                    place: { main, _ in
+                        let grid = resultGrid(main)
+                        return windowPoint(grid.cellRect(GridPosition(row: 1, column: 1)), in: grid)
+                    },
+                    clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
+                    doubleClicked: { main, _ in resultViewer(main)?.valuePanel != nil },
+                    menu: ["Copy", "Value Panel", "Record View", "Column Summary…", "Display As"],
+                    enabled: ["Copy", "Value Panel", "Record View", "Column Summary…"]),
+            Surface(name: "Grid row number",
+                    place: { main, _ in
+                        let grid = resultGrid(main)
+                        return windowPoint(NSRect(x: 0, y: grid.rowRect(1).minY, width: grid.rowNumbers.bounds.width, height: grid.rowHeight),
+                                           in: grid.rowNumbers)
+                    },
+                    clicked: { main in resultGrid(main).selection.containsRow(1) },
+                    doubleClicked: { main, _ in resultViewer(main)?.record == 1 },
+                    // In Record View now (the double-click), so without Display As.
+                    menu: ["Copy", "Record View", "Value Panel"],
+                    enabled: ["Copy", "Record View", "Value Panel"]),
             Surface(name: "Status bar: route",
                     place: { main, _ in statusItem(main.statusBar.route) },
                     clicked: { $0.statusBar.route.shown?.isShown == true },
@@ -154,7 +191,8 @@ extension AppTests {
         }
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
-        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Editor tab", "Result tab", "Status bar: route", "Status bar: server",
+        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Editor tab", "Result tab", "Grid cell",
+                                       "Grid row number", "Status bar: route", "Status bar: server",
                                        "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log"]
 
         @Test func everyRowHasItsChecks() {

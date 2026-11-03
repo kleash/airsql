@@ -82,6 +82,7 @@ final class GridValuePanel: NSView {
         self.value = value
         self.bytes = bytes ?? value.map { Array($0.utf8) }
         title.stringValue = column.map { "Value · \($0.name)" } ?? "Value"
+        title.toolTip = title.stringValue
         let first = value?.first(where: { !$0.isWhitespace })
         tree = first == "{" || first == "[" ? value.flatMap(JSONNode.parse) : nil
         let picture = column?.kind == .binary ? self.bytes.flatMap { NSImage(data: Data($0)) } : nil

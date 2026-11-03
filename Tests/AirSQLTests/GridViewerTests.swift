@@ -334,3 +334,88 @@ extension AppTests {
         #expect(rows.children[1].children.map(\.kind) == [.null, .string, .null])
     }
 }
+
+/// Lane L2's screens for `LayoutTests`: a result in the viewer with long values, its value panel (JSON and text), Record
+/// View, a transposed grid with its note, Text, Tree and Chart, and the column list's and Column Summary's popovers.
+@MainActor
+func gridViewerLayoutProblems(_ main: MainWindowController, appearance: NSAppearance.Name, place: String) -> [String] {
+    var problems: [String] = []
+    let window = main.window!
+    func check(_ what: String) {
+        window.appearance = NSAppearance(named: appearance)
+        window.contentView?.layoutSubtreeIfNeeded()
+        if let content = window.contentView { problems += layoutProblems(content, where: "\(place) \(what)") }
+    }
+    func check(_ view: NSView, _ what: String) {
+        view.appearance = NSAppearance(named: appearance)
+        view.layoutSubtreeIfNeeded()
+        problems += layoutProblems(view, where: "\(place) \(what)")
+    }
+    let source = FakeGridSource(rows: 2_000, columns: 12)
+    let content = ViewerContent(source)
+    main.open(content, title: "orders_with_a_long_name_for_the_tab", connection: Fixtures.production.id)
+    let viewer = content.viewer, grid = viewer.grid
+    content.viewer.status.rows.stringValue = "1,000 of ≈2,348,245,917 rows"
+    grid.selection.select(GridPosition(row: 3, column: 2))
+    grid.selection.select(GridPosition(row: 1_999, column: 2), extend: true)
+    check("grid with figures")
+    grid.selection.select(GridPosition(row: 0, column: 7))
+    viewer.toggleValuePanel(nil)
+    check("value panel (JSON)")
+    grid.selection.select(GridPosition(row: 1, column: 6))
+    check("value panel (text)")
+    viewer.toggleValuePanel(nil)
+    viewer.showRecordView(nil)
+    check("Record View")
+    viewer.transposeGrid(nil)
+    viewer.transposeGrid(nil)
+    check("transposed with its note")
+    viewer.transposeGrid(nil)
+    for presentation in [GridViewer.Presentation.text, .tree, .chart] {
+        viewer.present(presentation)
+        check("View As \(presentation)")
+    }
+    viewer.present(.table)
+    let list = GridColumnList(viewer: viewer)
+    check(list.view, "Column List")
+    let summary = GridSummaryView(column: "a_column_name_that_runs_to_sixty_characters_to_test_layout_x", origin: "From the server, within the filter",
+                                  nullText: "NULL")
+    summary.show(.success(ColumnSummary(values: (0..<2_000).map { source.value($0, 5) })))
+    check(summary.view, "Column Summary")
+    main.close(main.tabs.last!)
+    return problems
+}
+
+/// Lane L2's states for `HelpTests`: the viewer with its value panel, Record View's bar, Chart's controls, the column
+/// list, and Go to Row's sheet; every control there has a tooltip.
+@MainActor
+func gridViewerUnexplained(_ main: MainWindowController, _ harness: AgentServer) async -> [String] {
+    var missing: [String] = []
+    let window = main.window!
+    let content = ViewerContent(FakeGridSource(rows: 40, columns: 10))
+    main.open(content, title: "orders", connection: Fixtures.production.id)
+    let viewer = content.viewer
+    viewer.grid.selection.select(GridPosition(row: 2, column: 2))
+    viewer.toggleValuePanel(nil)
+    window.layoutIfNeeded()
+    missing += unexplained([window], where: "grid with the value panel")
+    viewer.showRecordView(nil)
+    window.layoutIfNeeded()
+    missing += unexplained([window], where: "Record View")
+    viewer.present(.chart)
+    window.layoutIfNeeded()
+    missing += unexplained([window], where: "Chart")
+    viewer.present(.table)
+    viewer.showColumnList(nil)
+    if await call(harness, "wait", ["until": "popover", "timeout": 5]).error == nil {
+        missing += unexplained(window.childWindows ?? [], where: "Column List")
+    }
+    window.childWindows?.forEach { $0.orderOut(nil) }
+    _ = await call(harness, "menu", ["path": "Data > Go to Row…"])
+    _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+    missing += unexplained(harness.openSheets(), where: "Go to Row")
+    _ = await call(harness, "press", ["title": "Cancel"])
+    _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    main.close(main.tabs.last!)
+    return missing
+}

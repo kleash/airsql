@@ -166,6 +166,8 @@ extension AppTests {
             missing += unexplained(harness.openSheets(), where: "Delete")
             _ = await call(harness, "press", ["title": "Cancel"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            // The grid's reading tools (L2).
+            missing += await gridViewerUnexplained(main, harness)
 
             #expect(missing.isEmpty, "\(missing.joined(separator: "\n"))")
         }

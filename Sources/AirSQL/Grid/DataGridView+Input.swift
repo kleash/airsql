@@ -11,7 +11,12 @@ extension DataGridView {
         let flags = event.modifierFlags
         if event.clickCount == 2, flags.isDisjoint(with: [.shift, .command]) {
             isDragging = false
-            beginEditing(at: position)
+            if canEdit(position) {
+                beginEditing(at: position)
+            } else {
+                selection.select(position)
+                delegate?.dataGridOpenValue(self)
+            }
             return
         }
         selection.select(position, extend: flags.contains(.shift), add: flags.contains(.command))

@@ -21,6 +21,8 @@ protocol DataGridViewDelegate: AnyObject {
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool)
     /// A double click on a row's number: Record View.
     func dataGrid(_ grid: DataGridView, openRecord row: Int)
+    /// A double click on a cell that can't be edited: show its whole value (default: a beep).
+    func dataGridOpenValue(_ grid: DataGridView)
     /// Columns were resized, auto-fitted or moved: remember `columnWidths` and `columnOrder`.
     func dataGridColumnsDidChange(_ grid: DataGridView)
 }
@@ -32,6 +34,7 @@ extension DataGridViewDelegate {
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? { nil }
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {}
     func dataGrid(_ grid: DataGridView, openRecord row: Int) {}
+    func dataGridOpenValue(_ grid: DataGridView) { NSSound.beep() }
     func dataGridColumnsDidChange(_ grid: DataGridView) {}
 }
 
