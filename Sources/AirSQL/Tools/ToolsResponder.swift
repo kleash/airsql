@@ -112,7 +112,8 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
             password = await withCheckedContinuation { continuation in
                 showPasswordPrompt(for: saved.displayName, user: saved.user, retry: false, canRemember: !saved.askPassword,
                                    on: window) { password, remember in
-                    if let password, remember {
+                    // Credentials are the person's (plan §2.8): an agent's typing logs in once, never saved.
+                    if let password, remember, !AgentGuard.refuses("Only the person at the Mac can save a password: it was used for this login only.") {
                         let write = model.setSavedPassword
                         DispatchQueue.global(qos: .userInitiated).async { write(key, password) }
                     }

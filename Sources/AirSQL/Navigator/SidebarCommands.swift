@@ -104,9 +104,7 @@ extension SidebarController: NSMenuItemValidation {
 
     @objc func openData(_ sender: Any?) {
         guard let main, let open = treeSelection?.open else { return }
-        for table in selectedObjects where table.kind.isTableLike {
-            main.open(NavigatorHooks.tableData(open, table, nil), title: table.name, connection: open.id)
-        }
+        for table in selectedObjects where table.kind.isTableLike { main.openTableData(table, of: open) }
     }
 
     @objc func openStructure(_ sender: Any?) {

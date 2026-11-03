@@ -151,6 +151,8 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
 
     /// Removes the log's files, off the main thread.
     static func clear(_ log: SQLLog, then done: @escaping () -> Void = {}) {
+        // The gate (plan §2.8): the log is the person's record, files on this Mac.
+        guard !AgentGuard.refuses("The SQL log is the person's: only they can clear it.") else { return }
         let urls = [log.fileURL, log.previousFileURL]
         Task {
             await Task.detached { urls.forEach { try? FileManager.default.removeItem(at: $0) } }.value

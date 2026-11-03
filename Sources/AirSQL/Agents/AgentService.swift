@@ -31,6 +31,8 @@ final class AgentService {
 
     /// Where open_in_console puts SQL: the main window's console tabs.
     var consoles: AgentConsoles?
+    /// Carries out the UI tools on the person's windows.
+    lazy var harness = AgentServer(main: main, model: model)
 
     init(model: AppModel, main: MainWindowController?, directory: URL = AgentSocket.directory) {
         self.model = model
@@ -51,6 +53,11 @@ final class AgentService {
                     return await self.handle(tool, arguments, client: client, progress: progress)
                 }
                 problem = nil
+                // A statement an agent's request sends on the person's sessions waits for them here.
+                AgentGate.approve = { [weak self] request in
+                    guard let self else { throw AirSQLError(.readOnly, AgentGate.declined) }
+                    try await self.approve(request)
+                }
             } catch {
                 problem = error.localizedDescription
                 log.error("agents: \(error.localizedDescription, privacy: .public)")
@@ -58,6 +65,7 @@ final class AgentService {
         } else if !allowed {
             listener?.close()
             listener = nil
+            AgentGate.approve = nil
             running.forEach { $0.cancel() }
         }
         updateStatus()
@@ -67,6 +75,7 @@ final class AgentService {
     func close() {
         listener?.close()
         listener = nil
+        AgentGate.approve = nil
     }
 
     var isListening: Bool { listener != nil }
@@ -96,6 +105,12 @@ final class AgentService {
                 }
             case "open_in_console": structured = try openInConsole(arguments)
             case "read_console": structured = try readConsole(arguments)
+            case _ where Self.uiTools.contains(tool):
+                let reply = await drive(tool, arguments, client: client)
+                let failure = reply["isError"] as? Bool == true
+                let text = ((reply["content"] as? [[String: Any]])?.first?["text"] as? String) ?? ""
+                finish(index, failure ? String(text.prefix(80)) : "done", failed: failure)
+                return reply
             case "resources/read":
                 let text = try await resource(arguments["uri"] as? String ?? "")
                 finish(index, "read")

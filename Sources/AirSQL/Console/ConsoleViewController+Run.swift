@@ -150,7 +150,8 @@ extension ConsoleViewController {
         }
         switch run.kind {
         case .explain: return await explain(run, on: session)
-        case .profile: _ = await runQuery("SET profiling = 1", on: session)
+        case .profile:  // profiling's switch is AirSQL's, not an agent's: the agents' gate doesn't ask about it
+            _ = await AgentGate.$agent.withValue(nil) { await runQuery("SET profiling = 1", on: session) }
         case .run: break
         }
         let all = SQLSplitter.statements(in: run.text, noBackslashEscapes: session.noBackslashEscapes)
@@ -184,7 +185,7 @@ extension ConsoleViewController {
             } else {
                 note(.info, "This server keeps no profile of the statement (SHOW PROFILE isn't available).")
             }
-            _ = await runQuery("SET profiling = 0", on: session)
+            _ = await AgentGate.$agent.withValue(nil) { await runQuery("SET profiling = 0", on: session) }
         }
     }
 

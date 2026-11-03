@@ -164,6 +164,14 @@ extension AgentService {
         case "open_in_console": return "open_in_console · “\(arguments["title"] as? String ?? "From an agent")”"
         case "read_console": return "read_console" + ((arguments["tab"] as? String).map { " · " + $0 } ?? "")
         case "resources/read": return "schema resource · " + (arguments["uri"] as? String ?? "")
+        case "menu": return "menu · " + (arguments["path"] as? String ?? "")
+        case "press", "set": return tool + " · " + (arguments["id"] as? String ?? arguments["title"] as? String ?? "")
+        case "key": return "key · " + (arguments["combo"] as? String ?? "")
+        case "type": return "type · " + short(arguments["text"] as? String ?? "")
+        case "select": return "select · " + ((arguments["names"] as? [String])?.joined(separator: ", ") ?? "")
+        case "wait": return "wait · " + (arguments["until"] as? String ?? "")
+        case "click", "double_click", "right_click":
+            return tool + " · \((arguments["x"] as? NSNumber)?.intValue ?? 0), \((arguments["y"] as? NSNumber)?.intValue ?? 0)"
         default: return tool + connection
         }
     }

@@ -1,14 +1,16 @@
 import AirSQLCore
 import AppKit
 
-/// Where the navigator hands over to the grid (L2, L3a), which sets `tableData`; until then the navigator shows its own
-/// read-only stand-in.
+/// Where the navigator hands over to the table tab (`TableDataController`).
 @MainActor
 enum NavigatorHooks {
-    /// A table's or view's rows (single click: in the preview tab; double-click and Open Data: a tab of their own),
-    /// filtered by a WHERE condition when one is given (Find Text on Server's matches).
+    /// A table's or view's rows, filtered by a WHERE condition when one is given: what a single click shows in the
+    /// preview tab. A double-click and Open Data use `MainWindowController.openTableData`, which reuses an open tab.
     static var tableData: (OpenConnection, DatabaseObject, String?) -> NSViewController = { open, table, condition in
-        TextContent.tablePlaceholder(open, table, where: condition)
+        guard let model = open.model, let context = Editors.context(model.connection(open.id), in: model) else {
+            return TextContent(title: table.name, caption: "Connect to the server again to see its rows.", text: "")
+        }
+        return TableDataController(model: model, context: context, database: table.database, table: table.name, filter: condition)
     }
 }
 
@@ -67,8 +69,8 @@ extension MainWindowController {
     }
 }
 
-/// Read-only text with a title and a caption: an object's CREATE statement, the results of maintenance, the stand-in
-/// for the grid. What has to be read from the server loads off the main thread under a spinner.
+/// Read-only text with a title and a caption: an object's CREATE statement, the results of maintenance. What has to
+/// be read from the server loads off the main thread under a spinner.
 @MainActor
 final class TextContent: NSViewController, TabContent {
     private let heading: String
@@ -168,19 +170,6 @@ final class TextContent: NSViewController, TabContent {
             guard let open else { throw AirSQLError.disconnected }
             return try await open.createStatement(object) + ";\n"
         }
-    }
-
-    /// Stands in for the data grid (L2, L3a) until it lands: the table's size and the query it will run.
-    static func tablePlaceholder(_ open: OpenConnection, _ table: DatabaseObject, where condition: String?) -> TextContent {
-        let database = open.snapshot.database(table.database)
-        let columns = database?.table(table.name)?.columns.count ?? 0
-        var facts = [table.kind == .view ? "View" : "Table"]
-        if let rows = database?.statistics?[table.name]?.rows { facts.append("about \(shortCount(rows)) rows") }
-        if columns > 0 { facts.append("\(columns) columns") }
-        return TextContent(title: table.name, caption: facts.joined(separator: " · ") + ". Its rows show here in the data grid, "
-                           + "which isn't in this build yet.",
-                           text: "SELECT * FROM \(table.quoted)" + (condition.map { " WHERE " + $0 } ?? "")
-                            + " LIMIT \(open.model?.data.settings.rowsPerPage ?? 1_000);\n")
     }
 }
 

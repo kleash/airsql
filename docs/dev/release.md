@@ -6,7 +6,7 @@ A release is a tag `vX.Y.Z` whose `VERSION` says `X.Y.Z`, made as AirSCP's are (
 |---|---|
 | `AirSQL-X.Y.Z.zip` + `.sha256` | The universal app, Developer ID signed with the hardened runtime, notarized and stapled |
 | `mariadb-connector-c-<v>-src.tar.gz`, `openssl-<v>.tar.gz` | The exact source of the libmariadb inside (NOTICE's offer: the LGPL lets people rebuild and replace it) |
-| `airsql.mcpb` + `.sha256` | The MCP bundle (`scripts/build-mcpb.sh`), once the tag has that script |
+| `airsql.mcpb` + `.sha256` | The MCP bundle (`scripts/build-mcpb.sh`) |
 | `sbom.spdx.json` | The SBOM (`scripts/sbom.sh`) |
 | `AirSQL-X.Y.Z.intoto.jsonl` | Signed build provenance for the files the release workflow built |
 

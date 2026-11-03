@@ -38,14 +38,17 @@ enum ConsoleSafety {
                 break
             }
         }
-        guard !warnings.isEmpty || (writes && safety.askBeforeConsoleWrite) else { return answer(true) }
-        let count = statements.count
+        // What an agent set off asks unless every statement is proven read-only (the agents' gate, plan §2.8).
+        let agent = AgentGate.agent != nil && safety.askBeforeAgentChanges
+            && statements.contains { !AgentGate.isReadOnly($0.sql, noBackslashEscapes: noBackslashEscapes) }
+        guard !warnings.isEmpty || (writes && safety.askBeforeConsoleWrite) || agent else { return answer(true) }
+        let count = statements.count, no = AgentGate.agent == nil ? "cancel" : "decline"
         let change = ChangeSQL(title: "Console", statements: statements.map(\.sql), connection: saved.id)
         var request = SQLPreviewRequest(
             change: change,
             heading: heading ?? "Run \(count == 1 ? "this statement" : "\(count) statements") on \(saved.displayName)?",
-            caption: count == 1 ? "It may change data or structure on the server. Check it, then run it or cancel."
-                : "They run one after another, and stop at the first error. Check them, then run them or cancel.")
+            caption: count == 1 ? "It may change data or structure on the server. Check it, then run it or \(no)."
+                : "They run one after another, and stop at the first error. Check them, then run them or \(no).")
         request.actionTitle = "Run"
         request.destructive = destructive
         request.warnings = warnings

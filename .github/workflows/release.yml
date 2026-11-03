@@ -1,7 +1,7 @@
 # Releases AirSQL for a tag vX.Y.Z (VERSION must say X.Y.Z), as AirSCP's release.yml does: the notarized universal app as
 # AirSQL-X.Y.Z.zip with its SHA-256; the exact source of the libmariadb inside it (Connector/C's and OpenSSL's tarballs,
 # as scripts/build-mariadb.sh pins and checks them: NOTICE's offer of the library's source); the MCP bundle airsql.mcpb
-# with its SHA-256 (scripts/build-mcpb.sh, when the tag has it); the SBOM sbom.spdx.json; signed build provenance for the
+# with its SHA-256 (scripts/build-mcpb.sh); the SBOM sbom.spdx.json; signed build provenance for the
 # files this run built (AirSQL-X.Y.Z.intoto.jsonl); the GitHub Release with notes; and the Homebrew cask
 # (packaging/homebrew/Casks/airsql.rb with this version and SHA-256) in kleash/homebrew-tap. Runs when the tag is pushed,
 # when a release is published (for example by `gh release create`), or by hand (Actions ▸ Release ▸ Run workflow, with
@@ -141,12 +141,7 @@ jobs:
         run: scripts/build-mariadb.sh
 
       - name: MCP bundle (airsql.mcpb)
-        run: |
-          if [ -f scripts/build-mcpb.sh ]; then
-            scripts/build-mcpb.sh
-          else
-            echo "No scripts/build-mcpb.sh at $TAG: this release has no MCP bundle."
-          fi
+        run: scripts/build-mcpb.sh
 
       - name: SBOM (sbom.spdx.json)
         run: scripts/sbom.sh build/sbom.spdx.json
@@ -161,7 +156,7 @@ jobs:
         with:
           subject-path: |
             build/sbom.spdx.json
-            ${{ hashFiles('scripts/build-mcpb.sh') != '' && 'build/airsql.mcpb' || '' }}
+            build/airsql.mcpb
             ${{ env.HAS_SIGNING == 'true' && format('build/AirSQL-{0}.zip', steps.version.outputs.version) || '' }}
 
       - name: GitHub Release
@@ -170,8 +165,7 @@ jobs:
         run: |
           cp "$PROVENANCE" "build/AirSQL-$VERSION.intoto.jsonl"
           files=("build/AirSQL-$VERSION.zip" "build/AirSQL-$VERSION.zip.sha256" build/sbom.spdx.json
-            "build/AirSQL-$VERSION.intoto.jsonl" vendor/out/source/*.tar.gz)
-          [ ! -f build/airsql.mcpb ] || files+=(build/airsql.mcpb build/airsql.mcpb.sha256)
+            "build/AirSQL-$VERSION.intoto.jsonl" build/airsql.mcpb build/airsql.mcpb.sha256 vendor/out/source/*.tar.gz)
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "${files[@]}" --clobber
             gh release edit "$TAG" --draft=false
