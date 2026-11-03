@@ -20,13 +20,15 @@ version 3 of the LGPL but not with version 2.1, so AirSQL uses Connector/C under
 version" allows. AirSQL's own code links to that library dynamically, which the LGPL allows for a program under other
 terms; AirSQL's licence allows changing AirSQL and reverse engineering it to debug such changes.
 
-The library's source: every AirSQL release attaches the exact Connector/C source it was built from
-(mariadb-connector-c-<version>-src.tar.gz) with scripts/build-mariadb.sh, which holds every build option and any patch.
-The same tarball is at https://archive.mariadb.org/connector-c-<version>/.
+The library's source: every AirSQL release attaches the exact sources it was built from, Connector/C's
+(mariadb-connector-c-<version>-src.tar.gz) and OpenSSL's (openssl-<version>.tar.gz); scripts/build-mariadb.sh holds
+every build option and any patch. The same tarballs are at https://archive.mariadb.org/connector-c-<version>/ and
+https://github.com/openssl/openssl/releases.
 
 To use a changed libmariadb: build it (scripts/build-mariadb.sh, pointed at your source, or your own build with the
 install name @rpath/libmariadb.3.dylib), put it in place of AirSQL.app/Contents/Frameworks/libmariadb.3.dylib, and sign
-the library, then the app, again, for example ad hoc:
+the library, then the app, again (a release's own signature loads only a library signed by AirSQL's maker), for
+example ad hoc:
     codesign --force --sign - AirSQL.app/Contents/Frameworks/libmariadb.3.dylib
     codesign --force --sign - AirSQL.app
 
