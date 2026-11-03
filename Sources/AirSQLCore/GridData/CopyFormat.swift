@@ -177,14 +177,8 @@ public struct CopyWriter {
 
     // MARK: Values
 
-    /// A value as SQL: numbers bare when they read as numbers, BIT digits as b'…', "0x…" hex in binary columns as X'…',
-    /// everything else a quoted string.
     func literal(_ value: String?, _ column: GridColumn) -> String {
-        guard let value else { return "NULL" }
-        if column.kind == .number, CopyWriter.isNumber(value) { return value }
-        if column.type.hasPrefix("bit"), !value.isEmpty, value.allSatisfy({ $0 == "0" || $0 == "1" }) { return "b'\(value)'" }
-        if column.kind == .binary, let digits = CopyWriter.hexDigits(value) { return "X'\(digits)'" }
-        return SQLQuote.string(value, noBackslashEscapes: options.noBackslashEscapes)
+        column.literal(value, noBackslashEscapes: options.noBackslashEscapes)
     }
 
     /// A number as JSON writes one (and SQL reads it): -?(0|[1-9][0-9]*)(.[0-9]+)?([eE][+-]?[0-9]+)?
