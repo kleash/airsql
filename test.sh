@@ -2,8 +2,8 @@
 # Runs the Swift Testing suite. Command Line Tools have no XCTest and keep Testing.framework
 # outside the default search paths, so point the compiler, linker and rpath at it.
 # Extra arguments go to `swift test` (e.g. ./test.sh --filter DriverTests).
-# AIRSQL_LAB=1 ./test.sh also runs the tests against the lab (the Compose project airsql-lab), starting it first
-# (testenv/up.sh).
+# AIRSQL_LAB=1 ./test.sh also runs the tests against the lab (the Compose project airsql-lab): as it runs when all of it
+# does, else after testenv/up.sh, which only the main checkout runs (testenv/AGENT.md).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -16,7 +16,11 @@ fi
 # libmariadb, as build.sh gets it: when vendor/out is missing or was made by another version of its script.
 [ "$(cat vendor/out/stamp 2>/dev/null)" = "$(shasum -a 256 scripts/build-mariadb.sh | cut -d' ' -f1)" ] || scripts/build-mariadb.sh
 if [[ ${AIRSQL_LAB:-} == 1 ]]; then
-    testenv/up.sh
+    docker=/Applications/Docker.app/Contents/Resources/bin/docker
+    [[ -x $docker ]] || docker=docker
+    lab=("$docker" compose -f testenv/docker-compose.yml)
+    running=$("${lab[@]}" ps --services --status running 2>/dev/null | sort) || true
+    [[ -n $running && $running == "$("${lab[@]}" config --services | sort)" ]] || testenv/up.sh
 fi
 clt=$(xcode-select -p)
 fw=$clt/Library/Developer/Frameworks

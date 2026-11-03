@@ -178,13 +178,13 @@ final class FlippedView: NSView {
 
 /// One tab of the strip. Clicks are handled here, without AppKit's tracking loop.
 @MainActor
-final class TabButton: NSView, NSTextFieldDelegate {
+final class TabButton: NSView {
     private weak var bar: TabBarView?
     private(set) weak var tab: Tab?
     private let title = NSTextField(labelWithString: "")
     private let close = NSButton()
     private let dot = DotView(diameter: 6)
-    private var editor: NSTextField?
+    private var editor: RenameField?
     private var selected = false
     private var colour: NSColor?
     private var hovering = false
@@ -299,38 +299,13 @@ final class TabButton: NSView, NSTextFieldDelegate {
 
     func beginRename() {
         guard editor == nil, let tab else { return }
-        let field = NSTextField(string: tab.title)
-        field.font = title.font
-        field.focusRingType = .none
-        field.delegate = self
-        field.toolTip = "Type the tab's new name; Return keeps it, Escape leaves it as it was"
-        field.setAccessibilityIdentifier("tab.rename")
-        field.frame = NSRect(x: 8, y: (bounds.height - 20) / 2, width: bounds.width - 16, height: 20)
-        addSubview(field)
-        title.isHidden = true
-        editor = field
-        window?.makeFirstResponder(field)
-        field.currentEditor()?.selectAll(nil)
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        if selector == #selector(NSResponder.cancelOperation(_:)) {
-            endRename(keep: false)
-            return true
+        let frame = NSRect(x: 8, y: (bounds.height - 20) / 2, width: bounds.width - 16, height: 20)
+        editor = RenameField.show(tab.title, over: title, frame: frame, id: "tab.rename",
+                                  tip: "Type the tab's new name; Return keeps it, Escape leaves it as it was") { [weak self] name in
+            guard let self else { return }
+            self.editor = nil
+            if let name { self.bar?.renamed(self, to: name) }
         }
-        return false
-    }
-
-    func controlTextDidEndEditing(_ notification: Notification) { endRename(keep: true) }
-
-    private func endRename(keep: Bool) {
-        guard let field = editor else { return }
-        editor = nil
-        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        field.delegate = nil
-        field.removeFromSuperview()
-        title.isHidden = false
-        if keep, !text.isEmpty { bar?.renamed(self, to: text) }
     }
 
     /// The renaming field, while it is shown (tests).

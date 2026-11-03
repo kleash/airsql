@@ -143,8 +143,9 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
     weak var window: ReconWindowController?
     let compare = button("Compare", id: "recon.compareButton", tip: "Compare the two databases (⌘R)", target: nil,
                          action: #selector(ReconWindowController.refresh(_:)))
-    let mode = popup(["Structure and Data", "Structure", "Data"], selected: 0, id: "recon.mode",
-                     tip: "Choose what to compare: tables' structure, their rows, or both", target: nil, action: nil)
+    static let modeTip = "Choose what to compare: tables' structure, their rows, or both"
+    static let ignoreTip = "Choose differences the compare doesn't count: AUTO_INCREMENT values, DEFINER, collations, whitespace"
+    let mode = popup(["Structure and Data", "Structure", "Data"], selected: 0, id: "recon.mode", tip: modeTip, target: nil, action: nil)
     let ignore = NSPopUpButton(frame: .zero, pullsDown: true)
     let tables = button("Tables…", id: "recon.tables", tip: "Choose the tables to compare, columns to leave out, a WHERE per table and renamed tables",
                         target: nil, action: #selector(ReconWindowController.showTables(_:)))
@@ -173,7 +174,7 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
             ignore.lastItem?.target = self
             ignore.lastItem?.action = #selector(ruleToggled(_:))
         }
-        ignore.toolTip = "Choose differences the compare doesn't count: AUTO_INCREMENT values, DEFINER, collations, whitespace"
+        ignore.toolTip = Self.ignoreTip
         ignore.setAccessibilityIdentifier("recon.ignore")
         for button in [compare, tables, export, changeset, sync] { button.bezelStyle = .texturedRounded }  // as the main toolbar's
         sync.bezelColor = .controlAccentColor
@@ -222,6 +223,8 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         func set(_ control: NSControl, _ reason: String?, _ tip: String) {
             control.isEnabled = reason == nil
             control.toolTip = reason ?? tip
+            // Its item's tooltip too: AppKit gives it to the control as its accessibility help (what VoiceOver reads).
+            window.window?.toolbar?.items.first { $0.view === control }?.toolTip = control.toolTip
         }
         let noResult = window.result == nil ? "Compare first: then there is something to show" : nil
         set(compare, window.compareBlocked, "Compare the two databases (⌘R)")
@@ -230,6 +233,8 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         set(export, noResult, Commands.exportReport.tip)
         set(changeset, noResult, "Save the sync script as a Liquibase changeset")
         set(sync, noResult, Commands.syncScript.tip)
-        for control in [mode, ignore] as [NSControl] { control.isEnabled = !window.isRunning }
+        let running = window.isRunning ? window.compareBlocked : nil  // "A compare is running…"
+        set(mode, running, Self.modeTip)
+        set(ignore, running, Self.ignoreTip)
     }
 }

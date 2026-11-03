@@ -147,13 +147,15 @@ final class SQLEditorView: NSTextView {
         }
         tokens = new
         highlightedLength = (text as NSString).length
-        let start = prefix > 0 ? new[prefix - 1].range.upperBound : 0
+        // From the token before the first changed one: a word's colour depends on the token after it (name( is a call).
+        let first = max(prefix - 1, 0)
+        let start = first > 0 ? new[first - 1].range.upperBound : 0
         let end = suffix > 0 ? new[new.count - suffix].range.lowerBound : highlightedLength
         guard start <= end else { return }
         let range = NSRange(location: start, length: end - start)
         storage.beginEditing()
         storage.setAttributes([.font: font, .foregroundColor: NSColor.labelColor], range: range)
-        SQLPreviewSheet.colour(storage, tokens: new, prefix..<(new.count - suffix), text: Array(text.utf16), font: font)
+        SQLPreviewSheet.colour(storage, tokens: new, first..<(new.count - suffix), text: Array(text.utf16), font: font)
         storage.endEditing()
     }
 

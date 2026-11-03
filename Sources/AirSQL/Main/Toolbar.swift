@@ -224,6 +224,8 @@ final class CommandToolbarItem: NSToolbarItem {
         let (enabled, why) = command.availability(from: button, otherwise: reason)
         button.isEnabled = enabled
         button.toolTip = enabled ? tip : why
+        // The item's own tooltip too: AppKit gives it to the button as its accessibility help (what VoiceOver reads).
+        if toolTip != button.toolTip { toolTip = button.toolTip }
         isEnabled = enabled
     }
 }

@@ -72,7 +72,8 @@ Also `docs/dev/grid-spec.md` (the grid), `docs/dev/mockups.html` (the look: them
                          # everything signed ad hoc inside out, then codesign --verify --deep --strict
 swift build              # debug build: must have 0 warnings (run the app from build/AirSQL.app, where libmariadb is)
 ./test.sh                # Swift Testing (needs Swift 6); extra args go to swift test: ./test.sh --filter DriverTests
-AIRSQL_LAB=1 ./test.sh   # + the lab suites (starts the lab: testenv/up.sh)
+AIRSQL_LAB=1 ./test.sh   # + the lab suites, on the lab as it runs; when some of it doesn't, testenv/up.sh starts it,
+                         # in the main checkout only: worktrees share that lab and its key and CA (testenv/AGENT.md)
 AIRSQL_SCREENSHOTS=1 ./test.sh --filter ScreenshotTests   # light and dark pictures of each screen, in build/screenshots
 AIRSQL_SCREENSHOTS=1 ./test.sh --filter GridScreenshotTests   # the grid's light and dark pictures, in build/screenshots
 AIRSQL_GRID_FPS=1 ./test.sh -c release -Xswiftc -enable-testing --filter GridFrameRateTests

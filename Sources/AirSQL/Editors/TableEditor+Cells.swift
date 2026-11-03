@@ -26,15 +26,19 @@ extension TableEditorController: NSComboBoxDataSource {
                 if !names.contains(column.type.name.uppercased()) { names.append(column.type.name.uppercased()) }
                 return choice(names, column.type.name.uppercased())
             case "length":
-                return text(column.type.length, placeholder: type?.hint ?? "", enabled: type?.length != EditorColumnType.Length.none)
-            case "unsigned": return check(column.type.unsigned, enabled: type?.numeric ?? false)
+                return because(text(column.type.length, placeholder: type?.hint ?? "", enabled: type?.length != EditorColumnType.Length.none),
+                               "\(column.type.name.uppercased()) takes no length or values")
+            case "unsigned": return because(check(column.type.unsigned, enabled: type?.numeric ?? false), "Only number columns can be unsigned")
             case "null": return check(column.nullable)
             case "default":
                 if let generated = column.generated { return text(generated.expression, placeholder: "expression") }
-                return text(EditorText.defaultValue(column.defaultValue, numeric: type?.numeric ?? false, noBackslashEscapes: nbe),
-                            placeholder: column.autoIncrement ? "counts up" : "none", enabled: !column.autoIncrement)
+                return because(text(EditorText.defaultValue(column.defaultValue, numeric: type?.numeric ?? false, noBackslashEscapes: nbe),
+                                    placeholder: column.autoIncrement ? "counts up" : "none", enabled: !column.autoIncrement),
+                               "An AUTO_INCREMENT column counts up by itself: it has no default")
             case "extra": return choice(Self.extras, extra(column), enabled: Self.extras.map { extraAllowed($0, column) })
-            case "collation": return combo(column.collation ?? "", placeholder: "table's", enabled: type?.text ?? false)
+            case "collation":
+                return because(combo(column.collation ?? "", placeholder: "table's", enabled: type?.text ?? false),
+                               "Only text columns have a collation")
             default: return text(column.comment, placeholder: "")
             }
         case .indexes:
@@ -100,6 +104,12 @@ extension TableEditorController: NSComboBoxDataSource {
     }
 
     // MARK: Controls
+
+    /// `control`, saying `reason` when its column's type turns it off (busy cells are covered by the editor's spinner).
+    private func because<Control: NSControl>(_ control: Control, _ reason: String) -> Control {
+        if !control.isEnabled && !isBusy { control.toolTip = reason }
+        return control
+    }
 
     private func text(_ value: String, placeholder: String, enabled: Bool = true) -> NSTextField {
         let field = ListTextField(string: value)

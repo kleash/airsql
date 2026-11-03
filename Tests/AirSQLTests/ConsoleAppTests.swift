@@ -40,6 +40,8 @@ extension AppTests {
             let tx = main.toolbarController.transactionPopup
             toolbar.validateVisibleItems()
             #expect(button(.run)?.isEnabled == false && button(.run)?.toolTip?.hasPrefix("Connect first: double-click") == true)
+            let help = AXNode.flatten(try #require(main.window)).first { $0.id == "toolbar.run" }?.help
+            #expect(help?.hasPrefix("Connect first: double-click") == true, "VoiceOver reads why too: \(help ?? "")")
             #expect(button(.commit)?.isEnabled == false && button(.commit)?.toolTip == "No transaction is open in this tab")
             #expect(button(.cancel)?.isEnabled == false && button(.cancel)?.toolTip == "Nothing is running in this tab")
             #expect(!tx.isEnabled && tx.toolTip?.hasPrefix("Connect first: double-click") == true)
@@ -117,6 +119,12 @@ extension AppTests {
             }
             #expect(color(at: "select") == .sqlKeyword && color(at: "'from'") == .sqlString && color(at: "-- note") == .sqlComment)
             #expect(color(at: "`from`") == .sqlIdentifier)
+            // A word becomes a call when ( is typed after it, and stops being one when the ( goes.
+            console.editor.setSelectedRange(NSRange(location: (storage.string as NSString).range(of: " t ").location + 3, length: 0))
+            _ = await call(harness, "type", ["text": "("])
+            #expect(color(at: "t (") == .sqlFunction)
+            console.editor.deleteBackward(nil)
+            #expect(color(at: "t where") == .sqlIdentifier)
             #expect(console.isEdited && main.tabBar.buttons.first?.toolTip?.contains("(unsaved)") == true)
 
             #expect(await call(harness, "menu", ["path": "Query > Format SQL"]).error == nil)

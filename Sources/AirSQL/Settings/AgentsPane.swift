@@ -119,9 +119,12 @@ final class AgentsPane: SettingsPaneController {
                 return centred(level)
             default:
                 let samples = checkbox("", id: "settings.agentSampleRows",
-                                       tip: "Let describe show agents a few rows of \(connection.displayName)'s tables",
+                                       tip: connection.agentAccess == .off ? "Choose an access other than Off first: agents see "
+                                           + "nothing of \(connection.displayName)"
+                                           : "Let describe show agents a few rows of \(connection.displayName)'s tables",
                                        on: connection.agentSampleRows, target: self, action: #selector(changed(_:)))
                 samples.isEnabled = connection.agentAccess != .off
+                samples.setAccessibilityLabel("Sample rows of \(connection.displayName)")
                 samples.tag = row
                 return centred(samples)
             }
