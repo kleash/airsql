@@ -2,9 +2,10 @@
 /// JSONSerialization would turn 1.10 into 1.1 and round big integers), only the whitespace between them changes. Used
 /// for MySQL's JSON and MariaDB's (LONGTEXT with a JSON_VALID check) alike, before Apply and in the editor.
 public enum JSONText {
-    /// Throws, saying where (line and column), when the text isn't one JSON value.
-    public static func validate(_ text: String) throws {
-        var parser = Parser(text, layout: nil)
+    /// Throws, saying where (line and column), when the text isn't one JSON value or nests deeper than `maxDepth`
+    /// (MySQL takes 100 levels; MariaDB's JSON_VALID 31).
+    public static func validate(_ text: String, maxDepth: Int = 100) throws {
+        var parser = Parser(text, layout: nil, maxDepth: maxDepth)
         try parser.document()
     }
 
@@ -26,13 +27,15 @@ public enum JSONText {
         let bytes: [UInt8]
         /// nil: check only; "": compact; otherwise the indent of one level.
         let indent: [UInt8]?
+        let maxDepth: Int
         var index = 0
         var depth = 0
         var output: [UInt8] = []
 
-        init(_ text: String, layout: String?) {
+        init(_ text: String, layout: String?, maxDepth: Int = 100) {
             bytes = Array(text.utf8)
             indent = layout.map { Array($0.utf8) }
+            self.maxDepth = maxDepth
         }
 
         mutating func document() throws {
@@ -62,7 +65,7 @@ public enum JSONText {
 
         private mutating func container(close: UInt8, members: Bool) throws {
             depth += 1
-            guard depth <= 100 else { throw problem("It nests deeper than 100 levels, which MySQL refuses") }
+            guard depth <= maxDepth else { throw problem("It nests deeper than \(maxDepth) levels, which the server refuses") }
             emit([bytes[index]])
             index += 1
             skipSpace()

@@ -168,6 +168,11 @@ struct GridEditValueTests {
         for (text, message) in problems {
             #expect(C.result(C.type("json", json: true), text).contains(message), "\(text)")
         }
+        // As deep as each server takes (the lab's MariaDB 11.4 and 11.8 refuse 32 levels, MySQL 8.4 101).
+        let deep = { (levels: Int) in String(repeating: "[", count: levels) + String(repeating: "]", count: levels) }
+        #expect(C.result(C.type("json", json: true), deep(100)).hasPrefix("'"))
+        #expect(C.result(C.type("json", json: true), deep(31), C.mariadb).hasPrefix("'"))
+        #expect(C.result(C.type("json", json: true), deep(32), C.mariadb).contains("deeper than 31 levels"))
         // MariaDB's JSON is LONGTEXT with a JSON_VALID check: checked the same way.
         #expect(C.result(C.type("longtext", charset: "utf8mb4", json: true), #"{"a": 1}"#, C.mariadb) == #"'{\"a\": 1}'"#)
     }

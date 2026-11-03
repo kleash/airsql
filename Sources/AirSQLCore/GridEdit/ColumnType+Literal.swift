@@ -23,7 +23,7 @@ extension ColumnType {
             }
             return SQLQuote.hex(value)
         case .json:
-            try JSONText.validate(text)
+            try JSONText.validate(text, maxDepth: context.flavour == .mariadb ? 31 : 100)
             return SQLQuote.string(text, noBackslashEscapes: context.noBackslashEscapes)
         case .enumeration(let members):
             guard let member = Self.member(text, of: members) else {

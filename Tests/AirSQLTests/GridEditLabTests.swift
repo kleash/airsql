@@ -64,7 +64,14 @@ struct GridEditLabTests {
         // dates, MariaDB's keeps them.
         var refused = [("dt", "2026-02-29"), ("tm", "839:00:00"), ("i", "2147483648"), ("y", "1900"), ("e", "zzz"),
                        ("vb", "0x" + String(repeating: "00", count: 17)), ("l", "中")]
-        if server.flavor == .mariadb { cases.append(("dt", "0000-00-00", "0000-00-00")) } else { refused.append(("dt", "0000-00-00")) }
+        let deep = { (levels: Int) in String(repeating: "[", count: levels) + String(repeating: "]", count: levels) }
+        if server.flavor == .mariadb {
+            cases += [("dt", "0000-00-00", "0000-00-00"), ("j", deep(31), deep(31))]
+            refused.append(("j", deep(32)))
+        } else {
+            cases.append(("j", deep(100), deep(100)))
+            refused += [("dt", "0000-00-00"), ("j", deep(101))]
+        }
         for (column, text, kept) in cases {
             #expect(try await roundTrip(column, text) == kept, "\(column) ← \(text)")
         }
