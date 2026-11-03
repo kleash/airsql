@@ -9,7 +9,7 @@ import AppKit
 @MainActor
 final class Connector {
     /// A connected connection: its sessions, what the server said at login, and the route under them.
-    final class Open {
+    @MainActor final class Open {
         let connection: Connection
         let server: ServerInfo
         /// The route under the sessions: its private socket (nil for Direct) is where the client tools and Terminal
@@ -239,28 +239,27 @@ final class Connector {
     /// Pings idle sessions (except one whose transaction has been open too long), and reports a dropped route or
     /// session: the person reconnects with Connect.
     private func watch(_ connected: Open, id: UUID) {
-        let token = ObjectIdentifier(connected)
-        connected.route.tunnel?.onExit = { [weak self] error in
-            DispatchQueue.main.async { self?.dropped(id, token, error.message) }
+        connected.route.tunnel?.onExit = { [weak self, weak connected] error in
+            DispatchQueue.main.async { self?.dropped(id, connected, error.message) }
         }
-        connected.keepAlive = Timer.scheduledTimer(withTimeInterval: Self.keepAliveInterval, repeats: true) { [weak self] _ in
+        connected.keepAlive = Timer.scheduledTimer(withTimeInterval: Self.keepAliveInterval, repeats: true) {
+            [weak self, weak connected] _ in
             MainActor.assumeIsolated {
-                guard let self, let saved = self.model.connection(id), let connection = self.open[id]?.connection else { return }
+                guard let self, let connected, let saved = self.model.connection(id) else { return }
                 let limit = TimeInterval(self.model.data.safety(for: saved).openTransactionMinutes * 60)
                 Task { [weak self] in
-                    await connection.keepAlive(transactionLimit: limit)
-                    if let main = try? await connection.session(.main), !main.isConnected {
-                        self?.dropped(id, token, AirSQLError.disconnected.message)
+                    await connected.connection.keepAlive(transactionLimit: limit)
+                    if let main = try? await connected.connection.session(.main), !main.isConnected {
+                        self?.dropped(id, connected, AirSQLError.disconnected.message)
                     }
                 }
             }
         }
     }
 
-    /// The connection `token` stands for dropped (if it is still the one open): it is reported, and its sessions and
-    /// route close.
-    private func dropped(_ id: UUID, _ token: ObjectIdentifier, _ message: String) {
-        guard let connected = open[id], ObjectIdentifier(connected) == token else { return }
+    /// `connected` dropped (if it is still the one open): it is reported, and its sessions and route close.
+    private func dropped(_ id: UUID, _ connected: Open?, _ message: String) {
+        guard let connected, open[id] === connected else { return }
         open[id] = nil
         model.states[id] = .failed(message)
         Task { await connected.close() }
