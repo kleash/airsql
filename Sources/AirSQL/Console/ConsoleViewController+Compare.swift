@@ -13,8 +13,8 @@ extension ConsoleViewController {
         case table(database: String, name: String)
     }
 
-    /// Every result tab with rows in this window but `tab` (this console's nearest first), then the tables of the
-    /// console's database, the result's own table first when it is in another.
+    /// Every result tab with rows in this window but `tab` (this console's nearest first), then the tables and views of
+    /// the console's database.
     func compareTargets(for tab: ResultTab) -> [CompareTarget] {
         var targets = resultTabs.reversed().filter { $0 !== tab && $0.content.store != nil }
             .map { CompareTarget.result($0, name: $0.title, connection: connectionID) }
@@ -23,12 +23,7 @@ extension ConsoleViewController {
             targets += console.resultTabs.filter { $0.content.store != nil }
                 .map { .result($0, name: "\(other.title) › \($0.title)", connection: console.connectionID) }
         }
-        let snapshot = model.openConnection(connectionID)?.snapshot
-        if let store = tab.content.store, case let (database?, table) = ResultGridView.table(of: store.columns), database != self.database,
-           snapshot?.table(database, table) != nil {
-            targets.append(.table(database: database, name: table))
-        }
-        if let database, let tables = snapshot?.database(database)?.tables {
+        if let database, let tables = model.openConnection(connectionID)?.snapshot.database(database)?.tables {
             targets += tables.map { .table(database: database, name: $0.name) }
         }
         return targets
@@ -53,6 +48,7 @@ extension ConsoleViewController {
             item.toolTip = tip
             with.menu?.addItem(item)
         }
+        var tables = false
         for (index, target) in targets.enumerated() {
             let item: NSMenuItem
             switch target {
@@ -61,10 +57,9 @@ extension ConsoleViewController {
                 item = NSMenuItem(title: name + other.label.dropFirst(other.title.count), action: nil, keyEquivalent: "")
                 item.toolTip = "Compare with the rows of \(name)"
             case .table(let database, let name):
-                if index == 0 || { if case .result = targets[index - 1] { return true } else { return false } }() {
-                    heading("Tables", "Tables and views of \(self.database ?? database), read when you compare")
-                }
-                item = NSMenuItem(title: database == self.database ? name : "\(database).\(name)", action: nil, keyEquivalent: "")
+                if !tables { heading("Tables", "The tables and views of \(database), read when you compare") }
+                tables = true
+                item = NSMenuItem(title: name, action: nil, keyEquivalent: "")
                 item.toolTip = "Compare with the rows of \(database).\(name) (up to \(ReconTableData.tableRows.formatted()))"
             }
             item.representedObject = target

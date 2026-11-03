@@ -211,7 +211,17 @@ final class ReconDetailView: NSObject {
     /// Made once per object shown, so its selection, sort and scrolling stay while the window updates.
     private func showRows(_ object: ReconObject) {
         guard let data = object.data, let result else { return }
-        if rows == nil {
+        switch data.outcome {
+        case .differentWithoutKey, .tooManyDifferences, .notCompared:
+            message.stringValue = ReconReport.lines(object, result).last?.detail.capitalizedFirst ?? ""
+            message.isHidden = false
+            rowsHolder.isHidden = true
+        case .same:
+            message.stringValue = "The rows of \(object.name) are the same on both sides."
+            message.isHidden = false
+            rowsHolder.isHidden = true
+        case .different:
+            guard rows == nil else { return }
             let names = result.source.name == result.target.name ? (result.source.database, result.target.database)
                 : (result.source.name, result.target.name)
             let diff = DiffSource(data, names: names)
@@ -223,17 +233,6 @@ final class ReconDetailView: NSObject {
             rowsHolder.addSubview(grid)
             grid.pin(to: rowsHolder)
             rows = grid
-        }
-        switch data.outcome {
-        case .differentWithoutKey, .tooManyDifferences, .notCompared:
-            message.stringValue = ReconReport.lines(object, result).last?.detail.capitalizedFirst ?? ""
-            message.isHidden = false
-            rowsHolder.isHidden = true
-        case .same:
-            message.stringValue = "The rows of \(object.name) are the same on both sides."
-            message.isHidden = false
-            rowsHolder.isHidden = true
-        case .different: break
         }
     }
 
