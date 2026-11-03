@@ -1,13 +1,21 @@
-# gitleaks looks for secrets in every commit of every branch (.gitleaks.toml lists its verified false positives): on
-# pushes to main, pull requests and by hand. Any finding fails the run. The scan of the bundled libraries
-# (Connector/C, OpenSSL) for known vulnerabilities joins it with the SBOM, as in AirSCP's security.yml.
+# The README's "Security" badge: on pushes to main, pull requests, by hand, and before every release (a CVE published
+# since the last run shows then). Any finding fails the run. As in AirSCP's security.yml:
+# - OSV-Scanner checks the SBOM (scripts/sbom.sh: MariaDB Connector/C and OpenSSL, as scripts/build-mariadb.sh pins
+#   them) against the OSV database (osv.dev), after showing that it sees these two at all: the same SBOM with older
+#   releases must fail. OSV lists few Connector/C CVEs (most are filed against MariaDB Server), so its release notes
+#   are worth a look when the pin moves.
+# - gitleaks looks for secrets in every commit of every branch (.gitleaks.toml lists its verified false positives).
+# A CVE in Connector/C or OpenSSL is fixed by a newer pin in scripts/build-mariadb.sh.
 name: Security
 
+# Pull requests, merges into main, by hand, and as a gate in release.yml, so no release ships with a known
+# vulnerability in Connector/C or OpenSSL.
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 # A newer push to a pull request replaces its run. Every other run has a group of its own and finishes: a cancelled
 # run (even one still waiting for an earlier one) shows as "failing" on the README's badge.
@@ -24,6 +32,42 @@ permissions:
   contents: read
 
 jobs:
+  dependencies:
+    name: Known vulnerabilities in Connector/C and OpenSSL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: SBOM (scripts/sbom.sh)
+        run: scripts/sbom.sh "$RUNNER_TEMP/sbom.spdx.json"
+
+      - name: OSV-Scanner 2.6.0
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/osv-scanner" \
+            https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64
+          echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+
+      - name: OSV-Scanner sees Connector/C and OpenSSL (Connector/C 3.1.7 and OpenSSL 3.5.0 must fail it)
+        run: |
+          sed -E 's#(pkg:git/github.com/mariadb-corporation/mariadb-connector-c@)[^"]+#\1v3.1.7#; s#(pkg:git/github.com/openssl/openssl@)[^"]+#\1openssl-3.5.0#' \
+            "$RUNNER_TEMP/sbom.spdx.json" > "$RUNNER_TEMP/old.spdx.json"
+          "$RUNNER_TEMP/osv-scanner" scan source --format json -L "$RUNNER_TEMP/old.spdx.json" > "$RUNNER_TEMP/old.json" || true
+          found=$(jq -r '[.results[].packages[] | select(.vulnerabilities | length > 0) | .package.name] | sort | join(" ")' \
+            "$RUNNER_TEMP/old.json" || true)
+          if [ "$found" != "mariadb-connector-c openssl" ]; then
+            echo "::error::OSV-Scanner flagged '$found' instead of both Connector/C 3.1.7 and OpenSSL 3.5.0: it can't see these components, so its scan of the SBOM would prove nothing"
+            exit 1
+          fi
+          echo "OSV-Scanner flags Connector/C 3.1.7 and OpenSSL 3.5.0, so it sees both components."
+
+      - name: OSV-Scanner on the SBOM
+        run: |
+          "$RUNNER_TEMP/osv-scanner" scan source -L "$RUNNER_TEMP/sbom.spdx.json"
+
   secrets:
     name: Secrets in the git history
     runs-on: ubuntu-latest

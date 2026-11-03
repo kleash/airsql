@@ -1,3 +1,8 @@
+---
+title: Change tables, views and routines
+nav_order: 12
+---
+
 # Change tables, views and routines
 
 AirSQL edits a table's structure in a form, and views, procedures, functions, triggers and events as the CREATE

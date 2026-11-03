@@ -1,3 +1,8 @@
+---
+title: Liquibase changelogs
+nav_order: 16
+---
+
 # Liquibase changelogs
 
 AirSQL writes [Liquibase](https://www.liquibase.com) changelogs in Liquibase's **formatted SQL**: plain SQL with

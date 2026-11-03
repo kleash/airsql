@@ -18,9 +18,13 @@ final class AppModel: ObservableObject {
     }
     /// Connections that aren't idle: connecting, connected, or failed. Set by whatever connects.
     @Published var states: [UUID: ConnectionState] = [:]
+    /// The connected connections: their sessions and schema caches (`attach`, `detach`).
+    @Published var open: [UUID: OpenConnection] = [:]
     /// What the status bar's agent chip says ("Claude Code · reading schema"); nil hides it. Set by agent access.
     @Published var agentStatus: String?
     let activity: ActivityCenter
+    /// Connects and disconnects; the connected connections' sessions are `connector.open[id]?.connection`.
+    lazy var connector = Connector(model: self)
     /// Saved passwords by Keychain key (a connection's id): the Keychain, off the main thread; tests replace them.
     var savedPassword: (String) -> String? = { Keychain.password(forKey: $0) }
     var setSavedPassword: (String, String?) -> Void = { Keychain.setPassword($1, forKey: $0) }
@@ -69,32 +73,38 @@ final class AppModel: ObservableObject {
         return result
     }
 
-    /// A copy of a connection named "<name> copy", with its saved password, saved after it.
+    /// A copy of a connection named "<name> copy", with its saved passwords (the database's, its SSH hosts', its
+    /// proxy's), saved after it.
     @discardableResult
     func duplicate(_ id: UUID) -> SavedConnection? {
-        guard var copy = connection(id) else { return nil }
-        let original = copy.id
+        guard let original = connection(id) else { return nil }
+        var copy = original
         copy.id = UUID()
         copy.name = copy.displayName + " copy"
         save(copy)
-        let read = savedPassword, write = setSavedPassword, key = copy.id.uuidString
+        let read = savedPassword, write = setSavedPassword, keys = Array(zip(original.secretKeys, copy.secretKeys))
         // The Keychain may wait for the person (a locked keychain): not on the main thread.
         DispatchQueue.global(qos: .userInitiated).async {
-            if let password = read(original.uuidString) { write(key, password) }
+            for (from, to) in keys {
+                if let password = read(from) { write(to, password) }
+            }
         }
         return copy
     }
 
     /// Forgets connections and their saved passwords and table settings.
     func delete(_ ids: Set<UUID>) {
+        let keys = data.connections.filter { ids.contains($0.id) }.flatMap(\.secretKeys)
+        for id in ids { connector.disconnect(id) }
         data.connections.removeAll { ids.contains($0.id) }
-        for id in ids { states[id] = nil }
+        for id in ids {
+            states[id] = nil
+            detach(id)
+        }
         let write = setSavedPassword
         DispatchQueue.global(qos: .userInitiated).async {
-            for id in ids {
-                write(id.uuidString, nil)
-                TableViewSettingsStore.shared.removeAll(connection: id)
-            }
+            for key in keys { write(key, nil) }
+            for id in ids { TableViewSettingsStore.shared.removeAll(connection: id) }
         }
     }
 }

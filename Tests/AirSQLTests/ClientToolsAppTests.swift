@@ -62,7 +62,7 @@ extension AppTests {
             return node?["value"] as? String ?? node?["title"] as? String ?? ""
         }
 
-        @Test func theToolsCommandsWorkOnADirectConnectionAndSayWhyNotElsewhere() async throws {
+        @Test func theToolsCommandsWorkOnADirectOrConnectedConnectionAndSayWhyNotElsewhere() async throws {
             let (main, _) = Self.window()
             let tools = try #require(main.nextResponder as? ToolsResponder)
             for action in [Commands.export.action, Commands.restore.action, Commands.runSQLFile.action, Commands.openInTerminal.action] {
@@ -71,6 +71,9 @@ extension AppTests {
             main.sidebar.select([Fixtures.staging.id])
             main.refresh()
             #expect(tools.availability(Commands.export.action).1?.contains("SSH") == true)
+            // Connected, an SSH route works too: the tools go through its socket.
+            _ = await openReplayed(main.model, Fixtures.staging.id)
+            #expect(tools.availability(Commands.export.action).0)
             var readOnly = ToolFixtures.local
             readOnly.readOnly = true
             let (other, _) = Self.window([readOnly])

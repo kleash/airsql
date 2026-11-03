@@ -1,5 +1,6 @@
 ---
 title: The SQL console
+nav_order: 9
 ---
 
 # The SQL console

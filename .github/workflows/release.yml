@@ -1,0 +1,217 @@
+# Releases AirSQL for a tag vX.Y.Z (VERSION must say X.Y.Z), as AirSCP's release.yml does: the notarized universal app as
+# AirSQL-X.Y.Z.zip with its SHA-256; the exact source of the libmariadb inside it (Connector/C's and OpenSSL's tarballs,
+# as scripts/build-mariadb.sh pins and checks them: NOTICE's offer of the library's source); the MCP bundle airsql.mcpb
+# with its SHA-256 (scripts/build-mcpb.sh, when the tag has it); the SBOM sbom.spdx.json; signed build provenance for the
+# files this run built (AirSQL-X.Y.Z.intoto.jsonl); the GitHub Release with notes; and the Homebrew cask
+# (packaging/homebrew/Casks/airsql.rb with this version and SHA-256) in kleash/homebrew-tap. Runs when the tag is pushed,
+# when a release is published (for example by `gh release create`), or by hand (Actions ▸ Release ▸ Run workflow, with
+# the tag).
+#
+# The app is built, signed and notarized here when the signing secrets exist (DEVELOPER_ID_P12: the base64 of the
+# Developer ID Application .p12, DEVELOPER_ID_P12_PASSWORD, NOTARY_KEY: the base64 of an App Store Connect API key's
+# .p8, NOTARY_KEY_ID, NOTARY_ISSUER). Without them the release must already have the zip that scripts/release-local.sh
+# made on a Mac with the Developer ID (gh release create vX.Y.Z build/AirSQL-X.Y.Z.zip …): it is checked and used as it
+# is. TAP_TOKEN (a token that can write to kleash/homebrew-tap) lets it update the cask; without it the cask is in the
+# run's summary. The whole procedure: docs/dev/release.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag to release, e.g. v1.0.0"
+        required: true
+
+concurrency:
+  group: release-${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+# bash with pipefail, so that `… | tee log` fails when the command does.
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
+
+jobs:
+  # No release ships with a known vulnerability in Connector/C or OpenSSL: the same scan as pull requests, first.
+  scan:
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+
+  release:
+    needs: scan
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: write       # the GitHub Release and its files
+      id-token: write       # to sign the build provenance (Sigstore)
+      attestations: write   # to keep it with the repository's artifact attestations
+    env:
+      # As ci.yml: the Command Line Tools alone (no Xcode project).
+      DEVELOPER_DIR: /Library/Developer/CommandLineTools
+      GH_TOKEN: ${{ github.token }}
+      HAS_SIGNING: ${{ secrets.DEVELOPER_ID_P12 != '' }}
+      HAS_TAP: ${{ secrets.TAP_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+
+      - name: Version
+        id: version
+        run: |
+          version=$(tr -d '[:space:]' < VERSION)
+          [ "v$version" = "$TAG" ] || { echo "::error::VERSION says $version, the tag is $TAG"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      # As ci.yml: the runner's newest Command Line Tools default to macOS 27's SDK, whose SwiftUI needs a macro plugin
+      # that only Xcode has. Build with the macOS 26 SDK they also ship.
+      - name: macOS 26 SDK
+        run: |
+          sdk=$(ls -d /Library/Developer/CommandLineTools/SDKs/MacOSX26*.sdk 2>/dev/null | sort -V | tail -n 1)
+          [ -n "$sdk" ] || { echo "::error::no macOS 26 SDK in the Command Line Tools"; exit 1; }
+          echo "SDKROOT=$sdk" >> "$GITHUB_ENV"
+
+      # With the signing secrets: build, sign and notarize here. No cache: libmariadb is built from its pinned sources.
+      - name: Sign and notarize (scripts/release-local.sh)
+        if: env.HAS_SIGNING == 'true'
+        env:
+          DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+        run: |
+          keychain=$RUNNER_TEMP/signing.keychain-db
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$DEVELOPER_ID_P12" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user | tr -d '"' | xargs security list-keychains -d user -s "$keychain"
+          echo "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          NOTARY_KEY_PATH=$RUNNER_TEMP/notary.p8 scripts/release-local.sh
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/notary.p8"
+
+      # Without them: the notarized zip made on a Mac, already on the release.
+      - name: Use the zip on the release
+        if: env.HAS_SIGNING != 'true'
+        run: |
+          mkdir -p build
+          if ! gh release download "$TAG" --pattern "AirSQL-$VERSION.zip" --dir build --clobber; then
+            echo "::error::No signing secrets, and the release $TAG has no AirSQL-$VERSION.zip. On the Mac with the Developer ID: scripts/release-local.sh, then gh release upload $TAG build/AirSQL-$VERSION.zip build/AirSQL-$VERSION.zip.sha256, then run this workflow again (Actions ▸ Release ▸ Run workflow, tag $TAG)."
+            exit 1
+          fi
+          (cd build && shasum -a 256 "AirSQL-$VERSION.zip" > "AirSQL-$VERSION.zip.sha256")
+
+      # This version, universal, notarized (so Developer ID signed with the hardened runtime), and it starts: under
+      # library validation it loads libmariadb only when the library has the app's team.
+      - name: Check the app in the zip
+        run: |
+          rm -rf "$RUNNER_TEMP/check" && mkdir "$RUNNER_TEMP/check"
+          ditto -x -k "build/AirSQL-$VERSION.zip" "$RUNNER_TEMP/check"
+          app=$RUNNER_TEMP/check/AirSQL.app
+          [ "$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")" = "$VERSION" ] \
+            || { echo "::error::the app in the zip isn't version $VERSION"; exit 1; }
+          for file in "$app/Contents/MacOS/AirSQL" "$app/Contents/Frameworks/libmariadb.3.dylib"; do
+            [ "$(lipo -archs "$file")" = "x86_64 arm64" ] || { echo "::error::$file isn't universal"; exit 1; }
+          done
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=4 "$app" \
+            || { echo "::error::Gatekeeper doesn't accept the app: it isn't notarized (see docs/dev/release.md)"; exit 1; }
+          "$app/Contents/MacOS/AirSQL" --version | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # The exact source of that libmariadb: in vendor/out/source once scripts/build-mariadb.sh has run (here, when
+      # release-local.sh built the app; otherwise it builds now, from the tag's pins).
+      - name: Library source (Connector/C and OpenSSL)
+        run: scripts/build-mariadb.sh
+
+      - name: MCP bundle (airsql.mcpb)
+        run: |
+          if [ -f scripts/build-mcpb.sh ]; then
+            scripts/build-mcpb.sh
+          else
+            echo "No scripts/build-mcpb.sh at $TAG: this release has no MCP bundle."
+          fi
+
+      - name: SBOM (sbom.spdx.json)
+        run: scripts/sbom.sh build/sbom.spdx.json
+
+      # SLSA build provenance, signed with Sigstore through GitHub's artifact attestations, for the files this run
+      # built: the SBOM, the bundle and, when the app was built and notarized here, the zip. A zip made on the Mac
+      # (scripts/release-local.sh) is left out, because this run didn't build it; the source tarballs are downloads
+      # that the SBOM names with their SHA-256. How to check: docs/dev/release.md.
+      - name: Build provenance
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            build/sbom.spdx.json
+            ${{ hashFiles('scripts/build-mcpb.sh') != '' && 'build/airsql.mcpb' || '' }}
+            ${{ env.HAS_SIGNING == 'true' && format('build/AirSQL-{0}.zip', steps.version.outputs.version) || '' }}
+
+      - name: GitHub Release
+        env:
+          PROVENANCE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          cp "$PROVENANCE" "build/AirSQL-$VERSION.intoto.jsonl"
+          files=("build/AirSQL-$VERSION.zip" "build/AirSQL-$VERSION.zip.sha256" build/sbom.spdx.json
+            "build/AirSQL-$VERSION.intoto.jsonl" vendor/out/source/*.tar.gz)
+          [ ! -f build/airsql.mcpb ] || files+=(build/airsql.mcpb build/airsql.mcpb.sha256)
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+            gh release edit "$TAG" --draft=false
+          else
+            cat > "$RUNNER_TEMP/notes.md" <<EOF
+          Install with Homebrew:
+
+          \`\`\`sh
+          brew install --cask kleash/tap/airsql
+          \`\`\`
+
+          Or download **AirSQL-$VERSION.zip** below, unzip it and drag AirSQL to Applications. macOS 13.1 or later, Apple silicon and Intel.
+          SHA-256: \`$(cut -d' ' -f1 "build/AirSQL-$VERSION.zip.sha256")\`
+
+          The two \`.tar.gz\` files are the exact source of the client library inside the app (MariaDB Connector/C, with the OpenSSL it contains); NOTICE says how to use your own build of it.
+          EOF
+            gh release create "$TAG" "${files[@]}" --verify-tag --title "AirSQL $VERSION" \
+              --notes-file "$RUNNER_TEMP/notes.md" --generate-notes
+          fi
+
+      # The cask with this version and the zip's SHA-256: written to kleash/homebrew-tap with TAP_TOKEN (through the
+      # API, so the token never sits in a git remote), otherwise put in the run's summary to add by hand.
+      - name: Homebrew cask (kleash/homebrew-tap)
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+        run: |
+          sha=$(cut -d' ' -f1 "build/AirSQL-$VERSION.zip.sha256")
+          sed -e '/^#/d' -e "s/^  version \".*\"$/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"$/  sha256 \"$sha\"/" \
+            packaging/homebrew/Casks/airsql.rb > build/airsql.rb
+          grep -q "^  version \"$VERSION\"$" build/airsql.rb && grep -q "^  sha256 \"$sha\"$" build/airsql.rb \
+            || { echo "::error::packaging/homebrew/Casks/airsql.rb has no version or sha256 line to fill"; exit 1; }
+          if [ "$HAS_TAP" != true ]; then
+            { echo "### Homebrew cask: no TAP_TOKEN, so add this as Casks/airsql.rb in kleash/homebrew-tap"
+              echo '```ruby'; cat build/airsql.rb; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          tap=repos/kleash/homebrew-tap/contents/Casks/airsql.rb
+          old=$(GH_TOKEN=$TAP_TOKEN gh api "$tap" --jq .sha 2>/dev/null) || old=
+          if [ "$old" = "$(git hash-object build/airsql.rb)" ]; then echo "The cask is already at $VERSION."; exit 0; fi
+          args=(-X PUT "$tap" -f message="AirSQL $VERSION" -f content="$(base64 < build/airsql.rb)")
+          [ -z "$old" ] || args+=(-f sha="$old")
+          GH_TOKEN=$TAP_TOKEN gh api "${args[@]}" > /dev/null
+          echo "kleash/homebrew-tap: Casks/airsql.rb at $VERSION."

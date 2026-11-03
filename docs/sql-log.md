@@ -1,5 +1,6 @@
 ---
 title: SQL log
+nav_order: 7
 ---
 
 # The SQL log

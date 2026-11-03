@@ -114,7 +114,9 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
             connectionPopup.toolTip = "The connection this window works on: choose another to show it"
         }
         databasePopup.isEnabled = false
-        databasePopup.toolTip = active == nil ? "Choose a connection first" : "Connect to choose the database the console uses"
+        databasePopup.toolTip = active == nil ? "Choose a connection first"
+            : model.openConnection(active?.id) == nil ? "Connect to choose the database the console uses"
+            : "Change the console's database with USE in the console"
         validateResponders()
         for (popup, item) in popupItems { item.toolTip = popup.toolTip }
     }

@@ -83,7 +83,10 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
             guard let connection = main.activeConnection else {
                 return main.selectedConnections.count > 1 ? "Select only one connection" : "Select a connection in the sidebar first"
             }
-            return connection.route == .direct ? nil : "Liquibase changelogs reach SSH and proxy routes once AirSQL has connected through them"
+            if connection.route != .direct, main.model.openConnection(connection.id) == nil {
+                return "Connect to \(connection.displayName) first: the changelog is read through its SSH or proxy route"
+            }
+            return nil
         }
     }
 }

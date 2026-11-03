@@ -1,3 +1,8 @@
+---
+title: Settings
+nav_order: 4
+---
+
 # Settings
 
 Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.

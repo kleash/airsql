@@ -1,5 +1,6 @@
 ---
 title: Read-only queries
+nav_order: 8
 ---
 
 # Read-only queries

@@ -1,0 +1,57 @@
+# AirSQL Help, the documentation site, as AirSCP's: GitHub Pages builds it from this folder (main branch, /docs) with the
+# Just the Docs theme as a remote theme: no Gemfile and no workflow to keep up, and it gives the side navigation and
+# the search box. Each page's front matter has its title and its place in the navigation (nav_order). llms.txt and
+# llms-full.txt (scripts/llms.sh) are published as they are.
+title: AirSQL Help
+description: How to use AirSQL, the Mac app for MySQL and MariaDB.
+url: https://kleash.github.io
+baseurl: /airsql
+lang: en
+
+remote_theme: just-the-docs/just-the-docs@v0.12.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-include-cache
+  - jekyll-relative-links # links between pages are written to the .md files, so they work on GitHub too
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+color_scheme: light
+search_enabled: true
+search:
+  heading_level: 2
+  previews: 2
+  button: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: Back to top
+
+aux_links:
+  AirSQL on GitHub: https://github.com/kleash/airsql
+aux_links_new_tab: true
+
+gh_edit_link: true
+gh_edit_link_text: Improve this page on GitHub
+gh_edit_repository: https://github.com/kleash/airsql
+gh_edit_branch: main
+gh_edit_source: docs
+gh_edit_view_mode: edit
+
+footer_content: >-
+  AirSQL is free and open source (Apache 2.0).
+  Something wrong? <a href="https://github.com/kleash/airsql/issues/new">Report a problem</a>.
+
+kramdown:
+  syntax_highlighter_opts:
+    block:
+      line_numbers: false
+
+# Notes for people who work on AirSQL, not pages of the help.
+exclude:
+  - dev/

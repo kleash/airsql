@@ -42,6 +42,17 @@ func sidebarRow(_ main: MainWindowController, _ name: String) -> (Double, Double
     return nil
 }
 
+/// The middle of the sidebar row of the folder named `name`.
+@MainActor
+func folderRow(_ main: MainWindowController, _ name: String) -> (Double, Double)? {
+    guard let id = main.model.data.folders.first(where: { $0.name == name })?.id else { return nil }
+    let outline = main.sidebar.outline
+    for row in 0..<outline.numberOfRows where (outline.item(atRow: row) as? SidebarNode)?.kind == .folder(id) {
+        return windowPoint(outline.rect(ofRow: row), in: outline)
+    }
+    return nil
+}
+
 /// The tab button showing `title`.
 @MainActor
 func tabButton(_ main: MainWindowController, _ title: String) -> TabButton {
@@ -56,20 +67,27 @@ func statusItem(_ item: StatusItemView) -> (Double, Double)? {
 extension AppTests {
     @MainActor @Suite struct InteractionTests {
         static let surfaces: [Surface] = [
+            // Production is connected: a double-click shows it (its tab) rather than connecting again.
             Surface(name: "Connection in the sidebar",
-                    place: { main, _ in sidebarRow(main, "Staging · shop") },
-                    clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.staging.id] && $0.contentKind == "summary" },
-                    doubleClicked: { _, received in received.contains("connect(_:)") },
+                    place: { main, _ in sidebarRow(main, "Production · shop") },
+                    clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.production.id]
+                        && $0.selectedTab?.connectionID == Fixtures.production.id },
+                    doubleClicked: { main, _ in
+                        main.window?.attachedSheet == nil && main.selectedTab?.connectionID == Fixtures.production.id
+                            && main.model.states[Fixtures.production.id] == .connected(server: "MariaDB 11.8.3")
+                    },
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
                            "Compare…", "Colour", "Delete…"],
-                    enabled: ["Duplicate", "Colour", "Delete…"]),
-            Surface(name: "Direct connection in the sidebar",
-                    place: { main, _ in sidebarRow(main, "Local MariaDB 11.8") },
-                    clicked: { $0.sidebar.selectedConnectionIDs == [Fixtures.local.id] && $0.contentKind == "summary" },
-                    doubleClicked: { _, received in received.contains("connect(_:)") },
-                    menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
-                           "Compare…", "Colour", "Delete…"],
-                    enabled: ["Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour", "Delete…"]),
+                    enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour",
+                              "Delete…"]),
+            Surface(name: "Folder in the sidebar",
+                    place: { main, _ in folderRow(main, "Clients") },
+                    clicked: { $0.sidebar.selectedFolderNodeID == InteractionTests.folder.id },
+                    doubleClicked: { main, _ in
+                        main.sidebar.outline.isItemExpanded(main.sidebar.selectedNodes.first) == false
+                    },
+                    menu: ["New Connection…", "New Folder…", "Rename Folder…", "Delete Folder…"],
+                    enabled: ["New Connection…", "New Folder…", "Rename Folder…", "Delete Folder…"]),
             Surface(name: "Editor tab",
                     place: { main, _ in
                         main.open(FixtureContent(), title: "Query 1", connection: Fixtures.production.id)
@@ -86,6 +104,7 @@ extension AppTests {
                     place: { main, _ in
                         let console = ConsoleViewController(model: main.model, connection: Fixtures.production.id)
                         main.open(console, title: "Query 1", connection: Fixtures.production.id)
+                        try? await Task.sleep(nanoseconds: 100_000_000)  // shown: the editor and results take their share
                         console.addResult(ConsoleFixtures.customers(rows: 3), title: "Top customers", summary: "38 ms · 3 rows")
                         console.selectResult(console.messagesTab)
                         main.window?.layoutIfNeeded()
@@ -132,18 +151,24 @@ extension AppTests {
                     clicked: { _ in true },
                     doubleClicked: { _, received in received.contains("showSQLLog(_:)") },
                     menu: ["SQL Log", "Clear SQL Log"], enabled: ["SQL Log"]),
-        ]
+        ] + navigatorSurfaces
 
         /// A window in the state every row starts from: the shop's connections, Production connected, a transaction
         /// open in its tab, an agent at work and an export running.
-        static func window() -> (MainWindowController, AgentServer, CommandRecorder, Activity) {
-            let model = testModel(Fixtures.shop)
+        /// The folder the local connection sits in.
+        static let folder = ConnectionFolder(name: "Clients")
+
+        static func window() async -> (MainWindowController, AgentServer, CommandRecorder, Activity) {
+            var local = Fixtures.local
+            local.folderID = folder.id
+            let model = testModel([Fixtures.production, Fixtures.staging, local, Fixtures.replica], folders: [folder])
             model.data.settings.agentsAllowed = true
             let (main, harness) = appWindow(model)
             let recorder = CommandRecorder()
             recorder.nextResponder = main.nextResponder
             main.nextResponder = recorder
             model.states[Fixtures.production.id] = .connected(server: "MariaDB 11.8.3")
+            await openReplayed(model, Fixtures.production.id)
             let content = FixtureContent()
             content.badge = "Transaction open · 2 changes"
             main.open(content, title: "Top customers.sql", connection: Fixtures.production.id)
@@ -154,8 +179,10 @@ extension AppTests {
         }
 
         /// The rows' names, for the test's arguments (`surfaces` holds their checks).
-        nonisolated static let rows = ["Connection in the sidebar", "Direct connection in the sidebar", "Editor tab", "Result tab", "Status bar: route", "Status bar: server",
-                                       "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log"]
+        nonisolated static let rows = ["Connection in the sidebar", "Folder in the sidebar", "Editor tab", "Result tab", "Status bar: route",
+                                       "Status bar: server", "Status bar: transaction", "Status bar: activity", "Status bar: agents", "Status bar: SQL log",
+                                       "Database in the tree", "Table or view in the tree", "Routine, trigger or event",
+                                       "Folder or category in the tree", "Table in the database view", "Process list row"]
 
         @Test func everyRowHasItsChecks() {
             #expect(Self.surfaces.map(\.name) == Self.rows)
@@ -164,7 +191,7 @@ extension AppTests {
         @Test(arguments: InteractionTests.rows)
         func surfaceAnswersEveryClick(_ row: String) async throws {
             let surface = try #require(Self.surfaces.first { $0.name == row })
-            let (main, harness, recorder, work) = Self.window()
+            let (main, harness, recorder, work) = await Self.window()
             defer { work.end() }
             let window = try #require(main.window)
             window.layoutIfNeeded()
@@ -202,7 +229,7 @@ extension AppTests {
         }
 
         @Test func rightClickSelectsTheRowUnderThePointerAndKeepsAMultipleSelection() async throws {
-            let (main, harness, _, work) = Self.window()
+            let (main, harness, _, work) = await Self.window()
             defer { work.end() }
             let staging = try #require(sidebarRow(main, "Staging · shop"))
             let local = try #require(sidebarRow(main, "Local MariaDB 11.8"))

@@ -188,8 +188,8 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
             reason = "Type the name of the database to copy into"
         } else if let target, target.readOnly {
             reason = "\(target.displayName) is read-only: turn that off in its settings to copy to it"
-        } else if let target, target.route != .direct {
-            reason = "Copies reach SSH and proxy routes once AirSQL has connected through them"
+        } else if let target, target.route != .direct, model.openConnection(target.id) == nil {
+            reason = "Connect to \(target.displayName) first: copies go through its SSH or proxy route"
         } else if let target, target.host == connection.host, target.port == connection.port, target.socket == connection.socket,
                   names.contains(where: { $0.key == $0.value }) {
             reason = "That is this server: type another database name to copy into"

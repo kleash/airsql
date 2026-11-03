@@ -6,8 +6,10 @@ import UniformTypeIdentifiers
 /// with SQL in it (the navigator's Generate SELECT, agents' open_in_console). The console's own commands reach the
 /// console shown even while the sidebar has the focus.
 extension MainWindowController: AgentConsoles {
+    /// A new console on the active connection, which starts connecting if it isn't connected.
     @objc func newQuery(_ sender: Any?) {
         guard let connection = activeConnection else { return NSSound.beep() }
+        if !isConnected(connection.id) { model.connector.connect(connection.id, on: window) }
         openConsole(text: "", title: nil, connection: connection.id)
     }
 
@@ -69,15 +71,6 @@ extension MainWindowController: AgentConsoles {
         (tab.content as? ConsoleViewController)?.note(.info, "An agent proposed this SQL: read it before you run it. Nothing "
                                                        + "runs until you press Run.")
         return tab
-    }
-
-    /// A console command sent while the focus is elsewhere in the window (the sidebar, the tab bar) goes to the console
-    /// shown, as the toolbar's Run does.
-    override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        if let console = selectedTab?.content as? ConsoleViewController, console.isViewLoaded, console.responds(to: action) {
-            return console
-        }
-        return super.supplementalTarget(forAction: action, sender: sender)
     }
 }
 
