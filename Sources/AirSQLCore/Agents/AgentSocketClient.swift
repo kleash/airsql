@@ -1,4 +1,4 @@
-// Ported from AirSCP 1.4.0 Sources/AirSCPCore/Askpass.swift (exchange, unixAddress) and AgentBridge.swift (directory,
+// Ported from AirSCP 1.4.0 Sources/AirSCPCore/Askpass.swift (exchange) and AgentBridge.swift (directory,
 // socketPathProblem).
 import Darwin
 import Foundation
@@ -17,7 +17,7 @@ public enum AgentSocket {
         defer { close(fd) }
         var on: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
-        guard var address = unixAddress(path), withUnsafePointer(to: &address, { pointer in
+        guard var address = Askpass.unixAddress(path), withUnsafePointer(to: &address, { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
         }) == 0 else { return nil }
         guard let body = try? JSONSerialization.data(withJSONObject: request),
@@ -45,21 +45,9 @@ public enum AgentSocket {
         return reply
     }
 
-    static func unixAddress(_ path: String) -> sockaddr_un? {
-        var address = sockaddr_un()
-        address.sun_family = sa_family_t(AF_UNIX)
-        let bytes = Array(path.utf8)
-        guard bytes.count < MemoryLayout.size(ofValue: address.sun_path) else { return nil }
-        withUnsafeMutableBytes(of: &address.sun_path) { raw in
-            raw.copyBytes(from: bytes)
-            raw[bytes.count] = 0
-        }
-        return address
-    }
-
     /// Why agents can't use `socket`: a path longer than a socket's (a long AIRSQL_SUPPORT_DIR).
     static func socketPathProblem(_ socket: String) -> String? {
-        guard unixAddress(socket) == nil else { return nil }
+        guard Askpass.unixAddress(socket) == nil else { return nil }
         return "The settings folder's path is too long for the agent socket (\(socket.utf8.count) bytes; a socket's path "
             + "may have 103): use a shorter folder (AIRSQL_SUPPORT_DIR)."
     }
@@ -67,7 +55,7 @@ public enum AgentSocket {
     /// Whether something listens at `path` (a socket left by a crash doesn't).
     static func answers(_ path: String) -> Bool {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0, var address = unixAddress(path) else { return false }
+        guard fd >= 0, var address = Askpass.unixAddress(path) else { return false }
         defer { close(fd) }
         return withUnsafePointer(to: &address) { pointer in
             pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }

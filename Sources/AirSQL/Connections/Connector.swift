@@ -58,8 +58,6 @@ final class Connector {
         LoginDialog.ask = { [weak self] prompt, secret in self?.askDialog(prompt, secret: secret) }
     }
 
-    func isConnecting(_ id: UUID) -> Bool { connecting[id] != nil }
-
     /// Connects `id` unless it is connected or connecting; prompts and the Trust sheet show on `window`.
     func connect(_ id: UUID, on window: NSWindow?) {
         guard let saved = model.connection(id), open[id] == nil, connecting[id] == nil else { return }

@@ -44,7 +44,7 @@ extension ResultStore.Column {
         return GridColumn(name: name, type: typeName, kind: kind, isKey: flags & UInt32(PRI_KEY_FLAG) != 0, marks: marks)
     }
 
-    /// The column's type as the header's second line shows it: "int unsigned", "varchar", "decimal", "datetime".
+    /// The column's type as the header's second line and agents' replies show it: "int unsigned", "varchar", "datetime".
     public var typeName: String {
         let names: [enum_field_types: String] = [
             MYSQL_TYPE_TINY: "tinyint", MYSQL_TYPE_SHORT: "smallint", MYSQL_TYPE_INT24: "mediumint", MYSQL_TYPE_LONG: "int",
@@ -55,7 +55,7 @@ extension ResultStore.Column {
             MYSQL_TYPE_VARCHAR: "varchar", MYSQL_TYPE_VAR_STRING: isBinary ? "varbinary" : "varchar",
             MYSQL_TYPE_STRING: isBinary ? "binary" : "char", MYSQL_TYPE_TINY_BLOB: isBinary ? "tinyblob" : "tinytext",
             MYSQL_TYPE_BLOB: isBinary ? "blob" : "text", MYSQL_TYPE_MEDIUM_BLOB: isBinary ? "mediumblob" : "mediumtext",
-            MYSQL_TYPE_LONG_BLOB: isBinary ? "longblob" : "longtext", MYSQL_TYPE_NULL: "null",
+            MYSQL_TYPE_LONG_BLOB: isBinary ? "longblob" : "longtext", MYSQL_TYPE_NULL: "null", MYSQL_TYPE_VECTOR: "vector",
         ]
         let name = names[type] ?? ""
         return isNumeric && flags & UInt32(UNSIGNED_FLAG) != 0 ? name + " unsigned" : name

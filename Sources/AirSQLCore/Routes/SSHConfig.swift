@@ -75,7 +75,11 @@ public enum SSHConfig {
                 return "The host or user name of \(name) can't start with - or contain spaces, quotes, commas or #."
             }
             if hop.login == .keyFile && hop.keyFile.isEmpty { return "Choose the key file of \(name), or log in another way." }
-            if hop.keyFile.contains("\"") { return "The key file of \(name) has a quote in its path, which ssh can't read." }
+            // A newline or control character would break onto a new ssh_config line (a quote in value() can't hold it)
+            // and inject directives; a quote has no escape. A real key path has none, so reject them, as host/user are.
+            if hop.keyFile.contains(where: { $0 == "\"" || $0.unicodeScalars.contains { $0.value < 0x20 || $0.value == 0x7F } }) {
+                return "The key file of \(name) has a quote, line break or control character in its path, which ssh can't read."
+            }
         }
         if Set(hops.map(\.host)).count < hops.count {
             return "Two hops of this route have the same host name; each hop needs a name of its own."

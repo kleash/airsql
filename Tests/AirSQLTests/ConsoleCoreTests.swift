@@ -73,6 +73,17 @@ struct StatementCheckTests {
         #expect(risk("TRUNCATE TABLE t")?.kind == .truncate && risk("TRUNCATE t")?.object == "t")
         #expect(risk("SELECT * FROM t") == nil && risk("INSERT INTO t SELECT * FROM u") == nil)
     }
+
+    /// A destructive statement hidden behind a version-gated comment the server skips still asks (plan §2.10): the
+    /// lexer reads the skipped comment as a comment, so the DROP/TRUNCATE after its */ is a real statement.
+    @Test func riskSeesStatementsHiddenBehindAVersionGatedComment() {
+        func risk(_ sql: String) -> StatementCheck.Risk? { StatementCheck.risk(sql, noBackslashEscapes: false) }
+        #expect(risk("/*!99999 ' */ DROP TABLE shop.t -- ' */")
+            == StatementCheck.Risk(kind: .drop, verb: "DROP", objectType: "table", object: "shop.t"))
+        #expect(risk("/*M!999999 ' */ TRUNCATE shop.t -- ' */")?.kind == .truncate)
+        #expect(risk("/*!99999 ' */ UPDATE shop.t SET a = 1 -- ' */")?.kind == .unboundedWrite)
+        #expect(StatementCheck.writes("/*!99999 ' */ DROP TABLE shop.t -- ' */", noBackslashEscapes: false))
+    }
 }
 
 struct SQLFormatterTests {

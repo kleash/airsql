@@ -250,10 +250,4 @@ enum ReconQuery {
         try Task.checkCancellation()
         return results.first(where: { $0.rows != nil })?.rows ?? ResultStore(columns: [])
     }
-
-    /// Every row as text, nil for NULL.
-    static func strings(_ session: DBConnection, _ sql: String) async throws -> [[String?]] {
-        let store = try await store(session, sql)
-        return (0..<store.rowCount).map { row in (0..<store.columns.count).map { store.string(row, $0) } }
-    }
 }

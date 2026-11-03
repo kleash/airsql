@@ -25,6 +25,7 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
     override init(frame: NSRect) {
         super.init(frame: frame)
         choice.selectedSegment = 0
+        choice.selectedSegmentBezelColor = .selectedSegment
         choice.target = self
         choice.action = #selector(reload)
         choice.toolTip = "Show the statement's columns, the server's functions or the keywords"

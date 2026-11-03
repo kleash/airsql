@@ -30,6 +30,7 @@ final class ReconDetailView: NSObject, NSTableViewDataSource, NSTableViewDelegat
         tabs.target = self
         tabs.action = #selector(tabChosen(_:))
         tabs.selectedSegment = 0
+        tabs.selectedSegmentBezelColor = .selectedSegment
         tabs.setToolTip("Show the two definitions side by side", forSegment: 0)
         tabs.setToolTip("Show the rows that differ, down to the cell", forSegment: 1)
         tabs.setAccessibilityIdentifier("recon.tabs")

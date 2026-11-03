@@ -51,11 +51,13 @@ extension NSView {
     }
 }
 
-/// A column of a list section: its identifier, header, width and what its header's tooltip says.
+/// A column of a list section: its identifier, header, width and what its header's tooltip says. `minimum`: how narrow
+/// it may get as the columns share the list's width; nil keeps it at its width (marks, checkboxes, short pop-ups).
 struct ListColumn {
     let id: String
     let title: String
     let width: CGFloat
+    var minimum: CGFloat?
     let tip: String
 }
 
@@ -65,34 +67,34 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
         let mark = ListColumn(id: "mark", title: "#", width: 30, tip: "The row's place; + marks a new one, • a changed one")
         switch section {
         case .columns:
-            return [mark, ListColumn(id: "name", title: "Name", width: 150, tip: "The column's name"),
-                    ListColumn(id: "type", title: "Type", width: 120, tip: "The column's type, from those this server has"),
-                    ListColumn(id: "length", title: "Length / values", width: 140,
+            return [mark, ListColumn(id: "name", title: "Name", width: 150, minimum: 100, tip: "The column's name"),
+                    ListColumn(id: "type", title: "Type", width: 120, minimum: 100, tip: "The column's type, from those this server has"),
+                    ListColumn(id: "length", title: "Length / values", width: 140, minimum: 100,
                                tip: "The length, the digits and decimals, or ENUM and SET values, as the type takes them"),
                     ListColumn(id: "unsigned", title: "Unsigned", width: 64, tip: "Numbers from zero up only"),
                     ListColumn(id: "null", title: "NULL", width: 44, tip: "The column may hold NULL"),
-                    ListColumn(id: "default", title: "Default", width: 150,
+                    ListColumn(id: "default", title: "Default", width: 150, minimum: 80,
                                tip: "Empty for none, NULL, 'text', a number or an expression; a generated column's expression"),
-                    ListColumn(id: "extra", title: "Extra", width: 190, tip: "Counts up by itself, follows updates, or is generated"),
-                    ListColumn(id: "collation", title: "Collation", width: 170, tip: "How text is compared and sorted; empty for the table's"),
-                    ListColumn(id: "comment", title: "Comment", width: 200, tip: "A note kept with the column")]
+                    ListColumn(id: "extra", title: "Extra", width: 190, minimum: 135, tip: "Counts up by itself, follows updates, or is generated"),
+                    ListColumn(id: "collation", title: "Collation", width: 170, minimum: 130, tip: "How text is compared and sorted; empty for the table's"),
+                    ListColumn(id: "comment", title: "Comment", width: 200, minimum: 80, tip: "A note kept with the column")]
         case .indexes:
-            return [mark, ListColumn(id: "name", title: "Name", width: 170, tip: "The index's name"),
+            return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "The index's name"),
                     ListColumn(id: "kind", title: "Kind", width: 110, tip: "Primary key, unique, plain, full-text or spatial"),
-                    ListColumn(id: "columns", title: "Columns", width: 300,
+                    ListColumn(id: "columns", title: "Columns", width: 300, minimum: 150,
                                tip: "Its columns in order, separated by commas; name(10) indexes the first 10 characters, DESC sorts down"),
-                    ListColumn(id: "comment", title: "Comment", width: 220, tip: "A note kept with the index")]
+                    ListColumn(id: "comment", title: "Comment", width: 220, minimum: 80, tip: "A note kept with the index")]
         case .foreignKeys:
-            return [mark, ListColumn(id: "name", title: "Name", width: 170, tip: "The key's name"),
-                    ListColumn(id: "columns", title: "Columns", width: 160, tip: "This table's columns, separated by commas"),
-                    ListColumn(id: "references", title: "References", width: 170, tip: "The table they point at"),
-                    ListColumn(id: "referencedColumns", title: "Its columns", width: 150,
+            return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "The key's name"),
+                    ListColumn(id: "columns", title: "Columns", width: 160, minimum: 100, tip: "This table's columns, separated by commas"),
+                    ListColumn(id: "references", title: "References", width: 170, minimum: 110, tip: "The table they point at"),
+                    ListColumn(id: "referencedColumns", title: "Its columns", width: 150, minimum: 100,
                                tip: "The columns there, in the same order, separated by commas"),
                     ListColumn(id: "onUpdate", title: "On update", width: 110, tip: "What happens to these rows when that key changes"),
                     ListColumn(id: "onDelete", title: "On delete", width: 110, tip: "What happens to these rows when that row goes")]
         case .checks, .options:
-            return [mark, ListColumn(id: "name", title: "Name", width: 180, tip: "The check's name"),
-                    ListColumn(id: "clause", title: "Condition", width: 380, tip: "What every row must satisfy, as SQL"),
+            return [mark, ListColumn(id: "name", title: "Name", width: 180, minimum: 100, tip: "The check's name"),
+                    ListColumn(id: "clause", title: "Condition", width: 380, minimum: 200, tip: "What every row must satisfy, as SQL"),
                     ListColumn(id: "enforced", title: "Enforced", width: 70, tip: "MySQL can keep a check without enforcing it")]
         }
     }
@@ -106,6 +108,8 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
             list.style = .plain
             list.rowHeight = 24
             list.intercellSpacing = NSSize(width: 6, height: 2)
+            // The columns share the list's width down to their minimums, then it scrolls sideways.
+            list.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
             list.registerForDraggedTypes([.editorRow])
             list.setDraggingSourceOperationMask(.move, forLocal: true)
             list.draggingDestinationFeedbackStyle = .gap
@@ -124,10 +128,12 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.id))
             column.title = spec.title
             column.width = spec.width
-            column.minWidth = min(spec.width, 40)
+            column.minWidth = spec.minimum ?? spec.width
+            column.resizingMask = spec.minimum == nil ? .userResizingMask : [.autoresizingMask, .userResizingMask]
             column.headerToolTip = spec.tip
             list.addTableColumn(column)
         }
+        list.sizeToFit()
         emptied = false
         reloadList()
     }

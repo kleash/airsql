@@ -69,6 +69,8 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         toolbarItems.window = self
         results.window = self
         window.open(size: Self.defaultSize, autosave: layoutName("Compare"))
+        window.layoutIfNeeded()
+        results.placeDivider()
         Self.open.append(self)
         update()
     }

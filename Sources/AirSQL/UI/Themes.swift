@@ -62,8 +62,16 @@ extension NSColor {
         if UserDefaults.standard.object(forKey: "AppleAccentColor") != nil { return .controlAccentColor }
         return appearance.isDark ? hex(0x3FB6C8) : hex(0x0A7F91)
     }
-    /// Text and symbols on the accent.
-    static let onAccent = pair(0xFFFFFF, 0x06181C)
+    /// Text and symbols on the accent: white, or Deep Water's ink (#06181C) where it reads better (on Deep Water's light
+    /// petrol, as the mockups give it, and on a light accent the person chose).
+    static let onAccent = NSColor(name: nil) { appearance in
+        var color = NSColor.white
+        appearance.performAsCurrentDrawingAppearance {
+            let ink = hex(0x06181C)
+            if ink.contrast(with: .accent) > NSColor.white.contrast(with: .accent) { color = ink }
+        }
+        return color
+    }
     /// The accent faintly behind content: a chip's or a banner's fill.
     static let accentFill = NSColor(name: nil) { appearance in
         var color = NSColor.accent
@@ -82,6 +90,15 @@ extension NSColor {
     }
     /// The selected, active or primary fill: labelColor in Porcelain (its near-black pill), the accent in Deep Water.
     static let pill = NSColor(name: nil) { $0.isDark ? .accent : .labelColor }
+    /// A selected segment: the pill, a deeper petrol in Deep Water (AppKit draws the selected label white, 2.4:1 on the
+    /// accent itself).
+    static let selectedSegment = NSColor(name: nil) { appearance in
+        var color = NSColor.labelColor
+        if appearance.isDark {
+            appearance.performAsCurrentDrawingAppearance { color = NSColor.accent.blended(withFraction: 0.35, of: .black) ?? color }
+        }
+        return color
+    }
     /// Text and symbols on a pill.
     static let onPill = NSColor(name: nil) { $0.isDark ? hex(0x06181C) : .controlBackgroundColor }
 
@@ -112,6 +129,19 @@ extension NSColor {
     static let statusOK = pair(0x2E8A52, 0x57C785)
     static let statusWarning = pair(0xB26B00, 0xE6A43B)
     static let statusBad = pair(0xC73636, 0xF07171)
+
+    /// WCAG's relative luminance, as the current appearance resolves the colour (0 black, 1 white).
+    var luminance: CGFloat {
+        guard let rgb = usingColorSpace(.sRGB) else { return 0 }
+        func linear(_ value: CGFloat) -> CGFloat { value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(rgb.redComponent) + 0.7152 * linear(rgb.greenComponent) + 0.0722 * linear(rgb.blueComponent)
+    }
+
+    /// WCAG's contrast ratio with `other` (1 to 21; AA asks 4.5 for text), both taken as opaque.
+    func contrast(with other: NSColor) -> CGFloat {
+        let (first, second) = (luminance, other.luminance)
+        return (max(first, second) + 0.05) / (min(first, second) + 0.05)
+    }
 
     private static func washes(_ appearance: NSAppearance) -> Bool {
         appearance.isDark && !NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
@@ -254,7 +284,8 @@ final class DotView: NSView {
 }
 
 /// A status in a capsule (11 pt semibold): tinted (its colour at 16 % behind it), the accent's fill, or neutral grey.
-/// The radius is half its height; the text is inset by at least that.
+/// The radius is half its height; the text is inset by at least that. The text is its colour a third of the way to
+/// black (Porcelain) or white (Deep Water): the colour itself is 3.3 to 4.2:1 on its own tint, under WCAG AA's 4.5:1.
 final class ChipView: NSView {
     enum Style { case tinted(NSColor), accent, neutral }
 
@@ -288,21 +319,30 @@ final class ChipView: NSView {
     }
 
     private func updateColors() {
+        let hue: NSColor
         switch style {
-        case .tinted(let hue): label.textColor = hue
-        case .accent: label.textColor = .accent
-        case .neutral: label.textColor = .secondaryLabelColor
+        case .tinted(let color): hue = color
+        case .accent: hue = .accent
+        case .neutral: hue = .secondaryLabelColor
+        }
+        label.textColor = NSColor(name: nil) { appearance in
+            var color = hue
+            appearance.performAsCurrentDrawingAppearance { color = hue.blended(withFraction: 0.35, of: .textColor) ?? hue }
+            return color
+        }
+    }
+
+    /// The capsule's colour in `appearance`.
+    func fill(in appearance: NSAppearance) -> NSColor {
+        switch style {
+        case .tinted(let hue): return hue.withAlphaComponent(appearance.isDark ? 0.2 : 0.16)
+        case .accent: return .accentFill
+        case .neutral: return .hover
         }
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let fill: NSColor
-        switch style {
-        case .tinted(let hue): fill = hue.withAlphaComponent(effectiveAppearance.isDark ? 0.2 : 0.16)
-        case .accent: fill = .accentFill
-        case .neutral: fill = .hover
-        }
-        fill.setFill()
+        fill(in: effectiveAppearance).setFill()
         NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
     }
 }

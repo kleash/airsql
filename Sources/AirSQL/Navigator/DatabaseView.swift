@@ -13,11 +13,13 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     private(set) var rows: [SchemaTable] = []
     private let caption = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
-    private static let columns: [(id: String, title: String, width: CGFloat, tip: String)] = [
-        ("name", "Name", 180, "The table's name"), ("rows", "Rows", 80, "About how many rows (InnoDB estimates it)"),
-        ("data", "Data", 72, "Space its rows take"), ("index", "Indexes", 72, "Space its indexes take"),
-        ("engine", "Engine", 70, "Its storage engine"), ("collation", "Collation", 130, "How its text compares and sorts"),
-        ("updated", "Updated", 130, "When its rows last changed, where the engine keeps it"), ("comment", "Comment", 200, "Its comment"),
+    /// The columns share the view's width down to `minimum`, then it scrolls sideways.
+    private static let columns: [(id: String, title: String, width: CGFloat, minimum: CGFloat, tip: String)] = [
+        ("name", "Name", 180, 120, "The table's name"), ("rows", "Rows", 80, 60, "About how many rows (InnoDB estimates it)"),
+        ("data", "Data", 72, 60, "Space its rows take"), ("index", "Indexes", 72, 60, "Space its indexes take"),
+        ("engine", "Engine", 70, 60, "Its storage engine"), ("collation", "Collation", 130, 110, "How its text compares and sorts"),
+        ("updated", "Updated", 130, 120, "When its rows last changed, where the engine keeps it"),
+        ("comment", "Comment", 200, 80, "Its comment"),
     ]
 
     init(_ open: OpenConnection, _ database: String) {
@@ -43,7 +45,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.id))
             tableColumn.title = column.title
             tableColumn.width = column.width
-            tableColumn.minWidth = column.id == "comment" ? 80 : 50
+            tableColumn.minWidth = column.minimum
             tableColumn.headerToolTip = column.tip + "; click to sort by it"
             tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.id, ascending: true)
             if ["rows", "data", "index"].contains(column.id) { tableColumn.headerCell.alignment = .right }
@@ -52,7 +54,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         table.style = .fullWidth
         table.usesAlternatingRowBackgroundColors = true
         table.allowsMultipleSelection = true
-        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.rowHeight = 22
         table.dataSource = self
         table.delegate = self
@@ -90,10 +92,10 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     @objc private func changed() { reload() }
 
-    /// The comment takes the width that is left.
+    /// The columns take the width there is.
     override func viewDidLayout() {
         super.viewDidLayout()
-        table.sizeLastColumnToFit()
+        table.sizeToFit()
     }
 
     /// Shows the cache's tables again, in the chosen order, keeping the selection.

@@ -32,15 +32,43 @@ func caption(_ text: String, width: CGFloat = 380) -> NSTextField {
     return field
 }
 
-/// A push button that says what it does, with an accessibility id (`area.name`).
-func button(_ title: String, id: String, tip: String, target: AnyObject?, action: Selector?) -> NSButton {
-    let button = NSButton(title: title, target: target, action: action)
+/// A push button that says what it does, with an accessibility id (`area.name`). `primary`: the screen's main button
+/// (Connect, Apply, Run), in the accent.
+func button(_ title: String, id: String, tip: String, target: AnyObject?, action: Selector?, primary: Bool = false) -> NSButton {
+    let button = primary ? PrimaryButton(title: title, target: target, action: action) : NSButton(title: title, target: target, action: action)
     button.bezelStyle = .rounded
     button.toolTip = tip
     button.setAccessibilityIdentifier(id)
     button.translatesAutoresizingMaskIntoConstraints = false
     button.setContentCompressionResistancePriority(.required, for: .horizontal)
     return button
+}
+
+/// A screen's main button: filled with the accent while its window is active, and its title then in the colour for text
+/// on the accent. AppKit draws that title white, 2.4:1 on Deep Water's petrol (WCAG AA asks 4.5:1).
+final class PrimaryButton: NSButton {
+    override class var cellClass: AnyClass? {
+        get { Cell.self }
+        set {}
+    }
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        bezelColor = .accent
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    private final class Cell: NSButtonCell {
+        override func drawTitle(_ title: NSAttributedString, withFrame frame: NSRect, in controlView: NSView) -> NSRect {
+            // Emphasized: AppKit fills the bezel (its window is active) and would put a white title on it.
+            guard interiorBackgroundStyle == .emphasized else { return super.drawTitle(title, withFrame: frame, in: controlView) }
+            let text = NSMutableAttributedString(attributedString: title)
+            text.addAttribute(.foregroundColor, value: NSColor.onAccent.withAlphaComponent(isEnabled ? 1 : 0.5),
+                              range: NSRange(location: 0, length: text.length))
+            return super.drawTitle(text, withFrame: frame, in: controlView)
+        }
+    }
 }
 
 /// A checkbox that says what it protects against or does.

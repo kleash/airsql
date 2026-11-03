@@ -71,7 +71,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     private init(_ request: SQLPreviewRequest, connection: SavedConnection?, completion: @escaping (SQLPreviewResult) -> Void) {
         self.request = request
         self.completion = completion
-        runButton = button(request.actionTitle, id: "preview.run", tip: "", target: nil, action: nil)
+        runButton = button(request.actionTitle, id: "preview.run", tip: "", target: nil, action: nil, primary: !request.destructive)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 400), styleMask: [.titled], backing: .buffered,
                               defer: true)
         window.title = request.heading
@@ -187,10 +187,18 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     /// in italic. Words that aren't reserved count as names, since only reserved words can't be one.
     static func coloured(_ sql: String, font: NSFont, noBackslashEscapes: Bool) -> NSAttributedString {
         let result = NSMutableAttributedString(string: sql, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        let tokens = SQLLexer.tokens(sql, noBackslashEscapes: noBackslashEscapes)
+        colour(result, tokens: tokens, tokens.indices, text: Array(sql.utf16), font: font)
+        return result
+    }
+
+    /// Colours `tokens[indices]` of `text` in `string` as `coloured` does: the console's editor colours what changed.
+    static func colour(_ string: NSMutableAttributedString, tokens: [SQLToken], _ indices: Range<Int>, text: [UInt16],
+                       font: NSFont) {
         let semibold = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
         let italic = NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(.italic), size: font.pointSize) ?? font
-        let text = Array(sql.utf16), tokens = SQLLexer.tokens(sql, noBackslashEscapes: noBackslashEscapes)
-        for (k, token) in tokens.enumerated() {
+        for k in indices {
+            let token = tokens[k]
             var color = NSColor.sqlIdentifier, style: NSFont?
             switch token.kind {
             case .comment, .hint, .codeStart, .codeEnd: (color, style) = (.sqlComment, italic)
@@ -206,10 +214,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
                     color = .sqlFunction
                 }
             }
-            result.addAttribute(.foregroundColor, value: color, range: NSRange(token.range))
-            if let style { result.addAttribute(.font, value: style, range: NSRange(token.range)) }
+            string.addAttribute(.foregroundColor, value: color, range: NSRange(token.range))
+            if let style { string.addAttribute(.font, value: style, range: NSRange(token.range)) }
         }
-        return result
     }
 
     private func banner(_ text: String, symbol: String, color: NSColor, id: String) -> NSView {
@@ -243,7 +250,6 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         runButton.action = #selector(run(_:))
         runButton.keyEquivalent = "\r"
         runButton.hasDestructiveAction = request.destructive
-        if !request.destructive { runButton.bezelColor = .accent }
         runButton.toolTip = request.typeToConfirm.map { "Type “\($0)” first" }
             ?? (request.text != nil ? "Put the text in the console's editor: nothing runs"
                 : "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : ""))

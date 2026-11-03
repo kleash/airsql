@@ -1,3 +1,4 @@
+import CMariaDB
 import Foundation
 import Testing
 @testable import AirSQLCore
@@ -92,6 +93,15 @@ struct AgentToolTests {
         #expect(AgentFormat.csvField("say \"hi\"\n") == "\"say \"\"hi\"\"\n\"")
         #expect(AgentFormat.name("orders") == "orders" && AgentFormat.name("order details") == "`order details`")
     }
+
+    /// A reply names its columns' types as the grid's header does: unsigned kept, MySQL 9's VECTOR named.
+    @Test func columnTypesAreTheGridsNames() {
+        let store = ResultStore(columns: [ResultStore.Column(name: "id", type: MYSQL_TYPE_LONGLONG, flags: UInt32(UNSIGNED_FLAG)),
+                                          ResultStore.Column(name: "v", type: MYSQL_TYPE_VECTOR, charset: 63),
+                                          ResultStore.Column(name: "note", type: MYSQL_TYPE_VAR_STRING)])
+        #expect(AgentFormat.columns(store).types == ["bigint unsigned", "vector", "varchar"])
+    }
+
     @Test func setupShowsTheChangeThenMakesIt() throws {
         let home = URL(fileURLWithPath: try scratch())
         let program = "/Applications/AirSQL.app/Contents/MacOS/AirSQL"

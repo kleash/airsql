@@ -23,6 +23,11 @@ struct SQLQuoteTests {
         #expect(SQLQuote.identifier("shop", "order items", "id`x") == "`shop`.`order items`.`id``x`")
     }
 
+    @Test func unquotedReadsBackWhatIdentifierWrote() {
+        for name in Hostile.values { #expect(SQLQuote.unquoted(SQLQuote.identifier(name)) == name) }
+        #expect(SQLQuote.unquoted("plain") == "plain" && SQLQuote.unquoted("`") == "`" && SQLQuote.unquoted("'a'") == "'a'")
+    }
+
     @Test func stringsEscapeAsMySQLDoes() {
         #expect(SQLQuote.string("plain") == "'plain'")
         #expect(SQLQuote.string("it's") == "'it\\'s'")

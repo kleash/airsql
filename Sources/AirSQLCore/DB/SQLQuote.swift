@@ -14,6 +14,12 @@ public enum SQLQuote {
         ([first] + rest).map(identifier).joined(separator: ".")
     }
 
+    /// A name read back from SQL: `my``table` → my`table; text that isn't in backticks as it is.
+    public static func unquoted(_ name: String) -> String {
+        guard name.count >= 2, name.hasPrefix("`"), name.hasSuffix("`") else { return name }
+        return String(name.dropFirst().dropLast()).replacingOccurrences(of: "``", with: "`")
+    }
+
     /// Text as a string literal in single quotes. With the server's usual sql_mode it is escaped as
     /// mysql_real_escape_string escapes it on AirSQL's utf8mb4 connections (\0 \n \r \\ \' \" \Z); when the session
     /// reports NO_BACKSLASH_ESCAPES (`DBConnection.noBackslashEscapes`) a backslash is an ordinary character there, so
