@@ -263,6 +263,30 @@ extension AppTests {
         #expect(grid.source?.cell(2, 9) == source.cell(2, 9) && content.viewer.displays.isEmpty)
     }
 
+    /// Numbers rounded to some decimal places; a DATETIME in the Mac's medium style, taken as UTC and shown in this Mac's
+    /// time zone; both kept for the table.
+    @Test func displayAsRoundsNumbersAndMovesDatesToAnotherTimeZone() async throws {
+        let key = GridViewer.ViewKey(connection: UUID(), database: "shop", table: "orders \(UUID())")
+        let source = FakeGridSource(rows: 20, columns: 10)
+        let (_, harness, content) = viewerWindow(source, key: key)
+        let grid = content.viewer.grid
+        grid.selection.select(GridPosition(row: 2, column: 2))
+        #expect(await call(harness, "menu", ["path": "Data > Display As > Decimal Places > No Decimals"]).error == nil)
+        #expect(grid.source?.cell(2, 2) == .text(GridDisplay.decimals0.format(source.value(2, 2), bytes: nil)!))
+        let refused = await call(harness, "menu", ["path": "Data > Display As > Time Zone > " + GridZone.utcToLocal.title])
+        #expect(refused.error?.contains("Only for DATETIME and TIMESTAMP columns") == true, "\(refused.error ?? "")")
+        grid.selection.select(GridPosition(row: 2, column: 3))
+        #expect(await call(harness, "menu", ["path": "Data > Display As > Medium Date and Time"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Display As > Time Zone > " + GridZone.utcToLocal.title]).error == nil)
+        let shown = GridDisplay.dateMedium.format(source.value(2, 3), bytes: nil, zone: .utcToLocal)
+        #expect(shown != nil && grid.source?.cell(2, 3) == .text(shown!) && grid.source?.value(2, 3) == source.value(2, 3))
+        #expect(grid.source?.columns[3].type == "datetime as medium date, UTC → this Mac's")
+        let again = ViewerContent(FakeGridSource(rows: 5, columns: 10), key: key)
+        #expect(again.viewer.displays == [2: .decimals0, 3: .dateMedium] && again.viewer.zones == [3: .utcToLocal])
+        #expect(await call(harness, "menu", ["path": "Data > Display As > Time Zone > As Stored"]).error == nil)
+        #expect(content.viewer.zones.isEmpty)
+    }
+
     @Test func displayTypesFormatValues() {
         let utc = TimeZone(identifier: "UTC")!
         #expect(GridDisplay.unixTime.format("1762164000", bytes: nil, timeZone: utc) == "2025-11-03 10:00:00")
@@ -273,6 +297,34 @@ extension AppTests {
         #expect(GridDisplay.uuid.format(nil, bytes: [1, 2]) == nil)
         #expect(GridDisplay.hex.format(nil, bytes: [0, 255]) == "0x00FF" && GridDisplay.text.format(nil, bytes: Array("héllo".utf8)) == "héllo")
         #expect(GridDisplay.grouped.format("1234567.50", bytes: nil)?.filter(\.isNumber) == "123456750")
+        // Decimal places, rounding half up, grouped as the Mac groups.
+        #expect(GridDisplay.decimals2.format("1234.5", bytes: nil)?.filter(\.isNumber) == "123450")
+        #expect(GridDisplay.decimals0.format("2.5", bytes: nil) == "3" && GridDisplay.decimals1.format("-0.25", bytes: nil)?.last == "3")
+        #expect(GridDisplay.decimals2.format("many", bytes: nil) == nil)
+        // Dates: the stored text moved from UTC to this Mac's time zone and back, fractions kept; a zero date or a TIME stays.
+        func posix(_ zone: TimeZone) -> DateFormatter {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = zone
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            return formatter
+        }
+        let moment = posix(utc).date(from: "2026-11-03 14:05:09")!
+        let local = posix(.current).string(from: moment)
+        #expect(GridDisplay.standard.format("2026-11-03 14:05:09.250", bytes: nil, zone: .utcToLocal) == local + ".250")
+        #expect(GridDisplay.standard.format(local, bytes: nil, zone: .localToUTC) == "2026-11-03 14:05:09")
+        #expect(GridDisplay.standard.format("2026-11-03 14:05:09", bytes: nil) == nil)
+        #expect(GridDisplay.standard.format("0000-00-00 00:00:00", bytes: nil, zone: .utcToLocal) == nil)
+        #expect(GridDisplay.dateShort.format("12:30:00", bytes: nil) == nil)
+        let medium = DateFormatter()
+        medium.timeZone = utc
+        medium.dateStyle = .medium
+        #expect(GridDisplay.dateMedium.format("2026-11-03", bytes: nil) == medium.string(from: posix(utc).date(from: "2026-11-03 00:00:00")!))
+        let date = GridColumn(name: "d", type: "date", kind: .date), time = GridColumn(name: "t", type: "time", kind: .date)
+        let stamp = GridColumn(name: "s", type: "timestamp", kind: .date)
+        #expect(GridDisplay.choices(for: date) == [.standard, .dateShort, .dateMedium, .dateLong])
+        #expect(GridDisplay.choices(for: time) == [.standard] && GridDisplay.choices(for: stamp).count == 4)
+        #expect(GridZone.applies(to: stamp) && !GridZone.applies(to: date) && !GridZone.applies(to: time))
         #expect(GridDisplay.choices(for: GridColumn(name: "n", kind: .number)).contains(.unixTime))
         #expect(GridDisplay.choices(for: GridColumn(name: "t")) == [.standard])
     }
