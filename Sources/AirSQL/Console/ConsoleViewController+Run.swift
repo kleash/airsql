@@ -38,6 +38,7 @@ extension ConsoleViewController {
     @objc func runAll(_ sender: Any?) { run(all: true) }
 
     private func run(all: Bool, kind: ConsoleRun.Kind = .run) {
+        if kind == .run, handedToCompare() { return }
         let selection = editor.selectedRange()
         let statements = ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil,
                                                   caret: selection.location, all: all,
@@ -55,7 +56,15 @@ extension ConsoleViewController {
 
     @objc func explain(_ sender: Any?) { run(all: false, kind: .explain) }
 
+    /// A sync script runs only through its compare.
+    private func handedToCompare() -> Bool {
+        guard let syncScript else { return false }
+        if !syncScript() { note(.info, "The compare window that made this script is closed: compare again to run a sync script.") }
+        return true
+    }
+
     @objc func profileQuery(_ sender: Any?) {
+        guard !handedToCompare() else { return }
         let selection = editor.selectedRange()
         guard let statement = ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil,
                                                        caret: selection.location, all: false,

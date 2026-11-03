@@ -67,8 +67,10 @@ Floats, decimals written with another scale and JSON with other spacing or key o
 ## The sync script
 
 The **Sync script** box shows the statements for the selected object; **Copy Sync Script** copies them. **Sync
-Script…** shows the whole script in the [SQL preview](sql-preview.md), where you can copy it, run it on the target,
-or cancel. It runs:
+Script…** opens the whole script in a [console](console.md) tab of the target named “Sync script”, to read (it can't
+be edited there; **Save As…** keeps a copy). It never runs on its own: **Run** in that tab brings the compare window
+back with the script in the [SQL preview](sql-preview.md), where you can copy it, run it on the target, or cancel. It
+runs:
 
 1. `USE` the target database and `SET time_zone = '+00:00'`;
 2. the structure changes, in order: foreign keys and objects that go or change are dropped first, then new tables,

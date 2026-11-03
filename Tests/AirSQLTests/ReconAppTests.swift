@@ -166,7 +166,8 @@ extension AppTests {
 
 extension AppTests.ReconAppTests {
     /// The whole path against the lab: both sides' databases listed, Compare with its activity, the result shown, and
-    /// the sync script in the SQL preview, which runs nothing until approved.
+    /// the sync script in a console tab marked "sync script", whose Run shows the SQL preview, which runs nothing until
+    /// approved.
     @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests")) func comparesThroughTheWindow() async throws {
         let setup = try await ReconLabTests.session(Lab.mariadb114)
         try await ReconLabTests.database(setup, "lane_l8a_ui_src", ReconLabTests.shopSource)
@@ -198,7 +199,14 @@ extension AppTests.ReconAppTests {
         #expect(model.activity.isIdle)
         #expect(controller.results.objects.first?.name == "gift_cards")
         #expect(result.object(.table, "customers")?.data?.differenceCount == 4)
+        let (main, _) = appWindow(model)
+        controller.main = main
         controller.showSyncScript(nil)
+        main.window?.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+        #expect(main.selectedTab?.title == "Sync script · lane_l8a_ui_dst" && !console.editor.isEditable)
+        #expect(console.text.hasPrefix("USE `lane_l8a_ui_dst`;"))
+        console.runAll(nil)
         let sheet = try #require(controller.window?.attachedSheet)
         controller.window?.endSheet(sheet)
         try await ReconLabTests.run(setup, ["DROP DATABASE lane_l8a_ui_src", "DROP DATABASE lane_l8a_ui_dst"])

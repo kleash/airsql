@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// The window's console commands: New Query (⌘T) on the active connection, Open… a .sql file, and opening a console
 /// with SQL in it (the navigator's Generate SELECT, agents' open_in_console). The console's own commands reach the
 /// console shown even while the sidebar has the focus.
-extension MainWindowController {
+extension MainWindowController: AgentConsoles {
     @objc func newQuery(_ sender: Any?) {
         guard let connection = activeConnection else { return NSSound.beep() }
         openConsole(text: "", title: nil, connection: connection.id)
@@ -63,6 +63,14 @@ extension MainWindowController {
         }
     }
 
+    /// Agents' open_in_console: the SQL in a new console tab, which says an agent proposed it and never runs it.
+    func open(sql: String, title: String, connection: UUID?) -> Tab? {
+        let tab = openConsole(text: sql, title: title, connection: connection)
+        (tab.content as? ConsoleViewController)?.note(.info, "An agent proposed this SQL: read it before you run it. Nothing "
+                                                       + "runs until you press Run.")
+        return tab
+    }
+
     /// A console command sent while the focus is elsewhere in the window (the sidebar, the tab bar) goes to the console
     /// shown, as the toolbar's Run does.
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
@@ -70,5 +78,23 @@ extension MainWindowController {
             return console
         }
         return super.supplementalTarget(forAction: action, sender: sender)
+    }
+}
+
+/// A console tab as agents' read_console sees it: its text, its database and the person's last statement.
+extension ConsoleViewController: AgentConsole {
+    var agentText: String { text }
+    var agentDatabase: String? { database }
+
+    var agentLastRun: AgentConsoleRun? {
+        if let run = running, run.kind != .explain, run.statements.indices.contains(run.index),
+           !run.statements[run.index].range.isEmpty {
+            return AgentConsoleRun(sql: run.statements[run.index].sql)
+        }
+        guard let outcome = lastOutcome else { return nil }
+        let rows = outcome.results.compactMap(\.rows).first
+        // read_console tells only whether it finished, not when.
+        return AgentConsoleRun(sql: outcome.statement.sql, finished: Date(), error: outcome.error?.message, rows: rows,
+                               affectedRows: rows == nil ? outcome.results.last?.affectedRows : nil)
     }
 }

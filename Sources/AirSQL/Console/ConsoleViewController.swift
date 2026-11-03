@@ -67,6 +67,9 @@ final class ConsoleViewController: NSViewController, TabContent {
     var zoomedSize: CGFloat?
     /// How the last statement run ended (agents' read_console reads it).
     var lastOutcome: ConsoleOutcome?
+    /// A compare's sync script (plan §2.9): Run hands it back to the compare, which shows it in the SQL preview and
+    /// runs it on a session of its own; false once the compare's window is closed.
+    var syncScript: (() -> Bool)?
     /// It said yes to closing: it isn't kept for the next launch.
     var closing = false
     private var placedDivider = false

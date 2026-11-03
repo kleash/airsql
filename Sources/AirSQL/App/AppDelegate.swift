@@ -47,7 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let main = MainWindowController(model: model)
         self.main = main
         agents = AgentService(model: model, main: main)
+        agents?.consoles = main
         main.showWindow(nil)
+        ConsoleDocuments.shared.restore(into: main)
         NSApp.activate(ignoringOtherApps: true)
         log.log("launched with \(model.data.connections.count, privacy: .public) connection(s)")
     }

@@ -433,6 +433,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.newConnection.action?:
             enabled = window?.attachedSheet == nil
             reason = "A sheet is open: answer it first"
+        case Commands.newQuery.action?:
+            enabled = activeConnection != nil
+            reason = "Select one connection in the sidebar first"
         case Commands.closeTab.action?, Commands.renameTab.action?:
             enabled = selectedTab != nil
             reason = "No tab is open"
