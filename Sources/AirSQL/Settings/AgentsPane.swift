@@ -50,7 +50,7 @@ final class AgentsPane: SettingsPaneController {
         command.lineBreakMode = .byTruncatingMiddle
         command.isSelectable = true
         command.toolTip = Self.program + " --mcp"
-        command.widthAnchor.constraint(lessThanOrEqualToConstant: 300).isActive = true
+        command.widthAnchor.constraint(lessThanOrEqualToConstant: 360).isActive = true  // all of it from /Applications
         form.row("Other clients", [command, action("Copy", id: "settings.copyMCPCommand",
                                                    tip: "Copy the command MCP clients start AirSQL's server with") {
             NSPasteboard.general.clearContents()
@@ -80,7 +80,8 @@ final class AgentsPane: SettingsPaneController {
         observers.append(model.$data.map(\.connections).removeDuplicates().dropFirst().sink { [weak table] _ in
             DispatchQueue.main.async { table?.reloadData() }
         })
-        for (id, title, width) in [("name", "Connection", 150.0), ("access", "Access", 140.0), ("samples", "Sample rows", 96.0)] {
+        // Access as wide as its pop-up with its longest level, "Schema + read + analytics".
+        for (id, title, width) in [("name", "Connection", 140.0), ("access", "Access", 214.0), ("samples", "Sample rows", 96.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
@@ -98,7 +99,7 @@ final class AgentsPane: SettingsPaneController {
         scroll.translatesAutoresizingMaskIntoConstraints = false
         let rows = CGFloat(min(model.data.connections.count, 6))
         NSLayoutConstraint.activate([
-            scroll.widthAnchor.constraint(equalToConstant: 410),
+            scroll.widthAnchor.constraint(equalToConstant: 474),
             scroll.heightAnchor.constraint(equalToConstant: rows * 30 + 28),
         ])
         return scroll
