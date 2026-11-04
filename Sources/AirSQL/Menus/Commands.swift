@@ -246,6 +246,8 @@ struct Command {
         let names: [String: String] = ["\r": "↩", "\u{8}": "⌫", "\u{7f}": "⌫", "\t": "⇥", "\u{1b}": "⎋", " ": "Space",
                                        String(UnicodeScalar(NSDownArrowFunctionKey)!): "↓",
                                        String(UnicodeScalar(NSUpArrowFunctionKey)!): "↑",
+                                       String(UnicodeScalar(NSLeftArrowFunctionKey)!): "←",
+                                       String(UnicodeScalar(NSRightArrowFunctionKey)!): "→",
                                        String(UnicodeScalar(NSF9FunctionKey)!): "F9", String(UnicodeScalar(NSF2FunctionKey)!): "F2"]
         return (flags.contains(.control) ? "⌃" : "") + (flags.contains(.option) ? "⌥" : "")
             + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "") + (names[key] ?? key.uppercased())
@@ -256,6 +258,8 @@ private func sel(_ name: String) -> Selector { NSSelectorFromString(name) }
 
 private let up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
 private let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
+private let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
+private let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
 private let f9 = String(UnicodeScalar(NSF9FunctionKey)!)
 private let f2 = String(UnicodeScalar(NSF2FunctionKey)!)
 
@@ -326,7 +330,7 @@ enum Commands {
     // MARK: Edit
     static let undo = Command("Undo", sel("undo:"), "z", tip: "Undo the last change")
     static let redo = Command("Redo", sel("redo:"), "Z", tip: "Redo what was undone")
-    static let cut = Command("Cut", #selector(NSText.cut(_:)), "x", tip: "Cut the selection")
+    static let cut = Command("Cut", #selector(NSText.cut(_:)), "x", tip: "Cut the selection: in a grid, copy the cells and clear them as pending edits")
     static let copy = Command("Copy", #selector(NSText.copy(_:)), "c", tip: "Copy the selection: text, cells or names")
     static let copyWithHeaders = Command("Copy with Headers", #selector(AirSQLActions.copyWithHeaders(_:)), "c", [.command, .option],
                                          tip: "Copy the selected cells with their column names as the first line")
@@ -371,9 +375,9 @@ enum Commands {
                                     tip: "Show or hide the selected cell's full value beside the grid: text, JSON, hex")
     static let recordView = Command("Record View", #selector(AirSQLActions.showRecordView(_:)), "r", [.command, .option],
                                     tip: "Show the selected row as a form, one field per column")
-    static let previousRecord = Command("Previous Record", #selector(AirSQLActions.showPreviousRecord(_:)),
+    static let previousRecord = Command("Previous Record", #selector(AirSQLActions.showPreviousRecord(_:)), left, [.command, .option],
                                         tip: "Show the row before this one in Record View")
-    static let nextRecord = Command("Next Record", #selector(AirSQLActions.showNextRecord(_:)),
+    static let nextRecord = Command("Next Record", #selector(AirSQLActions.showNextRecord(_:)), right, [.command, .option],
                                     tip: "Show the row after this one in Record View")
     static let heatmap = Command("Heatmap", #selector(AirSQLActions.toggleHeatmap(_:)),
                                  tip: "Colour the selected number columns by value, from low to high")
@@ -474,7 +478,7 @@ enum Commands {
                                         tip: "Add the copied cells as new rows; they are saved when you apply the changes")
     static let pasteWithFormat = Command("Paste with Format…", #selector(AirSQLActions.pasteWithFormat(_:)),
                                          tip: "Paste, choosing how the copied cells are separated and write decimals and dates")
-    static let deleteRows = Command("Delete Rows…", #selector(AirSQLActions.deleteRows(_:)), "\u{8}",
+    static let deleteRows = Command("Delete Rows", #selector(AirSQLActions.deleteRows(_:)), "\u{8}",
                                     tip: "Mark the selected rows for deletion; they are deleted when you apply")
     static let setNull = Command("Set NULL", #selector(AirSQLActions.setCellNull(_:)), "n", [.command, .option],
                                  tip: "Set the selected cells to NULL (a pending edit)")

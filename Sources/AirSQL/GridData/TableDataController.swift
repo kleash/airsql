@@ -153,12 +153,8 @@ final class TableDataController: NSViewController, TabContent {
         ])
         emptyNote.clear.target = self
         emptyNote.add.target = self
-        viewer.body.addSubview(emptyNote)
-        NSLayoutConstraint.activate([
-            emptyNote.centerXAnchor.constraint(equalTo: viewer.body.centerXAnchor),
-            emptyNote.centerYAnchor.constraint(equalTo: viewer.body.centerYAnchor),
-            emptyNote.widthAnchor.constraint(lessThanOrEqualTo: viewer.body.widthAnchor, constant: -2 * Spacing.double),
-        ])
+        emptyNote.place(in: viewer.body)
+        viewer.didPresent = { [weak self] in self?.updateBars() }
         self.view = view
         updateBars()
         open()

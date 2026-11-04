@@ -219,8 +219,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
 - **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
-  every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,
-  Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
+  every table's key, edits like a table tab (`grid.editor`, the pick-lists and foreign key drop-down, Data ▸ Set NULL, Set DEFAULT, Insert
+  Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
@@ -235,11 +235,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
 - **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
   `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+  `recon.filter`, `recon.hideMatching`, `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
-  sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
-- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
+  sheet `reconTables.filter`, `reconTables.list`, `reconTables.all`, `reconTables.none`, `reconTables.done`, `reconTables.cancel`.
+- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.filter`, `tools.objects` (`tools.include.<name>`), `tools.status`,
   `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
   `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
@@ -249,7 +249,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
-- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.objects`
+- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.filter`, `liquibase.objects`
   (`liquibase.include.<name>`, `liquibase.rows.<name>`, `liquibase.where.<name>`), `liquibase.author`, `liquibase.ids`,
   `liquibase.rollback`, `liquibase.preconditions`, `liquibase.layout`, `liquibase.saveTo`, `liquibase.choose`,
   `liquibase.preview`, `liquibase.copy`, `tools.run` (the person's); Save as Changeset `changeset.heading`,

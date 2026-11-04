@@ -38,6 +38,31 @@ extension AppTests {
                     try #require(views.compactMap { $0 as? NSSegmentedControl }.first))
         }
 
+        @Test func theFilterNarrowsTheListAndAllAndNoneMeanWhatIsShown() throws {
+            let (main, _) = ClientToolsAppTests.window()
+            let sheet = Self.sheet(on: main)
+            defer { sheet.close() }
+            let (list, _) = try Self.parts(sheet)
+            let content = try #require(sheet.window?.contentView)
+            let filter = try #require(find(ListFilter.self, id: "liquibase.filter", in: content))
+            func name(_ row: Int) -> String? { (list.view(atColumn: 0, row: row, makeIfNecessary: true) as? PickerCell)?.name.stringValue }
+            let everything = list.numberOfRows
+            let wanted = try #require(name(0))
+            filter.stringValue = wanted
+            filter.sendAction(filter.action, to: filter.target)
+            #expect(list.numberOfRows > 0 && list.numberOfRows < everything)
+            #expect((0..<list.numberOfRows).allSatisfy { name($0)?.contains(wanted) == true })
+            let menu = try #require(list.menu)
+            menu.delegate?.menuNeedsUpdate?(menu)
+            let none = try #require(menu.items.first { $0.title == "Include None" })
+            NSApp.sendAction(none.action!, to: none.target, from: none)
+            filter.stringValue = ""
+            filter.sendAction(filter.action, to: filter.target)
+            #expect(list.numberOfRows == everything)
+            let boxes = (0..<everything).compactMap { (list.view(atColumn: 0, row: $0, makeIfNecessary: true) as? PickerCell)?.box.state }
+            #expect(boxes.contains(.on) && boxes.contains(.off), "only what was shown was unticked")
+        }
+
         @Test func generateSheetIsTidyAndSaysWhatEachControlDoes() async throws {
             let (main, harness) = ClientToolsAppTests.window()
             var problems: [String] = []

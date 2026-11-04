@@ -451,8 +451,10 @@ unique key whose columns can't be NULL); so can an inner join's when every table
 `GROUP BY`, `DISTINCT`, `UNION`, a subquery in `FROM`, a self-join, a column worked out by the query, or a row of the
 "one" side of a join that shows in several result rows).
 
-- Double-click a cell (or start typing) to change it; **Set NULL** (⌥⌘N) and, in a one-table result, **Delete Rows…**
-  (⌘⌫) work as in a table tab. Values are checked by their column's type as you type. Changes wait, marked in colour,
+- Double-click a cell (or start typing) to change it. As in a table tab, a boolean toggles, ENUM and SET pick from their
+  members, ↑ and ↓ step a date, and a foreign key has its drop-down. **Cut** (⌘X), **Paste** (⌘V), **Set NULL** (⌥⌘N),
+  **Set DEFAULT**, **Insert Value** and, in a one-table result, **Delete Rows** (⌘⌫) work too. Paste fills the rows the
+  result has, and pastes nothing if a value doesn't fit its column. Values are checked by their column's type as you type. Changes wait, marked in colour,
   with a bar over the rows counting them; **Undo**, **Redo**, **Revert** and **Revert All** take them back.
 - **Apply** (⌘S while the rows have the keyboard, or the bar's button) writes them in one transaction on the
   connection's data session, each statement checked to change exactly its row. A join's changes always show the SQL
@@ -687,8 +689,8 @@ These open a console tab with the SQL in it, built from the names AirSQL read; n
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
 tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
-bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list to see its matching rows;
-right-click it to open all its rows or copy its name.
+bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
+matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
 Upper and lower case match as the column's collation says (most ignore case).
 
 ## See what the server is running
@@ -766,8 +768,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   current filter (the 1,000 most frequent). Tick the ones to show, or type part of a value and press **Contains**. The
   funnel opens over the rows and replaces its own earlier choice, so you can widen it again. In
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
-- **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
-  to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
+- **Sort**: double-click a header, or click the arrow at its right, to sort by that column, ascending, then descending,
+  then not at all; hold ⌥ to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
   repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting
@@ -783,8 +785,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 
 Nothing is written until you apply. Leaving a row writes nothing.
 
-- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). Return keeps the edit, Esc
-  cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
+- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). ⌫ starts with the cell empty.
+  Return keeps the edit, Esc cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
   the same way.
 - **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
   number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't
@@ -815,7 +817,8 @@ Nothing is written until you apply. Leaving a row writes nothing.
   in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, and
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
-  **Delete Rows…** (⌘⌫) marks the selected rows for deletion. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
@@ -952,8 +955,8 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
 - **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
-- Drag a header to move its column, drag its right edge to resize it, and double-click the edge, or the header, to fit
-  its values.
+- Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
+- Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the console, so they open as you left them.
 - **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
@@ -965,7 +968,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
   as a JSON tree, as hex, or as a picture when the bytes are an image. It follows the cell you select. A double-click
   on a cell you can't edit opens it too.
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
-  (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
+  (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
   console result shows the grid again, as does an Apply that deletes the row.
 - **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the button at the end of a table's grid bar) turns rows
@@ -1127,7 +1130,8 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
 **Tools ▸ Export…** (or right-click a connection ▸ Export…).
 
 1. Tick the databases or tables to export. Space ticks the selected rows; right-click for Include All, Include None and
-   Include Only These. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
+   Include Only These. The filter above the list shows only the tables with that text, each on its own line, so ticks
+   reach only what you see; what's ticked stays ticked when you clear it. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
    databases export whole, each with its own name.
 2. Choose the content (structure and data, structure only, data only) and the options: one consistent snapshot
    (`--single-transaction`), binary as hex, gzip, `DROP TABLE` before each table, and views, routines, triggers and
@@ -1246,8 +1250,9 @@ a session of its own. The compare only reads; nothing changes until you run the 
 
 The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
 much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
-for objects on one side, **structure**, **data**, then **match**. Click an object to see it; double-click it to see
-its rows when they differ.
+for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
+Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
+they differ. The two definitions scroll together.
 
 ## What is compared
 
@@ -1282,10 +1287,11 @@ different.
 
 ### Tables…
 
-After a first compare, **Tables…** lists the source's tables. Untick a table to leave it out, give the target table
-it should be compared with when it was renamed there, list columns whose values shouldn't count (such as
-`updated_at`), or add a WHERE condition for its rows on both sides. Double-click a table to tick or untick it, or
-right-click the selected tables for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
+**Tables…** lists the source's tables, once a source and database are chosen, so a long first compare can be limited.
+Untick a table to leave it out, give the target table it should be compared with when it was renamed there, list
+columns whose values shouldn't count (such as `updated_at`), or add a WHERE condition for its rows on both sides. Type
+in the filter to find a table; **Compare All** and **Compare None** tick and untick the tables shown. Double-click a
+table to tick or untick it, or right-click the selected tables (⌘ and ⇧ select several) for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
 too.
 
 ## How the data compare stays fast
@@ -1470,7 +1476,8 @@ with your own `liquibase` (`liquibase update`, `liquibase rollback-count 1`…).
 - **Content**: **DDL** writes the objects' structure, **DML** their rows, **DDL + DML** both.
 - The list holds the database's tables, views, procedures, functions, triggers, events and sequences, each ticked.
   Untick what you don't want; space ticks the selected rows, double-click ticks one, and the right-click menu
-  includes all, none or the selected rows. For **DML**, tick **Rows** for the tables whose rows to write, and type a
+  includes all, none or the selected rows; the filter above the list narrows it, and all and none then mean the
+  objects shown. For **DML**, tick **Rows** for the tables whose rows to write, and type a
   **WHERE** condition (double-click the cell) to write only some of them, such as `active = 1`.
 - **Author** and **Ids** make each `--changeset` line (see [Settings](#settings) below). **Rollback** adds the
   `--rollback` line that undoes each object. **Skip what already exists** adds preconditions that mark a changeset
@@ -1603,6 +1610,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
+| Previous Record | ⌥⌘← |
+| Next Record | ⌥⌘→ |
 | Transpose | ⌥⌘T |
 | Column List… | ⌘J |
 | SQL Log | ⌥⌘L |
@@ -1627,7 +1636,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
-| Delete Rows… | ⌘⌫ |
+| Delete Rows | ⌘⌫ |
 | Set NULL | ⌥⌘N |
 | Apply Changes | ⌘S |
 | Revert | ⌥⌘Z |
@@ -1995,8 +2004,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
 - **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
-  every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,
-  Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
+  every table's key, edits like a table tab (`grid.editor`, the pick-lists and foreign key drop-down, Data ▸ Set NULL, Set DEFAULT, Insert
+  Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
@@ -2011,11 +2020,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
 - **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
   `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+  `recon.filter`, `recon.hideMatching`, `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
-  sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
-- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
+  sheet `reconTables.filter`, `reconTables.list`, `reconTables.all`, `reconTables.none`, `reconTables.done`, `reconTables.cancel`.
+- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.filter`, `tools.objects` (`tools.include.<name>`), `tools.status`,
   `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
   `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
@@ -2025,7 +2034,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
-- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.objects`
+- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.filter`, `liquibase.objects`
   (`liquibase.include.<name>`, `liquibase.rows.<name>`, `liquibase.where.<name>`), `liquibase.author`, `liquibase.ids`,
   `liquibase.rollback`, `liquibase.preconditions`, `liquibase.layout`, `liquibase.saveTo`, `liquibase.choose`,
   `liquibase.preview`, `liquibase.copy`, `tools.run` (the person's); Save as Changeset `changeset.heading`,

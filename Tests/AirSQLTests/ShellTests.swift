@@ -216,6 +216,24 @@ extension AppTests {
         main.statusBar.activity.shown?.close()
     }
 
+    @Test func closingSettingsKeepsTheValueBeingTyped() throws {
+        let model = testModel()
+        let settings = SettingsWindowController(model: model)
+        keptWindows.append(settings)
+        let window = try #require(settings.window)
+        window.setFrameOrigin(NSPoint(x: -21000, y: -21000))
+        window.orderFront(nil)
+        settings.show(.safety)
+        let content = try #require(window.contentView)
+        let field = try #require(find(NSTextField.self, id: "settings.safety.agentRowCap", in: content))
+        window.makeFirstResponder(field)
+        let editor = try #require(field.currentEditor() as? NSTextView)
+        editor.selectAll(nil)
+        editor.insertText("250", replacementRange: editor.selectedRange())
+        window.close()
+        #expect(model.data.settings.safety.agentRowCap == 250)
+    }
+
     @Test func settingsChangeTheSavedSettings() async throws {
         let model = testModel()
         let settings = SettingsWindowController(model: model)

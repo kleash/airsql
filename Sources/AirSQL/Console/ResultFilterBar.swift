@@ -207,11 +207,19 @@ extension ResultGridView {
         updateHighlight()
         viewer.reloadData()
         filterBar.show(conditions.map(\.condition), shown: reordered.rowCount, of: source.rowCount)
+        updateEmptyNote()
         let idle = conditions.isEmpty && search.isEmpty && filterBar.searchField.currentEditor() == nil
         guard idle else { return filterBar.isHidden = false }
         guard !filterBar.isHidden else { return }
         filterBar.isHidden = true
         if let responder = window?.firstResponder as? NSView, responder.isDescendant(of: filterBar) { window?.makeFirstResponder(grid) }
+    }
+
+    func updateEmptyNote() {
+        let filtered = source.rowCount > 0
+        emptyNote.isHidden = rows.rowCount > 0 || viewer.presentation != .table
+        emptyNote.text.stringValue = filtered ? "No rows match the filter or search." : "This result has no rows."
+        emptyNote.clear.isHidden = conditions.isEmpty && filterBar.searchField.stringValue.isEmpty  // the find bar's filter is its own
     }
 
     /// Tints the cells holding Search All Columns' text and the find bar's matches.

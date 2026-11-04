@@ -26,6 +26,7 @@ final class ReconDetailView: NSObject {
     private let rowsHolder = NSView()
     private var object: ReconObject?
     private var result: ReconResult?
+    private var scrollingTogether = false
 
     override init() {
         super.init()
@@ -58,6 +59,11 @@ final class ReconDetailView: NSObject {
         let halves = leftColumn.widthAnchor.constraint(equalTo: rightColumn.widthAnchor)
         halves.priority = .defaultLow  // halves to start with; dragging the divider wins
         halves.isActive = true
+        for side in [left, right] {
+            side.contentView.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(definitionScrolled(_:)),
+                                                   name: NSView.boundsDidChangeNotification, object: side.contentView)
+        }
         message.alignment = .center
         let scriptHeader = NSStackView(views: [scriptTitle, destructive])
         scriptHeader.spacing = Spacing.double
@@ -98,6 +104,17 @@ final class ReconDetailView: NSObject {
         scroll.borderType = .noBorder
         scroll.translatesAutoresizingMaskIntoConstraints = false
         return scroll
+    }
+
+    /// The definitions' lines are aligned: one side scrolled takes the other along, as far as it goes.
+    @objc private func definitionScrolled(_ notification: Notification) {
+        guard !scrollingTogether, let moved = notification.object as? NSClipView else { return }
+        scrollingTogether = true
+        defer { scrollingTogether = false }
+        let other = moved === left.contentView ? right : left
+        let wanted = NSRect(origin: moved.bounds.origin, size: other.contentView.bounds.size)
+        other.contentView.scroll(to: other.contentView.constrainBoundsRect(wanted).origin)
+        other.reflectScrolledClipView(other.contentView)
     }
 
     private func text(_ scroll: NSScrollView) -> NSTextView { scroll.documentView as! NSTextView }

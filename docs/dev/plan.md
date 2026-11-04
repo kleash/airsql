@@ -329,9 +329,9 @@ tooltip. Drag and drop works where a Mac user expects it (tree items into the ed
 | Table or view in the tree | Select, preview its data in the current table tab | Open in its own tab | Open Data, Open Structure, Copy Name, Generate SELECT/INSERT/UPDATE, Export…, Copy Table…, Maintenance ▸, Truncate…, Rename…, Drop…, Refresh |
 | Routine, trigger or event | Select, show its definition | Open its editor | Open, Run… (procedures), Copy CREATE, Drop…, Refresh |
 | Folder or category in the tree | Select | Expand or collapse | New…, Refresh, Expand All, Collapse All |
-| Grid cell | Select the cell | Edit in place (typed editor) | Copy, Copy As ▸, Paste, Quick Filter ▸, Column Summary…, Related Rows, Set NULL, Set DEFAULT, Insert Value ▸, Value Panel, Display As ▸, Delete Rows… |
+| Grid cell | Select the cell | Edit in place (typed editor) | Copy, Copy As ▸, Paste, Quick Filter ▸, Column Summary…, Related Rows, Set NULL, Set DEFAULT, Insert Value ▸, Value Panel, Display As ▸, Delete Rows |
 | Grid column header | Select the column; the sort control sorts | Auto-fit width on the border | Sort ▸, Filter by Values…, Hide Column, Column List…, Freeze, Display As ▸, Copy Column Name, Column Summary… |
-| Grid row number | Select the row | Open Record View | Copy Rows As ▸, Duplicate Row, Delete Rows…, Record View |
+| Grid row number | Select the row | Open Record View | Copy Rows As ▸, Duplicate Row, Delete Rows, Record View |
 | Result tab | Show it | Rename | Pin, Rename, Close, Close Others, Export…, Compare With… |
 | Editor tab | Show it | Rename (unsaved) | Close, Close Others, Duplicate, Rename, Reveal in Finder, Change Connection |
 | SQL editor | Place the cursor | Select the word | Run Statement, Run Selection, Explain, Format, Copy As ▸, Cut, Copy, Paste |

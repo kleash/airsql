@@ -216,6 +216,15 @@ final class TableEmptyNote: NSStackView {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Centres it over the viewer's rows.
+    func place(in body: NSView) {
+        body.addSubview(self)
+        NSLayoutConstraint.activate([
+            centerXAnchor.constraint(equalTo: body.centerXAnchor), centerYAnchor.constraint(equalTo: body.centerYAnchor),
+            widthAnchor.constraint(lessThanOrEqualTo: body.widthAnchor, constant: -2 * Spacing.double),
+        ])
+    }
 }
 
 /// The notice under the grid bar: pending changes with Preview SQL, Revert All and Apply; why the table is read-only;

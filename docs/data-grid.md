@@ -44,8 +44,8 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
 - **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
-- Drag a header to move its column, drag its right edge to resize it, and double-click the edge, or the header, to fit
-  its values.
+- Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
+- Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the console, so they open as you left them.
 - **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
@@ -57,7 +57,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
   as a JSON tree, as hex, or as a picture when the bytes are an image. It follows the cell you select. A double-click
   on a cell you can't edit opens it too.
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
-  (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
+  (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
   console result shows the grid again, as does an Apply that deletes the row.
 - **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the button at the end of a table's grid bar) turns rows

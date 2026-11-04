@@ -19,6 +19,8 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     /// The bar over the rows, and its conditions on the source's columns (ANDed).
     let filterBar = ResultFilterBar()
     let findBar = TableFindBar()
+    /// Over the grid when there are no rows to show.
+    let emptyNote = TableEmptyNote()
     /// Whether the find bar's Filter Rows was hiding rows at the last change.
     var findFiltered = false
     var conditions: [(column: Int, condition: GridCondition)] = []
@@ -30,6 +32,8 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     weak var model: AppModel?
     var transactionOpen: () -> Bool = { false }
     var editContext: EditContext?
+    var checklist: SetChecklist?
+    var lookup: ForeignKeyLookup?
     /// The pending changes' bar over the rows, and "Editable" or "Read-only" in the status bar.
     let notice = TableDataNotice()
     let editState = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
@@ -64,11 +68,17 @@ final class ResultGridView: NSView, DataGridViewDelegate {
             self.filter(column, by: GridCondition(self.source.columns[column], .equals, [value]), adding: true)
         }
         grid.setAccessibilityLabel("Result rows")
+        emptyNote.add.isHidden = true
+        emptyNote.clear.target = self
+        emptyNote.place(in: viewer.body)
+        viewer.didPresent = { [weak self] in self?.updateEmptyNote() }
+        updateEmptyNote()
         filterBar.owner = self
         filterBar.show([], shown: source.rowCount, of: source.rowCount)
         // The filter bar shows while a filter or a search is on (⇧⌘E opens it), and an edited result's notice while its
         // changes wait; hidden, they take no room.
         findBar.owner = self
+        viewer.findBar = findBar
         let bars = NSStackView(views: [filterBar, findBar, notice])
         bars.orientation = .vertical
         bars.spacing = 0
@@ -120,7 +130,11 @@ final class ResultGridView: NSView, DataGridViewDelegate {
             menu.addItem(quickFilterItem())
             menu.add([Commands.clearFilter, nil])
             if editable {
-                menu.add([Commands.setNull, nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
+                menu.add([Commands.cut, Commands.paste, Commands.setNull, Commands.setDefault])
+                let values = insertValueItems()
+                if !values.isEmpty { menu.addItem(MainMenu.submenu("Insert Value", values)) }
+                if let column = viewer.focusedCell?.column, foreignKey(column) != nil { menu.add([Commands.chooseReferencedRow]) }
+                menu.add([nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
                          Commands.previewChanges, Commands.apply, nil])
             }
             menu.add([Commands.exportRows])

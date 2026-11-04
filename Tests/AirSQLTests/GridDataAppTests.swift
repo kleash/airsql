@@ -552,10 +552,32 @@ extension AppTests {
             #expect(tab.emptyNote.text.stringValue == "No rows match the filter or search.")
             tab.emptyNote.clear.performClick(nil)
             #expect(await eventually(timeout: 5) { tab.loading == nil && tab.emptyNote.clear.isHidden })
+            tab.viewer.present(.text)
+            #expect(tab.emptyNote.isHidden)  // the note follows View As
+            tab.viewer.present(.table)
+            #expect(!tab.emptyNote.isHidden)
             tab.emptyNote.add.performClick(nil)
             #expect(tab.emptyNote.isHidden && tab.grid.rowCount == 1)
             let (_, _, readOnly) = try await Self.tab(session: session, readOnly: true)
             #expect(!readOnly.emptyNote.isHidden && readOnly.emptyNote.add.isHidden)
+        }
+
+        /// ⌫ on rows selected by their numbers marks them, as ⌘⌫ does; ⌘X copies the cells and clears them, pending.
+        @Test func deleteKeyMarksRowsAndCutClearsCells() async throws {
+            let (_, _, tab) = try await Self.tab()
+            let source = try #require(tab.source)
+            tab.grid.selection.selectRow(0)
+            tab.grid.deleteBackward(nil)
+            #expect(source.changes.isDeleted(try #require(source.rowKey(0))))
+            tab.undo(nil)
+            #expect(source.changes.isEmpty)
+
+            let nullable = try #require(source.table.columns.firstIndex { $0.nullable })
+            let shown = try #require(tab.grid.columnOrder.firstIndex(of: nullable))
+            tab.grid.selection.select(GridPosition(row: 0, column: shown))
+            let copies = NSPasteboard.general.changeCount
+            tab.cut(nil)
+            #expect(NSPasteboard.general.changeCount > copies && source.value(0, nullable) == nil)
         }
 
         /// ⌘Z undoes text being typed, not the grid's changes: the tab stands aside for the window's undo manager.

@@ -22,8 +22,9 @@ a session of its own. The compare only reads; nothing changes until you run the 
 
 The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
 much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
-for objects on one side, **structure**, **data**, then **match**. Click an object to see it; double-click it to see
-its rows when they differ.
+for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
+Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
+they differ. The two definitions scroll together.
 
 ## What is compared
 
@@ -58,10 +59,11 @@ different.
 
 ### Tables…
 
-After a first compare, **Tables…** lists the source's tables. Untick a table to leave it out, give the target table
-it should be compared with when it was renamed there, list columns whose values shouldn't count (such as
-`updated_at`), or add a WHERE condition for its rows on both sides. Double-click a table to tick or untick it, or
-right-click the selected tables for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
+**Tables…** lists the source's tables, once a source and database are chosen, so a long first compare can be limited.
+Untick a table to leave it out, give the target table it should be compared with when it was renamed there, list
+columns whose values shouldn't count (such as `updated_at`), or add a WHERE condition for its rows on both sides. Type
+in the filter to find a table; **Compare All** and **Compare None** tick and untick the tables shown. Double-click a
+table to tick or untick it, or right-click the selected tables (⌘ and ⇧ select several) for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
 too.
 
 ## How the data compare stays fast
