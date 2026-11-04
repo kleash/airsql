@@ -49,6 +49,58 @@ public enum ConsoleScript {
         return line(of: statement.range.lowerBound, in: text) + number - 1
     }
 
+    /// What the text leaves open, found without a server: the opening of a quote or comment it ends inside, and brackets
+    /// without a partner in their statement. At most `unclosedLimit`, for a script that's broken all the way down.
+    public static func unclosed(in text: String, noBackslashEscapes: Bool) -> [SQLProblem] {
+        let tokens = SQLLexer.tokens(text, noBackslashEscapes: noBackslashEscapes)
+        let utf16 = Array(text.utf16)
+        var problems: [SQLProblem] = []
+        func add(_ token: SQLToken, length: Int = 1, _ message: String) {
+            problems.append(SQLProblem(range: token.range.lowerBound..<(token.range.lowerBound + length), message: message))
+        }
+        var code: [SQLToken] = []
+        for token in tokens {
+            switch token.kind {
+            case .codeStart: code.append(token)
+            case .codeEnd: code.removeLast()
+            case .comment, .hint: if !token.isClosed { add(token, length: 2, "This comment has no closing */") }
+            case .quotedName: if !token.isClosed { add(token, "This name has no closing `") }
+            default: if !token.isClosed { add(token, "This text has no closing quote") }
+            }
+        }
+        for token in code { add(token, length: 2, "This comment has no closing */") }
+
+        let closers: [UInt16: UInt16] = [0x28: 0x29, 0x5B: 0x5D, 0x7B: 0x7D]
+        func name(_ unit: UInt16) -> String { String(decoding: [unit], as: UTF16.self) }
+        var next = 0
+        for statement in SQLSplitter.statements(in: text, noBackslashEscapes: noBackslashEscapes) {
+            var open: [SQLToken] = []
+            while next < tokens.count, tokens[next].range.lowerBound < statement.range.upperBound {
+                let token = tokens[next]
+                next += 1
+                guard token.kind == .symbol, token.range.count == 1, token.range.lowerBound >= statement.range.lowerBound
+                else { continue }
+                let unit = utf16[token.range.lowerBound]
+                if closers[unit] != nil {
+                    open.append(token)
+                } else if let opener = closers.first(where: { $0.value == unit })?.key {
+                    if let last = open.last, utf16[last.range.lowerBound] == opener {
+                        open.removeLast()
+                    } else {
+                        add(token, "This \(name(unit)) has no opening \(name(opener))")
+                    }
+                }
+            }
+            for token in open {
+                let unit = utf16[token.range.lowerBound]
+                add(token, "This \(name(unit)) has no closing \(name(closers[unit] ?? unit))")
+            }
+        }
+        return Array(problems.prefix(unclosedLimit))
+    }
+
+    static let unclosedLimit = 100
+
     /// Where an error in `statement` points, in the whole text: the token at the server's "near '…' at line N", the
     /// statement's last token for near '', or the name in an unknown column or table error. `message` is the server's
     /// text, `shown` what the underline says. Nil when the error names no place, or `statement` isn't in the text.

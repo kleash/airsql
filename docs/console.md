@@ -24,6 +24,8 @@ own session, which every console tab of that connection shares.
 ## Write SQL
 
 - Keywords, names, strings, numbers and comments have their own colours; the brackets around the cursor are marked.
+- A quote, comment or bracket left open is underlined in red a moment after you stop typing, and hovering over it says
+  what's missing. No server is asked.
 - **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
   keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
   elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;

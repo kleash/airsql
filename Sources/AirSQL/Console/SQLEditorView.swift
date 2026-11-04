@@ -21,6 +21,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     var onDropFiles: (([URL]) -> Void)?
     /// Where the last Run failed, underlined until the text changes.
     var runProblem: SQLProblem? { didSet { if runProblem != oldValue { underlineProblems() } } }
+    /// What the text leaves open (`ConsoleScript.unclosed`), as of the last pause in the typing.
+    private var unclosed: [SQLProblem] = [] { didSet { if unclosed != oldValue { underlineProblems() } } }
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
     static let indentUnit = "    "
@@ -111,6 +113,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         tokens = []
         highlightedLength = 0
         highlight()
+        checkLater()
     }
 
     override func didChangeText() {
@@ -124,6 +127,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         }
         clearMarks()
         runProblem = nil
+        checkLater()
         (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
         onChange?()
     }
@@ -176,7 +180,17 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     // MARK: Problems (underlined in red, the message on hover)
 
-    var problems: [SQLProblem] { [runProblem].compactMap { $0 } }
+    var problems: [SQLProblem] { [runProblem].compactMap { $0 } + unclosed }
+
+    /// A pause first: `(` is only a problem if nothing follows it.
+    private func checkLater() {
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(check), object: nil)
+        perform(#selector(check), with: nil, afterDelay: 0.5)
+    }
+
+    @objc func check() {
+        unclosed = ConsoleScript.unclosed(in: string, noBackslashEscapes: noBackslashEscapes)
+    }
 
     /// Draws `problems` again. The hover areas are fixed rectangles, so they're remade whenever the text moves.
     private func underlineProblems() {

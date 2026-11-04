@@ -130,6 +130,14 @@ extension AppTests {
             editor.setSelectedRange(NSRange(location: 8, length: 0))
             editor.insertText(" ", replacementRange: editor.selectedRange())
             #expect(editor.runProblem == nil && !underlined(11))
+            // What the text leaves open needs no Run, and goes when it is closed.
+            editor.setText("SELECT (1")
+            editor.check()
+            #expect(underlined(7) && editor.problems.map(\.message) == ["This ( has no closing )"])
+            editor.setSelectedRange(NSRange(location: 9, length: 0))
+            editor.insertText(")", replacementRange: editor.selectedRange())
+            editor.check()
+            #expect(!underlined(7) && editor.problems.isEmpty)
         }
 
         @Test func schemaChangesAreToldApart() {

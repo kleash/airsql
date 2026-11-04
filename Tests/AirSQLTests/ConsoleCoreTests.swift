@@ -48,6 +48,28 @@ struct ConsoleScriptTests {
         #expect(ConsoleScript.problem("… near 'FORM' at line 1", shown: "", statement: SQLStatement(sql: "FORM"), noBackslashEscapes: false) == nil)
     }
 
+    @Test func whatTheTextLeavesOpen() {
+        func problems(_ text: String, noBackslashEscapes: Bool = false) -> [String] {
+            ConsoleScript.unclosed(in: text, noBackslashEscapes: noBackslashEscapes).map {
+                "\($0.range.lowerBound): \($0.message)"
+            }
+        }
+        #expect(problems("SELECT ('a', `b`, [1], {d '2020-01-01'}) /* c */; -- it's (\nSELECT ')' # (").isEmpty)
+        #expect(problems("SELECT 'a") == ["7: This text has no closing quote"])
+        #expect(problems("SELECT `a") == ["7: This name has no closing `"])
+        #expect(problems("SELECT 1 /* a") == ["9: This comment has no closing */"])
+        #expect(problems("SELECT 1 /*! a") == ["9: This comment has no closing */"])
+        #expect(problems("SELECT 'a\\'") == ["7: This text has no closing quote"])
+        #expect(problems("SELECT 'a\\'", noBackslashEscapes: true).isEmpty)
+        #expect(problems("SELECT (1, (2)") == ["7: This ( has no closing )"])
+        #expect(problems("SELECT 1)") == ["8: This ) has no opening ("])
+        #expect(problems("SELECT (1]") == ["9: This ] has no opening [", "7: This ( has no closing )"])
+        // A bracket left open ends with its statement; a routine's own delimiter keeps its ; inside.
+        #expect(problems("SELECT (1;\nSELECT 2)") == ["7: This ( has no closing )", "19: This ) has no opening ("])
+        #expect(problems("DELIMITER $$\nCREATE PROCEDURE p() BEGIN SELECT (1); END$$\nDELIMITER ;\nSELECT 2").isEmpty)
+        #expect(ConsoleScript.unclosed(in: String(repeating: "(;", count: 500), noBackslashEscapes: false).count == ConsoleScript.unclosedLimit)
+    }
+
     @Test func resultTabsAreNamedFromTheCommentAbove() {
         let statements = SQLSplitter.statements(in: script)
         func title(_ index: Int) -> String? {
