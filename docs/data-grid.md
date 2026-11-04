@@ -27,8 +27,9 @@ column's comment.
 With cells selected, the status bar shows the focused cell (**r3 : c5**, row and column), how many cells are
 selected, and one figure for them: their sum, or their count when they aren't numbers. Click the figure to see them
 all (count, sum, average, smallest, largest, median, distinct values) and choose the one shown. Sums of decimals are
-exact. **Edit ▸ Copy Selection Summary** (⇧⌘C) copies every figure. Selections of more than 100,000 cells aren't added
-up. In a narrow window the figure, then the focused cell, make way for the rest; a table's row count and its **Count
+exact; a whole column's figure says **of loaded rows** while the table has more. Only whole numbers add up: dates,
+version numbers, phone numbers and BIT values get a count. **Edit ▸ Copy Selection Summary** (⇧⌘C) copies every figure.
+Selections of more than 100,000 cells aren't added up. In a narrow window the figure, then the focused cell, make way for the rest; a table's row count and its **Count
 Exactly**, **Load More** and **Load All** stay. Right-click them to copy what they say, or to count or load rows.
 
 ## Move around
@@ -95,8 +96,10 @@ copying and editing use the stored value.
   object or array to open or close it; right-click to copy a value or to open or close every one.
 - **View ▸ Chart** draws the rows as a bar, line, area, pie, scatter or histogram chart of a number column, by another
   column. Choose the kind and columns above the chart; point at it to read a value. Bars add up the values of each
-  label and show the first 30 labels; a pie shows eight slices and puts the rest in **Other**. **Save as PNG…** saves
-  a picture of it. Pie charts need macOS 14 or later.
+  label and show the first 30 labels; a pie shows eight slices and puts the rest in **Other**. Lines, areas and points
+  by a date column go in date order along a date axis; by a text column, along the row numbers. A chart covers the
+  first 10,000 rows of those loaded, and under it, and in its picture, says so when that leaves rows out. **Save as
+  PNG…** saves a picture of it. Pie charts need macOS 14 or later.
 
 ## Column Summary
 
