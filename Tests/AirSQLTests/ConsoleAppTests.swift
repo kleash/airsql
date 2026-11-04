@@ -140,6 +140,27 @@ extension AppTests {
             #expect(!underlined(7) && editor.problems.isEmpty)
         }
 
+        /// ⌘Z takes back the text in front of you: each console has its own steps, and an object editor's don't touch them.
+        @Test func eachTextHasItsOwnUndo() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, harness, first) = try await Self.console(model)
+            _ = await call(harness, "type", ["text": "one"])
+            first.editor.undoManager?.removeAllActions()  // a test's typing has no event to end its undo group
+            first.editor.replace(NSRange(location: 3, length: 0), with: " more")
+            #expect(await call(harness, "menu", ["path": "File > New Query"]).error == nil)
+            let second = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(second !== first && main.window?.firstResponder === second.editor)
+            second.editor.replace(NSRange(location: 0, length: 0), with: "two")
+            #expect(first.editor.undoManager !== second.editor.undoManager)
+            #expect(await call(harness, "menu", ["path": "Edit > Undo"]).error == nil)
+            #expect(second.text == "" && first.text == "one more")
+            #expect(await call(harness, "menu", ["path": "Edit > Redo"]).error == nil)
+            #expect(second.text == "two")
+            // A loaded text is a starting point, and only its own editor's.
+            second.editor.setText("loaded")
+            #expect(second.editor.undoManager?.canUndo == false && first.editor.undoManager?.canUndo == true)
+        }
+
         @Test func schemaChangesAreToldApart() {
             #expect(ConsoleViewController.changesSchema("/* new */ create table t (id int)"))
             #expect(ConsoleViewController.changesSchema("DROP VIEW v") && ConsoleViewController.changesSchema("rename table a to b"))

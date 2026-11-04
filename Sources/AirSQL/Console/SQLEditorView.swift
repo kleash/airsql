@@ -25,6 +25,10 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     private var unclosed: [SQLProblem] = [] { didSet { if unclosed != oldValue { underlineProblems() } } }
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
+    /// Its own, not the window's: Undo in one console must never change another's hidden text, and an object editor's
+    /// loaded code must not wipe the consoles' steps.
+    private let ownUndoManager = UndoManager()
+    override var undoManager: UndoManager? { ownUndoManager }
     static let indentUnit = "    "
 
     /// A TextKit 1 editor in a scroll view with a line-number ruler, not wrapping lines.
@@ -102,9 +106,14 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     }
 
     override func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        if item.action == #selector(performTextFinderAction(_:)) { return onFind != nil }
+        if item.action == #selector(performTextFinderAction(_:)), !usesFindBar { return onFind != nil }
+        if item.action == Commands.undo.action { return ownUndoManager.canUndo }
+        if item.action == Commands.redo.action { return ownUndoManager.canRedo }
         return super.validateMenuItem(item)
     }
+
+    @objc func undo(_ sender: Any?) { ownUndoManager.undo() }
+    @objc func redo(_ sender: Any?) { ownUndoManager.redo() }
 
     // MARK: Colours
 
@@ -198,7 +207,9 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         let length = (string as NSString).length
         layout.removeTemporaryAttribute(.underlineStyle, forCharacterRange: NSRange(location: 0, length: length))
         layout.removeTemporaryAttribute(.underlineColor, forCharacterRange: NSRange(location: 0, length: length))
+        let tip = toolTip  // an object editor has one for the whole view
         removeAllToolTips()
+        toolTip = tip
         for problem in problems where problem.range.upperBound <= length {
             let range = NSRange(problem.range)
             layout.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.thick.rawValue, .underlineColor: NSColor.statusBad],
