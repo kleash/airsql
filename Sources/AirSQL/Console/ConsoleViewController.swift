@@ -135,6 +135,7 @@ final class ConsoleViewController: NSViewController, TabContent {
             results.heightAnchor.constraint(greaterThanOrEqualToConstant: ResultsView.barHeight + 90),
         ])
         results.onSelect = { [weak self] tab in self?.selectResult(tab) }
+        results.onClose = { [weak self] in self?.closeResult(nil) }
         results.onRename = { [weak self] tab, title in
             tab.title = title
             self?.showResults()

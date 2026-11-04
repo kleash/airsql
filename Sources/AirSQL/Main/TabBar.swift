@@ -59,7 +59,7 @@ final class Tab {
 
 /// The strip of tabs above the content (plan §2.4): each tab's title (cut with an ellipsis, the full title in its
 /// tooltip), its unsaved dot or close button, and the connection's colour along the top of the active tab. A click
-/// shows a tab, a double-click renames it, a right-click opens its menu; "+" opens a new query.
+/// shows a tab, a double-click renames it, a middle-click closes it, a right-click opens its menu; "+" opens a new query.
 @MainActor
 final class TabBarView: NSView {
     weak var controller: MainWindowController?
@@ -161,12 +161,12 @@ final class TabBarView: NSView {
         controller?.rename(tab, to: title)
     }
 
-    /// The tab's menu (plan §2.12): Close, Close Others, Duplicate, Rename, Reveal in Finder, Change Connection.
+    /// The tab's menu (plan §2.12): Close, Close Others, Close All, Duplicate, Rename, Reveal in Finder, Change Connection.
     func menu(for button: TabButton) -> NSMenu {
         if let tab = button.tab { controller?.select(tab) }
         let menu = NSMenu(title: "Tab")
-        menu.add([Commands.closeTab, Commands.closeOtherTabs, Commands.duplicateTab, Commands.renameTab, nil,
-                  Commands.revealInFinder, Commands.changeConnection])
+        menu.add([Commands.closeTab, Commands.closeOtherTabs, Commands.closeAllTabs, Commands.duplicateTab, Commands.renameTab,
+                  nil, Commands.revealInFinder, Commands.changeConnection])
         return menu
     }
 }
@@ -236,7 +236,7 @@ final class TabButton: NSView {
         let edited = tab.tabContent?.isEdited ?? false
         dot.isHidden = !edited || hovering
         close.isHidden = edited && !hovering
-        toolTip = tab.title + (edited ? " (unsaved)" : "") + ": click to show it, double-click to rename it, right-click for more"
+        toolTip = tab.title + (edited ? " (unsaved)" : "") + ": click to show it, double-click to rename it, middle-click to close it, right-click for more"
         setAccessibilityLabel(tab.title)
         setAccessibilityValue(selected ? 1 : 0)
         setAccessibilityHelp(toolTip)
@@ -286,6 +286,11 @@ final class TabButton: NSView {
     override func mouseDown(with event: NSEvent) {
         guard editor == nil else { return super.mouseDown(with: event) }
         bar?.clicked(self, count: event.clickCount)
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard event.buttonNumber == 2 else { return super.otherMouseUp(with: event) }
+        closeClicked()
     }
 
     override func menu(for event: NSEvent) -> NSMenu? { bar?.menu(for: self) }

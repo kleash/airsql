@@ -28,6 +28,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Open… | ⌘O |
 | Close Tab | ⌘W |
 | Close Other Tabs | ⌥⌘W |
+| Close All Tabs | ⌥⇧⌘W |
 | Close Window | ⇧⌘W |
 | Save | ⌘S |
 | Save As… | ⇧⌘S |

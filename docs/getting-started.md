@@ -17,8 +17,8 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
 
 - **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
-- **The tabs** hold your queries and tables. Double-click a tab to rename it; right-click it to close others or
-  duplicate it.
+- **The tabs** hold your queries and tables. Double-click a tab to rename it; middle-click it to close it; right-click it
+  to close the others or all of them, or to duplicate it.
 - **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
   All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.

@@ -64,12 +64,13 @@ extension SidebarController: NSMenuItemValidation {
         }
     }
 
-    /// A double-click makes a database current and opens it, opens or closes a group, opens an object in its own tab.
+    /// A double-click makes a database current and opens or closes it, opens or closes a group, opens an object in its
+    /// own tab.
     func treeDoubleClicked(_ node: SidebarNode) {
         switch node.kind {
         case .database(let id, let name):
             model.openConnection(id)?.currentDatabase = name
-            outline.expandItem(node)
+            fallthrough
         case .category:
             if outline.isItemExpanded(node) { outline.animator().collapseItem(node) } else { outline.animator().expandItem(node) }
         case .object(_, let object):

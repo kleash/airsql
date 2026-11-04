@@ -127,6 +127,47 @@ extension AppTests {
             #expect(open.snapshot.database("airsql_fixture")?.table("orders")?.columns.isEmpty == false)
         }
 
+        @Test func newOnAGroupMakesOneOfItsKindAndSaysWhyNotOtherwise() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let outline = main.sidebar.outline
+            let fixture = try #require(main.sidebar.treeNodes[.database(id, "airsql_fixture")])
+            outline.expandItem(fixture)
+            func select(_ kind: SidebarNode.Kind) throws {
+                let row = outline.row(forItem: try #require(main.sidebar.treeNodes[kind]))
+                outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            }
+            let new = Commands.createObject.item()
+
+            try select(.database(id, "airsql_fixture"))
+            #expect(main.validateEditorItem(new)?.enabled == false)
+            #expect(main.validateEditorItem(new)?.reason?.isEmpty == false)
+
+            try select(.category(id, "airsql_fixture", .view))
+            #expect(main.validateEditorItem(new)?.enabled == true)
+            main.createObject(new)
+            #expect(await eventually(timeout: 5) { main.selectedTab?.content is ObjectEditorController })
+
+            try select(.category(id, "airsql_fixture", .table))
+            main.createObject(new)
+            #expect(await eventually(timeout: 5) { main.selectedTab?.content is TableEditorController })
+        }
+
+        @Test func aDoubleClickOnADatabaseOpensItAndAnotherClosesIt() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let fixture = try #require(main.sidebar.treeNodes[.database(id, "airsql_fixture")])
+            main.sidebar.treeDoubleClicked(fixture)
+            #expect(await eventually(timeout: 5) { main.sidebar.outline.isItemExpanded(fixture) })
+            #expect(open.currentDatabase == "airsql_fixture")
+            main.sidebar.treeDoubleClicked(fixture)
+            #expect(await eventually(timeout: 5) { !main.sidebar.outline.isItemExpanded(fixture) })
+        }
+
         /// Every navigator screen and dialog, light and dark, at the window's smallest and usual size: every control says
         /// what it does, and nothing is cut, crosses a rounded edge or overlaps.
         @Test func everyScreenIsExplainedAndTidy() async throws {

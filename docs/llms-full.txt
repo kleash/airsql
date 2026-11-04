@@ -100,8 +100,8 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
 
 - **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
-- **The tabs** hold your queries and tables. Double-click a tab to rename it; right-click it to close others or
-  duplicate it.
+- **The tabs** hold your queries and tables. Double-click a tab to rename it; middle-click it to close it; right-click it
+  to close the others or all of them, or to duplicate it.
 - **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
   All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
@@ -605,9 +605,10 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](https://kleash.github.io/airsql/editors.html));
-  **Create Table…** and **New…** make a table or object in the database you right-clicked.
+  **Create Table…** makes a table in the database you right-clicked; **New…** on a group (Tables, Views…) makes
+  another of its kind.
 - **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
-  open it. The console's statements run in the current database ([The SQL console](https://kleash.github.io/airsql/console.html)).
+  open it; double-click again to close it. The console's statements run in the current database ([The SQL console](https://kleash.github.io/airsql/console.html)).
 - **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
@@ -1476,6 +1477,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Open… | ⌘O |
 | Close Tab | ⌘W |
 | Close Other Tabs | ⌥⌘W |
+| Close All Tabs | ⌥⇧⌘W |
 | Close Window | ⇧⌘W |
 | Save | ⌘S |
 | Save As… | ⇧⌘S |

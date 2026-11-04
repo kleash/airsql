@@ -124,8 +124,9 @@ extension AppTests {
                     },
                     clicked: { $0.selectedTab?.title == "Query 1" && $0.contentKind == "tab" },
                     doubleClicked: { main, _ in tabButton(main, "Query 1").renameField != nil },
-                    menu: ["Close Tab", "Close Other Tabs", "Duplicate Tab", "Rename Tab…", "Reveal in Finder", "Change Connection…"],
-                    enabled: ["Close Tab", "Close Other Tabs", "Duplicate Tab", "Rename Tab…"]),
+                    menu: ["Close Tab", "Close Other Tabs", "Close All Tabs", "Duplicate Tab", "Rename Tab…", "Reveal in Finder",
+                           "Change Connection…"],
+                    enabled: ["Close Tab", "Close Other Tabs", "Close All Tabs", "Duplicate Tab", "Rename Tab…"]),
             Surface(name: "Result tab",
                     place: { main, _ in
                         let console = ConsoleViewController(model: main.model, connection: Fixtures.production.id)

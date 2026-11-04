@@ -72,6 +72,8 @@ final class ResultsView: NSView, NSTextFieldDelegate {
     /// A tab is chosen (click), renamed (the new name), or its menu asked for (it is selected first).
     var onSelect: ((ResultTab) -> Void)?
     var onRename: ((ResultTab, String) -> Void)?
+    /// Close the result on show.
+    var onClose: (() -> Void)?
     var tabMenu: (() -> NSMenu)?
     static let barHeight: CGFloat = 30
 
@@ -182,6 +184,13 @@ final class ResultsView: NSView, NSTextFieldDelegate {
         guard let tab = button.tab else { return }
         onSelect?(tab)
         if count == 2, tab.content.isRenamable { button.beginRename() }
+    }
+
+    /// Messages stay.
+    func closeClicked(_ button: ResultTabButton) {
+        guard let tab = button.tab, tab.content.isRenamable else { return }
+        onSelect?(tab)
+        onClose?()
     }
 
     func renamed(_ button: ResultTabButton, to title: String) {
