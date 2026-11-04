@@ -35,6 +35,33 @@ struct ConsoleLabTests {
         await session.close()
     }
 
+    /// Statements the fixture answers, read by the unknown-name check against the real schema cache, stay clean; a
+    /// wrong name beside them is still found.
+    @Test(arguments: ["mariadb", "mysql"])
+    func validFixtureQueriesHaveNoUnknownNames(_ flavor: String) async throws {
+        let session = try await session(flavor)
+        let cache = SchemaCache(source: session, includes: { $0 == Lab.fixture || $0 == "information_schema" })
+        try await cache.load()
+        try await cache.loadDetails([Lab.fixture])
+        for sql in [
+            "SELECT c.id, COUNT(*) AS orders_made, SUM(i.quantity) total FROM customers c JOIN orders o ON o.customer_id = c.id "
+                + "JOIN order_items i ON i.order_id = o.id GROUP BY c.id HAVING total > 0 ORDER BY orders_made DESC LIMIT 5",
+            "SELECT * FROM customer_order_totals",
+            "SELECT id FROM `order details` LIMIT 1",
+            "SELECT o.id, EXTRACT(YEAR FROM NOW()) FROM orders o WHERE EXISTS (SELECT 1 FROM customers c WHERE c.id = o.customer_id)",
+            "SELECT table_name FROM information_schema.tables LIMIT 1",
+        ] {
+            let ran = await run("USE \(SQLQuote.identifier(Lab.fixture))", on: session)
+            #expect(ran.error == nil)
+            let outcome = await run(sql, on: session)
+            #expect(outcome.error == nil, "\(sql): \(outcome.error?.message ?? "")")
+            #expect(SQLNameCheck.problems(in: sql, snapshot: cache.snapshot, database: Lab.fixture).isEmpty, "\(sql)")
+        }
+        let found = SQLNameCheck.problems(in: "SELECT nope FROM customers; SELECT * FROM nosuch", snapshot: cache.snapshot, database: Lab.fixture)
+        #expect(found.count == 2)
+        await session.close()
+    }
+
     @Test(arguments: ["mariadb", "mysql"])
     func cancelAndTheQueryTimeoutStopTheStatement(_ flavor: String) async throws {
         let session = try await session(flavor)

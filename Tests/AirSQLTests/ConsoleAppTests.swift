@@ -112,6 +112,21 @@ extension AppTests {
             #expect(editor.string == "SELECT 1")
         }
 
+        /// An unknown table is underlined from the schema cache a moment after the typing, with no session; Run isn't held back.
+        @Test func anUnknownTableIsUnderlinedAndSaysWhatWasNotFound() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            var context = (snapshot: Optional(SQLNameCheckTests.snapshot()), database: Optional("shop"), changed: Set<String>())
+            editor.nameContext = { context }
+            editor.setText("SELECT * FROM nosuch")
+            editor.check()
+            #expect(await eventually(timeout: 10) { !editor.problems.isEmpty })
+            #expect(editor.problems.map(\.range) == [14..<20] && editor.problems[0].message.hasPrefix("No table named “nosuch”"))
+            context.snapshot = nil
+            editor.check()
+            #expect(await eventually(timeout: 10) { editor.problems.isEmpty })
+        }
+
         /// Statements after which the navigator's tree reloads.
         /// Where a Run failed is underlined and says why on hover, until the text changes.
         @Test func aFailedRunsPlaceIsUnderlinedUntilTheTextChanges() async throws {

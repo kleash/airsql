@@ -68,6 +68,11 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
     let outline = PickerOutline()
     let scroll = NSScrollView()
     private(set) var databases: [PickerNode] = []
+    /// What the outline lists at its top: the databases or, while filtering, the matching tables alone, so that a tick
+    /// never reaches a table the filter hides.
+    private var roots: [PickerNode] = []
+    private lazy var filter = ListFilter("Filter", id: "tools.filter", tip: "Type part of a name to show only those tables; what is ticked stays ticked",
+                                         list: outline) { [weak self] in self?.applyFilter() }
     /// After each change of what is included.
     var onChange: () -> Void = {}
 
@@ -104,16 +109,38 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
     func view(height: CGFloat) -> NSView {
         let box = SurfaceView(.content, radius: Radius.card, border: .separatorColor)
         box.translatesAutoresizingMaskIntoConstraints = false
+        box.addSubview(filter)
         box.addSubview(scroll)
-        scroll.pin(to: box, insets: .all(Radius.card))
-        box.heightAnchor.constraint(equalToConstant: height).isActive = true
+        NSLayoutConstraint.activate([
+            filter.topAnchor.constraint(equalTo: box.topAnchor, constant: Radius.card),
+            filter.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: Radius.card),
+            filter.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -Radius.card),
+            scroll.topAnchor.constraint(equalTo: filter.bottomAnchor, constant: Spacing.half),
+            scroll.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: Radius.card),
+            scroll.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -Radius.card),
+            scroll.bottomAnchor.constraint(equalTo: box.bottomAnchor, constant: -Radius.card),
+            box.heightAnchor.constraint(equalToConstant: height),
+        ])
         return box
     }
 
     func show(_ databases: [PickerNode], expanding: String?) {
         self.databases = databases
-        outline.reloadData()
+        applyFilter()
         if let node = databases.first(where: { $0.name == expanding }) { outline.expandItem(node) }
+    }
+
+    private func applyFilter() {
+        let text = filter.stringValue
+        roots = text.isEmpty ? databases : databases.flatMap { database -> [PickerNode] in
+            let whole = GridFilter.matches(text, [database.name])
+            if database.tables.isEmpty { return whole ? [database] : [] }
+            return database.tables.filter { whole || GridFilter.matches(text, [$0.name]) }
+        }
+        outline.deselectAll(nil)
+        outline.reloadData()
+        // Leaving a filter: what it ticked stays in view.
+        if text.isEmpty { for database in databases where database.state != .off { outline.expandItem(database) } }
     }
 
     var isEnabled: Bool {
@@ -177,12 +204,12 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
     }
 
     @objc private func includeAll(_ sender: Any?) {
-        databases.forEach { include($0, true) }
+        roots.forEach { include($0, true) }
         changed()
     }
 
     @objc private func includeNone(_ sender: Any?) {
-        databases.forEach { include($0, false) }
+        roots.forEach { include($0, false) }
         changed()
     }
 
@@ -209,8 +236,8 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
         item("Leave Out", #selector(leaveOutSelected(_:)), "Untick the selected rows")
         item("Include Only These", #selector(includeOnly(_:)), "Tick the selected rows and untick every other")
         menu.addItem(.separator())
-        item("Include All", #selector(includeAll(_:)), "Tick every database and table")
-        item("Include None", #selector(includeNone(_:)), "Untick everything")
+        item("Include All", #selector(includeAll(_:)), "Tick every database and table shown")
+        item("Include None", #selector(includeNone(_:)), "Untick every database and table shown")
     }
 
     @objc private func includeSelected(_ sender: Any?) {
@@ -226,11 +253,11 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
     // MARK: Data source and rows
 
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-        (item as? PickerNode)?.tables.count ?? databases.count
+        (item as? PickerNode)?.tables.count ?? roots.count
     }
 
     func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-        (item as? PickerNode)?.tables[index] ?? databases[index]
+        (item as? PickerNode)?.tables[index] ?? roots[index]
     }
 
     func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
@@ -240,8 +267,9 @@ final class ObjectPicker: NSObject, NSOutlineViewDataSource, NSOutlineViewDelega
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
         guard let node = item as? PickerNode else { return nil }
         let cell = outlineView.makeView(withIdentifier: PickerCell.id, owner: nil) as? PickerCell ?? PickerCell()
-        cell.name.stringValue = node.name
-        cell.name.toolTip = node.name
+        // Listed alone while filtering, a table says which database it's in.
+        cell.name.stringValue = node.isDatabase || filter.stringValue.isEmpty ? node.name : node.database + "." + node.name
+        cell.name.toolTip = cell.name.stringValue
         cell.name.textColor = isEnabled ? .labelColor : .disabledControlTextColor
         cell.box.setAccessibilityLabel(node.name)
         cell.box.allowsMixedState = node.isDatabase

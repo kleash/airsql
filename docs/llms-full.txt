@@ -364,6 +364,12 @@ own session, which every console tab of that connection shares.
 - Keywords, names, strings, numbers and comments have their own colours; the brackets around the cursor are marked.
 - A quote, comment or bracket left open is underlined in red a moment after you stop typing, and hovering over it says
   what's missing. No server is asked.
+- A table or column that isn't in the schema AirSQL has read is underlined in red the same way, and hovering over it
+  says what wasn't found. It's only advice: **Run** still runs, and nothing is sent to the server to check. When
+  AirSQL isn't sure it says nothing: a database whose details aren't loaded yet, temporary tables and tables made or
+  altered in the same text or session, CTEs, derived tables, and any statement other than a plain SELECT, INSERT,
+  REPLACE, UPDATE or DELETE. Columns are checked only when every table in the statement is known. If a table is new,
+  **Refresh** the schema and the underline goes.
 - **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
   keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
   elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
@@ -681,8 +687,8 @@ These open a console tab with the SQL in it, built from the names AirSQL read; n
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
 tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
-bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list to see its matching rows;
-right-click it to open all its rows or copy its name.
+bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
+matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
 Upper and lower case match as the column's collation says (most ignore case).
 
 ## See what the server is running
@@ -1030,6 +1036,8 @@ parts, chosen at the top:
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
 green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Discard** takes back all of them.
+⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
+as new rows.
 
 Under the lists, the SQL that Apply would run updates as you type. When something can't work yet (a VARCHAR without a
 length, two columns of one name, an emoji in a name, which the server would keep as `?`), it says what to fix instead.
@@ -1058,6 +1066,8 @@ server keeps it, to edit as text.
 - MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
   function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
   apply again, and **Revert** puts the old code back.
+- When the server refuses the code, the place it points to is underlined in red, with the message on hover, until you
+  change the text.
 - Renaming it in the code makes the new one and then drops the old one.
 
 ## The ER diagram
@@ -1068,7 +1078,7 @@ at, virtual foreign keys you added in a table's rows included ([Virtual foreign 
 Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure** and **Copy Name**. **Export Image…** saves the diagram as a PNG, and **Export
+right-click it for **Open Structure** and **Copy Name** (⌘C copies the selected table's name too). **Export Image…** saves the diagram as a PNG, and **Export
 Mermaid…** as Mermaid text, which many docs sites and wikis draw.
 
 
@@ -1106,7 +1116,8 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
 **Tools ▸ Export…** (or right-click a connection ▸ Export…).
 
 1. Tick the databases or tables to export. Space ticks the selected rows; right-click for Include All, Include None and
-   Include Only These. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
+   Include Only These. The filter above the list shows only the tables with that text, each on its own line, so ticks
+   reach only what you see; what's ticked stays ticked when you clear it. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
    databases export whole, each with its own name.
 2. Choose the content (structure and data, structure only, data only) and the options: one consistent snapshot
    (`--single-transaction`), binary as hex, gzip, `DROP TABLE` before each table, and views, routines, triggers and
@@ -1222,8 +1233,9 @@ a session of its own. The compare only reads; nothing changes until you run the 
 
 The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
 much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
-for objects on one side, **structure**, **data**, then **match**. Click an object to see it; double-click it to see
-its rows when they differ.
+for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
+Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
+they differ. The two definitions scroll together.
 
 ## What is compared
 
@@ -1257,10 +1269,11 @@ though, so the same view on MySQL and on MariaDB can still show as different.
 
 ### Tables…
 
-After a first compare, **Tables…** lists the source's tables. Untick a table to leave it out, give the target table
-it should be compared with when it was renamed there, list columns whose values shouldn't count (such as
-`updated_at`), or add a WHERE condition for its rows on both sides. Double-click a table to tick or untick it, or
-right-click the selected tables for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
+**Tables…** lists the source's tables, once a source and database are chosen, so a long first compare can be limited.
+Untick a table to leave it out, give the target table it should be compared with when it was renamed there, list
+columns whose values shouldn't count (such as `updated_at`), or add a WHERE condition for its rows on both sides. Type
+in the filter to find a table; **Compare All** and **Compare None** tick and untick the tables shown. Double-click a
+table to tick or untick it, or right-click the selected tables (⌘ and ⇧ select several) for Compare and Leave Out. **Leave Out of Next Compare** in an object's menu unticks it
 too.
 
 ## How the data compare stays fast
@@ -1442,7 +1455,8 @@ with your own `liquibase` (`liquibase update`, `liquibase rollback-count 1`…).
 - **Content**: **DDL** writes the objects' structure, **DML** their rows, **DDL + DML** both.
 - The list holds the database's tables, views, procedures, functions, triggers, events and sequences, each ticked.
   Untick what you don't want; space ticks the selected rows, double-click ticks one, and the right-click menu
-  includes all, none or the selected rows. For **DML**, tick **Rows** for the tables whose rows to write, and type a
+  includes all, none or the selected rows; the filter above the list narrows it, and all and none then mean the
+  objects shown. For **DML**, tick **Rows** for the tables whose rows to write, and type a
   **WHERE** condition (double-click the cell) to write only some of them, such as `active = 1`.
 - **Author** and **Ids** make each `--changeset` line (see [Settings](#settings) below). **Rollback** adds the
   `--rollback` line that undoes each object. **Skip what already exists** adds preconditions that mark a changeset
@@ -1985,11 +1999,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
 - **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
   `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+  `recon.filter`, `recon.hideMatching`, `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
-  sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
-- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
+  sheet `reconTables.filter`, `reconTables.list`, `reconTables.all`, `reconTables.none`, `reconTables.done`, `reconTables.cancel`.
+- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.filter`, `tools.objects` (`tools.include.<name>`), `tools.status`,
   `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
   `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
@@ -1999,7 +2013,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
-- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.objects`
+- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.filter`, `liquibase.objects`
   (`liquibase.include.<name>`, `liquibase.rows.<name>`, `liquibase.where.<name>`), `liquibase.author`, `liquibase.ids`,
   `liquibase.rollback`, `liquibase.preconditions`, `liquibase.layout`, `liquibase.saveTo`, `liquibase.choose`,
   `liquibase.preview`, `liquibase.copy`, `tools.run` (the person's); Save as Changeset `changeset.heading`,

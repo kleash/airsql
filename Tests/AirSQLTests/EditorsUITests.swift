@@ -105,8 +105,9 @@ extension AppTests {
             let other = middle(4, 1)
             let menu = await call(harness, "click", ["x": other.0, "y": other.1, "button": "right"])
             #expect(list.selectedRow == 4, "a right-click selects the row it is on: \(menu.error ?? "")")
-            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Delete Rows"])
-            #expect((menu["menu"] as? [[String: Any]])?.allSatisfy { $0["enabled"] as? Bool == true } == true)
+            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Delete Rows"])
+            // Paste waits for rows copied.
+            #expect((menu["menu"] as? [[String: Any]])?.filter { $0["enabled"] as? Bool != true }.map { $0["title"] as? String } == ["Paste"])
             _ = await call(harness, "menu", ["path": "context > Delete Rows"])
             #expect(list.numberOfRows == 5 && editor.sqlText.string.contains("DROP COLUMN `total`"))
         }
@@ -189,6 +190,32 @@ extension AppTests {
             #expect(!editor.applyButton.isEnabled && editor.applyButton.toolTip?.contains("is read-only") == true)
         }
 
+        /// ⌘C gives rows as CREATE TABLE lines, and ⌘V adds them, in this table or another, under names of their own.
+        @Test func rowsCopyAsTheirDefinitionsAndPasteBetweenTables() async throws {
+            let (_, _, editor) = try await tableEditor("customers")
+            let (_, _, other) = try await tableEditor("orders")
+            let paste = NSMenuItem(title: "Paste", action: Commands.paste.action, keyEquivalent: "")
+            let before = other.design.columns.count
+            other.section = .columns
+            editor.section = .columns
+            editor.list.selectRowIndexes([0], byExtendingSelection: false)
+            let name = editor.design.columns[0].name
+            editor.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix(SQLQuote.identifier(name) + " ") == true)
+            #expect(other.validateMenuItem(paste))
+            other.list.selectRowIndexes([0], byExtendingSelection: false)
+            other.paste(nil)
+            #expect(other.design.columns.count == before + 1)
+            #expect(other.design.columns[1].original == nil && !other.design.columns[1].autoIncrement)
+            #expect(other.list.selectedRow == 1)
+            other.undo.undo()
+            #expect(other.design.columns.count == before)
+            // Text copied elsewhere since is not rows.
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString("x", forType: .string)
+            #expect(!other.validateMenuItem(paste))
+        }
+
         @Test func theObjectEditorShowsTheCodeAndWhoItRunsAs() async throws {
             let model = testModel([Fixtures.local])
             let (main, harness) = appWindow(model)
@@ -232,6 +259,8 @@ extension AppTests {
             #expect(diagram.canvas.selected == "orders", "\(reply.error ?? "") at \(point); canvas \(diagram.canvas.convert(diagram.canvas.bounds, to: nil))")
             let menu = await call(harness, "click", ["x": point.0, "y": point.1, "button": "right"])
             #expect(titles(menu["menu"]) == ["Open Structure", "Copy Name"])
+            diagram.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string) == "`orders`")
             _ = await call(harness, "click", ["x": point.0, "y": point.1, "count": 2])
             #expect(main.selectedTab?.title == "orders · structure")
             #expect(diagram.canvas.png().map { NSBitmapImageRep(data: $0)?.pixelsWide ?? 0 } == Int(diagram.canvas.bounds.width * 2))

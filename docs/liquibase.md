@@ -17,7 +17,8 @@ with your own `liquibase` (`liquibase update`, `liquibase rollback-count 1`…).
 - **Content**: **DDL** writes the objects' structure, **DML** their rows, **DDL + DML** both.
 - The list holds the database's tables, views, procedures, functions, triggers, events and sequences, each ticked.
   Untick what you don't want; space ticks the selected rows, double-click ticks one, and the right-click menu
-  includes all, none or the selected rows. For **DML**, tick **Rows** for the tables whose rows to write, and type a
+  includes all, none or the selected rows; the filter above the list narrows it, and all and none then mean the
+  objects shown. For **DML**, tick **Rows** for the tables whose rows to write, and type a
   **WHERE** condition (double-click the cell) to write only some of them, such as `active = 1`.
 - **Author** and **Ids** make each `--changeset` line (see [Settings](#settings) below). **Rollback** adds the
   `--rollback` line that undoes each object. **Skip what already exists** adds preconditions that mark a changeset

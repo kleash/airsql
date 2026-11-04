@@ -33,7 +33,8 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
 **Tools ▸ Export…** (or right-click a connection ▸ Export…).
 
 1. Tick the databases or tables to export. Space ticks the selected rows; right-click for Include All, Include None and
-   Include Only These. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
+   Include Only These. The filter above the list shows only the tables with that text, each on its own line, so ticks
+   reach only what you see; what's ticked stays ticked when you clear it. One database exports without `CREATE DATABASE`, so you can restore it under any name; several
    databases export whole, each with its own name.
 2. Choose the content (structure and data, structure only, data only) and the options: one consistent snapshot
    (`--single-transaction`), binary as hex, gzip, `DROP TABLE` before each table, and views, routines, triggers and

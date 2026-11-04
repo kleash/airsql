@@ -20,6 +20,10 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     private let databaseMenu = popup([], selected: 0, id: "liquibase.database", tip: "Choose the database to write a changelog of",
                                      target: nil, action: nil)
     private let list = LiquibaseObjectTable()
+    private lazy var filter = ListFilter("Filter", id: "liquibase.filter", tip: "Type part of a name to show only those objects; what is ticked stays ticked",
+                                         list: list) { [weak self] in self?.applyFilter() }
+    /// The objects the filter keeps.
+    private var shown: [Item] = []
     private let author = AirSQL.textField("", placeholder: "Your Mac account's name", id: "liquibase.author",
                                           tip: "Type who the changesets are by, as Liquibase records it", width: 200)
     private let ids = AirSQL.textField("", placeholder: "{date}-{n}-{object}", id: "liquibase.ids",
@@ -142,9 +146,18 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         scroll.translatesAutoresizingMaskIntoConstraints = false
         let box = SurfaceView(.content, radius: Radius.card, border: .separatorColor)
         box.translatesAutoresizingMaskIntoConstraints = false
+        box.addSubview(filter)
         box.addSubview(scroll)
-        scroll.pin(to: box, insets: .all(Radius.card))
-        box.heightAnchor.constraint(equalToConstant: 230).isActive = true
+        NSLayoutConstraint.activate([
+            filter.topAnchor.constraint(equalTo: box.topAnchor, constant: Radius.card),
+            filter.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: Radius.card),
+            filter.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -Radius.card),
+            scroll.topAnchor.constraint(equalTo: filter.bottomAnchor, constant: Spacing.half),
+            scroll.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: Radius.card),
+            scroll.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -Radius.card),
+            scroll.bottomAnchor.constraint(equalTo: box.bottomAnchor, constant: -Radius.card),
+            box.heightAnchor.constraint(equalToConstant: 230),
+        ])
         return box
     }
 
@@ -208,7 +221,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         reading?.cancel()
         schema = nil
         items = []
-        list.reloadData()
+        applyFilter()
         loading("Reading the definitions in \(name)…")
         refresh()
         let options = self.options, updates = Throttle()
@@ -252,8 +265,15 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         loading(nil)
         if !chosen { url = url.deletingLastPathComponent().appendingPathComponent(defaultName(read.database)) }
         showLocation()
-        list.reloadData()
+        applyFilter()
         refresh()
+    }
+
+    private func applyFilter() {
+        let text = filter.stringValue
+        shown = items.filter { text.isEmpty || GridFilter.matches(text, [$0.object.name]) }
+        list.deselectAll(nil)
+        list.reloadData()
     }
 
     // MARK: Changes
@@ -287,8 +307,8 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     func controlTextDidEndEditing(_ notification: Notification) {
         guard let field = notification.object as? NSTextField, field !== author, field !== ids else { return }
         let row = list.row(for: field)
-        guard items.indices.contains(row) else { return }
-        items[row].filter = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard shown.indices.contains(row) else { return }
+        shown[row].filter = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         refresh()
     }
 
@@ -426,10 +446,10 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
 
     // MARK: The list
 
-    func numberOfRows(in tableView: NSTableView) -> Int { items.count }
+    func numberOfRows(in tableView: NSTableView) -> Int { shown.count }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let item = items[row], enabled = list.isEnabled
+        let item = shown[row], enabled = list.isEnabled
         switch tableColumn?.identifier.rawValue {
         case "rows":
             guard item.isTable else { return nil }
@@ -478,14 +498,14 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
 
     @objc private func boxClicked(_ sender: NSButton) {
         let row = list.row(for: sender)
-        guard items.indices.contains(row) else { return }
-        include([items[row]], !items[row].included)
+        guard shown.indices.contains(row) else { return }
+        include([shown[row]], !shown[row].included)
     }
 
     @objc private func rowsClicked(_ sender: NSButton) {
         let row = list.row(for: sender)
-        guard items.indices.contains(row) else { return }
-        withRows([items[row]], sender.state == .on)
+        guard shown.indices.contains(row) else { return }
+        withRows([shown[row]], sender.state == .on)
     }
 
     private func include(_ chosen: [Item], _ on: Bool) {
@@ -510,7 +530,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
     private var targetItems: [Item] {
         let clicked = list.clickedRow
         let rows = clicked >= 0 && !list.selectedRowIndexes.contains(clicked) ? IndexSet(integer: clicked) : list.selectedRowIndexes
-        return rows.filter { items.indices.contains($0) }.map { items[$0] }
+        return rows.filter { shown.indices.contains($0) }.map { shown[$0] }
     }
 
     /// Double-click and space: tick or untick (rows, for DML).
@@ -531,8 +551,8 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         for (title, action, tip, shown) in [
             ("Include", #selector(includeChosen(_:)), "Tick the selected objects", contentChoice != .data),
             ("Leave Out", #selector(leaveOutChosen(_:)), "Untick the selected objects", contentChoice != .data),
-            ("Include All", #selector(includeAll(_:)), "Tick every object", contentChoice != .data),
-            ("Include None", #selector(includeNone(_:)), "Untick every object", contentChoice != .data),
+            ("Include All", #selector(includeAll(_:)), "Tick every object shown", contentChoice != .data),
+            ("Include None", #selector(includeNone(_:)), "Untick every object shown", contentChoice != .data),
             ("Insert Rows", #selector(rowsOfChosen(_:)), "Insert the rows of the selected tables", showsRows),
             ("No Rows", #selector(noRowsOfChosen(_:)), "Leave the rows of the selected tables out", showsRows),
         ] where shown {
@@ -546,8 +566,8 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
 
     @objc private func includeChosen(_ sender: Any?) { include(targetItems, true) }
     @objc private func leaveOutChosen(_ sender: Any?) { include(targetItems, false) }
-    @objc private func includeAll(_ sender: Any?) { include(items, true) }
-    @objc private func includeNone(_ sender: Any?) { include(items, false) }
+    @objc private func includeAll(_ sender: Any?) { include(shown, true) }
+    @objc private func includeNone(_ sender: Any?) { include(shown, false) }
     @objc private func rowsOfChosen(_ sender: Any?) { withRows(targetItems, true) }
     @objc private func noRowsOfChosen(_ sender: Any?) { withRows(targetItems, false) }
 }

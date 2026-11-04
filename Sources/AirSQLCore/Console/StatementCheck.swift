@@ -81,6 +81,7 @@ public enum StatementCheck {
         var raw: String
         var kind: SQLToken.Kind
         var depth: Int
+        var range: Range<Int> = 0..<0
     }
 
     static func codeWords(_ sql: String, noBackslashEscapes: Bool) -> [Word] {
@@ -93,12 +94,12 @@ public enum StatementCheck {
             case .symbol:
                 let raw = lexer.string(token.range)
                 if raw == "(" { depth += 1 } else if raw == ")" { depth = max(0, depth - 1) }
-                words.append(Word(text: raw, raw: raw, kind: .symbol, depth: depth))
+                words.append(Word(text: raw, raw: raw, kind: .symbol, depth: depth, range: token.range))
             default:
                 let raw = lexer.string(token.range)
                 let upper = token.kind == .word || token.kind == .variable
                 words.append(Word(text: upper ? lexer.upper(token.range) : raw, raw: raw, kind: token.kind,
-                                  depth: depth))
+                                  depth: depth, range: token.range))
             }
         }
         return words

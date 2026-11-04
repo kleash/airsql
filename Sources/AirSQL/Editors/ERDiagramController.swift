@@ -177,8 +177,10 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         NSPasteboard.general.setString(SQLQuote.identifier(table), forType: .string)
     }
 
+    @objc func copy(_ sender: Any?) { copyName(sender) }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        guard item.action == Commands.openStructure.action || item.action == Commands.copyName.action else { return true }
+        guard [Commands.openStructure.action, Commands.copyName.action, Commands.copy.action].contains(item.action) else { return true }
         let enabled = canvas.selected != nil
         item.explain(enabled: enabled, reason: enabled ? nil : "Click a table first")
         return enabled

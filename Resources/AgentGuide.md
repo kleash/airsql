@@ -235,11 +235,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
 - **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
   `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+  `recon.filter`, `recon.hideMatching`, `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
-  sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
-- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
+  sheet `reconTables.filter`, `reconTables.list`, `reconTables.all`, `reconTables.none`, `reconTables.done`, `reconTables.cancel`.
+- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.filter`, `tools.objects` (`tools.include.<name>`), `tools.status`,
   `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
   `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
@@ -249,7 +249,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
-- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.objects`
+- **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.filter`, `liquibase.objects`
   (`liquibase.include.<name>`, `liquibase.rows.<name>`, `liquibase.where.<name>`), `liquibase.author`, `liquibase.ids`,
   `liquibase.rollback`, `liquibase.preconditions`, `liquibase.layout`, `liquibase.saveTo`, `liquibase.choose`,
   `liquibase.preview`, `liquibase.copy`, `tools.run` (the person's); Save as Changeset `changeset.heading`,

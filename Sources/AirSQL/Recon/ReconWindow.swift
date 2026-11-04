@@ -157,7 +157,56 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         return nil
     }
 
+    /// Why Tables… can't open now, or nil when it can: it needs a compare's list or a source to read one from.
+    var tablesBlocked: String? {
+        if result != nil { return nil }
+        if isRunning || Self.connect == nil { return compareBlocked }
+        return source.connection == nil || source.database.isEmpty ? "Choose a connection and a database for the source first" : nil
+    }
+
     // MARK: Comparing
+
+    /// Tables…: the last compare's tables or, before one, the source's, so that a long first run can be limited.
+    @objc func showTables(_ sender: Any?) {
+        guard let window, tablesBlocked == nil else { return }
+        if let result {
+            let tables = result.objects.filter { $0.kind == .table && $0.status != .onlyInTarget }.map(\.name)
+            return ReconTablesSheet.show(for: self, tables: tables, on: window)
+        }
+        guard let connect = Self.connect, let left = source.connection else { return }
+        let database = source.database
+        progressBar.doubleValue = 0
+        progressLabel.stringValue = "Reading the tables of \(database)…"
+        progressStrip.isHidden = false
+        task = Task { [weak self] in
+            var tables: [String] = [], failure: Error?
+            do {
+                let session = try await connect(left, window).toolsSession()
+                do {
+                    let cache = SchemaCache(source: session, includes: { $0 == database })
+                    try await cache.load()
+                    tables = cache.snapshot.database(database)?.tables.filter { $0.kind == .table }.map(\.name) ?? []
+                } catch {
+                    failure = error
+                }
+                await session.close()
+            } catch {
+                failure = error
+            }
+            guard let self else { return }
+            self.task = nil
+            self.progressStrip.isHidden = true
+            self.update()
+            if failure is CancellationError || (failure as? AirSQLError)?.kind == .cancelled { return }
+            if let failure { return showError(failure.localizedDescription, title: "The tables couldn't be read", on: window) }
+            if tables.isEmpty {
+                return showError("\(left.displayName) has no tables in \(database), or this login can't see them.",
+                                 title: "No tables to choose", on: window)
+            }
+            ReconTablesSheet.show(for: self, tables: tables, on: window)
+        }
+        update()
+    }
 
     /// Compare again (⌘R).
     @objc func refresh(_ sender: Any?) {

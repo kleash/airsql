@@ -346,6 +346,35 @@ extension AppTests {
             #expect(separator.isEnabled && separator.toolTip == tip)
         }
 
+        @Test func thePickersFilterListsMatchingTablesAloneSoTicksStayOnWhatIsShown() async throws {
+            let (main, harness) = Self.window()
+            let sheet = Self.exportSheet(on: main)
+            defer { sheet.close() }
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let content = try #require(sheet.window?.contentView)
+            let picker = try #require(find(PickerOutline.self, in: content))
+            let filter = try #require(find(ListFilter.self, id: "tools.filter", in: content))
+            let customers = try #require((0..<picker.numberOfRows).compactMap { picker.item(atRow: $0) as? PickerNode }.first { $0.name == "customers" })
+            let database = try #require(customers.parent)
+            let menu = try #require(picker.menu)
+            menu.delegate?.menuNeedsUpdate?(menu)
+            let none = try #require(menu.items.first { $0.title == "Include None" }), all = try #require(menu.items.first { $0.title == "Include All" })
+            NSApp.sendAction(none.action!, to: none.target, from: none)
+            #expect(database.state == .off)
+            filter.stringValue = "CUSTOM"
+            filter.sendAction(filter.action, to: filter.target)
+            let shown = (0..<picker.numberOfRows).compactMap { picker.item(atRow: $0) as? PickerNode }
+            #expect(shown.contains { $0 === customers } && shown.allSatisfy { !$0.isDatabase && $0.name.lowercased().contains("custom") })
+            let cell = try #require(picker.view(atColumn: 0, row: 0, makeIfNecessary: true) as? PickerCell)
+            #expect(cell.name.stringValue == shown[0].database + "." + shown[0].name)
+            NSApp.sendAction(all.action!, to: all.target, from: all)
+            #expect(customers.included && database.tables.count > shown.count && database.state == .mixed)
+            // Clearing it keeps the ticks in view.
+            filter.stringValue = ""
+            filter.sendAction(filter.action, to: filter.target)
+            #expect((0..<picker.numberOfRows).contains { picker.item(atRow: $0) as? PickerNode === customers })
+        }
+
         @Test func thePickerTicksWithAClickADoubleClickSpaceAndItsMenu() async throws {
             let (main, harness) = Self.window()
             let sheet = Self.exportSheet(on: main)

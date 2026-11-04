@@ -23,6 +23,10 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     var runProblem: SQLProblem? { didSet { if runProblem != oldValue { underlineProblems() } } }
     /// What the text leaves open (`ConsoleScript.unclosed`), as of the last pause in the typing.
     private var unclosed: [SQLProblem] = [] { didSet { if unclosed != oldValue { underlineProblems() } } }
+    /// What the check for unknown names reads, as of now; nil: it stays silent (an object editor, no connection).
+    var nameContext: (() -> (snapshot: SchemaSnapshot?, database: String?, changed: Set<String>)?)?
+    /// Tables and columns the schema cache doesn't have (`SQLNameCheck`), as of the last pause in the typing.
+    private var unknownNames: [SQLProblem] = [] { didSet { if unknownNames != oldValue { underlineProblems() } } }
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
     /// Its own, not the window's: Undo in one console must never change another's hidden text, and an object editor's
@@ -189,16 +193,29 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     // MARK: Problems (underlined in red, the message on hover)
 
-    var problems: [SQLProblem] { [runProblem].compactMap { $0 } + unclosed }
+    var problems: [SQLProblem] { [runProblem].compactMap { $0 } + unclosed + unknownNames }
 
     /// A pause first: `(` is only a problem if nothing follows it.
-    private func checkLater() {
+    func checkLater() {
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(check), object: nil)
         perform(#selector(check), with: nil, afterDelay: 0.5)
     }
 
     @objc func check() {
-        unclosed = ConsoleScript.unclosed(in: string, noBackslashEscapes: noBackslashEscapes)
+        let text = string, noBackslashEscapes = noBackslashEscapes
+        unclosed = ConsoleScript.unclosed(in: text, noBackslashEscapes: noBackslashEscapes)
+        guard let context = nameContext?() else {
+            unknownNames = []
+            return
+        }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let found = SQLNameCheck.problems(in: text, snapshot: context.snapshot, database: context.database, changed: context.changed,
+                                              noBackslashEscapes: noBackslashEscapes)
+            DispatchQueue.main.async {
+                guard let self, self.string == text else { return }  // the check after this edit is on its way
+                self.unknownNames = found
+            }
+        }
     }
 
     /// Draws `problems` again. The hover areas are fixed rectangles, so they're remade whenever the text moves.
