@@ -86,6 +86,18 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        stretchRecordValues()
+    }
+
+    /// Record View's values get the width the names leave, when it opens (once the grid is laid out) and as it grows.
+    private func stretchRecordValues() {
+        guard record != nil, grid.columnWidths.count == 2 else { return }
+        let room = floor(grid.scrollView.contentSize.width - grid.columnWidths[0])
+        if room > grid.columnWidths[1] { grid.columnWidths[1] = room }
+    }
+
     /// Settings ▸ Grid changed: its NULL text, and its text size unless this grid is zoomed (⌘+ or ⌘−).
     @objc private func gridSettingsChanged(_ notification: Notification) {
         guard let settings = (notification.object as? AppModel)?.data.settings,
@@ -297,9 +309,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         let order = layout?.order ?? grid.columnOrder
         record = row
         grid.source = TransposedSource(displayed ?? source, order: order, rows: [row])
-        // The values get the width the names leave.
-        let room = floor(grid.scrollView.contentSize.width - (grid.columnWidths.first ?? 0))
-        if grid.columnWidths.count == 2, room > grid.columnWidths[1] { grid.columnWidths[1] = room }
+        DispatchQueue.main.async { [weak self] in self?.stretchRecordValues() }
         focusCell(GridPosition(row: min(field, max(0, order.count - 1)), column: 1))
         updateRecordBar()
         status.update()
