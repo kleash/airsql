@@ -58,6 +58,7 @@ final class ExportRowsSheet: NSWindowController {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 260), styleMask: [.titled], backing: .buffered,
                               defer: true)
         window.title = "Export Rows of \(request.title)"
+        window.backgroundColor = .ground
         super.init(window: window)
         format.target = self
         format.action = #selector(formatChanged(_:))

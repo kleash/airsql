@@ -152,7 +152,7 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
 
 /// Messages' table: a first click selects the row, and a double-click stays the table's; only a single click on the
 /// selected row's text reaches the text, to select some of it.
-final class MessagesTable: NSTableView {
+final class MessagesTable: ContentTable {
     override func validateProposedFirstResponder(_ responder: NSResponder, for event: NSEvent?) -> Bool {
         guard responder is NSTextField, let event else { return super.validateProposedFirstResponder(responder, for: event) }
         return event.clickCount == 1 && isRowSelected(row(at: convert(event.locationInWindow, from: nil)))
@@ -175,6 +175,7 @@ final class PlanView: NSView {
         let text = scroll.documentView as! NSTextView
         text.isEditable = false
         text.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        text.backgroundColor = .content
         text.string = tree.isEmpty ? "The server gave no plan tree for this statement." : tree
         text.textContainerInset = NSSize(width: 8, height: 8)
         text.setAccessibilityIdentifier("console.planTree")

@@ -252,7 +252,7 @@ final class TreeCell: NSTableCellView {
     private func colour() {
         let selected = backgroundStyle == .emphasized
         name.textColor = selected ? .onAccent : nameColour
-        count.textColor = selected ? .onAccent : .tertiaryLabelColor
+        count.textColor = selected ? .onAccent : .quietText
     }
 
     private func setBusy(_ busy: Bool) {

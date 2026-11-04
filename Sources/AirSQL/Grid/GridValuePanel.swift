@@ -53,6 +53,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         wrap.action = #selector(toggleWrap(_:))
         wrap.controlSize = .small
         text.isEditable = false
+        text.backgroundColor = .content
         text.delegate = self
         text.allowsUndo = true
         text.isRichText = false

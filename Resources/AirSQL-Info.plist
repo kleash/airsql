@@ -93,5 +93,7 @@
 			</dict>
 		</dict>
 	</array>
+	<key>NSAccentColorName</key>
+	<string>AccentColor</string>
 </dict>
 </plist>

@@ -81,7 +81,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         table.autosaveName = layoutName("Processes")  // its widths and sort, for next time
         table.autosaveTableColumns = true
         table.style = .fullWidth
-        table.usesAlternatingRowBackgroundColors = true
+        table.stripes = true
         table.allowsMultipleSelection = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.dataSource = self
@@ -375,7 +375,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
 /// The process list: a right-click selects the row under the pointer first and opens the process menu; Return shows the
 /// query, Delete offers to stop it (the connection, when it isn't running one).
 @MainActor
-final class ProcessTableView: NSTableView {
+final class ProcessTableView: ContentTable {
     weak var owner: ProcessListContent?
 
     override func menu(for event: NSEvent) -> NSMenu? {

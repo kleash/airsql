@@ -7,7 +7,7 @@ extension NSPasteboard.PasteboardType {
 }
 
 /// The table editor's list: Delete removes the selected rows; right-clicking a row that isn't selected selects it.
-final class EditorList: NSTableView {
+final class EditorList: ContentTable {
     override func keyDown(with event: NSEvent) {
         if event.charactersIgnoringModifiers == "\u{7f}" || event.specialKey == .deleteForward, !selectedRowIndexes.isEmpty {
             sendCommand(Commands.deleteRows.action)
@@ -106,7 +106,7 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
             list.dataSource = self
             list.delegate = self
             list.allowsMultipleSelection = true
-            list.usesAlternatingRowBackgroundColors = true
+            list.stripes = true
             list.style = .plain
             list.rowHeight = 24
             list.intercellSpacing = NSSize(width: 6, height: 2)

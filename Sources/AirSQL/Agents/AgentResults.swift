@@ -100,7 +100,7 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
             table.addTableColumn(column)
         }
         table.style = .fullWidth
-        table.usesAlternatingRowBackgroundColors = true
+        table.stripes = true
         table.allowsMultipleSelection = true
         table.dataSource = self
         table.delegate = self
@@ -290,7 +290,7 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
 
 /// The Agent tab's list: a right-click selects the row under the pointer first and opens the statement's menu.
 @MainActor
-final class AgentRunTable: NSTableView {
+final class AgentRunTable: ContentTable {
     weak var owner: AgentResultsContent?
 
     override func menu(for event: NSEvent) -> NSMenu? { selectsRow(for: event) ? owner?.contextMenu() : nil }

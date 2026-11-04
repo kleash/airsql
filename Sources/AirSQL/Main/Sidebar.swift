@@ -664,7 +664,7 @@ final class SidebarCell: NSTableCellView {
     private func colour() {
         let selected = backgroundStyle == .emphasized
         name.textColor = selected ? .onAccent : nameColour
-        badge.textColor = selected ? .onAccent : .tertiaryLabelColor
+        badge.textColor = selected ? .onAccent : .quietText
         icon.contentTintColor = selected ? .onAccent : .secondaryLabelColor
     }
 }

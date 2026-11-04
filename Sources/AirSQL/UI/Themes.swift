@@ -26,12 +26,13 @@ extension NSColor {
     // MARK: Surfaces
 
     /// The window's ground: the toolbar, the tab strip, around sheets. macOS 26 draws windows in the content colour;
-    /// 7.5 % of labelColor gives the ground back its grey (Porcelain) and its lift (Deep Water).
-    static let ground = NSColor(name: nil) { surface(.windowBackgroundColor, $0, lifted: true) }
+    /// 7.5 % of labelColor gives Porcelain's ground back its grey. Deep Water's lies below the content, as in the mockups.
+    static let ground = NSColor(name: nil) { $0.isDark ? shaded(0.24, $0) : surface(.windowBackgroundColor, $0, lifted: true) }
     /// The editor, the grid, lists.
     static let content = NSColor(name: nil) { surface(.controlBackgroundColor, $0, lifted: false) }
-    /// The navigator: the ground, 3.5 % towards labelColor (a shade darker in Porcelain, lighter in Deep Water).
+    /// The navigator: Porcelain's ground, 3.5 % towards labelColor, or Deep Water's between its ground and the content.
     static let side = NSColor(name: nil) { appearance in
+        if appearance.isDark { return shaded(0.11, appearance) }
         var color = NSColor.ground
         appearance.performAsCurrentDrawingAppearance { color = NSColor.ground.blended(withFraction: 0.035, of: .labelColor) ?? color }
         return color
@@ -169,6 +170,13 @@ extension NSColor {
 
     private static func washes(_ appearance: NSAppearance) -> Bool {
         appearance.isDark && !NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+    }
+
+    /// The content, `fraction` of the way to black.
+    private static func shaded(_ fraction: CGFloat, _ appearance: NSAppearance) -> NSColor {
+        var color = NSColor.content
+        appearance.performAsCurrentDrawingAppearance { color = NSColor.content.blended(withFraction: fraction, of: .black) ?? color }
+        return color
     }
 
     /// Deep Water's wash: 6 % petrol over its surfaces; none in Porcelain, nor with Increase Contrast.

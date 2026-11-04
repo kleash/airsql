@@ -49,6 +49,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         window.minSize = Self.minimumSize
         window.isReleasedWhenClosed = false
         window.title = "Compare"
+        window.backgroundColor = .ground
         window.autorecalculatesKeyViewLoop = true  // Tab goes through the list and views a compare shows
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified

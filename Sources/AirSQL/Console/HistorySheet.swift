@@ -11,7 +11,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     private let openInTab: (String) -> Void
     private let preview = NSTextView.scrollableTextView()
     private let search = NSSearchField()
-    private let table = NSTableView()
+    private let table = ContentTable()
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private var entries: [HistoryEntry] = []
     private let empty = label("", font: .systemFont(ofSize: 12.5), color: .secondaryLabelColor, wraps: true)
@@ -58,7 +58,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         }
         table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.style = .inset
-        table.usesAlternatingRowBackgroundColors = true
+        table.stripes = true
         table.rowHeight = 22
         table.allowsMultipleSelection = true
         table.dataSource = self
@@ -75,6 +75,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         scroll.translatesAutoresizingMaskIntoConstraints = false
         let code = preview.documentView as! NSTextView
         code.isEditable = false
+        code.backgroundColor = .content
         code.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
         code.textContainerInset = NSSize(width: 4, height: 4)
         code.toolTip = "Read the selected statement whole; select part of it to copy"

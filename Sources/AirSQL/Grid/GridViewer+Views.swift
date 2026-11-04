@@ -42,6 +42,7 @@ extension GridViewer {
             let scroll = NSTextView.scrollableTextView()
             let text = scroll.documentView as! NSTextView
             text.isEditable = false
+            text.backgroundColor = .content
             let font = NSFont.monospacedSystemFont(ofSize: grid.fontSize, weight: .regular)
             text.font = font
             // Tabs (TSV) every eight characters, past the default stops too. Long rows wrap, so only what shows is laid out: a

@@ -29,6 +29,7 @@ final class SortSheet: NSWindowController {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 200), styleMask: [.titled], backing: .buffered,
                               defer: true)
         window.title = "Sort \(title)"
+        window.backgroundColor = .ground
         super.init(window: window)
         window.contentView = makeContent(title)
         showKeys()

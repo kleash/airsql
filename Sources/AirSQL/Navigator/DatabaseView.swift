@@ -67,7 +67,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         table.autosaveName = layoutName("Database tables")  // its widths and sort, for next time
         table.autosaveTableColumns = true
         table.style = .fullWidth
-        table.usesAlternatingRowBackgroundColors = true
+        table.stripes = true
         table.allowsMultipleSelection = true
         table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.rowHeight = 22
@@ -307,7 +307,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 /// The database view's table: a right-click selects the row under the pointer first and opens the table menu; Return
 /// opens, Delete drops.
 @MainActor
-final class DatabaseTableView: NSTableView {
+final class DatabaseTableView: ContentTable {
     weak var owner: DatabaseViewController?
 
     override func menu(for event: NSEvent) -> NSMenu? {

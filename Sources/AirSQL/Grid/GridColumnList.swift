@@ -8,7 +8,7 @@ import AppKit
 final class GridColumnList: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
     private weak var viewer: GridViewer?
     private let search = NSSearchField()
-    let table = NSTableView()
+    let table = ContentTable()
     private let footer = label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
     /// Source columns matching the search, in the grid's order (shown ones first, then hidden ones).
     private(set) var rows: [Int] = []

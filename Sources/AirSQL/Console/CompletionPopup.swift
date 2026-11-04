@@ -125,7 +125,7 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         badge.layer?.cornerRadius = Radius.cell
         let name = label(item.label, font: .systemFont(ofSize: 12), truncates: true)
         name.toolTip = item.label
-        let detail = label(item.detail, font: .systemFont(ofSize: 11), color: .tertiaryLabelColor, truncates: true)
+        let detail = label(item.detail, font: .systemFont(ofSize: 11), color: .quietText, truncates: true)
         detail.toolTip = item.detail
         detail.setContentCompressionResistancePriority(.defaultLow - 1, for: .horizontal)
         let rowView = NSView()

@@ -15,7 +15,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
     private var values: [(value: String?, count: Int)] = []
     private var ticked: Set<Int> = []
     private var shown: [Int] = []
-    private let table = NSTableView()
+    private let table = ContentTable()
     private let search = NSSearchField()
     private let note = label("Counting the values…", font: .systemFont(ofSize: NSFont.smallSystemFontSize),
                              color: .secondaryLabelColor, truncates: true)
@@ -83,6 +83,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         self.completion = completion
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: Self.size), styleMask: [.titled], backing: .buffered, defer: true)
         window.title = "Filter \(table) by \(column.name)"
+        window.backgroundColor = .ground
         super.init(window: window)
         window.contentView = makeContent(table)
         window.setContentSize(Self.size)

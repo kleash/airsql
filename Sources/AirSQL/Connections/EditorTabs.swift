@@ -204,6 +204,7 @@ extension ConnectionEditor {
                  caption: "For example: shop, reports_*. The others stay on the server, out of the way.")
         let sql = NSTextView()
         sql.string = draft.startupSQL
+        sql.backgroundColor = .content
         sql.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         sql.isRichText = false
         sql.isAutomaticQuoteSubstitutionEnabled = false

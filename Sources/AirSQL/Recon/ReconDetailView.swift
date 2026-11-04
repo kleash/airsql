@@ -9,7 +9,7 @@ final class ReconDetailView: NSObject {
     let view = NSView()
     let tabs = NSSegmentedControl(labels: ["Structure", "Data"], trackingMode: .selectOne, target: nil, action: nil)
     static let structureTip = "Show the two definitions side by side", dataTip = "Show the rows that differ, down to the cell"
-    let ignoring = label("", font: .systemFont(ofSize: 11.5), color: .tertiaryLabelColor, truncates: true)
+    let ignoring = label("", font: .systemFont(ofSize: 11.5), color: .quietText, truncates: true)
     let left = ReconDetailView.textView(id: "recon.sourceDDL")
     let right = ReconDetailView.textView(id: "recon.targetDDL")
     let leftTitle = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
@@ -97,6 +97,7 @@ final class ReconDetailView: NSObject {
         let scroll = NSTextView.scrollableTextView()
         let text = scroll.documentView as! NSTextView
         text.isEditable = false
+        text.backgroundColor = .content
         text.isRichText = false
         text.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         text.textContainerInset = NSSize(width: 6, height: 6)
@@ -201,7 +202,7 @@ final class ReconDetailView: NSObject {
                 string: object.targetDDL ?? "Not in \(result.target.name)", attributes: object.targetDDL == nil ? absent : plain))
             return
         }
-        let missing = NSAttributedString(string: "(missing)", attributes: [.foregroundColor: NSColor.tertiaryLabelColor, .font: font])
+        let missing = NSAttributedString(string: "(missing)", attributes: [.foregroundColor: NSColor.quietText, .font: font])
         let (a, b) = (NSMutableAttributedString(), NSMutableAttributedString())
         let rows = ReconLines.aligned(sourceDDL, targetDDL)
         for (index, row) in rows.enumerated() {

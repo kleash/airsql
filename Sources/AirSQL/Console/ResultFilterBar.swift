@@ -18,7 +18,7 @@ final class ResultFilterBar: NSView, NSSearchFieldDelegate {
         setAccessibilityIdentifier("result.filterBar")
         scope.setAccessibilityIdentifier("result.scope")
         scope.toolTip = "Filters and the sort run here, on the rows the query returned; the query isn't run again"
-        let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .tertiaryLabelColor)
+        let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .quietText)
         conditionsText.setAccessibilityIdentifier("result.filter")
         // The conditions give way first (the chip's text resists at .defaultLow), down to a readable part; the tooltip has
         // all of them.

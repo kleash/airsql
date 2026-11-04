@@ -38,10 +38,12 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 560),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "SQL Log"
+        window.backgroundColor = .ground
         window.minSize = NSSize(width: 560, height: 320)
         window.isReleasedWhenClosed = false
         super.init(window: window)
         text.isEditable = false
+        text.backgroundColor = .content
         text.isRichText = false
         text.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
         text.textContainerInset = NSSize(width: 8, height: 8)

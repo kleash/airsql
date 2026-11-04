@@ -82,6 +82,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.title = SettingsPane.general.title
+        window.backgroundColor = .ground
         window.toolbarStyle = .preference
         super.init(window: window)
         window.delegate = self

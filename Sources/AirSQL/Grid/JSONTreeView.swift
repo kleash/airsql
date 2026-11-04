@@ -28,7 +28,7 @@ final class JSONTreeView: NSScrollView, NSOutlineViewDataSource, NSOutlineViewDe
         outline.dataSource = self
         outline.delegate = self
         outline.style = .plain
-        outline.usesAlternatingRowBackgroundColors = true
+        outline.backgroundColor = .content
         outline.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         outline.target = self
         outline.doubleAction = #selector(openOrClose(_:))

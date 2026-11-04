@@ -8,7 +8,7 @@ import AppKit
 final class ForeignKeyLookup: NSObject, NSSearchFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private(set) var popover = NSPopover()
     let search = NSSearchField()
-    let table = NSTableView()
+    let table = ContentTable()
     let status = label("Loading…", font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
     /// The rows shown: the referenced key's values, and the label.
     private(set) var rows: [(key: [String], label: String?)] = []

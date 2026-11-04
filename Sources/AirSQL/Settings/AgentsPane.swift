@@ -89,7 +89,7 @@ final class AgentsPane: SettingsPaneController {
         }
         table.rowHeight = 28
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.usesAlternatingRowBackgroundColors = true
+        table.stripes = true
         table.allowsColumnReordering = false
         table.setAccessibilityIdentifier("settings.agentAccessList")
         let scroll = NSScrollView()
@@ -222,7 +222,7 @@ final class AgentsPane: SettingsPaneController {
     }
 
     /// The access list: a right-click selects the row under the pointer first and opens its menu.
-    final class AccessTableView: NSTableView {
+    final class AccessTableView: ContentTable {
         weak var owner: AccessTable?
 
         override func menu(for event: NSEvent) -> NSMenu? { selectsRow(for: event) ? owner?.menu(for: self) : nil }

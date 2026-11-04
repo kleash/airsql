@@ -14,7 +14,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
     private var rows: [Row]
     /// The indexes in `rows` the filter keeps, in order.
     private var shown: [Int]
-    private let table = NSTableView()
+    private let table = ContentTable()
     private lazy var filter = ListFilter("Filter Tables", id: "reconTables.filter", tip: "Type part of a name to show only those tables",
                                          list: table) { [weak self] in self?.applyFilter() }
     private var retainUntilClosed: ReconTablesSheet?
@@ -65,7 +65,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         table.delegate = self
         table.rowHeight = 24
         table.allowsMultipleSelection = true
-        table.usesAlternatingRowBackgroundColors = true
+        table.stripes = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.setAccessibilityIdentifier("reconTables.list")
         // A double-click ticks or unticks the row's Compare; a right-click offers both.

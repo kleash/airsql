@@ -288,8 +288,26 @@ final class ListFilter: NSSearchField, NSSearchFieldDelegate {
     }
 }
 
+/// A list on the content surface, with stripes in the theme's colours: AppKit's are neutral grey, beside Deep Water's slate.
+class ContentTable: NSTableView {
+    /// Instead of `usesAlternatingRowBackgroundColors`, which would give the rows AppKit's colours.
+    var stripes = false
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        backgroundColor = .content
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func didAdd(_ rowView: NSTableRowView, forRow row: Int) {
+        if stripes { rowView.backgroundColor = row.isMultiple(of: 2) ? .content : .gridZebra }
+        super.didAdd(rowView, forRow: row)
+    }
+}
+
 /// A table whose Return and Enter do what its double-click does.
-final class ReturnTable: NSTableView {
+final class ReturnTable: ContentTable {
     var onReturn: () -> Void = {}
 
     override func keyDown(with event: NSEvent) {

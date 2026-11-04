@@ -17,7 +17,7 @@ final class QuickOpenSheet: NSWindowController, NSSearchFieldDelegate, NSTableVi
     private let items: [Item]
     private(set) var shown: [Item] = []
     let field = NSSearchField()
-    let table = NSTableView()
+    let table = ContentTable()
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private var retainUntilClosed: QuickOpenSheet?
 
@@ -33,6 +33,7 @@ final class QuickOpenSheet: NSWindowController, NSSearchFieldDelegate, NSTableVi
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 380), styleMask: [.titled], backing: .buffered,
                               defer: true)
         window.title = "Quick Open"
+        window.backgroundColor = .ground
         super.init(window: window)
         window.contentView = makeContent()
         narrow()

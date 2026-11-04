@@ -41,6 +41,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.title = "AirSQL"
+        window.backgroundColor = .ground  // the toolbar draws over it
         window.autorecalculatesKeyViewLoop = true  // Tab goes on into whichever tab is shown
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified

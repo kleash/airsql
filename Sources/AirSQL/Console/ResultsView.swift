@@ -60,7 +60,7 @@ final class ResultsView: NSView, NSTextFieldDelegate {
     private let strip = NSStackView()
     /// The tabs, scrolled sideways when more are open than fit.
     private let tabsScroll = NSScrollView()
-    private let summary = label("", font: .systemFont(ofSize: 11.5), color: .tertiaryLabelColor, truncates: true)
+    private let summary = label("", font: .systemFont(ofSize: 11.5), color: .quietText, truncates: true)
     private let spinner = NSProgressIndicator()
     let cancelButton = AirSQL.button("Cancel", id: "console.cancel", tip: Commands.cancelQuery.tip + " (⌘.)", target: nil,
                                      action: Commands.cancelQuery.action)

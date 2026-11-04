@@ -104,6 +104,14 @@ extension AppTests {
             }
         }
 
+        @Test func deepWaterLiesBelowItsContent() {
+            NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance {
+                #expect(NSColor.ground.luminance < NSColor.side.luminance)
+                #expect(NSColor.side.luminance < NSColor.content.luminance)
+                #expect(NSColor.ground.luminance < NSColor.bar.luminance)
+            }
+        }
+
         @Test func chipTextReadsOnItsTint() {
             let styles: [(ChipView.Style, String)] = [(.tinted(.statusWarning), "warning"), (.tinted(.statusBad), "bad"),
                                                       (.tinted(.statusOK), "ok"), (.accent, "accent"), (.neutral, "neutral")]
