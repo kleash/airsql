@@ -85,3 +85,17 @@ idle connections. Double-click a row (or press Return) to read its whole stateme
 Both ask first. Right before it stops anything, AirSQL checks that the process is still running what the list showed
 (on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so. Both work on a
 read-only connection too: they change no data.
+
+## Getting back to your tabs
+
+When you open AirSQL again, your tabs come back in their old order with the old one showing, and so does the sidebar's
+selection. Query tabs are as you left them. Table, structure and process-list tabs come back as placeholders: AirSQL doesn't
+connect to anything by itself, also not to a Production connection.
+
+- A placeholder says what the tab was and where. **Connect and Open** connects the usual way, with its prompts, then
+  loads the tab in the same place; on a connection that's connected already the button is **Open**, which just loads.
+- If the connect fails, the tab stays and says why, with **Try Again**, **Edit Connection…** and **Troubleshooting**.
+- A placeholder closes without a question, and Quit doesn't ask about it.
+- Only names are kept: the connection, database, object and kind. Rows and filters aren't. Pending changes aren't part of
+  the tab: they stay with the table and show when you [open it](table-data.md).
+- A tab whose connection you deleted doesn't come back.

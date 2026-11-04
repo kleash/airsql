@@ -1,9 +1,10 @@
 import AirSQLCore
 import AppKit
 
-/// Keeps the open console tabs for the next launch (plan §2.6): after each change, a moment later, Consoles.json is
-/// written off the main thread with every console tab's title, connection, file and unsaved text; at quit it is
-/// written at once. `restore(into:)` opens them again (AppDelegate calls it once the main window is up).
+/// Keeps the open tabs for the next launch (plan §2.6): after each change, a moment later, Consoles.json is written off
+/// the main thread with every console tab's title, connection, file and unsaved text, what the other tabs showed (by
+/// name), the tab shown and the sidebar's selection; at quit it is written at once. `restore(into:)` opens them again
+/// (AppDelegate calls it once the main window is up), the others as placeholders: nothing connects.
 @MainActor
 final class ConsoleDocuments {
     static let shared = ConsoleDocuments()
@@ -32,6 +33,12 @@ final class ConsoleDocuments {
 
     func closed(_ console: ConsoleViewController) { schedule() }
 
+    /// The window's tabs or the sidebar's selection changed: saved a moment later.
+    func tabsChanged(in window: MainWindowController) {
+        if main == nil { main = window }
+        if main === window { schedule() }
+    }
+
     private func schedule() {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.save(wait: false) } }
@@ -39,19 +46,25 @@ final class ConsoleDocuments {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
 
-    /// The window's console tabs now, in their order (a console being closed, an empty one without a file, and a sync
-    /// script, whose compare doesn't outlive the app, left out).
-    var snapshot: [SavedConsole] {
-        (main?.tabs ?? []).compactMap { tab in
-            guard let console = tab.content as? ConsoleViewController, !console.closing, console.syncScript == nil else {
-                return nil
+    /// The window now: its tabs in their order (a console being closed, an empty one without a file, a sync script, whose
+    /// compare doesn't outlive the app, and tabs without a `place` left out) and the sidebar's selection.
+    var snapshot: SavedWindow {
+        let tabs = (main?.tabs ?? []).compactMap { tab -> SavedConsole? in
+            var saved: SavedConsole?
+            if let console = tab.content as? ConsoleViewController {
+                let text = console.text
+                guard !console.closing, console.syncScript == nil, console.fileURL != nil || !text.isEmpty else { return nil }
+                saved = SavedConsole(id: console.documentID, title: tab.title, connection: console.connectionID,
+                                     path: console.fileURL?.path, text: console.isEdited || console.fileURL == nil ? text : nil,
+                                     caret: console.isViewLoaded ? console.editor.selectedRange().location : 0)
+            } else if let place = tab.place {
+                saved = SavedConsole(id: tab.id, title: tab.title, connection: tab.connectionID, path: nil, text: nil, caret: 0,
+                                     place: place, preview: tab.content is PreviewContent ? true : nil)
             }
-            let text = console.text
-            guard console.fileURL != nil || !text.isEmpty else { return nil }
-            return SavedConsole(id: console.documentID, title: tab.title, connection: console.connectionID,
-                                path: console.fileURL?.path, text: console.isEdited || console.fileURL == nil ? text : nil,
-                                caret: console.isViewLoaded ? console.editor.selectedRange().location : 0)
+            if tab === main?.selectedTab { saved?.selected = true }
+            return saved
         }
+        return SavedWindow(tabs: tabs, sidebar: main?.sidebar.selectedRowIDs ?? [])
     }
 
     /// Writes now and waits until it's on disk: quitting, so the last text isn't lost.
@@ -62,39 +75,53 @@ final class ConsoleDocuments {
     private func save(wait: Bool) {
         pending?.cancel()
         pending = nil
-        let consoles = snapshot, url = fileURL
+        let window = snapshot, url = fileURL
         let write: @Sendable () -> Void = {
             do {
-                try ConsoleTabStore.save(consoles, to: url)
+                try ConsoleTabStore.save(window, to: url)
             } catch {
-                log.error("can't save the console tabs: \(error.localizedDescription, privacy: .public)")
+                log.error("can't save the tabs: \(error.localizedDescription, privacy: .public)")
             }
         }
         if wait { queue.sync(execute: write) } else { queue.async(execute: write) }
     }
 
-    /// Opens the consoles of the last session in `main`, reading them (and their files) off the main thread.
+    /// Opens the tabs of the last session in `main`, reading them (and their files) off the main thread. A tab whose
+    /// connection is gone is dropped, and the rest are placeholders; none of it contacts a server.
     func restore(into main: MainWindowController) {
         self.main = main
         let url = fileURL
         restoring = Task {
             // Each console's text, and the text of its file (what was last saved).
-            let saved = await Task.detached { () -> [(SavedConsole, String, String)] in
-                ConsoleTabStore.load(from: url).compactMap { console in
+            let (saved, sidebar) = await Task.detached { () -> ([(SavedConsole, String, String)], [UUID]) in
+                let window = ConsoleTabStore.load(from: url)
+                return (window.tabs.compactMap { console in
+                    if console.place != nil { return (console, "", "") }
                     let file = console.path.flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
                     guard let text = console.text ?? file else { return nil }
                     return (console, text, file ?? "")
-                }
+                }, window.sidebar)
             }.value
+            var selected: Tab?
             for (console, text, file) in saved {
-                let controller = ConsoleViewController(model: main.model, connection: main.model.connection(console.connection)?.id,
-                                                       text: text, fileURL: console.path.map { URL(fileURLWithPath: $0) },
-                                                       documentID: console.id)
-                if console.path != nil { controller.savedText = file }
-                main.open(controller, title: console.title, connection: controller.connectionID)
-                controller.editor.setSelectedRange(NSRange(location: min(console.caret, (text as NSString).length), length: 0))
-                changed(controller)
+                let tab: Tab
+                if let place = console.place {
+                    guard let id = main.model.connection(console.connection)?.id else { continue }
+                    let content = RestoredTabContent(place, title: console.title, connection: id, main: main)
+                    tab = main.open(console.preview == true ? PreviewContent(content) : content, title: console.title, connection: id)
+                } else {
+                    let controller = ConsoleViewController(model: main.model, connection: main.model.connection(console.connection)?.id,
+                                                           text: text, fileURL: console.path.map { URL(fileURLWithPath: $0) },
+                                                           documentID: console.id)
+                    if console.path != nil { controller.savedText = file }
+                    tab = main.open(controller, title: console.title, connection: controller.connectionID)
+                    controller.editor.setSelectedRange(NSRange(location: min(console.caret, (text as NSString).length), length: 0))
+                    changed(controller)
+                }
+                if console.selected == true { selected = tab }
             }
+            main.sidebar.select(sidebar)
+            if let selected { main.select(selected) }
         }
     }
 }

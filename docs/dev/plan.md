@@ -192,7 +192,7 @@ P0 builds and freezes, so lanes plug in instead of inventing:
 - Formatter: whitespace and keyword case only; never touches literals, comments, executable comments or DELIMITER
   blocks; a round-trip test proves the token stream is unchanged (R15).
 - EXPLAIN: a table plus a text tree (MySQL TREE format; MariaDB JSON flattened); no graphical plan in 1.0 (R15).
-- History per connection, SQL log viewer, unsaved tabs restored after relaunch, drag and drop of tree items and .sql
+- History per connection, SQL log viewer, unsaved tabs restored after relaunch (table, structure and process-list tabs as placeholders that connect only on request), drag and drop of tree items and .sql
   files into the editor.
 
 ### 2.7 Schema cache and navigator
