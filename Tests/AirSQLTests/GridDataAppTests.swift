@@ -77,6 +77,9 @@ final class FakeTableSession: TableSession {
             }
         }
         statements.append(sql)
+        if sql.hasPrefix("SELECT DISTINCT") {
+            return result([.init(name: "v", type: MYSQL_TYPE_STRING)], [["EU"], ["US"]])
+        }
         if sql.contains(" GROUP BY ") {
             return result([.init(name: "v", type: MYSQL_TYPE_STRING), .init(name: "n", type: MYSQL_TYPE_LONGLONG)], [["EU", "2"], ["US", "1"]])
         }
@@ -604,13 +607,28 @@ extension AppTests {
             #expect(session.statements.contains { $0.hasPrefix("UPDATE") })
         }
 
-        @Test func whereBarCompletesColumnNames() async throws {
-            let (_, _, tab) = try await Self.tab()
-            tab.bar.filterText = "region = 'EU' AND cu"
-            var index = 0
-            let words = tab.bar.textView(tab.bar.whereField, completions: [], forPartialWordRange: NSRange(location: 18, length: 2),
-                                         indexOfSelectedItem: &index)
-            #expect(words == ["customer_id", "CURDATE()"])
+        @Test func whereBarSuggestsColumnsOperatorsAndValuesAsYouType() async throws {
+            let session = FakeTableSession()
+            let (main, _, tab) = try await Self.tab(session: session)
+            let field = tab.bar.whereField
+            main.window?.makeFirstResponder(field)
+            func labels() -> [String] { field.suggestedItems.map(\.label) }
+            field.insertText("reg", replacementRange: field.selectedRange())
+            #expect(labels() == ["region"])
+            field.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(field.text == "region " && labels().contains("IS NULL"), "the operators come next")
+            field.insertText("= ", replacementRange: field.selectedRange())
+            #expect(await eventually(timeout: 5) { labels() == ["EU", "US"] }, "the values, read off the main thread")
+            #expect(session.statements.last?.hasPrefix("SELECT DISTINCT `region` FROM (SELECT `region` FROM ") == true)
+            field.doCommand(by: #selector(NSResponder.moveDown(_:)))
+            field.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+            #expect(field.text == "region = 'US'" && labels().isEmpty && tab.bar.filterText == field.text)
+            #expect(session.statements.last?.contains("WHERE") == false, "Return chose the value: the filter hasn't run")
+            // With nothing chosen, Return applies the condition as it always has.
+            field.insertText(" a", replacementRange: field.selectedRange())
+            #expect(labels() == ["AND"])
+            field.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+            #expect(await eventually(timeout: 5) { session.statements.contains { $0.contains("WHERE") } })
         }
 
         /// A console result filters, searches and sorts its own rows, as a table tab's loaded rows, with no query.

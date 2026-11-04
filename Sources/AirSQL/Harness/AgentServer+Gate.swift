@@ -73,7 +73,7 @@ extension AgentServer {
     /// (every connection's statements, in a window of its own: hidden from every agent).
     static func showsData(_ view: NSView) -> Bool {
         view is DataGridView || ["valuePanel", "grid.text", "grid.tree", "grid.chart", "columnSummary", "grid.figure", "grid.set",
-                                 "grid.lookup", "grid.editor.problem", "result.filter", "tableData.where", "values.list",
+                                 "grid.lookup", "grid.editor.problem", "result.filter", "tableData.where", "tableData.suggestions", "values.list",
                                  "quickFilter.value", "recon.rows", "recon.script", "processes.list", "console.messages",
                                  "console.planTree", "preview.sql", "sqlLog.text"]
             .contains(view.accessibilityIdentifier())

@@ -700,7 +700,9 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 
 - **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
   fine. It is coloured as SQL, as in the console, and the field grows as the condition wraps, up to eight lines (then
-  it scrolls); ⌥↩ starts a new line. ⌥⎋ completes column names. The clock (or ⌥↓ in the field) lists the table's last
+  it scrolls); ⌥↩ starts a new line. Suggestions show as you type: columns, then operators,
+  then the column's values (read from its first 10,000 rows), then AND and OR. ↑ and ↓ choose, Tab inserts, ⎋ closes, and
+  ⌥⎋ brings them up anywhere. The clock (or ⌥↓ in the field) lists the table's last
   20 filters; the ⓧ, or **Data ▸ Clear Filter**, shows every row again. The filter and the sort are kept for the next
   time the table opens. On a read-only connection, the whole SELECT must pass the
   [read-only check](https://kleash.github.io/airsql/read-only-queries.html): a condition that calls a function such as `SLEEP` or `GET_LOCK` isn't sent,

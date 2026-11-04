@@ -3,7 +3,8 @@ import AppKit
 
 /// The WHERE bar's condition (grid-spec §4): SQL coloured as the console colours it, in a box that grows from one line
 /// to eight as the condition wraps, then scrolls. Return applies it, ⌥↩ starts a new line, Tab moves on, ⌥↓ lists the
-/// recent filters; ⌥⎋ completes through the delegate.
+/// recent filters. Suggestions show as you type (⌥⎋ brings them up anywhere): ↑ and ↓ choose, Tab inserts, and Return only
+/// after ↑ or ↓, as it applies the condition.
 @MainActor
 final class ConditionView: NSTextView {
     static let maxLines = 8
@@ -11,6 +12,11 @@ final class ConditionView: NSTextView {
     var placeholder = "" { didSet { needsDisplay = true } }
     var onReturn: (() -> Void)?
     var onRecent: (() -> Void)?
+    /// The text or the caret changed (false), or ⌥⎋ asked (true): `suggest` the words that fit.
+    var onSuggest: ((_ asked: Bool) -> Void)?
+    private lazy var suggestions = CompletionPopup(editor: self, id: "tableData.suggestions",
+                                                   footer: "⇥ inserts · ⎋ closes · values come from the first 10,000 rows")
+    private var chose = false
     /// The session's NO_BACKSLASH_ESCAPES, which decides where strings end.
     var noBackslashEscapes = false { didSet { colour() } }
     /// The box the bar shows: a field's border around the text and its scroller.
@@ -77,7 +83,17 @@ final class ConditionView: NSTextView {
         super.didChangeText()
         colour()
         enclosingScrollView?.invalidateIntrinsicContentSize()
+        onSuggest?(false)
     }
+
+    /// Shows `items` in place of `word`; none closes the list.
+    func suggest(_ items: [CompletionItem], replacing word: Range<Int>) {
+        chose = false
+        suggestions.show(items, replacing: word)
+    }
+
+    var suggestedItems: [CompletionItem] { suggestions.items }
+    func closeSuggestions() { suggestions.close() }
 
     private func colour() {
         guard let storage = textStorage, let font else { return }
@@ -90,6 +106,33 @@ final class ConditionView: NSTextView {
     }
 
     // MARK: Keys
+
+    override func complete(_ sender: Any?) { onSuggest?(true) }
+
+    override func doCommand(by selector: Selector) {
+        guard suggestions.isShown else { return super.doCommand(by: selector) }
+        switch selector {
+        case #selector(moveUp(_:)), #selector(moveDown(_:)):
+            suggestions.move(selector == #selector(moveUp(_:)) ? -1 : 1)
+            chose = true
+        case #selector(insertTab(_:)): suggestions.accept()
+        case #selector(insertNewline(_:)) where chose: suggestions.accept()
+        case #selector(cancelOperation(_:)): suggestions.close()
+        default:
+            suggestions.close()
+            super.doCommand(by: selector)
+        }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        closeSuggestions()
+        super.mouseDown(with: event)
+    }
+
+    override func resignFirstResponder() -> Bool {
+        closeSuggestions()
+        return super.resignFirstResponder()
+    }
 
     override func insertNewline(_ sender: Any?) { onReturn?() }
     override func insertTab(_ sender: Any?) { window?.selectNextKeyView(self) }

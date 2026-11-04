@@ -8,14 +8,15 @@ import AppKit
 final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegate {
     private let panel: NSPanel
     private let table = NSTableView()
-    private weak var editor: SQLEditorView?
+    private weak var editor: NSTextView?
     private(set) var items: [CompletionItem] = []
     /// The text the suggestions replace.
     private var range = 0..<0
     static let rowHeight: CGFloat = 22
     static let footerHeight: CGFloat = 24
 
-    init(editor: SQLEditorView) {
+    init(editor: NSTextView, id: String = "completion.list",
+         footer text: String = "↩ inserts · ⎋ closes · from the schema cache: nothing is sent while you type") {
         self.editor = editor
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 200), styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: true)
@@ -36,15 +37,14 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.delegate = self
         table.target = self
         table.doubleAction = #selector(doubleClicked(_:))
-        table.setAccessibilityIdentifier("completion.list")
+        table.setAccessibilityIdentifier(id)
         table.setAccessibilityLabel("Completions")
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
         scroll.drawsBackground = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        let footer = label("↩ inserts · ⎋ closes · from the schema cache: nothing is sent while you type",
-                           font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
+        let footer = label(text, font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
         footer.toolTip = footer.stringValue
         let bar = SurfaceView(.bar)
         bar.translatesAutoresizingMaskIntoConstraints = false
@@ -153,6 +153,7 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         case .database: return ("DB", .hex(0x6B7785))
         case .function, .routine: return ("F", .hex(0x0A7F91))
         case .keyword: return ("K", .hex(0x9B2F8A))
+        case .value: return ("=", .hex(0x2E7D4F))
         }
     }
 }

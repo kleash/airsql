@@ -111,6 +111,14 @@ public final class TableDataSource: GridSource {
         return "SELECT \(name), COUNT(*)" + from(filter ?? self.filter) + " GROUP BY \(name) ORDER BY COUNT(*) DESC, \(name) LIMIT \(limit)"
     }
 
+    /// A column's values for the WHERE bar's suggestions: from the first rows only, so a keystroke never scans a big table.
+    /// shortcut: a value past the first 10,000 rows isn't offered, typing it still works.
+    public func sampleValuesSQL(_ column: Int, limit: Int) -> String {
+        let name = SQLQuote.identifier(columns[column].name)
+        return "SELECT DISTINCT \(name) FROM (SELECT \(name) FROM " + SQLQuote.identifier(database, table.name)
+            + " LIMIT 10000) AS sample LIMIT \(limit)"
+    }
+
     /// Forgets the loaded rows (a new filter or sort, Refresh); the pending changes stay, and with `keepingSaved` the rows
     /// read back after Apply.
     public func reset(keepingSaved: Bool = false) {

@@ -59,6 +59,25 @@ struct GridFilterTests {
         #expect(GridCondition(name, .isNull).matches(nil) && !GridCondition(name, .isNotNull).matches(nil))
     }
 
+    @Test func theWhereBarSuggestsWhatFitsTheCaret() {
+        let names = ["id", "status", "created at"]
+        func place(_ text: String) -> WhereSuggestion.Place { WhereSuggestion.place(text, caret: text.utf16.count, columns: names).place }
+        #expect(place("") == .names && place("st") == .names && place("id = 1 AND ") == .names && place("(") == .names)
+        #expect(place("status ") == .operators && place("`created at` ") == .operators && place("STATUS NOT ") == .operators)
+        #expect(place("status = ") == .value(column: 1) && place("status LIKE 'pa") == .value(column: 1))
+        #expect(place("status NOT LIKE ") == .value(column: 1) && place("id IN (1, ") == .value(column: 0) && place("id NOT IN (") == .value(column: 0))
+        #expect(place("id = 1 ") == .joiners && place("status = 'paid' an") == .joiners && place("(id = 1) ") == .joiners)
+        #expect(place("id = 1 -- no") == .nothing && place("other = ") == .nothing)
+        #expect(WhereSuggestion.place("status = 'pa", caret: 12, columns: names).word == 9..<12)
+        let columns = [GridColumn(name: "id", type: "int", kind: .number), GridColumn(name: "created at", type: "date", kind: .date),
+                       GridColumn(name: "status", type: "char(9)")]
+        #expect(WhereSuggestion.items(.names, word: "at", columns: columns).map(\.text) == ["`created at` ", "status "])
+        #expect(WhereSuggestion.items(.value(column: 2), word: "'pa", columns: columns, values: ["paid", "o'pal", nil, "new"]).map(\.text)
+                == ["'paid'", #"'o\'pal'"#])
+        #expect(WhereSuggestion.items(.value(column: 0), word: "", columns: columns, values: ["7"]).map(\.text) == ["7"])
+        #expect(WhereSuggestion.items(.operators, word: "is", columns: columns).map(\.label) == ["IS NULL", "IS NOT NULL"])
+    }
+
     @Test func whereBarAndAddedConditions() {
         #expect(GridFilter.condition("  WHERE id > 3 \n") == "id > 3")
         #expect(GridFilter.condition("where\nid > 3") == "id > 3")

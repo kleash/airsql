@@ -77,6 +77,9 @@ final class TableDataController: NSViewController, TabContent {
     /// Edit as Table's rows, added once the table is read; and Apply shows the SQL first for them.
     var waitingInserts: InsertRows?
     var previewsApply = false
+    /// The WHERE bar's suggestions: each column's sample of values, and the read of one under way.
+    var sampledValues: [Int: [String?]] = [:]
+    var sampling: (column: Int, task: Task<Void, Never>)?
     /// What each column's funnel added to the filter, by column name.
     var funnels: [String: GridCondition] = [:]
     /// A new filter or sort came while rows were loading: load again once they are in.

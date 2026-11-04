@@ -2,7 +2,7 @@ import Foundation
 
 /// A suggestion of completion (plan §2.6).
 public struct CompletionItem: Equatable, Sendable {
-    public enum Kind: String, Sendable { case join, column, table, view, alias, database, function, routine, keyword }
+    public enum Kind: String, Sendable { case join, column, table, view, alias, database, function, routine, keyword, value }
 
     public var kind: Kind
     /// What goes in place of the word being typed.

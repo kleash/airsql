@@ -132,6 +132,43 @@ extension TableDataController {
         })
     }
 
+    /// The WHERE bar's suggestions at the caret. A column's values are read once, off the main thread; the next keystroke
+    /// stops a read it no longer needs.
+    func suggest(asked: Bool) {
+        let field = bar.whereField, caret = field.selectedRange()
+        guard let source, caret.length == 0, view.window?.firstResponder === field else { return field.closeSuggestions() }
+        let text = field.string
+        let (place, word) = WhereSuggestion.place(text, caret: caret.location, columns: source.columns.map(\.name),
+                                                  noBackslashEscapes: noBackslashEscapes)
+        var values: [String?]?
+        if case .value(let column) = place {
+            values = sampledValues[column]
+            if values == nil { sample(column) }
+        } else {
+            sampling?.task.cancel()
+            sampling = nil
+        }
+        let typed = String(decoding: Array(text.utf16)[word], as: UTF16.self)
+        let items = WhereSuggestion.items(place, word: typed, columns: source.columns, values: values, noBackslashEscapes: noBackslashEscapes)
+        // Between words only where something has to come next; nothing for a word already whole.
+        let wanted = asked || !typed.isEmpty || !text.isEmpty && place != .joiners
+        let whole = items.count == 1 && items[0].text.trimmingCharacters(in: .whitespaces).lowercased() == typed.lowercased()
+        field.suggest(wanted && !whole ? items : [], replacing: word)
+    }
+
+    private func sample(_ column: Int) {
+        guard let source, sampling?.column != column, source.columns[column].kind != .binary else { return }
+        sampling?.task.cancel()
+        let sql = source.sampleValuesSQL(column, limit: 200), open = openSession
+        sampling = (column, Task { [weak self] in
+            guard let session = try? await open(), let self,
+                  let store = try? await stoppable(session, sql, { try await session.query(sql, rowCap: 200).first?.rows }) else { return }
+            sampledValues[column] = (0..<store.rowCount).map { TableDataSource.text(store, $0, 0) }
+            sampling = nil
+            suggest(asked: false)
+        })
+    }
+
     func dataGridFiltersColumns(_ grid: DataGridView) -> Bool { source != nil }
 
     /// A header's funnel: Filter by Values in a popover. The list leaves out the column's own earlier choice, which comes
