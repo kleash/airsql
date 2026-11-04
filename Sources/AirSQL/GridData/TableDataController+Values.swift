@@ -80,14 +80,7 @@ extension TableDataController {
     func dataGrid(_ grid: DataGridView, edit row: Int, column: Int, typed: String?) -> Bool {
         guard let source, let type = type(column) else { return false }
         if type.isBoolean {
-            let value: PendingChanges.Value
-            switch typed?.lowercased() {
-            case nil, " ": value = .text(source.value(row, column)?.contains { $0 != "0" } == true ? "0" : "1")
-            case "t", "1": value = .text("1")
-            case "f", "0": value = .text("0")
-            case "n": value = .null
-            default: return false
-            }
+            guard let value = booleanValue(typed: typed, current: source.value(row, column)) else { return false }
             // The selected booleans all take the focused one's new state; other selected cells stay as they are.
             setSelected { self.type($0)?.isBoolean == true ? value : nil }
             return true
@@ -117,19 +110,8 @@ extension TableDataController {
 
     /// An ENUM's members (and NULL where allowed) as a menu over the cell, the cell's value ticked.
     func pickList(_ members: [String], row: Int, column: Int) -> NSMenu {
-        let menu = NSMenu(title: source?.columns[column].name ?? "")
-        let current = source?.value(row, column)
-        let nullable = source?.table.columns[column].nullable == true
-        for member in members.map(Optional.some) + (nullable ? [nil] : []) {
-            let item = NSMenuItem(title: member ?? grid.nullText, action: #selector(pickMember(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = member
-            item.state = member == current ? .on : .off
-            item.toolTip = member == nil ? "Set the selected cells to NULL (a pending edit)"
-                : "Set the selected cells to \(member ?? "") (a pending edit)"
-            menu.addItem(item)
-        }
-        return menu
+        pickListMenu(members, title: source?.columns[column].name ?? "", current: source?.value(row, column),
+                     nullable: source?.table.columns[column].nullable == true, nullText: grid.nullText, target: self)
     }
 
     private func showPickList(_ members: [String], row: Int, column: Int) {
@@ -243,28 +225,63 @@ extension TableDataController {
     /// Insert Value's items for the focused column: values the server works out when Apply runs.
     func insertValueItems() -> [NSMenuItem] {
         guard let source, let column = viewer.focusedCell?.column else { return [] }
-        let info = source.table.columns[column], type = ColumnType(info)
-        return info.insertValues.map { value in
-            let item = NSMenuItem(title: value.title(for: type, values), action: Commands.insertValue.action, keyEquivalent: "")
-            item.representedObject = value.rawValue
-            item.toolTip = value.help
-            return item
-        }
+        return AirSQL.insertValueItems(source.table.columns[column], values)
     }
 
     /// Insert Value ▸ an item: each selected cell gets it, as SQL for its own column's type.
     @objc func insertCellValue(_ sender: Any?) {
         guard let raw = (sender as? NSMenuItem)?.representedObject as? String, let chosen = InsertValue(rawValue: raw),
               let source else { return NSSound.beep() }
-        setSelected { column in
-            let info = source.table.columns[column]
-            guard info.insertValues.contains(chosen) else { return nil }
-            switch chosen {
-            case .null: return .null
-            case .default: return .default
-            default: return .sql(chosen.sql(for: ColumnType(info), self.values))
-            }
-        }
+        setSelected { insertedValue(chosen, source.table.columns[$0], self.values) }
+    }
+}
+
+// Shared with a console result's cells (`ResultGridView+Values`).
+
+/// What a boolean cell becomes: toggled (nil `typed`, Space), or as t, f, 1, 0 and n say; nil: anything else, typed as text.
+func booleanValue(typed: String?, current: String?) -> PendingChanges.Value? {
+    switch typed?.lowercased() {
+    case nil, " ": return .text(current?.contains { $0 != "0" } == true ? "0" : "1")
+    case "t", "1": return .text("1")
+    case "f", "0": return .text("0")
+    case "n": return .null
+    default: return nil
+    }
+}
+
+/// An ENUM's members (and NULL where allowed) as a menu, `current` ticked; `target` has `pickMember(_:)`.
+@MainActor func pickListMenu(_ members: [String], title: String, current: String?, nullable: Bool, nullText: String, target: AnyObject) -> NSMenu {
+    let menu = NSMenu(title: title)
+    for member in members.map(Optional.some) + (nullable ? [nil] : []) {
+        let item = NSMenuItem(title: member ?? nullText, action: #selector(TableDataController.pickMember(_:)), keyEquivalent: "")
+        item.target = target
+        item.representedObject = member
+        item.state = member == current ? .on : .off
+        item.toolTip = member == nil ? "Set the selected cells to NULL (a pending edit)"
+            : "Set the selected cells to \(member ?? "") (a pending edit)"
+        menu.addItem(item)
+    }
+    return menu
+}
+
+/// Insert Value's items for a column: values the server works out when Apply runs.
+@MainActor func insertValueItems(_ info: SchemaColumn, _ values: EditContext) -> [NSMenuItem] {
+    let type = ColumnType(info)
+    return info.insertValues.map { value in
+        let item = NSMenuItem(title: value.title(for: type, values), action: Commands.insertValue.action, keyEquivalent: "")
+        item.representedObject = value.rawValue
+        item.toolTip = value.help
+        return item
+    }
+}
+
+/// `chosen` as a pending value for a column; nil where the column doesn't take it.
+func insertedValue(_ chosen: InsertValue, _ info: SchemaColumn, _ values: EditContext) -> PendingChanges.Value? {
+    guard info.insertValues.contains(chosen) else { return nil }
+    switch chosen {
+    case .null: return .null
+    case .default: return .default
+    default: return .sql(chosen.sql(for: ColumnType(info), values))
     }
 }
 

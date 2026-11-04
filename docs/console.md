@@ -105,8 +105,10 @@ unique key whose columns can't be NULL); so can an inner join's when every table
 `GROUP BY`, `DISTINCT`, `UNION`, a subquery in `FROM`, a self-join, a column worked out by the query, or a row of the
 "one" side of a join that shows in several result rows).
 
-- Double-click a cell (or start typing) to change it; **Set NULL** (⌥⌘N) and, in a one-table result, **Delete Rows**
-  (⌘⌫) work as in a table tab. Values are checked by their column's type as you type. Changes wait, marked in colour,
+- Double-click a cell (or start typing) to change it. As in a table tab, a boolean toggles, ENUM and SET pick from their
+  members, ↑ and ↓ step a date, and a foreign key has its drop-down. **Cut** (⌘X), **Paste** (⌘V), **Set NULL** (⌥⌘N),
+  **Set DEFAULT**, **Insert Value** and, in a one-table result, **Delete Rows** (⌘⌫) work too. Paste fills the rows the
+  result has, and pastes nothing if a value doesn't fit its column. Values are checked by their column's type as you type. Changes wait, marked in colour,
   with a bar over the rows counting them; **Undo**, **Redo**, **Revert** and **Revert All** take them back.
 - **Apply** (⌘S while the rows have the keyboard, or the bar's button) writes them in one transaction on the
   connection's data session, each statement checked to change exactly its row. A join's changes always show the SQL

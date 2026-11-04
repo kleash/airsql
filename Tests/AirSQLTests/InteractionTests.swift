@@ -161,7 +161,7 @@ extension AppTests {
                     menu: ["Copy", "Copy with Headers", "Copy As", "Cut", "Paste", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
                            "Related Rows", "Add Row", "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
                            "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Cut", "Paste", "Quick Filter", "Set DEFAULT", "Insert Value", "Related Rows", "Add Row",
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Cut", "Quick Filter", "Set DEFAULT", "Insert Value", "Related Rows", "Add Row",
                               "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…"]),
             // Near a header's left (its sort control is at the right): a double-click sorts by the column.
             Surface(name: "Table rows: column header",
@@ -221,10 +221,10 @@ extension AppTests {
                     },
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultGrid(main).editor != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Cut", "Set NULL", "Delete Rows", "Revert",
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Cut", "Paste", "Set NULL", "Set DEFAULT", "Insert Value", "Delete Rows", "Revert",
                            "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
                     // email is NOT NULL: Set NULL is off, saying so.
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Cut", "Delete Rows", "Export Rows…", "Value Panel",
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Cut", "Set DEFAULT", "Insert Value", "Delete Rows", "Export Rows…", "Value Panel",
                               "Record View", "Column Summary…"]),
             // A console result's header: its rows sort and filter here.
             Surface(name: "Grid column header",

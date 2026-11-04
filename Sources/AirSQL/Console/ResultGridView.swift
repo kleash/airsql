@@ -32,6 +32,8 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     weak var model: AppModel?
     var transactionOpen: () -> Bool = { false }
     var editContext: EditContext?
+    var checklist: SetChecklist?
+    var lookup: ForeignKeyLookup?
     /// The pending changes' bar over the rows, and "Editable" or "Read-only" in the status bar.
     let notice = TableDataNotice()
     let editState = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
@@ -128,7 +130,11 @@ final class ResultGridView: NSView, DataGridViewDelegate {
             menu.addItem(quickFilterItem())
             menu.add([Commands.clearFilter, nil])
             if editable {
-                menu.add([Commands.cut, Commands.setNull, nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
+                menu.add([Commands.cut, Commands.paste, Commands.setNull, Commands.setDefault])
+                let values = insertValueItems()
+                if !values.isEmpty { menu.addItem(MainMenu.submenu("Insert Value", values)) }
+                if let column = viewer.focusedCell?.column, foreignKey(column) != nil { menu.add([Commands.chooseReferencedRow]) }
+                menu.add([nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
                          Commands.previewChanges, Commands.apply, nil])
             }
             menu.add([Commands.exportRows])

@@ -97,17 +97,17 @@ public final class ResultEditSource: GridSource {
         return !canDelete || !changes[0].isDeleted(key(row, 0))
     }
 
-    /// The column's type, for checking a value.
-    public func type(_ column: Int) -> ColumnType? {
-        guard case .editable(let source, let name)? = editing?.columns[column], let info = tables[source].column(name) else { return nil }
-        return ColumnType(info)
+    /// The table's column a result column edits.
+    public func info(_ column: Int) -> SchemaColumn? {
+        guard case .editable(let source, let name)? = editing?.columns[column] else { return nil }
+        return tables[source].column(name)
     }
 
+    /// The column's type, for checking a value.
+    public func type(_ column: Int) -> ColumnType? { info(column).map(ColumnType.init) }
+
     /// Whether NULL can go in the column.
-    public func nullable(_ column: Int) -> Bool {
-        guard case .editable(let source, let name)? = editing?.columns[column] else { return false }
-        return tables[source].column(name)?.nullable == true
-    }
+    public func nullable(_ column: Int) -> Bool { info(column)?.nullable == true }
 
     public func set(_ value: PendingChanges.Value, row: Int, column: Int) {
         guard canEdit(row, column), case .editable(let source, let name)? = editing?.columns[column] else { return }
