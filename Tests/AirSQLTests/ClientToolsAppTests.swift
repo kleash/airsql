@@ -87,6 +87,35 @@ extension AppTests {
             #expect(toolsMenu.items.map(\.title).starts(with: ["Open in Terminal", "Export…", "Restore…", "Copy to Another Server…"]))
         }
 
+        @Test func aProgramChosenInTheSheetJoinsTheMenuBesideOneOfTheSameTitleAndIsKeptForTheConnection() async throws {
+            let (main, harness) = Self.window()
+            let sheet = Self.exportSheet(on: main)
+            defer { sheet.close() }
+            let same = try #require(ToolFixtures.dumps.first)
+            sheet.use(tool: ClientTool(path: "/Volumes/Tools/" + same.name, version: same.version))
+            let root = try #require(sheet.window?.contentView)
+            let menu = try #require(find(NSPopUpButton.self, id: "export.tool", in: root))
+            #expect(menu.numberOfItems == ToolFixtures.dumps.count + 2 && menu.indexOfSelectedItem == 0)
+            #expect(main.model.connection(ToolFixtures.local.id)?.dumpPath == "/Volumes/Tools/" + same.name)
+            sheet.use(tool: ClientTool(path: "/Volumes/Tools/" + same.name, version: same.version))
+            #expect(menu.numberOfItems == ToolFixtures.dumps.count + 2, "chosen twice, listed once")
+            #expect(await Self.text(harness, "export.command").contains("/Volumes/Tools/"))
+        }
+
+        @Test func copyCommandIsThereOnlyWhileThereIsACommand() async throws {
+            let (main, _) = Self.window()
+            let sheet = Self.exportSheet(on: main)
+            defer { sheet.close() }
+            let root = try #require(sheet.window?.contentView)
+            let menu = try #require(find(NSPopUpButton.self, id: "export.tool", in: root))
+            let copy = try #require(find(NSButton.self, id: "export.copyCommand", in: root))
+            let reveal = try #require(find(NSButton.self, id: "export.reveal", in: root))
+            #expect(!copy.isHidden && reveal.isHidden)
+            menu.selectItem(at: menu.numberOfItems - 1)  // AirSQL (built in)
+            _ = menu.sendAction(menu.action, to: menu.target)
+            #expect(copy.isHidden)
+        }
+
         @Test func aToolIsAWindowOfItsOwnThatAsksBeforeClosingOnWorkUnderWay() async throws {
             let (main, harness) = Self.window()
             let sheet = Self.exportSheet(on: main)

@@ -167,6 +167,34 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
         return (box, text)
     }
 
+    // MARK: The Tool pop-up
+
+    /// Fills a Tool pop-up: `tools` (two can have one title: the menu's own `addItem` would drop one), then AirSQL's own
+    /// way, `builtIn` saying what that does.
+    func fill(_ menu: NSPopUpButton, tools: [ClientTool], builtIn: String) {
+        menu.removeAllItems()
+        for tool in tools { menu.menu?.addItem(withTitle: tool.title, action: nil, keyEquivalent: "").toolTip = tool.path }
+        menu.menu?.addItem(withTitle: "AirSQL (built in)", action: nil, keyEquivalent: "").toolTip = builtIn
+    }
+
+    /// Asks for a program anywhere on this Mac, starting in Homebrew's folder, which Finder hides; `done` gets it with
+    /// its version.
+    func chooseProgram(_ kind: ClientTool.Kind, done: @escaping (ClientTool) -> Void) {
+        guard let window else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.treatsFilePackagesAsDirectories = true
+        panel.showsHiddenFiles = true
+        panel.directoryURL = URL(fileURLWithPath: "/opt/homebrew/opt")
+        panel.message = "Choose the \(kind.names.joined(separator: " or ")) program."
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let path = panel.url?.path else { return }
+            Task { @MainActor in
+                if let tool = await ClientTools.find(kind, chosen: path, folders: []).first { done(tool) }
+            }
+        }
+    }
+
     // MARK: Running
 
     /// Says what the sheet is doing while it loads (a spinner), or that it is ready (nil).

@@ -38,12 +38,14 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
 2. Choose the content (structure and data, structure only, data only) and the options: one consistent snapshot
    (`--single-transaction`), binary as hex, gzip, `DROP TABLE` before each table, and views, routines, triggers and
    events.
-3. Pick the tool, where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
-4. The box under the form shows the exact command line. **Copy Command** copies it.
+3. Pick the tool (**Choose…** beside it finds a `mysqldump` or `mariadb-dump` anywhere on this Mac, and Restore and Run
+   SQL File take a `mysql` or `mariadb` the same way), where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
+4. The box under the form shows the exact command line of the tool you picked, and **Copy Command** copies it. AirSQL's
+   built-in export runs no command, so the box says what it does and the button isn't there.
 5. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
 
 The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
-or failed export never leaves half a file.
+or failed export never leaves half a file. When it is done, **Show in Finder** shows you the file.
 
 **AirSQL (built in)** in the Tool menu writes the SQL itself, through a connection of its own: the tables' `CREATE`
 statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one

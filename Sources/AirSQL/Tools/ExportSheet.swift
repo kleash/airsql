@@ -24,11 +24,17 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
                                    target: nil, action: nil)
     private let toolMenu = popup([], selected: 0, id: "export.tool", tip: "Choose the program that writes the dump",
                                  target: nil, action: nil)
+    private let chooseTool = button("Choose…", id: "export.chooseTool", tip: "Choose a mysqldump or mariadb-dump program anywhere on this Mac",
+                                    target: nil, action: nil)
     private let fit = label("", font: .systemFont(ofSize: 11.5), wraps: true)
     private let saveTo = label("", font: .systemFont(ofSize: 12.5), truncates: true)
     private let choose = button("Choose…", id: "export.choose", tip: "Choose the file to save the dump in", target: nil, action: nil)
     private let extra = AirSQL.textField("", placeholder: "Optional, for example --skip-triggers", id: "export.extra",
                                   tip: "Add your own options for the dump tool, as you would type them in Terminal")
+    private lazy var copyButton = button("Copy Command", id: "export.copyCommand", tip: "Copy the command line (it holds no password)",
+                                         target: self, action: #selector(copyCommand(_:)))
+    private let reveal = button("Show in Finder", id: "export.reveal", tip: "Show the exported file in Finder", target: nil, action: nil)
+    private var exported: URL?
     private var command: NSTextView?
     private var server: ServerInfo?
     private var tools: [ClientTool] = []
@@ -50,6 +56,11 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         }
         choose.target = self
         choose.action = #selector(chooseFile(_:))
+        reveal.target = self
+        reveal.action = #selector(showInFinder(_:))
+        reveal.isHidden = true
+        chooseTool.target = self
+        chooseTool.action = #selector(chooseProgram(_:))
         extra.delegate = self
         picker.onChange = { [weak self] in self?.formChanged(nil) }
     }
@@ -75,7 +86,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         options.alignment = .leading
         options.spacing = 4
         form.row("Options", [options]).yPlacement = .top
-        form.row("Tool", [toolMenu])
+        form.row("Tool", [toolMenu, chooseTool])
         form.grid.addRow(with: [NSGridCell.emptyContentView, fit]).topPadding = -4
         fit.preferredMaxLayoutWidth = 420
         saveTo.stringValue = SettingsPaneController.shown(url)
@@ -105,13 +116,12 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
     }
 
     override func extraButtons() -> [NSButton] {
-        [button("Copy Command", id: "export.copyCommand", tip: "Copy the command line (it holds no password)", target: self,
-                action: #selector(copyCommand(_:)))]
+        [copyButton, reveal]
     }
 
     override func setFormEnabled(_ enabled: Bool) {
         let why = enabled ? nil : "It is running: wait for it, or Stop it"
-        for control in [content, snapshot, hexBlob, gzip, dropTable, objects, toolMenu, choose, extra] as [NSControl] {
+        for control in [content, snapshot, hexBlob, gzip, dropTable, objects, toolMenu, chooseTool, choose, extra] as [NSControl] {
             control.isEnabled = enabled
             if let why { control.toolTip = why }
         }
@@ -127,6 +137,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         dropTable.toolTip = "Make the file replace tables of the same name when it is restored"
         objects.toolTip = "Export the databases' views, procedures, functions, triggers and events too"
         toolMenu.toolTip = "Choose the program that writes the dump"
+        chooseTool.toolTip = "Choose a mysqldump or mariadb-dump program anywhere on this Mac"
         choose.toolTip = "Choose the file to save the dump in"
         extra.toolTip = "Add your own options for the dump tool, as you would type them in Terminal"
     }
@@ -162,18 +173,27 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         let current = connection.database.isEmpty ? (databases.count == 1 ? databases.first?.name : nil) : connection.database
         if let node = databases.first(where: { $0.name == current }) { picker.include(node, true) }
         picker.show(databases, expanding: current)
-        toolMenu.removeAllItems()
-        for tool in tools {
-            toolMenu.addItem(withTitle: tool.title)
-            toolMenu.lastItem?.toolTip = tool.path
-        }
-        toolMenu.addItem(withTitle: "AirSQL (built in)")
-        toolMenu.lastItem?.toolTip = "Export with AirSQL itself: no client tools needed"
+        fill(toolMenu, tools: tools, builtIn: Self.builtInTip)
         let picked = tools.firstIndex { $0.path == connection.dumpPath }
             ?? ClientTools.best(tools, for: server).flatMap { best in tools.firstIndex { $0 == best } }
         toolMenu.selectItem(at: picked ?? tools.count)
         loading(nil)
         formChanged(nil)
+    }
+
+    private static let builtInTip = "Export with AirSQL itself: no client tools needed"
+
+    @objc private func chooseProgram(_ sender: Any?) {
+        chooseProgram(.dump) { [weak self] in self?.use(tool: $0) }
+    }
+
+    /// Adds `tool` (Choose…'s) to the menu and uses it.
+    func use(tool: ClientTool) {
+        tools.removeAll { $0.path == tool.path }
+        tools.insert(tool, at: 0)
+        fill(toolMenu, tools: tools, builtIn: Self.builtInTip)
+        toolMenu.selectItem(at: 0)
+        formChanged(toolMenu)
     }
 
     // MARK: Changes
@@ -224,6 +244,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             status.stringValue = tables.isEmpty ? "" : ObjectPicker.count(tables.count, "table") + " · about "
                 + Self.bytes(tables.reduce(0) { $0 + $1.bytes }) + " of data on the server"
         }
+        copyButton.isHidden = tool == nil || request == nil  // AirSQL's own export has no command to copy
         if let tool, let request {
             let argv = ToolCommand(tool: tool, options: options, server: server).dump(request, optionFile: "/private")
             command?.string = ToolCommand.display(argv, optionFile: "/private")
@@ -310,6 +331,10 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         NSPasteboard.general.setString(command?.string ?? "", forType: .string)
     }
 
+    @objc private func showInFinder(_ sender: Any?) {
+        if let exported { NSWorkspace.shared.activateFileViewerSelecting([exported]) }
+    }
+
     // MARK: Running
 
     override func run() {
@@ -317,6 +342,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         guard !AgentGuard.refuses("An export writes a file on this Mac: only the person at the Mac can start one. Leave the "
                                   + "sheet for them, or use run_queries with to_file.") else { return }
         guard let request = makeRequest() else { return }
+        reveal.isHidden = true
         let url = self.url, options = self.options
         let tables = picker.databases.flatMap(\.tables).filter(\.included)
         let estimate = tables.reduce(Int64(0)) { $0 + $1.bytes }
@@ -346,6 +372,8 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
                     }
                 }
                 updates.cancel()
+                exported = url
+                reveal.isHidden = false
                 finish("Exported \(what): \(Self.bytes(outcome.bytes)) of SQL in \(url.lastPathComponent).", failed: false)
             } catch {
                 updates.cancel()
