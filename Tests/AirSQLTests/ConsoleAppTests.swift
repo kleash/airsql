@@ -522,6 +522,21 @@ extension AppTests.ConsoleAppTests {
         #expect(await eventually(timeout: 5) { main.tabs.isEmpty })
     }
 
+    @Test func reopenClosedTabBringsBackAConsolesTextUnderItsName() async throws {
+        let (main, harness, console) = try await Self.console()
+        console.editor.string = "SELECT 'lost';"
+        let title = main.selectedTab?.title
+        main.closeTab(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["title": "Don't Save"])
+        #expect(await eventually(timeout: 5) { main.tabs.isEmpty })
+        main.reopenClosedTab(nil)
+        let back = try #require(main.selectedTab?.content as? ConsoleViewController)
+        #expect(back !== console && back.text == "SELECT 'lost';" && main.selectedTab?.title == title)
+        back.editor.string = ""
+        #expect(!main.validateMenuItem(Commands.reopenClosedTab.item()), "the list is empty again")
+    }
+
     @Test func theMiddleButtonClosesATabNotShownAfterAskingAndTheOneShownStays() async throws {
         let (main, harness, first) = try await Self.console()
         first.editor.string = "SELECT 1;"

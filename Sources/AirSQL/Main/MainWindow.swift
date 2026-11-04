@@ -180,6 +180,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         select(tab)
         let finish = { [weak self] (ok: Bool) in
             guard ok, let self, let index = self.tabs.firstIndex(where: { $0 === tab }) else { return }
+            if let reopen = content?.reopen {
+                self.closedTabs.append((tab.connectionID, reopen))
+                self.closedTabs = Array(self.closedTabs.suffix(20))
+            }
             self.tabs.remove(at: index)
             if self.selectedTab === tab {
                 self.selectedTab = self.tabs.first { $0 === before } ?? (self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)])
@@ -222,7 +226,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     /// Brings every part up to date with the model, the tabs and the selection.
     func refresh() {
-        tabBar.show(tabs, selected: selectedTab) { [weak self] tab in self?.model.connection(tab.connectionID)?.colour.color }
+        tabBar.show(tabs, selected: selectedTab) { [weak self] tab in self?.model.connection(tab.connectionID) }
         updateContent()
         updateTint()
         updateStatus()
@@ -268,6 +272,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     private var contentKindKey = ""
+    /// The tabs closed, last at the end, for Reopen Closed Tab.
+    private var closedTabs: [(connection: UUID?, reopen: (MainWindowController) -> Void)] = []
 
     private func updateTint() {
         let colour = activeConnection?.colour.color
@@ -313,7 +319,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     func updateStatus() {
         let connection = activeConnection
-        statusBar.route.show(connection.map(routeText) ?? "", tip: "the route to the server: click for details, right-click to copy")
+        let route = connection.map { $0.marks.isEmpty ? routeText($0) : $0.marks + " · " + routeText($0) }
+        statusBar.route.show(route ?? "", tip: "the route to the server: click for details, right-click to copy")
         let state = connection.flatMap { model.states[$0.id] }
         var server = ""
         if connection != nil {
@@ -390,6 +397,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     @objc func closeAllTabs(_ sender: Any?) { close(tabs) }
+
+    @objc func reopenClosedTab(_ sender: Any?) {
+        closedTabs.removeAll { $0.connection != nil && model.connection($0.connection) == nil }
+        closedTabs.popLast()?.reopen(self)
+    }
 
     @objc func duplicateTab(_ sender: Any?) {
         guard let tab = selectedTab, let copy = tab.tabContent?.duplicate() else { return }
@@ -468,7 +480,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = activeConnection != nil || sidebar.focusedDatabase != nil
             reason = "Select one connection in the sidebar first"
         case Commands.closeTab.action?:
-            item.showsClosing(tab: selectedTab != nil)
+            item.toolTip = (selectedTab == nil ? Commands.closeWindow : Commands.closeTab).tip
             return true
         case Commands.closeAllTabs.action?, Commands.renameTab.action?, Commands.renameF2.action?:
             enabled = selectedTab != nil
@@ -481,6 +493,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 enabled = false  // F2 in a grid is the grid's: it gets the key
                 reason = "F2 edits in the grid"
             }
+        case Commands.quickOpen.action?:
+            enabled = window?.attachedSheet == nil
+            reason = "A sheet is open: answer it first"
+        case Commands.reopenClosedTab.action?:
+            enabled = closedTabs.contains { $0.connection == nil || model.connection($0.connection) != nil }
+            reason = "No closed tab to reopen"
         case Commands.closeOtherTabs.action?:
             enabled = tabs.count > 1
             reason = "Only one tab is open"

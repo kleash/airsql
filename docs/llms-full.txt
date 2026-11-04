@@ -101,7 +101,9 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
 - **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
 - **The tabs** hold your queries and tables. Double-click a tab to rename it; middle-click it to close it; right-click it
-  to close the others or all of them, or to duplicate it.
+  to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as
+  it does in Settings, the SQL log and Compare. ⇧⌘T brings back the tab you closed last. ⌘P (**Quick Open…**) goes to a
+  table, view or connection by part of its name.
 - **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
   All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
@@ -661,7 +663,9 @@ Upper and lower case match as the column's collation says (most ignore case).
 ## See what the server is running
 
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
-running, refreshed every 5 seconds (choose another interval, or Off). Double-click a row to read its whole statement.
+running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
+with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
+idle connections. Double-click a row to read its whole statement.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.
@@ -1475,9 +1479,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | New Connection… | ⌘N |
 | New Query | ⌘T |
 | Open… | ⌘O |
+| Quick Open… | ⌘P |
 | Close Tab | ⌘W |
 | Close Other Tabs | ⌥⌘W |
 | Close All Tabs | ⌥⇧⌘W |
+| Reopen Closed Tab | ⇧⌘T |
 | Close Window | ⇧⌘W |
 | Save | ⌘S |
 | Save As… | ⇧⌘S |

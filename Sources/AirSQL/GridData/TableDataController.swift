@@ -401,6 +401,14 @@ final class TableDataController: NSViewController, TabContent {
     var isEdited: Bool { source?.changes.isEmpty == false }
     var statusAccessory: NSView? { viewer.status }
 
+    var reopen: ((MainWindowController) -> Void)? {
+        let (table, database, connection) = (tableName, database, context.connection)
+        return { main in
+            guard let context = Editors.context(connection, in: main.model) else { return NSSound.beep() }
+            main.openTableData(table, database: database, context: context)
+        }
+    }
+
     func shouldClose(_ answer: @escaping (Bool) -> Void) {
         guard let source, !source.changes.isEmpty, model.data.safety(for: context.connection).warnOnClose,
               let window = view.window else { return answer(true) }

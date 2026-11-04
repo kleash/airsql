@@ -26,9 +26,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | New Connection… | ⌘N |
 | New Query | ⌘T |
 | Open… | ⌘O |
+| Quick Open… | ⌘P |
 | Close Tab | ⌘W |
 | Close Other Tabs | ⌥⌘W |
 | Close All Tabs | ⌥⇧⌘W |
+| Reopen Closed Tab | ⇧⌘T |
 | Close Window | ⇧⌘W |
 | Save | ⌘S |
 | Save As… | ⇧⌘S |

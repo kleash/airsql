@@ -23,6 +23,8 @@ import AppKit
     @objc optional func closeTab(_ sender: Any?)
     @objc optional func closeOtherTabs(_ sender: Any?)
     @objc optional func closeAllTabs(_ sender: Any?)
+    @objc optional func reopenClosedTab(_ sender: Any?)
+    @objc optional func quickOpen(_ sender: Any?)
     @objc optional func duplicateTab(_ sender: Any?)
     @objc optional func renameTab(_ sender: Any?)
     @objc optional func renameSelection(_ sender: Any?)
@@ -278,12 +280,16 @@ enum Commands {
     static let newQuery = Command("New Query", #selector(AirSQLActions.newQuery(_:)), "t",
                                   tip: "Open a new SQL console tab on the selected connection")
     static let open = Command("Open…", #selector(AirSQLActions.openSQLFile(_:)), "o", tip: "Open a .sql file in a new console tab")
+    static let quickOpen = Command("Quick Open…", #selector(AirSQLActions.quickOpen(_:)), "p",
+                                   tip: "Go to a table, view or connection by typing part of its name")
     static let closeTab = Command("Close Tab", #selector(AirSQLActions.closeTab(_:)), "w",
                                   tip: "Close the tab shown; asks first about unsaved text or pending edits")
     static let closeOtherTabs = Command("Close Other Tabs", #selector(AirSQLActions.closeOtherTabs(_:)), "w", [.command, .option],
                                         tip: "Close every tab but the one shown; asks first about unsaved work")
     static let closeAllTabs = Command("Close All Tabs", #selector(AirSQLActions.closeAllTabs(_:)), "W", [.command, .option],
                                       tip: "Close every tab; asks first about unsaved work")
+    static let reopenClosedTab = Command("Reopen Closed Tab", #selector(AirSQLActions.reopenClosedTab(_:)), "T",
+                                         tip: "Open the tab closed last again: a console with its text, a table from its first page")
     static let closeWindow = Command("Close Window", #selector(NSWindow.performClose(_:)), "W",
                                      tip: "Close the window; connections stay open")
     static let save = Command("Save", #selector(AirSQLActions.saveQuery(_:)), "s", tip: "Save the console's text to its .sql file")
@@ -674,7 +680,7 @@ enum Commands {
     /// Every command above, for the checks (the tab commands once).
     static let all: [Command] = [
         about, settings, hide, hideOthers, showAll, quit,
-        newConnection, newQuery, open, closeTab, closeOtherTabs, closeAllTabs, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
+        newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
         runSQLFile, importCSV, importSSHConfig,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyColumnName, copyCreate,
@@ -736,13 +742,6 @@ enum Commands {
 }
 
 extension NSMenuItem {
-    /// Close Tab (⌘W) says what it closes here: the tab, or where there is none the window.
-    func showsClosing(tab: Bool) {
-        let command = tab ? Commands.closeTab : Commands.closeWindow
-        title = command.title
-        toolTip = command.tip
-    }
-
     /// Sets the tooltip for the item's state: why it is off (when that is known), else what it does.
     func explain(enabled: Bool, reason: String?) {
         toolTip = (enabled ? nil : reason) ?? Commands.tip(for: self) ?? toolTip

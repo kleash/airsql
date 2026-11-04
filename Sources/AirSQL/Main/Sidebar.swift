@@ -438,7 +438,8 @@ final class SidebarCell: NSTableCellView {
     private let dot = DotView(diameter: 9)
     private let name = NSTextField(labelWithString: "")
     private let shield = NSImageView()
-    private let state = DotView(diameter: 6)
+    private let state = NSImageView()
+    private let lock = NSImageView()
     private let badge = NSTextField(labelWithString: "")
     private let icon = NSImageView()
     private let spinner = NSProgressIndicator()
@@ -465,12 +466,16 @@ final class SidebarCell: NSTableCellView {
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
         shield.contentTintColor = .statusWarning
         shield.toolTip = "Custom safety: this connection has safety settings of its own (its Safety tab)"
+        lock.image = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Read-only")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        lock.contentTintColor = .secondaryLabelColor
+        lock.toolTip = "Read-only: AirSQL refuses writes on this connection"
         icon.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityLabel("Loading the schema")
-        let stack = NSStackView(views: [icon, dot, name, shield, spinner, state, badge])
+        let stack = NSStackView(views: [icon, dot, name, lock, shield, spinner, state, badge])
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
@@ -501,19 +506,35 @@ final class SidebarCell: NSTableCellView {
         nameColour = .labelColor
         colour()
         shield.isHidden = !connection.hasCustomSafety
+        lock.isHidden = !connection.readOnly
         badge.isHidden = false
-        badge.stringValue = connection.routeBadge
+        badge.stringValue = (connection.colour == .production ? "PROD · " : "") + connection.routeBadge
+        // Each state its own shape, not only its own colour.
+        let symbol: (name: String, colour: NSColor)?
+        var next = "double-click to connect"
         switch connectionState {
-        case .connected?: state.color = .statusOK
-        case .connecting?: state.color = .statusWarning
-        case .failed?: state.color = .statusBad
-        case nil: state.color = nil
+        case .connected?:
+            symbol = ("checkmark.circle.fill", .statusOK)
+            next = "double-click to show it"
+        case .connecting?:
+            symbol = ("ellipsis.circle.fill", .statusWarning)
+            next = "connecting"
+        case .failed?:
+            symbol = ("exclamationmark.triangle.fill", .statusBad)
+            next = "double-click to try again"
+        case nil: symbol = nil
         }
+        let status = stateText(connectionState)
+        state.isHidden = symbol == nil
+        state.image = symbol.flatMap { NSImage(systemSymbolName: $0.name, accessibilityDescription: status) }?
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .semibold))
+        state.contentTintColor = symbol?.colour
+        state.toolTip = status
         let where_ = connection.route == .direct && !connection.socket.isEmpty ? connection.socket
             : connection.host + (connection.port.map { ":\($0)" } ?? "")
         toolTip = name.stringValue + (where_.isEmpty ? "" : " — " + where_) + " · " + connection.routeBadge
-            + ": double-click to connect, right-click for more"
-        setAccessibilityLabel(name.stringValue)
+            + (connection.marks.isEmpty ? "" : " · " + connection.marks) + ": " + next + ", right-click for more"
+        setAccessibilityLabel([name.stringValue, connection.marks, status].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
     func showFolder(_ title: String, count: Int) {
@@ -525,7 +546,8 @@ final class SidebarCell: NSTableCellView {
         nameColour = .labelColor
         colour()
         shield.isHidden = true
-        state.color = nil
+        lock.isHidden = true
+        state.isHidden = true
         badge.isHidden = false
         badge.stringValue = "\(count)"
         toolTip = "\(title): \(count) connection\(count == 1 ? "" : "s"); double-click to open or close the folder"
@@ -540,7 +562,8 @@ final class SidebarCell: NSTableCellView {
         nameColour = .tertiaryLabelColor
         colour()
         shield.isHidden = true
-        state.color = nil
+        lock.isHidden = true
+        state.isHidden = true
         badge.isHidden = true
         toolTip = nil
     }

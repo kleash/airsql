@@ -43,8 +43,8 @@ enum MainMenu {
         menus.app.addItem(services)
         menus.app.add([nil, Commands.hide, Commands.hideOthers, Commands.showAll, nil, Commands.quit])
 
-        menus.file.add([Commands.newConnection, Commands.newQuery, nil, Commands.closeTab, Commands.closeOtherTabs,
-                        Commands.closeAllTabs, Commands.closeWindow, nil, Commands.duplicateTab, Commands.renameTab, Commands.renameF2,
+        menus.file.add([Commands.newConnection, Commands.newQuery, Commands.quickOpen, nil, Commands.closeTab, Commands.closeOtherTabs,
+                        Commands.closeAllTabs, Commands.reopenClosedTab, Commands.closeWindow, nil, Commands.duplicateTab, Commands.renameTab, Commands.renameF2,
                         Commands.revealInFinder])
 
         menus.edit.add([Commands.undo, Commands.redo, nil, Commands.cut, Commands.copy, Commands.paste, Commands.delete,

@@ -71,7 +71,9 @@ Upper and lower case match as the column's collation says (most ignore case).
 ## See what the server is running
 
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
-running, refreshed every 5 seconds (choose another interval, or Off). Double-click a row to read its whole statement.
+running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
+with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
+idle connections. Double-click a row to read its whole statement.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.

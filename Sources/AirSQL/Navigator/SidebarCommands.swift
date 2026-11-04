@@ -132,8 +132,16 @@ extension SidebarController: NSMenuItemValidation {
         NavigatorActions.runRoutine(routine, on: open, main: main)
     }
 
-    @objc func copyName(_ sender: Any?) {
-        let names = selectedNodes.compactMap(\.quotedName)
+    @objc func copyName(_ sender: Any?) { put(selectedNodes.compactMap(\.quotedName)) }
+
+    /// ⌘C: the names of the rows selected, connections' too.
+    @objc func copy(_ sender: Any?) { put(copyableNames) }
+
+    private var copyableNames: [String] {
+        selectedNodes.compactMap { $0.quotedName ?? model.connection($0.connectionID)?.displayName }
+    }
+
+    private func put(_ names: [String]) {
         guard !names.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(names.joined(separator: ", "), forType: .string)
@@ -241,6 +249,8 @@ extension SidebarController: NSMenuItemValidation {
         case Commands.refresh.action?:
             let open = selection != nil || selectedConnectionIDs.contains { model.openConnection($0) != nil }
             reason = open ? nil : "Select a connected connection or something in its tree first"
+        case Commands.copy.action?:
+            reason = copyableNames.isEmpty ? "Select a connection, database or object first" : nil
         case Commands.expandAll.action?, Commands.collapseAll.action?:
             reason = selectedNodes.contains { !$0.children.isEmpty } ? nil : "Select a row that has rows under it first"
         case Commands.renameF2.action? where selectedFolderNodeID != nil:

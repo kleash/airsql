@@ -129,12 +129,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == Commands.closeTab.action {
-            item.showsClosing(tab: false)
             // A sheet has its own buttons.
             guard let window = NSApp.keyWindow, window.styleMask.contains(.closable), window.sheetParent == nil else {
                 item.toolTip = NSApp.keyWindow == nil ? "No window is open" : "Answer the sheet first"
                 return false
             }
+            item.toolTip = Commands.closeWindow.tip
             return true
         }
         item.explain(enabled: true, reason: nil)

@@ -177,11 +177,84 @@ extension AppTests {
                 let event = try #require(NSApp.nextEvent(matching: .keyDown, until: .distantFuture, inMode: .default, dequeue: true))
                 outline.keyDown(with: event)
             }
+            // The rest of the run's selections aren't arrow keys.
+            let other = try #require(NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0,
+                                                        windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0))
+            NSApp.postEvent(other, atStart: true)
+            _ = NSApp.nextEvent(matching: .applicationDefined, until: .distantFuture, inMode: .default, dequeue: true)
             let stopped = try #require(outline.item(atRow: start + 2) as? SidebarNode)
             #expect(outline.selectedRow == start + 2)
             #expect(main.selectedTab?.title == shown, "nothing read yet")
             guard case .object(_, let object) = stopped.kind else { throw AirSQLError(.other, "not an object") }
             #expect(await eventually(timeout: 5) { main.selectedTab?.title == object.name })
+        }
+
+        @Test func theProcessListSortsFiltersAndHidesSleepers() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let list = ProcessListContent(open)
+            main.open(list, title: "Processes", connection: id)
+            _ = await eventually(timeout: 10) { !list.isRefreshing }
+            func process(_ id: UInt64, _ user: String, _ command: String, time: Int) -> ServerProcess {
+                ServerProcess(id: id, user: user, host: "h", database: nil, command: command, time: time, state: nil,
+                              info: command == "Sleep" ? nil : "SELECT \(id)", queryID: nil)
+            }
+            list.show([process(1, "ann", "Sleep", time: 900), process(2, "bob", "Query", time: 9),
+                       process(3, "cid", "Query", time: 100)])
+            list.table.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
+
+            // Time compares as a number, and the header's first click puts the longest first.
+            let time = try #require(list.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("time")))
+            list.table.sortDescriptors = [try #require(time.sortDescriptorPrototype)]
+            #expect(list.processes.map(\.id) == [1, 3, 2])
+            #expect(list.selected.map(\.id) == [2], "the selection follows its row")
+
+            list.hideSleeping.state = .on
+            list.hideSleeping.sendAction(list.hideSleeping.action, to: list.hideSleeping.target)
+            #expect(list.processes.map(\.id) == [3, 2])
+            list.filter.stringValue = "SELECT 3"
+            list.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            #expect(list.processes.map(\.id) == [3])
+
+            list.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            list.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("3\tcid\th") == true)
+        }
+
+        @Test func commandCCopiesTheNamesOfTheRowsSelected() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let copy = Commands.copy.item()
+            main.sidebar.select([id])
+            #expect(main.sidebar.validateMenuItem(copy))
+            main.sidebar.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string) == Fixtures.production.displayName)
+            let row = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders")))?.row)
+            main.sidebar.outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            main.sidebar.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string) == "`orders`")
+        }
+
+        @Test func quickOpenFindsTablesAndConnectionsByPartOfTheirName() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, harness) = appWindow(model)
+            _ = await openReplayed(model, id)
+            #expect(await call(harness, "menu", ["path": "File > Quick Open…"]).error == nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let sheet = try #require(main.window?.attachedSheet?.windowController as? QuickOpenSheet)
+            #expect(sheet.shown.contains { $0.place == "Connection" } && sheet.shown.contains { $0.name == "orders" })
+            sheet.field.stringValue = "ORDERS"
+            sheet.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            #expect(sheet.shown.first?.name == "orders" && sheet.table.selectedRow == 0)
+            let editor = NSTextView()
+            #expect(sheet.control(sheet.field, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))))
+            #expect(await eventually(timeout: 5) { main.window?.attachedSheet == nil && main.tabs.contains { $0.title == "orders" } })
+            #expect(main.selectedTab?.content is TableDataController)
         }
 
         @Test func aDoubleClickOnADatabaseOpensItAndAnotherClosesIt() async throws {

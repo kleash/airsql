@@ -160,6 +160,11 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     /// The sidebar's "custom safety" mark: this connection overrides the settings that would apply.
     public var hasCustomSafety: Bool { safety != nil }
 
+    /// What the connection is marked, in words, for wherever its colour alone would have to say it ("" when unmarked).
+    public var marks: String {
+        [colour == .none ? nil : colour.title, readOnly ? "read-only" : nil].compactMap { $0 }.joined(separator: ", ")
+    }
+
     /// What the sidebar shows at the row's end: TCP, Socket, SSH, Jump or Proxy.
     public var routeBadge: String {
         switch route {
