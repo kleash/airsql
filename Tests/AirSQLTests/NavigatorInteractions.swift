@@ -35,7 +35,7 @@ extension AppTests.InteractionTests {
             Surface(name: "Table or view in the tree",
                     place: { main, _ in treeRow(main, .object(id, orders))?.point },
                     clicked: { $0.selectedTab?.title == "orders" && preview($0) != nil },
-                    doubleClicked: { main, _ in main.tabs.filter { $0.title == "orders" }.count == 2 },
+                    doubleClicked: { main, _ in main.tabs.filter { $0.title == "orders" }.count == 1 && main.selectedTab?.content is TableDataController },
                     menu: tableMenu, enabled: tableCommands),
             Surface(name: "Routine, trigger or event",
                     place: { main, _ in treeRow(main, .object(id, procedure))?.point },
