@@ -59,7 +59,7 @@ extension TableDataController {
         let sql = source.pageSQL(offset: 0, limit: nil)
         let request = ExportRowsRequest(
             title: tableName, columns: order.map { source.columns[$0] }, database: database, table: tableName,
-            selectedCount: rows.count, selected: { rows.map { row in order.map { source.value(row, $0) } } },
+            noBackslashEscapes: noBackslashEscapes, hiddenColumns: source.columns.count - order.count, selectedCount: rows.count, selected: { rows.map { row in order.map { source.value(row, $0) } } },
             loadedCount: source.rowCount, loaded: { (0..<source.rowCount).map { row in order.map { source.value(row, $0) } } },
             all: { write in
                 let session = try await sessions.toolsSession()

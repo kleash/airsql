@@ -44,6 +44,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
   `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
   loaded rows instead.
+- Search and `LIKE` read the text a cell shows, BIT digits and JSON included. Whether they ignore case is the column's
+  collation: `utf8mb4_bin` and other binary ones don't, and JSON follows the connection's.
 - **Quick Filter**: right-click a cell for `=`, `<>`, `<`, `>`, `LIKE` (starts with, ends with, contains), `IS NULL` and
   `IS NOT NULL` with its value, and `IN` / `NOT IN` with every value selected in its column. Each item shows its SQL.
   Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. **Data ▸ Quick
@@ -63,7 +65,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
   repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting
   by a column without an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the
-  loaded rows sort here instead.
+  loaded rows sort here instead, as plain text without case or accents, or by value in number columns: the server's
+  collation can order them otherwise, and an ENUM goes by its text.
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
@@ -191,3 +194,7 @@ These work in a console's results too.
   (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
   In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
   and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.
+  Hidden columns aren't exported, and the sheet says how many are left out. SQL formats leave out generated columns.
+  In CSV a real NULL has no quotes and the text NULL has them, so CSV import tells them apart; TSV has no way to.
+  CSV is UTF-8 without a BOM, which scripts read as it is: Excel for Mac needs **Data ▸ From Text**.
+  XML and HTML can't hold control characters, nor can a workbook: each shows as �.

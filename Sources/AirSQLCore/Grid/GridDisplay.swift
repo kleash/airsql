@@ -65,14 +65,15 @@ public enum GridDisplay: String, CaseIterable, Codable {
             formatter.timeZone = timeZone
             return formatter.string(from: Date(timeIntervalSince1970: self == .unixMillis ? number / 1000 : number))
         case .grouped, .decimals0, .decimals1, .decimals2, .decimals3, .decimals4:
-            guard let value, let decimal = Decimal(string: value, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
-            let formatter = NumberFormatter()
-            formatter.numberStyle = .decimal
-            formatter.roundingMode = .halfUp
-            formatter.maximumFractionDigits = decimals
-                ?? value.firstIndex(of: ".").map { value.distance(from: $0, to: value.endIndex) - 1 } ?? 0
-            formatter.minimumFractionDigits = formatter.maximumFractionDigits
-            return formatter.string(from: decimal as NSDecimalNumber)
+            guard let value, var decimal = Decimal(string: value, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+            guard let decimals else {
+                // Every digit as it is: a DECIMAL(65,30) has more than any number type here keeps.
+                let plain = !value.contains { $0 == "e" || $0 == "E" } && CopyWriter.isNumber(value)
+                return GridAggregate.laidOut(plain ? value : "\(decimal)", fraction: 0, grouping: true, .current)
+            }
+            var rounded = Decimal()
+            NSDecimalRound(&rounded, &decimal, decimals, .plain)
+            return GridAggregate.laidOut("\(rounded)", fraction: decimals, grouping: true, .current)
         case .uuid:
             guard let bytes, bytes.count == 16 else { return nil }
             let hex = bytes.map { String(format: "%02x", $0) }.joined()

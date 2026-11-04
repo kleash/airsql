@@ -89,7 +89,10 @@ session on each: no file in between.
 3. **Import**. The rows go in one transaction: if one fails (a duplicate key, a value the column refuses), none of the
    file stays, and the message says which records.
 
-Empty fields become NULL unless you untick it. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+Empty fields and a `NULL` without quotes become NULL unless you untick it (AirSQL's own CSV writes the text NULL in
+quotes, so the two come back apart), and a whole `0x…` field in a BLOB or BINARY column becomes its bytes. The file should
+be UTF-8: a field that isn't reads as Windows-1252, and the end of the import says so, as it does when the server gave
+warnings. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
 
 ## Open the mysql command line in Terminal
 

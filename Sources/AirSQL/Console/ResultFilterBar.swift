@@ -77,7 +77,8 @@ final class ResultFilterBar: NSView, NSSearchFieldDelegate {
         } else {
             conditionsText.attributedStringValue = SQLPreviewSheet.coloured(sql, font: .monospacedSystemFont(ofSize: 12, weight: .regular),
                                                                             noBackslashEscapes: false)
-            conditionsText.toolTip = "Showing the rows where " + sql
+            conditionsText.toolTip = "Showing the rows where " + sql + ". This runs here, not on the server: = is exact whatever "
+                + "the column's collation, and LIKE ignores case and accents"
         }
         clearButton.isHidden = conditions.isEmpty && searchField.stringValue.isEmpty
         scope.text = shown == total ? "Local · every row" : "Local · \(shown.formatted()) of \(total.formatted()) rows"

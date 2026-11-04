@@ -247,9 +247,10 @@ extension TableDataController: DataGridViewDelegate {
         loading = Task {
             defer { Self.applying.remove(connection) }
             do {
-                var insertIDs: [UInt64] = []
+                var insertIDs: [UInt64] = [], warnings = 0
                 try await PendingChanges.apply(statements) { sql in
                     let result = try await session.query(sql, rowCap: 1).last
+                    warnings += result?.warnings ?? 0
                     if sql.hasPrefix("INSERT ") { insertIDs.append(result?.insertID ?? 0) }
                     return result?.affectedRows ?? 0
                 }
@@ -283,6 +284,10 @@ extension TableDataController: DataGridViewDelegate {
                     bar.busy = false
                 } else {
                     loadRows(more: false, through: source.loadedRows, keepingSaved: true)
+                }
+                if warnings > 0 {
+                    showError("The server gave \(warnings) warning\(warnings == 1 ? "" : "s"): it may have stored something other than "
+                              + "you typed, as the rows now show.", title: "Applied to \(tableName), with warnings", on: view.window)
                 }
             } catch {
                 activity.end()

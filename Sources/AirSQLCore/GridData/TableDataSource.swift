@@ -21,6 +21,8 @@ public final class TableDataSource: GridSource {
     public var localFilter: (([String?]) -> Bool)? { didSet { applyLocalFilter() } }
     /// The loaded rows sorted here, by columns in order, instead of on the server.
     public var localSort: [(column: Int, ascending: Bool)] = [] { didSet { applyLocalFilter() } }
+    /// What a TIMESTAMP cell's tooltip says: the session's time zone, its text from `EditContext`.
+    public var timeZoneNote: String?
     /// The most characters a cell shows (key columns: all of them).
     public static let shownLimit = 1_000
 
@@ -113,8 +115,20 @@ public final class TableDataSource: GridSource {
 
     /// Column Summary on the server: a column's distinct values, NULLs, smallest, largest and all rows, within the filter.
     public func summarySQL(_ column: Int) -> String {
-        let name = SQLQuote.identifier(columns[column].name)
-        return "SELECT COUNT(DISTINCT \(name)), COUNT(*) - COUNT(\(name)), MIN(\(name)), MAX(\(name)), COUNT(*)" + from
+        let name = SQLQuote.identifier(columns[column].name), info = table.columns[column], type = info.dataType.lowercased()
+        var (least, most) = ("MIN(\(name))", "MAX(\(name))")
+        if type == "bit" {
+            // MariaDB sends MIN and MAX of a BIT as decimal text under the type BIT.
+            let width = columns[column].type.filter(\.isNumber)
+            (least, most) = ("LPAD(BIN(MIN(\(name) + 0)), \(width), '0')", "LPAD(BIN(MAX(\(name) + 0)), \(width), '0')")
+        } else if type == "enum", let open = info.columnType.firstIndex(of: "(") {
+            // By position in the list, as the server sorts them, not by text.
+            let list = info.columnType[info.columnType.index(after: open)...].dropLast()
+            (least, most) = ("ELT(MIN(\(name) + 0), \(list))", "ELT(MAX(\(name) + 0), \(list))")
+        } else if columns[column].kind == .binary, !type.hasSuffix("binary"), !type.hasSuffix("blob") {
+            (least, most) = ("NULL", "NULL")  // MySQL refuses MIN of a geometry, and neither means anything
+        }
+        return "SELECT COUNT(DISTINCT \(name)), COUNT(*) - COUNT(\(name)), \(least), \(most), COUNT(*)" + from
     }
 
     /// A column's most frequent values with how many rows have each, within the filter (Column Summary, Filter by
@@ -298,17 +312,21 @@ public final class TableDataSource: GridSource {
         store.display(row, column, binaryBytes: .max)
     }
 
+    public func note(_ row: Int, _ column: Int) -> String? {
+        columns[column].type.lowercased().hasPrefix("timestamp") ? timeZoneNote : nil
+    }
+
     /// A cell's value with its pending change, whole (for editing, copying and exporting): nil for NULL.
     public func value(_ index: Int, _ column: Int) -> String? {
         switch row(index) {
         case .loaded(let row):
             if !changes.state.edits.isEmpty, let key = rowKey(index), let value = changes.value(key, columns[column].name) {
-                return value.text ?? shownText(value)
+                return value.text ?? shownText(value, column)
             }
             return value(loaded: row, column)
         case .inserted(let id):
             guard let value = changes.insert(id)?.values[columns[column].name] else { return unset(column) }
-            return value.text ?? shownText(value)
+            return value.text ?? shownText(value, column)
         case nil: return nil
         }
     }
@@ -346,7 +364,13 @@ public final class TableDataSource: GridSource {
         }
     }
 
-    private func shownText(_ value: PendingChanges.Value) -> String? { value == .default ? "DEFAULT" : nil }
+    private func shownText(_ value: PendingChanges.Value, _ column: Int) -> String? {
+        switch value {
+        case .default: return unset(column)
+        case .sql(let sql): return sql
+        default: return nil
+        }
+    }
 
     // MARK: GridSource
 

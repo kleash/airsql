@@ -97,6 +97,25 @@ struct StatementCheckTests {
         }
     }
 
+    @Test func aLimitedWriteIsNotEveryRowAndCharsetChangesAreSpotted() {
+        func risk(_ sql: String) -> StatementCheck.Risk? { StatementCheck.risk(sql, noBackslashEscapes: false) }
+        #expect(risk("DELETE FROM t LIMIT 5")?.limited == true && risk("DELETE FROM t")?.limited == false)
+        #expect(StatementCheck.changesCharset("SET NAMES latin1", noBackslashEscapes: false))
+        #expect(StatementCheck.changesCharset("set character set cp1251", noBackslashEscapes: false))
+        #expect(!StatementCheck.changesCharset("SET NAMES utf8mb4", noBackslashEscapes: false))
+        #expect(!StatementCheck.changesCharset("SET @a = 'SET NAMES latin1'", noBackslashEscapes: false))
+    }
+
+    @Test func completionKnowsTheServerAndQuotesMySQL8Words() {
+        #expect(SQLCompletion.quote("rank") == "`rank`" && SQLCompletion.quote("name") == "name")
+        let mysql57 = SchemaServer(version: "5.7.44"), mysql84 = SchemaServer(version: "8.4.13"), mariadb = SchemaServer(version: "10.5.29-MariaDB")
+        for name in ["REGEXP_REPLACE", "REGEXP_SUBSTR", "JSON_VALUE"] {
+            let function = SQLFunction.all.first { $0.name == name }
+            #expect(function?.available(on: mysql57) == false && function?.available(on: mysql84) == true
+                    && function?.available(on: mariadb) == true, "\(name)")
+        }
+    }
+
     @Test func unboundedWritesDropsAndTruncates() {
         func risk(_ sql: String) -> StatementCheck.Risk? { StatementCheck.risk(sql, noBackslashEscapes: false) }
         #expect(risk("UPDATE t SET a = 1")?.kind == .unboundedWrite)

@@ -128,7 +128,7 @@ struct GridDataTests {
         let cells = try document.nodes(forXPath: "//*[local-name()='row']").map { row in
             (row.children ?? []).map { $0.stringValue ?? "" }
         }
-        #expect(cells == [["id", "name", "price"], ["1", "Ann", "12.50"], ["2", "", "-3"], ["3", "<&> \"quoted\" ", "x"]])
+        #expect(cells == [["id", "name", "price"], ["1", "Ann", "12.50"], ["2", "", "-3"], ["3", "<&> \"quoted\" \u{FFFD}", "x"]])
         #expect(sheet.contains("<c><v>12.50</v></c>") && sheet.contains("<c/>"))
         // unzip reads names as patterns: [ starts a set.
         for part in ["\\[Content_Types\\].xml", "_rels/.rels", "xl/workbook.xml", "xl/_rels/workbook.xml.rels"] {

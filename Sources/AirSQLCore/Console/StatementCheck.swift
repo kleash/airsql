@@ -17,6 +17,8 @@ public enum StatementCheck {
         public var objectType: String
         /// The object as written ("shop.orders"; "a, b" for several): what a typed confirmation asks for.
         public var object: String
+        /// A write with a LIMIT of its own: it reaches that many rows, not every one.
+        public var limited = false
     }
 
     /// Statements that change nothing on the server but the session: they never ask, even where every write asks.
@@ -35,6 +37,14 @@ public enum StatementCheck {
             return words.contains { global.contains($0.text) || $0.text.hasPrefix("@@GLOBAL.") || $0.text.hasPrefix("@@PERSIST") }
         }
         return true
+    }
+
+    /// SET NAMES or SET CHARACTER SET to anything but utf8mb4: results stop being the UTF-8 AirSQL reads them as.
+    public static func changesCharset(_ sql: String, noBackslashEscapes: Bool) -> Bool {
+        let words = codeWords(sql, noBackslashEscapes: noBackslashEscapes).map(\.text)
+        guard words.first == "SET", words.count >= 3 else { return false }
+        if words[1] == "NAMES" { return !sql.lowercased().contains("utf8mb4") }
+        return (words[1] == "CHARACTER" || words[1] == "CHARSET") && !sql.lowercased().contains("utf8mb4")
     }
 
     /// The prompt-worthy kind of the statement, if it is one.
@@ -57,7 +67,8 @@ public enum StatementCheck {
                start.first?.text == "FROM" {
                 start = start[(from + 1)...]
             }
-            return Risk(kind: .unboundedWrite, verb: verb, objectType: "table", object: name(Array(start)))
+            return Risk(kind: .unboundedWrite, verb: verb, objectType: "table", object: name(Array(start)),
+                        limited: rest.contains { $0.depth == 0 && $0.text == "LIMIT" })
         case "DROP":
             let skip: Set<String> = ["TEMPORARY", "ONLINE", "OFFLINE"]
             let afterSkip = rest.drop { skip.contains($0.text) }

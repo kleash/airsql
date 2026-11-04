@@ -3,10 +3,16 @@ import Foundation
 
 /// Reads CSV as spreadsheets write it (RFC 4180): fields split by the separator, double quotes around fields that hold
 /// separators, quotes or line breaks, a quote inside written twice, records ended by LF or CRLF, a UTF-8 BOM ignored.
-/// It takes the file in pieces and keeps an unfinished record for the next one.
+/// Text is UTF-8; a field that isn't reads as Windows-1252, which spreadsheets on Windows save. It takes the file in
+/// pieces and keeps an unfinished record for the next one.
 public struct CSVReader {
     public var separator: UInt8
+    /// A NULL without quotes, as AirSQL's CSV writes the real one, reads as an empty field.
+    public var bareNullIsEmpty = false
+    /// Whether a field wasn't UTF-8.
+    public private(set) var readWindows1252 = false
     private var field: [UInt8] = []
+    private var fieldQuoted = false
     private var record: [String] = []
     private var quoted = false
     /// In a quoted field, a quote was just read: the end of the quotes, or the first of two.
@@ -56,6 +62,7 @@ public struct CSVReader {
             switch byte {
             case 0x22 where field.isEmpty:
                 quoted = true
+                fieldQuoted = true
             case separator:
                 endField()
             case 0x0A, 0x0D:
@@ -89,8 +96,14 @@ public struct CSVReader {
     }
 
     private mutating func endField() {
-        record.append(String(decoding: field, as: UTF8.self))
+        var text = String(decoding: field, as: UTF8.self)
+        if text.contains("\u{FFFD}"), String(bytes: field, encoding: .utf8) == nil {
+            text = String(bytes: field, encoding: .windowsCP1252) ?? text
+            readWindows1252 = true
+        }
+        record.append(bareNullIsEmpty && !fieldQuoted && text == "NULL" ? "" : text)
         field = []
+        fieldQuoted = false
     }
 
     /// The separator a sample most likely uses: of comma, semicolon, tab and bar, the one found most often on its first
@@ -114,17 +127,28 @@ public enum CSVImport {
         public var separator = UInt8(ascii: ",")
         /// The first record names the columns: it isn't imported.
         public var header = true
-        /// Empty fields become NULL (otherwise empty strings).
+        /// Empty fields and a NULL without quotes become NULL (otherwise strings).
         public var emptyIsNull = true
+        /// Columns that take a whole "0x…" field as its bytes, as AirSQL's CSV writes them.
+        public var binaryColumns: Set<String> = []
 
         public init() {}
     }
 
-    /// Rows imported so far, and the bytes of the file read of its size.
+    /// Rows imported so far, the bytes of the file read of its size, the server's warnings (it stored something other
+    /// than the file said) and whether a field wasn't UTF-8.
     public struct Progress: Equatable, Sendable {
         public var rows: Int64
         public var bytes: Int64
         public var size: Int64
+        public var warnings = 0
+        public var notUTF8 = false
+
+        /// What the finished import should add, "" when nothing happened.
+        public var note: String {
+            (notUTF8 ? " Some fields weren't UTF-8 and were read as Windows-1252: check them." : "")
+                + (warnings > 0 ? " The server gave \(warnings) warning\(warnings == 1 ? "" : "s"): it changed some values as it stored them." : "")
+        }
     }
 
     /// The first records of the file, for the mapping sheet: up to `limit` of them, from its first 256 KB. File work.
@@ -143,7 +167,7 @@ public enum CSVImport {
     /// (nil: left out, so the server's default applies).
     public static func run(_ url: URL, options: Options, into session: DBConnection, database: String, table: String,
                            columns: [String], mapping: [Int?], cancellation: Cancellation,
-                           progress: @escaping (Progress) -> Void) async throws -> Int64 {
+                           progress: @escaping (Progress) -> Void) async throws -> Progress {
         let used = zip(columns, mapping).compactMap { column, field in field.map { (column, $0) } }
         guard !used.isEmpty else { throw AirSQLError(.other, "No column takes a field of the file: map at least one.") }
         let fd = open(url.path, O_RDONLY | O_CLOEXEC)
@@ -155,6 +179,7 @@ public enum CSVImport {
             .joined(separator: ", ") + ") VALUES "
         let noBackslashEscapes = session.noBackslashEscapes
         var reader = CSVReader(separator: options.separator)
+        reader.bareNullIsEmpty = options.emptyIsNull
         var state = Progress(rows: 0, bytes: 0, size: Int64(info.st_size))
         var pending = "", skipHeader = options.header, record = 0
         func add(_ records: [[String]]) async throws {
@@ -165,8 +190,9 @@ public enum CSVImport {
                     continue
                 }
                 if fields.count == 1 && fields[0].isEmpty { continue }  // a blank line
-                let values = used.map { _, index -> String in
+                let values = used.map { column, index -> String in
                     let value = index < fields.count ? fields[index] : ""
+                    if options.binaryColumns.contains(column), let digits = CopyWriter.hexDigits(value) { return "X'\(digits)'" }
                     return value.isEmpty && options.emptyIsNull ? "NULL" : SQLQuote.string(value, noBackslashEscapes: noBackslashEscapes)
                 }
                 pending += (pending.isEmpty ? insert : ",") + "(" + values.joined(separator: ",") + ")"
@@ -177,7 +203,7 @@ public enum CSVImport {
         func flush() async throws {
             guard !pending.isEmpty else { return }
             do {
-                _ = try await session.query(pending)
+                state.warnings += try await session.query(pending).last?.warnings ?? 0
             } catch let error as AirSQLError {
                 throw AirSQLError(error.kind, "Records up to \(record) couldn't be imported: \(error.message)", details: error.details)
             }
@@ -202,7 +228,8 @@ public enum CSVImport {
             _ = try? await session.query("ROLLBACK")
             throw error
         }
+        state.notUTF8 = reader.readWindows1252
         progress(state)
-        return state.rows
+        return state
     }
 }

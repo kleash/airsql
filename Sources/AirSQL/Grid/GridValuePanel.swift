@@ -147,7 +147,8 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
 
     private func describe() -> String {
         let count = bytes?.count ?? 0
-        let size = "\(count.formatted()) byte\(count == 1 ? "" : "s")"
+        // Text arrives as UTF-8, whatever the column's character set: these aren't the bytes on the server's disk.
+        let size = "\(count.formatted()) byte\(count == 1 ? "" : "s")" + (column?.kind == .binary ? "" : " as UTF-8")
         switch mode {
         case .json: return "Valid JSON · " + size
         case .image: return image.image.map { "\(Int($0.size.width)) × \(Int($0.size.height)) image · " + size } ?? size

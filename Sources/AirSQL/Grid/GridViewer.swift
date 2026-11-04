@@ -21,6 +21,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     weak var host: DataGridViewDelegate?
     /// The table the rows come from, for the SQL copy formats (INSERT, UPDATE…).
     var copyTable: (database: String?, name: String) = (nil, "table")
+    /// The session's NO_BACKSLASH_ESCAPES, for the strings of what's copied as SQL.
+    var noBackslashEscapes = false
     /// ⌘C with nothing selected copies every row (a console result) rather than nothing.
     var copiesEverything = false
     /// The host's own highlight (find matches), by the host's row and column: tinted over the cells.
@@ -561,7 +563,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private func copySelection(_ format: CopyFormat, headers: Bool) {
         if copiesEverything, grid.selection.isEmpty, grid.selection.cursor == nil { grid.selectAll(nil) }
         guard let copied else { return NSSound.beep() }
-        GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name)
+        GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name,
+                     noBackslashEscapes: noBackslashEscapes)
     }
 
     // MARK: The host's cells

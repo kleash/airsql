@@ -32,11 +32,11 @@ public struct GridCondition: Equatable, Sendable {
             // ESCAPE '!' keeps a backslash of the value from being LIKE's own escape.
             let text = value ?? ""
             guard text.contains(where: { "%_!\\".contains($0) }) else {
-                return name + " LIKE " + SQLQuote.string(prefix + text + suffix, noBackslashEscapes: noBackslashEscapes)
+                return column.likeTarget + " LIKE " + SQLQuote.string(prefix + text + suffix, noBackslashEscapes: noBackslashEscapes)
             }
             let escaped = text.replacingOccurrences(of: "!", with: "!!").replacingOccurrences(of: "%", with: "!%")
                 .replacingOccurrences(of: "_", with: "!_")
-            return name + " LIKE " + SQLQuote.string(prefix + escaped + suffix, noBackslashEscapes: noBackslashEscapes)
+            return column.likeTarget + " LIKE " + SQLQuote.string(prefix + escaped + suffix, noBackslashEscapes: noBackslashEscapes)
                 + " ESCAPE '!'"
         }
         let listed = values.compactMap { $0 }.map(literal).joined(separator: ", ")
@@ -134,7 +134,7 @@ public enum GridFilter {
         let parts = columns.compactMap { column -> String? in
             let name = SQLQuote.identifier(column.name)
             switch column.kind {
-            case .text, .json: return name + like
+            case .text, .json: return column.likeTarget + like
             case .number, .date: return "CAST(\(name) AS CHAR)" + like
             case .binary: return CopyWriter.hexDigits(text).map { name + " = X'\($0)'" }
             }
@@ -163,7 +163,7 @@ public enum GridSorting {
            let y = Decimal(string: b, locale: Locale(identifier: "en_US_POSIX")) {
             return x == y ? .orderedSame : x < y ? .orderedAscending : .orderedDescending
         }
-        return a.compare(b, options: [.caseInsensitive, .numeric])
+        return a.compare(b, options: [.caseInsensitive, .diacriticInsensitive])
     }
 
     /// `rows` sorted by `keys` (columns of `columns`, values from `value`); equal rows keep their order.
@@ -182,6 +182,15 @@ public enum GridSorting {
 }
 
 extension GridColumn {
+    /// What LIKE reads, so it sees the cell's text: a BIT's digits, not its bytes, and JSON in the connection's collation
+    /// like other text, not its own binary one.
+    var likeTarget: String {
+        let name = SQLQuote.identifier(self.name)
+        if kind == .json { return "CAST(\(name) AS CHAR)" }
+        guard type.lowercased().hasPrefix("bit") else { return name }
+        return "LPAD(BIN(\(name) + 0), \(type.filter(\.isNumber).isEmpty ? "1" : type.filter(\.isNumber)), '0')"
+    }
+
     /// A value as SQL for this column: numbers bare when they read as numbers, BIT digits as b'…', a whole "0x…" in a
     /// binary column as X'…', anything else a quoted string.
     public func literal(_ value: String?, noBackslashEscapes: Bool = false) -> String {

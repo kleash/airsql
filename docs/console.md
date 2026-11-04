@@ -60,6 +60,8 @@ on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another;
 While a statement runs, the bar above the results shows which one and for how long, with **Cancel**; the status bar
 lists it too. Cancel stops only that statement: AirSQL checks the server is still running it before it stops it. A
 connection can have a query timeout: a statement that runs longer is stopped the same way, and Messages says so.
+The time shown covers the whole run: waiting its turn, the server's work and fetching every row. After an `UPDATE`,
+Messages counts the rows changed; the server's note beside it says how many matched.
 
 Console tabs of one connection share its session, so while one runs a statement the others wait.
 

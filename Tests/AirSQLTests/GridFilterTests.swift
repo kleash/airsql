@@ -37,7 +37,9 @@ struct GridFilterTests {
         #expect(GridCondition(float, .isIn, ["3.14", nil]).sql() == "((CAST(`f` AS CHAR) + 0) IN (3.14) OR `f` IS NULL)")
         #expect(GridCondition(json, .notEquals, ["[1]"]).sql() == "CAST(`j` AS BINARY) <> '[1]'")
         #expect(GridCondition(json, .equals, [nil]).sql() == "`j` IS NULL")
-        #expect(GridCondition(json, .contains, ["a"]).sql() == "`j` LIKE '%a%'")
+        #expect(GridCondition(json, .contains, ["a"]).sql() == "CAST(`j` AS CHAR) LIKE '%a%'")
+        let bit = GridColumn(name: "b", type: "bit(10)")
+        #expect(GridCondition(bit, .contains, ["101"]).sql() == "LPAD(BIN(`b` + 0), 10, '0') LIKE '%101%'")
     }
 
     @Test(arguments: [false, true])
@@ -107,7 +109,7 @@ struct GridFilterTests {
         let columns = [GridColumn(name: "id", kind: .number), name, GridColumn(name: "born", kind: .date),
                        GridColumn(name: "doc", kind: .json), GridColumn(name: "photo", kind: .binary)]
         #expect(GridFilter.search("an", in: columns) == "CAST(`id` AS CHAR) LIKE '%an%' OR `name` LIKE '%an%' OR "
-                + "CAST(`born` AS CHAR) LIKE '%an%' OR `doc` LIKE '%an%'")
+                + "CAST(`born` AS CHAR) LIKE '%an%' OR CAST(`doc` AS CHAR) LIKE '%an%'")
         #expect(GridFilter.search("0xff", in: columns)?.hasSuffix(" OR `photo` = X'FF'") == true)
         #expect(GridFilter.search("1%", in: [name]) == "`name` LIKE '%1!%%' ESCAPE '!'")
         #expect(GridFilter.search("", in: columns) == nil)

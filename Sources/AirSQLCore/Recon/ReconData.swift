@@ -248,6 +248,9 @@ enum ReconQuery {
             Task { _ = try? await session.cancel() }
         }
         try Task.checkCancellation()
-        return results.first(where: { $0.rows != nil })?.rows ?? ResultStore(columns: [])
+        let store = results.first(where: { $0.rows != nil })?.rows ?? ResultStore(columns: [])
+        // Past the store's limit the rest is gone, and rows missing here would read as differences.
+        if store.capped { throw AirSQLError(.other, "A batch of rows is too large to hold in memory, so the compare stopped.") }
+        return store
     }
 }

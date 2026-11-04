@@ -10,6 +10,8 @@ struct ExportRowsRequest {
     var database: String?
     var table: String
     var noBackslashEscapes = false
+    /// The columns hidden in the grid, which aren't written.
+    var hiddenColumns = 0
     var selectedCount: Int
     var selected: () -> [[String?]]
     var loadedCount: Int
@@ -74,6 +76,11 @@ final class ExportRowsSheet: NSWindowController {
         form.row("Options", [headers])
         form.row("NULL as", [nullText])
         form.row("", [crlf])
+        if request.hiddenColumns > 0 {
+            let count = request.hiddenColumns
+            form.row("", [label("\(count) hidden column\(count == 1 ? " is" : "s are") left out: show them first to export them",
+                               font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)])
+        }
         let cancel = button("Cancel", id: "export.cancel", tip: "Close without exporting", target: self, action: #selector(cancel(_:)))
         cancel.keyEquivalent = "\u{1b}"
         copyButton = button("Copy", id: "export.copy", tip: "Put the rows on the clipboard in this format", target: self,

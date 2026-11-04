@@ -40,13 +40,25 @@ struct ReconStructure {
     private func columns(_ left: SchemaTable, _ right: SchemaTable) -> [ReconPart] {
         var parts: [ReconPart] = []
         var previous: String?
+        // The columns both have, in the source's order; `order` plays the moves that put the target's in it.
+        let shared = left.columns.filter { right.column($0.name) != nil }.map { $0.name.lowercased() }
+        var order = right.columns.filter { left.column($0.name) != nil }.map { $0.name.lowercased() }
+        var moved: Set<String> = []
+        for (index, name) in shared.enumerated() where order[index] != name {
+            moved.insert(name)
+            order.removeAll { $0 == name }
+            order.insert(name, at: index)
+        }
         for column in left.columns {
             if let other = right.column(column.name) {
-                let changes = columnChanges(from: other, to: column)
+                let isMoved = moved.contains(column.name.lowercased())
+                let changes = columnChanges(from: other, to: column) + (isMoved ? ["moved"] : [])
                 if !changes.isEmpty {
-                    parts.append(ReconPart(kind: .column, name: column.name, change: .changed, after: previous,
-                                           detail: changes.joined(separator: ", "),
-                                           narrowing: Self.narrows(from: other, to: column)))
+                    var part = ReconPart(kind: .column, name: column.name, change: .changed, after: previous,
+                                         detail: changes.joined(separator: ", "),
+                                         narrowing: Self.narrows(from: other, to: column))
+                    part.moved = isMoved
+                    parts.append(part)
                 }
             } else {
                 parts.append(ReconPart(kind: .column, name: column.name, change: .added, after: previous, detail: "added"))
@@ -185,6 +197,16 @@ struct ReconStructure {
            ReconNormal.charset(collation) != ReconNormal.charset(other) {
             parts.append(ReconPart(kind: .options, name: "collation", change: .changed, definition: "COLLATE=\(collation)",
                                    detail: "default collation \(other) → \(collation)"))
+        }
+        if let format = ours?.rowFormat, let other = theirs?.rowFormat, format.lowercased() != other.lowercased() {
+            parts.append(ReconPart(kind: .options, name: "row_format", change: .changed, definition: "ROW_FORMAT=\(format.uppercased())",
+                                   detail: "row format \(other) → \(format)"))
+        }
+        // Whether, not how: no statement here, as a partitioning clause isn't among what the compare reads.
+        let partitioned = ours?.createOptions?.lowercased().contains("partitioned"), other = theirs?.createOptions?.lowercased().contains("partitioned")
+        if let partitioned, let other, partitioned != other {
+            parts.append(ReconPart(kind: .options, name: "partitioning", change: .changed,
+                                   detail: partitioned ? "partitioned only in the source" : "partitioned only in the target"))
         }
         if !options.ignore.autoIncrement, let next = ours?.autoIncrement, let other = theirs?.autoIncrement, next != other {
             parts.append(ReconPart(kind: .options, name: "auto_increment", change: .changed,

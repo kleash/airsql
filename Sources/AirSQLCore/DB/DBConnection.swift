@@ -102,6 +102,11 @@ public struct StatementResult {
     public var warnings: Int
     /// The server's note, such as "Rows matched: 1  Changed: 1  Warnings: 0".
     public var info: String?
+    /// Rows really changed: an UPDATE's "Changed:" from `info`, or else `affectedRows`.
+    public var changedRows: UInt64 {
+        guard let info, let range = info.range(of: "Changed: ") else { return affectedRows }
+        return UInt64(info[range.upperBound...].prefix(while: \.isNumber)) ?? affectedRows
+    }
     /// From sending the statement until this result was read.
     public var duration: TimeInterval
 }

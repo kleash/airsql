@@ -121,6 +121,12 @@ struct ReconTests {
         #expect(structure.compare(mysql, mariadb).isEmpty)
     }
 
+    @Test func jsonTrueIsNotOne() {
+        func same(_ a: String, _ b: String) -> Bool { ReconTableSQL.same(Array(a.utf8), Array(b.utf8), .json) }
+        #expect(!same(#"{"a": true}"#, #"{"a": 1}"#) && !same("[false]", "[0]"))
+        #expect(same(#"{"a": 1, "b": [true, null]}"#, #"{"b":[true,null],"a":1.0}"#) && !same("[1, 2]", "[2, 1]"))
+    }
+
     @Test func spellingsNormalise() {
         func column(_ type: String, json: Bool = false) -> SchemaColumn {
             SchemaColumn(name: "c", dataType: "", columnType: type, nullable: true, defaultValue: .null, autoIncrement: false,

@@ -18,7 +18,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         ("name", "Name", 180, 120, "The table's name"), ("rows", "Rows", 80, 60, "About how many rows (InnoDB estimates it)"),
         ("data", "Data", 72, 60, "Space its rows take"), ("index", "Indexes", 72, 60, "Space its indexes take"),
         ("engine", "Engine", 70, 60, "Its storage engine"), ("collation", "Collation", 140, 130, "How its text compares and sorts"),
-        ("updated", "Updated", 140, 135, "When its rows last changed, where the engine keeps it"),
+        ("updated", "Updated", 140, 135, "When its rows last changed, by the server's clock, where the engine keeps it"),
         ("comment", "Comment", 200, 80, "Its comment"),
     ]
 

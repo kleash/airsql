@@ -71,7 +71,7 @@ final class GridSummaryView: NSViewController {
                 let name: NSView
                 if choose != nil {
                     let shown = value.map { $0.count > 60 ? String($0.prefix(60)) + "…" : $0 } ?? "NULL"
-                    let link = GridStatusView.link(value ?? nullText, id: "columnSummary.value",
+                    let link = GridStatusView.link(ColumnSummary.label(value, nullText: nullText), id: "columnSummary.value",
                                                    tip: "Show only the rows where \(column) is \(shown)", action: #selector(chosen(_:)))
                     link.target = self
                     link.tag = index

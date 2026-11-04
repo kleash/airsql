@@ -97,12 +97,13 @@ extension ConsoleViewController {
     /// Compares off the main thread (reading the table on the data session), listed in the activity with Cancel.
     private func compare(_ tab: ResultTab, _ store: ResultStore, with target: CompareTarget, key: [String]) {
         let other: String, work: Task<ReconTableData, Error>
-        var otherConnection: UUID?
+        var otherConnection: UUID?, capped = store.capped
         switch target {
         case .result(let result, let name, let connection):
             guard let second = result.content.store else { return }
             other = name
             otherConnection = connection == connectionID ? nil : connection
+            capped = capped || second.capped
             work = Task.detached {
                 try Task.checkCancellation()
                 return ReconTableData.compare(store, second, key: key)
@@ -115,15 +116,15 @@ extension ConsoleViewController {
             }
         }
         let activity = model.activity.start("Comparing \(tab.title) with \(other)", connection: connectionID) { work.cancel() }
-        Task { [weak self] in
+        Task { [weak self, capped] in
             let outcome = await work.result
             activity.end()
-            self?.showComparison(outcome, of: tab, store, with: other, on: otherConnection)
+            self?.showComparison(outcome, of: tab, store, with: other, on: otherConnection, capped: capped)
         }
     }
 
     private func showComparison(_ outcome: Result<ReconTableData, Error>, of tab: ResultTab, _ store: ResultStore, with other: String,
-                                on otherConnection: UUID?) {
+                                on otherConnection: UUID?, capped: Bool) {
         guard let window = view.window else { return }
         let title = "Can't compare \(tab.title) with \(other)"
         let data: ReconTableData
@@ -137,9 +138,9 @@ extension ConsoleViewController {
         case .notCompared(let why): return showError(why, title: title, on: window)
         case .same:
             let alert = NSAlert()
-            alert.messageText = "\(tab.title) and \(other) have the same rows"
+            alert.messageText = capped ? "\(tab.title) and \(other) match as far as they go" : "\(tab.title) and \(other) have the same rows"
             alert.informativeText = "Their \(data.sourceRows.formatted()) rows match in the \(data.columns.count) columns both have, "
-                + "matched on \(key)."
+                + "matched on \(key)." + (capped ? " A result was cut at the row limit, so rows past it weren't compared." : "")
             alert.addOK()
             return alert.beginSheetModal(for: window)
         case .different, .differentWithoutKey, .tooManyDifferences: break

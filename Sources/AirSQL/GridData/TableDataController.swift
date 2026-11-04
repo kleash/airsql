@@ -65,7 +65,7 @@ final class TableDataController: NSViewController, TabContent {
     /// The preview tab moved on while this was opening: its rows aren't read.
     var abandoned = false
     /// The data session's NO_BACKSLASH_ESCAPES, as filters quote their values for it (read at each load).
-    var noBackslashEscapes = false
+    var noBackslashEscapes = false { didSet { viewer.noBackslashEscapes = noBackslashEscapes } }
     /// The data session's sql_mode and time zone, which decide what a value may be (read with the first page).
     var editContext: EditContext?
     /// A SET column's checklist, or a foreign key's drop-down, while it shows.
@@ -239,6 +239,7 @@ final class TableDataController: NSViewController, TabContent {
                 noBackslashEscapes = session.noBackslashEscapes
                 bar.whereField.noBackslashEscapes = noBackslashEscapes
                 if editContext == nil { editContext = try await readEditContext(session) }
+                source.timeZoneNote = editContext?.timeZoneNote
                 let page = try await stoppable(session, sql) { try await session.query(sql, rowCap: requested).first?.rows }
                 if !more {
                     source.reset(keepingSaved: keepingSaved)
@@ -341,6 +342,7 @@ final class TableDataController: NSViewController, TabContent {
         if let source, viewer.source !== source, source.loadedRows > 0 || !source.hasMore { viewer.show(source) }
         viewer.reloadData()
         updateBars()
+        if !findBar.isHidden { findChanged() }  // its count covers the rows now loaded
         // Edit as Table's rows, after the loaded ones.
         if let inserts = waitingInserts, source != nil {
             waitingInserts = nil
