@@ -39,6 +39,8 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     var bindings: [NSObject] = []
     private var retainUntilClosed: ConnectionEditor?
     static let width: CGFloat = 720
+    /// Room around a tab inside its scroll view, which clips: a field's focus ring and borders draw outside the field.
+    static let ringRoom: CGFloat = 4
 
     /// Shows the editor on `window`; `done` gets the saved connection and whether to connect now.
     @discardableResult
@@ -91,8 +93,8 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
             tabs.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double),
             tabs.centerXAnchor.constraint(equalTo: root.centerXAnchor),
             holder.topAnchor.constraint(equalTo: tabs.bottomAnchor, constant: Spacing.double),
-            holder.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
-            holder.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
+            holder.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20 - Self.ringRoom),
+            holder.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20 + Self.ringRoom),
             status.topAnchor.constraint(equalTo: holder.bottomAnchor, constant: Spacing.double),
             status.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             status.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
@@ -151,7 +153,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         let document = FlippedView()
         document.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(content)
-        content.pin(to: document)
+        content.pin(to: document, insets: .all(Self.ringRoom))
         let scroll = NSScrollView()
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
@@ -183,7 +185,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         guard let window, let root = window.contentView else { return }
         if let tabContent, let tabHeight {
             let screen = (window.sheetParent?.screen ?? NSScreen.main)?.visibleFrame.height ?? 775
-            tabHeight.constant = min(tabContent.fittingSize.height, Self.tabLimit(screen: screen))
+            tabHeight.constant = min(tabContent.fittingSize.height + 2 * Self.ringRoom, Self.tabLimit(screen: screen))
         }
         root.layoutSubtreeIfNeeded()
         let size = root.fittingSize
