@@ -315,7 +315,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         let failure = error as? AirSQLError
         if failure?.kind == .cancelled { return status.stringValue = "" }
         status.textColor = error == nil ? .statusOK : .statusBad
-        status.stringValue = report + (error.map { "\n" + (($0 as? AirSQLError)?.message ?? $0.localizedDescription) } ?? "")
+        status.stringValue = report + (error.map { "\n" + $0.localizedDescription } ?? "")
         if tab == .tls { refreshTab() }  // a certificate trusted meanwhile
     }
 

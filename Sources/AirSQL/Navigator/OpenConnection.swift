@@ -93,7 +93,7 @@ final class OpenConnection {
                 try await work(schema)
             } catch is CancellationError {
             } catch {
-                failure = (error as? AirSQLError)?.message ?? error.localizedDescription
+                failure = error.localizedDescription
             }
             activity.end()
             self?.finished(load, key, failure)

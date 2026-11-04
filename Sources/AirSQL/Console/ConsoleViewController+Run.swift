@@ -144,7 +144,7 @@ extension ConsoleViewController {
                 self?.editor.noBackslashEscapes = session.noBackslashEscapes
                 await self?.perform(run, on: session, connection: id)
             } catch {
-                self?.note(.error, (error as? AirSQLError)?.message ?? error.localizedDescription)
+                self?.note(.error, error.localizedDescription)
             }
             self?.finish(run)
             done?()
@@ -214,7 +214,7 @@ extension ConsoleViewController {
         if text == run.text { editor.flash(NSRange(statement.range)) }
         let table = await ConsoleRunner.run(SQLStatement(sql: ExplainPlan.tableSQL(statement.sql)), in: run.text, on: session)
         if let error = table.error {
-            let shown = error.message + (error.details.isEmpty ? "" : " " + error.details)
+            let shown = error.localizedDescription
             note(.error, shown, statement: statement, run: run)
             if self.text == run.text {
                 editor.runProblem = ConsoleScript.problem(error.details.isEmpty ? error.message : error.details, shown: shown,

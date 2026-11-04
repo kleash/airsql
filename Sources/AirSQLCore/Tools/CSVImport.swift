@@ -205,7 +205,8 @@ public enum CSVImport {
             do {
                 state.warnings += try await session.query(pending).last?.warnings ?? 0
             } catch let error as AirSQLError {
-                throw AirSQLError(error.kind, "Records up to \(record) couldn't be imported: \(error.message)", details: error.details)
+                throw AirSQLError(error.kind, "Records up to \(record) couldn't be imported: \(error.message)", details: error.details,
+                                  code: error.code)
             }
             pending = ""
         }

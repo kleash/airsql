@@ -174,7 +174,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         } catch {
             let stopped = error is CancellationError || (error as? AirSQLError)?.kind == .cancelled
             status.stringValue = stopped ? "Stopped: \(matches.count) tables with matches so far."
-                : "Couldn't search: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                : "Couldn't search: " + error.localizedDescription
         }
         status.toolTip = status.stringValue
     }

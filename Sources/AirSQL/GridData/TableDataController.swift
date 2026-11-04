@@ -183,7 +183,7 @@ final class TableDataController: NSViewController, TabContent {
                 if context.connection.readOnly { noBackslashEscapes = try await openSession().noBackslashEscapes }
                 show(TableDataSource(database: database, table: info), settings: saved, changes: left)
             } catch {
-                problem = (error as? AirSQLError)?.message ?? error.localizedDescription
+                problem = error.localizedDescription
                 bar.busy = false
                 updateBars()
             }
@@ -250,7 +250,7 @@ final class TableDataController: NSViewController, TabContent {
                 // Load More's rows just stay as they are.
                 if !more { problem = "Cancelled, so these aren't the rows you asked for. Refresh (⌘R) loads them." }
             } catch {
-                problem = "The rows didn't load: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                problem = "The rows didn't load: " + error.localizedDescription
             }
             finishLoading()
         }
@@ -279,7 +279,7 @@ final class TableDataController: NSViewController, TabContent {
                 await MainActor.run { source.finishLoading() }
             } catch where Task.isCancelled {
             } catch {
-                problem = "Not every row loaded: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                problem = "Not every row loaded: " + error.localizedDescription
             }
             finishLoading()
         }
@@ -383,7 +383,7 @@ final class TableDataController: NSViewController, TabContent {
                 }
             } catch where Task.isCancelled {
             } catch {
-                problem = "The rows weren't counted: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                problem = "The rows weren't counted: " + error.localizedDescription
             }
             endRead()
             updateBars()

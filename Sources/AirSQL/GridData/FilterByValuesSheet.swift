@@ -72,7 +72,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
                 show(rows.map { ($0.first ?? nil, Int(($0.count > 1 ? $0[1] : nil) ?? "") ?? 0) })
             } catch where !Task.isCancelled {
                 spinner.stopAnimation(nil)
-                note.stringValue = "The values weren't counted: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                note.stringValue = "The values weren't counted: " + error.localizedDescription
                 note.textColor = .statusBad
             } catch {}
         }

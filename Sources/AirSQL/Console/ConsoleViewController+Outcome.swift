@@ -10,8 +10,7 @@ extension ConsoleViewController {
         let time = milliseconds(outcome.duration)
         if !statement.range.isEmpty { lastOutcome = outcome }
         if let error = outcome.error {
-            var text = run.cancelled && error.kind == .cancelled ? "Cancelled · \(time)" : error.message
-            if !error.details.isEmpty, error.kind != .cancelled { text += " " + error.details }
+            let text = run.cancelled && error.kind == .cancelled ? "Cancelled · \(time)" : error.localizedDescription
             note(.error, text, statement: statement, run: run, line: outcome.errorLine)
             if self.text == run.text {
                 if let line = outcome.errorLine { resultsRuler?.errorLine = line }

@@ -166,7 +166,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
                 let rows = try await session.rows(NavigatorSQL.processList(mariaDB: mariaDB))
                 show(NavigatorSQL.processes(rows))
             } catch {
-                status.stringValue = "Couldn't read the processes: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                status.stringValue = "Couldn't read the processes: " + error.localizedDescription
                 status.toolTip = status.stringValue
             }
             spinner.stopAnimation(nil)
@@ -296,7 +296,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
                 _ = try await session.query(connection ? NavigatorSQL.killConnection(process) : NavigatorSQL.killQuery(process))
             }
         } catch {
-            notes.append((error as? AirSQLError)?.message ?? error.localizedDescription)
+            notes.append(error.localizedDescription)
         }
         if !notes.isEmpty { showError(notes.joined(separator: "\n"), title: "Not everything was stopped", on: view.window) }
         refresh(nil)

@@ -63,7 +63,7 @@ public struct ApplyFailure: LocalizedError {
             return "\(rows) was changed or deleted by someone else since it was loaded (the statement changed \(changed) "
                 + "of \(statement.expectedRows)), so nothing was applied. Revert the change, reload the rows, then make it again."
         }
-        let message = (error as? AirSQLError)?.message ?? error?.localizedDescription ?? "The server refused a statement."
+        let message = error?.localizedDescription ?? "The server refused a statement."
         return message + " Nothing was applied."
     }
 }

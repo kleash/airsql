@@ -325,7 +325,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
                 }.value
                 switch loaded {
                 case .success(let text): if let refusal = keep(text) { self?.say(refusal, problem: true) }
-                case .failure(let error): self?.say((error as? AirSQLError)?.message ?? error.localizedDescription, problem: true)
+                case .failure(let error): self?.say(error.localizedDescription, problem: true)
                 }
             }
         }

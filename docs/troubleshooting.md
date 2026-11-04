@@ -5,8 +5,8 @@ nav_order: 92
 
 # Troubleshooting
 
-AirSQL says what went wrong in plain words, with the server's own error under **Details**. Here is what to do about
-the common problems.
+AirSQL says what went wrong in plain words, followed by the server's own error with its number. Here is what to do
+about the common problems.
 
 ## A connection fails
 

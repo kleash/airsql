@@ -196,7 +196,7 @@ extension TableDataController: DataGridViewDelegate {
                 session = try await openSession()
             } catch {
                 loading = nil
-                return showError((error as? AirSQLError)?.message ?? error.localizedDescription,
+                return showError(error.localizedDescription,
                                  title: "AirSQL couldn't reach the server", on: view.window)
             }
             loading = nil

@@ -92,7 +92,7 @@ extension ObjectEditorController {
                         sent.utf16.prefix($0.range.lowerBound).filter { $0 == 0x0A }.count + 1
                     }
                 }
-                let message = (failure as? AirSQLError).map { $0.message + "\n\n" + $0.details } ?? failure.localizedDescription
+                let message = failure.localizedDescription
                 let dropped = change.statements.prefix(done).contains { $0.hasPrefix("DROP ") }
                 showError(message + "\n\n" + (dropped ? "The old \(kind.rawValue) was dropped before the new code failed: fix the code "
                                                   + "and Apply again, or Revert to put the old code back and Apply that."
