@@ -120,21 +120,22 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         let (letter, color) = Self.badge(item.kind)
         let badge = label(letter, font: .systemFont(ofSize: 8.5, weight: .bold), color: .white)
         badge.alignment = .center
-        badge.wantsLayer = true
-        badge.layer?.backgroundColor = color.cgColor
-        badge.layer?.cornerRadius = Radius.cell
+        let ground = SurfaceView(color, radius: Radius.cell)
+        ground.translatesAutoresizingMaskIntoConstraints = false
+        ground.addSubview(badge)
         let name = label(item.label, font: .systemFont(ofSize: 12), truncates: true)
         name.toolTip = item.label
         let detail = label(item.detail, font: .systemFont(ofSize: 11), color: .quietText, truncates: true)
         detail.toolTip = item.detail
         detail.setContentCompressionResistancePriority(.defaultLow - 1, for: .horizontal)
         let rowView = NSView()
-        for view in [badge, name, detail] { rowView.addSubview(view) }
+        for view in [ground, name, detail] { rowView.addSubview(view) }
         NSLayoutConstraint.activate([
-            badge.leadingAnchor.constraint(equalTo: rowView.leadingAnchor, constant: 10),
-            badge.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            badge.widthAnchor.constraint(equalToConstant: 16), badge.heightAnchor.constraint(equalToConstant: 15),
-            name.leadingAnchor.constraint(equalTo: badge.trailingAnchor, constant: Spacing.unit),
+            ground.leadingAnchor.constraint(equalTo: rowView.leadingAnchor, constant: 10),
+            ground.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
+            ground.widthAnchor.constraint(equalToConstant: 16), ground.heightAnchor.constraint(equalToConstant: 15),
+            badge.centerXAnchor.constraint(equalTo: ground.centerXAnchor), badge.centerYAnchor.constraint(equalTo: ground.centerYAnchor),
+            name.leadingAnchor.constraint(equalTo: ground.trailingAnchor, constant: Spacing.unit),
             name.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
             detail.leadingAnchor.constraint(greaterThanOrEqualTo: name.trailingAnchor, constant: 14),
             detail.trailingAnchor.constraint(equalTo: rowView.trailingAnchor, constant: -10),

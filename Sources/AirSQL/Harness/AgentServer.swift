@@ -775,7 +775,7 @@ final class AgentServer {
     private func draw(_ window: NSWindow, _ overlays: [NSWindow], size: NSSize, in context: NSGraphicsContext) {
         // The window's background in its appearance (light or dark): the title bar and glass are see-through.
         window.effectiveAppearance.performAsCurrentDrawingAppearance {
-            NSColor.windowBackgroundColor.setFill()
+            Self.ground(of: window).setFill()
             NSRect(origin: .zero, size: size).fill()
         }
         Self.draw(window, at: .zero)
@@ -909,13 +909,19 @@ final class AgentServer {
     }
 
     /// `opaque`: on the window's background colour, as on screen.
+    /// What a window shows behind its views; an alert's is clear, over glass a picture doesn't have.
+    private static func ground(of window: NSWindow?) -> NSColor {
+        guard let color = window?.backgroundColor, color.alphaComponent > 0 else { return .windowBackgroundColor }
+        return color
+    }
+
     private static func draw(_ view: NSView, in rect: NSRect, opaque: Bool) {
         guard let cached = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         if opaque, let context = NSGraphicsContext(bitmapImageRep: cached) {
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = context
             view.effectiveAppearance.performAsCurrentDrawingAppearance {
-                NSColor.windowBackgroundColor.setFill()
+                Self.ground(of: view.window).setFill()
                 NSRect(origin: .zero, size: cached.size).fill()
             }
             NSGraphicsContext.restoreGraphicsState()

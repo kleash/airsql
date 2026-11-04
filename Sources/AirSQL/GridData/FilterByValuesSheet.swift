@@ -132,9 +132,9 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = Spacing.unit
-        stack.edgeInsets = NSEdgeInsets(top: Spacing.double, left: Spacing.double, bottom: Spacing.double, right: Spacing.double)
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 16, right: 20)
         for view in [heading, search, scroll, status, buttons] {
-            view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -2 * Spacing.double).isActive = true
+            view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
         }
         scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true
         return stack

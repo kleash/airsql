@@ -87,7 +87,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         [title, spinner, caption, filter, scroll, empty].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             title.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double),
-            title.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.unit)  // over the list's text,
+            title.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.unit),  // over the list's text
             spinner.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: Spacing.unit),
             spinner.centerYAnchor.constraint(equalTo: title.centerYAnchor),
             spinner.trailingAnchor.constraint(lessThanOrEqualTo: filter.leadingAnchor, constant: -Spacing.unit),

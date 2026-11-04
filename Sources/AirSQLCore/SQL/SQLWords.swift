@@ -81,6 +81,11 @@ public enum SQLWords {
         VECTOR_TO_STRING VECTOR_DIM
         """)
 
+    /// Not reserved, but they read as keywords in routines' headers and bodies: coloured as keywords, nothing more.
+    public static let routineWords = words("BEGIN END DEFINER INVOKER RETURNS RETURN DECLARE DO THEN")
+    /// Words followed by a name: a "(" after that name opens a column list, not a call.
+    public static let beforeName = words("TABLE INTO REFERENCES EXISTS JOIN")
+
     /// Words that "(" may follow without a call: clauses and operators (IN (…), OVER (…), USE INDEX (…), MATCH …
     /// AGAINST (…), MEMBER OF (…), WITHIN GROUP (…)) and data types (CAST(x AS DECIMAL(10,2)), JSON_TABLE columns).
     static let beforeParenthesis = words("""

@@ -98,6 +98,8 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         saveTo.widthAnchor.constraint(equalToConstant: 200).isActive = true
         bottom.row("Save to", [saveTo, choose])
         let left = NSStackView(views: [top.finish(), makeList(), bottom.finish()])
+        // One label column, above the list and below it.
+        for form in [top, bottom] { form.grid.column(at: 0).width = max(top.labelWidth, bottom.labelWidth) }
         left.orientation = .vertical
         left.alignment = .leading
         left.spacing = 10

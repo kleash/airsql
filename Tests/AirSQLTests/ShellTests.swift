@@ -6,6 +6,23 @@ import Testing
 // The app shell driven as a person would, through the harness: the first run, the sidebar's commands, tabs, the status
 // bar, Settings, the SQL preview sheet, the Trust and password sheets, and the harness's own tools.
 extension AppTests {
+    @Test func tabsPastTheBarsEndStayInReach() throws {
+        let (main, _) = appWindow(testModel(Fixtures.shop))
+        main.window?.setContentSize(MainWindowController.minimumSize)
+        main.open(FixtureContent(), title: "Query 1", connection: Fixtures.production.id)
+        main.tabBar.layoutSubtreeIfNeeded()
+        let bar = main.tabBar
+        func button(_ id: String) throws -> NSButton {
+            try #require(descendants(of: bar).compactMap { $0 as? NSButton }.first { $0.accessibilityIdentifier() == id })
+        }
+        #expect(try button("tabs.more").isHidden)
+        for number in 2...12 { main.open(FixtureContent(), title: "Query \(number)", connection: Fixtures.production.id) }
+        bar.layoutSubtreeIfNeeded()
+        #expect(try !button("tabs.more").isHidden)
+        #expect(try button("tabs.new").frame.maxX <= button("tabs.more").frame.minX)
+        #expect(try button("tabs.more").frame.maxX <= bar.bounds.maxX)
+    }
+
     @Test func tabsNameTheirConnectionWhenTheirTitlesClash() throws {
         let (main, _) = appWindow(testModel(Fixtures.shop))
         main.open(FixtureContent(), title: "orders", connection: Fixtures.production.id)
@@ -322,6 +339,9 @@ extension AppTests {
         #expect(colour("'x", in: sql) == .sqlString && colour("1.5", in: sql) == .sqlNumber && colour("=", in: sql) == .labelColor)
         #expect(colour("-- why", in: sql) == .sqlComment && colour("/*!50000", in: sql) == .sqlComment)
         #expect(colour("AND", in: sql) == .sqlKeyword)
+        // Routines' words, and a name before a column list, which isn't a call.
+        #expect(colour("BEGIN", in: "CREATE DEFINER = x PROCEDURE p() BEGIN SELECT 1; END") == .sqlKeyword)
+        #expect(colour("customers", in: "INSERT INTO customers (id) VALUES (1)") == .sqlIdentifier)
         // The string ends where the session's server will end it.
         #expect(colour("FROM", in: "SELECT 'C:\\' FROM t", noBackslashEscapes: true) == .sqlKeyword)
         #expect(colour("FROM", in: "SELECT 'C:\\' FROM t'", noBackslashEscapes: false) == .sqlString)

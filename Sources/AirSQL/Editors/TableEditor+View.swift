@@ -49,7 +49,7 @@ extension TableEditorController {
             control.toolTip = tip
             control.setAccessibilityIdentifier(id)
             control.translatesAutoresizingMaskIntoConstraints = false
-            control.widthAnchor.constraint(equalToConstant: 28).isActive = true
+            control.widthAnchor.constraint(equalToConstant: 38).isActive = true
         }
         let buttons = NSStackView(views: [addButton, removeButton])
         buttons.spacing = 0

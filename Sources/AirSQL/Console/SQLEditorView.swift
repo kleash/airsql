@@ -194,7 +194,10 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     func flash(_ range: NSRange) {
         guard let layout = layoutManager, NSMaxRange(range) <= (string as NSString).length else { return }
         let color = NSColor.accent.withAlphaComponent(0.16)
-        layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: range)
+        // Line by line, without the line ends: a marked line end would fill the rest of the line, across the window.
+        (string as NSString).enumerateSubstrings(in: range, options: [.byLines, .substringNotRequired]) { _, line, _, _ in
+            layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: line)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self, let layout = self.layoutManager, NSMaxRange(range) <= (self.string as NSString).length else { return }
             layout.removeTemporaryAttribute(.backgroundColor, forCharacterRange: range)

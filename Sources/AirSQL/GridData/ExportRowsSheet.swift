@@ -95,8 +95,8 @@ final class ExportRowsSheet: NSWindowController {
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = Spacing.double
-        stack.edgeInsets = NSEdgeInsets(top: Spacing.triple, left: Spacing.triple, bottom: Spacing.double, right: Spacing.triple)
-        buttons.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -2 * Spacing.triple).isActive = true
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 16, right: 20)
+        buttons.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
         stack.widthAnchor.constraint(greaterThanOrEqualToConstant: 440).isActive = true
         return stack
     }

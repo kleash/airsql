@@ -68,6 +68,12 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
         options.setAccessibilityIdentifier("find.options")
         count.setAccessibilityIdentifier("find.count")
         for control in [previous, next, replace, replaceAll, done] { control.controlSize = .small }
+        // The console's find bar's arrows.
+        for (control, symbol, name) in [(previous, "chevron.left", "Previous Match"), (next, "chevron.right", "Next Match")] {
+            control.title = ""
+            control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: name)
+            control.bezelStyle = .texturedRounded
+        }
         // 200 wide when there is room, down to 100 rather than widening a window at its smallest (which holds its size at
         // 500), then the count shortens (whole in its tooltip): Find and Replace fit beside the sidebar at 900. Hidden,
         // the bar still sets the tab's narrowest, so Replace is only there once asked for.

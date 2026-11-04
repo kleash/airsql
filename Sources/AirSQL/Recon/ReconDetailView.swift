@@ -66,6 +66,7 @@ final class ReconDetailView: NSObject {
         }
         message.alignment = .center
         let scriptHeader = NSStackView(views: [scriptTitle, destructive])
+        scriptHeader.alignment = .firstBaseline
         scriptHeader.spacing = Spacing.double
         scriptHeader.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 4, right: Spacing.double)
         script.heightAnchor.constraint(equalToConstant: 150).isActive = true

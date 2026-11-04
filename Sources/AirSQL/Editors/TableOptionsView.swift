@@ -40,7 +40,9 @@ final class TableOptionsView: NSView {
         form.row("Name", [name])
         form.row("Database", [database], caption: "Only a new table chooses its database; move a table with the bulk table editor.")
         form.row("Engine", [engine])
-        form.row("Collation", [collation])
+        let collationRow = form.row("Collation", [collation])
+        collationRow.rowAlignment = .none  // a combo box's baseline sits high
+        collationRow.yPlacement = .center
         form.row("Row format", [rowFormat])
         form.row("Next number", [next])
         form.row("Comment", [comment])

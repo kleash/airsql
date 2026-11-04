@@ -72,6 +72,7 @@ final class SafetyPane: SettingsPaneController {
         form.row("", [toggle("Warn when closing with an open transaction or pending edits", id: "settings.safety.warnOnClose",
                              tip: Self.tip("warnOnClose", "on by default"),
                              \.safety.warnOnClose)])
+        form.heading("All of these")
         form.row("", [action("Restore Defaults", id: "settings.safety.restoreDefaults",
                              tip: "Put every switch and limit on this pane back to AirSQL's defaults") { [weak self] in
             self?.model.data.settings.safety = SafetySettings()

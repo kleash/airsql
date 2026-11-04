@@ -55,9 +55,9 @@ final class SortSheet: NSWindowController {
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = Spacing.double
-        stack.edgeInsets = NSEdgeInsets(top: Spacing.double, left: Spacing.double, bottom: Spacing.double, right: Spacing.double)
+        stack.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 16, right: 20)
         for view in [heading, buttons] {
-            view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -2 * Spacing.double).isActive = true
+            view.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -40).isActive = true
         }
         stack.widthAnchor.constraint(equalToConstant: 480).isActive = true
         return stack

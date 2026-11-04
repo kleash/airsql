@@ -215,12 +215,15 @@ extension ConnectionEditor {
         let scroll = NSScrollView()
         scroll.documentView = sql
         scroll.hasVerticalScroller = true
-        scroll.borderType = .bezelBorder
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        scroll.widthAnchor.constraint(equalToConstant: 380).isActive = true
-        scroll.heightAnchor.constraint(equalToConstant: 72).isActive = true
+        scroll.drawsBackground = false
+        let box = SurfaceView(.content, radius: Radius.control, border: .separatorColor)
+        box.translatesAutoresizingMaskIntoConstraints = false
+        box.addSubview(scroll)
+        scroll.pin(to: box, insets: .all(2))
+        box.widthAnchor.constraint(equalToConstant: 380).isActive = true
+        box.heightAnchor.constraint(equalToConstant: 72).isActive = true
         sql.autoresizingMask = [.width]
-        form.row("Startup SQL", [scroll], caption: "Runs in every session after it logs in (SET sql_mode, time_zone…).")
+        form.row("Startup SQL", [box], caption: "Runs in every session after it logs in (SET sql_mode, time_zone…).")
         for kind in [ClientTool.Kind.client, .dump] { toolRow(form, kind) }
         return content(form)
     }
@@ -270,7 +273,7 @@ extension ConnectionEditor {
         form.row("", [toggle("Agents may see sample rows", \.agentSampleRows, id: "editor.sampleRows",
                              tip: "Let agents see a few rows of a table with its structure (off by default)")])
         if !model.data.settings.agentsAllowed {
-            form.row("", [caption("Agents are off for every connection until you turn them on in Settings ▸ Agents.")])
+            form.row("", [caption("Agents are off for every connection until you turn them on in Settings\u{A0}▸\u{A0}Agents.")])
         }
         return content(form)
     }

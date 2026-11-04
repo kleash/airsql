@@ -212,9 +212,13 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
             case .variable, .symbol: continue
             case .word:
                 let next = k + 1 < tokens.count ? tokens[k + 1] : nil
-                if SQLWords.reserved.contains(String(decoding: text[token.range], as: UTF16.self).uppercased()) {
+                let word = String(decoding: text[token.range], as: UTF16.self).uppercased()
+                let previous = k > 0 && tokens[k - 1].kind == .word
+                    ? String(decoding: text[tokens[k - 1].range], as: UTF16.self).uppercased() : ""
+                if SQLWords.reserved.contains(word) || SQLWords.routineWords.contains(word) {
                     (color, style) = (.sqlKeyword, semibold)
-                } else if let next, next.kind == .symbol, text[next.range.lowerBound] == 0x28 {  // a call: name(
+                } else if let next, next.kind == .symbol, text[next.range.lowerBound] == 0x28,  // a call: name(
+                          !SQLWords.beforeName.contains(previous) {
                     color = .sqlFunction
                 }
             }

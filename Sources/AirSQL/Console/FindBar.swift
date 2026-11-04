@@ -46,7 +46,9 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         let all = button("Replace All", id: "find.replaceAll", tip: "Replace every match in one change (⌘Z takes it back)",
                          target: self, action: #selector(replaceAll(_:)))
         [replace, all].forEach { $0.controlSize = .small }
-        let findRow = NSStackView(views: [search, previous, next, count, matchCase, regex, done])
+        let doneSpacer = NSView()
+        doneSpacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        let findRow = NSStackView(views: [search, previous, next, count, matchCase, regex, doneSpacer, done])
         findRow.spacing = Spacing.unit
         findRow.setCustomSpacing(Spacing.half, after: previous)
         replaceRow.setViews([replacement, replace, all], in: .leading)
@@ -55,6 +57,7 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         rows.orientation = .vertical
         rows.alignment = .leading
         rows.spacing = 6
+        findRow.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true  // Done at the bar's end, as a table's has it
         let background = SurfaceView(.bar)
         let line = Hairline()
         for view in [background, rows, line] { view.translatesAutoresizingMaskIntoConstraints = false; addSubview(view) }
@@ -62,7 +65,7 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         NSLayoutConstraint.activate([
             rows.topAnchor.constraint(equalTo: topAnchor, constant: 6),
             rows.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
-            rows.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Spacing.unit),
+            rows.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.unit),
             rows.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -6),
             line.leadingAnchor.constraint(equalTo: leadingAnchor), line.trailingAnchor.constraint(equalTo: trailingAnchor),
             line.bottomAnchor.constraint(equalTo: bottomAnchor), line.heightAnchor.constraint(equalToConstant: 1),

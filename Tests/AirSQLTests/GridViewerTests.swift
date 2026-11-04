@@ -272,6 +272,7 @@ extension AppTests {
         #expect(grid.rowCount == 6 && grid.columnCount == 31)
         #expect(shown.cell(1, 0) == .text("amount_2") && shown.cell(1, 5) == source.cell(4, 2))
         #expect(shown.base(1, 5)! == (4, 2) && shown.base(1, 0) == nil)
+        #expect(shown.sourceColumn(1, 5) == source.columns[2] && shown.sourceColumn(1, 0) == nil)  // its type's look
         // The focused cell follows: row 4 of amount_2 is now line 1, column 5.
         #expect(grid.selection.cursor == GridPosition(row: 1, column: 5))
         #expect(await call(harness, "key", ["combo": "cmd+alt+t"]).error == nil)

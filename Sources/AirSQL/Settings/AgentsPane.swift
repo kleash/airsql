@@ -27,9 +27,11 @@ final class AgentsPane: SettingsPaneController {
             form.row("", [caption("Agents can't start: " + problem)])
         }
         form.heading("Access")
-        form.row("Connections", [accessList()],
+        let list = form.row("Connections", [accessList()],
                  caption: "Schema: names and structure. + read: read-only queries within Settings ▸ Safety's row cap and "
                     + "timeout. + analytics: profile, ten times the rows, files. Sample rows: describe shows a few.")
+        list.rowAlignment = .none  // the label at the list's top
+        list.yPlacement = .top
         let folder = label(Self.shown(Self.exportFolder), truncates: true)
         folder.toolTip = Self.shown(Self.exportFolder)
         folder.lineBreakMode = .byTruncatingMiddle
@@ -81,7 +83,7 @@ final class AgentsPane: SettingsPaneController {
             DispatchQueue.main.async { table?.reloadData() }
         })
         // Access as wide as its pop-up with its longest level, "Schema + read + analytics".
-        for (id, title, width) in [("name", "Connection", 130.0), ("access", "Access", 190.0), ("samples", "Sample rows", 96.0)] {
+        for (id, title, width) in [("name", "Connection", 130.0), ("access", "Access", 170.0), ("samples", "Sample rows", 100.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width

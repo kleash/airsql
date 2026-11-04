@@ -67,7 +67,6 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         let definerLabel = label("Runs as:", font: .systemFont(ofSize: 12))
         definer.target = self
         definer.action = #selector(definerChosen(_:))
-        definer.controlSize = .small
         status.style = .spinning
         status.controlSize = .small
         status.isDisplayedWhenStopped = false

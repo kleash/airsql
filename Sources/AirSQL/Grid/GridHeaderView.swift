@@ -30,7 +30,9 @@ final class GridHeaderView: NSView {
     private var nameFont: NSFont { .systemFont(ofSize: grid.fontSize, weight: .semibold) }
     private var typeFont: NSFont { .systemFont(ofSize: grid.fontSize - 1.5) }
     var thickness: CGFloat {
-        ceil(nameFont.ascender - nameFont.descender) + ceil(typeFont.ascender - typeFont.descender) + 8
+        // Results without types have no second line to keep room for.
+        let hasTypes = grid.source?.columns.contains { !$0.typeLine.isEmpty } ?? true
+        return ceil(nameFont.ascender - nameFont.descender) + (hasTypes ? ceil(typeFont.ascender - typeFont.descender) : 0) + 8
     }
 
     /// Follows the grid's text size.
