@@ -112,6 +112,26 @@ extension AppTests {
         }
 
         /// Statements after which the navigator's tree reloads.
+        /// Where a Run failed is underlined and says why on hover, until the text changes.
+        @Test func aFailedRunsPlaceIsUnderlinedUntilTheTextChanges() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor), layout = try #require(editor.layoutManager)
+            editor.setText("SELECT 1\nFORM t")
+            editor.runProblem = SQLProblem(range: 9..<13, message: "The SQL has a syntax error.")
+            func underlined(_ index: Int) -> Bool {
+                layout.temporaryAttribute(.underlineStyle, atCharacterIndex: index, effectiveRange: nil) != nil
+            }
+            #expect(underlined(10) && !underlined(14) && !underlined(2))
+            let glyphs = layout.glyphRange(forCharacterRange: NSRange(location: 10, length: 1), actualCharacterRange: nil)
+            let rect = layout.boundingRect(forGlyphRange: glyphs, in: try #require(editor.textContainer))
+            let over = NSPoint(x: rect.midX + editor.textContainerOrigin.x, y: rect.midY + editor.textContainerOrigin.y)
+            #expect(editor.view(editor, stringForToolTip: 0, point: over, userData: nil) == "The SQL has a syntax error.")
+            #expect(editor.view(editor, stringForToolTip: 0, point: NSPoint(x: 8, y: 10), userData: nil) == "")
+            editor.setSelectedRange(NSRange(location: 8, length: 0))
+            editor.insertText(" ", replacementRange: editor.selectedRange())
+            #expect(editor.runProblem == nil && !underlined(11))
+        }
+
         @Test func schemaChangesAreToldApart() {
             #expect(ConsoleViewController.changesSchema("/* new */ create table t (id int)"))
             #expect(ConsoleViewController.changesSchema("DROP VIEW v") && ConsoleViewController.changesSchema("rename table a to b"))

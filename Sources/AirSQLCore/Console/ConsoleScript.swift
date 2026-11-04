@@ -1,5 +1,16 @@
 import Foundation
 
+/// A place in the text to underline in red, and what to say about it on hover. UTF-16 offsets, as NSTextView's.
+public struct SQLProblem: Equatable, Sendable {
+    public var range: Range<Int>
+    public var message: String
+
+    public init(range: Range<Int>, message: String) {
+        self.range = range
+        self.message = message
+    }
+}
+
 /// The console's view of its text (plan §2.6): which statements a run sends, the line a statement starts on, where an
 /// error points, and the name a result tab takes from the comment above its query. Offsets are UTF-16, as NSTextView's.
 public enum ConsoleScript {
@@ -36,6 +47,58 @@ public enum ConsoleScript {
         guard let match = message.range(of: #"at line ([0-9]+)\s*$"#, options: .regularExpression),
               let number = Int(message[match].filter(\.isNumber)), number >= 1 else { return nil }
         return line(of: statement.range.lowerBound, in: text) + number - 1
+    }
+
+    /// Where an error in `statement` points, in the whole text: the token at the server's "near '…' at line N", the
+    /// statement's last token for near '', or the name in an unknown column or table error. `message` is the server's
+    /// text, `shown` what the underline says. Nil when the error names no place, or `statement` isn't in the text.
+    public static func problem(_ message: String, shown: String, statement: SQLStatement,
+                               noBackslashEscapes: Bool) -> SQLProblem? {
+        guard !statement.range.isEmpty else { return nil }
+        let tokens = SQLLexer.tokens(statement.sql, noBackslashEscapes: noBackslashEscapes)
+        let token = nearToken(message, in: statement.sql, tokens: tokens) ?? namedToken(message, in: statement.sql, tokens: tokens)
+        return token.map {
+            SQLProblem(range: ($0.range.lowerBound + statement.range.lowerBound)..<($0.range.upperBound + statement.range.lowerBound),
+                       message: shown)
+        }
+    }
+
+    private static let nearPattern = try! NSRegularExpression(pattern: #"near '(.*)' at line ([0-9]+)\s*$"#,
+                                                              options: .dotMatchesLineSeparators)
+    private static let namePattern = try! NSRegularExpression(pattern: #"\b(?:Unknown column|Unknown table|Table) '([^']+)'"#)
+
+    private static func nearToken(_ message: String, in sql: String, tokens: [SQLToken]) -> SQLToken? {
+        let whole = NSRange(message.startIndex..., in: message)
+        guard let match = nearPattern.firstMatch(in: message, range: whole), let near = Range(match.range(at: 1), in: message),
+              let number = Range(match.range(at: 2), in: message).flatMap({ Int(message[$0]) }) else { return nil }
+        let code = tokens.filter { $0.kind != .comment }
+        if near.isEmpty { return code.last }
+        // The near text is the rest of the statement from the token, cut to some 80 characters, on line N or after.
+        let text = sql as NSString
+        var from = 0
+        for _ in 1..<max(number, 1) {
+            let newline = text.range(of: "\n", range: NSRange(location: from, length: text.length - from))
+            guard newline.location != NSNotFound else { break }
+            from = NSMaxRange(newline)
+        }
+        var found = text.range(of: String(message[near]), range: NSRange(location: from, length: text.length - from))
+        if found.location == NSNotFound { found = text.range(of: String(message[near])) }
+        guard found.location != NSNotFound else { return nil }
+        return code.first { $0.range.upperBound > found.location }
+    }
+
+    // shortcut: the first token with the name, which may be another table's column of that name; the server gives no
+    // place for these, so a finer answer would need the query's scopes.
+    private static func namedToken(_ message: String, in sql: String, tokens: [SQLToken]) -> SQLToken? {
+        guard let match = namePattern.firstMatch(in: message, range: NSRange(message.startIndex..., in: message)),
+              let quoted = Range(match.range(at: 1), in: message),
+              let name = message[quoted].split(separator: ".").last?.lowercased() else { return nil }
+        let text = Array(sql.utf16)
+        return tokens.first { token in
+            guard token.kind == .word || token.kind == .quotedName else { return false }
+            let word = String(decoding: text[token.range], as: UTF16.self)
+            return (token.kind == .word ? word : String(word.dropFirst().dropLast())).lowercased() == name
+        }
     }
 
     /// The comment right above `statement`, after the statement before it (which ends at `after`), as a result tab's

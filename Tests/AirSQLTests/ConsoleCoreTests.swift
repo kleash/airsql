@@ -29,6 +29,25 @@ struct ConsoleScriptTests {
         #expect(ConsoleScript.errorLine("Table 'x' doesn't exist", statement: statements[1], in: script) == nil)
     }
 
+    @Test func errorsPointAtTheirToken() {
+        let text = "SELECT 1;\nSELECT `é`, a\nFORM t WHERE x = 'FORM';"
+        let statement = SQLSplitter.statements(in: text)[1]
+        func marked(_ message: String) -> String? {
+            ConsoleScript.problem(message, shown: "shown", statement: statement, noBackslashEscapes: false).map {
+                String(decoding: Array(text.utf16)[$0.range], as: UTF16.self)
+            }
+        }
+        #expect(marked("Error 1064 (42000): You have an error … to use near 'FORM t WHERE x = 'FORM'' at line 2") == "FORM")
+        #expect(marked("… near 't WHERE x = 'FORM'' at line 2") == "t")  // a quote inside the near text
+        #expect(marked("… near 'WHERE' at line 9") == "WHERE")  // the line is only where to start looking
+        #expect(marked("… near '' at line 2") == "'FORM'")  // the statement's end
+        #expect(marked("… near 'nothing like it' at line 1") == nil)
+        #expect(marked("Error 1054 (42S22): Unknown column 'q.A' in 'field list'") == "a")
+        #expect(marked("Error 1146 (42S02): Table 'db.é' doesn't exist") == "`é`")
+        #expect(marked("Error 1062 (23000): Duplicate entry '1' for key 'a'") == nil)
+        #expect(ConsoleScript.problem("… near 'FORM' at line 1", shown: "", statement: SQLStatement(sql: "FORM"), noBackslashEscapes: false) == nil)
+    }
+
     @Test func resultTabsAreNamedFromTheCommentAbove() {
         let statements = SQLSplitter.statements(in: script)
         func title(_ index: Int) -> String? {
