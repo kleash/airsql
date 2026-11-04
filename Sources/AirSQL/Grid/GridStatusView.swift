@@ -80,7 +80,9 @@ final class GridStatusView: NSStackView {
     @objc private func addUp() {
         guard let grid = viewer?.grid, let source = grid.source, grid.selection.cursor != nil else { return }
         if let cells = grid.selection.cells(rows: grid.rowCount, columns: grid.columnCount, limit: Self.limit) {
-            aggregate = GridAggregate(cells.map { source.value($0.row, grid.sourceColumn($0.column)) })
+            let columns = Set(cells.map { grid.sourceColumn($0.column) })
+            aggregate = GridAggregate(cells.map { source.value($0.row, grid.sourceColumn($0.column)) },
+                                      numbers: !columns.contains { source.columns[$0].type.lowercased().hasPrefix("bit") })
         } else {
             aggregate = nil
         }
@@ -95,9 +97,14 @@ final class GridStatusView: NSStackView {
             figure.toolTip = "Select fewer than \(Self.limit.formatted()) cells to see their sum, average and count"
             return
         }
+        // A whole column's figure is only the loaded rows' while the table has more.
+        let partial = (viewer?.source as? TableDataSource)?.hasMore == true && viewer?.grid.selection.areas.contains {
+            if case .columns = $0 { return true }
+            return $0 == .all
+        } == true
         // A sum of words falls back to the count.
         let kind = aggregate.text(Self.shown) == nil ? .count : Self.shown
-        let text = "\(kind.title) \(aggregate.text(kind) ?? "")"
+        let text = "\(kind.title)\(partial ? " of loaded rows" : "") \(aggregate.text(kind) ?? "")"
         figure.attributedTitle = NSAttributedString(string: text, attributes: [.foregroundColor: NSColor.accent, .font: figure.font!])
         figure.toolTip = "Show every figure for the selected cells and choose the one shown here; ⇧⌘C copies it"
     }

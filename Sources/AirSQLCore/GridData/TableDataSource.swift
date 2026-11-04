@@ -61,7 +61,7 @@ public final class TableDataSource: GridSource {
             .contains(type) { return .number }
         if ["date", "datetime", "timestamp", "time", "year"].contains(type) { return .date }
         if type.hasSuffix("binary") || type.hasSuffix("blob") || ["geometry", "point", "linestring", "polygon", "multipoint",
-           "multilinestring", "multipolygon", "geometrycollection", "vector"].contains(type) { return .binary }
+           "multilinestring", "multipolygon", "geometrycollection", "geomcollection", "vector"].contains(type) { return .binary }
         return .text
     }
 
@@ -77,10 +77,12 @@ public final class TableDataSource: GridSource {
     }
 
     /// The SELECT of `limit` rows from `offset` (no limit: nil): every column by name (invisible ones too), the filter,
-    /// and the sort, else the key's order, so pages follow one another.
+    /// and the sort, then the key for rows the sort leaves equal, so pages follow one another without repeating or
+    /// missing a row. The key goes the way of the sort's last column: an index on that column still serves both.
     public func pageSQL(offset: Int, limit: Int?) -> String {
         var sql = "SELECT " + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") + from
-        let order = sort.isEmpty ? (key ?? []).map { TableViewSettings.SortKey(column: columns[$0].name, ascending: true) } : sort
+        let ties = (key ?? []).map { columns[$0].name }.filter { name in !sort.contains { $0.column == name } }
+        let order = sort + ties.map { TableViewSettings.SortKey(column: $0, ascending: sort.last?.ascending ?? true) }
         if !order.isEmpty { sql += " ORDER BY " + GridSorting.orderBy(order) }
         if let limit { sql += " LIMIT \(limit)" }
         if offset > 0 { sql += (limit == nil ? " LIMIT 18446744073709551615" : "") + " OFFSET \(offset)" }
@@ -132,7 +134,8 @@ public final class TableDataSource: GridSource {
         applyLocalFilter()
     }
 
-    /// Adds a page that asked for `requested` rows (nil: all the rest), after the rows already loaded.
+    /// Adds a page that asked for `requested` rows, after the rows already loaded; nil: a batch of all the rest, which
+    /// `finishLoading` ends, so a Load All that is stopped still has more.
     public func append(_ page: ResultStore, requested: Int?) {
         if !saved.isEmpty, let key, page.rowCount > 0 {
             // A row read back after Apply that this page brings shows once, where the page has it.
@@ -144,7 +147,7 @@ public final class TableDataSource: GridSource {
             pageStarts.append(loadedRows)
             loadedRows += page.rowCount
         }
-        hasMore = requested.map { page.rowCount >= $0 } ?? false || page.capped
+        hasMore = requested.map { page.rowCount >= $0 } ?? true || page.capped
         applyLocalFilter()
     }
 

@@ -24,9 +24,10 @@ public struct GridCondition: Equatable, Sendable {
         let name = SQLQuote.identifier(column.name), value = values.first ?? nil
         func literal(_ value: String) -> String { column.literal(value, noBackslashEscapes: noBackslashEscapes) }
         func like(_ prefix: String, _ suffix: String) -> String {
-            // '!' escapes % and _ in the value (a backslash means something else under NO_BACKSLASH_ESCAPES).
+            // '!' escapes % and _ in the value (a backslash means something else under NO_BACKSLASH_ESCAPES), and
+            // ESCAPE '!' keeps a backslash of the value from being LIKE's own escape.
             let text = value ?? ""
-            guard text.contains(where: { "%_!".contains($0) }) else {
+            guard text.contains(where: { "%_!\\".contains($0) }) else {
                 return name + " LIKE " + SQLQuote.string(prefix + text + suffix, noBackslashEscapes: noBackslashEscapes)
             }
             let escaped = text.replacingOccurrences(of: "!", with: "!!").replacingOccurrences(of: "%", with: "!%")

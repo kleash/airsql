@@ -58,7 +58,7 @@ public struct CopyOptions: Codable, Equatable, Sendable {
 
 /// Writes rows in one format. Values are text as the grid shows it in full (never shortened), nil for NULL; binary
 /// values are "0x…" hex. The SQL formats name `table` (in `database` when given) and address rows by the key columns
-/// among those copied, or by every column when there are none.
+/// among those copied (`GridCopy` adds the rest of the key), or by every column when there are none.
 public struct CopyWriter {
     public let format: CopyFormat
     public let columns: [GridColumn]

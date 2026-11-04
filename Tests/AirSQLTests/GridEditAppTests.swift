@@ -122,7 +122,7 @@ extension AppTests {
                 try? await Task.sleep(nanoseconds: 20_000_000)
                 return tab.loading == nil && tab.source?.changes.isEmpty == true
             }
-            #expect(session.statements.contains("UPDATE `airsql_fixture`.`customers` SET `email` = 'cy@example.com' WHERE `id` = 42"))
+            #expect(session.statements.contains("UPDATE `airsql_fixture`.`customers` SET `email` = 'cy@example.com' WHERE `id` = 42 AND `email` <=> 'cy@example.net'"))
             #expect(tab.source?.saved.count == 1 && tab.source?.cell(2, 1) == .text("cy@example.com") && tab.source?.mark(2, 1) == GridMark.none)
             tab.grid.selection.selectRow(2)
             tab.deleteRows(nil)

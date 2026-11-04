@@ -76,6 +76,14 @@ extension GridViewer {
         return "\n\nShowing the first \(shown.formatted()) of \(source.rowCount.formatted()) rows loaded."
     }
 
+    /// What a chart of the rows shown leaves out: rows past `presentedLimit`, and rows the table tab hasn't loaded.
+    var chartCoverage: String? {
+        guard let source else { return nil }
+        let shown = min(source.rowCount, Self.presentedLimit).formatted()
+        if (source as? TableDataSource)?.hasMore == true { return "Covers the first \(shown) rows loaded, not the whole table" }
+        return source.rowCount > Self.presentedLimit ? "Covers the first \(shown) of \(source.rowCount.formatted()) rows" : nil
+    }
+
     /// The first rows (at most `presentedLimit`) by the columns on screen, as the grid shows them; nil for NULL.
     func presentedRows() -> (columns: [GridColumn], rows: [[String?]]) {
         guard let shown = displayed ?? source else { return ([], []) }

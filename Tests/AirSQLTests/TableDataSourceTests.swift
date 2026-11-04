@@ -37,7 +37,10 @@ struct TableDataSourceTests {
                 == "SELECT `id`, `name`, `photo`, `price` FROM `shop`.`items` ORDER BY `id` ASC LIMIT 1000")
         source.filter = "WHERE price > 1"
         source.sort = [.init(column: "name", ascending: false)]
-        #expect(source.pageSQL(offset: 2_000, limit: 1_000).hasSuffix(" WHERE (price > 1\n) ORDER BY `name` DESC LIMIT 1000 OFFSET 2000"))
+        #expect(source.pageSQL(offset: 2_000, limit: 1_000).hasSuffix(" WHERE (price > 1\n) ORDER BY `name` DESC, `id` DESC LIMIT 1000 OFFSET 2000"))
+        source.sort = [.init(column: "id", ascending: false), .init(column: "name", ascending: true)]
+        #expect(source.pageSQL(offset: 0, limit: 5).hasSuffix("ORDER BY `id` DESC, `name` ASC LIMIT 5"))
+        source.sort = [.init(column: "name", ascending: false)]
         #expect(source.pageSQL(offset: 10, limit: nil).hasSuffix("LIMIT 18446744073709551615 OFFSET 10"))
         #expect(source.countSQL == "SELECT COUNT(*) FROM `shop`.`items` WHERE (price > 1\n)")
         let plain = TableDataSource(database: "shop", table: Self.table(key: false))

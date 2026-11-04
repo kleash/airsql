@@ -69,7 +69,7 @@ extension AppTests {
             _ = await call(harness, "press", ["title": "Apply"])
             await ready { view.edits?.isEmpty == false }
             #expect(session.statements == ["START TRANSACTION", "DELETE FROM `airsql_fixture`.`customers` WHERE `id` IN (2)",
-                                           "UPDATE `airsql_fixture`.`customers` SET `email` = 'ann@example.net' WHERE `id` = 1", "COMMIT",
+                                           "UPDATE `airsql_fixture`.`customers` SET `email` = 'ann@example.net' WHERE `id` = 1 AND `email` <=> 'ann@example.com'", "COMMIT",
                                            "SELECT `id`, `email`, `name` FROM `airsql_fixture`.`customers` WHERE `id` IN (1)"])
             // What the server kept shows; the deleted row is gone.
             #expect(view.grid.rowCount == 1 && view.source.cell(0, 1) == .text("ANN@EXAMPLE.NET") && view.notice.isHidden)
@@ -90,7 +90,7 @@ extension AppTests {
             view.applyChanges(nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             let sql = shownText("preview.sql", in: main.window?.attachedSheet) ?? ""
-            #expect(sql.contains("UPDATE `airsql_fixture`.`customers` SET `email` = 'cy@example.net' WHERE `id` = 9;"))
+            #expect(sql.contains("UPDATE `airsql_fixture`.`customers` SET `email` = 'cy@example.net' WHERE `id` = 9 AND `email` <=> 'cy@example.org';"))
             #expect(!session.statements.contains("START TRANSACTION"))
             _ = await call(harness, "press", ["title": "Cancel"])
             #expect(view.edits?.pendingRows == 1)

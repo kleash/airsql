@@ -99,6 +99,14 @@ struct GridReadingTests {
         #expect(figures.minimum == "12" && figures.maximum == "shipped" && figures.distinct == 3)
         #expect(GridAggregate([nil, nil]).text(.sum) == nil && GridAggregate([String?]()).count == 0)
         #expect(GridAggregate(["-1e3", "+2", ".5"]).copyText(.sum) == "-997.5")
+        // Only a whole number counts: Decimal(string:) alone stops at the first character it can't read.
+        for values in [["2026-11-03", "1000-01-01"], ["1.2.3", "1.10.0"], ["555-1234", "555-9876"], ["-", "1"], ["10:30:00"]] {
+            #expect(GridAggregate(values).text(.sum) == nil, "\(values)")
+        }
+        let dates = GridAggregate(["2026-11-03", "1000-01-01"])
+        #expect(dates.text(.minimum) == "1000-01-01" && dates.text(.maximum) == "2026-11-03")
+        #expect(GridAggregate(["101", "011"], numbers: false).text(.sum) == nil)
+        #expect(GridAggregate(["007", "1."]).copyText(.sum) == "8")
     }
 
     @Test func selectedCellsAreEachCountedOnce() {

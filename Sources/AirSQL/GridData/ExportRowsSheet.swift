@@ -159,7 +159,14 @@ final class ExportRowsSheet: NSWindowController {
                         }
                     }
                     try output.finish()
-                    await MainActor.run { work.end() }
+                    let cut = output.cutCells
+                    await MainActor.run {
+                        work.end()
+                        guard cut > 0 else { return }
+                        showError("\(cut.formatted()) \(cut == 1 ? "cell was" : "cells were") longer than the 32,767 characters a cell of Excel "
+                                  + "holds, and the file has only the start of them. Export as CSV to keep every value whole.",
+                                  title: "\(url.lastPathComponent) was saved with values cut", on: parent)
+                    }
                 } catch {
                     try? FileManager.default.removeItem(at: url)
                     await MainActor.run {
@@ -192,6 +199,9 @@ final class ExportOutput: @unchecked Sendable {
             file = nil
         }
     }
+
+    /// The cells Excel's limit cut.
+    var cutCells: Int { workbook?.cutCells ?? 0 }
 
     func write(_ rows: [[String?]]) throws {
         if let workbook {

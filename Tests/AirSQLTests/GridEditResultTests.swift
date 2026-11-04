@@ -125,9 +125,9 @@ struct ResultEditSourceTests {
         #expect(source.cell(0, 1) == .text("US") && source.mark(0, 1) == .edited && source.cell(0, 3) == .null && source.pendingRows == 3)
         #expect(source.mark(0, 0) == GridMark.none && source.isChanged(1))
         let statements = try source.statements(context: context).map(\.sql)
-        #expect(statements == ["UPDATE `airsql_fixture`.`orders` SET `region` = 'US' WHERE `id` = 1",
-                               "UPDATE `airsql_fixture`.`customers` SET `email` = NULL WHERE `id` = 7",
-                               "UPDATE `airsql_fixture`.`customers` SET `email` = 'c@x' WHERE `id` = 8"])
+        #expect(statements == ["UPDATE `airsql_fixture`.`orders` SET `region` = 'US' WHERE `id` = 1 AND `region` <=> 'EU'",
+                               "UPDATE `airsql_fixture`.`customers` SET `email` = NULL WHERE `id` = 7 AND `email` <=> 'a@x'",
+                               "UPDATE `airsql_fixture`.`customers` SET `email` = 'c@x' WHERE `id` = 8 AND `email` <=> 'b@x'"])
         // Undo takes back the NULL, then both edits of the multi-cell step at once.
         source.undo()
         #expect(source.cell(0, 3) == .text("a@x") && source.cell(1, 3) == .text("c@x"))

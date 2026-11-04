@@ -104,7 +104,7 @@ final class GridChartView: NSView {
         let y = numbers[yColumn.indexOfSelectedItem], x = labels.indices.contains(xColumn.indexOfSelectedItem) ? labels[xColumn.indexOfSelectedItem] : nil
         let ys = viewer.numbers(y)
         xColumn.isEnabled = chosen != .histogram
-        var points: [GridChart.Point]
+        var points: [GridChart.Point], byDate = false, byRow = false
         switch chosen {
         case .bar, .pie:
             let names: [String?] = x.map { column in (0..<ys.count).map { source.value($0, column) } }
@@ -112,13 +112,20 @@ final class GridChartView: NSView {
             points = chosen == .pie ? GridChart.totals(labels: names, values: ys, limit: GridChart.sliceLimit)
                 : GridChart.totals(labels: names, values: ys, limit: GridChart.barLimit, other: false)
         case .line, .area, .scatter:
-            let xs = x.flatMap { source.columns[$0].kind == .number ? viewer.numbers($0) : nil }
-            points = GridChart.series(xs: xs, ys: ys)
+            byDate = x.map { source.columns[$0].kind == .date } ?? false
+            if byDate, let x {
+                points = GridChart.series(dates: (0..<ys.count).map { source.value($0, x) }, ys: ys)
+            } else {
+                let xs = x.flatMap { source.columns[$0].kind == .number ? viewer.numbers($0) : nil }
+                byRow = xs == nil
+                points = GridChart.series(xs: xs, ys: ys)
+            }
         case .histogram:
             points = GridChart.histogram(ys, bins: 20)
         }
-        spec = GridChartSpec(kind: chosen, points: points, x: chosen == .histogram ? source.columns[y].name : x.map { source.columns[$0].name } ?? "Row",
-                             y: chosen == .histogram ? "Rows" : source.columns[y].name)
+        spec = GridChartSpec(kind: chosen, points: points,
+                             x: chosen == .histogram ? source.columns[y].name : byRow ? "Row" : x.map { source.columns[$0].name } ?? "Row",
+                             y: chosen == .histogram ? "Rows" : source.columns[y].name, byDate: byDate, coverage: viewer.chartCoverage)
         hosting.rootView = GridChartBody(spec: spec)
     }
 
@@ -157,6 +164,10 @@ struct GridChartSpec {
     var points: [GridChart.Point]
     var x: String
     var y: String
+    /// x is a place in time (`GridChart.seconds`), and the axis says so.
+    var byDate = false
+    /// What the chart leaves out of the table or result, when it does.
+    var coverage: String?
 
     static let empty = GridChartSpec(kind: .bar, points: [], x: "", y: "")
 }
@@ -176,6 +187,9 @@ struct GridChartBody: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(hovered.map { "\($0.label): \($0.y.formatted())" } ?? caption)
                 .font(.system(size: 11.5).monospacedDigit()).foregroundColor(.secondary)
+            if let coverage = spec.coverage {
+                Text(coverage).font(.system(size: 11.5)).foregroundColor(.secondary)
+            }
             chart.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -208,6 +222,7 @@ struct GridChartBody: View {
                 LineMark(x: .value(spec.x, point.x), y: .value(spec.y, point.y)).foregroundStyle(Self.series)
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
+            .modifier(DateAxis(spec: spec))
             .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, axis: .number, hovered: $hovered))
         case .area:
             Chart(spec.points) { point in
@@ -215,11 +230,13 @@ struct GridChartBody: View {
                 LineMark(x: .value(spec.x, point.x), y: .value(spec.y, point.y)).foregroundStyle(Self.series)
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
+            .modifier(DateAxis(spec: spec))
             .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, axis: .number, hovered: $hovered))
         case .scatter:
             Chart(spec.points) { point in
                 PointMark(x: .value(spec.x, point.x), y: .value(spec.y, point.y)).foregroundStyle(Self.series).symbolSize(64)
             }
+            .modifier(DateAxis(spec: spec))
             .chartXAxisLabel(spec.x).chartYAxisLabel(spec.y).modifier(Hover(points: spec.points, axis: .number, hovered: $hovered))
         case .pie:
             if #available(macOS 14, *) {
@@ -232,6 +249,25 @@ struct GridChartBody: View {
             } else {
                 Text("Pie charts need macOS 14 or later: choose Bar to compare the same values.").foregroundColor(.secondary)
             }
+        }
+    }
+}
+
+/// Writes a date chart's x axis as dates, not seconds.
+private struct DateAxis: ViewModifier {
+    let spec: GridChartSpec
+
+    func body(content: Content) -> some View {
+        if spec.byDate {
+            let span = (spec.points.last?.x ?? 0) - (spec.points.first?.x ?? 0)
+            content.chartXScale(domain: .automatic(includesZero: false)).chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                    AxisGridLine()
+                    AxisValueLabel { Text(value.as(Double.self).map { GridChart.dateLabel($0, span: span) } ?? "") }
+                }
+            }
+        } else {
+            content
         }
     }
 }

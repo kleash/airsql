@@ -130,6 +130,215 @@ struct GridDataLabTests {
         }
     }
 
+    /// You load price 1.50, a colleague sets 20, you set 15: their 20 stays. A column you didn't edit doesn't matter.
+    @Test(arguments: servers)
+    func anEditedCellChangedBySomeoneElseRollsEverythingBack(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            let other = try await connected(server)
+            let source = try await loaded("items", snapshot, on: session)
+            source.set(.text("15"), row: 0, column: 2)
+            source.set(.text("Bo"), row: 1, column: 1)
+            source.set(.text("0xAB"), row: 0, column: 3)
+            source.set(.text("110"), row: 0, column: 4)
+            _ = try await other.query("UPDATE \(Self.database).items SET price = 20 WHERE id = 1")
+            let failure = await #expect(throws: ApplyFailure.self) { try await apply(source, on: session) }
+            #expect(failure?.statement.target == .update(["1"]) && failure?.changed == 0)
+            #expect(failure?.errorDescription?.contains("nothing was applied") == true)
+            let after = try await rows("SELECT id, \(SQLQuote.identifier(Self.odd)), price FROM \(Self.database).items WHERE id < 3 ORDER BY id",
+                                       on: session)
+            #expect(after == [["1", "Ann", "20.00"], ["2", "Bob", "2.00"]])
+
+            // Changes restored after a restart are checked too.
+            let restored = try await loaded("items", snapshot, on: session)
+            restored.changes = PendingChanges(keyColumns: ["id"], state: source.changes.state)
+            await #expect(throws: ApplyFailure.self) { try await apply(restored, on: session) }
+
+            // Someone else's change to another column, and values that compare exactly, let the edit through.
+            source.changes.revertAll()
+            let fresh = try await loaded("items", snapshot, on: session)
+            fresh.set(.text("15"), row: 0, column: 2)
+            fresh.set(.text("0xAB"), row: 0, column: 3)
+            fresh.set(.text("110"), row: 0, column: 4)
+            fresh.set(.text("x"), row: 1, column: 3)  // NULL before
+            _ = try await other.query("UPDATE \(Self.database).items SET \(SQLQuote.identifier(Self.odd)) = 'Anna' WHERE id = 1")
+            await other.close()
+            try await apply(fresh, on: session)
+            #expect(try await rows("SELECT \(SQLQuote.identifier(Self.odd)), price, HEX(photo), BIN(flags) FROM \(Self.database).items "
+                                   + "WHERE id = 1", on: session) == [["Anna", "15.00", "AB", "110"]])
+        }
+    }
+
+    /// Every type's loaded value finds itself in the WHERE, or the edit goes by the key: no false conflict, and no
+    /// refusal from a strict server, which MySQL gives a zero date as a literal.
+    @Test(arguments: servers)
+    func everyTypeAppliesWithoutAFalseConflict(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, _ in
+            let table = "\(Self.database).types"
+            let mode = try await rows("SELECT @@SESSION.sql_mode", on: session)[0][0] ?? ""
+            for statement in [
+                "SET SESSION sql_mode = ''",
+                "CREATE TABLE \(table) (id INT PRIMARY KEY, a DATE, b DATETIME(3), c TIMESTAMP(3) NULL, d TIME(2), e YEAR, f FLOAT, "
+                    + "g DOUBLE, h DECIMAL(30,10), i BIT(5), j ENUM('x','y'), k SET('x','y'), l JSON, m POINT, n BINARY(4), "
+                    + "o VARCHAR(20), p TEXT, q BIGINT UNSIGNED, r CHAR(3), s TINYINT(1)) ENGINE=InnoDB",
+                "INSERT INTO \(table) VALUES (1, '0000-00-00', '2024-01-00 10:00:00.123', '2024-03-31 01:30:00.125', '-838:59:59.00', "
+                    + "2024, 0.1, 0.1, 123456789012345678.1234567891, b'00101', 'y', 'x,y', '{\"a\": 1.50}', POINT(1, 2), X'0102', "
+                    + "'it''s \\\\ %', 'é😀', 18446744073709551615, 'ab', 1), "
+                    + "(2, '2024-02-29', '2024-02-29 23:59:59.999', NULL, '00:00:00.50', 1901, 16777217, 1.7976931348623157e308, "
+                    + "-0.0000000001, b'0', 'x', '', '[]', NULL, X'00000000', '', '', 0, '', 0)",
+                "SET SESSION sql_mode = '\(mode)'",
+            ] { _ = try await session.query(statement) }
+            let cache = SchemaCache(source: session, includes: { $0 == Self.database })
+            try await cache.load()
+            for column in 1...19 {
+                let source = try await loaded("types", cache.snapshot, on: session)
+                let bit = source.columns[column].name == "i", set = ["j", "k"].contains(source.columns[column].name)
+                let value: PendingChanges.Value = source.columns[column].name == "o" ? .text("edited") : .null
+                for row in 0..<2 { source.set(bit || set ? .text(bit ? "1" : "x") : value, row: row, column: column) }
+                try await apply(source, on: session)
+            }
+        }
+    }
+
+    /// Pages of a sort with many equal values follow one another: the key breaks the ties (MySQL 8.4 repeated and
+    /// missed rows without it).
+    @Test(arguments: servers)
+    func sortedPagesNeitherRepeatNorMissARow(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let cache = SchemaCache(source: session, includes: { $0 == Lab.fixture })
+        try await cache.load()
+        let source = TableDataSource(database: Lab.fixture, table: try #require(cache.snapshot.table(Lab.fixture, "big")))
+        for ascending in [true, false] {
+            source.sort = [.init(column: "flag", ascending: ascending)]
+            var seen = Set<String?>()
+            for page in 0..<3 {
+                for row in try await rows(source.pageSQL(offset: page * 1_000, limit: 1_000), on: session) { seen.insert(row[0]) }
+            }
+            #expect(seen.count == 3_000)
+        }
+        await session.close()
+    }
+
+    /// A backslash in a contains, starts-with or Search All Columns value is an ordinary character, in both sql_modes.
+    @Test(arguments: servers)
+    func aBackslashInAFilterIsJustABackslash(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            let items = "\(Self.database).items", odd = SQLQuote.identifier(Self.odd)
+            _ = try await session.query("DELETE FROM \(items)")
+            _ = try await session.query("INSERT INTO \(items) (id, \(odd)) VALUES (1, '\\\\slashed\\\\'), (2, 'C:\\\\temp'), (3, 'C:temp'), "
+                                        + "(4, 'abc%'), (5, 'abc\\\\def')")
+            let source = try await loaded("items", snapshot, on: session)
+            let name = source.columns[1]
+            let mode = try await rows("SELECT @@SESSION.sql_mode", on: session)[0][0] ?? ""
+            for noBackslashEscapes in [false, true] {
+                if noBackslashEscapes { _ = try await session.query("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES')") }
+                func ids(_ condition: String) async throws -> [String?] {
+                    try await rows("SELECT id FROM \(items) WHERE \(condition) ORDER BY id", on: session).map { $0[0] }
+                }
+                func sql(_ op: GridCondition.Operator, _ value: String) -> String {
+                    GridCondition(name, op, [value]).sql(noBackslashEscapes: noBackslashEscapes)
+                }
+                #expect(try await ids(sql(.contains, #"\slashed\"#)) == ["1"])
+                #expect(try await ids(sql(.contains, #"C:\temp"#)) == ["2"])
+                #expect(try await ids(sql(.startsWith, #"abc\"#)) == ["5"])
+                #expect(try await ids(sql(.endsWith, #"\"#)) == ["1"])
+                let search = try #require(GridFilter.search(#"C:\t"#, in: [name], noBackslashEscapes: noBackslashEscapes))
+                #expect(try await ids(search) == ["2"])
+            }
+            _ = try await session.query("SET SESSION sql_mode = '\(mode)'")
+        }
+    }
+
+    /// A BIGINT UNSIGNED and a DECIMAL as the server sends them reach the workbook whole; a 20 KB BLOB says it was cut.
+    @Test(arguments: servers)
+    func excelKeepsWhatTheServerSends(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let result = try #require(try await session.query("SELECT CAST(18446744073709551615 AS UNSIGNED) AS id, "
+                                                          + "CAST(1234567890123456.78 AS DECIMAL(20,2)) AS amount, 42 AS plain, "
+                                                          + "CAST(REPEAT('ab', 10000) AS BINARY) AS photo").first?.rows)
+        await session.close()
+        let source = ResultSetSource(result)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("rows.xlsx")
+        let writer = try XLSXWriter(url: url, columns: source.columns)
+        try writer.add(source.columns.indices.map { TableDataSource.text(result, 0, $0) })
+        try writer.finish()
+        #expect(writer.cutCells == 1)
+        let sheet = try GridDataTests().run("/usr/bin/unzip", ["-p", url.path, "xl/worksheets/sheet1.xml"])
+        #expect(sheet.contains(">18446744073709551615</t>") && sheet.contains(">1234567890123456.78</t>") && sheet.contains("<c><v>42</v></c>"))
+    }
+
+    /// Copy As DELETE of part of a composite key names the whole key, so it removes the one row selected.
+    @Test(arguments: servers)
+    func copyAsDeleteAddressesOnlyTheRowsSelected(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            _ = try await session.query("INSERT INTO \(Self.database).pairs VALUES (1, UNHEX(REPEAT('11', 16)), 'd')")
+            let source = try await loaded("pairs", snapshot, on: session)
+            let sql = await MainActor.run {
+                GridCopy.text(source, rows: [0], columns: [0, 2], format: .delete, headers: false, nullText: "NULL",
+                              database: Self.database, table: "pairs")
+            }
+            #expect(sql.contains("`shop` = 1 AND `tag` = X'"))
+            let update = await MainActor.run {
+                GridCopy.text(source, rows: [0], columns: [2], format: .update, headers: false, nullText: "NULL",
+                              database: Self.database, table: "pairs")
+            }
+            #expect(update.contains("SET `note` = 'a' WHERE `shop` = 1 AND `tag` = X'"))
+            let done = try await session.query(String(sql.dropLast(2))).last?.affectedRows
+            #expect(done == 1)
+
+            // A console result that shows part of the key: the server flags `shop` as a key, but it alone isn't one.
+            let query = "SELECT shop, note FROM \(Self.database).pairs WHERE note = 'b'"
+            let store = try #require(try await session.query(query).first?.rows)
+            let result = ResultEditSource(store)
+            result.setEditing(ResultEditing(sql: query, store: store, snapshot: snapshot, defaultDatabase: Self.database), snapshot: snapshot)
+            #expect(result.columns[0].isKey)
+            let copied = await MainActor.run {
+                GridCopy.text(result, rows: [0], columns: [0, 1], format: .delete, headers: false, nullText: "NULL",
+                              database: Self.database, table: "pairs")
+            }
+            #expect(copied.contains("WHERE `shop` = 1 AND `note` = 'b';"))
+        }
+    }
+
+    /// Load All's batches leave more to load until the end of the stream: one that stops there says so.
+    @Test(arguments: servers)
+    func aStoppedLoadAllStillHasMore(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            let source = TableDataSource(database: Self.database, table: try #require(snapshot.table(Self.database, "items")))
+            let batch = try #require(try await session.query(source.pageSQL(offset: 0, limit: 2)).first?.rows)
+            source.append(batch, requested: nil)
+            #expect(source.loadedRows == 2 && source.hasMore)
+            let rest = try #require(try await session.query(source.pageSQL(offset: 2, limit: nil)).first?.rows)
+            source.append(rest, requested: nil)
+            source.finishLoading()
+            #expect(source.loadedRows == 3 && !source.hasMore)
+        }
+    }
+
+    /// DATE, DATETIME and TIMESTAMP as the server writes them find their place on a chart's axis.
+    @Test(arguments: servers)
+    func chartsPlaceTheServersDates(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let dates = try await rows("SELECT CAST('2026-03-01' AS DATE) UNION ALL SELECT CAST('2026-01-15 10:30:00.25' AS DATETIME(2)) "
+                                   + "UNION ALL SELECT CAST('2025-12-31 23:59:59' AS DATETIME)", on: session).map { $0[0] }
+        await session.close()
+        let points = GridChart.series(dates: dates, ys: [1, 2, 3])
+        #expect(points.map(\.y) == [3, 2, 1] && points.map(\.label) == [dates[2], dates[1], dates[0]])
+    }
+
+    /// What the server sends for dates and BIT adds up to nothing; DECIMAL and exponents do.
+    @Test(arguments: servers)
+    func statusFiguresAddUpOnlyWholeNumbers(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let dates = try await rows("SELECT CAST('2026-11-03' AS DATE) UNION ALL SELECT CAST('1000-01-01' AS DATE)", on: session).map { $0[0] }
+        #expect(GridAggregate(dates).text(.sum) == nil && GridAggregate(dates).text(.minimum) == "1000-01-01")
+        let prices = try await rows("SELECT CAST(1.50 AS DECIMAL(5,2)) UNION ALL SELECT CAST(-2.25 AS DECIMAL(5,2))", on: session).map { $0[0] }
+        #expect(GridAggregate(prices).copyText(.sum) == "-0.75")
+        await session.close()
+    }
+
     @Test(arguments: servers)
     func binaryAndCompositeKeysAddressTheirRows(_ server: Lab.Server) async throws {
         try await withTables(server) { session, snapshot in

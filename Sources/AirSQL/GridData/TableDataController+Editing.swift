@@ -218,8 +218,8 @@ extension TableDataController: DataGridViewDelegate {
             guard let window = view.window else { return }
             let rows = source.changes.rowCount
             var request = SQLPreviewRequest(change: change, heading: "Apply \(rows) \(rows == 1 ? "change" : "changes") to \(database).\(tableName)?",
-                                            caption: "They run in one transaction. If a row was changed or deleted by someone else "
-                                                + "since it was loaded, nothing is applied.")
+                                            caption: TableEditing.applyCaption(reading: "it was loaded",
+                                                                               unchecked: source.changes.uncheckedColumns(source.columns)))
             request.warnings = warnings
             request.destructive = !source.changes.state.deletes.isEmpty
             request.noBackslashEscapes = session.noBackslashEscapes

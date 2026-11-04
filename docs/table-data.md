@@ -16,7 +16,8 @@ session, a session of their own, so a long query in a console never holds them u
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
 - **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
   Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
-  while the tab is open. Cancel it in the status bar's activity.
+  while the tab is open. Cancel it in the status bar's activity: what arrived stays, and Load More and Load All carry
+  on from there.
 - Anything slow here (a page, a filter, a sort, Load All, Count Exactly, Column Summary) can be stopped with **⌘.**, the
   toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
 - **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
@@ -55,9 +56,10 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
   to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
-  and the minus takes it away. Rows sort on the server. On a table of over a million rows, sorting by a column without
-  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here
-  instead.
+  and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
+  repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting
+  by a column without an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the
+  loaded rows sort here instead.
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
@@ -145,11 +147,18 @@ says why; so are views. Generated columns can't be edited.
 - A table a single click shows, in the preview tab, keeps its pending changes when you click another table: the tab
   stays open with its dot, and the next table gets a preview of its own.
 - **Data ▸ Apply Changes** (⌘S) writes every pending change in one transaction on the data session: deletes first (in
-  batches of 500), then edits, then new rows. Each statement must change exactly its rows. If one changes another
-  number (someone else changed or deleted the row since it was loaded) or the server refuses one, everything is rolled
-  back, nothing is applied, and the grid selects the row; when the server's error names a column ("Data too long for
-  column 'note'", "Column 'name' cannot be null", a duplicate value of a unique key), it selects that cell. Reload the
-  row, or fix the value, then apply again.
+  batches of 500), then edits, then new rows. Each edit's `UPDATE` names the row by its key and the edited cells by the
+  values you loaded (`` `price` <=> 10 ``), and each statement must change exactly its rows. If one changes another
+  number (someone else changed a cell you edited, or deleted the row, since it was loaded) or the server refuses one,
+  everything is rolled back, nothing is applied, and the grid selects the row; when the server's error names a column
+  ("Data too long for column 'note'", "Column 'name' cannot be null", a duplicate value of a unique key), it selects
+  that cell. Fix the value and apply again; if someone else got there first, revert the change, reload the rows and
+  make it again. Changes kept over a restart are checked the same way.
+- What Apply can't check: FLOAT, TIMESTAMP, JSON, spatial and vector values, dates with a zero month or day and values
+  over 64 KB don't compare exactly, so edits to those go by the key alone and overwrite what is there; the preview
+  names them. A change that only differs in case or trailing spaces can pass on a column whose collation ignores
+  those. Rows to delete go by their key: someone else's change to a row doesn't stop its delete, and neither does a
+  change to a column you didn't edit stop your edit.
 - **Preview SQL…** shows the statements first, in the [SQL preview](sql-preview.md). The preview also comes first on
   connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection),
   and whenever there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes
@@ -170,9 +179,11 @@ These work in a console's results too.
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
-  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key columns copied, or by every column. The one
-  you choose becomes ⌘C's format.
+  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
+  didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
   (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
+  In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
+  and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.
