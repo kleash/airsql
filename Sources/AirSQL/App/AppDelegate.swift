@@ -87,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationWillTerminate(_ notification: Notification) {
         agents?.close()
+        ToolSheet.open.filter(\.running).forEach { $0.stop() }  // a dump or client program would outlive the app
         Store.flush()
         TableViewSettingsStore.shared.flush()
         PendingChangesStore.shared.flush()

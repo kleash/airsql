@@ -230,15 +230,15 @@ extension AppTests {
             export.show(on: window, loads: false)
             export.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            if let sheet = window.attachedSheet { check(sheet, "Export") }
+            if let sheet = ToolSheet.open.last?.window { check(sheet, "Export") }
             _ = export.begin("Exporting shop")
             export.progress("Writing this_table_name_is_sixty_four_characters_long_the_most_mysql_has · 1.9 GB of ≈3.1 GB", done: 19,
                             total: 31)
-            if let sheet = window.attachedSheet { check(sheet, "Export running") }
+            if let sheet = ToolSheet.open.last?.window { check(sheet, "Export running") }
             export.finish("mariadb-dump stopped: mariadb-dump: Got error: 1045: \"Access denied for user 'a_very_long_user_name'@'"
                           + "warehouse-primary-0001.analytics.internal.example.com' (using password: YES)\" when trying to connect",
                           failed: true)
-            if let sheet = window.attachedSheet { check(sheet, "Export failed") }
+            if let sheet = ToolSheet.open.last?.window { check(sheet, "Export failed") }
             export.close()
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             let restore = RestoreSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: true)
@@ -246,14 +246,14 @@ extension AppTests {
             restore.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["this_database_name_is_sixty_four_characters_long_the_most_it_has"])
             restore.use(URL(fileURLWithPath: "/Volumes/Backups/" + String(repeating: "very long folder name/", count: 6) + "dump.sql"))
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            if let sheet = window.attachedSheet { check(sheet, "Run SQL File") }
+            if let sheet = ToolSheet.open.last?.window { check(sheet, "Run SQL File") }
             restore.close()
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             let copy = CopySheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
             copy.show(on: window, loads: false)
             copy.show(databases: ToolFixtures.databases())
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            if let sheet = window.attachedSheet { check(sheet, "Copy to Another Server") }
+            if let sheet = ToolSheet.open.last?.window { check(sheet, "Copy to Another Server") }
             copy.close()
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             let csv = CSVImportSheet(model: model, connection: ToolFixtures.local, options: ToolFixtures.options)
@@ -261,7 +261,7 @@ extension AppTests {
             csv.show(databases: ToolFixtures.databases())
             csv.show(columns: ToolFixtures.customerColumns)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            if let sheet = window.attachedSheet { check(sheet, "Import CSV") }
+            if let sheet = ToolSheet.open.last?.window { check(sheet, "Import CSV") }
             csv.close()
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             try await connectionScreens(main, harness, check: check)

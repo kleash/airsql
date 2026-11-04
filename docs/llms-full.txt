@@ -1040,9 +1040,13 @@ and in a connection's right-click menu in the sidebar.
 installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
 (MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
 
-Each sheet says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
+Export, Restore, Run SQL File, Copy to Another Server and Import CSV each open in a window of their own, which you can
+move aside to keep working. Closing it while it runs asks first; disconnecting the connection it uses, or quitting, says
+it is running and stops it.
+
+Each window says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
 older version than the server), or why it can't be used (not there, too old: AirSQL needs MySQL 5.7 or MariaDB 10.3
-tools or newer). The tool you pick in a sheet is remembered for that connection: it shows, and can be changed, in the
+tools or newer). The tool you pick in one is remembered for that connection: it shows, and can be changed, in the
 connection editor's Options tab.
 
 No tools at all? Install MySQL's or MariaDB's client tools (for example `brew install mysql-client`), then choose
@@ -1058,12 +1062,14 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
 2. Choose the content (structure and data, structure only, data only) and the options: one consistent snapshot
    (`--single-transaction`), binary as hex, gzip, `DROP TABLE` before each table, and views, routines, triggers and
    events.
-3. Pick the tool, where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
-4. The box under the form shows the exact command line. **Copy Command** copies it.
-5. **Export**. The sheet shows the table being written, the bytes so far and the time left. **Stop** ends it.
+3. Pick the tool (**Choose…** beside it finds a `mysqldump` or `mariadb-dump` anywhere on this Mac, and Restore and Run
+   SQL File take a `mysql` or `mariadb` the same way), where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
+4. The box under the form shows the exact command line of the tool you picked, and **Copy Command** copies it. AirSQL's
+   built-in export runs no command, so the box says what it does and the button isn't there.
+5. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
 
 The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
-or failed export never leaves half a file.
+or failed export never leaves half a file. When it is done, **Show in Finder** shows you the file.
 
 **AirSQL (built in)** in the Tool menu writes the SQL itself, through a connection of its own: the tables' `CREATE`
 statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
@@ -1914,11 +1920,12 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
   sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
-- **Client tools sheets**: `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
+- **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
   `tools.timeLeft`, `tools.cancel`, `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
-  `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`; Restore `restore.file`,
-  `restore.fileInfo`, `restore.choose`, `restore.database`, `restore.tool`, `restore.stopOnError`, `restore.continue`,
+  `export.chooseTool`, `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`,
+  `export.reveal`; Restore `restore.file`,
+  `restore.fileInfo`, `restore.choose`, `restore.database`, `restore.tool`, `restore.chooseTool`, `restore.stopOnError`, `restore.continue`,
   `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
   `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
   `csv.emptyIsNull`, `csv.mapping`.
