@@ -50,7 +50,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         super.init(model: model, connection: connection, options: options, width: 840, action: "Export",
                    actionTip: "Write the dump to the file chosen in Save to")
         heading.stringValue = "Export from \(connection.displayName)"
-        for control in [content, snapshot, hexBlob, gzip, dropTable, objects, toolMenu] as [NSControl] {
+        for control in [content, snapshot, hexBlob, gzip, dropTable, objects, toolMenu, unchecked] as [NSControl] {
             control.target = self
             control.action = #selector(formChanged(_:))
         }
@@ -87,7 +87,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         options.spacing = 4
         form.row("Options", [options]).yPlacement = .top
         form.row("Tool", [toolMenu, chooseTool])
-        form.grid.addRow(with: [NSGridCell.emptyContentView, fit]).topPadding = -4
+        form.grid.addRow(with: [NSGridCell.emptyContentView, toolNote(fit)]).topPadding = -4
         fit.preferredMaxLayoutWidth = 420
         saveTo.stringValue = SettingsPaneController.shown(url)
         saveTo.toolTip = url.path
@@ -98,7 +98,8 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         form.row("Extra options", [extra])
         let grid = form.finish()
         grid.column(at: 1).width = 400
-        grid.setContentHuggingPriority(.defaultHigh, for: .vertical)
+        // Below controls' compression resistance (750): at a tie pop-ups and buttons are squeezed to 20 pt.
+        grid.setContentHuggingPriority(.init(749), for: .vertical)
         toolMenu.widthAnchor.constraint(lessThanOrEqualToConstant: 300).isActive = true
         let columns = NSStackView(views: [picker.view(height: 250), grid])
         columns.alignment = .top
@@ -174,8 +175,10 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         if let node = databases.first(where: { $0.name == current }) { picker.include(node, true) }
         picker.show(databases, expanding: current)
         fill(toolMenu, tools: tools, builtIn: Self.builtInTip)
-        let picked = tools.firstIndex { $0.path == connection.dumpPath }
-            ?? ClientTools.best(tools, for: server).flatMap { best in tools.firstIndex { $0 == best } }
+        // Only a tool that can run now is picked for the person, the one kept for the connection first.
+        let runnable = ToolCommand.runnable(tools, options: options, server: server)
+        let picked = (runnable.first { $0.path == connection.dumpPath } ?? ClientTools.best(runnable, for: server))
+            .flatMap { best in tools.firstIndex { $0 == best } }
         toolMenu.selectItem(at: picked ?? tools.count)
         loading(nil)
         formChanged(nil)
@@ -203,7 +206,13 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         return index >= 0 && index < tools.count ? tools[index] : nil
     }
 
+    override var uncheckedTip: String {
+        "Run this export once without the check: the connection is encrypted but can't prove it's this server, so the dump and "
+            + "the login could be exposed"
+    }
+
     @objc private func formChanged(_ sender: Any?) {
+        if sender as? NSPopUpButton === toolMenu { unchecked.state = .off }
         // The tool chosen is kept for the connection (its latest version: nothing else of it is touched).
         if sender as? NSPopUpButton === toolMenu, let tool, var latest = model.connection(connection.id), latest.dumpPath != tool.path {
             latest.dumpPath = tool.path
@@ -224,13 +233,19 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         }
         if let tool {
             let fitness = ClientTools.fit(tool, server: server)
-            fit.stringValue = ToolCommand(tool: tool, options: options, server: server).tlsProblem ?? fitness.message
+            let problem = toolCommand(tool, server: server).tlsProblem
+            fit.stringValue = problem ?? fitness.message
             switch fitness {
             case .good: fit.textColor = .statusOK
             case .warning: fit.textColor = .statusWarning
             case .unusable: fit.textColor = .statusBad
             }
+            if problem != nil { fit.textColor = .statusBad }
+            useBuiltIn.isHidden = problem == nil && fitness.isUsable
+            showUnchecked(toolCommand(tool, server: server), note: fit)
         } else {
+            useBuiltIn.isHidden = true
+            showUnchecked(nil, note: fit)
             fit.stringValue = tools.isEmpty ? "No mysqldump or mariadb-dump found on this Mac: AirSQL exports with its own code. "
                 + "Install MySQL's or MariaDB's client tools to use theirs." : "AirSQL's own export, through this connection."
             fit.textColor = .secondaryLabelColor
@@ -246,7 +261,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         }
         copyButton.isHidden = tool == nil || request == nil  // AirSQL's own export has no command to copy
         if let tool, let request {
-            let argv = ToolCommand(tool: tool, options: options, server: server).dump(request, optionFile: "/private")
+            let argv = toolCommand(tool, server: server).dump(request, optionFile: "/private")
             command?.string = ToolCommand.display(argv, optionFile: "/private")
                 + (request.gzip ? " | /usr/bin/gzip -c" : "") + " > " + ToolCommand.shellWord(url.path)
         } else {
@@ -297,7 +312,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             reason = extraError
         } else if let tool {
             if case .unusable(let why) = ClientTools.fit(tool, server: server) { reason = why }
-            if let problem = ToolCommand(tool: tool, options: options, server: server).tlsProblem { reason = problem }
+            if let problem = toolCommand(tool, server: server).tlsProblem { reason = problem }
         } else if !extraWords.isEmpty {
             reason = "Extra options are for mysqldump and mariadb-dump: AirSQL's own export takes none"
         }
@@ -349,7 +364,8 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         let what = request.databases.count == 1 ? request.databases[0] : "\(request.databases.count) databases"
         let cancellation = begin("Exporting \(what) from \(connection.displayName)")
         let updates = Throttle()
-        let tool = self.tool, command = tool.map { ToolCommand(tool: $0, options: options, server: server) }
+        let tool = self.tool, command = tool.map { toolCommand($0, server: server) }
+        logUnchecked(command)
         Task {
             do {
                 let outcome: ToolOutcome

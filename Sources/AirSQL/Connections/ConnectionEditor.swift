@@ -21,7 +21,18 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     }
 
     /// The connection as edited (saved on Save).
-    var draft: SavedConnection { didSet { routePathLabel?.stringValue = routePath } }
+    var draft: SavedConnection {
+        didSet {
+            routePathLabel?.stringValue = routePath
+            if draft.tls != oldValue.tls { tlsFollowsHost = false } else if tlsFollowsHost { draft.tls.mode = Self.tlsMode(for: draft) }
+        }
+    }
+    /// A new connection's TLS until the person sets it: local servers rarely offer TLS, so off for one on this Mac, where
+    /// nothing crosses a network, and the strict check as soon as the host or the route says it is elsewhere.
+    private var tlsFollowsHost: Bool
+    private static func tlsMode(for connection: SavedConnection) -> TLSOptions.Mode {
+        connection.isOnThisMac ? .off : TLSOptions().mode
+    }
     /// The SSH and Proxy tab's Path line, which follows the draft as it is edited.
     weak var routePathLabel: NSTextField?
     let isNew: Bool
@@ -54,6 +65,8 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
 
     private init(_ connection: SavedConnection, isNew: Bool, model: AppModel, done: @escaping (SavedConnection, Bool) -> Void) {
         draft = connection
+        if isNew { draft.tls.mode = Self.tlsMode(for: connection) }
+        tlsFollowsHost = isNew
         self.isNew = isNew
         self.model = model
         self.done = done

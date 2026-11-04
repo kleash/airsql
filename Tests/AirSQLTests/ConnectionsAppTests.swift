@@ -171,6 +171,52 @@ extension AppTests {
         #expect(model.data.connections.count == 1)
     }
 
+    /// A new connection starts with TLS off only while it goes straight to this Mac: another host or a route brings the
+    /// strict check back, and what the person sets stays.
+    @Test func aNewConnectionsTLSFollowsItsHostUntilThePersonSetsIt() async throws {
+        let model = testModel([])
+        let (main, harness) = appWindow(model)
+        let editor = ConnectionEditor.show(SavedConnection(host: "127.0.0.1", user: "root"), isNew: true, model: model,
+                                           on: try #require(main.window)) { _, _ in }
+        #expect(editor.draft.tls.mode == .off)
+        editor.draft.host = "db.example.com"
+        #expect(editor.draft.tls.mode == .verifyIdentity)
+        editor.draft.host = "LOCALHOST"
+        #expect(editor.draft.tls.mode == .off)
+        editor.draft.route = .ssh
+        #expect(editor.draft.tls.mode == .verifyIdentity, "127.0.0.1 through a route is the far end's")
+        editor.draft.route = .direct
+        editor.draft.tls.mode = .required
+        editor.draft.host = "127.0.0.1"
+        #expect(editor.draft.tls.mode == .required, "the person's choice stays")
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+
+        // A connection already saved keeps its TLS whatever its host says.
+        var saved = SavedConnection(host: "db.example.com", user: "root")
+        saved.tls.mode = .verifyIdentity
+        let existing = ConnectionEditor.show(saved, isNew: false, model: model, on: try #require(main.window)) { _, _ in }
+        existing.draft.host = "127.0.0.1"
+        #expect(existing.draft.tls.mode == .verifyIdentity)
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
+    /// Import lists a file's connections with ticks: one that is already here starts unticked.
+    @Test func importListsAFilesConnectionsAndLeavesOutThoseAlreadyHere() async throws {
+        var here = SavedConnection(name: "Here", host: "db.example.com", user: "app")
+        here.database = "shop"
+        let model = testModel([here])
+        let (main, harness) = appWindow(model)
+        let file = URL(fileURLWithPath: try scratch() + "/connections.json")
+        try ConnectionImport.export([here, SavedConnection(name: "New", host: "other.example.com", user: "app")]).write(to: file)
+        main.importConnections(from: file)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["title": "Import"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(model.data.connections.map(\.displayName).sorted() == ["Here", "New"])
+    }
+
     /// A connect that fails says why in a sheet, and the sidebar marks the connection; Disconnect is off again.
     @Test func aFailedConnectIsReported() async throws {
         var nowhere = SavedConnection(name: "Nowhere", host: "127.0.0.1", port: 1, user: "root")
@@ -186,7 +232,16 @@ extension AppTests {
             Issue.record("not failed: \(String(describing: model.states[nowhere.id]))")
         }
         #expect(model.activity.isIdle)
-        _ = await call(harness, "press", ["title": "OK"])
+        // Try Again connects again and fails again; Edit Connection… opens the settings; Close ends it.
+        _ = await call(harness, "press", ["title": "Try Again"])
+        #expect(await eventually(timeout: 30) { main.window?.attachedSheet != nil && model.activity.isIdle })
+        _ = await call(harness, "press", ["title": "Edit Connection…"])
+        #expect(await eventually(timeout: 10) { main.window?.attachedSheet?.windowController is ConnectionEditor })
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        _ = await call(harness, "menu", ["path": "Connection > Connect"])
+        #expect(await eventually(timeout: 30) { main.window?.attachedSheet != nil })
+        _ = await call(harness, "press", ["title": "Close"])
         _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
         let item = Commands.disconnect.item()
         #expect(main.validateMenuItem(item) == false)

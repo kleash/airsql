@@ -145,6 +145,10 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     }
 
     /// The name, else user@host:port (or the socket).
+    /// Whether the server is on this Mac: a direct connection to a loopback name (through a route, that name is the far
+    /// end's, reached over the network).
+    public var isOnThisMac: Bool { route == .direct && ["127.0.0.1", "localhost", "::1"].contains(host.lowercased()) }
+
     public var displayName: String {
         if !name.isEmpty { return name }
         let server = !socket.isEmpty && route == .direct ? socket : host + (port.map { ":\($0)" } ?? "")

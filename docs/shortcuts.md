@@ -70,6 +70,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Show Next Result | ⌥⌘] |
+| Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |

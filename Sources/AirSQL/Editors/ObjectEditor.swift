@@ -19,7 +19,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     var account: String?
     private(set) var isBusy = false
 
-    let code = NSTextView()
+    let (codeScroll, code) = SQLEditorView.make(fontSize: 12.5)
     let definer = popup([], selected: 0, id: "objectEditor.definer", tip: "", target: nil, action: nil)
     let applyButton = button("Apply", id: "objectEditor.apply", tip: "", target: nil, action: #selector(AirSQLActions.applyChanges(_:)),
                              primary: true)
@@ -52,27 +52,11 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     var isEdited: Bool { name == nil || code.string != original }
 
     override func loadView() {
-        code.isRichText = false
-        code.isAutomaticQuoteSubstitutionEnabled = false
-        code.isAutomaticDashSubstitutionEnabled = false
-        code.isAutomaticTextReplacementEnabled = false
-        code.isAutomaticSpellingCorrectionEnabled = false
-        code.isContinuousSpellCheckingEnabled = false
-        code.allowsUndo = true
         code.usesFindBar = true
         code.isIncrementalSearchingEnabled = true
-        code.font = .monospacedSystemFont(ofSize: 12.5, weight: .regular)
-        code.textContainerInset = NSSize(width: Spacing.unit, height: Spacing.unit)
-        code.isVerticallyResizable = true
-        code.autoresizingMask = [.width]
-        code.textContainer?.widthTracksTextView = true
         code.delegate = self
         code.setAccessibilityIdentifier("objectEditor.code")
         code.toolTip = "Edit the \(kind.rawValue)'s CREATE statement, then Apply"
-        let scroll = NSScrollView()
-        scroll.documentView = code
-        scroll.hasVerticalScroller = true
-        scroll.borderType = .noBorder
 
         let kindLabel = label(kind.keyword, font: .systemFont(ofSize: 11, weight: .semibold), color: .secondaryLabelColor)
         let definerLabel = label("Runs as:", font: .systemFont(ofSize: 12))
@@ -97,11 +81,11 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         let footer = NSStackView(views: [note])
         footer.edgeInsets = NSEdgeInsets(top: Spacing.half + 1, left: Spacing.double, bottom: Spacing.half + 1, right: Spacing.double)
 
-        let root = editorLayout(bar: bar, content: scroll, footer: footer)
+        let root = editorLayout(bar: bar, content: codeScroll, footer: footer)
         root.addSubview(overlay)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            overlay.topAnchor.constraint(equalTo: scroll.topAnchor), overlay.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            overlay.topAnchor.constraint(equalTo: codeScroll.topAnchor), overlay.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             overlay.leadingAnchor.constraint(equalTo: root.leadingAnchor), overlay.trailingAnchor.constraint(equalTo: root.trailingAnchor),
         ])
         root.setAccessibilityIdentifier("objectEditor")
@@ -131,9 +115,8 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
                 }
                 self.account = account
                 self.definition = definition
-                code.string = original
-                colourCode()
-                code.undoManager?.removeAllActions()
+                code.noBackslashEscapes = server.noBackslashEscapes
+                code.setText(original)
                 isBusy = false
                 overlay.hide()
                 NotificationCenter.default.post(name: .tabContentDidChange, object: self)
@@ -148,21 +131,8 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     @objc private func retry(_ sender: Any?) { load() }
 
     func textDidChange(_ notification: Notification) {
-        colourCode()
         updateControls()
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
-    }
-
-    /// Colours the code as the SQL preview does, in place (the caret and the undo stay).
-    func colourCode() {
-        guard let storage = code.textStorage else { return }
-        let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
-        let coloured = SQLPreviewSheet.coloured(code.string, font: font, noBackslashEscapes: server.noBackslashEscapes)
-        storage.beginEditing()
-        coloured.enumerateAttributes(in: NSRange(location: 0, length: coloured.length)) { attributes, range, _ in
-            storage.setAttributes(attributes, range: range)
-        }
-        storage.endEditing()
     }
 
     /// The definer pop-up, Apply, Revert and the note, for the code as it is now.
@@ -221,9 +191,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     func setLoaded(name: String, definition: ObjectDefinition?) {
         self.name = name
         if let definition { self.definition = definition }
-        code.string = original
-        colourCode()
-        code.undoManager?.removeAllActions()
+        code.setText(original)
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
         guard let main = view.window?.windowController as? MainWindowController,
               let tab = main.tabs.first(where: { $0.content === self }) else { return }

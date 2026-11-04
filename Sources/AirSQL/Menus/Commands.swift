@@ -32,6 +32,9 @@ import AppKit
     @objc optional func runSQLFile(_ sender: Any?)
     @objc optional func importCSV(_ sender: Any?)
     @objc optional func importSSHConfig(_ sender: Any?)
+    @objc optional func importConnections(_ sender: Any?)
+    @objc optional func exportConnections(_ sender: Any?)
+    @objc optional func newConnectionFromURL(_ sender: Any?)
 
     // Edit
     @objc optional func copyWithHeaders(_ sender: Any?)
@@ -80,6 +83,8 @@ import AppKit
     @objc optional func renameResult(_ sender: Any?)
     @objc optional func closeResult(_ sender: Any?)
     @objc optional func closeOtherResults(_ sender: Any?)
+    @objc optional func showNextResult(_ sender: Any?)
+    @objc optional func showPreviousResult(_ sender: Any?)
     @objc optional func exportResult(_ sender: Any?)
     @objc optional func compareResult(_ sender: Any?)
     @objc optional func toggleComment(_ sender: Any?)
@@ -311,6 +316,12 @@ enum Commands {
                                    tip: "Load rows from a CSV file into a table, choosing which column goes where")
     static let importSSHConfig = Command("Import from ~/.ssh/config…", #selector(AirSQLActions.importSSHConfig(_:)),
                                          tip: "Make connections that tunnel through the SSH hosts in your ~/.ssh/config")
+    static let importConnections = Command("Import Connections…", #selector(AirSQLActions.importConnections(_:)),
+                                           tip: "Add connections from another app or an export file, without passwords")
+    static let exportConnections = Command("Export Connections…", #selector(AirSQLActions.exportConnections(_:)),
+                                           tip: "Save the selected connections, or all of them, to a file, without passwords")
+    static let newConnectionFromURL = Command("New Connection from URL…", #selector(AirSQLActions.newConnectionFromURL(_:)),
+                                              tip: "Make a connection from a mysql:// address")
 
     // MARK: Edit
     static let undo = Command("Undo", sel("undo:"), "z", tip: "Undo the last change")
@@ -343,7 +354,7 @@ enum Commands {
                               tip: "Find text in the editor, or values in the grid's loaded rows")
     static let findAndReplace = Command("Find and Replace…", #selector(NSResponder.performTextFinderAction(_:)), "f", [.command, .option],
                                         tag: NSTextFinder.Action.showReplaceInterface.rawValue,
-                                        tip: "Find and replace text in the editor, or values in the grid as pending edits")
+                                        tip: "Find and replace text in the editor, or values in a table tab as pending edits")
     static let findNext = Command("Find Next", #selector(NSResponder.performTextFinderAction(_:)), "g",
                                   tag: NSTextFinder.Action.nextMatch.rawValue, tip: "Show the next match")
     static let findPrevious = Command("Find Previous", #selector(NSResponder.performTextFinderAction(_:)), "G",
@@ -434,6 +445,10 @@ enum Commands {
     static let renameResult = Command("Rename Result…", #selector(AirSQLActions.renameResult(_:)),
                                       tip: "Give this result tab a name of your own")
     static let closeResult = Command("Close Result", #selector(AirSQLActions.closeResult(_:)), tip: "Close this result tab")
+    static let nextResult = Command("Show Next Result", #selector(AirSQLActions.showNextResult(_:)), "]", [.command, .option],
+                                    tip: "Show the next result tab, or Messages")
+    static let previousResult = Command("Show Previous Result", #selector(AirSQLActions.showPreviousResult(_:)), "[", [.command, .option],
+                                        tip: "Show the previous result tab, or Messages")
     static let closeOtherResults = Command("Close Other Results", #selector(AirSQLActions.closeOtherResults(_:)),
                                            tip: "Close every result tab but this one")
     static let exportResult = Command("Export Result…", #selector(AirSQLActions.exportResult(_:)),
@@ -682,7 +697,7 @@ enum Commands {
         about, settings, hide, hideOthers, showAll, quit,
         newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
-        runSQLFile, importCSV, importSSHConfig,
+        runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
@@ -690,7 +705,7 @@ enum Commands {
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
-        closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
+        closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,

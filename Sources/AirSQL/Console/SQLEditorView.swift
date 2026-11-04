@@ -4,7 +4,7 @@ import AppKit
 /// The console's SQL editor (plan §2.6): SF Mono, coloured by SQLLexer as the mockups colour SQL, line numbers, the
 /// matching bracket, comment and indent commands, and Return keeping the line's indentation. Plain text only: nothing
 /// is ever substituted (quotes, dashes, links, spelling).
-final class SQLEditorView: NSTextView {
+final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     /// The session's NO_BACKSLASH_ESCAPES, which decides where strings end.
     var noBackslashEscapes = false { didSet { if noBackslashEscapes != oldValue { highlightAll() } } }
     /// Called after every change of the text (the console saves and marks itself edited).
@@ -19,8 +19,16 @@ final class SQLEditorView: NSTextView {
     var completionPopup: CompletionPopup?
     /// .sql files dropped on the editor: the console opens them.
     var onDropFiles: (([URL]) -> Void)?
+    /// Where the last Run failed, underlined until the text changes.
+    var runProblem: SQLProblem? { didSet { if runProblem != oldValue { underlineProblems() } } }
+    /// What the text leaves open (`ConsoleScript.unclosed`), as of the last pause in the typing.
+    private var unclosed: [SQLProblem] = [] { didSet { if unclosed != oldValue { underlineProblems() } } }
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
+    /// Its own, not the window's: Undo in one console must never change another's hidden text, and an object editor's
+    /// loaded code must not wipe the consoles' steps.
+    private let ownUndoManager = UndoManager()
+    override var undoManager: UndoManager? { ownUndoManager }
     static let indentUnit = "    "
 
     /// A TextKit 1 editor in a scroll view with a line-number ruler, not wrapping lines.
@@ -85,6 +93,7 @@ final class SQLEditorView: NSTextView {
         font = .monospacedSystemFont(ofSize: size, weight: .regular)
         typingAttributes = [.font: font!, .foregroundColor: NSColor.labelColor]
         highlightAll()
+        underlineProblems()
         (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
     }
 
@@ -97,9 +106,14 @@ final class SQLEditorView: NSTextView {
     }
 
     override func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        if item.action == #selector(performTextFinderAction(_:)) { return onFind != nil }
+        if item.action == #selector(performTextFinderAction(_:)), !usesFindBar { return onFind != nil }
+        if item.action == Commands.undo.action { return ownUndoManager.canUndo }
+        if item.action == Commands.redo.action { return ownUndoManager.canRedo }
         return super.validateMenuItem(item)
     }
+
+    @objc func undo(_ sender: Any?) { ownUndoManager.undo() }
+    @objc func redo(_ sender: Any?) { ownUndoManager.redo() }
 
     // MARK: Colours
 
@@ -108,6 +122,7 @@ final class SQLEditorView: NSTextView {
         tokens = []
         highlightedLength = 0
         highlight()
+        checkLater()
     }
 
     override func didChangeText() {
@@ -120,6 +135,8 @@ final class SQLEditorView: NSTextView {
             highlight()
         }
         clearMarks()
+        runProblem = nil
+        checkLater()
         (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
         onChange?()
     }
@@ -159,8 +176,6 @@ final class SQLEditorView: NSTextView {
         storage.endEditing()
     }
 
-    // MARK: Marks (what ran, the matching bracket)
-
     /// Shows for a moment, behind its text, the statement that ran (no chooser: the highlight says what ran).
     func flash(_ range: NSRange) {
         guard let layout = layoutManager, NSMaxRange(range) <= (string as NSString).length else { return }
@@ -171,6 +186,48 @@ final class SQLEditorView: NSTextView {
             layout.removeTemporaryAttribute(.backgroundColor, forCharacterRange: range)
         }
     }
+
+    // MARK: Problems (underlined in red, the message on hover)
+
+    var problems: [SQLProblem] { [runProblem].compactMap { $0 } + unclosed }
+
+    /// A pause first: `(` is only a problem if nothing follows it.
+    private func checkLater() {
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(check), object: nil)
+        perform(#selector(check), with: nil, afterDelay: 0.5)
+    }
+
+    @objc func check() {
+        unclosed = ConsoleScript.unclosed(in: string, noBackslashEscapes: noBackslashEscapes)
+    }
+
+    /// Draws `problems` again. The hover areas are fixed rectangles, so they're remade whenever the text moves.
+    private func underlineProblems() {
+        guard let layout = layoutManager, let container = textContainer else { return }
+        let length = (string as NSString).length
+        layout.removeTemporaryAttribute(.underlineStyle, forCharacterRange: NSRange(location: 0, length: length))
+        layout.removeTemporaryAttribute(.underlineColor, forCharacterRange: NSRange(location: 0, length: length))
+        let tip = toolTip  // an object editor has one for the whole view
+        removeAllToolTips()
+        toolTip = tip
+        for problem in problems where problem.range.upperBound <= length {
+            let range = NSRange(problem.range)
+            layout.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.thick.rawValue, .underlineColor: NSColor.statusBad],
+                                          forCharacterRange: range)
+            let glyphs = layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let none = NSRange(location: NSNotFound, length: 0)
+            layout.enumerateEnclosingRects(forGlyphRange: glyphs, withinSelectedGlyphRange: none, in: container) { rect, _ in
+                self.addToolTip(rect.offsetBy(dx: self.textContainerOrigin.x, dy: self.textContainerOrigin.y), owner: self, userData: nil)
+            }
+        }
+    }
+
+    func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+        let index = characterIndexForInsertion(at: point)
+        return problems.first { ($0.range.lowerBound...$0.range.upperBound).contains(index) }?.message ?? ""
+    }
+
+    // MARK: Marks (what ran, the matching bracket)
 
     private var bracketMarks: [NSRange] = []
 

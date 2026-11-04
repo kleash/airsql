@@ -24,6 +24,8 @@ own session, which every console tab of that connection shares.
 ## Write SQL
 
 - Keywords, names, strings, numbers and comments have their own colours; the brackets around the cursor are marked.
+- A quote, comment or bracket left open is underlined in red a moment after you stop typing, and hovering over it says
+  what's missing. No server is asked.
 - **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
   keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
   elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
@@ -74,13 +76,19 @@ nothing runs.
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
   tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
+  A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
+  Messages included.
 - Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
 - **Messages** lists what each statement did: its rows or the rows it changed, how long it took, the server's
-  warnings, or its error and the line it points to (that line is marked red beside the editor). Double-click a message
+  warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
+  names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
   to select its statement.
 - A result keeps at most its first 100,000 rows; the tab then says it is cut short.
+- **Edit ▸ Find** (⌘F) with a result's rows focused finds values in them, as in a [table tab](table-data.md): ⌘G and ⇧⌘G
+  move between matches, and Options has Match Case, Regular Expression, Whole Words and Filter Rows. Replace is for
+  table tabs.
 - **Filter, search and sort a result** on its rows, at once, without running the query again: right-click a cell for
   **Quick Filter** (the same conditions as in a [table tab](table-data.md#filter-search-and-sort), Type a Value…
   included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Sort by

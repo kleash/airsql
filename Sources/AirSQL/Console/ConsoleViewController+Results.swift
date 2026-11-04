@@ -161,6 +161,16 @@ extension ConsoleViewController {
         }
     }
 
+    @objc func showNextResult(_ sender: Any?) { stepResult(1) }
+    @objc func showPreviousResult(_ sender: Any?) { stepResult(-1) }
+
+    /// Shows the tab `offset` along the bar, Messages included, going round at the ends.
+    private func stepResult(_ offset: Int) {
+        let tabs = allResultTabs
+        guard let shown = selectedResult ?? resultTabs.last, let index = tabs.firstIndex(where: { $0 === shown }) else { return }
+        selectResult(tabs[(index + offset + tabs.count) % tabs.count])
+    }
+
     /// Export Result…: the shown result's Export Rows…, wherever the focus is.
     @objc func exportResult(_ sender: Any?) {
         guard let grid = currentResult?.view as? ResultGridView else { return NSSound.beep() }
