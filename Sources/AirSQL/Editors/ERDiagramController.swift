@@ -55,6 +55,13 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         let menu = NSMenu()
         menu.add([Commands.openStructure, Commands.copyName])
         canvas.menu = menu
+        canvas.blankMenu = NSMenu()
+        for control in [exportImage, exportMermaid] {
+            let item = NSMenuItem(title: control.title, action: control.action, keyEquivalent: "")
+            item.target = self
+            item.toolTip = control.toolTip
+            canvas.blankMenu?.addItem(item)
+        }
         let root = editorLayout(bar: bar, content: scroll)
         root.addSubview(overlay)
         overlay.translatesAutoresizingMaskIntoConstraints = false

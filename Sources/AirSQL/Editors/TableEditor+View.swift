@@ -234,6 +234,11 @@ extension TableEditorController {
         case Commands.addRow.action?, Commands.duplicateRow.action?, Commands.deleteRows.action?:
             enabled = !isBusy && section != .options && (item.action == Commands.addRow.action || !list.selectedRowIndexes.isEmpty)
             reason = section == .options ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"
+            // Off while typing: ⌘⌫ reaches the text as delete to the line's start.
+            if item.action == Commands.deleteRows.action, sections.window?.firstResponder is NSText {
+                enabled = false
+                reason = "Finish typing in the cell first"
+            }
         case Commands.copy.action?:
             enabled = canCopyRows
             reason = section == .options ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"

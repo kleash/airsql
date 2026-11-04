@@ -64,10 +64,11 @@ extension DataGridView {
         }
     }
 
-    /// A right click on a cell that isn't selected selects it first; the delegate's menu acts on the selection.
+    /// A right click on a cell that isn't selected selects it first; the delegate's menu acts on the selection (off the
+    /// cells too, for Add Row).
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let position = position(at: convert(event.locationInWindow, from: nil)), takeKeyboard() else { return nil }
-        if !selection.contains(position) { selection.select(position) }
+        guard takeKeyboard() else { return nil }
+        if let position = position(at: convert(event.locationInWindow, from: nil)), !selection.contains(position) { selection.select(position) }
         return delegate?.dataGrid(self, menuFor: .cells)
     }
 

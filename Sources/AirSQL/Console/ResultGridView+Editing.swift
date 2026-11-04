@@ -177,7 +177,8 @@ extension ResultGridView {
     override func responds(to selector: Selector!) -> Bool {
         if selector == #selector(AirSQLActions.saveQuery(_:)) { return edits?.isEmpty == false }
         // Text being typed undoes itself: ⌘Z goes on past the result to the window's undo manager.
-        if selector == Commands.undo.action || selector == Commands.redo.action, window?.firstResponder is NSTextView { return false }
+        // Likewise ⌘⌫: off here, it reaches the text as delete to the line's start.
+        if [Commands.undo.action, Commands.redo.action, Commands.deleteRows.action].contains(selector), window?.firstResponder is NSTextView { return false }
         if Self.editingActions.contains(selector) { return edits?.editing?.isEditable == true }
         return super.responds(to: selector)
     }

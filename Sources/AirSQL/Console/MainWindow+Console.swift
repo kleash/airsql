@@ -50,13 +50,18 @@ extension MainWindowController: AgentConsoles {
     }
 
     /// Opens each file in a console tab of the active connection (reading them off the main thread); a file already
-    /// open shows its tab, also one of the last session's tabs coming back or one opened while the file was read.
+    /// open shows its tab, also one of the last session's tabs coming back or one opened while the file was read. A .csv
+    /// or .sql.gz opens its tool's sheet instead, with the file chosen.
     @discardableResult
     func openFiles(_ urls: [URL]) -> Task<Void, Never> {
         let connection = activeConnection?.id
         return Task {
             await ConsoleDocuments.shared.restoring?.value
             for url in urls {
+                if SQLEditorView.opensInSheet(url) {
+                    sequence(first: self as NSResponder, next: \.nextResponder).lazy.compactMap { $0 as? ToolsResponder }.first?.open(file: url)
+                    continue
+                }
                 let read = await Task.detached { () -> Result<String, Error> in
                     Result { try String(contentsOf: url, encoding: .utf8) }
                 }.value

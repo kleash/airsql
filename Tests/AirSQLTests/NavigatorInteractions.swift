@@ -11,8 +11,8 @@ extension AppTests.InteractionTests {
         let orders = DatabaseObject(.table, "airsql_fixture", "orders")
         let procedure = DatabaseObject(.procedure, "airsql_fixture", "add_customer")
         let views = SidebarNode.Kind.category(id, "airsql_fixture", .view)
-        let tableMenu = ["Open Data", "Open Structure", "Copy Name", "Generate SELECT", "Generate INSERT", "Generate UPDATE",
-                         "Export…", "Copy Table…", "Bulk Table Editor…", "Maintenance", "Truncate…", "Rename…", "Drop…", "Refresh"]
+        let tableMenu = ["Open Data", "Open Structure", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Generate SELECT",
+                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Maintenance", "Truncate…", "Rename…", "Drop…", "Refresh"]
         let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Generate SELECT", "Generate INSERT",
                                           "Generate UPDATE", "Copy Table…", "Bulk Table Editor…", "Maintenance", "Truncate…",
                                           "Rename…", "Drop…", "Refresh"]
@@ -29,7 +29,7 @@ extension AppTests.InteractionTests {
                     doubleClicked: { main, _ in
                         main.model.openConnection(id)?.currentDatabase == "airsql_fixture" && expanded(main, .database(id, "airsql_fixture"))
                     },
-                    menu: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Generate Liquibase Changelog…",
+                    menu: ["New Query", "New Database…", "Create Table…", "Copy Name", "Copy Name Without Quotes", "Export…", "Restore…", "Generate Liquibase Changelog…",
                            "Compare…", "Refresh", "Drop…"],
                     enabled: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Refresh", "Drop…"]),
             Surface(name: "Table or view in the tree",

@@ -6,13 +6,15 @@ import AppKit
 /// right-click opens the table menu; ⌘ and ⇧ select several for the bulk commands; the headers sort.
 @MainActor
 final class DatabaseViewController: NSViewController, TabContent, NSTableViewDataSource, NSTableViewDelegate,
-    NSMenuItemValidation {
+    NSMenuItemValidation, NSSearchFieldDelegate {
     let open: OpenConnection
     let database: String
     let table = DatabaseTableView()
     private(set) var rows: [SchemaTable] = []
     private let caption = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
+    let filter = NSSearchField()
+    private let empty = label("", font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
     /// The columns share the view's width down to `minimum`, then it scrolls sideways.
     private static let columns: [(id: String, title: String, width: CGFloat, minimum: CGFloat, tip: String)] = [
         ("name", "Name", 180, 120, "The table's name"), ("rows", "Rows", 80, 60, "About how many rows (InnoDB estimates it)"),
@@ -41,6 +43,17 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         spinner.isDisplayedWhenStopped = false
         spinner.translatesAutoresizingMaskIntoConstraints = false
         spinner.setAccessibilityLabel("Loading")
+        filter.placeholderString = "Filter by name"
+        filter.toolTip = "Type part of a name to show only the tables that have it"
+        filter.setAccessibilityIdentifier("database.filter")
+        filter.delegate = self
+        filter.sendsSearchStringImmediately = true
+        filter.translatesAutoresizingMaskIntoConstraints = false
+        empty.alignment = .center
+        empty.menu = NSMenu(title: "Tables")
+        empty.menu?.add([Commands.createTable, Commands.refresh])
+        empty.setAccessibilityIdentifier("database.empty")
+        empty.translatesAutoresizingMaskIntoConstraints = false
         for column in Self.columns {
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.id))
             tableColumn.title = column.title
@@ -51,6 +64,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             if ["rows", "data", "index"].contains(column.id) { tableColumn.headerCell.alignment = .right }
             table.addTableColumn(tableColumn)
         }
+        table.autosaveName = layoutName("Database tables")  // its widths and sort, for next time
+        table.autosaveTableColumns = true
         table.style = .fullWidth
         table.usesAlternatingRowBackgroundColors = true
         table.allowsMultipleSelection = true
@@ -69,13 +84,16 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        [title, spinner, caption, scroll].forEach(root.addSubview)
+        [title, spinner, caption, filter, scroll, empty].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             title.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double),
             title.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
             spinner.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: Spacing.unit),
             spinner.centerYAnchor.constraint(equalTo: title.centerYAnchor),
-            spinner.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -Spacing.double),
+            spinner.trailingAnchor.constraint(lessThanOrEqualTo: filter.leadingAnchor, constant: -Spacing.unit),
+            filter.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+            filter.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.double),
+            filter.widthAnchor.constraint(equalToConstant: 200),
             caption.topAnchor.constraint(equalTo: title.bottomAnchor, constant: Spacing.half),
             caption.leadingAnchor.constraint(equalTo: title.leadingAnchor),
             caption.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -Spacing.double),
@@ -83,6 +101,9 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            empty.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+            empty.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
+            empty.widthAnchor.constraint(lessThanOrEqualTo: scroll.widthAnchor, constant: -2 * Spacing.double),
         ])
         view = root
         NotificationCenter.default.addObserver(self, selector: #selector(changed), name: .openConnectionDidChange, object: open)
@@ -91,6 +112,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     }
 
     @objc private func changed() { reload() }
+
+    func controlTextDidChange(_ notification: Notification) { reload() }
 
     /// The columns take the width there is.
     override func viewDidLayout() {
@@ -102,18 +125,23 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     func reload() {
         let selected = Set(table.selectedRowIndexes.compactMap { rows[safe: $0]?.name })
         let found = open.snapshot.database(database)
-        rows = sorted(found?.tables ?? [], found?.statistics ?? [:])
+        let text = filter.stringValue.trimmingCharacters(in: .whitespaces)
+        let all = found?.tables ?? []
+        rows = sorted(text.isEmpty ? all : all.filter { $0.name.localizedCaseInsensitiveContains(text) }, found?.statistics ?? [:])
         table.reloadData()
         table.selectRowIndexes(IndexSet(rows.indices.filter { selected.contains(rows[$0].name) }), byExtendingSelection: false)
         let loading = open.loading.contains(.statistics(database))
         if loading { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
-        var parts = ["\(rows.count) table\(rows.count == 1 ? "" : "s") and views"]
+        var parts = [(text.isEmpty ? "" : "\(rows.count) of ") + "\(all.count) table\(all.count == 1 ? "" : "s") and views"]
         if let found { parts.append(found.charset + " · " + found.collation) }
         if loading { parts.append("reading sizes…") } else if found?.statistics == nil, let error = open.loadError {
             parts.append("couldn't read sizes: " + error)
         }
         caption.stringValue = found == nil ? "This database isn't on the server any more." : parts.joined(separator: " · ")
         caption.toolTip = caption.stringValue
+        empty.stringValue = !rows.isEmpty || found == nil ? ""
+            : all.isEmpty ? "No tables yet. Right-click here and choose Create Table…." : "No table has “\(text)” in its name."
+        empty.isHidden = empty.stringValue.isEmpty
     }
 
     private func sorted(_ tables: [SchemaTable], _ statistics: [String: TableStatistics]) -> [SchemaTable] {
@@ -193,10 +221,10 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     }
 
     func contextMenu() -> NSMenu? {
-        guard !selectedObjects.isEmpty else { return nil }
+        guard !selectedObjects.isEmpty else { return empty.menu }
         let menu = NSMenu(title: "Table")
-        menu.add([Commands.openData, Commands.openStructure, Commands.copyName, nil, Commands.generateSelect,
-                  Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable, Commands.bulkEdit])
+        menu.add([Commands.openData, Commands.openStructure, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, nil,
+                  Commands.generateSelect, Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable, Commands.bulkEdit])
         menu.addItem(NavigatorMenus.maintenance())
         menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.refresh])
         return menu
@@ -225,6 +253,15 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     @objc func copyName(_ sender: Any?) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(selectedObjects.map { SQLQuote.identifier($0.name) }.joined(separator: ", "), forType: .string)
+    }
+
+    @objc func copyPlainName(_ sender: Any?) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(selectedObjects.map(\.name).joined(separator: ", "), forType: .string)
+    }
+
+    @objc func copyCreateStatement(_ sender: Any?) {
+        if let first = selectedObjects.first { NavigatorActions.copyCreate(first, on: open, window: view.window) }
     }
 
     /// ⌘C: the selected tables' names.
@@ -273,7 +310,10 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 final class DatabaseTableView: NSTableView {
     weak var owner: DatabaseViewController?
 
-    override func menu(for event: NSEvent) -> NSMenu? { selectsRow(for: event) ? owner?.contextMenu() : nil }
+    override func menu(for event: NSEvent) -> NSMenu? {
+        if !selectsRow(for: event) { deselectAll(nil) }
+        return owner?.contextMenu()
+    }
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {

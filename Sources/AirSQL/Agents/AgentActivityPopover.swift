@@ -85,7 +85,8 @@ final class AgentActivityPopover: NSViewController {
             list.addArrangedSubview(text)
         }
         for event in events {
-            let what = label(event.summary, font: .systemFont(ofSize: 12), truncates: true)
+            let what = label(event.summary, font: .systemFont(ofSize: 12), wraps: true)
+            what.preferredMaxLayoutWidth = 300
             what.toolTip = event.client + ": " + event.summary
             let when = label(Self.time.string(from: event.time), font: .monospacedDigitSystemFont(ofSize: 11, weight: .regular),
                              color: NSColor.quietText)
@@ -96,6 +97,7 @@ final class AgentActivityPopover: NSViewController {
                                color: event.failed ? .statusBad : NSColor.quietText, truncates: true)
             result.toolTip = outcome
             let row = EventRow(views: [top, result])
+            row.text = event.client + ": " + event.summary + " · " + outcome
             if let run = service.runs.first(where: { $0.call == event.id }) {
                 row.open = { [weak self] in
                     guard let self else { return }
@@ -121,13 +123,29 @@ final class AgentActivityPopover: NSViewController {
 /// A call's row: a double-click anywhere on it opens what it got, when it got rows.
 private final class EventRow: NSStackView {
     var open: (() -> Void)?
+    /// What Copy puts on the pasteboard.
+    var text = ""
 
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2, let open { open() } else { super.mouseDown(with: event) }
     }
 
     /// The labels' clicks are the row's.
-    override func hitTest(_ point: NSPoint) -> NSView? { open != nil && super.hitTest(point) != nil ? self : super.hitTest(point) }
+    override func hitTest(_ point: NSPoint) -> NSView? { super.hitTest(point) != nil ? self : nil }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = NSMenu(title: "Call")
+        let copy = NSMenuItem(title: "Copy", action: #selector(copyText), keyEquivalent: "")
+        copy.target = self
+        copy.toolTip = "Copy what the agent asked and how it ended"
+        menu.addItem(copy)
+        return menu
+    }
+
+    @objc private func copyText() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
 }
 
 /// A stack as a scroll view's document, laid out from the top.

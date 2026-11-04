@@ -37,6 +37,8 @@ final class ConsoleViewController: NSViewController, TabContent {
         var ranCode = false
     }
     static var shared: [UUID: Shared] = [:]
+    /// The width Query Helpers last had, in any tab.
+    static var helpersWidth: CGFloat = 260
 
     let model: AppModel
     /// The document's own id: what restores it after relaunch.

@@ -42,6 +42,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private let content = NSStackView()
     let body = NSView()
     private(set) var valuePanel: GridValuePanel?
+    /// The width it last had, in any tab.
+    private static var valuePanelWidth: CGFloat = 320
     private let recordBar = NSStackView()
     let recordLabel = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
 
@@ -340,6 +342,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// Value Panel (⇧↩): the focused cell's whole value beside the grid.
     @objc func toggleValuePanel(_ sender: Any?) {
         if let valuePanel {
+            Self.valuePanelWidth = valuePanel.frame.width
             valuePanel.removeFromSuperview()
             self.valuePanel = nil
         } else {
@@ -347,7 +350,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             split.addArrangedSubview(panel)
             split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
             split.layoutSubtreeIfNeeded()
-            split.setPosition(max(240, split.bounds.width - 320), ofDividerAt: 0)
+            split.setPosition(max(240, split.bounds.width - Self.valuePanelWidth), ofDividerAt: 0)
             valuePanel = panel
             updateValuePanel()
         }
