@@ -93,13 +93,13 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         let message = messages[row]
         if identifier.rawValue == "icon" {
             let image = NSImageView()
-            let (symbol, color): (String, NSColor) = switch message.level {
-            case .ok: ("checkmark.circle.fill", .statusOK)
-            case .warning: ("exclamationmark.triangle.fill", .statusWarning)
-            case .error: ("xmark.octagon.fill", .statusBad)
-            case .info: ("info.circle", .secondaryLabelColor)
+            let (symbol, color, name): (String, NSColor, String) = switch message.level {
+            case .ok: ("checkmark.circle.fill", .statusOK, "Done")
+            case .warning: ("exclamationmark.triangle.fill", .statusWarning, "Warning")
+            case .error: ("xmark.octagon.fill", .statusBad, "Error")
+            case .info: ("info.circle", .secondaryLabelColor, "Note")
             }
-            image.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            image.image = NSImage(systemSymbolName: symbol, accessibilityDescription: name)
             image.contentTintColor = color
             image.imageAlignment = .alignTop
             return image

@@ -280,7 +280,8 @@ extension ResultGridView {
         }
         TableDataController.applying.insert(connection)
         notice.apply.isEnabled = false
-        let activity = model.activity.start("Applying changes to a result", connection: connection)
+        let stop = ApplyStop()
+        let activity = model.activity.start("Applying changes to a result", connection: connection) { stop.stop() }
         Task {
             defer {
                 TableDataController.applying.remove(connection)
@@ -289,7 +290,11 @@ extension ResultGridView {
             }
             do {
                 let session = try await open()
-                try await PendingChanges.apply(statements) { sql in try await session.query(sql, rowCap: 1).last?.affectedRows ?? 0 }
+                stop.session = session
+                try await PendingChanges.apply(statements) { sql in
+                    try stop.starting(sql)
+                    return try await session.query(sql, rowCap: 1).last?.affectedRows ?? 0
+                }
                 var read: [(rows: ResultStore, source: Int, columns: [Int])] = []
                 for item in edits.readBack(noBackslashEscapes: session.noBackslashEscapes) {
                     if let rows = try? await session.query(item.sql, rowCap: PendingChanges.deleteBatch).first?.rows {

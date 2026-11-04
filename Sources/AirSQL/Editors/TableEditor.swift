@@ -42,6 +42,7 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
                              primary: true)
     let discardButton = button("Revert", id: "tableEditor.discard", tip: "", target: nil,
                                action: #selector(AirSQLActions.revertChanges(_:)))
+    let listHint = label("", color: .secondaryLabelColor)
     let status = NSProgressIndicator()
     let overlay = EditorOverlay()
 

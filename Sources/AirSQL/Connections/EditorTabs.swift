@@ -148,9 +148,9 @@ extension ConnectionEditor {
 
     func tlsTab() -> NSView {
         let form = Form()
-        let modes: [(String, TLSOptions.Mode)] = [("Off", .off), ("Required, not checked", .required),
-                                                  ("Check the authority", .verifyCA),
-                                                  ("Check the authority and host name", .verifyIdentity)]
+        let modes: [(String, TLSOptions.Mode)] = [("Off", .off), ("Encrypt, don't check the server", .required),
+                                                  ("Encrypt, check the certificate", .verifyCA),
+                                                  ("Encrypt, check certificate and host name", .verifyIdentity)]
         form.row("TLS", [choice(\.tls.mode, modes, id: "editor.tlsMode",
                                 tip: "Choose how the connection is encrypted and how the server proves who it is") { [weak self] in
             self?.refreshTab()
@@ -159,7 +159,7 @@ extension ConnectionEditor {
                 + "to trust when you connect: AirSQL then remembers it and refuses any other."
             : "Not used with the server's own socket, which never leaves this Mac.")
         guard draft.tls.mode != .off else { return content(form) }
-        form.row("Authority file", file(\.tls.caFile, placeholder: "macOS's own", id: "editor.caFile",
+        form.row("CA certificate", file(\.tls.caFile, placeholder: "macOS's own", id: "editor.caFile",
                                         tip: "Choose the PEM file of a private certificate authority to trust besides the Mac's"))
         form.row("Certificate", file(\.tls.certFile, placeholder: "none", id: "editor.certFile",
                                      tip: "Choose your client certificate (PEM), for a server that asks for one"))
@@ -190,7 +190,7 @@ extension ConnectionEditor {
         let form = Form()
         form.row("", [toggle("Read-only", \.readOnly, id: "editor.readOnly",
                              tip: "Refuse anything but reads on this connection, from every window and from agents")])
-        form.row("", [toggle("Compressed protocol", \.compress, id: "editor.compress",
+        form.row("", [toggle("Compress traffic", \.compress, id: "editor.compress",
                              tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
         let timeout = textField(draft.queryTimeout == 0 ? "" : String(draft.queryTimeout), placeholder: "none",
                                 id: "editor.queryTimeout", tip: "Type how many seconds a statement may run before it is "

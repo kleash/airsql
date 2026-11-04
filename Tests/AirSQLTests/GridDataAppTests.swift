@@ -271,6 +271,24 @@ extension AppTests {
             _ = await call(harness, "press", ["title": "OK"])
         }
 
+        @Test func stoppingAnApplyLeavesCommitAlone() async throws {
+            let session = FakeTableSession()
+            let stop = ApplyStop()
+            stop.session = session
+            try stop.starting("START TRANSACTION")
+            try stop.starting("COMMIT")
+            stop.stop()  // COMMIT is running: nothing is sent, and only ROLLBACK may follow
+            #expect(throws: AirSQLError.self) { try stop.starting("UPDATE t SET a = 1") }
+            try stop.starting("ROLLBACK")
+            await Task.yield()
+            #expect(session.cancelled.isEmpty)
+            let second = ApplyStop()
+            second.session = session
+            try second.starting("UPDATE t SET a = 1")
+            second.stop()
+            #expect(await eventually { session.cancelled == ["UPDATE t SET a = 1"] })
+        }
+
         @Test func previewShowsTheSQLAndWarnsBeforeApply() async throws {
             let (main, harness, tab) = try await Self.tab()
             tab.source?.set(.null, row: 0, column: 1)

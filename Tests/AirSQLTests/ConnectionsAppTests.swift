@@ -25,7 +25,7 @@ extension AppTests {
         }
         #expect(await call(harness, "press", ["title": "TLS"]).error == nil)
         #expect(sheet.tab == .tls)
-        #expect(await call(harness, "set", ["id": "editor.tlsMode", "value": "Check the authority"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.tlsMode", "value": "Encrypt, check the certificate"]).error == nil)
         #expect(await call(harness, "set", ["id": "editor.cleartext", "value": true]).error == nil)
         #expect(await call(harness, "press", ["title": "SSH and Proxy"]).error == nil)
         #expect(await call(harness, "set", ["id": "editor.jump0.host", "value": "bastion.example.com"]).error == nil)

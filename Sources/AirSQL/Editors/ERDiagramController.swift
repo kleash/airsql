@@ -108,7 +108,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         overlay.show(loading: "Reading the tables of \(database ?? "the server")…")
         exportImage.isEnabled = false
         exportMermaid.isEnabled = false
-        let work = activity.start("Drawing the diagram of \(database ?? "a database")", connection: context.connection.id) {}
+        let work = activity.start("Drawing the diagram of \(database ?? "a database")", connection: context.connection.id)
         let context = self.context
         Task {
             defer { work.end() }
@@ -144,12 +144,14 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         databases.addItems(withTitles: names)
         databases.selectItem(withTitle: database ?? "")
         let tables = diagram.columns.reduce(0) { $0 + $1.count }
-        summary.stringValue = tables == 0 ? "No tables here yet" : "\(tables) tables, \(diagram.links.count) foreign keys"
+        summary.stringValue = tables == 0 ? "No tables here yet: choose another database, or add one with Database ▸ Create Table…" : "\(tables) tables, \(diagram.links.count) foreign keys"
         summary.toolTip = summary.stringValue
         overlay.hide()
         exportImage.isEnabled = tables > 0
         exportMermaid.isEnabled = tables > 0
-        for button in [exportImage, exportMermaid] where !button.isEnabled { button.toolTip = "There are no tables to export" }
+        exportImage.toolTip = tables > 0 ? "Save the diagram as a PNG picture" : "There are no tables to export"
+        exportMermaid.toolTip = tables > 0 ? "Save the diagram as Mermaid text, for docs and wikis that draw it"
+            : "There are no tables to export"
         if let main = view.window?.windowController as? MainWindowController, let tab = main.tabs.first(where: { $0.content === self }) {
             main.rename(tab, to: tabTitle)
         }

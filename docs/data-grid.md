@@ -15,8 +15,8 @@ a column's summary. Loading, filtering, editing, copying and exporting a table's
 Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:
 
 - a gold key: the primary key, or the unique key the grid uses to find a row when there is no primary key;
-- a grey key: another unique key; an outline key: an index;
-- an arrow: a foreign key.
+- a 1 in a circle: another unique key; an outline key: an index;
+- a chain link: a foreign key.
 
 After the type, **auto** marks an auto-increment column, **generated** a generated one, **default** a column with a
 default value, and **null** a column that allows NULL. Hold the pointer over a header for all of this in words and the

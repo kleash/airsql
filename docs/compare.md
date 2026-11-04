@@ -21,7 +21,7 @@ a session of its own. The compare only reads; nothing changes until you run the 
    window's activity list.
 
 The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
-much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
+much of the data had to come over the network. The list shows what differs first: **only source** and **only target**
 for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
 Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
 they differ. The two definitions scroll together.

@@ -122,6 +122,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         okButton = button("Filter", id: "values.ok", tip: "Show only the rows with the ticked values", target: self, action: #selector(ok(_:)))
         okButton.keyEquivalent = "\r"
         okButton.isEnabled = false
+        okButton.toolTip = "Wait until the values are counted"
         containsButton = button("Contains", id: "values.contains", tip: "Show the rows whose \(column.name) contains the text typed above",
                                 target: self, action: #selector(contains(_:)))
         containsButton.isEnabled = false
@@ -147,6 +148,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         let more = rows.count >= Self.limit ? " (the \(Self.limit.formatted()) most frequent)" : ""
         note.stringValue = "\(rows.count.formatted()) values\(more), counted \(place)"
         okButton.isEnabled = true
+        okButton.toolTip = "Show only the rows with the ticked values"
     }
 
     private func filter() {
@@ -200,6 +202,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
     @objc private func contains(_ sender: Any?) { finish(GridCondition(column, .contains, [search.stringValue]), filtering: true) }
 
     private func finish(_ condition: GridCondition?, filtering: Bool) {
+        reading?.cancel()  // nobody is waiting for the values now: it would hold up the shared session
         popover?.close()
         if let window, let parent = window.sheetParent { parent.endSheet(window) }
         if filtering { completion(condition) }

@@ -46,9 +46,11 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         search.sendsSearchStringImmediately = true
         search.translatesAutoresizingMaskIntoConstraints = false
         // The statement and the result share what the time leaves; a long error is shortened, whole in its tooltip.
-        for (identifier, title, width, minimum) in [("time", "When", 150.0, 150.0), ("sql", "Statement", 360.0, 160.0),
-                                                    ("result", "Result", 200.0, 100.0)] {
+        for (identifier, title, width, minimum, tip) in [("time", "When", 150.0, 150.0, "Sort by when it ran"),
+                                                         ("sql", "Statement", 360.0, 160.0, "Sort by the statement's text"),
+                                                         ("result", "Result", 200.0, 100.0, "Sort by what came of it: rows, or an error")] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.headerToolTip = tip
             column.title = title
             column.width = width
             column.minWidth = minimum
@@ -150,6 +152,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
                 : "No statement has these words."
             self.empty.isHidden = !found.isEmpty
             self.insertButton.isEnabled = !found.isEmpty
+            self.insertButton.toolTip = found.isEmpty ? "No statement to insert" : "Put the selected statement in the editor at the cursor"
         }
     }
 

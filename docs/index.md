@@ -37,6 +37,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
   the access you choose.
 - [Liquibase changelogs](liquibase.md): a database as formatted SQL changesets, and any change saved as one.
 - [Keyboard shortcuts](shortcuts.md): every command's shortcut.
+- [Accessibility](accessibility.md): VoiceOver, the keyboard, motion and text size.
 - [Privacy and security](privacy-security.md): what AirSQL connects to, where passwords are kept, what agents may do.
 - [Troubleshooting](troubleshooting.md): when a connection fails, and how to report a problem.
 

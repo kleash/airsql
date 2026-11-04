@@ -14,7 +14,7 @@ with your own `liquibase` (`liquibase update`, `liquibase rollback-count 1`…).
 
 **Tools ▸ Generate Liquibase Changelog…** writes a changelog of a database of the connection the window is about.
 
-- **Content**: **DDL** writes the objects' structure, **DML** their rows, **DDL + DML** both.
+- **Content**: **Structure** writes the objects' DDL, **Rows** their rows as DML, **Both** the two.
 - The list holds the database's tables, views, procedures, functions, triggers, events and sequences, each ticked.
   Untick what you don't want; space ticks the selected rows, double-click ticks one, and the right-click menu
   includes all, none or the selected rows; the filter above the list narrows it, and all and none then mean the

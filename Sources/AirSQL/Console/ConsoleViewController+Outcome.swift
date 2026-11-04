@@ -77,6 +77,7 @@ extension ConsoleViewController {
         }
         let sql = statement?.sql.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         messagesView.append(ConsoleMessage(level: level, range: range, line: first, statement: sql, text: text))
+        if level != .ok { announce(text) }
         if level == .error || level == .info || (level == .warning && statement == nil) || resultTabs.isEmpty {
             selectedResult = messagesTab
         }

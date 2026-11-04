@@ -80,10 +80,12 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
         removeAllToolTips()
         elements = boxes.map { box in
             addToolTip(box.frame, owner: self, userData: nil)
-            let element = NSAccessibilityElement()
+            let element = ERBoxElement()
+            element.open = { [weak self] in self?.onOpen?(box.table.name) }
             element.setAccessibilityParent(self)
-            element.setAccessibilityRole(.group)
-            element.setAccessibilityLabel("Table \(box.table.name), \(box.table.columns.count) columns")
+            element.setAccessibilityRole(.button)
+            element.setAccessibilityLabel("Table \(box.table.name), \(box.table.columns.count) columns: "
+                                          + box.table.columns.map(\.name).joined(separator: ", "))
             element.setAccessibilityFrameInParentSpace(box.frame)
             element.setAccessibilitySelected(box.table.name == selected)
             return element
@@ -224,5 +226,15 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
         rep.size = bounds.size
         cacheDisplay(in: bounds, to: rep)
         return rep.representation(using: .png, properties: [:])
+    }
+}
+
+/// A box for VoiceOver: pressing it opens its table, as a double-click does.
+private final class ERBoxElement: NSAccessibilityElement {
+    var open: (() -> Void)?
+
+    override func accessibilityPerformPress() -> Bool {
+        open?()
+        return true
     }
 }

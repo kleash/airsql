@@ -334,6 +334,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         if failure?.kind == .cancelled { return status.stringValue = "" }
         status.textColor = error == nil ? .statusOK : .statusBad
         status.stringValue = report + (error.map { "\n" + $0.localizedDescription } ?? "")
+        announce(status.stringValue)
         if tab == .tls { refreshTab() }  // a certificate trusted meanwhile
     }
 

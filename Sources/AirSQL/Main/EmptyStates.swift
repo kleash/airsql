@@ -117,7 +117,9 @@ func selectConnectionView() -> NSView {
     let title = label("Select a connection", font: .systemFont(ofSize: 15, weight: .semibold))
     let text = label("Select a connection in the sidebar to see its details, or double-click it to connect.",
                      font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
-    let stack = NSStackView(views: [title, text])
+    let add = button("New Connection…", id: "selectConnection.add", tip: Commands.newConnection.tip + " (⌘N)", target: nil,
+                     action: Commands.newConnection.action)
+    let stack = NSStackView(views: [title, text, add])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = Spacing.unit

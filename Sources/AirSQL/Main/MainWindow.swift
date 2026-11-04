@@ -627,7 +627,7 @@ final class FileDropView: NSView {
 final class MainSplitViewController: NSSplitViewController {
     override func toggleSidebar(_ sender: Any?) {
         guard let item = splitViewItems.first else { return }
-        item.animator().isCollapsed = !item.isCollapsed
+        gently(item).isCollapsed = !item.isCollapsed
     }
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {

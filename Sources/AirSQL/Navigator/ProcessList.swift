@@ -33,6 +33,13 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     private static let columns: [(String, String, CGFloat)] = [("id", "Id", 50), ("user", "User", 80), ("host", "Host", 120),
         ("db", "Database", 90), ("command", "Command", 76), ("time", "Time", 50), ("state", "State", 120), ("info", "Query", 300)]
 
+    private static let columnTips = [
+        "id": "The server's number for this connection, used to kill it",
+        "command": "What the connection is doing: Query runs a statement, Sleep waits for the next one",
+        "time": "How many seconds it has been in this state",
+        "state": "What the statement is busy with now, in the server's words",
+    ]
+
     init(_ open: OpenConnection) {
         self.open = open
         interval = popup(Self.intervals.map { $0 == 0 ? "Off" : "Every \($0) s" }, selected: 2, id: "processes.interval",
@@ -75,7 +82,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             if id == "id" || id == "time" { column.headerCell.alignment = .right }
             // Time starts with the longest running, the main reason to sort.
             column.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: id != "time")
-            column.headerToolTip = "Sort by " + title.lowercased() + "; click again to reverse"
+            column.headerToolTip = (Self.columnTips[id].map { $0 + ". " } ?? "") + "Click to sort by it, again to reverse"
             table.addTableColumn(column)
         }
         table.autosaveName = layoutName("Processes")  // its widths and sort, for next time
@@ -200,7 +207,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         updateButtons()
         let busy = processes.filter { $0.info != nil }.count
         status.stringValue = (processes.count == found.count ? "\(found.count)" : "\(processes.count) of \(found.count)")
-            + " connections, \(busy) running a statement · read at " + readAt.formatted(date: .omitted, time: .standard)
+            + " processes, \(busy) running a statement · read at " + readAt.formatted(date: .omitted, time: .standard)
         status.toolTip = status.stringValue
     }
 

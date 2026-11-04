@@ -83,8 +83,11 @@ final class AgentsPane: SettingsPaneController {
             DispatchQueue.main.async { table?.reloadData() }
         })
         // Access as wide as its pop-up with its longest level, "Schema + read + analytics".
-        for (id, title, width) in [("name", "Connection", 140.0), ("access", "Access", 214.0), ("samples", "Sample rows", 96.0)] {
+        for (id, title, width, tip) in [("name", "Connection", 140.0, "Your saved connections"),
+                                        ("access", "Access", 214.0, "Choose what agents may do on this connection"),
+                                        ("samples", "Sample rows", 96.0, "Let agents see a few rows when they read a table's details")] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
+            column.headerToolTip = tip
             column.title = title
             column.width = width
             table.addTableColumn(column)
@@ -150,7 +153,7 @@ final class AgentsPane: SettingsPaneController {
             samples.tag = -1
             samples.state = connection.agentSampleRows ? .on : .off
             samples.toolTip = connection.agentAccess == .off ? "Choose an access other than Off first: agents see nothing of "
-                + connection.displayName : "Let describe show agents a few rows of \(connection.displayName)'s tables"
+                + connection.displayName : "Let agents see a few rows when they read the details of \(connection.displayName)'s tables"
             menu.items.forEach { $0.target = self }
             menu.autoenablesItems = false
             samples.isEnabled = connection.agentAccess != .off
@@ -186,7 +189,7 @@ final class AgentsPane: SettingsPaneController {
                 let samples = checkbox("", id: "settings.agentSampleRows",
                                        tip: connection.agentAccess == .off ? "Choose an access other than Off first: agents see "
                                            + "nothing of \(connection.displayName)"
-                                           : "Let describe show agents a few rows of \(connection.displayName)'s tables",
+                                           : "Let agents see a few rows when they read the details of \(connection.displayName)'s tables",
                                        on: connection.agentSampleRows, target: self, action: #selector(changed(_:)))
                 samples.isEnabled = connection.agentAccess != .off
                 samples.setAccessibilityLabel("Sample rows of \(connection.displayName)")

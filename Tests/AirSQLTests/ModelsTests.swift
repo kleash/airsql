@@ -96,7 +96,7 @@ struct ModelsTests {
         socket.socket = "/tmp/mysql.sock"
         #expect(socket.displayName == "root@/tmp/mysql.sock" && socket.routeBadge == "Socket")
         #expect(SavedConnection(name: "x", route: .sshJump).routeBadge == "Jump")
-        #expect(SavedConnection(name: "x").routeBadge == "TCP")
+        #expect(SavedConnection(name: "x").routeBadge == "Direct")
     }
 
     @Test func tableViewSettingsAreKeptPerTable() throws {

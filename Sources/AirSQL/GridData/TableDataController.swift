@@ -11,6 +11,26 @@ protocol TableSession: AnyObject {
 
 extension DBConnection: TableSession {}
 
+/// Cancel during an Apply: stops the statement running (a lock wait, usually), so the transaction rolls back. COMMIT is
+/// left to finish: stopped midway nobody could say whether it took.
+@MainActor
+final class ApplyStop {
+    var session: TableSession?
+    private var running: String?, stopped = false
+
+    /// Called before each statement of the Apply; once stopped only ROLLBACK goes on.
+    func starting(_ sql: String) throws {
+        if stopped && sql != "ROLLBACK" { throw AirSQLError.cancelled }
+        running = sql == "COMMIT" || sql == "ROLLBACK" ? nil : sql
+    }
+
+    func stop() {
+        stopped = true
+        guard let session, let running else { return }
+        Task { _ = try? await session.cancel(statement: running) }
+    }
+}
+
 /// Set from any thread to stop a stream between batches (Cancel on Load All's activity).
 final class StopFlag: @unchecked Sendable {
     private let lock = NSLock()
@@ -61,7 +81,7 @@ final class TableDataController: NSViewController, TabContent {
     /// A load under way (a page, Load All, Refresh, Apply): one at a time.
     var loading: Task<Void, Never>?
     /// That load in Activity, when Cancel can stop it (a read, not Apply).
-    private var activity: Activity?
+    var activity: Activity?
     /// The preview tab moved on while this was opening: its rows aren't read.
     var abandoned = false
     /// The data session's NO_BACKSLASH_ESCAPES, as filters quote their values for it (read at each load).
