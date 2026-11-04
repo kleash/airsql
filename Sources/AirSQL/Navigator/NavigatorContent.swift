@@ -34,6 +34,7 @@ final class PreviewContent: NSViewController, TabContent {
     }
 
     func show(_ content: NSViewController) {
+        (shown as? TableDataController)?.abandoned = true
         shown.view.removeFromSuperview()
         shown.removeFromParent()
         shown = content

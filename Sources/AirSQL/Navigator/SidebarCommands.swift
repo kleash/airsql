@@ -51,7 +51,7 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     /// A single click shows the row in the preview tab: a database's tables, a table's rows, an object's definition.
-    func showSelectedObject() {
+    @objc func showSelectedObject() {
         guard let main, let (open, nodes) = treeSelection, nodes.count == 1 else { return }
         switch nodes[0].kind {
         case .database(_, let name):

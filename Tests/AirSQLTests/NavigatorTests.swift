@@ -155,6 +155,35 @@ extension AppTests {
             #expect(await eventually(timeout: 5) { main.selectedTab?.content is TableEditorController })
         }
 
+        /// A click previews at once; arrow keys wait for the row they stop on.
+        @Test func arrowingThroughTheTreeReadsOnlyTheRowItStopsOn() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let outline = main.sidebar.outline
+            let first = try #require(open.snapshot.database("airsql_fixture")?.tables.map(\.name).sorted().first)
+            let start = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", first)))?.row)
+            outline.selectRowIndexes(IndexSet(integer: start), byExtendingSelection: false)
+            let shown = main.selectedTab?.title
+            #expect(shown != nil)
+            // The arrow as the run loop hands it over: the current event while the outline takes it.
+            let arrow = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                      windowNumber: main.window?.windowNumber ?? 0, context: nil,
+                                                      characters: "\u{F701}", charactersIgnoringModifiers: "\u{F701}",
+                                                      isARepeat: false, keyCode: 125))
+            for _ in 0..<2 {
+                NSApp.postEvent(arrow, atStart: true)
+                let event = try #require(NSApp.nextEvent(matching: .keyDown, until: .distantFuture, inMode: .default, dequeue: true))
+                outline.keyDown(with: event)
+            }
+            let stopped = try #require(outline.item(atRow: start + 2) as? SidebarNode)
+            #expect(outline.selectedRow == start + 2)
+            #expect(main.selectedTab?.title == shown, "nothing read yet")
+            guard case .object(_, let object) = stopped.kind else { throw AirSQLError(.other, "not an object") }
+            #expect(await eventually(timeout: 5) { main.selectedTab?.title == object.name })
+        }
+
         @Test func aDoubleClickOnADatabaseOpensItAndAnotherClosesIt() async throws {
             let id = Fixtures.production.id
             let model = testModel(Fixtures.shop)

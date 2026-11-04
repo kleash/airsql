@@ -271,7 +271,13 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard !reloading else { return }
         onSelect?()
-        showSelectedObject()
+        // Arrowing passes over rows: only the one it stops on is read, or the others would queue ahead of it.
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(showSelectedObject), object: nil)
+        if NSApp.currentEvent?.type == .keyDown {
+            perform(#selector(showSelectedObject), with: nil, afterDelay: 0.3)
+        } else {
+            showSelectedObject()
+        }
     }
 
     func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
