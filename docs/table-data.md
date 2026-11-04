@@ -45,8 +45,10 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **Type a Value…** (in both Quick Filter menus) asks for the value: choose how to compare (`=`, `<>`, `<`, `>`, starts
   with, contains, ends with), type the value, and press **Filter**. Tick **Add to the current filter** to keep the
   filter there is and add the condition with `AND`.
-- **Filter by Values…** (**Data ▸ Filter by Values…**, or a column header's menu): the column's values with how many
-  rows have each, counted on the server within the current filter (the 1,000 most frequent). Tick the ones to show. In
+- **Filter by Values…** (the funnel on a column's header, shown on hover and on a filtered column; **Data ▸ Filter by
+  Values…**; or a header's menu): the column's values with how many rows have each, counted on the server within the
+  current filter (the 1,000 most frequent). Tick the ones to show, or type part of a value and press **Contains**. The
+  funnel opens over the rows and replaces its own earlier choice, so you can widen it again. In
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
 - **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
   to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per

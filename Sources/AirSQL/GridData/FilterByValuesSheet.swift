@@ -3,10 +3,12 @@ import AppKit
 
 /// Filter by Values… (grid-spec §4): a column's values within the current filter, each with its count, worked out on
 /// the server for a table (the 1,000 most frequent), from the rows shown for a console result; tick the ones to show,
-/// as in a spreadsheet. OK adds `column IN (…)` to the filter.
+/// as in a spreadsheet. OK adds `column IN (…)` to the filter; Contains, the text typed in the search box. A header's
+/// funnel shows the same list in a popover.
 @MainActor
-final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
+final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSPopoverDelegate {
     static let limit = 1_000
+    private static let size = NSSize(width: 460, height: 420)
 
     private let column: GridColumn
     private let completion: (GridCondition?) -> Void
@@ -21,7 +23,12 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
     private var place = "on the server within the current filter"
     private let spinner = NSProgressIndicator()
     private var okButton: NSButton!
+    private var containsButton: NSButton!
     private var retainUntilClosed: FilterByValuesSheet?
+    /// The popover it shows in, the values ticked when it opens (nil: all of them), and the read of the values.
+    private var popover: NSPopover?
+    private var chosen: [String?]?
+    private var reading: Task<Void, Never>?
 
     /// Shows the sheet for `column` and reads its values with `read` (rows of value and count); `onServer` says where.
     static func show(column: GridColumn, table: String, onServer: Bool = true, on window: NSWindow,
@@ -30,27 +37,55 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         if !onServer { sheet.place = "in the rows shown" }
         sheet.retainUntilClosed = sheet
         window.beginSheet(sheet.window!)
-        Task {
+        sheet.load(read)
+    }
+
+    /// Shows the list in a popover at `rect` of `view`, `chosen` ticked; closing it stops the read.
+    static func pop(column: GridColumn, table: String, chosen: [String?]?, at rect: NSRect, of view: NSView,
+                    read: @escaping () async throws -> [[String?]], completion: @escaping (GridCondition?) -> Void) {
+        let sheet = FilterByValuesSheet(column: column, table: table, completion: completion)
+        sheet.chosen = chosen
+        sheet.retainUntilClosed = sheet
+        let content = NSViewController()
+        content.view = sheet.window!.contentView!
+        sheet.window!.contentView = nil
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.delegate = sheet
+        popover.contentViewController = content
+        popover.contentSize = Self.size
+        sheet.popover = popover
+        popover.show(relativeTo: rect, of: view, preferredEdge: .maxY)
+        sheet.search.window?.makeFirstResponder(sheet.search)
+        sheet.load(read)
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        reading?.cancel()
+        retainUntilClosed = nil
+    }
+
+    private func load(_ read: @escaping () async throws -> [[String?]]) {
+        reading = Task {
             do {
                 let rows = try await read()
-                sheet.show(rows.map { ($0.first ?? nil, Int(($0.count > 1 ? $0[1] : nil) ?? "") ?? 0) })
-            } catch {
-                sheet.spinner.stopAnimation(nil)
-                sheet.note.stringValue = "The values weren't counted: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
-                sheet.note.textColor = .statusBad
-            }
+                show(rows.map { ($0.first ?? nil, Int(($0.count > 1 ? $0[1] : nil) ?? "") ?? 0) })
+            } catch where !Task.isCancelled {
+                spinner.stopAnimation(nil)
+                note.stringValue = "The values weren't counted: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                note.textColor = .statusBad
+            } catch {}
         }
     }
 
     private init(column: GridColumn, table: String, completion: @escaping (GridCondition?) -> Void) {
         self.column = column
         self.completion = completion
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 380, height: 420), styleMask: [.titled], backing: .buffered,
-                              defer: true)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: Self.size), styleMask: [.titled], backing: .buffered, defer: true)
         window.title = "Filter \(table) by \(column.name)"
         super.init(window: window)
         window.contentView = makeContent(table)
-        window.setContentSize(NSSize(width: 380, height: 420))
+        window.setContentSize(Self.size)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -59,7 +94,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         let heading = label("Show the rows of \(tableName) whose \(column.name) is:", font: .systemFont(ofSize: 13, weight: .semibold),
                             truncates: true)
         search.placeholderString = "Find a value"
-        search.toolTip = "Show only the values with this text"
+        search.toolTip = "Show only the values with this text; Contains filters the rows by it"
         search.setAccessibilityIdentifier("values.search")
         search.delegate = self
         let check = NSTableColumn(identifier: .init("value"))
@@ -87,8 +122,11 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         okButton = button("Filter", id: "values.ok", tip: "Show only the rows with the ticked values", target: self, action: #selector(ok(_:)))
         okButton.keyEquivalent = "\r"
         okButton.isEnabled = false
+        containsButton = button("Contains", id: "values.contains", tip: "Show the rows whose \(column.name) contains the text typed above",
+                                target: self, action: #selector(contains(_:)))
+        containsButton.isEnabled = false
         let status = NSStackView(views: [spinner, note])
-        let buttons = NSStackView(views: [helpButton(.tableData), all, none, NSView(), cancel, okButton])
+        let buttons = NSStackView(views: [helpButton(.tableData), all, none, NSView(), cancel, containsButton, okButton])
         let stack = NSStackView(views: [heading, search, scroll, status, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -103,7 +141,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
 
     private func show(_ rows: [(value: String?, count: Int)]) {
         values = rows
-        ticked = Set(rows.indices)
+        ticked = Set(rows.indices.filter { chosen?.contains(rows[$0].value) ?? true })
         filter()
         spinner.stopAnimation(nil)
         let more = rows.count >= Self.limit ? " (the \(Self.limit.formatted()) most frequent)" : ""
@@ -117,7 +155,10 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         table.reloadData()
     }
 
-    func controlTextDidChange(_ obj: Notification) { filter() }
+    func controlTextDidChange(_ obj: Notification) {
+        containsButton.isEnabled = !search.stringValue.isEmpty
+        filter()
+    }
 
     func numberOfRows(in tableView: NSTableView) -> Int { shown.count }
 
@@ -156,9 +197,12 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         finish(everything ? nil : GridCondition(column, .isIn, ticked.sorted().map { values[$0].value }), filtering: true)
     }
 
+    @objc private func contains(_ sender: Any?) { finish(GridCondition(column, .contains, [search.stringValue]), filtering: true) }
+
     private func finish(_ condition: GridCondition?, filtering: Bool) {
+        popover?.close()
         if let window, let parent = window.sheetParent { parent.endSheet(window) }
         if filtering { completion(condition) }
-        retainUntilClosed = nil
+        if popover == nil { retainUntilClosed = nil }
     }
 }

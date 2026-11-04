@@ -759,6 +759,12 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         host?.dataGrid(grid, sortBy: column, adding: adding)
     }
 
+    func dataGridFiltersColumns(_ grid: DataGridView) -> Bool { !transposed && record == nil && host?.dataGridFiltersColumns(grid) == true }
+
+    func dataGrid(_ grid: DataGridView, filterValuesOf column: Int, at rect: NSRect) {
+        host?.dataGrid(grid, filterValuesOf: column, at: rect)
+    }
+
     /// A double click on a row's number: Record View of that row.
     func dataGrid(_ grid: DataGridView, openRecord row: Int) {
         guard !transposed, record == nil else { return }

@@ -6,8 +6,10 @@ import AppKit
 // so far. The grid bar's chip always says which; the cells the search matches are tinted.
 extension TableDataController {
     /// The condition the server gets: the WHERE bar's, and the search's when it runs on the server.
-    var serverFilter: String {
-        let typed = GridFilter.condition(bar.filterText)
+    var serverFilter: String { serverFilter(typed: bar.filterText) }
+
+    private func serverFilter(typed text: String) -> String {
+        let typed = GridFilter.condition(text)
         // A search of the loaded rows only stays here.
         let search = bar.loadedOnly.state == .on ? nil
             : source.flatMap { GridFilter.search(bar.searchField.stringValue, in: $0.columns, noBackslashEscapes: noBackslashEscapes) }
@@ -128,6 +130,42 @@ extension TableDataController {
             guard let self, let condition else { return }
             self.applyFilter(GridFilter.adding(condition.sql(noBackslashEscapes: self.noBackslashEscapes), to: self.bar.filterText))
         })
+    }
+
+    func dataGridFiltersColumns(_ grid: DataGridView) -> Bool { source != nil }
+
+    /// A header's funnel: Filter by Values in a popover. The list leaves out the column's own earlier choice, which comes
+    /// ticked, so it can be widened; what is chosen replaces it.
+    func dataGrid(_ grid: DataGridView, filterValuesOf column: Int, at rect: NSRect) {
+        guard let source else { return }
+        let info = source.columns[column], earlier = funnels[info.name]
+        let others = earlier.flatMap { GridFilter.removing($0.sql(noBackslashEscapes: noBackslashEscapes), from: bar.filterText) }
+        let sql = source.topValuesSQL(column, limit: FilterByValuesSheet.limit, filter: serverFilter(typed: others ?? bar.filterText))
+        let open = openSession
+        FilterByValuesSheet.pop(column: info, table: tableName, chosen: others == nil || earlier?.op != .isIn ? nil : earlier?.values, at: rect,
+                                of: grid.header, read: { [weak self] in
+            let session = try await open()
+            guard let self, let store = try await self.stoppable(session, sql, {
+                try await session.query(sql, rowCap: FilterByValuesSheet.limit).first?.rows
+            }) else { return [] }
+            return (0..<store.rowCount).map { [TableDataSource.text(store, $0, 0), store.string($0, 1)] }
+        }, completion: { [weak self] condition in
+            guard let self else { return }
+            let rest = others ?? self.bar.filterText
+            self.funnels[info.name] = condition
+            self.applyFilter(condition.map { GridFilter.adding($0.sql(noBackslashEscapes: self.noBackslashEscapes), to: rest) } ?? rest)
+        })
+    }
+
+    /// The columns the WHERE bar's condition names: their funnels stay on show.
+    func updateFunnels() {
+        guard let source else { return }
+        let filter = GridFilter.condition(bar.filterText), text = Array(filter.utf16)
+        let names = Set(SQLLexer.tokens(filter, noBackslashEscapes: noBackslashEscapes).compactMap { token -> String? in
+            let word = String(decoding: text[token.range], as: UTF16.self)
+            return token.kind == .word ? word.lowercased() : token.kind == .quotedName ? word.dropFirst().dropLast().lowercased() : nil
+        })
+        grid.filteredColumns = Set(source.columns.indices.filter { names.contains(source.columns[$0].name.lowercased()) })
     }
 
     @objc func clearFilter(_ sender: Any?) {

@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 /// The grid's column header, above the cells and scrolled across with them: each column's name in semibold over its type, a key mark on key columns, and at the right the sort control (the column's arrow and its
-/// place in the sort; on hover, both arrows). Clicking selects the column; the sort control sorts; dragging the border
+/// place in the sort; on hover, both arrows), before it the filter's funnel where the host has one (on hover, and on a filtered column). Clicking selects the column; the sort control sorts; dragging the border
 /// resizes and a double click on it auto-fits; dragging a header moves the column.
 final class GridHeaderView: NSView {
     unowned let grid: DataGridView
@@ -11,6 +11,8 @@ final class GridHeaderView: NSView {
     /// Where a moved column would go (the display index it would take), while one is dragged.
     var dropIndex: Int? { didSet { if dropIndex != oldValue { needsDisplay = true } } }
     static let sortWidth: CGFloat = 18
+    static let funnelWidth: CGFloat = 16
+    private var funnels: Bool { grid.delegate?.dataGridFiltersColumns(grid) == true }
     private var drag: Drag?
     private var symbols: [String: NSImage] = [:]
 
@@ -43,7 +45,7 @@ final class GridHeaderView: NSView {
     func width(for column: GridColumn) -> CGFloat {
         let name = (column.name as NSString).size(withAttributes: [.font: nameFont]).width + CGFloat(icons(column).count) * 13
         let type = (column.typeLine as NSString).size(withAttributes: [.font: typeFont]).width
-        return ceil(max(name, type)) + 8 + 4 + Self.sortWidth
+        return ceil(max(name, type)) + 8 + 4 + Self.sortWidth + (funnels ? Self.funnelWidth : 0)
     }
 
     /// A display column's left and right edges here (frozen columns stay where they are).
@@ -73,6 +75,7 @@ final class GridHeaderView: NSView {
                 }
                 drawLabels(info, in: rect)
                 drawSortControl(sourceColumn, column, in: rect)
+                drawFunnel(sourceColumn, column, in: rect)
                 NSColor.softSeparator.setFill()
                 NSRect(x: right - pixel, y: 0, width: pixel, height: bounds.height).fill()
             }
@@ -89,7 +92,7 @@ final class GridHeaderView: NSView {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
         var x = rect.minX + 8
-        let room = rect.maxX - Self.sortWidth - 4
+        let room = rect.maxX - Self.sortWidth - 4 - (funnels ? Self.funnelWidth : 0)
         let nameHeight = ceil(nameFont.ascender - nameFont.descender)
         for (name, color) in icons(info) {
             guard let image = symbol(name, size: grid.fontSize - 3, color: color) else { continue }
@@ -162,6 +165,23 @@ final class GridHeaderView: NSView {
         }
     }
 
+    /// The funnel: filled in the accent colour on a filtered column, plain on hover.
+    private func drawFunnel(_ sourceColumn: Int, _ column: Int, in rect: NSRect) {
+        guard let funnel = funnelRect(rect) else { return }
+        let filtered = grid.filteredColumns.contains(sourceColumn)
+        guard filtered || hovered == column,
+              let image = symbol(filtered ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
+                                 size: grid.fontSize - 1, color: filtered ? .accent : .secondaryLabelColor) else { return }
+        let size = image.size
+        image.draw(in: NSRect(x: funnel.midX - size.width / 2, y: funnel.midY - size.height / 2, width: size.width, height: size.height))
+    }
+
+    /// Where a header's funnel is; nil where the host has none, or the column is too narrow for it.
+    func funnelRect(_ rect: NSRect) -> NSRect? {
+        guard funnels, rect.width > Self.sortWidth + Self.funnelWidth + 8 else { return nil }
+        return NSRect(x: rect.maxX - Self.sortWidth - 2 - Self.funnelWidth, y: 0, width: Self.funnelWidth, height: rect.height)
+    }
+
     /// Where a header's sort control is.
     func sortRect(_ rect: NSRect) -> NSRect {
         NSRect(x: rect.maxX - Self.sortWidth - 2, y: 0, width: Self.sortWidth, height: rect.height)
@@ -191,6 +211,12 @@ final class GridHeaderView: NSView {
         return sortRect(NSRect(x: left, y: 0, width: right - left, height: bounds.height)).contains(point)
     }
 
+    /// The funnel under a point, if any.
+    private func funnel(at point: NSPoint, _ column: Int) -> NSRect? {
+        let (left, right) = edges(column)
+        return funnelRect(NSRect(x: left, y: 0, width: right - left, height: bounds.height)).flatMap { $0.contains(point) ? $0 : nil }
+    }
+
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil), flags = event.modifierFlags
         guard grid.takeKeyboard() else { return }
@@ -203,6 +229,10 @@ final class GridHeaderView: NSView {
             return
         }
         guard let column = column(at: point) else { return }
+        if let funnel = funnel(at: point, column) {
+            grid.delegate?.dataGrid(grid, filterValuesOf: grid.columnOrder[column], at: funnel)
+            return
+        }
         if isInSortControl(point, column) {
             grid.delegate?.dataGrid(grid, sortBy: grid.columnOrder[column], adding: flags.contains(.option))
             return
@@ -267,7 +297,8 @@ final class GridHeaderView: NSView {
         if border != nil {
             toolTip = "Drag to resize the column; double-click to fit its values"
         } else if let column, let info = grid.source?.columns[grid.columnOrder[column]] {
-            toolTip = isInSortControl(point, column) ? "Sort by \(info.name); ⌥-click to add it to the sort"
+            toolTip = funnel(at: point, column) != nil ? "Filter by \(info.name)'s values"
+                : isInSortControl(point, column) ? "Sort by \(info.name); ⌥-click to add it to the sort"
                 : "Select the column; drag to move it; double-click to fit its values\n" + info.details
         } else {
             toolTip = nil

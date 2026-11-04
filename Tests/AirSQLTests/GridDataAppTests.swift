@@ -462,7 +462,7 @@ extension AppTests {
                 }
                 return nil
             }
-            for command in [Commands.find, Commands.filter, Commands.searchAllColumns, Commands.addRow, Commands.columnList,
+            for command in [Commands.save, Commands.cancelQuery, Commands.find, Commands.filter, Commands.searchAllColumns, Commands.addRow, Commands.columnList,
                             Commands.transpose, Commands.loadMore] {
                 #expect(target(command.action) === tab, "\(command.title): \(String(describing: target(command.action)))")
             }
@@ -522,10 +522,78 @@ extension AppTests {
             #expect(await eventually(timeout: 5) { tab.loading == nil })
         }
 
+        @Test func anEmptyTableOrFilterSaysSoAndOffersTheNextStep() async throws {
+            let session = FakeTableSession()
+            session.rows = []
+            let (_, _, tab) = try await Self.tab(session: session)
+            #expect(!tab.emptyNote.isHidden && tab.emptyNote.text.stringValue == "orders has no rows.")
+            #expect(tab.emptyNote.clear.isHidden && !tab.emptyNote.add.isHidden)
+            tab.applyFilter("region = 'XX'")
+            #expect(await eventually(timeout: 5) { tab.loading == nil && !tab.emptyNote.clear.isHidden })
+            #expect(tab.emptyNote.text.stringValue == "No rows match the filter or search.")
+            tab.emptyNote.clear.performClick(nil)
+            #expect(await eventually(timeout: 5) { tab.loading == nil && tab.emptyNote.clear.isHidden })
+            tab.emptyNote.add.performClick(nil)
+            #expect(tab.emptyNote.isHidden && tab.grid.rowCount == 1)
+            let (_, _, readOnly) = try await Self.tab(session: session, readOnly: true)
+            #expect(!readOnly.emptyNote.isHidden && readOnly.emptyNote.add.isHidden)
+        }
+
+        /// ⌘Z undoes text being typed, not the grid's changes: the tab stands aside for the window's undo manager.
+        @Test func commandZUndoesTypingInTheTabsFields() async throws {
+            let (main, _, tab) = try await Self.tab()
+            let window = try #require(main.window)
+            tab.keep(.text("US"), row: 0, column: 2)
+            window.makeFirstResponder(tab.grid)
+            #expect(tab.responds(to: Commands.undo.action))
+            window.makeFirstResponder(tab.bar.whereField)
+            #expect(!tab.responds(to: Commands.undo.action) && !tab.responds(to: Commands.redo.action))
+            tab.bar.whereField.insertText("region", replacementRange: NSRange(location: 0, length: 0))
+            #expect(window.undoManager?.canUndo == true)
+            window.undoManager?.undo()
+            #expect(tab.bar.whereField.text.isEmpty && tab.source?.changes.isEmpty == false, "the edit stays pending")
+            window.makeFirstResponder(tab.bar.searchField)
+            #expect(!tab.responds(to: Commands.undo.action))
+            window.makeFirstResponder(tab.grid)
+            #expect(tab.responds(to: Commands.undo.action))
+        }
+
+        @Test func aColumnsFunnelFiltersByItsValuesAndCanWidenAgain() async throws {
+            let session = FakeTableSession()
+            let (main, harness, tab) = try await Self.tab(session: session)
+            let window = try #require(main.window)
+            tab.applyFilter("number > 1")
+            await ready { tab.loading != nil }
+            func open() async throws -> NSTableView {
+                tab.dataGrid(tab.grid, filterValuesOf: 2, at: NSRect(x: 10, y: 0, width: 16, height: 20))
+                #expect(await call(harness, "wait", ["until": "popover", "timeout": 5]).error == nil)
+                let content = try #require(harness.popovers(of: window).last?.contentView)
+                let list = try #require(find(NSTableView.self, id: "values.list", in: content))
+                #expect(await eventually(timeout: 5) { list.numberOfRows == 2 })
+                return list
+            }
+            func box(_ list: NSTableView, _ row: Int) -> NSButton? { list.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSButton }
+            let list = try await open()
+            #expect(session.statements.last?.contains("WHERE (number > 1") == true)
+            box(list, 1)?.performClick(nil)
+            #expect(await call(harness, "press", ["id": "values.ok"]).error == nil)
+            await ready { tab.loading != nil }
+            #expect(tab.bar.filterText == "(number > 1) AND `region` IN ('EU')" && tab.grid.filteredColumns == [2, 3])
+            // Open again: the column's own choice comes ticked, and doesn't narrow the list or the next choice.
+            let again = try await open()
+            #expect(session.statements.last?.contains("IN (") == false)
+            #expect(box(again, 0)?.state == .on && box(again, 1)?.state == .off)
+            #expect(await call(harness, "press", ["id": "values.all"]).error == nil)
+            #expect(await call(harness, "press", ["id": "values.ok"]).error == nil)
+            await ready { tab.loading != nil }
+            #expect(tab.bar.filterText == "number > 1" && tab.grid.filteredColumns == [3])
+        }
+
         /// AppKit tries only File ▸ Save for ⌘S, so it must act on a table tab's and an edited result's changes.
         @Test func commandSAppliesATablesChanges() async throws {
             let session = FakeTableSession()
-            let (_, harness, tab) = try await Self.tab(session: session)
+            let (main, harness, tab) = try await Self.tab(session: session)
+            main.window?.makeFirstResponder(tab.grid)
             let save = Commands.save.item()
             #expect(!tab.validateMenuItem(save) && save.toolTip == "No changes are pending")
             tab.grid.selection.select(GridPosition(row: 0, column: 2))

@@ -181,6 +181,29 @@ final class TableDataBar: NSView, NSTextViewDelegate {
     }
 }
 
+/// Over the rows of an empty table or a filter that matches nothing: what happened and what to do next.
+@MainActor
+final class TableEmptyNote: NSStackView {
+    let text = label("", color: .secondaryLabelColor, wraps: true)
+    let clear = button("Clear Filter", id: "tableData.empty.clear", tip: Commands.clearFilter.tip, target: nil,
+                       action: Commands.clearFilter.action)
+    let add = button("Add Row", id: "tableData.empty.add", tip: Commands.addRow.tip, target: nil, action: Commands.addRow.action)
+
+    init() {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        setAccessibilityIdentifier("tableData.empty")
+        text.setAccessibilityIdentifier("tableData.emptyText")
+        text.alignment = .center
+        orientation = .vertical
+        spacing = Spacing.unit
+        setViews([text, NSStackView(views: [clear, add])], in: .center)
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+}
+
 /// The notice under the grid bar: pending changes with Preview SQL, Revert All and Apply; why the table is read-only;
 /// or what went wrong. Hidden when there is nothing to say.
 @MainActor

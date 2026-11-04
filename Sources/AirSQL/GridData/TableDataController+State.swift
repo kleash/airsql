@@ -6,6 +6,7 @@ extension TableDataController: NSMenuItemValidation {
     func updateBars() {
         guard let source else {
             bar.scope.isHidden = true
+            emptyNote.isHidden = true
             notice.show(.problem, problem)
             viewer.status.rows.stringValue = problem == nil ? "Loading…" : ""
             for link in [countLink, moreLink, allLink] { link.isHidden = true }
@@ -32,6 +33,13 @@ extension TableDataController: NSMenuItemValidation {
         } else {
             notice.show(.readOnly, editingOff.map { "Read-only. " + $0 + "." })
         }
+        updateFunnels()
+        let filtered = !source.filter.isEmpty || source.localFilter != nil
+        emptyNote.isHidden = source.rowCount > 0 || source.hasMore && source.localFilter == nil || loading != nil || problem != nil
+            || viewer.presentation != .table
+        emptyNote.text.stringValue = filtered ? "No rows match the filter or search." : "\(tableName) has no rows."
+        emptyNote.clear.isHidden = !filtered
+        emptyNote.add.isHidden = editingOff != nil
         let loaded = source.keptRows.formatted()
         let rows = viewer.status.rows
         if !source.hasMore {
@@ -75,7 +83,11 @@ extension TableDataController: NSMenuItemValidation {
 
     // The viewer's commands (Go to Row, Copy As, Record View…) reach it from the menu bar while the focus is in the grid
     // bar or the find bar.
-    override func responds(to selector: Selector!) -> Bool { super.responds(to: selector) || viewer.responds(to: selector) }
+    override func responds(to selector: Selector!) -> Bool {
+        // Text being typed undoes itself: ⌘Z goes on past this tab to the window's undo manager.
+        if selector == Commands.undo.action || selector == Commands.redo.action, view.window?.firstResponder is NSTextView { return false }
+        return super.responds(to: selector) || viewer.responds(to: selector)
+    }
     override func forwardingTarget(for selector: Selector!) -> Any? { viewer.responds(to: selector) ? viewer : nil }
 
     /// Whether a command can run now, and why not.

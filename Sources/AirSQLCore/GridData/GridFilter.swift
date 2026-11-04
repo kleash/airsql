@@ -99,6 +99,26 @@ public enum GridFilter {
         return filter.isEmpty ? condition : "(\(filter)) AND \(condition)"
     }
 
+    /// The filter without a `condition` that `adding` put there, however many came after it; nil when it isn't there
+    /// as `adding` left it (someone typed over it).
+    public static func removing(_ condition: String, from filter: String) -> String? {
+        let filter = self.condition(filter)
+        if filter == condition { return "" }
+        if let first = filter.range(of: "(\(condition)) AND ") { return filter.replacingCharacters(in: first, with: "") }
+        // (earlier) AND condition: the earlier part, as it was before.
+        let tail = ") AND " + condition, tokens = SQLLexer.tokens(filter), text = Array(filter.utf16)
+        var open: [Int] = []
+        for token in tokens where token.kind == .symbol && token.range.count == 1 {
+            if text[token.range.lowerBound] == 40 { open.append(token.range.lowerBound) }
+            guard text[token.range.lowerBound] == 41, let start = open.popLast() else { continue }
+            let end = token.range.lowerBound + tail.utf16.count
+            guard end <= text.count, Array(text[token.range.lowerBound..<end]) == Array(tail.utf16),
+                  end == text.count || text[end] == 41 else { continue }
+            return String(decoding: text[..<start] + text[(start + 1)..<token.range.lowerBound] + text[end...], as: UTF16.self)
+        }
+        return nil
+    }
+
     /// Search All Columns on the server, as HeidiSQL builds it: text in any column. Text and JSON columns are matched
     /// with LIKE, numbers and dates cast to text first, and binary columns only by a whole "0x…" value. Nil when no
     /// column can hold the text.

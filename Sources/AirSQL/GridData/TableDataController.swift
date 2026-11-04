@@ -47,6 +47,7 @@ final class TableDataController: NSViewController, TabContent {
     let bar = TableDataBar()
     let findBar = TableFindBar()
     let notice = TableDataNotice()
+    let emptyNote = TableEmptyNote()
     /// The status bar's links, after the rows' count (`viewer.status.rows`).
     lazy var countLink = link("Count Exactly", Commands.countRows, id: "tableData.count")
     lazy var moreLink = link("Load More", Commands.loadMore, id: "tableData.loadMore")
@@ -76,6 +77,8 @@ final class TableDataController: NSViewController, TabContent {
     /// Edit as Table's rows, added once the table is read; and Apply shows the SQL first for them.
     var waitingInserts: InsertRows?
     var previewsApply = false
+    /// What each column's funnel added to the filter, by column name.
+    var funnels: [String: GridCondition] = [:]
     /// A new filter or sort came while rows were loading: load again once they are in.
     var reloadWhenDone = false
     /// What went wrong last (a filter the server refused), until the next load works.
@@ -140,6 +143,14 @@ final class TableDataController: NSViewController, TabContent {
             bars.trailingAnchor.constraint(equalTo: view.trailingAnchor), viewer.topAnchor.constraint(equalTo: bars.bottomAnchor),
             viewer.leadingAnchor.constraint(equalTo: view.leadingAnchor), viewer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             viewer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        emptyNote.clear.target = self
+        emptyNote.add.target = self
+        viewer.body.addSubview(emptyNote)
+        NSLayoutConstraint.activate([
+            emptyNote.centerXAnchor.constraint(equalTo: viewer.body.centerXAnchor),
+            emptyNote.centerYAnchor.constraint(equalTo: viewer.body.centerYAnchor),
+            emptyNote.widthAnchor.constraint(lessThanOrEqualTo: viewer.body.widthAnchor, constant: -2 * Spacing.double),
         ])
         self.view = view
         updateBars()
@@ -287,7 +298,7 @@ final class TableDataController: NSViewController, TabContent {
 
     /// Runs `work`, which sends `sql`. Cancelled, `sql` is stopped on the server, and nothing else: it may be waiting behind
     /// another tab's statement on the shared session, so Cancel keeps asking until it has run.
-    private func stoppable<T>(_ session: TableSession, _ sql: String, _ work: () async throws -> T) async throws -> T {
+    func stoppable<T>(_ session: TableSession, _ sql: String, _ work: () async throws -> T) async throws -> T {
         try Task.checkCancellation()
         let finished = StopFlag()
         defer { finished.set() }

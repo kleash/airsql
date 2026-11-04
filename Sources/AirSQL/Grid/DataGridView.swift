@@ -28,6 +28,10 @@ protocol DataGridViewDelegate: AnyObject {
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu?
     /// The sort control in a column's header was clicked; with ⌥ `adding` the column to the sort.
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool)
+    /// Whether the headers show a funnel for filtering a column by its values (default false), and it was clicked at
+    /// `rect` of the header.
+    func dataGridFiltersColumns(_ grid: DataGridView) -> Bool
+    func dataGrid(_ grid: DataGridView, filterValuesOf column: Int, at rect: NSRect)
     /// A double click on a row's number: Record View.
     func dataGrid(_ grid: DataGridView, openRecord row: Int)
     /// A double click on a cell that can't be edited: show its whole value (default: a beep).
@@ -46,6 +50,8 @@ extension DataGridViewDelegate {
         -> (text: String, part: NSRange)? { nil }
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? { nil }
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {}
+    func dataGridFiltersColumns(_ grid: DataGridView) -> Bool { false }
+    func dataGrid(_ grid: DataGridView, filterValuesOf column: Int, at rect: NSRect) {}
     func dataGrid(_ grid: DataGridView, openRecord row: Int) {}
     func dataGridOpenValue(_ grid: DataGridView) { NSSound.beep() }
     func dataGridColumnsDidChange(_ grid: DataGridView) {}
@@ -122,6 +128,8 @@ final class DataGridView: NSView {
     /// The editor overlay while a cell is edited.
     var editor: GridEditor?
     var isDragging = false
+    /// The columns the filter names, whose headers keep their funnel on show.
+    var filteredColumns: Set<Int> = [] { didSet { if filteredColumns != oldValue { header.needsDisplay = true } } }
     var hoveredCell: GridPosition?
     var accessibilityElements = GridAccessibilityElements()
     /// The cells drawn so far: the spike's measure that drawing follows the area shown, not the number of rows.

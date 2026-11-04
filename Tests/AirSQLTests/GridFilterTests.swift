@@ -63,6 +63,12 @@ struct GridFilterTests {
         #expect(GridFilter.condition("  WHERE id > 3 \n") == "id > 3")
         #expect(GridFilter.condition("where\nid > 3") == "id > 3")
         #expect(GridFilter.condition("whereabouts = 1") == "whereabouts = 1")
+        #expect(GridFilter.removing("`b` = 2", from: "`b` = 2") == "")
+        #expect(GridFilter.removing("`b` = 2", from: "(a = ')' OR c = 3) AND `b` = 2") == "a = ')' OR c = 3")
+        #expect(GridFilter.removing("`b` = 2", from: "(`b` = 2) AND `c` = 3") == "`c` = 3")
+        #expect(GridFilter.removing("`b` = 2", from: "((a) AND `b` = 2) AND `c` = 3") == "(a) AND `c` = 3")
+        #expect(GridFilter.removing("`b` = 2", from: "(a) AND `b` = 20") == nil, "typed over: not the same condition")
+        #expect(GridFilter.removing("`b` = 2", from: "a = 1") == nil)
         #expect(GridFilter.adding("`b` = 2", to: "") == "`b` = 2")
         #expect(GridFilter.adding("`b` = 2", to: "WHERE a = 1 OR c = 3") == "(a = 1 OR c = 3) AND `b` = 2")
     }

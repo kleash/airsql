@@ -69,7 +69,9 @@ public final class TableDataSource: GridSource {
 
     /// " FROM `database`.`table`", then " WHERE (…)" with the filter: a newline before the closing parenthesis, so a
     /// condition ending in a -- comment can't swallow it (or the ORDER BY and LIMIT after it).
-    private var from: String {
+    private var from: String { from(filter) }
+
+    private func from(_ filter: String) -> String {
         let condition = GridFilter.condition(filter)
         return " FROM " + SQLQuote.identifier(database, table.name) + (condition.isEmpty ? "" : " WHERE (\(condition)\n)")
     }
@@ -103,10 +105,10 @@ public final class TableDataSource: GridSource {
     }
 
     /// A column's most frequent values with how many rows have each, within the filter (Column Summary, Filter by
-    /// Values).
-    public func topValuesSQL(_ column: Int, limit: Int) -> String {
+    /// Values); a header's funnel gives the filter without its own column's choice.
+    public func topValuesSQL(_ column: Int, limit: Int, filter: String? = nil) -> String {
         let name = SQLQuote.identifier(columns[column].name)
-        return "SELECT \(name), COUNT(*)" + from + " GROUP BY \(name) ORDER BY COUNT(*) DESC, \(name) LIMIT \(limit)"
+        return "SELECT \(name), COUNT(*)" + from(filter ?? self.filter) + " GROUP BY \(name) ORDER BY COUNT(*) DESC, \(name) LIMIT \(limit)"
     }
 
     /// Forgets the loaded rows (a new filter or sort, Refresh); the pending changes stay, and with `keepingSaved` the rows
