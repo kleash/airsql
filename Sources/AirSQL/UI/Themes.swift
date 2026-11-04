@@ -45,7 +45,11 @@ extension NSColor {
     /// A lighter separator, between rows and cells.
     static let softSeparator = NSColor(name: nil) { appearance in
         var color = NSColor.separatorColor
-        appearance.performAsCurrentDrawingAppearance { color = NSColor.separatorColor.withAlphaComponent(0.5) }
+        appearance.performAsCurrentDrawingAppearance {
+            // Half of the separator's own alpha: withAlphaComponent sets it, and 0.5 is well above what the separator has.
+            let separator = NSColor.separatorColor.usingColorSpace(.sRGB) ?? .separatorColor
+            color = separator.withAlphaComponent(separator.alphaComponent * 0.5)
+        }
         return color
     }
     /// A row under the pointer.

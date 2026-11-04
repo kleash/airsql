@@ -165,13 +165,13 @@ final class GridHeaderView: NSView {
         }
     }
 
-    /// The funnel: filled in the accent colour on a filtered column, plain on hover.
+    /// The funnel: in the accent colour on a filtered column, quiet on hover.
     private func drawFunnel(_ sourceColumn: Int, _ column: Int, in rect: NSRect) {
         guard let funnel = funnelRect(rect) else { return }
         let filtered = grid.filteredColumns.contains(sourceColumn)
         guard filtered || hovered == column,
-              let image = symbol(filtered ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle",
-                                 size: grid.fontSize - 1, color: filtered ? .accent : .secondaryLabelColor) else { return }
+              let image = symbol("line.3.horizontal.decrease.circle", size: grid.fontSize - 1,
+                                 color: filtered ? .accent : .secondaryLabelColor) else { return }
         let size = image.size
         image.draw(in: NSRect(x: funnel.midX - size.width / 2, y: funnel.midY - size.height / 2, width: size.width, height: size.height))
     }

@@ -592,6 +592,21 @@ extension AppTests {
             #expect(tab.bar.filterText == "number > 1" && tab.grid.filteredColumns == [3])
         }
 
+        /// At 900 pt the condition was squeezed in beside the search and wrapped to eight lines.
+        @Test func aNarrowBarGivesTheConditionARowOfItsOwn() async throws {
+            let (main, _, tab) = try await Self.tab(size: NSSize(width: 900, height: 600))
+            tab.bar.filterText = "region = 'EU' AND total > 100 AND customer_id IN (1, 2, 3)"
+            main.window?.layoutIfNeeded()
+            let box = tab.bar.whereField.box
+            #expect(tab.bar.frame.width < 860 && box.frame.width > 400, "\(tab.bar.frame.width) \(box.frame.width)")
+            #expect(box.window != nil && tab.bar.frame.height < 80, "\(tab.bar.frame.height)")
+            main.window?.setContentSize(NSSize(width: 1600, height: 600))
+            main.window?.layoutIfNeeded()
+            main.window?.layoutIfNeeded()
+            #expect(abs(box.convert(box.bounds, to: tab.bar).midY - tab.bar.searchField.convert(tab.bar.searchField.bounds, to: tab.bar).midY) < 2)
+            #expect(tab.bar.frame.height < 45, "\(tab.bar.frame.height)")
+        }
+
         /// AppKit tries only File ▸ Save for ⌘S, so it must act on a table tab's and an edited result's changes.
         @Test func commandSAppliesATablesChanges() async throws {
             let session = FakeTableSession()

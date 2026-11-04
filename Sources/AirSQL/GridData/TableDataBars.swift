@@ -16,6 +16,14 @@ final class TableDataBar: NSView, NSTextViewDelegate {
     let loadedOnly = checkbox("Loaded rows only", id: "tableData.loadedOnly",
                               tip: "Search only the rows loaded so far, without asking the server", on: false, target: nil, action: nil)
     private let spinner = NSProgressIndicator()
+    /// The condition with its label and buttons: in the bar's row, or under it when the bar is narrow.
+    private let whereRow = NSStackView()
+    private let row = NSStackView()
+    private let rows = NSStackView()
+    private let spacer = NSView()
+    private lazy var whereRowWidth = whereRow.widthAnchor.constraint(equalTo: rows.widthAnchor)
+    /// Below this the condition would be left too little room to read in the row.
+    private static let narrowWidth: CGFloat = 860
 
     var filterText: String {
         get { whereField.text }
@@ -70,28 +78,34 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityIdentifier("tableData.busy")
         spinner.toolTip = "Rows are loading from the server: ⌘. cancels"
-        let row = NSStackView(views: [scope, whereLabel, whereField.box, clearButton, recentButton, searchField, loadedOnly, spinner,
-                                      transposeButton, helpButton(.dataGrid)])
+        whereRow.setViews([whereLabel, whereField.box, clearButton, recentButton], in: .leading)
+        whereRow.spacing = Spacing.half
+        whereRow.setHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.isHidden = true
+        spacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        row.setViews([scope, whereRow, spacer, searchField, loadedOnly, spinner, transposeButton, helpButton(.dataGrid)], in: .leading)
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
-        row.setCustomSpacing(Spacing.half, after: whereLabel)
-        row.setCustomSpacing(Spacing.half, after: whereField.box)
-        row.setCustomSpacing(Spacing.half, after: clearButton)
         row.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.unit)
+        rows.orientation = .vertical
+        rows.spacing = 0
+        rows.setViews([row], in: .top)
+        rows.setHuggingPriority(.defaultHigh, for: .vertical)
+        row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
         let hairline = Hairline(.softSeparator)
-        for view in [row, hairline] {
+        for view in [rows, hairline] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
         NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: leadingAnchor), row.trailingAnchor.constraint(equalTo: trailingAnchor),
-            row.topAnchor.constraint(equalTo: topAnchor), row.bottomAnchor.constraint(equalTo: hairline.topAnchor),
+            rows.leadingAnchor.constraint(equalTo: leadingAnchor), rows.trailingAnchor.constraint(equalTo: trailingAnchor),
+            rows.topAnchor.constraint(equalTo: topAnchor), rows.bottomAnchor.constraint(equalTo: hairline.topAnchor),
             hairline.leadingAnchor.constraint(equalTo: leadingAnchor), hairline.trailingAnchor.constraint(equalTo: trailingAnchor),
             hairline.bottomAnchor.constraint(equalTo: bottomAnchor), hairline.heightAnchor.constraint(equalToConstant: 1),
             whereField.box.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             // The bar grows with the condition's lines, keeping a margin round it.
-            whereField.box.topAnchor.constraint(greaterThanOrEqualTo: row.topAnchor, constant: 4),
-            row.bottomAnchor.constraint(greaterThanOrEqualTo: whereField.box.bottomAnchor, constant: 4),
+            whereField.box.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: 4),
+            rows.bottomAnchor.constraint(greaterThanOrEqualTo: whereField.box.bottomAnchor, constant: 4),
             searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 150),  // its placeholder whole
             searchField.widthAnchor.constraint(lessThanOrEqualToConstant: 190),
         ])
@@ -108,6 +122,19 @@ final class TableDataBar: NSView, NSTextViewDelegate {
 
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() { layer?.backgroundColor = NSColor.bar.cgColor }
+
+    override func layout() {
+        // Narrow, the condition gets a row of its own: squeezed in beside the search it wrapped to eight lines.
+        let narrow = bounds.width < Self.narrowWidth
+        if narrow != (whereRow.superview === rows) {
+            whereRow.removeFromSuperview()
+            if narrow { rows.addArrangedSubview(whereRow) } else { row.insertArrangedSubview(whereRow, at: 1) }
+            whereRow.edgeInsets = narrow ? NSEdgeInsets(top: 0, left: Spacing.unit, bottom: 6, right: Spacing.unit) : NSEdgeInsets()
+            whereRowWidth.isActive = narrow
+            spacer.isHidden = !narrow
+        }
+        super.layout()
+    }
 
     private func configure(_ button: NSButton, symbol: String, id: String, tip: String, action: Selector) {
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: tip)
