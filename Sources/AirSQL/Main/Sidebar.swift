@@ -388,7 +388,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         switch node.kind {
         case .header: break
         case .folder:
-            if outline.isItemExpanded(node) { outline.animator().collapseItem(node) } else { outline.animator().expandItem(node) }
+            if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .connection:
             // Connect (or show it when connected): whatever connects implements it.
             outline.sendCommand(Commands.connect.action)
@@ -567,7 +567,7 @@ final class SidebarCell: NSTableCellView {
         badge.font = .systemFont(ofSize: 11)
         badge.setContentCompressionResistancePriority(.required, for: .horizontal)
         badge.setContentHuggingPriority(.required, for: .horizontal)
-        shield.image = NSImage(systemSymbolName: "shield.lefthalf.filled", accessibilityDescription: "Custom safety")?
+        shield.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Custom safety")?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
         shield.contentTintColor = .statusWarning
         shield.toolTip = "Custom safety: this connection has safety settings of its own (its Safety tab)"

@@ -205,3 +205,35 @@ struct AboutTests {
         #expect(NSImage(contentsOf: root.appendingPathComponent("Resources/AppIcon.icns"))?.representations.count == 10)
     }
 }
+
+extension AppTests {
+    @MainActor @Suite struct OffReasonsTests {
+        /// With no window nothing answers Data's commands: AppKit greys them without asking, and the tip says why.
+        @Test func anItemNothingAnswersSaysWhy() throws {
+            _ = NSApplication.shared
+            let bar = MainMenu.build()
+            let data = try #require(bar.item(withTitle: "Data")?.submenu)
+            let add = try #require(data.items.first { $0.action == Commands.addRow.action })
+            OffReasons.shared.menuWillOpen(data)
+            #expect(!add.isEnabled && add.toolTip == "Open a table or a query's result first")
+            let tools = try #require(bar.item(withTitle: "Tools")?.submenu)
+            OffReasons.shared.menuWillOpen(tools)
+            #expect(tools.items.first { $0.action == Commands.syncScript.action }?.toolTip == "Open Tools ▸ Compare… first")
+        }
+    }
+}
+
+extension AppTests {
+    @MainActor @Suite struct ShortcutsWindowTests {
+        @Test func listsTheCommandsAndNarrows() throws {
+            _ = NSApplication.shared
+            let shown = ShortcutsWindowController.show()
+            defer { shown.close() }
+            #expect(shown.text.string.contains("⌘T\tNew Query"))
+            let filter = try #require(shown.window?.contentView?.subviews.compactMap { $0 as? NSSearchField }.first)
+            filter.stringValue = "new query"
+            shown.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            #expect(shown.text.string == "⌘T\tNew Query")
+        }
+    }
+}

@@ -40,7 +40,7 @@ final class AgentActivityPopover: NSViewController {
         scroll.translatesAutoresizingMaskIntoConstraints = false
         document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
         let caption = label("Agents never see passwords and can't change data: they read within each connection's access "
-                            + "(Settings ▸ Agents) and propose SQL in console tabs for you to run.",
+                            + "(Settings ▸ Agents) and propose SQL in query tabs for you to run.",
                             font: .systemFont(ofSize: 11), color: NSColor.quietText, wraps: true)
         caption.preferredMaxLayoutWidth = 380
         let stack = NSStackView(views: [header, scroll, caption])

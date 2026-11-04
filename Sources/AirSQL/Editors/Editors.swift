@@ -164,7 +164,7 @@ extension MainWindowController {
         }
         if item.action == Commands.createObject.action, item.tag == 0 {
             guard let kind = selectedTreeKind else { return (false, "Select a group such as Views in the tree, or use New Object") }
-            if kind == .sequence { return (false, "Sequences have no editor: write CREATE SEQUENCE in a console") }
+            if kind == .sequence { return (false, "Sequences have no editor: write CREATE SEQUENCE in a query tab") }
         }
         return (true, nil)
     }

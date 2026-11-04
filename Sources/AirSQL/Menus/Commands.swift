@@ -11,6 +11,8 @@ import AppKit
     @objc optional func showHelpSite(_ sender: Any?)
     @objc optional func showGettingStarted(_ sender: Any?)
     @objc optional func showShortcuts(_ sender: Any?)
+    @objc optional func showOfflineHelp(_ sender: Any?)
+    @objc optional func showReleaseNotes(_ sender: Any?)
     @objc optional func focusSidebar(_ sender: Any?)
     @objc optional func focusEditor(_ sender: Any?)
     @objc optional func focusResults(_ sender: Any?)
@@ -297,8 +299,8 @@ enum Commands {
     static let newConnection = Command("New Connection…", #selector(AirSQLActions.newConnection(_:)), "n",
                                        tip: "Save a MySQL or MariaDB server to connect to: its address, login and route")
     static let newQuery = Command("New Query", #selector(AirSQLActions.newQuery(_:)), "t",
-                                  tip: "Open a new SQL console tab on the selected connection")
-    static let open = Command("Open…", #selector(AirSQLActions.openSQLFile(_:)), "o", tip: "Open a .sql file in a new console tab")
+                                  tip: "Open a new query tab on the selected connection")
+    static let open = Command("Open…", #selector(AirSQLActions.openSQLFile(_:)), "o", tip: "Open a .sql file in a new query tab")
     static let quickOpen = Command("Quick Open…", #selector(AirSQLActions.quickOpen(_:)), "p",
                                    tip: "Go to a table, view or connection by typing part of its name")
     static let closeTab = Command("Close Tab", #selector(AirSQLActions.closeTab(_:)), "w",
@@ -308,12 +310,12 @@ enum Commands {
     static let closeAllTabs = Command("Close All Tabs", #selector(AirSQLActions.closeAllTabs(_:)), "W", [.command, .option],
                                       tip: "Close every tab; asks first about unsaved work")
     static let reopenClosedTab = Command("Reopen Closed Tab", #selector(AirSQLActions.reopenClosedTab(_:)), "T",
-                                         tip: "Open the tab closed last again: a console with its text, a table from its first page")
+                                         tip: "Open the tab closed last again: a query with its text, a table from its first page")
     static let closeWindow = Command("Close Window", #selector(NSWindow.performClose(_:)), "W",
                                      tip: "Close the window; connections stay open")
-    static let save = Command("Save", #selector(AirSQLActions.saveQuery(_:)), "s", tip: "Save the console's text to its .sql file, or apply a table's pending changes")
+    static let save = Command("Save", #selector(AirSQLActions.saveQuery(_:)), "s", tip: "Save the query's text to its .sql file, or apply a table's pending changes")
     static let saveAs = Command("Save As…", #selector(AirSQLActions.saveQueryAs(_:)), "S",
-                                tip: "Save the console's text to a new .sql file")
+                                tip: "Save the query's text to a new .sql file")
     static let duplicateTab = Command("Duplicate Tab", #selector(AirSQLActions.duplicateTab(_:)),
                                       tip: "Open a copy of the tab shown next to it")
     static let renameTab = Command("Rename Tab…", #selector(AirSQLActions.renameTab(_:)),
@@ -421,6 +423,8 @@ enum Commands {
     static let smaller = Command("Smaller", #selector(AirSQLActions.zoomOut(_:)), "-", tip: "Make the editor's and grid's text smaller")
     static let actualSize = Command("Actual Size", #selector(AirSQLActions.zoomReset(_:)), "0",
                                     tip: "Use the text sizes chosen in Settings again")
+    static let customizeToolbar = Command("Customize Toolbar…", #selector(NSWindow.runToolbarCustomizationPalette(_:)),
+                                          tip: "Choose the toolbar's buttons, and whether they show their names")
     static let refresh = Command("Refresh", #selector(AirSQLActions.refresh(_:)), "r",
                                  tip: "Load the tree, table or list shown again from the server")
     static let autoRefresh = Command("Refresh Every", #selector(AirSQLActions.setAutoRefresh(_:)),
@@ -433,9 +437,9 @@ enum Commands {
                                       tip: "Run the statement at the cursor, or the selected text")
     static let runSelection = Command("Run Selection", #selector(AirSQLActions.runSelection(_:)), tip: "Run the selected text only")
     static let runAll = Command("Run All", #selector(AirSQLActions.runAll(_:)), "\r", [.command, .shift],
-                                tip: "Run every statement in the console, one after another")
+                                tip: "Run every statement in the tab, one after another")
     static let runAllF9 = Command("Run All", #selector(AirSQLActions.runAll(_:)), f9, [], hidden: true,
-                                  tip: "Run every statement in the console, one after another (F9)")
+                                  tip: "Run every statement in the tab, one after another (F9)")
     static let runStatementF9 = Command("Run Statement", #selector(AirSQLActions.runStatement(_:)), f9, .control, hidden: true,
                                         tip: "Run the statement at the cursor, or the selected text (⌃F9)")
     static let explain = Command("Explain", #selector(AirSQLActions.explain(_:)), "e", [.command, .option],
@@ -443,19 +447,19 @@ enum Commands {
     static let cancelQuery = Command("Cancel", #selector(AirSQLActions.cancelQuery(_:)), ".",
                                      tip: "Stop the statement that is running in this tab")
     static let commit = Command("Commit", #selector(AirSQLActions.commit(_:)), tip: "Make the open transaction's changes permanent")
-    static let rollback = Command("Rollback", #selector(AirSQLActions.rollback(_:)), tip: "Undo every change of the open transaction")
+    static let rollback = Command("Roll Back", #selector(AirSQLActions.rollback(_:)), tip: "Undo every change of the open transaction")
     static let autoCommit = Command("Auto-commit", #selector(AirSQLActions.setTransactionMode(_:)), tag: 0,
                                     tip: "Commit each statement by itself (Auto-commit), or only when you press Commit (Manual)")
-    static let manualCommit = Command("Manual", #selector(AirSQLActions.setTransactionMode(_:)), tag: 1,
+    static let manualCommit = Command("Manual Commit", #selector(AirSQLActions.setTransactionMode(_:)), tag: 1,
                                       tip: "Commit each statement by itself (Auto-commit), or only when you press Commit (Manual)")
     static let isolation = Command("Isolation Level", #selector(AirSQLActions.setIsolationLevel(_:)),
-                                   tip: "Set how the console's transactions see each other's changes")
+                                   tip: "Set how this tab's transactions see each other's changes")
     static let formatSQL = Command("Format SQL", #selector(AirSQLActions.formatSQL(_:)), "f", [.command, .option, .shift],
                                    tip: "Tidy the SQL's spacing and keyword case; values and comments stay as they are")
     static let history = Command("Query History", #selector(AirSQLActions.showHistory(_:)), "y",
                                  tip: "Search the statements run on this connection and insert one again")
     static let changeConnection = Command("Change Connection…", #selector(AirSQLActions.changeConnection(_:)),
-                                          tip: "Run this console's statements on another connection")
+                                          tip: "Run this tab's statements on another connection")
     static let profile = Command("Profile", #selector(AirSQLActions.profileQuery(_:)),
                                  tip: "Run the statement and show where the server spent its time")
     static let saveAsChangeset = Command("Save as Changeset…", #selector(AirSQLActions.saveAsChangeset(_:)),
@@ -516,11 +520,11 @@ enum Commands {
     static let previewChanges = Command("Preview SQL…", #selector(AirSQLActions.previewChanges(_:)), "s", [.command, .option],
                                         tip: "Show the SQL that Apply would run, without running it")
     static let revert = Command("Revert", #selector(AirSQLActions.revertChanges(_:)), "z", [.command, .option],
-                                tip: "Throw away the pending changes of the selected rows")
+                                tip: "Discard the pending changes of the selected rows")
     static let filter = Command("Filter…", #selector(AirSQLActions.focusFilter(_:)), "F",
                                 tip: "Type a WHERE condition to filter the table on the server")
     static let searchAllColumns = Command("Search All Columns", #selector(AirSQLActions.searchAllColumns(_:)), "E",
-                                          tip: "Find rows with this text in any column")
+                                          tip: "Show only the rows with this text in any column")
     static let quickFilter = Command("Quick Filter", #selector(AirSQLActions.quickFilter(_:)),
                                      tip: "Filter by the selected value: equal, not equal, greater, like, NULL…")
     static let filterEquals = Command("Equal to Selection", #selector(AirSQLActions.quickFilterEquals(_:)), "1", [.command, .control],
@@ -599,13 +603,13 @@ enum Commands {
                                        tip: "Open the table's columns, indexes and keys in the table editor")
     static let openObject = Command("Open", #selector(AirSQLActions.openObject(_:)), tip: "Open the routine, trigger or event in its editor")
     static let runRoutine = Command("Run…", #selector(AirSQLActions.runRoutine(_:)),
-                                    tip: "Put a CALL of the procedure, or a SELECT of the function, in a console tab to fill in")
+                                    tip: "Put a CALL of the procedure, or a SELECT of the function, in a query tab to fill in")
     static let generateSelect = Command("Generate SELECT", #selector(AirSQLActions.generateSelect(_:)),
-                                        tip: "Put a SELECT of this table's columns in a console tab")
+                                        tip: "Put a SELECT of this table's columns in a query tab")
     static let generateInsert = Command("Generate INSERT", #selector(AirSQLActions.generateInsert(_:)),
-                                        tip: "Put an INSERT for this table in a console tab")
+                                        tip: "Put an INSERT for this table in a query tab")
     static let generateUpdate = Command("Generate UPDATE", #selector(AirSQLActions.generateUpdate(_:)),
-                                        tip: "Put an UPDATE for this table in a console tab")
+                                        tip: "Put an UPDATE for this table in a query tab")
     static let copyTable = Command("Copy Table…", #selector(AirSQLActions.copyTable(_:)),
                                    tip: "Copy this table, with or without its rows, to another database")
     static let maintenance = Command("Maintenance", #selector(AirSQLActions.runMaintenance(_:)),
@@ -619,7 +623,7 @@ enum Commands {
     static let expandAll = Command("Expand All", #selector(AirSQLActions.expandAll(_:)), tip: "Open every folder under this one")
     static let collapseAll = Command("Collapse All", #selector(AirSQLActions.collapseAll(_:)), tip: "Close every folder under this one")
     static let findOnServer = Command("Find Text on Server…", #selector(AirSQLActions.findOnServer(_:)),
-                                      tip: "Search every table of the server for a text")
+                                      tip: "Find a text in every table of the server; rows stay as they are")
     static let processList = Command("Process List", #selector(AirSQLActions.showProcessList(_:)), "p", [.command, .option],
                                      tip: "Show what every connection to the server is running, with Kill")
     static let killQuery = Command("Kill Query…", #selector(AirSQLActions.killQuery(_:)),
@@ -690,8 +694,8 @@ enum Commands {
                                        tip: "Show what agents asked AirSQL to do, newest last")
     static let agentResults = Command("Agent Results", #selector(AirSQLActions.showAgentResults(_:)),
                                       tip: "Show the queries agents ran on this connection and the rows they got")
-    static let openInNewConsole = Command("Open in New Console", #selector(AirSQLActions.openInNewConsole(_:)),
-                                          tip: "Open the selected statements in a new console tab, to edit and run yourself")
+    static let openInNewConsole = Command("Open in New Query", #selector(AirSQLActions.openInNewConsole(_:)),
+                                          tip: "Open the selected statements in a new query tab, to edit and run yourself")
     static let turnAgentsOff = Command("Turn Agents Off", #selector(AirSQLActions.turnAgentsOff(_:)),
                                        tip: "Stop every agent from using AirSQL until you turn agents on again")
 
@@ -719,7 +723,11 @@ enum Commands {
     static let help = Command("AirSQL Help", #selector(AirSQLActions.showHelpSite(_:)),
                               tip: "Open AirSQL Help on the web: every task step by step, with pictures")
     static let shortcuts = Command("Keyboard Shortcuts", #selector(AirSQLActions.showShortcuts(_:)),
-                                   tip: "Open the list of every shortcut in AirSQL Help")
+                                   tip: "Show every shortcut, in a list you can narrow as you type")
+    static let offlineHelp = Command("AirSQL Help Offline", #selector(AirSQLActions.showOfflineHelp(_:)),
+                                     tip: "Open the text of AirSQL Help kept in the app, for when the site can't be reached")
+    static let releaseNotes = Command("Release Notes", #selector(AirSQLActions.showReleaseNotes(_:)),
+                                      tip: "Open the list of versions on GitHub: what changed, and the newest to download")
     static let gettingStarted = Command("Getting Started", #selector(AirSQLActions.showGettingStarted(_:)),
                                         tip: "Open the first steps in AirSQL Help: add a connection, run a query, edit rows")
     static let reportProblem = Command("Report a Problem", #selector(AirSQLActions.reportProblem(_:)),
@@ -739,7 +747,7 @@ enum Commands {
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
-        cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,
+        cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
@@ -757,7 +765,7 @@ enum Commands {
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
-        help, gettingStarted, shortcuts, reportProblem, copyDiagnostics, agentGuide,
+        help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
     ]
 
     /// The command with this action (and tag, for the actions several commands share).

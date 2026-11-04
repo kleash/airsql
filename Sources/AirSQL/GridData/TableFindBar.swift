@@ -46,6 +46,12 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
 
     init() {
         super.init(frame: .zero)
+        for (button, symbol, name) in [(previous, "chevron.left", "Previous Match"), (next, "chevron.right", "Next Match")] {
+            button.title = ""
+            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: name)
+            button.imagePosition = .imageOnly
+            button.setAccessibilityLabel(name)
+        }
         translatesAutoresizingMaskIntoConstraints = false
         findField.placeholderString = "Find in loaded rows"
         findField.toolTip = "Find this text in the loaded rows; Return shows the next match"

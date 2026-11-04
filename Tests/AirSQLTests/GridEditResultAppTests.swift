@@ -260,7 +260,7 @@ extension AppTests {
             #expect(view.viewer.record == nil && view.grid.sortOrder == [DataGridView.Sort(column: 1, ascending: true)])
         }
 
-        /// A result's edits not applied are never thrown away unasked (grid-spec rule 1): the next Run keeps its tab, as
+        /// A result's edits not applied are never discarded unasked (grid-spec rule 1): the next Run keeps its tab, as
         /// if pinned; Close Result, closing the console and Quit ask first.
         @Test func aResultsEditsStayUntilThePersonThrowsThemAway() async throws {
             let (main, harness, console) = try await AppTests.ConsoleAppTests.console()
@@ -278,7 +278,7 @@ extension AppTests {
             view.keep(.text("ann@example.net"), row: 0, column: 1)
             #expect(view.edits?.pendingRows == 1)
             #expect(view.validateMenuItem(Commands.save.item()), "⌘S applies them while the rows have the keyboard")
-            #expect(main.unfinishedWork().contains { $0.hasPrefix("Edits to 1 row in the results of") && $0.hasSuffix("thrown away") })
+            #expect(main.unfinishedWork().contains { $0.hasPrefix("Edits to 1 row in the results of") && $0.hasSuffix("discarded") })
             console.dropUnpinnedResults()
             #expect(console.resultTabs.count == 1 && !tab.pinned)
             var closes: Bool?
@@ -291,7 +291,7 @@ extension AppTests {
             console.selectResult(tab)
             console.closeResult(nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            _ = await call(harness, "press", ["title": "Throw Away"])
+            _ = await call(harness, "press", ["title": "Discard"])
             _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             #expect(console.resultTabs.isEmpty && main.unfinishedWork().isEmpty)
         }

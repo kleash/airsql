@@ -114,7 +114,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func showHelpSite(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.home.url) }
 
     @objc func showGettingStarted(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.gettingStarted.url) }
-    @objc func showShortcuts(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.shortcuts.url) }
+    @objc func showShortcuts(_ sender: Any?) { ShortcutsWindowController.show() }
+
+    /// The help's text, kept in the app for a Mac that can't reach the site (build.sh copies docs/llms-full.txt).
+    private var offlineHelp: URL? { Bundle.main.url(forResource: "AirSQL Help", withExtension: "txt") }
+    @objc func showOfflineHelp(_ sender: Any?) { offlineHelp.map { _ = NSWorkspace.shared.open($0) } }
+    @objc func showReleaseNotes(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.releases) }
 
     @objc func reportProblem(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.reportProblem) }
 
@@ -138,6 +143,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
             item.toolTip = Commands.closeWindow.tip
             return true
+        }
+        if item.action == Commands.offlineHelp.action, offlineHelp == nil {
+            item.toolTip = "This build has no copy of the help"
+            return false
         }
         item.explain(enabled: true, reason: nil)
         return true
@@ -173,6 +182,9 @@ enum HelpPage: String, CaseIterable {
     case dataGrid = "data-grid.html"
     case liquibase = "liquibase.html"
     case troubleshooting = "troubleshooting.html#a-connection-fails"
+    case navigator = "navigator.html"
+    case console = "console.html"
+    case sqlLog = "sql-log.html"
 
     /// The site: GitHub Pages, built from docs/.
     static let site = URL(string: "https://kleash.github.io/airsql/")!
@@ -182,6 +194,9 @@ enum HelpPage: String, CaseIterable {
     static var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
+
+    /// Help ▸ Release Notes: what each version changed, and the newest one to download.
+    static let releases = URL(string: "https://github.com/kleash/airsql/releases")!
 
     /// Help ▸ Report a Problem: the repository's issue form, with AirSQL's and macOS's versions filled in.
     static var reportProblem: URL {

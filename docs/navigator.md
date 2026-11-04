@@ -54,7 +54,7 @@ A read-only connection offers none of these.
 
 ## Write SQL from the tree
 
-These open a console tab with the SQL in it, built from the names AirSQL read; nothing runs until you press Run.
+These open a query tab with the SQL in it, built from the names AirSQL read; nothing runs until you press Run.
 
 - **Generate SELECT**, **Generate INSERT** and **Generate UPDATE** on a table's or view's menu (in the sidebar or the
   database view) write a statement with its columns. A `?` marks each value for you to fill in: INSERT leaves out the
@@ -89,7 +89,7 @@ read-only connection too: they change no data.
 ## Getting back to your tabs
 
 When you open AirSQL again, your tabs come back in their old order with the old one showing, and so does the sidebar's
-selection. Consoles are as you left them. Table, structure and process-list tabs come back as placeholders: AirSQL doesn't
+selection. Query tabs are as you left them. Table, structure and process-list tabs come back as placeholders: AirSQL doesn't
 connect to anything by itself, also not to a Production connection.
 
 - A placeholder says what the tab was and where. **Connect and Open** connects the usual way, with its prompts, then

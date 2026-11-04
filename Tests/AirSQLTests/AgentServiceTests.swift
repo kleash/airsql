@@ -213,7 +213,7 @@ extension AppTests {
                                                               pressure: 1)))
         #expect(main.selectedTab?.content === tab && tab.table.selectedRowIndexes == [0, 1])
 
-        // A double-click on a statement, or Open in New Console, puts it in a new console tab of the connection.
+        // A double-click on a statement, or Open in New Query, puts it in a new console tab of the connection.
         tab.table.selectRowIndexes([0], byExtendingSelection: false)
         tab.openInNewConsole(nil)
         let console = try #require(main.selectedTab?.content as? ConsoleViewController)

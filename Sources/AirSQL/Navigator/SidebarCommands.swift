@@ -72,7 +72,7 @@ extension SidebarController: NSMenuItemValidation {
             model.openConnection(id)?.currentDatabase = name
             fallthrough
         case .category:
-            if outline.isItemExpanded(node) { outline.animator().collapseItem(node) } else { outline.animator().expandItem(node) }
+            if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .object(_, let object):
             if object.kind.isTableLike { openData(nil) } else { openObject(nil) }
         default:

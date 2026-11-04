@@ -62,11 +62,14 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         self.go = go
         stopButton = stop
         updateButtons()
-        let bar = NSStackView(views: [field, scope, go, stop, spinner])
+        let bar = NSStackView(views: [field, scope, go, stop, spinner, helpButton(.navigator)])
         bar.spacing = Spacing.unit
         bar.translatesAutoresizingMaskIntoConstraints = false
-        for (id, title, width) in [("table", "Table", 260.0), ("columns", "Columns", 260.0), ("rows", "Matching rows", 110.0)] {
+        for (id, title, width, tip) in [("table", "Table", 260.0, "Sort by the table that holds the text"),
+                                        ("columns", "Columns", 260.0, "The columns that hold it; click to sort by them"),
+                                        ("rows", "Matching rows", 110.0, "Sort by how many rows hold it")] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
+            column.headerToolTip = tip
             column.title = title
             column.width = width
             column.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: id != "rows")
@@ -170,11 +173,13 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
                     arrange()
                 }
             }
-            status.stringValue = "\(matches.count) of \(tables.count) tables hold “\(text)”. Double-click one to see its rows."
+            status.stringValue = matches.isEmpty ? "None of the \(tables.count) tables hold “\(text)”. Try part of it, or another database."
+                : "\(matches.count) of \(tables.count) tables hold “\(text)”. Double-click one to see its rows."
+            announce(status.stringValue)
         } catch {
             let stopped = error is CancellationError || (error as? AirSQLError)?.kind == .cancelled
             status.stringValue = stopped ? "Stopped: \(matches.count) tables with matches so far."
-                : "Couldn't search: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                : "Couldn't search: " + error.localizedDescription
         }
         status.toolTip = status.stringValue
     }

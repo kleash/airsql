@@ -5,25 +5,24 @@ nav_order: 9
 
 # The SQL console
 
-A console tab is where you write and run SQL on one connection. Its statements run one at a time, on the connection's
-own session, which every console tab of that connection shares.
+A query tab (the SQL console) is where you write and run SQL on one connection. Its statements run one at a time, on the connection's
+own session, which every query tab of that connection shares.
 
-## Open a console
+## Open a query tab
 
-- **File ▸ New Query** (⌘T), the **+** at the end of the tabs, or **New Query** on a connection's menu opens an empty
-  console on the selected connection. **New Query** on a database's menu (or ⌘T while a database is selected in the
+- **File ▸ New Query** (⌘T), the **+** at the end of the tabs, or **New Query** on a connection's menu opens an empty query tab on the selected connection. **New Query** on a database's menu (or ⌘T while a database is selected in the
   sidebar) makes that database the current one first.
-- **File ▸ Open…** (⌘O) opens .sql files, each in a console of its own. You can also drop .sql files anywhere on the
+- **File ▸ Open…** (⌘O) opens .sql files, each in a query tab of its own. You can also drop .sql files anywhere on the
   window or on AirSQL's Dock icon, or open them with AirSQL from Finder: they open on the connection shown.
-- **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
+- **File ▸ Save** (⌘S) saves the tab's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
 - Drag a result's tab to put the results in another order.
 - Drag a tab along the strip to move it. Past ⌘9, the **Window** menu lists every tab.
-- Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
-- When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL. The
+- Double-click a query tab's tab (or press F2 while its editor has the focus) to give it a name of your own.
+- When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL. The
   other tabs come back too: see [Getting back to your tabs](navigator.md#getting-back-to-your-tabs).
 - **File ▸ Open Recent** lists the .sql files you had open lately.
-- **Query ▸ Change Connection…** runs the console's statements on another connection.
+- **Query ▸ Change Connection…** runs the tab's statements on another connection.
 
 ## Write SQL
 
@@ -77,13 +76,13 @@ connection can have a query timeout: a statement that runs longer is stopped the
 The time shown covers the whole run: waiting its turn, the server's work and fetching every row. After an `UPDATE`,
 Messages counts the rows changed; the server's note beside it says how many matched.
 
-Console tabs of one connection share its session, so while one runs a statement the others wait.
+Query tabs of one connection share its session, so while one runs a statement the others wait.
 
 ### The current database
 
 Statements run in the connection's current database, which the toolbar's database pop-up shows and the sidebar shows in
 bold. Choose another in the pop-up, double-click one in the sidebar, or type `USE`: all three change the same one, for
-every console tab of the connection. A database chosen in the pop-up or the sidebar is made current with `USE` just
+every query tab of the connection. A database chosen in the pop-up or the sidebar is made current with `USE` just
 before the next statement runs (Messages shows it), so a run under way is never switched midway; if that `USE` fails,
 nothing runs.
 
@@ -128,12 +127,11 @@ unique key whose columns can't be NULL); so can an inner join's when every table
   with a bar over the rows counting them; **Undo**, **Redo**, **Revert** and **Revert All** take them back.
 - **Apply** (⌘S while the rows have the keyboard, or the bar's button) writes them in one transaction on the
   connection's data session, each statement checked to change exactly its row. A join's changes always show the SQL
-  first; so do changes on connections whose **Settings ▸ Safety** asks for the preview, and deletes that cascade. If the
-  console has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
+  first; so do changes on connections whose **Settings ▸ Safety** asks for the preview, and deletes that cascade. If the query tab has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
 - After Apply, the edited rows are read back from the server, so the result shows what was stored; deleted rows go.
   New rows and pasting are for a table tab: open the table to add rows.
-- Edits not applied are never thrown away unasked: the next run keeps their result tab, and disconnecting asks first;
-  so do closing the result, closing the console and quitting, unless the connection's Safety settings don't warn on
+- Edits not applied are never discarded unasked: the next run keeps their result tab, and disconnecting asks first;
+  so do closing the result, closing the query tab and quitting, unless the connection's Safety settings don't warn on
   close.
 - On a read-only connection nothing can be edited.
 
@@ -142,21 +140,21 @@ unique key whose columns can't be NULL); so can an inner join's when every table
 Select one or more `INSERT … VALUES` statements of one table (or put the cursor in one) and choose **Query ▸ Edit as
 Table** (also in the editor's right-click menu). The table opens in its tab with each row as a new row, a pending
 change: strings and numbers as their values, `NULL`, `DEFAULT`, and anything else (such as `NOW()`) as SQL the server
-works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the console.
+works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the query tab.
 
 ## Transactions
 
-- **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
-  **Manual**, your changes wait in a transaction until you press **Commit**, or **Rollback** to undo them. Leaving
+- **Auto-commit** (the toolbar's transaction pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
+  **Manual**, your changes wait in a transaction until you press **Commit**, or **Roll Back** to undo them. Leaving
   Manual with changes waiting asks first whether to commit them or roll them back.
-- The **isolation level** (in the Tx pop-up, or Query ▸ Isolation Level) sets how the console's transactions see
-  others' changes: Read Uncommitted, Read Committed, Repeatable Read or Serializable, set on the console's session with
+- The **isolation level** (in the transaction pop-up, or Query ▸ Isolation Level) sets how the tab's transactions see
+  others' changes: Read Uncommitted, Read Committed, Repeatable Read or Serializable, set on the tab's session with
   `SET SESSION TRANSACTION ISOLATION LEVEL`. Until you choose one, the server's own applies (usually Repeatable Read).
-- The toolbar's Run, Commit, Rollback and Cancel are on only when the console can do them now; when one is off, its
+- The toolbar's Run, Commit, Roll Back and Cancel are on only when the query tab can do them now; when one is off, its
   tooltip says why (not connected, no transaction open, nothing running).
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
-- Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
+- Closing the connection's last query tab with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
 - Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes and result edits not yet
   applied.
 
@@ -175,7 +173,7 @@ shows in a sheet, with what it will do:
 
 ## History, the SQL log, plans and profiles
 
-- **Query ▸ Query History** (⌘Y) lists the statements run on the console's connection, newest first. Type to search;
+- **Query ▸ Query History** (⌘Y) lists the statements run on the tab's connection, newest first. Type to search;
   Return or a double-click puts one in the editor at the cursor, and a click shows it whole below the list. Click a
   header to sort, ⌘-click to select several; a right-click also opens them in a new tab or deletes them from the
   history. Passwords in statements are masked before they are kept, as in the SQL log.

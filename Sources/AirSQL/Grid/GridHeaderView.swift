@@ -115,18 +115,18 @@ final class GridHeaderView: NSView {
         draw(info.typeLine, typeFont, .quietText, x: rect.minX + 8, baseline: 4 + nameHeight + typeFont.ascender)
     }
 
-    /// The symbols before a column's name: a gold key for the key that addresses rows (the primary key), a grey one
-    /// for another unique key, an outline for an index, and an accent arrow for a foreign key.
+    /// The symbols before a column's name: a gold key for the key that addresses rows (the primary key), a "1" (one row per value)
+    /// for another unique key, an outline for an index, and an accent chain link for a foreign key.
     private func icons(_ column: GridColumn) -> [(String, NSColor)] {
         var icons: [(String, NSColor)] = []
         if column.isKey || column.marks.contains(.primary) {
             icons.append(("key.fill", .statusWarning))
         } else if column.marks.contains(.unique) {
-            icons.append(("key.fill", .secondaryLabelColor))
+            icons.append(("1.circle", .secondaryLabelColor))
         } else if column.marks.contains(.indexed) {
             icons.append(("key", .secondaryLabelColor))
         }
-        if column.marks.contains(.foreign) { icons.append(("arrow.up.right", .accent)) }
+        if column.marks.contains(.foreign) { icons.append(("link", .accent)) }
         return icons
     }
 

@@ -145,3 +145,22 @@ extension RoutesTests {
         #expect(made.route == .ssh && made.sshHost.host == "db-gw" && made.host == "127.0.0.1" && SSHConfig.problem(with: made) == nil)
     }
 }
+
+struct LocalServerTests {
+    @Test func findsOnlyARealSocket() throws {
+        let path = NSTemporaryDirectory() + "as-\(getpid()).sock", plain = path + ".txt"
+        FileManager.default.createFile(atPath: plain, contents: Data())
+        defer { unlink(path); unlink(plain) }
+        #expect(LocalServer.socket(in: ["/nothing/here", plain]) == nil)
+        let server = socket(AF_UNIX, SOCK_STREAM, 0)
+        defer { close(server) }
+        var address = sockaddr_un()
+        address.sun_family = sa_family_t(AF_UNIX)
+        _ = withUnsafeMutableBytes(of: &address.sun_path) { path.utf8CString.withUnsafeBytes($0.copyMemory) }
+        let bound = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(server, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+        }
+        try #require(bound == 0)
+        #expect(LocalServer.socket(in: [plain, path]) == path)
+    }
+}

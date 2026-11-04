@@ -49,3 +49,27 @@ struct ErrorMappingTests {
         #expect(error.message == "View 'v' references invalid table(s) or column(s).")
     }
 }
+
+/// What people read of a server error: plain words, then the server's, once.
+struct ErrorWordsTests {
+    @Test func theServersWordsFollowThePlainOnes() {
+        let typo = ErrorMapping.map(code: 1054, sqlState: "42S22", message: "Unknown column 'nmae' in 'where clause'")
+        #expect(typo.localizedDescription == "That column doesn't exist. Error 1054 (42S22): Unknown column 'nmae' in 'where clause'")
+        let unmapped = ErrorMapping.map(code: 9999, message: "something odd")
+        #expect(unmapped.localizedDescription == "Error 9999: something odd", "said once")
+        #expect(ErrorMapping.map(code: 1317, message: "interrupted").localizedDescription == AirSQLError.cancelled.message)
+    }
+
+    @Test func everydayErrorsHaveANextStep() {
+        for code in [1046, 1048, 1050, 1055, 1067, 1071, 1091, 1175, 1215, 1264, 1292, 1364, 1366, 1406, 1701, 1822, 3819] {
+            #expect(ErrorMapping.map(code: code, message: "raw").message != "Raw.", "\(code)")
+        }
+        #expect(ErrorMapping.map(code: 4025, message: "raw", mariaDB: true).message != "Raw.")
+        #expect(ErrorMapping.map(code: 3819, message: "raw", mariaDB: true).message == "Raw.", "MariaDB numbers it otherwise")
+    }
+
+    @Test func detailsThatArentTheServersStayOut() {
+        let script = AirSQLError(.other, "It failed.", details: "SELECT secret")
+        #expect(script.localizedDescription == "It failed.")
+    }
+}

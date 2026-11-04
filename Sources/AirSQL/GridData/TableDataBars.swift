@@ -46,12 +46,12 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         scope.setAccessibilityIdentifier("tableData.scope")
         scope.toolTip = "Where the filter and the sort run: on the server for every row, or here on the loaded rows"
         scope.label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)  // the search and WHERE narrow first
-        let whereLabel = label("WHERE", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .quietText)
+        let whereLabel = label("Filter", font: .systemFont(ofSize: 10.5, weight: .semibold), color: .quietText)
         whereField.placeholder = "for example status = 'paid'"
         whereField.toolTip = "Type a WHERE condition and press Return to filter every row on the server (suggestions show as you "
             + "type, Tab inserts one; ⌥↩ starts a new line)"
         whereField.setAccessibilityIdentifier("tableData.where")
-        whereField.setAccessibilityLabel("WHERE condition")
+        whereField.setAccessibilityLabel("Filter: a WHERE condition")
         whereField.delegate = self
         whereField.onReturn = { [weak self] in self?.filterEntered(nil) }
         whereField.onRecent = { [weak self] in self?.showRecent(nil) }
@@ -83,7 +83,7 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         whereRow.setHuggingPriority(.defaultLow, for: .horizontal)
         spacer.isHidden = true
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        row.setViews([scope, whereRow, spacer, searchField, loadedOnly, spinner, transposeButton, helpButton(.dataGrid)], in: .leading)
+        row.setViews([scope, whereRow, spacer, searchField, loadedOnly, spinner, transposeButton, helpButton(.tableData)], in: .leading)
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.unit)
@@ -240,7 +240,7 @@ final class TableDataNotice: NSView {
     let text = label("", font: .systemFont(ofSize: 12), wraps: true)
     lazy var preview = button("Preview SQL…", id: "tableData.preview", tip: Commands.previewChanges.tip, target: nil,
                               action: Commands.previewChanges.action)
-    lazy var revert = button("Revert All", id: "tableData.revert", tip: "Throw away every pending change",
+    lazy var revert = button("Revert All", id: "tableData.revert", tip: "Discard every pending change",
                              target: nil, action: #selector(TableDataController.revertAllChanges(_:)))
     lazy var apply = button("Apply", id: "tableData.apply", tip: Commands.apply.tip, target: nil, action: Commands.apply.action)
     private var kind = Kind.readOnly

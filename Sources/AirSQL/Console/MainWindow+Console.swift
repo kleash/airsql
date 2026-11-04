@@ -42,7 +42,7 @@ extension MainWindowController: AgentConsoles {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "sql") ?? .plainText, .plainText]
         panel.allowsMultipleSelection = true
-        panel.message = "Open .sql files in console tabs"
+        panel.message = "Open .sql files in query tabs"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK else { return }
             self?.openFiles(panel.urls)

@@ -11,6 +11,26 @@ protocol TableSession: AnyObject {
 
 extension DBConnection: TableSession {}
 
+/// Cancel during an Apply: stops the statement running (a lock wait, usually), so the transaction rolls back. COMMIT is
+/// left to finish: stopped midway nobody could say whether it took.
+@MainActor
+final class ApplyStop {
+    var session: TableSession?
+    private var running: String?, stopped = false
+
+    /// Called before each statement of the Apply; once stopped only ROLLBACK goes on.
+    func starting(_ sql: String) throws {
+        if stopped && sql != "ROLLBACK" { throw AirSQLError.cancelled }
+        running = sql == "COMMIT" || sql == "ROLLBACK" ? nil : sql
+    }
+
+    func stop() {
+        stopped = true
+        guard let session, let running else { return }
+        Task { _ = try? await session.cancel(statement: running) }
+    }
+}
+
 /// Set from any thread to stop a stream between batches (Cancel on Load All's activity).
 final class StopFlag: @unchecked Sendable {
     private let lock = NSLock()
@@ -61,7 +81,7 @@ final class TableDataController: NSViewController, TabContent {
     /// A load under way (a page, Load All, Refresh, Apply): one at a time.
     var loading: Task<Void, Never>?
     /// That load in Activity, when Cancel can stop it (a read, not Apply).
-    private var activity: Activity?
+    var activity: Activity?
     /// The preview tab moved on while this was opening: its rows aren't read.
     var abandoned = false
     /// The data session's NO_BACKSLASH_ESCAPES, as filters quote their values for it (read at each load).
@@ -183,7 +203,7 @@ final class TableDataController: NSViewController, TabContent {
                 if context.connection.readOnly { noBackslashEscapes = try await openSession().noBackslashEscapes }
                 show(TableDataSource(database: database, table: info), settings: saved, changes: left)
             } catch {
-                problem = (error as? AirSQLError)?.message ?? error.localizedDescription
+                problem = error.localizedDescription
                 bar.busy = false
                 updateBars()
             }
@@ -250,7 +270,7 @@ final class TableDataController: NSViewController, TabContent {
                 // Load More's rows just stay as they are.
                 if !more { problem = "Cancelled, so these aren't the rows you asked for. Refresh (⌘R) loads them." }
             } catch {
-                problem = "The rows didn't load: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                problem = "The rows didn't load: " + error.localizedDescription
             }
             finishLoading()
         }
@@ -279,7 +299,7 @@ final class TableDataController: NSViewController, TabContent {
                 await MainActor.run { source.finishLoading() }
             } catch where Task.isCancelled {
             } catch {
-                problem = "Not every row loaded: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                problem = "Not every row loaded: " + error.localizedDescription
             }
             finishLoading()
         }
@@ -383,7 +403,7 @@ final class TableDataController: NSViewController, TabContent {
                 }
             } catch where Task.isCancelled {
             } catch {
-                problem = "The rows weren't counted: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                problem = "The rows weren't counted: " + error.localizedDescription
             }
             endRead()
             updateBars()
@@ -454,8 +474,8 @@ final class TableDataController: NSViewController, TabContent {
         alert.messageText = known.map { "Load all \($0.exact ? "" : "about ")\($0.rows.formatted()) rows?" } ?? "Load every row that's left?"
         alert.informativeText = (known == nil ? "How many there are isn't known. " : "")
             + "They are held in memory while the tab is open. A filter shows fewer rows."
-        alert.addButton(withTitle: "Load All")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Load All").toolTip = "Read every row that's left into this tab"
+        alert.addButton(withTitle: "Cancel").toolTip = "Keep only the rows loaded so far"
         alert.beginSheetModal(for: window) { [weak self] response in
             if response == .alertFirstButtonReturn { self?.loadAllRows() }
         }
@@ -531,12 +551,13 @@ final class TableDataController: NSViewController, TabContent {
         guard let source, !source.changes.isEmpty, model.data.safety(for: context.connection).warnOnClose,
               let window = view.window else { return answer(true) }
         let alert = NSAlert()
-        alert.messageText = "Apply the changes to \(tableName) before closing?"
-        alert.informativeText = "\(source.changes.rowCount.formatted()) rows have pending changes. Kept, they come back the next "
-            + "time you open the table."
-        alert.addButton(withTitle: "Keep for Later")
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Throw Away")
+        alert.messageText = "Keep the changes to \(tableName) for later?"
+        let rows = source.changes.rowCount
+        alert.informativeText = (rows == 1 ? "1 row has" : "\(rows.formatted()) rows have") + " pending changes, not applied. "
+            + "Kept, they come back the next time you open the table."
+        alert.addButton(withTitle: "Keep for Later").toolTip = "Close the tab; the changes come back with the table, still not applied"
+        alert.addButton(withTitle: "Cancel").toolTip = "Keep the tab open"
+        alert.addButton(withTitle: "Discard").toolTip = "Close the tab and lose the changes"
         alert.buttons[2].hasDestructiveAction = true
         alert.beginSheetModal(for: window) { [weak self] response in
             switch response {

@@ -158,7 +158,7 @@ extension AppTests {
                 #expect(rowNumber >= 4.5, "\(theme): a row number is \(rowNumber):1")
 
                 let bar = TableDataBar()
-                let whereLabel = try #require(descendants(of: bar).compactMap { $0 as? NSTextField }.first { $0.stringValue == "WHERE" })
+                let whereLabel = try #require(descendants(of: bar).compactMap { $0 as? NSTextField }.first { $0.stringValue == "Filter" })
                 let label = try drawnContrast(bar, size: NSSize(width: 760, height: 36), in: { whereLabel.convert(whereLabel.bounds, to: $0) },
                                               appearance: appearance)
                 #expect(label >= 4.5, "\(theme): the WHERE label is \(label):1")

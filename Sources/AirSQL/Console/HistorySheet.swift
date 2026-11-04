@@ -46,9 +46,11 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         search.sendsSearchStringImmediately = true
         search.translatesAutoresizingMaskIntoConstraints = false
         // The statement and the result share what the time leaves; a long error is shortened, whole in its tooltip.
-        for (identifier, title, width, minimum) in [("time", "When", 150.0, 150.0), ("sql", "Statement", 360.0, 160.0),
-                                                    ("result", "Result", 200.0, 100.0)] {
+        for (identifier, title, width, minimum, tip) in [("time", "When", 150.0, 150.0, "Sort by when it ran"),
+                                                         ("sql", "Statement", 360.0, 160.0, "Sort by the statement's text"),
+                                                         ("result", "Result", 200.0, 100.0, "Sort by what came of it: rows, or an error")] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.headerToolTip = tip
             column.title = title
             column.width = width
             column.minWidth = minimum
@@ -89,7 +91,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         insertButton.keyEquivalent = "\r"
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let buttons = NSStackView(views: [clear, status, spacer, cancel, insertButton])
+        let buttons = NSStackView(views: [helpButton(.console), clear, status, spacer, cancel, insertButton])
         buttons.spacing = Spacing.unit
         buttons.translatesAutoresizingMaskIntoConstraints = false
         empty.alignment = .center
@@ -146,10 +148,11 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             self.table.reloadData()
             if !found.isEmpty { self.table.selectRowIndexes([0], byExtendingSelection: false) }
             self.status.stringValue = found.isEmpty ? "" : "\(found.count.formatted()) statement\(found.count == 1 ? "" : "s")"
-            self.empty.stringValue = words.isEmpty ? "Nothing has run on this connection yet: statements you run in a console show here."
+            self.empty.stringValue = words.isEmpty ? "Nothing has run on this connection yet: statements you run in a query tab show here."
                 : "No statement has these words."
             self.empty.isHidden = !found.isEmpty
             self.insertButton.isEnabled = !found.isEmpty
+            self.insertButton.toolTip = found.isEmpty ? "No statement to insert" : "Put the selected statement in the editor at the cursor"
         }
     }
 
@@ -240,7 +243,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         let insert = NSMenuItem(title: "Insert", action: #selector(insertSelected(_:)), keyEquivalent: "")
         insert.toolTip = "Put the statement in the editor at the cursor"
         let tab = NSMenuItem(title: "Open in New Tab", action: #selector(openSelected(_:)), keyEquivalent: "")
-        tab.toolTip = "Put the statement in a new console tab, to read it before running it"
+        tab.toolTip = "Put the statement in a new query tab, to read it before running it"
         let copy = Commands.copy.item()
         let remove = NSMenuItem(title: "Delete from History", action: #selector(deleteSelected(_:)), keyEquivalent: "")
         remove.toolTip = "Forget the selected statements on this Mac"

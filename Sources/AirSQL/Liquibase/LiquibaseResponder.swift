@@ -61,7 +61,7 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
         guard !statements.isEmpty else {
             return console.note(.info, "There is no statement here to save: type one, or put the cursor in one.")
         }
-        let title = main.selectedTab?.title ?? "Console"
+        let title = main.selectedTab?.title ?? "Query"
         let changeset = Liquibase.changeset(title: title, statements: statements, noBackslashEscapes: console.editor.noBackslashEscapes,
                                             rollback: main.model.data.settings.liquibase.rollback)
         ChangesetSheet.show([changeset], heading: "Save " + (statements.count == 1 ? "the statement" : "\(statements.count) statements")
@@ -83,7 +83,7 @@ final class LiquibaseResponder: NSResponder, NSMenuItemValidation {
         switch action {
         case #selector(saveAsChangeset(_:)):
             guard let console = main.selectedTab?.content as? ConsoleViewController else {
-                return "Open a console tab with the statements to save"
+                return "Open a query tab with the statements to save"
             }
             return console.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Type the statements to save first" : nil
         default:

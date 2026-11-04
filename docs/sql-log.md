@@ -6,7 +6,7 @@ nav_order: 7
 # The SQL log
 
 AirSQL writes every statement it sends to a server into one file on your Mac, just before the statement goes out.
-Use it to see exactly what AirSQL did: what the console ran, what a table edit applied, what the navigator asked the
+Use it to see exactly what AirSQL did: what a query tab ran, what a table edit applied, what the navigator asked the
 server for.
 
 ## Where it is
@@ -22,7 +22,7 @@ one before, and a new file starts. It stays on your Mac: AirSQL sends it nowhere
 
 - the time;
 - the connection's name;
-- the session: **main** (console tabs), **data** (table tabs and their edits), **schema** (the navigator), **agent**
+- the session: **main** (query tabs), **data** (table tabs and their edits), **schema** (the navigator), **agent**
   (AI agents), **tools** (client tools and compare), **cancel** (the short connection that stops a running statement);
 - the statement's number in that session. The server sees the same number in a comment at the start of the statement,
   `/* airsql:main:12 */`, so you can find it in the server's process list.

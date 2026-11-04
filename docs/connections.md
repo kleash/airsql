@@ -18,9 +18,9 @@ tabs:
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.
 - **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
-  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Check the authority and host name** is the safe choice: the server must
+  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Encrypt, check certificate and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
-  shows its fingerprint when you connect (see [Trust a server](trust-a-server.md)). Add an authority file for a
+  shows its fingerprint when you connect (see [Trust a server](trust-a-server.md)). Add a CA certificate for a
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
@@ -29,12 +29,12 @@ tabs:
   connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
   why it can't be used).
 - **Safety**: safety checks of the connection's own: every switch and limit of [Settings ▸ Safety](settings.md#safety),
-  starting from the ones that applied, with a shield beside its name in the sidebar.
+  starting from the ones that applied, with a slider mark beside its name in the sidebar.
 - **Agents**: what AI agents may do with this connection.
 
 A **read-only** connection's sessions are read-only on the server, and AirSQL itself runs on it only statements it can
 prove only read: SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN (as [read-only queries](read-only-queries.md)
-decide), and USE. Anything else is refused before it is sent, with the reason, from the console, the navigator, a
+decide), and USE. Anything else is refused before it is sent, with the reason, from the query tab, the navigator, a
 compare's sync script, Restore, Run SQL File and CSV import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
 it. A table tab's WHERE filter goes through the same check, within the whole SELECT it runs in, so a condition can't
 call a function such as `SLEEP` or `GET_LOCK` there. Open in Terminal starts `mysql` with a read-only session. The

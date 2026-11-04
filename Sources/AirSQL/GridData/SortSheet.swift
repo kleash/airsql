@@ -82,7 +82,7 @@ final class SortSheet: NSWindowController {
             let down = symbolButton("chevron.down", id: "sort.down.\(index)", tip: "Move this column down: sort by it after the one below",
                                     action: #selector(moveKeyDown(_:)))
             down.isEnabled = index < keys.count - 1
-            let remove = symbolButton("minus.circle", id: "sort.remove.\(index)", tip: "Stop sorting by this column",
+            let remove = symbolButton("minus", id: "sort.remove.\(index)", tip: "Stop sorting by this column",
                                       action: #selector(removeKey(_:)))
             for control in [column, direction, up, down, remove] { control.tag = index }
             let line = NSStackView(views: [lead, column, direction, up, down, remove])

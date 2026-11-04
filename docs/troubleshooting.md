@@ -5,8 +5,8 @@ nav_order: 92
 
 # Troubleshooting
 
-AirSQL says what went wrong in plain words, with the server's own error under **Details**. Here is what to do about
-the common problems.
+AirSQL says what went wrong in plain words, followed by the server's own error with its number. Here is what to do
+about the common problems.
 
 ## A connection fails
 
@@ -43,6 +43,10 @@ devices on it. If you chose **Don't Allow**: System Settings ▸ Privacy & Secur
 ## AirSQL doesn't open
 
 It needs macOS 13.1 or later. Downloads from the releases page and Homebrew are notarized and open normally.
+
+## No help pages show
+
+The help is on the web. On a Mac that can't reach it, **Help ▸ AirSQL Help Offline** opens the same text, kept in the app.
 
 ## Report a problem
 

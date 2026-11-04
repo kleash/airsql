@@ -165,7 +165,7 @@ extension AppTests {
             let level = try #require(tx.item(withTitle: "Read Committed"))
             #expect((harness.target(for: level.action!, explicit: nil, in: main.window) as? NSMenuItemValidation)?
                 .validateMenuItem(level) == true)
-            #expect(level.state == .on && tx.titleOfSelectedItem == "Tx: Auto-commit")
+            #expect(level.state == .on && tx.titleOfSelectedItem == "Auto-commit")
 
             // Run…: the procedure's CALL, its parameters as the server lists them.
             let routine = try #require(treeRow(main, .object(open.id, DatabaseObject(.procedure, a, "twice"))))

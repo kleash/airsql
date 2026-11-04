@@ -76,7 +76,7 @@ final class ForeignKeyLookup: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
                 status.stringValue = count == 0 ? "No rows match" : count >= 100 ? "The first 100 rows: type to find others" : "\(count) rows"
             } catch {
                 rows = []
-                status.stringValue = "The rows didn't load: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                status.stringValue = "The rows didn't load: " + error.localizedDescription
             }
             status.toolTip = status.stringValue
             table.reloadData()

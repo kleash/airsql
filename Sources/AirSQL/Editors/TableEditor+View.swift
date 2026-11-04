@@ -70,6 +70,9 @@ extension TableEditorController {
         ])
         listHolder.addSubview(listColumn)
         listColumn.pin(to: listHolder)
+        listColumn.addSubview(listHint)
+        NSLayoutConstraint.activate([listHint.centerXAnchor.constraint(equalTo: listScroll.centerXAnchor),
+                                     listHint.centerYAnchor.constraint(equalTo: listScroll.centerYAnchor)])
         options.editor = self
         listHolder.addSubview(options)
         options.pin(to: listHolder)
@@ -169,11 +172,14 @@ extension TableEditorController {
     }
 
     func updateButtons() {
+        let kinds: [Section: String] = [.indexes: "indexes", .foreignKeys: "foreign keys", .checks: "checks"]
+        listHint.isHidden = list.numberOfRows > 0 || kinds[section] == nil
+        listHint.stringValue = "No \(kinds[section] ?? "rows") yet: press + below to add one"
         let reason = applyReason
         applyButton.isEnabled = reason == nil
         applyButton.toolTip = reason ?? "Show the SQL in the preview sheet, then run it on the server (⌘S)"
         discardButton.isEnabled = !isBusy && isEdited && before != nil
-        discardButton.toolTip = discardButton.isEnabled ? "Throw away your changes and show the table as the server has it"
+        discardButton.toolTip = discardButton.isEnabled ? "Discard your changes and show the table as the server has it"
             : (isBusy ? "Wait until the server has answered" : "Nothing to discard")
         addButton.isEnabled = !isBusy && section != .options
         removeButton.isEnabled = !isBusy && section != .options && !list.selectedRowIndexes.isEmpty

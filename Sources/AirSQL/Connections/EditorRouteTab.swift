@@ -129,7 +129,7 @@ extension ConnectionEditor {
         form.row("", [own])
         let toggles: [(String, WritableKeyPath<SavedConnection, Bool>, String)] = [
             ("Ask before UPDATE or DELETE without WHERE", \.safety!.askBeforeUnboundedWrite, "unboundedWrite"),
-            ("Ask before any write from the console", \.safety!.askBeforeConsoleWrite, "consoleWrite"),
+            ("Ask before any write from a query tab", \.safety!.askBeforeConsoleWrite, "consoleWrite"),
             ("Show the SQL before the grid's Apply", \.safety!.previewBeforeApply, "previewApply"),
             ("Ask before DROP or TRUNCATE", \.safety!.askBeforeDrop, "drop"),
             ("Type a table's name to drop or empty it", \.safety!.typeNameForTables, "typeTableName"),

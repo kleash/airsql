@@ -169,10 +169,10 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         [colour == .none ? nil : colour.title, readOnly ? "read-only" : nil].compactMap { $0 }.joined(separator: ", ")
     }
 
-    /// What the sidebar shows at the row's end: TCP, Socket, SSH, Jump or Proxy.
+    /// What the sidebar shows at the row's end: Direct, Socket, SSH, Jump or Proxy.
     public var routeBadge: String {
         switch route {
-        case .direct: return socket.isEmpty ? "TCP" : "Socket"
+        case .direct: return socket.isEmpty ? "Direct" : "Socket"
         case .ssh: return "SSH"
         case .sshJump: return "Jump"
         case .sshProxy: return "SSH + proxy"

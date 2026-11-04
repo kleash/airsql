@@ -59,7 +59,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         let toolbar = NSToolbar(identifier: "Main")
         toolbar.delegate = toolbarController
         toolbar.displayMode = .iconOnly
-        toolbar.allowsUserCustomization = false
+        toolbar.allowsUserCustomization = true
+        toolbar.autosavesConfiguration = layoutName("Main") != nil
         window.toolbar = toolbar
         window.open(size: Self.defaultSize, autosave: layoutName("Main"))
         if split.splitView.autosaveName == nil || UserDefaults.standard.object(forKey: "NSSplitView Subview Frames Sidebar") == nil {
@@ -315,7 +316,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         statusBar.transaction.popover = { [weak self] in
             guard let self, let badge = self.selectedTab?.tabContent?.transactionBadge else { return nil }
             let commit = button("Commit", id: "popover.commit", tip: Commands.commit.tip, target: nil, action: Commands.commit.action)
-            let rollback = button("Rollback", id: "popover.rollback", tip: Commands.rollback.tip, target: nil,
+            let rollback = button("Roll Back", id: "popover.rollback", tip: Commands.rollback.tip, target: nil,
                                   action: Commands.rollback.action)
             return InfoPopover(id: "popover.transaction", heading: "Transaction", lines: [badge], buttons: [commit, rollback])
         }
@@ -644,7 +645,7 @@ final class FileDropView: NSView {
 final class MainSplitViewController: NSSplitViewController {
     override func toggleSidebar(_ sender: Any?) {
         guard let item = splitViewItems.first else { return }
-        item.animator().isCollapsed = !item.isCollapsed
+        gently(item).isCollapsed = !item.isCollapsed
     }
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {

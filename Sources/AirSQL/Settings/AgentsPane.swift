@@ -5,6 +5,8 @@ import Combine
 /// Settings ▸ Agents: whether AI agents may use AirSQL, each connection's access, the folder their exports go to, and
 /// adding AirSQL to Claude Code or Gemini CLI (plan §2.8). Only the person changes these: agents can't.
 final class AgentsPane: SettingsPaneController {
+    override var helpPage: HelpPage { .agents }
+
     /// Where agents' exports go: inside AirSQL's folder, so macOS asks nothing (R18).
     static var exportFolder: URL { AgentTarget.exportFolder }
     /// The program agents start: this AirSQL's own, with --mcp.
@@ -22,7 +24,7 @@ final class AgentsPane: SettingsPaneController {
                              tip: "Let Claude Code, Gemini CLI or another MCP client use AirSQL (off by default)",
                              \.agentsAllowed)],
                  caption: "Agents never see passwords and can't change data: they read within each connection's access "
-                    + "below, and propose SQL in console tabs for you to run. Every call is listed in Agent Activity.")
+                    + "below, and propose SQL in query tabs for you to run. Every call is listed in Agent Activity.")
         if let problem = (NSApp.delegate as? AppDelegate)?.agents?.problem {
             form.row("", [caption("Agents can't start: " + problem)])
         }
@@ -81,8 +83,11 @@ final class AgentsPane: SettingsPaneController {
             DispatchQueue.main.async { table?.reloadData() }
         })
         // Access as wide as its pop-up with its longest level, "Schema + read + analytics".
-        for (id, title, width) in [("name", "Connection", 140.0), ("access", "Access", 214.0), ("samples", "Sample rows", 96.0)] {
+        for (id, title, width, tip) in [("name", "Connection", 140.0, "Your saved connections"),
+                                        ("access", "Access", 214.0, "Choose what agents may do on this connection"),
+                                        ("samples", "Sample rows", 96.0, "Let agents see a few rows when they read a table's details")] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
+            column.headerToolTip = tip
             column.title = title
             column.width = width
             table.addTableColumn(column)
@@ -148,7 +153,7 @@ final class AgentsPane: SettingsPaneController {
             samples.tag = -1
             samples.state = connection.agentSampleRows ? .on : .off
             samples.toolTip = connection.agentAccess == .off ? "Choose an access other than Off first: agents see nothing of "
-                + connection.displayName : "Let describe show agents a few rows of \(connection.displayName)'s tables"
+                + connection.displayName : "Let agents see a few rows when they read the details of \(connection.displayName)'s tables"
             menu.items.forEach { $0.target = self }
             menu.autoenablesItems = false
             samples.isEnabled = connection.agentAccess != .off
@@ -184,7 +189,7 @@ final class AgentsPane: SettingsPaneController {
                 let samples = checkbox("", id: "settings.agentSampleRows",
                                        tip: connection.agentAccess == .off ? "Choose an access other than Off first: agents see "
                                            + "nothing of \(connection.displayName)"
-                                           : "Let describe show agents a few rows of \(connection.displayName)'s tables",
+                                           : "Let agents see a few rows when they read the details of \(connection.displayName)'s tables",
                                        on: connection.agentSampleRows, target: self, action: #selector(changed(_:)))
                 samples.isEnabled = connection.agentAccess != .off
                 samples.setAccessibilityLabel("Sample rows of \(connection.displayName)")
@@ -257,18 +262,23 @@ final class AgentsPane: SettingsPaneController {
                 + (change.before == nil ? "" : ", replacing the entry there now") + ", and keep the old file next to it "
                 + "(.airsql-backup). Then restart \(change.client.title)."
             alert.accessoryView = codeView((change.before.map { "Now:\n" + $0 + "\n\nAfter:\n" } ?? "") + change.after)
-            alert.addButton(withTitle: "Add")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: "Add").toolTip = "Write this entry to the file, keeping the old file next to it"
+            alert.addButton(withTitle: "Cancel").toolTip = "Leave the file as it is"
             show(alert) { [weak self] response in
                 guard response == .alertFirstButtonReturn else { return }
                 DispatchQueue.global(qos: .userInitiated).async {
                     let result = Result { try AgentSetup.apply(change) }
                     DispatchQueue.main.async {
-                        guard case .failure(let error) = result else { return }
-                        let failed = NSAlert()
-                        failed.messageText = "AirSQL couldn't change \(change.file.lastPathComponent)"
-                        failed.informativeText = error.localizedDescription
-                        self?.show(failed) { _ in }
+                        let said = NSAlert()
+                        switch result {
+                        case .success:
+                            said.messageText = "AirSQL is in \(change.client.title)"
+                            said.informativeText = "Restart \(change.client.title) to see AirSQL's tools."
+                        case .failure(let error):
+                            said.messageText = "AirSQL couldn't change \(change.file.lastPathComponent)"
+                            said.informativeText = error.localizedDescription
+                        }
+                        self?.show(said) { _ in }
                     }
                 }
             }

@@ -241,14 +241,14 @@ final class ReconObjectCell: NSTableCellView {
     }
 
     /// The widest chip's width: its text, its label's 2-point margins and the chip's 9-point insets.
-    static let chipWidth = ["only left", "only right", "structure", "data", "match"].map {
+    static let chipWidth = ["only source", "only target", "structure", "data", "match"].map {
         NSAttributedString(string: $0, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width.rounded(.up) + 22
     }.max() ?? 0
 
     static func chip(_ object: ReconObject) -> (String, ChipView.Style) {
         switch object.status {
-        case .onlyInSource: return ("only left", .tinted(.statusBad))
-        case .onlyInTarget: return ("only right", .tinted(.statusBad))
+        case .onlyInSource: return ("only source", .tinted(.statusBad))
+        case .onlyInTarget: return ("only target", .tinted(.statusBad))
         case .different: return ("structure", .tinted(.statusWarning))
         case .same: return object.data?.differs == true ? ("data", .accent) : ("match", .tinted(.statusOK))
         }

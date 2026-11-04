@@ -99,8 +99,7 @@ enum NavigatorActions {
                     if changeset { SQLPreviewSheet.changesetWriter?(request.change, request.noBackslashEscapes) }
                     done?(results)
                 } catch {
-                    let message = (error as? AirSQLError)?.message ?? error.localizedDescription
-                    showError(message, title: "Couldn't \(request.actionTitle.lowercased()): the server said no", on: window)
+                    showError(error.localizedDescription, title: "Couldn't \(request.actionTitle.lowercased())", on: window)
                 }
             }
         }
@@ -194,7 +193,7 @@ enum NavigatorActions {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
             } catch {
-                showError((error as? AirSQLError)?.message ?? error.localizedDescription, title: "Couldn't read the definition",
+                showError(error.localizedDescription, title: "Couldn't read the definition",
                           on: window)
             }
         }
@@ -241,7 +240,7 @@ enum NavigatorActions {
                     console?.note(.info, "Put a value in place of each ?, then press Run: nothing runs until you do.")
                 }
             } catch {
-                showError((error as? AirSQLError)?.message ?? error.localizedDescription,
+                showError(error.localizedDescription,
                           title: "Couldn't read the parameters of \(routine.name)", on: main.window)
             }
         }

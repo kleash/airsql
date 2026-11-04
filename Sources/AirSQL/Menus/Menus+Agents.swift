@@ -1,7 +1,7 @@
 import AppKit
 
 extension MainMenu {
-    /// Lane L7 (agents): Help ▸ AI Agents; View ▸ Agent Results and Query ▸ Open in New Console (the Agent tab's).
+    /// Lane L7 (agents): Help ▸ AI Agents; View ▸ Agent Results and Query ▸ Open in New Query (the Agent tab's).
     /// Tools ▸ Agents ▸ Set Up Agents…, Agent Activity and Turn Agents Off are P0's already (the agent chip's menu has
     /// them).
     static func addAgentItems(_ menus: Menus) {

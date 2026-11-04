@@ -130,7 +130,15 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         let picture = column?.kind == .binary ? self.bytes.flatMap { NSImage(data: Data($0)) } : nil
         image.image = picture
         let fits: [Mode: Bool] = [.text: value != nil, .json: tree != nil, .hex: value != nil, .image: picture != nil]
-        for item in Mode.allCases { modes.setEnabled(fits[item] == true, forSegment: item.rawValue) }
+        let tips: [Mode: (on: String, off: String)] = [
+            .text: ("Show the value as text", "This cell has no value"), .json: ("Show the value as a JSON tree", "The value isn't JSON"),
+            .hex: ("Show the value's bytes in hexadecimal", "This cell has no value"),
+            .image: ("Show the value as a picture", "The value isn't a picture"),
+        ]
+        for item in Mode.allCases {
+            modes.setEnabled(fits[item] == true, forSegment: item.rawValue)
+            modes.setToolTip(fits[item] == true ? tips[item]?.on : tips[item]?.off, forSegment: item.rawValue)
+        }
         if let picked, fits[picked] == true { mode = picked } else { mode = picture != nil ? .image : tree != nil ? .json : .text }
         modes.selectedSegment = value == nil ? -1 : mode.rawValue
         footer.stringValue = column == nil ? "Select a cell to see its whole value here" : summary
@@ -325,7 +333,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
                 }.value
                 switch loaded {
                 case .success(let text): if let refusal = keep(text) { self?.say(refusal, problem: true) }
-                case .failure(let error): self?.say((error as? AirSQLError)?.message ?? error.localizedDescription, problem: true)
+                case .failure(let error): self?.say(error.localizedDescription, problem: true)
                 }
             }
         }

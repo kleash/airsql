@@ -26,7 +26,7 @@ parts, chosen at the top:
 - **Options**: the table's name, engine, default collation, row format, next AUTO_INCREMENT number and comment.
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
-green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Discard** takes back all of them.
+green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Revert** takes back all of them.
 Drag columns to put them in another order, or press ⇧⌘↑ and ⇧⌘↓. ⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
 as new rows.
 
@@ -57,7 +57,7 @@ server keeps it, to edit as text.
 - MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
   function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
   apply again, and **Revert** puts the old code back.
-- The code has the console's editor: line numbers, completion, Comment Lines (⌘/), Format SQL and the matching bracket.
+- The code has the tab's editor: line numbers, completion, Comment Lines (⌘/), Format SQL and the matching bracket.
 - When the server refuses the code, the place it points to is underlined in red, with the message on hover, until you
   change the text.
 - Renaming it in the code makes the new one and then drops the old one.

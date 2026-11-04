@@ -14,7 +14,7 @@ with your own `liquibase` (`liquibase update`, `liquibase rollback-count 1`…).
 
 **Tools ▸ Generate Liquibase Changelog…** writes a changelog of a database of the connection the window is about.
 
-- **Content**: **DDL** writes the objects' structure, **DML** their rows, **DDL + DML** both.
+- **Content**: **Structure** writes the objects' DDL, **Rows** their rows as DML, **Both** the two.
 - The list holds the database's tables, views, procedures, functions, triggers, events and sequences, each ticked.
   Untick what you don't want; space ticks the selected rows, double-click ticks one, and the right-click menu
   includes all, none or the selected rows; the filter above the list narrows it, and all and none then mean the
@@ -61,7 +61,7 @@ differently from how it runs here, AirSQL says so and doesn't write it.
 ## Save a change as a changeset
 
 When the [SQL preview](sql-preview.md) shows a change (the table editor, a view or routine, a sync script), tick
-**Save as Liquibase changeset**: once the change has run, a sheet shows the changeset. In the console, select the
+**Save as Liquibase changeset**: once the change has run, a sheet shows the changeset. In the query tab, select the
 statements (or put the insertion point in one) and choose **Query ▸ Save as Changeset…**. In the compare window,
 **Save as Changeset…** (or **Query ▸ Save as Changeset…** in its “Sync script” tab) saves the sync script: a changeset
 per structure step and one per run of row changes on a table, destructive steps saying so in their `--comment`.

@@ -21,7 +21,7 @@ a session of its own. The compare only reads; nothing changes until you run the 
    window's activity list.
 
 The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
-much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
+much of the data had to come over the network. The list shows what differs first: **only source** and **only target**
 for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
 Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
 they differ. The two definitions scroll together.
@@ -111,9 +111,8 @@ values: after running the script, compare again to copy their values. After a sy
 In a [console](console.md), **Compare With…** (a result tab's right-click menu, or **Query ▸ Compare With…**) compares
 the result shown with another one, row by row:
 
-- **Compare with** offers the other result tabs of the window, this console's nearest first (a result from another
-  console tab, such as the same query on another server, carries that tab's name), then the tables and views of the
-  console's database.
+- **Compare with** offers the other result tabs of the window, this tab's nearest first (a result from another
+  query tab, such as the same query on another server, carries that tab's name), then the tables and views of the tab's database.
 - **Match rows on** says which columns tell rows apart: the result's key when it has one, a single column, or every
   column (rows then differ only as being on one side). Rows with the same values there are the same row; when several
   share them, they pair up in the order they come.

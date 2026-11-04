@@ -84,7 +84,7 @@ extension NavigatorActions {
             do {
                 body(try await ServerChoices.read(open))
             } catch {
-                showError((error as? AirSQLError)?.message ?? error.localizedDescription, title: "Couldn't read the server's options",
+                showError(error.localizedDescription, title: "Couldn't read the server's options",
                           on: window)
             }
         }

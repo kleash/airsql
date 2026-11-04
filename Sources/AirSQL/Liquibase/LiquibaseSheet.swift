@@ -16,7 +16,7 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         var isTable: Bool { object.kind == .table }
     }
 
-    private let content = NSSegmentedControl(labels: ["DDL", "DML", "DDL + DML"], trackingMode: .selectOne, target: nil, action: nil)
+    private let content = NSSegmentedControl(labels: ["Structure", "Rows", "Both"], trackingMode: .selectOne, target: nil, action: nil)
     private let databaseMenu = popup([], selected: 0, id: "liquibase.database", tip: "Choose the database to write a changelog of",
                                      target: nil, action: nil)
     private let list = LiquibaseObjectTable()
@@ -65,6 +65,9 @@ final class LiquibaseSheet: ToolSheet, NSTableViewDataSource, NSTableViewDelegat
         content.selectedSegmentBezelColor = .selectedSegment
         content.setAccessibilityIdentifier("liquibase.content")
         content.toolTip = "Write the objects' structure (DDL), their rows (DML), or both"
+        content.setToolTip("Write the objects' structure as DDL: CREATE TABLE and the like", forSegment: 0)
+        content.setToolTip("Write the tables' rows as DML: INSERT statements", forSegment: 1)
+        content.setToolTip("Write the structure, then the rows", forSegment: 2)
         for control in [content, databaseMenu, rollback, preconditions, layoutMenu] as [NSControl] {
             control.target = self
             control.action = #selector(formChanged(_:))

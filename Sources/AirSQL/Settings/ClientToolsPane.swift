@@ -5,6 +5,8 @@ import AppKit
 /// Terminal. Empty fields: AirSQL finds them (Homebrew, /usr/local/mysql/bin, MAMP, PATH) and picks the best for each
 /// server. Each field says which program and version it found, or why there is none or it can't be used.
 final class ClientToolsPane: SettingsPaneController {
+    override var helpPage: HelpPage { .clientTools }
+
     private var fields: [ClientTool.Kind: NSTextField] = [:]
     private var notes: [ClientTool.Kind: NSTextField] = [:]
     private let found = label("", font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, wraps: true)

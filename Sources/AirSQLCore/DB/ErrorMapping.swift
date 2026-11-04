@@ -42,7 +42,12 @@ public struct AirSQLError: Error, LocalizedError, Equatable {
         self.sqlState = sqlState
     }
 
-    public var errorDescription: String? { message }
+    /// What people read: the plain words, then the server's own, which name the column or the place in the SQL. Only
+    /// the server's: other `details` hold a tool's output or the SQL itself. An unmapped message already is the server's.
+    public var errorDescription: String? {
+        guard code != 0, !details.isEmpty, kind != .cancelled else { return message }
+        return details.localizedCaseInsensitiveContains(message.dropLast()) ? details : message + " " + details
+    }
 
     public static let cancelled = AirSQLError(.cancelled, "The statement was cancelled.")
     public static let disconnected = AirSQLError(.disconnected, "The connection to the server was lost. Connect again to go on.")
@@ -125,7 +130,8 @@ public enum ErrorMapping {
                 return error(.tls, "The server doesn't offer TLS. Turn TLS off for this connection only if you trust every "
                     + "network between this Mac and the server.")
             }
-            return error(.tls, "TLS couldn't be set up with the server.")
+            return error(.tls, "TLS couldn't be set up with the server. Check the files in this connection's TLS tab, or "
+                + "ask the server's administrator.")
 
         // Statements
         case 1317:
@@ -150,6 +156,39 @@ public enum ErrorMapping {
             return error(.readOnly, "This session is read-only, so it can't change data.")
         case 1290, 1836:
             return error(.readOnly, "The server doesn't allow this now (it may be read-only).")
+        case 1046:
+            return error(.other, "No database is chosen. Pick one in the toolbar, or write it in the SQL (database.table).")
+        case 1048:
+            return error(.other, "This column can't be NULL: give it a value.")
+        case 1050:
+            return error(.other, "A table with that name already exists. Choose another name.")
+        case 1055:
+            return error(.other, "A selected column isn't in GROUP BY. Add it there, or wrap it in a function such as MAX().")
+        case 1067:
+            return error(.other, "The default value doesn't suit the column's type. Change it or remove it.")
+        case 1071:
+            return error(.other, "The key is too long for this server. Index fewer columns, or only the start of a long text "
+                + "column.")
+        case 1091:
+            return error(.notFound, "That column or key doesn't exist, so it can't be dropped. Check the name.")
+        case 1175:
+            return error(.other, "Safe updates are on, and this statement has no WHERE that uses a key. Add one, or run "
+                + "SET sql_safe_updates = 0 first.")
+        case 1215, 1822:
+            return error(.foreignKey, "The foreign key can't be added. Both columns need the same type, and the column it "
+                + "refers to needs an index.")
+        case 1264:
+            return error(.other, "The value is out of range for this column. Use a smaller one, or a wider column type.")
+        case 1292, 1366:
+            return error(.other, "A value doesn't suit its column's type. Check how it is written, for example a date.")
+        case 1364:
+            return error(.other, "A column with no default needs a value. Give it one, or add a default to the column.")
+        case 1406:
+            return error(.other, "The value is too long for this column. Shorten it, or make the column wider.")
+        case 1701:
+            return error(.foreignKey, "A foreign key refers to this table, so it can't be emptied. Delete the rows instead.")
+        case 3819 where !mariaDB, 4025 where mariaDB:
+            return error(.other, "A value breaks one of the table's CHECK rules. Change it to suit the rule.")
         case 1205:
             return error(.lockTimeout, "Another session holds a lock on these rows, and waiting for it timed out. Try again.")
         case 1213:

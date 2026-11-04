@@ -179,7 +179,7 @@ final class ExportRowsSheet: NSWindowController {
                     await MainActor.run {
                         work.end()
                         guard !(error is CancellationError) else { return }
-                        showError((error as? AirSQLError)?.message ?? error.localizedDescription,
+                        showError(error.localizedDescription,
                                   title: "The rows of \(request.title) weren't exported", on: parent)
                     }
                 }

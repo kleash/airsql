@@ -97,6 +97,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         tabs.translatesAutoresizingMaskIntoConstraints = false
         holder.translatesAutoresizingMaskIntoConstraints = false
         status.setAccessibilityIdentifier("editor.status")
+        status.isSelectable = true  // a failed test's words, to copy
         status.preferredMaxLayoutWidth = Self.width - 40
         let buttons = buttonRow()
         let root = SurfaceView(.ground)
@@ -211,6 +212,23 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     /// Shows the current tab again (after a choice that changes what it shows, such as the route).
     func refreshTab() { show(tab) }
 
+    /// The socket of a server on this Mac, in the Socket field; a stat of each usual path, so off the main thread.
+    @objc func findSocket(_ sender: Any?) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let found = LocalServer.socket()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let found {
+                    self.draft.socket = found
+                    self.refreshTab()
+                } else {
+                    self.status.textColor = .secondaryLabelColor
+                    self.status.stringValue = "No server's socket is in the usual places: use the host and port, or type its path."
+                }
+            }
+        }
+    }
+
     // MARK: Saving
 
     /// What keeps the draft from being saved, in words; nil when it can be.
@@ -315,7 +333,8 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         let failure = error as? AirSQLError
         if failure?.kind == .cancelled { return status.stringValue = "" }
         status.textColor = error == nil ? .statusOK : .statusBad
-        status.stringValue = report + (error.map { "\n" + (($0 as? AirSQLError)?.message ?? $0.localizedDescription) } ?? "")
+        status.stringValue = report + (error.map { "\n" + $0.localizedDescription } ?? "")
+        announce(status.stringValue)
         if tab == .tls { refreshTab() }  // a certificate trusted meanwhile
     }
 

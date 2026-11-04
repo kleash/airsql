@@ -10,13 +10,13 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
     private let picker = ObjectPicker()
     private let targetMenu = popup([], selected: 0, id: "copy.target", tip: "Choose the connection to copy to", target: nil,
                                    action: nil)
-    private let databaseField = AirSQL.textField("", placeholder: "Database name", id: "copy.database",
-                                                 tip: "Type the database the copy goes into on the other server (made if it isn't there)")
+    private let databaseTip = "Type the database the copy goes into on the other server (made if it isn't there)"
+    private let replaceTip = "Drop the other server's tables of the same name before copying: their rows are lost"
+    private lazy var databaseField = AirSQL.textField("", placeholder: "Database name", id: "copy.database", tip: databaseTip)
     private let content = popup(DumpRequest.Content.allCases.map(\.title), selected: 0, id: "copy.content",
                                 tip: "Choose what to copy: the tables' structure, their rows, or both", target: nil, action: nil)
-    private let replace = checkbox("Replace tables that are there (DROP TABLE first)", id: "copy.replace",
-                                   tip: "Drop the other server's tables of the same name before copying: their rows are lost",
-                                   on: false, target: nil, action: nil)
+    private lazy var replace = checkbox("Replace tables that are there (DROP TABLE first)", id: "copy.replace", tip: replaceTip,
+                                        on: false, target: nil, action: nil)
     private let objects = checkbox("Views, routines, triggers and events", id: "copy.objects",
                                    tip: "Copy the databases' views, procedures, functions, triggers and events too", on: true,
                                    target: nil, action: nil)
@@ -143,6 +143,7 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
     @objc private func formChanged(_ sender: Any?) {
         let included = picker.included
         databaseField.isEnabled = !running && included.count <= 1
+        databaseField.toolTip = included.count > 1 ? "Off with several databases ticked: each keeps its name" : databaseTip
         // The field follows the ticked database until the person types a name of their own.
         let typed = databaseField.stringValue
         if typed.isEmpty || typed == filledName {
@@ -151,6 +152,7 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
         }
         databaseField.placeholderString = included.count > 1 ? "Each keeps its name" : "Database name"
         replace.isEnabled = !running && content.indexOfSelectedItem != 2
+        replace.toolTip = content.indexOfSelectedItem == 2 ? "Off when only data is copied: no table is created" : replaceTip
         updateSummary()
     }
 

@@ -69,7 +69,8 @@ final class GridColumnList: NSViewController, NSTableViewDataSource, NSTableView
         rows = all.filter { text.isEmpty || source.columns[$0].name.range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
         table.reloadData()
         if !rows.isEmpty, table.selectedRow < 0 { table.selectRowIndexes([0], byExtendingSelection: false) }
-        footer.stringValue = "\(shown.count) of \(source.columns.count) columns shown"
+        footer.stringValue = rows.isEmpty ? "No column has “\(text)” in its name: clear the search to see them all"
+            : "\(shown.count) of \(source.columns.count) columns shown"
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
