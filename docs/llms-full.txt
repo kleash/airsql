@@ -362,7 +362,8 @@ own session, which every console tab of that connection shares.
 - Drag a result's tab to put the results in another order.
 - Drag a tab along the strip to move it. Past ⌘9, the **Window** menu lists every tab.
 - Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
-- When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL.
+- When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL. The
+  other tabs come back too: see [Getting back to your tabs](https://kleash.github.io/airsql/navigator.html#getting-back-to-your-tabs).
 - **File ▸ Open Recent** lists the .sql files you had open lately.
 - **Query ▸ Change Connection…** runs the console's statements on another connection.
 
@@ -724,6 +725,20 @@ idle connections. Double-click a row (or press Return) to read its whole stateme
 Both ask first. Right before it stops anything, AirSQL checks that the process is still running what the list showed
 (on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so. Both work on a
 read-only connection too: they change no data.
+
+## Getting back to your tabs
+
+When you open AirSQL again, your tabs come back in their old order with the old one showing, and so does the sidebar's
+selection. Consoles are as you left them. Table, structure and process-list tabs come back as placeholders: AirSQL doesn't
+connect to anything by itself, also not to a Production connection.
+
+- A placeholder says what the tab was and where. **Connect and Open** connects the usual way, with its prompts, then
+  loads the tab in the same place; on a connection that's connected already the button is **Open**, which just loads.
+- If the connect fails, the tab stays and says why, with **Try Again**, **Edit Connection…** and **Troubleshooting**.
+- A placeholder closes without a question, and Quit doesn't ask about it.
+- Only names are kept: the connection, database, object and kind. Rows and filters aren't. Pending changes aren't part of
+  the tab: they stay with the table and show when you [open it](https://kleash.github.io/airsql/table-data.html).
+- A tab whose connection you deleted doesn't come back.
 
 
 ---
@@ -1849,7 +1864,8 @@ connection's access level is their choice alone.
 6. To work in AirSQL's windows (open a table, use a menu, fill a sheet), `snapshot` first, then `menu`, `press`, `set`,
    `type`, `key` and the clicks, and `wait` for what they start (see ui and screens).
 
-Connections must be connected in AirSQL (by the person) before the database tools work on them.
+Connections must be connected in AirSQL (by the person) before the database tools work on them. After a relaunch, tabs
+other than consoles are placeholders: they hold names only, and they connect nothing until their button is pressed.
 
 ## access
 

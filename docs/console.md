@@ -20,7 +20,8 @@ own session, which every console tab of that connection shares.
 - Drag a result's tab to put the results in another order.
 - Drag a tab along the strip to move it. Past ⌘9, the **Window** menu lists every tab.
 - Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
-- When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL.
+- When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL. The
+  other tabs come back too: see [Getting back to your tabs](navigator.md#getting-back-to-your-tabs).
 - **File ▸ Open Recent** lists the .sql files you had open lately.
 - **Query ▸ Change Connection…** runs the console's statements on another connection.
 

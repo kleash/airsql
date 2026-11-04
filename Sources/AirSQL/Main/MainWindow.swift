@@ -169,6 +169,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         guard tabs.contains(where: { $0 === tab }) else { return }
         selectedTab = tab
         refresh()
+        ConsoleDocuments.shared.tabsChanged(in: self)
+    }
+
+    /// Puts `content` in the place of a tab that came back after a relaunch: same title, same order, shown if it was.
+    func replace(_ restored: RestoredTabContent, with content: NSViewController) {
+        guard let index = tabs.firstIndex(where: { $0.shown === restored }) else { return }
+        let tab = tabs[index]
+        if let preview = tab.content as? PreviewContent {
+            preview.show(content)
+        } else {
+            tabs[index] = Tab(title: tab.title, connectionID: tab.connectionID, content: content)
+            if selectedTab === tab { selectedTab = tabs[index] }
+        }
+        refresh()
+        if selectedTab === tabs[index], let table = content as? TableDataController { window?.makeFirstResponder(table.grid) }
     }
 
     /// Closes `tab` once its content agrees (it may ask about unsaved work first), then runs `then`. It is shown first:
@@ -189,6 +204,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 self.selectedTab = self.tabs.first { $0 === before } ?? (self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)])
             }
             self.refresh()
+            ConsoleDocuments.shared.tabsChanged(in: self)
             then?()
         }
         if let content { content.shouldClose(finish) } else { finish(true) }
@@ -223,6 +239,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             selectedTab = nil
         }
         refresh()
+        ConsoleDocuments.shared.tabsChanged(in: self)
     }
 
     /// Brings every part up to date with the model, the tabs and the selection.
@@ -465,6 +482,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         guard let from = tabs.firstIndex(where: { $0 === tab }), from != index, tabs.indices.contains(index) else { return }
         tabs.insert(tabs.remove(at: from), at: index)
         refresh()
+        ConsoleDocuments.shared.tabsChanged(in: self)
     }
 
     @objc func showActivity(_ sender: Any?) {

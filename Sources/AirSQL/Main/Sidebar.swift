@@ -286,9 +286,21 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     /// The selected connections, in the sidebar's order.
     var selectedConnectionIDs: [UUID] { selectedNodes.compactMap(\.connectionID) }
 
-    /// Selects these connections (none: no selection).
+    /// What the next launch selects: the connections and folders selected, a row of a connection's tree standing for the
+    /// connection (its tree isn't there until it connects).
+    var selectedRowIDs: [UUID] {
+        selectedNodes.compactMap { node in
+            switch node.kind {
+            case .header: return nil
+            case .folder(let id), .connection(let id), .database(let id, _), .category(let id, _, _), .object(let id, _),
+                 .message(let id, _): return id
+            }
+        }
+    }
+
+    /// Selects these connections and folders (none: no selection).
     func select(_ ids: [UUID]) {
-        let rows = IndexSet(ids.compactMap { connections[$0] }.map { outline.row(forItem: $0) }.filter { $0 >= 0 })
+        let rows = IndexSet(ids.compactMap { connections[$0] ?? folders[$0] }.map { outline.row(forItem: $0) }.filter { $0 >= 0 })
         outline.selectRowIndexes(rows, byExtendingSelection: false)
         if let first = rows.first { outline.scrollRowToVisible(first) }
     }

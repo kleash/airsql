@@ -21,7 +21,8 @@ connection's access level is their choice alone.
 6. To work in AirSQL's windows (open a table, use a menu, fill a sheet), `snapshot` first, then `menu`, `press`, `set`,
    `type`, `key` and the clicks, and `wait` for what they start (see ui and screens).
 
-Connections must be connected in AirSQL (by the person) before the database tools work on them.
+Connections must be connected in AirSQL (by the person) before the database tools work on them. After a relaunch, tabs
+other than consoles are placeholders: they hold names only, and they connect nothing until their button is pressed.
 
 ## access
 

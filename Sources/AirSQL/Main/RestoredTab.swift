@@ -1,0 +1,156 @@
+import AirSQLCore
+import AppKit
+import Combine
+
+extension Tab {
+    /// What brings this tab back after a relaunch, by name only; nil: it isn't kept.
+    var place: SavedPlace? {
+        switch shown {
+        case let restored as RestoredTabContent:
+            return restored.place
+        case let table as TableDataController:
+            return SavedPlace(kind: .table, database: table.database, object: table.tableName)
+        case let editor as TableEditorController:
+            return editor.table.map { SavedPlace(kind: .structure, database: editor.database, object: $0) }
+        case let editor as ObjectEditorController:
+            guard let kind = SavedPlace.Kind(rawValue: editor.kind.rawValue) else { return nil }
+            return editor.name.map { SavedPlace(kind: kind, database: editor.database, object: $0) }
+        case is ProcessListContent:
+            return SavedPlace(kind: .processes)
+        default:
+            return nil
+        }
+    }
+}
+
+/// A table, structure or process-list tab back after a relaunch. AirSQL never connects by itself, so the tab says what
+/// it was until the person presses its button, which connects the normal way (prompts, Trust sheet, error sheet) and
+/// puts the real tab in its place.
+@MainActor
+final class RestoredTabContent: NSViewController, TabContent {
+    let place: SavedPlace
+    private let model: AppModel
+    private let connectionID: UUID
+    private weak var main: MainWindowController?
+    /// The person pressed the button: the tab loads once the connect ends. A failed connect keeps it, for the error
+    /// sheet's Try Again; a cancelled one ends it.
+    private var wanted = false
+    private let what = label("", font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
+    private let state = label("", font: .systemFont(ofSize: 13), wraps: true)
+    private let spinner = NSProgressIndicator()
+    private lazy var open = button("", id: "restored.open", tip: "", target: self, action: #selector(openTab(_:)), primary: true)
+    private lazy var edit = button("Edit Connection…", id: "restored.edit", tip: "Open the connection's settings", target: self,
+                                   action: #selector(editConnection(_:)))
+    private lazy var help = button("Troubleshooting", id: "restored.help",
+                                   tip: "Open the help page on what to do about failed connections", target: self,
+                                   action: #selector(troubleshoot(_:)))
+    private var observers: [AnyCancellable] = []
+
+    init(_ place: SavedPlace, title: String, connection: UUID, main: MainWindowController) {
+        self.place = place
+        model = main.model
+        connectionID = connection
+        self.main = main
+        super.init(nibName: nil, bundle: nil)
+        self.title = title
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func loadView() {
+        let heading = label(title ?? "", font: .systemFont(ofSize: 15, weight: .semibold), truncates: true)
+        heading.toolTip = title
+        what.setAccessibilityIdentifier("restored.what")
+        state.setAccessibilityIdentifier("restored.state")
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        let stateRow = NSStackView(views: [spinner, state])
+        stateRow.spacing = Spacing.unit
+        let buttons = NSStackView(views: [open, edit, help])
+        buttons.spacing = Spacing.unit
+        open.keyEquivalent = "\r"
+        let stack = NSStackView(views: [heading, what, stateRow, buttons])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = Spacing.unit
+        stack.setCustomSpacing(Spacing.double, after: stateRow)
+        heading.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor).isActive = true
+        for line in [what, stateRow] { line.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
+        view = centered(card(stack, id: "restored"), width: 460)
+        // A moment later: both publish before the value changes, and a connect attaches right after its state.
+        observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.update() } })
+        observers.append(model.$data.sink { [weak self] _ in DispatchQueue.main.async { self?.update() } })
+        update()
+    }
+
+    private var summary: String {
+        let name = place.object ?? "", database = place.database ?? ""
+        switch place.kind {
+        case .table: return "The rows of \(name) in \(database)"
+        case .structure: return "The structure of \(name) in \(database)"
+        case .processes: return "The server's process list"
+        case .view, .procedure, .function, .trigger, .event: return "The \(place.kind.rawValue) \(name) in \(database)"
+        }
+    }
+
+    private func update() {
+        guard let saved = model.connection(connectionID) else { return }
+        let connected = model.openConnection(connectionID) != nil
+        let current = model.states[connectionID]
+        var failed = false, connecting = false
+        if case .failed? = current { failed = true }
+        if case .connecting? = current { connecting = true }
+        if current == nil { wanted = false }
+        if wanted, connected { return load() }
+        what.stringValue = summary + ", on " + saved.displayName + (saved.marks.isEmpty ? "" : " (\(saved.marks))")
+        state.stringValue = stateText(current)
+        state.textColor = failed ? .systemRed : .labelColor
+        spinner.isHidden = !connecting
+        if connecting { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
+        open.title = connected ? "Open" : failed ? "Try Again" : "Connect and Open"
+        open.isEnabled = !(wanted && connecting)
+        open.toolTip = connected ? "Load this tab from the server"
+            : wanted && connecting ? "Connecting: the tab loads once it's connected, or cancel in the status bar"
+            : "Connect to \(saved.displayName), then load this tab"
+        edit.isHidden = !failed
+        help.isHidden = !failed
+    }
+
+    /// Loads the real tab; if one on the same thing was opened meanwhile, that one shows and this tab goes.
+    private func load() {
+        guard let main, let opened = model.openConnection(connectionID),
+              let context = Editors.context(model.connection(connectionID), in: model) else { return }
+        wanted = false
+        if let tab = main.tabs.first(where: { $0.connectionID == connectionID && !($0.shown is Self) && $0.place == place }),
+           let mine = main.tabs.first(where: { $0.shown === self }) {
+            return main.close(mine) { main.select(tab) }
+        }
+        let content: NSViewController
+        switch place.kind {
+        case .table:
+            content = TableDataController(model: model, context: context, database: place.database ?? "", table: place.object ?? "",
+                                          filter: nil)
+        case .structure:
+            content = TableEditorController(context: context, database: place.database, table: place.object, activity: model.activity)
+        case .processes:
+            content = ProcessListContent(opened)
+        case .view, .procedure, .function, .trigger, .event:
+            guard let kind = ObjectKind(rawValue: place.kind.rawValue) else { return }
+            content = ObjectEditorController(context: context, kind: kind, database: place.database ?? "", name: place.object,
+                                             table: nil, activity: model.activity)
+        }
+        main.replace(self, with: content)
+    }
+
+    @objc private func openTab(_ sender: Any?) {
+        wanted = true
+        if model.openConnection(connectionID) == nil { model.connector.connect(connectionID, on: main?.window) }
+        update()
+    }
+
+    @objc private func editConnection(_ sender: Any?) {
+        if let saved = model.connection(connectionID) { main?.edit(saved, isNew: false) }
+    }
+
+    @objc private func troubleshoot(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.troubleshooting.url) }
+}
