@@ -42,10 +42,17 @@ enum TestEnvironment {
         // saved in the defaults.
         UserDefaults.standard.register(defaults: ["NSAutomaticWindowAnimationsEnabled": false, "NSWindowResizeTime": 0.001])
         UserDefaults.standard.removePersistentDomain(forName: ProcessInfo.processInfo.processName)
-        // After a menu, window-server events stop the main run loop: rerun it, as NSApp.run does.
-        if #available(macOS 27, *) {
-            RunLoop.main.add(Timer(timeInterval: 0, repeats: false) { _ in RunLoop.main.run() }, forMode: .common)
+        // After a menu or a tool's window, window-server events stop the main run loop, and the bottom one stopping
+        // (Swift's CFRunLoopRun) ended the test process with status 0: as it ends, a run loop that goes on takes its
+        // place, as NSApp.run does. Only there, with no task current: inside a run loop a main-actor test runs, neither
+        // that test nor the main queue would go on again.
+        let main = CFRunLoopGetMain()
+        let ending = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.exit.rawValue, true, 0) { observer, _ in
+            guard withUnsafeCurrentTask(body: { $0 == nil }) else { return }
+            CFRunLoopRemoveObserver(main, observer, .defaultMode)
+            RunLoop.main.run()
         }
+        CFRunLoopAddObserver(main, ending, .defaultMode)
     }()
 }
 
