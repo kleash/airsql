@@ -46,12 +46,17 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Select All | ⌘A |
 | Extend Selection | ⌥↑ |
 | Shrink Selection | ⌥↓ |
+| Copy Name | ⌃⌘C |
+| Copy CREATE | ⌃⇧⌘C |
 | Find… | ⌘F |
 | Find and Replace… | ⌥⌘F |
 | Find Next | ⌘G |
 | Find Previous | ⇧⌘G |
 | Use Selection for Find | ⌘E |
 | Hide Sidebar | ⌃⌘S |
+| Go to Sidebar | ⌥⌘1 |
+| Go to Editor | ⌥⌘2 |
+| Go to Results | ⌥⌘3 |
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
@@ -71,32 +76,42 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Close Result | ⌃⌘W |
 | Show Next Result | ⌥⌘] |
 | Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
+| Query Helpers | ⌃⌘H |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
 | Delete Rows… | ⌘⌫ |
 | Set NULL | ⌥⌘N |
 | Apply Changes | ⌘S |
+| Preview SQL… | ⌥⌘S |
 | Revert | ⌥⌘Z |
 | Filter… | ⇧⌘F |
 | Search All Columns | ⇧⌘E |
 | Equal to Selection | ⌃⌘1 |
 | Not Equal to Selection | ⌃⌘2 |
+| Clear Filter | ⌃⌘0 |
+| Sort Ascending | ⌃⌥⌘↑ |
+| Sort Descending | ⌃⌥⌘↓ |
 | Go to Row… | ⌘L |
 | Related Rows | ⌃⌘↓ |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
+| Create Table… | ⌃⌘N |
+| Open Structure | ⌥⌘O |
 | Process List | ⌥⌘P |
 | Connect | ⌘K |
 | Disconnect | ⇧⌘K |
 | Minimize | ⌘M |
 | Show Previous Tab | ⌘{ |
 | Show Next Tab | ⌘} |
+| Show Previous Tab | ⌃⇧⇥ |
+| Show Next Tab | ⌃⇥ |
 | Tab 1 | ⌘1 |
 
 ⌘S saves a console's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
