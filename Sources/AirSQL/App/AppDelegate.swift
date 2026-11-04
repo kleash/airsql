@@ -158,6 +158,7 @@ enum HelpPage: String, CaseIterable {
     case tableData = "table-data.html"
     case dataGrid = "data-grid.html"
     case liquibase = "liquibase.html"
+    case troubleshooting = "troubleshooting.html#a-connection-fails"
 
     /// The site: GitHub Pages, built from docs/.
     static let site = URL(string: "https://kleash.github.io/airsql/")!

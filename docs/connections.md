@@ -17,7 +17,8 @@ tabs:
   port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.
-- **TLS**: how the connection is encrypted. **Check the authority and host name** is the safe choice: the server must
+- **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
+  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Check the authority and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
   shows its fingerprint when you connect (see [Trust a server](trust-a-server.md)). Add an authority file for a
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
