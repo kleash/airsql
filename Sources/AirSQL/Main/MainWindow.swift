@@ -443,6 +443,30 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window?.makeFirstResponder(sidebar.filter)
     }
 
+    @objc func focusSidebar(_ sender: Any?) {
+        if split.splitViewItems.first?.isCollapsed == true { split.toggleSidebar(nil) }
+        window?.makeFirstResponder(sidebar.outline)
+    }
+
+    @objc func focusEditor(_ sender: Any?) { window?.makeFirstResponder(shownView(SQLEditorView.self)) }
+    @objc func focusResults(_ sender: Any?) { window?.makeFirstResponder(shownView(DataGridView.self)) }
+
+    /// The first `type` on screen in the tab shown.
+    private func shownView<T: NSView>(_ type: T.Type) -> T? {
+        func walk(_ view: NSView) -> T? {
+            if let found = view as? T, !found.isHiddenOrHasHiddenAncestor { return found }
+            return view.subviews.lazy.compactMap(walk).first
+        }
+        return selectedTab.flatMap { $0.shown.isViewLoaded ? walk($0.shown.view) : nil }
+    }
+
+    /// Moves `tab` to `index` in the strip (a drag).
+    func move(_ tab: Tab, to index: Int) {
+        guard let from = tabs.firstIndex(where: { $0 === tab }), from != index, tabs.indices.contains(index) else { return }
+        tabs.insert(tabs.remove(at: from), at: index)
+        refresh()
+    }
+
     @objc func showActivity(_ sender: Any?) {
         guard !model.activity.running.isEmpty else { return }
         statusBar.activity.showPopover()
@@ -477,6 +501,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             reason = "Select a connection in the sidebar first"
             let raw = item.representedObject as? String
             item.state = !connections.isEmpty && connections.allSatisfy({ $0.colour.rawValue == raw }) ? .on : .off
+        case Commands.focusEditor.action?:
+            enabled = shownView(SQLEditorView.self) != nil
+            reason = "The tab shown has no SQL editor"
+        case Commands.focusResults.action?:
+            enabled = shownView(DataGridView.self) != nil
+            reason = "The tab shown has no grid: run a query or open a table first"
         case Commands.newConnection.action?:
             enabled = window?.attachedSheet == nil
             reason = "A sheet is open: answer it first"
@@ -540,9 +570,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// Window ▸ the tabs (⌘1…⌘9) named after them; the others hidden, their shortcuts kept.
     func updateWindowMenu(_ menu: NSMenu) {
         for item in menu.items where item.action == Commands.tab(1).action {
+            guard item.tag <= 9 else {
+                menu.removeItem(item)
+                continue
+            }
             let index = item.tag - 1
             item.title = index < tabs.count ? tabs[index].title : ""
             item.isHidden = index >= tabs.count
+        }
+        // Past ⌘9, the rest by name: the strip shows only so many.
+        if tabs.count > 9, let ninth = menu.items.lastIndex(where: { $0.tag == 9 && $0.action == Commands.tab(1).action }) {
+            for number in 10...tabs.count {
+                let item = Commands.tab(number).item()
+                item.keyEquivalent = ""
+                item.title = tabs[number - 1].title
+                menu.insertItem(item, at: ninth + number - 9)
+            }
         }
         // AppKit's own items there (the windows' list) say what they do too.
         for item in menu.items where item.toolTip == nil && !item.isSeparatorItem {

@@ -58,7 +58,13 @@ extension ResultStore.Column {
             MYSQL_TYPE_BLOB: isBinary ? "blob" : "text", MYSQL_TYPE_MEDIUM_BLOB: isBinary ? "mediumblob" : "mediumtext",
             MYSQL_TYPE_LONG_BLOB: isBinary ? "longblob" : "longtext", MYSQL_TYPE_NULL: "null", MYSQL_TYPE_VECTOR: "vector",
         ]
-        let name = names[type] ?? ""
+        var name = names[type] ?? ""
+        // ENUM and SET arrive as CHAR, every TEXT as BLOB: their flags and length (in bytes, up to 4 a character) tell.
+        if flags & UInt32(ENUM_FLAG) != 0 { name = "enum" } else if flags & UInt32(SET_FLAG) != 0 { name = "set" }
+        if type == MYSQL_TYPE_BLOB, length > 0 {
+            let limits: [UInt] = isBinary ? [255, 65_535, 16_777_215] : [1_020, 262_140, 67_108_860]
+            name = ["tiny", "", "medium", "long"][limits.firstIndex { UInt(length) <= $0 } ?? 3] + (isBinary ? "blob" : "text")
+        }
         return isNumeric && flags & UInt32(UNSIGNED_FLAG) != 0 ? name + " unsigned" : name
     }
 

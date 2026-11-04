@@ -76,6 +76,9 @@ extension ConsoleViewController: NSMenuItemValidation {
 
     // MARK: Validation
 
+    /// ⌘R: the schema again, for completion and the helpers.
+    @objc func refresh(_ sender: Any?) { model.openConnection(connectionID)?.load() }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let (enabled, reason) = verdict(for: item)
         item.explain(enabled: enabled, reason: enabled ? nil : reason)
@@ -91,6 +94,8 @@ extension ConsoleViewController: NSMenuItemValidation {
         // The toolbar asks at every event: the first character that isn't a space answers.
         let hasText = text.contains { !$0.isWhitespace }
         switch item.action {
+        case Commands.refresh.action:
+            return (isConnected, offline ?? "")
         case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(explain(_:)), #selector(profileQuery(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (hasText, "Type a statement first")

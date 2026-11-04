@@ -30,6 +30,8 @@ extension TableDataController: NSMenuItemValidation {
             notice.show(.problem, problem)
         } else if !source.changes.isEmpty {
             notice.show(.pending, (restored ? "Kept from before: " : "") + pendingSummary(source.changes))
+        } else if source.shifted {
+            notice.show(.problem, "The table changed between pages, so a row may repeat or be missing. Refresh (⌘R) reads them again.")
         } else {
             notice.show(.readOnly, editingOff.map { "Read-only. " + $0 + "." })
         }
@@ -40,16 +42,17 @@ extension TableDataController: NSMenuItemValidation {
         emptyNote.text.stringValue = filtered ? "No rows match the filter or search." : "\(tableName) has no rows."
         emptyNote.clear.isHidden = !filtered
         emptyNote.add.isHidden = editingOff != nil
-        let loaded = source.keptRows.formatted()
-        let rows = viewer.status.rows
+        let kept = source.keptRows + source.saved.count, loaded = kept.formatted()
+        let rows = viewer.status.rows, known = knownTotal
         if !source.hasMore {
-            rows.stringValue = "\(loaded) \(source.keptRows == 1 ? "row" : "rows")"
-        } else if let total, total.filter == source.filter {
-            rows.stringValue = "\(loaded) of \(total.exact ? "" : "about ")\(total.rows.formatted()) rows"
+            rows.stringValue = "\(loaded) \(kept == 1 ? "row" : "rows")"
+        } else if let known {
+            rows.stringValue = "\(loaded) of \(known.exact ? "" : "about ")\(known.rows.formatted()) rows"
         } else {
             rows.stringValue = "\(loaded) rows loaded"
         }
-        rows.toolTip = total?.exact == false && source.hasMore ? "The server's estimate: Count Exactly counts the rows" : nil
+        rows.stringValue += readAt.map { " · read " + GridStatusView.time($0) } ?? ""
+        rows.toolTip = known?.exact == false && source.hasMore ? "The server's estimate: Count Exactly counts the rows" : nil
         countLink.isHidden = total?.exact == true && total?.filter == source.filter || !source.hasMore
         moreLink.isHidden = !source.hasMore
         allLink.isHidden = !source.hasMore
@@ -85,7 +88,8 @@ extension TableDataController: NSMenuItemValidation {
     // bar or the find bar.
     override func responds(to selector: Selector!) -> Bool {
         // Text being typed undoes itself: ⌘Z goes on past this tab to the window's undo manager.
-        if selector == Commands.undo.action || selector == Commands.redo.action, view.window?.firstResponder is NSTextView { return false }
+        // Likewise ⌘⌫: off here, it reaches the text as delete to the line's start.
+        if [Commands.undo.action, Commands.redo.action, Commands.deleteRows.action].contains(selector), view.window?.firstResponder is NSTextView { return false }
         return super.responds(to: selector) || viewer.responds(to: selector)
     }
     override func forwardingTarget(for selector: Selector!) -> Any? { viewer.responds(to: selector) ? viewer : nil }

@@ -48,8 +48,10 @@ enum GridCopy {
 
     /// `rows` by `columns` (source columns, in the order given) of `source` as text in `format`, whole values.
     static func text(_ source: GridSource, rows: [Int], columns: [Int], format: CopyFormat, headers: Bool, nullText: String,
-                     database: String? = nil, table: String = "table") -> String {
-        let options = CopyOptions(headers: headers, nullText: format == .tsv || format == .csv ? nullText : "NULL")
+                     database: String? = nil, table: String = "table", noBackslashEscapes: Bool = false,
+                     selected: ((Int, Int) -> Bool)? = nil) -> String {
+        var options = CopyOptions(headers: headers, nullText: format == .tsv || format == .csv ? nullText : "NULL")
+        options.noBackslashEscapes = noBackslashEscapes
         // UPDATE and DELETE need the whole key, copied or not: part of one addresses more rows than were selected.
         let columns = format == .update || format == .delete
             ? columns + source.columns.indices.filter { source.columns[$0].isKey && !columns.contains($0) } : columns
@@ -62,18 +64,24 @@ enum GridCopy {
         }
         var writer = CopyWriter(format, columns: written, database: database, table: table, options: options)
         var text = writer.header()
-        for row in rows { text += writer.row(columns.map { source.value(row, $0) }) }
+        // Cells of the block that weren't selected stay empty in a table of text; a statement or object needs its row whole.
+        let holes = format == .tsv || format == .csv ? selected : nil
+        for row in rows { text += writer.row(columns.map { holes?(row, $0) == false ? "" : source.value(row, $0) }) }
         return text + writer.footer()
     }
 
     /// Puts the cells the grid's selection covers on the pasteboard, read from `source` (in the grid's coordinates);
     /// beeps when nothing is selected.
     static func copy(_ grid: DataGridView, source: GridSource, format: CopyFormat, headers: Bool = false, database: String? = nil,
-                     table: String = "table") {
+                     table: String = "table", noBackslashEscapes: Bool = false) {
         let (rows, columns) = covered(grid)
         guard !rows.isEmpty, !columns.isEmpty else { return NSSound.beep() }
+        let shown = Dictionary(uniqueKeysWithValues: (0..<grid.columnCount).map { (grid.sourceColumn($0), $0) })
+        let areas = grid.selection.areas
         let text = text(source, rows: rows, columns: columns, format: format, headers: headers, nullText: grid.nullText,
-                        database: database, table: table)
+                        database: database, table: table, noBackslashEscapes: noBackslashEscapes) { row, column in
+            areas.isEmpty || shown[column].map { grid.selection.contains(GridPosition(row: row, column: $0)) } ?? true
+        }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }

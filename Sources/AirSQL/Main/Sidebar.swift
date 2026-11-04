@@ -47,6 +47,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     private var treeShown: Set<UUID> = []
     private var observers: [AnyCancellable] = []
     private var reloading = false
+    /// A right-click is choosing the row its menu acts on: that shows nothing, so the tab in front stays.
+    fileprivate var openingMenu = false
     /// Called when the selected connections change.
     var onSelect: (() -> Void)?
 
@@ -151,6 +153,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         NotificationCenter.default.addObserver(self, selector: #selector(openConnectionChanged), name: .openConnectionDidChange,
                                                object: nil)
         outline.setDraggingSourceOperationMask(.copy, forLocal: false)
+        outline.setDraggingSourceOperationMask(.move, forLocal: true)
+        outline.registerForDraggedTypes([.sidebarConnection])
         reload()
     }
 
@@ -252,6 +256,27 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
 
     func controlTextDidChange(_ notification: Notification) { reload() }
 
+    /// ↓ in the filter goes to the list, on the first row that matches; Return opens that row, as it does in the list.
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        let opens = selector == #selector(NSResponder.insertNewline(_:))
+        guard opens || selector == #selector(NSResponder.moveDown(_:)) else { return false }
+        let text = filter.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !opens || !text.isEmpty else { return false }
+        let rows = (0..<outline.numberOfRows).filter { row in
+            guard let node = outline.item(atRow: row) as? SidebarNode, outlineView(outline, shouldSelectItem: node) else { return false }
+            if case .folder = node.kind { return false }
+            return true
+        }
+        let named = rows.first { outlineView(outline, typeSelectStringFor: nil, item: outline.item(atRow: $0) as Any)?
+            .localizedCaseInsensitiveContains(text) == true }
+        guard let row = named ?? rows.first else { return !opens }
+        outline.selectRowIndexes([row], byExtendingSelection: false)
+        outline.scrollRowToVisible(row)
+        view.window?.makeFirstResponder(outline)
+        if opens { doubleClicked(nil) }
+        return true
+    }
+
     // MARK: Selection
 
     var selectedNodes: [SidebarNode] {
@@ -271,6 +296,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard !reloading else { return }
         onSelect?()
+        guard !openingMenu else { return }
         // Arrowing passes over rows: only the one it stops on is read, or the others would queue ahead of it.
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(showSelectedObject), object: nil)
         if NSApp.currentEvent?.type == .keyDown {
@@ -300,15 +326,51 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         }
     }
 
-    /// Dragging tree rows puts their names, quoted for SQL, on the pasteboard (into the editor).
+    /// Dragging tree rows puts their names, quoted for SQL, on the pasteboard (into the editor); a connection's row
+    /// goes to a folder.
     func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
-        guard let node = item as? SidebarNode, let text = node.quotedName else { return nil }
+        guard let node = item as? SidebarNode else { return nil }
         let item = NSPasteboardItem()
-        item.setString(text, forType: .string)
+        if let id = node.connectionID {
+            item.setString(id.uuidString, forType: .sidebarConnection)
+        } else if let text = node.quotedName {
+            item.setString(text, forType: .string)
+        } else {
+            return nil
+        }
         return item
     }
 
-    @objc private func doubleClicked(_ sender: Any?) {
+    /// The row a connection dropped on `node` lands in: a folder, a connection's folder, or the list outside any
+    /// folder (the heading); the tree's rows take nothing.
+    func dropRow(on node: SidebarNode?) -> SidebarNode? {
+        switch node?.kind {
+        case nil, .header?: return header
+        case .folder?: return node
+        case .connection(let id)?:
+            return model.connection(id)?.folderID.flatMap { folders[$0] } ?? header
+        default: return nil
+        }
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?,
+                     proposedChildIndex index: Int) -> NSDragOperation {
+        guard info.draggingSource as AnyObject === outline, info.draggingPasteboard.availableType(from: [.sidebarConnection]) != nil,
+              let row = dropRow(on: item as? SidebarNode) else { return [] }
+        outlineView.setDropItem(row, dropChildIndex: NSOutlineViewDropOnItemIndex)
+        return .move
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
+        guard let row = item as? SidebarNode else { return false }
+        var folder: UUID?
+        if case .folder(let id) = row.kind { folder = id }
+        let ids = (info.draggingPasteboard.pasteboardItems ?? []).compactMap { $0.string(forType: .sidebarConnection).flatMap(UUID.init) }
+        model.move(ids, toFolder: folder)
+        return !ids.isEmpty
+    }
+
+    @objc fileprivate func doubleClicked(_ sender: Any?) {
         let row = outline.clickedRow >= 0 ? outline.clickedRow : outline.selectedRow
         guard let node = outline.item(atRow: row) as? SidebarNode else { return }
         switch node.kind {
@@ -334,12 +396,21 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
                       Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compare, nil])
             menu.addItem(ConnectionMenus.colourMenu())
+            menu.addItem(ConnectionMenus.moveMenu())
             menu.add([nil, Commands.deleteConnection])
         } else if nodes.allSatisfy({ $0.connectionOfTree != nil }) {
             return treeMenu(nodes)
         } else {
             menu.add([Commands.newConnection, Commands.newFolder, nil, Commands.renameFolder, Commands.deleteFolder])
         }
+        return menu
+    }
+
+    /// The menu of the list's empty space: what can be made there.
+    fileprivate func blankMenu() -> NSMenu {
+        outline.deselectAll(nil)  // or New Folder… would take the selected connections with it
+        let menu = NSMenu(title: "Connections")
+        menu.add([Commands.newConnection, Commands.newFolder])
         return menu
     }
 
@@ -393,15 +464,35 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     }
 }
 
+extension NSPasteboard.PasteboardType {
+    /// A connection's row dragged inside the sidebar: its id.
+    static let sidebarConnection = NSPasteboard.PasteboardType("com.airsql.sidebar-connection")
+}
+
 /// The outline: a right-click selects the row under the pointer first (unless it is part of the selection) and opens
-/// the menu of the selection; Return connects, Delete forgets.
+/// the menu of the selection (the empty space has its own); Return connects, Delete forgets.
 @MainActor
 final class SidebarOutlineView: NSOutlineView {
     weak var sidebar: SidebarController?
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let header = (item(atRow: row(at: convert(event.locationInWindow, from: nil))) as? SidebarNode)?.kind == .header
-        return !header && selectsRow(for: event) ? sidebar?.contextMenu() : nil
+        sidebar?.openingMenu = true
+        defer { sidebar?.openingMenu = false }
+        return !header && selectsRow(for: event) ? sidebar?.contextMenu() : sidebar?.blankMenu()
+    }
+
+    /// ⌘F here goes to the filter, unless the tab shown has a find of its own (the window sends it on).
+    override func responds(to selector: Selector!) -> Bool {
+        if selector == #selector(performTextFinderAction(_:)), sidebar?.main?.selectedTab?.shown.responds(to: selector) == true { return false }
+        return super.responds(to: selector)
+    }
+
+    override func performTextFinderAction(_ sender: Any?) { sidebar?.main?.filterSidebar(sender) }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        guard item.action == #selector(performTextFinderAction(_:)) else { return super.validateUserInterfaceItem(item) }
+        return item.tag == NSTextFinder.Action.showFindInterface.rawValue
     }
 
     override func keyDown(with event: NSEvent) {
@@ -413,6 +504,8 @@ final class SidebarOutlineView: NSOutlineView {
                 sendCommand(Commands.deleteConnection.action)
             } else if sidebar?.selectedNodes.contains(where: { $0.connectionOfTree != nil }) == true {
                 sendCommand(Commands.drop.action)
+            } else if sidebar?.selectedFolderNodeID != nil {
+                sendCommand(Commands.deleteFolder.action)
             }
         default:
             super.keyDown(with: event)

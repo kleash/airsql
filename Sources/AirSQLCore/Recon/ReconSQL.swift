@@ -177,13 +177,28 @@ struct ReconTableSQL {
             return x == y
         case .json:
             let options: JSONSerialization.ReadingOptions = [.fragmentsAllowed]
-            guard let x = try? JSONSerialization.jsonObject(with: Data(left), options: options) as? NSObject,
-                  let y = try? JSONSerialization.jsonObject(with: Data(right), options: options) as? NSObject else {
+            guard let x = try? JSONSerialization.jsonObject(with: Data(left), options: options),
+                  let y = try? JSONSerialization.jsonObject(with: Data(right), options: options) else {
                 return false
             }
-            return x.isEqual(y)
+            return sameJSON(x, y)
         case .bit, .binary, .blob, .text, .longText, .temporal:
             return false
+        }
+    }
+
+    /// Parsed JSON the same, with true and 1 apart, which NSNumber's isEqual isn't. shortcut: numbers compare as parsed,
+    /// so they tie past about 38 digits; comparing them exactly needs a JSON reader that keeps their text.
+    private static func sameJSON(_ left: Any, _ right: Any) -> Bool {
+        switch (left, right) {
+        case let (a as [String: Any], b as [String: Any]):
+            return a.count == b.count && a.allSatisfy { key, value in b[key].map { sameJSON(value, $0) } ?? false }
+        case let (a as [Any], b as [Any]):
+            return a.count == b.count && zip(a, b).allSatisfy(sameJSON)
+        case let (a as NSNumber, b as NSNumber):
+            return (CFGetTypeID(a) == CFBooleanGetTypeID()) == (CFGetTypeID(b) == CFBooleanGetTypeID()) && a == b
+        default:
+            return (left as? NSObject)?.isEqual(right) == true
         }
     }
 

@@ -45,7 +45,7 @@ extension AppTests {
         // Count Rows Exactly replaces the estimate.
         #expect(await call(harness, "menu", ["path": "Data > Count Rows Exactly"]).error == nil)
         _ = await eventually(timeout: 60) { table.total?.exact == true }
-        #expect(table.viewer.status.rows.stringValue == "2,000 of 1,000,000 rows")
+        #expect(table.viewer.status.rows.stringValue.hasPrefix("2,000 of 1,000,000 rows"))
     }
 
     @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
@@ -59,7 +59,7 @@ extension AppTests {
         #expect(columns[3].typeLine.hasSuffix(" · default") && columns[5].marks == [.nullable])
         // A filter has no estimate: the rows loaded, then all of them once a page comes back short.
         let rows = table.viewer.status.rows.stringValue
-        #expect(rows.hasSuffix(" rows") && !rows.contains("about"), "\(rows)")
+        #expect(rows.contains(" rows") && !rows.contains("about"), "\(rows)")
     }
 
     @Test func columnSummaryOfAResultCountsTheRowsInMemory() async throws {

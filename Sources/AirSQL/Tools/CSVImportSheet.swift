@@ -311,13 +311,14 @@ final class CSVImportSheet: ToolSheet {
         options.separator = Self.separators[max(0, separatorMenu.indexOfSelectedItem)]
         options.header = header.state == .on
         options.emptyIsNull = emptyIsNull.state == .on
+        options.binaryColumns = Set(columns.filter { $0.type.lowercased().contains("binary") || $0.type.lowercased().contains("blob") }.map(\.name))
         let names = columns.map(\.name), fields = mapping.map { $0.indexOfSelectedItem > 0 ? $0.indexOfSelectedItem - 1 : nil }
         let start = { [self] in
             let cancellation = begin("Importing \(file.lastPathComponent) into \(table)")
             let updates = Throttle()
             Task {
                 do {
-                    let rows = try await CSVImport.run(file, options: options, into: session, database: database, table: table,
+                    let done = try await CSVImport.run(file, options: options, into: session, database: database, table: table,
                                                        columns: names, mapping: fields, cancellation: cancellation) { state in
                         updates.send {
                             self.progress("Imported \(ObjectPicker.compact(state.rows)) rows · \(Self.bytes(state.bytes)) of "
@@ -325,7 +326,7 @@ final class CSVImportSheet: ToolSheet {
                         }
                     }
                     updates.cancel()
-                    finish("Imported \(rows) rows into \(table).", failed: false)
+                    finish("Imported \(done.rows) rows into \(table)." + done.note, failed: false)
                 } catch {
                     updates.cancel()
                     finish((cancellation.isCancelled ? "Stopped." : error.localizedDescription) + " Nothing of this file was kept.",

@@ -16,6 +16,9 @@ and in a connection's right-click menu in the sidebar.
 installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
 (MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
 
+A `.csv` dropped on the window or the Dock icon opens Import CSV with the file chosen, and a `.sql.gz` opens Run SQL
+File the same way; nothing runs until you press the sheet's button.
+
 Export, Restore, Run SQL File, Copy to Another Server and Import CSV each open in a window of their own, which you can
 move aside to keep working. Closing it while it runs asks first; disconnecting the connection it uses, or quitting, says
 it is running and stops it.
@@ -90,7 +93,10 @@ session on each: no file in between.
 3. **Import**. The rows go in one transaction: if one fails (a duplicate key, a value the column refuses), none of the
    file stays, and the message says which records.
 
-Empty fields become NULL unless you untick it. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+Empty fields and a `NULL` without quotes become NULL unless you untick it (AirSQL's own CSV writes the text NULL in
+quotes, so the two come back apart), and a whole `0x…` field in a BLOB or BINARY column becomes its bytes. The file should
+be UTF-8: a field that isn't reads as Windows-1252, and the end of the import says so, as it does when the server gave
+warnings. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
 
 ## Open the mysql command line in Terminal
 

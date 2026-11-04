@@ -5,7 +5,7 @@
 	<!-- build.sh sets CFBundleShortVersionString and CFBundleVersion from VERSION. -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
-	<!-- .sql files open in console tabs: from Finder's Open With, and dropped on the Dock icon. -->
+	<!-- .sql files open in console tabs, from Finder's Open With and dropped on the Dock icon; .csv and .sql.gz open their tool's sheet when dropped there. -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -18,6 +18,30 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>org.iso.sql</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>CSV File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.comma-separated-values-text</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Compressed SQL File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>org.gnu.gnu-zip-archive</string>
 			</array>
 		</dict>
 	</array>

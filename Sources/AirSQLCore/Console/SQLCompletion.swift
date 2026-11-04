@@ -163,7 +163,9 @@ public enum SQLCompletion {
             for key in from.foreignKeys {
                 let other = key.referencedTable, a = alias(other)
                 let on = zip(key.columns, key.referencedColumns).map { "\(quote(a)).\(quote($1)) = \(quote(ref.name)).\(quote($0))" }
-                items.append(CompletionItem(kind: .join, text: "\(quote(other)) \(a) ON " + on.joined(separator: " AND "),
+                // In another database, its name goes with it: the plain name would be looked for in this one.
+                let target = key.referencedDatabase == db ? quote(other) : "\(quote(key.referencedDatabase)).\(quote(other))"
+                items.append(CompletionItem(kind: .join, text: "\(target) \(a) ON " + on.joined(separator: " AND "),
                                             label: "\(other) \(a) ON " + on.joined(separator: " AND "), detail: "foreign key"))
             }
             // …and others' keys point at this one.
@@ -196,10 +198,17 @@ public enum SQLCompletion {
         return snapshot?.table(db, ref.table)
     }
 
+    /// Reserved since MySQL 8, where a bare `rank` is error 1064; keywords, not names, for the highlighter elsewhere.
+    private static let mysql8Reserved: Set<String> = [
+        "CUBE", "CUME_DIST", "DENSE_RANK", "EMPTY", "EXCEPT", "FIRST_VALUE", "FUNCTION", "GROUPING", "GROUPS", "JSON_TABLE", "LAG",
+        "LAST_VALUE", "LATERAL", "LEAD", "MANUAL", "NTH_VALUE", "NTILE", "OF", "OVER", "PARALLEL", "PERCENT_RANK", "QUALIFY", "RANK",
+        "RECURSIVE", "ROW", "ROWS", "ROW_NUMBER", "SYSTEM", "TABLESAMPLE", "WINDOW",
+    ]
+
     /// A name as it can be typed: bare when it is a plain word that isn't reserved, else in backticks.
     public static func quote(_ name: String) -> String {
         let plain = !name.isEmpty && name.utf16.allSatisfy(SQLLexer.isNameChar) && !(name.first?.isNumber ?? true)
-            && !SQLWords.reserved.contains(name.uppercased())
+            && !SQLWords.reserved.contains(name.uppercased()) && !mysql8Reserved.contains(name.uppercased())
         return plain ? name : SQLQuote.identifier(name)
     }
 

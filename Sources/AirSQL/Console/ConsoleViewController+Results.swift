@@ -67,6 +67,7 @@ extension ConsoleViewController {
             let view = ResultGridView(store: store, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize), viewKey: key,
                                       transposed: settings.transposeSingleRow && store.rowCount == 1 && store.columns.count > 1,
                                       editable: query != nil)
+            view.viewer.noBackslashEscapes = noBackslashEscapes
             if let query, let self {
                 view.editingContext = context
                 view.model = model

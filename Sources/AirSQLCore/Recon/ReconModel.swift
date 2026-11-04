@@ -158,6 +158,8 @@ public struct ReconPart: Equatable {
     public var detail: String
     /// A changed column whose new type may not hold every value it has now (a narrowing ALTER): destructive.
     public var narrowing = false
+    /// A changed column that also has to move, after `after`.
+    public var moved = false
 
     public init(kind: Kind, name: String, change: Change, definition: String = "", after: String? = nil,
                 detail: String = "", narrowing: Bool = false) {

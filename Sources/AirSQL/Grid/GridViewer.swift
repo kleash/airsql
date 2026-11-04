@@ -21,6 +21,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     weak var host: DataGridViewDelegate?
     /// The table the rows come from, for the SQL copy formats (INSERT, UPDATE…).
     var copyTable: (database: String?, name: String) = (nil, "table")
+    /// The session's NO_BACKSLASH_ESCAPES, for the strings of what's copied as SQL.
+    var noBackslashEscapes = false
     /// ⌘C with nothing selected copies every row (a console result) rather than nothing.
     var copiesEverything = false
     /// The host's own highlight (find matches), by the host's row and column: tinted over the cells.
@@ -40,6 +42,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private let content = NSStackView()
     let body = NSView()
     private(set) var valuePanel: GridValuePanel?
+    /// The width it last had, in any tab.
+    private static var valuePanelWidth: CGFloat = 320
     private let recordBar = NSStackView()
     let recordLabel = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
 
@@ -338,6 +342,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     /// Value Panel (⇧↩): the focused cell's whole value beside the grid.
     @objc func toggleValuePanel(_ sender: Any?) {
         if let valuePanel {
+            Self.valuePanelWidth = valuePanel.frame.width
             valuePanel.removeFromSuperview()
             self.valuePanel = nil
         } else {
@@ -345,7 +350,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             split.addArrangedSubview(panel)
             split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
             split.layoutSubtreeIfNeeded()
-            split.setPosition(max(240, split.bounds.width - 320), ofDividerAt: 0)
+            split.setPosition(max(240, split.bounds.width - Self.valuePanelWidth), ofDividerAt: 0)
             valuePanel = panel
             updateValuePanel()
         }
@@ -565,7 +570,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private func copySelection(_ format: CopyFormat, headers: Bool) {
         if copiesEverything, grid.selection.isEmpty, grid.selection.cursor == nil { grid.selectAll(nil) }
         guard let copied else { return NSSound.beep() }
-        GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name)
+        GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name,
+                     noBackslashEscapes: noBackslashEscapes)
     }
 
     // MARK: The host's cells

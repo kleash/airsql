@@ -10,6 +10,10 @@ import AppKit
     @objc optional func showSettings(_ sender: Any?)
     @objc optional func showHelpSite(_ sender: Any?)
     @objc optional func showGettingStarted(_ sender: Any?)
+    @objc optional func showShortcuts(_ sender: Any?)
+    @objc optional func focusSidebar(_ sender: Any?)
+    @objc optional func focusEditor(_ sender: Any?)
+    @objc optional func focusResults(_ sender: Any?)
     @objc optional func reportProblem(_ sender: Any?)
     @objc optional func copyDiagnostics(_ sender: Any?)
     @objc optional func showMainWindow(_ sender: Any?)
@@ -179,6 +183,8 @@ import AppKit
     @objc optional func newFolder(_ sender: Any?)
     @objc optional func renameFolder(_ sender: Any?)
     @objc optional func deleteFolder(_ sender: Any?)
+    @objc optional func moveToFolder(_ sender: Any?)
+    @objc optional func copyPlainName(_ sender: Any?)
 
     // Tools
     @objc optional func exportDatabase(_ sender: Any?)
@@ -350,10 +356,12 @@ enum Commands {
                                          tip: "Grow the grid's selection from the cell to its column, its row, then everything")
     static let shrinkSelection = Command("Shrink Selection", #selector(AirSQLActions.shrinkSelection(_:)), down, .option,
                                          tip: "Shrink the grid's selection back: everything, the row, the column, the cell")
-    static let copyName = Command("Copy Name", #selector(AirSQLActions.copyName(_:)), tip: "Copy the selected object's name, quoted for SQL")
+    static let copyName = Command("Copy Name", #selector(AirSQLActions.copyName(_:)), "c", [.command, .control], tip: "Copy the selected object's name, quoted for SQL")
+    static let copyPlainName = Command("Copy Name Without Quotes", #selector(AirSQLActions.copyPlainName(_:)),
+                                       tip: "Copy the selected object's name as it is, for chat or code")
     static let copyColumnName = Command("Copy Column Name", #selector(AirSQLActions.copyColumnNames(_:)),
                                         tip: "Copy the name of the selected column")
-    static let copyCreate = Command("Copy CREATE", #selector(AirSQLActions.copyCreateStatement(_:)),
+    static let copyCreate = Command("Copy CREATE", #selector(AirSQLActions.copyCreateStatement(_:)), "C", [.command, .control],
                                     tip: "Copy the statement that creates the selected object")
     static let copyQuery = Command("Copy Query", #selector(AirSQLActions.copyQuery(_:)),
                                    tip: "Copy the full query the selected process is running")
@@ -373,6 +381,12 @@ enum Commands {
     // MARK: View
     static let toggleSidebar = Command("Hide Sidebar", #selector(NSSplitViewController.toggleSidebar(_:)), "s", [.command, .control],
                                        tip: "Hide or show the connections and the database tree")
+    static let focusSidebar = Command("Go to Sidebar", #selector(AirSQLActions.focusSidebar(_:)), "1", [.command, .option],
+                                      tip: "Put the keyboard in the connections and the tree")
+    static let focusEditor = Command("Go to Editor", #selector(AirSQLActions.focusEditor(_:)), "2", [.command, .option],
+                                     tip: "Put the keyboard in the SQL editor of the tab shown")
+    static let focusResults = Command("Go to Results", #selector(AirSQLActions.focusResults(_:)), "3", [.command, .option],
+                                      tip: "Put the keyboard in the grid of the tab shown")
     static let filterSidebar = Command("Filter Sidebar", #selector(AirSQLActions.filterSidebar(_:)), "j", [.command, .option],
                                        tip: "Type part of a name to narrow the connections and the tree")
     static let valuePanel = Command("Value Panel", #selector(AirSQLActions.toggleValuePanel(_:)), "\r", .shift,
@@ -452,7 +466,7 @@ enum Commands {
                                    tip: "Keep this result tab: the next run opens a new one")
     static let renameResult = Command("Rename Result…", #selector(AirSQLActions.renameResult(_:)),
                                       tip: "Give this result tab a name of your own")
-    static let closeResult = Command("Close Result", #selector(AirSQLActions.closeResult(_:)), tip: "Close this result tab")
+    static let closeResult = Command("Close Result", #selector(AirSQLActions.closeResult(_:)), "w", [.command, .control], tip: "Close this result tab")
     static let nextResult = Command("Show Next Result", #selector(AirSQLActions.showNextResult(_:)), "]", [.command, .option],
                                     tip: "Show the next result tab, or Messages")
     static let previousResult = Command("Show Previous Result", #selector(AirSQLActions.showPreviousResult(_:)), "[", [.command, .option],
@@ -475,7 +489,7 @@ enum Commands {
     static let goToLine = Command("Go to Line…", #selector(AirSQLActions.goToLine(_:)), "g", .control, tip: "Go to a line of the SQL by its number")
     static let wordWrap = Command("Word Wrap", #selector(AirSQLActions.toggleWordWrap(_:)),
                                   tip: "Wrap long lines at the editor's edge instead of scrolling sideways")
-    static let helpers = Command("Query Helpers", #selector(AirSQLActions.toggleHelpers(_:)),
+    static let helpers = Command("Query Helpers", #selector(AirSQLActions.toggleHelpers(_:)), "h", [.command, .control],
                                  tip: "Show or hide the columns, functions and keywords beside the editor")
 
     // MARK: Data
@@ -499,7 +513,7 @@ enum Commands {
                                      tip: "Put this value or function in the selected cells (a pending edit)")
     static let apply = Command("Apply Changes", #selector(AirSQLActions.applyChanges(_:)), "s",
                                tip: "Write the pending edits, new rows and deletions to the server in one transaction")
-    static let previewChanges = Command("Preview SQL…", #selector(AirSQLActions.previewChanges(_:)),
+    static let previewChanges = Command("Preview SQL…", #selector(AirSQLActions.previewChanges(_:)), "s", [.command, .option],
                                         tip: "Show the SQL that Apply would run, without running it")
     static let revert = Command("Revert", #selector(AirSQLActions.revertChanges(_:)), "z", [.command, .option],
                                 tip: "Throw away the pending changes of the selected rows")
@@ -536,10 +550,10 @@ enum Commands {
                                       tip: "Filter this column by a value you type: equal, not equal, less, greater or LIKE")
     static let filterByValues = Command("Filter by Values…", #selector(AirSQLActions.filterByValues(_:)),
                                         tip: "Tick the values to show in this column, as in a spreadsheet")
-    static let clearFilter = Command("Clear Filter", #selector(AirSQLActions.clearFilter(_:)), tip: "Show every row again")
-    static let sortAscending = Command("Sort Ascending", #selector(AirSQLActions.sortAscending(_:)),
+    static let clearFilter = Command("Clear Filter", #selector(AirSQLActions.clearFilter(_:)), "0", [.command, .control], tip: "Show every row again")
+    static let sortAscending = Command("Sort Ascending", #selector(AirSQLActions.sortAscending(_:)), up, [.command, .control, .option],
                                        tip: "Sort by this column, smallest first")
-    static let sortDescending = Command("Sort Descending", #selector(AirSQLActions.sortDescending(_:)),
+    static let sortDescending = Command("Sort Descending", #selector(AirSQLActions.sortDescending(_:)), down, [.command, .control, .option],
                                         tip: "Sort by this column, largest first")
     static let clearSort = Command("Clear Sort", #selector(AirSQLActions.clearSort(_:)), tip: "Show rows in the table's own order again")
     static let sortColumns = Command("Sort by Columns…", #selector(AirSQLActions.sortColumns(_:)),
@@ -576,12 +590,12 @@ enum Commands {
     // MARK: Database
     static let newDatabase = Command("New Database…", #selector(AirSQLActions.newDatabase(_:)),
                                      tip: "Create a database with a character set and collation")
-    static let createTable = Command("Create Table…", #selector(AirSQLActions.createTable(_:)),
+    static let createTable = Command("Create Table…", #selector(AirSQLActions.createTable(_:)), "n", [.command, .control],
                                      tip: "Design a new table: its columns, keys and options")
     static let createObject = Command("New…", #selector(AirSQLActions.createObject(_:)),
                                       tip: "Create another of what is selected in the tree: a table, view, routine, trigger or event")
     static let openData = Command("Open Data", #selector(AirSQLActions.openData(_:)), tip: "Open the table's rows in a tab of their own")
-    static let openStructure = Command("Open Structure", #selector(AirSQLActions.openStructure(_:)),
+    static let openStructure = Command("Open Structure", #selector(AirSQLActions.openStructure(_:)), "o", [.command, .option],
                                        tip: "Open the table's columns, indexes and keys in the table editor")
     static let openObject = Command("Open", #selector(AirSQLActions.openObject(_:)), tip: "Open the routine, trigger or event in its editor")
     static let runRoutine = Command("Run…", #selector(AirSQLActions.runRoutine(_:)),
@@ -646,6 +660,8 @@ enum Commands {
                                    tip: "Make a sidebar folder for connections; the selected connections move into it")
     static let renameFolder = Command("Rename Folder…", #selector(AirSQLActions.renameFolder(_:)),
                                       tip: "Give the selected sidebar folder another name (F2)")
+    static let moveToFolder = Command("No Folder", #selector(AirSQLActions.moveToFolder(_:)),
+                                      tip: "Move the selected connections here")
     static let deleteFolder = Command("Delete Folder…", #selector(AirSQLActions.deleteFolder(_:)),
                                       tip: "Remove the selected folder; its connections stay, outside any folder")
 
@@ -686,6 +702,10 @@ enum Commands {
                                      tip: "Show the tab to the left of the one shown")
     static let nextTab = Command("Show Next Tab", #selector(AirSQLActions.showNextTab(_:)), "}",
                                  tip: "Show the tab to the right of the one shown")
+    static let nextTabControl = Command("Show Next Tab", #selector(AirSQLActions.showNextTab(_:)), "\t", .control, hidden: true,
+                                        tip: "Show the tab to the right of the one shown")
+    static let previousTabControl = Command("Show Previous Tab", #selector(AirSQLActions.showPreviousTab(_:)), "\t", [.control, .shift],
+                                            hidden: true, tip: "Show the tab to the left of the one shown")
     static let mainWindow = Command("AirSQL", #selector(AirSQLActions.showMainWindow(_:)), tip: "Bring AirSQL's main window back")
     static let bringAllToFront = Command("Bring All to Front", #selector(NSApplication.arrangeInFront(_:)),
                                          tip: "Bring every AirSQL window in front of other apps")
@@ -698,6 +718,8 @@ enum Commands {
     // MARK: Help
     static let help = Command("AirSQL Help", #selector(AirSQLActions.showHelpSite(_:)),
                               tip: "Open AirSQL Help on the web: every task step by step, with pictures")
+    static let shortcuts = Command("Keyboard Shortcuts", #selector(AirSQLActions.showShortcuts(_:)),
+                                   tip: "Open the list of every shortcut in AirSQL Help")
     static let gettingStarted = Command("Getting Started", #selector(AirSQLActions.showGettingStarted(_:)),
                                         tip: "Open the first steps in AirSQL Help: add a connection, run a query, edit rows")
     static let reportProblem = Command("Report a Problem", #selector(AirSQLActions.reportProblem(_:)),
@@ -713,9 +735,9 @@ enum Commands {
         newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
         runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
-        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyColumnName, copyCreate,
+        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
-        toggleSidebar, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
+        toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
@@ -731,11 +753,11 @@ enum Commands {
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
         killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
-        renameFolder, deleteFolder,
+        renameFolder, deleteFolder, moveToFolder,
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
-        minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
-        help, gettingStarted, reportProblem, copyDiagnostics, agentGuide,
+        minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
+        help, gettingStarted, shortcuts, reportProblem, copyDiagnostics, agentGuide,
     ]
 
     /// The command with this action (and tag, for the actions several commands share).
@@ -752,6 +774,7 @@ enum Commands {
 
     /// Menu items that only open a submenu, by title.
     static let submenus: [String: String] = [
+        "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",
         "Copy As": "Copy the selected cells as TSV, CSV, Markdown, JSON, SQL and more",

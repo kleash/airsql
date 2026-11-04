@@ -30,20 +30,26 @@ extension ConsoleViewController {
                 number += 1
                 let count = "\(rows.rowCount.formatted()) row\(rows.rowCount == 1 ? "" : "s")"
                 let summary = time + " · " + count + (rows.capped ? " (the first \(rows.rowCount.formatted()))" : "")
+                    + " · read " + GridStatusView.time(Date())
                 if outcome.error == nil { note(.ok, count + (rows.capped ? ", the first only" : "") + " · " + time, statement: statement, run: run) }
                 addResult(rows, title: title.map { number > 1 ? "\($0) (\(number))" : $0 }, summary: summary,
                           query: number > 1 ? "\(statement.sql) (\(number))" : statement.sql)
             } else if outcome.error == nil {
-                let affected = result.affectedRows
-                let text = writes ? "\(affected.formatted()) row\(affected == 1 ? "" : "s") affected" : "Done"
+                let affected = result.changedRows
+                let word = result.info?.contains("Changed:") == true ? "changed" : "affected"
+                let text = writes ? "\(affected.formatted()) row\(affected == 1 ? "" : "s") \(word)" : "Done"
                 note(.ok, text + " · " + time + (result.info.map { " · " + $0 } ?? ""), statement: statement, run: run)
             }
         }
         for warning in outcome.warnings { note(.warning, warning, statement: statement, run: run) }
+        if StatementCheck.changesCharset(statement.sql, noBackslashEscapes: session.noBackslashEscapes) {
+            note(.warning, "AirSQL reads every result as UTF-8, so accents will look wrong after this: SET NAMES utf8mb4 puts it right",
+                 statement: statement, run: run)
+        }
         if outcome.error == nil, outcome.results.isEmpty, !run.cancelled { note(.ok, "Done · " + time, statement: statement, run: run) }
 
         // The transaction's changes, the current database.
-        let changed = outcome.results.reduce(UInt64(0)) { $0 + $1.affectedRows }
+        let changed = outcome.results.reduce(UInt64(0)) { $0 + $1.changedRows }
         let database = outcome.error == nil ? StatementCheck.usedDatabase(statement.sql) : nil
         changeShared { shared in
             shared.changes = session.inTransaction ? shared.changes + (writes ? changed : 0) : 0

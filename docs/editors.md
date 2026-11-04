@@ -70,7 +70,7 @@ at, virtual foreign keys you added in a table's rows included ([Virtual foreign 
 Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure**, **Open Data** and **Copy Name** (⌘C copies the selected table's name too). Pinch,
+right-click it for **Open Structure**, **Open Data** and **Copy Name** (⌘C copies the selected table's name too), or the empty space to export. Pinch,
 ⌘+ and ⌘− zoom, ⌘0 goes back to actual size and **Fit** shows the whole diagram; ⌘F goes to the find field, where typing
 part of a name selects that table and Return goes to the next. ⌘R reads the schema again. **Export Image…** saves the diagram as a PNG, and **Export
 Mermaid…** as Mermaid text, which many docs sites and wikis draw.

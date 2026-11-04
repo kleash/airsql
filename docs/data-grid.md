@@ -73,6 +73,7 @@ copying and editing use the stored value.
   grouped by thousands as your Mac groups them; or **Date from Unix Time** (seconds or milliseconds), in your time zone.
 - Dates: **Short**, **Medium** or **Long Date and Time**, as your Mac writes dates (System Settings ▸ General ▸ Language
   & Region). A DATE column shows the date only. Zero dates, TIME and YEAR stay as stored.
+- A TIMESTAMP cell's tooltip names the session's time zone, which the value is shown in.
 - **Time Zone ▸** (DATETIME and TIMESTAMP columns) moves the values: **From UTC to This Mac's** takes them as UTC and
   shows them in your time zone; **From This Mac's to UTC** does the reverse. A TIMESTAMP arrives in the session's time
   zone, so choose the first one when that is UTC. The header says so (`datetime as medium date, UTC → this Mac's`).

@@ -65,7 +65,8 @@ final class Tab {
 /// The strip of tabs above the content (plan §2.4): each tab's title (cut with an ellipsis, the full title in its
 /// tooltip), its unsaved dot or close button, and the connection's colour along its top; when one title is open on two
 /// connections, the connection's name after it. A click
-/// shows a tab, a double-click renames it, a middle-click closes it, a right-click opens its menu; "+" opens a new query.
+/// shows a tab, a drag moves it along the strip, a double-click renames it, a middle-click closes it, a right-click opens
+/// its menu; "+" opens a new query.
 @MainActor
 final class TabBarView: NSView {
     weak var controller: MainWindowController?
@@ -73,6 +74,7 @@ final class TabBarView: NSView {
     private let strip = FlippedView()
     private let plus = NSButton()
     private(set) var buttons: [TabButton] = []
+    private weak var dragged: Tab?
     static let height: CGFloat = 32
     /// Wide enough for a dozen letters of a title (the tooltip has all of it); more tabs scroll sideways.
     static let minimumTabWidth: CGFloat = 140
@@ -160,8 +162,17 @@ final class TabBarView: NSView {
 
     func clicked(_ button: TabButton, count: Int) {
         guard let controller, let tab = button.tab else { return }
+        dragged = tab
         controller.select(tab)
         if count == 2, tab.tabContent?.canRename == true { button.beginRename() }
+    }
+
+    /// The pointer, in the window, while a tab is held: the tab takes the place under it. The buttons stay and show the
+    /// tabs in their new order, so the tab held is kept here.
+    func drag(to point: NSPoint) {
+        let x = strip.convert(point, from: nil).x
+        guard let dragged, let index = buttons.firstIndex(where: { $0.frame.minX <= x && x < $0.frame.maxX }) else { return }
+        controller?.move(dragged, to: index)
     }
 
     func renamed(_ button: TabButton, to title: String) {
@@ -248,7 +259,7 @@ final class TabButton: NSView {
         dot.isHidden = !edited || hovering
         close.isHidden = edited && !hovering
         let place = name.map { " on " + $0 + (connection?.marks.isEmpty == false ? " (\(connection?.marks ?? ""))" : "") } ?? ""
-        toolTip = tab.title + place + (edited ? " (unsaved)" : "") + ": click to show it, double-click to rename it, middle-click to close it, right-click for more"
+        toolTip = tab.title + place + (edited ? " (unsaved)" : "") + ": click to show it, drag to move it, double-click to rename it, middle-click to close it, right-click for more"
         setAccessibilityLabel(tab.title + place)
         setAccessibilityValue(selected ? 1 : 0)
         setAccessibilityHelp(toolTip)
@@ -303,6 +314,11 @@ final class TabButton: NSView {
     override func mouseDown(with event: NSEvent) {
         guard editor == nil else { return super.mouseDown(with: event) }
         bar?.clicked(self, count: event.clickCount)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard editor == nil else { return super.mouseDragged(with: event) }
+        bar?.drag(to: event.locationInWindow)
     }
 
     override func otherMouseUp(with event: NSEvent) {

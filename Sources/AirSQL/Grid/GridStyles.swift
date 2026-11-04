@@ -64,9 +64,19 @@ struct GridStyles {
     static func display(_ text: String) -> String {
         var text = text
         if text.utf16.count > displayLimit { text = String(text.prefix(displayLimit)) }
-        guard text.utf8.contains(where: { $0 == 10 || $0 == 13 || $0 == 9 }) else { return text }
-        return text.replacingOccurrences(of: "\r\n", with: "↵").replacingOccurrences(of: "\n", with: "↵")
+        guard text.utf8.last == 32 || text.utf8.contains(where: { $0 == 10 || $0 == 13 || $0 == 9 || $0 >= 0xC2 }) else { return text }
+        var shown = text.replacingOccurrences(of: "\r\n", with: "↵").replacingOccurrences(of: "\n", with: "↵")
             .replacingOccurrences(of: "\r", with: "↵").replacingOccurrences(of: "\t", with: "⇥")
+        // Spaces at the end and characters that draw nothing: 'abc ' and 'abc' mustn't look the same. (Not U+200D, which
+        // joins emoji.)
+        let invisible: [Unicode.Scalar: Character] = ["\u{00A0}": "⍽", "\u{200B}": "␣", "\u{2060}": "␣", "\u{FEFF}": "␣"]
+        if shown.unicodeScalars.contains(where: { invisible[$0] != nil }) {
+            shown = String(shown.unicodeScalars.reduce(into: String.UnicodeScalarView()) { out, scalar in
+                out.append(invisible[scalar]?.unicodeScalars.first ?? scalar)
+            })
+        }
+        let spaces = shown.reversed().prefix { $0 == " " }.count
+        return shown.dropLast(spaces) + String(repeating: "␣", count: spaces)
     }
 
     /// The width a cell's text takes (without the padding).

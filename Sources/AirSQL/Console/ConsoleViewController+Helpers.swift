@@ -24,6 +24,7 @@ extension ConsoleViewController {
 
     @objc func toggleHelpers(_ sender: Any?) {
         if helpersShown {
+            Self.helpersWidth = helpers.frame.width
             outer.removeArrangedSubview(helpers)
             helpers.removeFromSuperview()
             editor.onSelectionChange = nil
@@ -31,7 +32,7 @@ extension ConsoleViewController {
             outer.addArrangedSubview(helpers)
             outer.setHoldingPriority(.defaultLow + 10, forSubviewAt: 1)
             outer.layoutSubtreeIfNeeded()
-            outer.setPosition(max(320, outer.bounds.width - 260), ofDividerAt: 0)
+            outer.setPosition(max(320, outer.bounds.width - Self.helpersWidth), ofDividerAt: 0)
             helpers.reload()
             // Follows the statement at the cursor, a moment after it moves.
             editor.onSelectionChange = { [weak self] in

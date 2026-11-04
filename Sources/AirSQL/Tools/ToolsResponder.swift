@@ -92,11 +92,29 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
     }
 
     /// Asks for the password if need be, then shows the sheet `make` builds on the main window.
-    private func open(_ make: @escaping (AppModel, SavedConnection, ConnectOptions) -> ToolSheet) {
+    private func open(_ make: @escaping (AppModel, SavedConnection, ConnectOptions) -> ToolSheet, then: ((ToolSheet) -> Void)? = nil) {
         guard let main, let window = main.window, window.attachedSheet == nil, let saved = connection else { return }
         Task {
             guard let options = await Self.options(for: saved, model: main.model, on: window), window.attachedSheet == nil else { return }
-            make(main.model, saved, options).show(on: window)
+            let sheet = make(main.model, saved, options)
+            sheet.show(on: window)
+            then?(sheet)
+        }
+    }
+
+    /// A .csv or .sql.gz dropped or opened from Finder: Import CSV… or Run SQL File… with the file chosen; nothing runs
+    /// until the person presses the sheet's button.
+    func open(file url: URL) {
+        let csv = url.pathExtension.lowercased() == "csv"
+        let (enabled, reason) = availability(csv ? #selector(importCSV(_:)) : #selector(runSQLFile(_:)))
+        guard enabled else {
+            return showError(reason ?? "Select a connection in the sidebar first", title: "AirSQL can't open “\(url.lastPathComponent)” yet",
+                             on: main?.window)
+        }
+        if csv {
+            open({ CSVImportSheet(model: $0, connection: $1, options: $2) }, then: { ($0 as? CSVImportSheet)?.use(url) })
+        } else {
+            open({ RestoreSheet(model: $0, connection: $1, options: $2, builtIn: true) }, then: { ($0 as? RestoreSheet)?.use(url) })
         }
     }
 

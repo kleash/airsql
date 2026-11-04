@@ -9,9 +9,10 @@ Every command is in the menu bar, with its shortcut next to it, and right-click 
 the pointer over a menu item to see what it does. A greyed-out item says why it is off.
 
 ⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
-Tab indents, ⌃⇥ moves on.
+Tab indents, ⌥⌘1 goes to the sidebar and ⌥⌘3 to the results. ⌃⇥ and ⌃⇧⇥ show the next and previous tab, as in Safari.
 
-F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar, else the tab shown
+F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar (on a connection, it
+opens Edit…), else the tab shown
 (a console that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
 edited (a console result's) shows its value in the value panel.
 
@@ -45,12 +46,17 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Select All | ⌘A |
 | Extend Selection | ⌥↑ |
 | Shrink Selection | ⌥↓ |
+| Copy Name | ⌃⌘C |
+| Copy CREATE | ⌃⇧⌘C |
 | Find… | ⌘F |
 | Find and Replace… | ⌥⌘F |
 | Find Next | ⌘G |
 | Find Previous | ⇧⌘G |
 | Use Selection for Find | ⌘E |
 | Hide Sidebar | ⌃⌘S |
+| Go to Sidebar | ⌥⌘1 |
+| Go to Editor | ⌥⌘2 |
+| Go to Results | ⌥⌘3 |
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
@@ -72,11 +78,13 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Close Result | ⌃⌘W |
 | Show Next Result | ⌥⌘] |
 | Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
+| Query Helpers | ⌃⌘H |
 | Go to Line… | ⌃G |
 | Move Up | ⇧⌘↑ |
 | Move Down | ⇧⌘↓ |
@@ -86,21 +94,29 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Delete Rows | ⌘⌫ |
 | Set NULL | ⌥⌘N |
 | Apply Changes | ⌘S |
+| Preview SQL… | ⌥⌘S |
 | Revert | ⌥⌘Z |
 | Filter… | ⇧⌘F |
 | Search All Columns | ⇧⌘E |
 | Equal to Selection | ⌃⌘1 |
 | Not Equal to Selection | ⌃⌘2 |
+| Clear Filter | ⌃⌘0 |
+| Sort Ascending | ⌃⌥⌘↑ |
+| Sort Descending | ⌃⌥⌘↓ |
 | Go to Row… | ⌘L |
 | Related Rows | ⌃⌘↓ |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
+| Create Table… | ⌃⌘N |
+| Open Structure | ⌥⌘O |
 | Process List | ⌥⌘P |
 | Connect | ⌘K |
 | Disconnect | ⇧⌘K |
 | Minimize | ⌘M |
 | Show Previous Tab | ⌘{ |
 | Show Next Tab | ⌘} |
+| Show Previous Tab | ⌃⇧⇥ |
+| Show Next Tab | ⌃⇥ |
 | Tab 1 | ⌘1 |
 
 ⌘S saves a console's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in

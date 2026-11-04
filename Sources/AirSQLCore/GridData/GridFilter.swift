@@ -23,23 +23,27 @@ public struct GridCondition: Equatable, Sendable {
     public func sql(noBackslashEscapes: Bool = false) -> String {
         let name = SQLQuote.identifier(column.name), value = values.first ?? nil
         func literal(_ value: String) -> String { column.literal(value, noBackslashEscapes: noBackslashEscapes) }
+        // What = and IN compare with the cell: a FLOAT holds more digits than its text, so 3.14159 never equals it as
+        // a number, and MySQL's JSON never equals a string; both are compared as the server writes them.
+        let exact = column.kind == .json ? "CAST(\(name) AS BINARY)"
+            : column.type.lowercased().hasPrefix("float") ? "(CAST(\(name) AS CHAR) + 0)" : name
         func like(_ prefix: String, _ suffix: String) -> String {
             // '!' escapes % and _ in the value (a backslash means something else under NO_BACKSLASH_ESCAPES), and
             // ESCAPE '!' keeps a backslash of the value from being LIKE's own escape.
             let text = value ?? ""
             guard text.contains(where: { "%_!\\".contains($0) }) else {
-                return name + " LIKE " + SQLQuote.string(prefix + text + suffix, noBackslashEscapes: noBackslashEscapes)
+                return column.likeTarget + " LIKE " + SQLQuote.string(prefix + text + suffix, noBackslashEscapes: noBackslashEscapes)
             }
             let escaped = text.replacingOccurrences(of: "!", with: "!!").replacingOccurrences(of: "%", with: "!%")
                 .replacingOccurrences(of: "_", with: "!_")
-            return name + " LIKE " + SQLQuote.string(prefix + escaped + suffix, noBackslashEscapes: noBackslashEscapes)
+            return column.likeTarget + " LIKE " + SQLQuote.string(prefix + escaped + suffix, noBackslashEscapes: noBackslashEscapes)
                 + " ESCAPE '!'"
         }
         let listed = values.compactMap { $0 }.map(literal).joined(separator: ", ")
         let hasNull = values.contains { $0 == nil }
         switch op {
-        case .equals: return value.map { name + " = " + literal($0) } ?? name + " IS NULL"
-        case .notEquals: return value.map { name + " <> " + literal($0) } ?? name + " IS NOT NULL"
+        case .equals: return value.map { exact + " = " + literal($0) } ?? name + " IS NULL"
+        case .notEquals: return value.map { exact + " <> " + literal($0) } ?? name + " IS NOT NULL"
         case .less: return name + " < " + (value.map(literal) ?? "NULL")
         case .greater: return name + " > " + (value.map(literal) ?? "NULL")
         case .startsWith: return like("", "%")
@@ -47,10 +51,10 @@ public struct GridCondition: Equatable, Sendable {
         case .contains: return like("%", "%")
         case .isIn:
             if listed.isEmpty { return name + " IS NULL" }
-            return hasNull ? "(\(name) IN (\(listed)) OR \(name) IS NULL)" : "\(name) IN (\(listed))"
+            return hasNull ? "(\(exact) IN (\(listed)) OR \(name) IS NULL)" : "\(exact) IN (\(listed))"
         case .notIn:
             if listed.isEmpty { return name + " IS NOT NULL" }
-            return hasNull ? "(\(name) NOT IN (\(listed)) AND \(name) IS NOT NULL)" : "\(name) NOT IN (\(listed))"
+            return hasNull ? "(\(exact) NOT IN (\(listed)) AND \(name) IS NOT NULL)" : "\(exact) NOT IN (\(listed))"
         case .isNull: return name + " IS NULL"
         case .isNotNull: return name + " IS NOT NULL"
         }
@@ -130,7 +134,7 @@ public enum GridFilter {
         let parts = columns.compactMap { column -> String? in
             let name = SQLQuote.identifier(column.name)
             switch column.kind {
-            case .text, .json: return name + like
+            case .text, .json: return column.likeTarget + like
             case .number, .date: return "CAST(\(name) AS CHAR)" + like
             case .binary: return CopyWriter.hexDigits(text).map { name + " = X'\($0)'" }
             }
@@ -159,7 +163,7 @@ public enum GridSorting {
            let y = Decimal(string: b, locale: Locale(identifier: "en_US_POSIX")) {
             return x == y ? .orderedSame : x < y ? .orderedAscending : .orderedDescending
         }
-        return a.compare(b, options: [.caseInsensitive, .numeric])
+        return a.compare(b, options: [.caseInsensitive, .diacriticInsensitive])
     }
 
     /// `rows` sorted by `keys` (columns of `columns`, values from `value`); equal rows keep their order.
@@ -178,6 +182,15 @@ public enum GridSorting {
 }
 
 extension GridColumn {
+    /// What LIKE reads, so it sees the cell's text: a BIT's digits, not its bytes, and JSON in the connection's collation
+    /// like other text, not its own binary one.
+    var likeTarget: String {
+        let name = SQLQuote.identifier(self.name)
+        if kind == .json { return "CAST(\(name) AS CHAR)" }
+        guard type.lowercased().hasPrefix("bit") else { return name }
+        return "LPAD(BIN(\(name) + 0), \(type.filter(\.isNumber).isEmpty ? "1" : type.filter(\.isNumber)), '0')"
+    }
+
     /// A value as SQL for this column: numbers bare when they read as numbers, BIT digits as b'…', a whole "0x…" in a
     /// binary column as X'…', anything else a quoted string.
     public func literal(_ value: String?, noBackslashEscapes: Bool = false) -> String {

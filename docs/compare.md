@@ -43,8 +43,9 @@ they differ. The two definitions scroll together.
 
 MySQL and MariaDB write the same thing differently, and the compare reads them alike: `int(11)` and `int`, MariaDB's
 JSON (a LONGTEXT with a check) and MySQL's, `CURRENT_TIMESTAMP` and `current_timestamp()`, `NO ACTION` and
-`RESTRICT`, check constraints the two servers name differently. Each flavour writes a view's body its own way,
-though, so the same view on MySQL and on MariaDB can still show as different.
+`RESTRICT`, check constraints the two servers name differently. Each flavour writes a view's or routine's body its own
+way, though (MariaDB adds `COLLATE` to a function's `RETURNS`), so the same one on MySQL and on MariaDB can still show as
+different.
 
 ### Ignore rules
 
@@ -135,4 +136,7 @@ line, for a spreadsheet) or **Markdown** (for a ticket). HTML and Markdown list 
 
 - More than 100,000 differing rows in one table are reported as too many to list, without sync statements for that
   table: narrow the compare with a WHERE, or copy the table instead.
-- Partitioning, row formats and system versioning aren't compared.
+- Column order and row formats are compared and synced. Partitioning is only noticed on one side: a table partitioned
+  differently on both reads the same, and no statement adds or removes it. System versioning isn't compared.
+- The data compare reads each side as it goes, not one snapshot: on a busy table it can show rows that changed meanwhile.
+- A FLOAT compares by the text the server gives, about six digits: 1.0000001 and 1.0000002 both read `1`.

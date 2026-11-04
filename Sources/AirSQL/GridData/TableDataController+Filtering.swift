@@ -301,10 +301,12 @@ extension TableDataController {
             }
             self?.reloadForFilter()
         }
-        guard let total, total.rows > 1_000_000, let column = unindexed.first, let window = view.window,
+        // Under a filter nobody knows, and most filters leave few rows; a table's estimate can be wrong, so that asks.
+        let known = knownTotal
+        guard known.map({ $0.rows > 1_000_000 }) ?? source.filter.isEmpty, let column = unindexed.first, let window = view.window,
               model.data.safety(for: context.connection).askBeforeUnindexedSort else { return apply() }
         let alert = NSAlert()
-        alert.messageText = "Sort \(total.exact ? "" : "about ")\(total.rows.formatted()) rows by \(column)?"
+        alert.messageText = "Sort " + (known.map { "\($0.exact ? "" : "about ")\($0.rows.formatted()) rows" } ?? "every row") + " by \(column)?"
         alert.informativeText = "\(column) has no index, so the server sorts every row before it sends the first page. That can "
             + "take a while and load the server."
         alert.addButton(withTitle: "Sort")

@@ -50,6 +50,11 @@ final class GridStatusView: NSStackView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    /// When rows were read, for "· read 14:32": the time, and the date unless it's today.
+    static func time(_ date: Date) -> String {
+        date.formatted(date: Calendar.current.isDateInToday(date) ? .omitted : .abbreviated, time: .shortened)
+    }
+
     /// Shows the selection as it is now.
     func update() {
         rows.isHidden = rows.stringValue.isEmpty

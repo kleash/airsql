@@ -81,7 +81,8 @@ extension AgentTarget {
         if ["tinyint", "smallint", "mediumint", "int", "integer", "bigint", "decimal", "numeric", "float", "double",
             "real"].contains(type) { return .number }
         if column.isJSON || type.hasSuffix("blob") || ["json", "geometry", "point", "linestring", "polygon", "multipoint",
-                                                       "multilinestring", "multipolygon", "geometrycollection"].contains(type) {
+                                                       "multilinestring", "multipolygon", "geometrycollection",
+                                                       "geomcollection"].contains(type) {
             return .opaque
         }
         return type.hasSuffix("text") ? .text : .value

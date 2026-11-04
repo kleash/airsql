@@ -16,10 +16,43 @@ public enum ExplainPlan {
     /// MariaDB's or MySQL's JSON plan as indented lines: each query block, table (its access, key, rows and
     /// condition), join, subquery, temporary table and sort, in the server's order.
     public static func tree(fromJSON json: String) -> String {
-        guard let data = json.data(using: .utf8), let root = try? JSONSerialization.jsonObject(with: data) else { return json }
+        guard let data = numberingRepeats(json).data(using: .utf8), let root = try? JSONSerialization.jsonObject(with: data)
+        else { return json }
         var lines: [String] = []
         walk(root, depth: 0, into: &lines)
         return lines.joined(separator: "\n")
+    }
+
+    /// MariaDB 10.5 and 10.6 repeat the "table" key of a join, and a JSON reader keeps only the last of them: each
+    /// repeat becomes "table#002" and so on, in order, which `walk` and `order` read past.
+    private static func numberingRepeats(_ json: String) -> String {
+        let bytes = Array(json.utf8)
+        var out: [UInt8] = [], seen: [[ArraySlice<UInt8>: Int]] = [], index = 0
+        while index < bytes.count {
+            let byte = bytes[index]
+            if byte == UInt8(ascii: "{") { seen.append([:]) }
+            if byte == UInt8(ascii: "}") { _ = seen.popLast() }
+            guard byte == UInt8(ascii: "\"") else {
+                out.append(byte)
+                index += 1
+                continue
+            }
+            var end = index + 1
+            while end < bytes.count, bytes[end] != UInt8(ascii: "\"") { end += bytes[end] == UInt8(ascii: "\\") ? 2 : 1 }
+            guard end < bytes.count else { return json }
+            let text = bytes[(index + 1)..<end]
+            var next = end + 1
+            while next < bytes.count, [9, 10, 13, 32].contains(bytes[next]) { next += 1 }
+            out += bytes[index..<end]
+            if next < bytes.count, bytes[next] == UInt8(ascii: ":"), !seen.isEmpty {
+                let count = seen[seen.count - 1][text, default: 0] + 1
+                seen[seen.count - 1][text] = count
+                if count > 1 { out += Array(String(format: "#%03d", count).utf8) }
+            }
+            out.append(UInt8(ascii: "\""))
+            index = end + 1
+        }
+        return String(decoding: out, as: UTF8.self)
     }
 
     private static let shown = ["access_type", "key", "used_key_parts", "ref", "rows", "rows_examined_per_scan",
@@ -34,6 +67,7 @@ public enum ExplainPlan {
         guard let object = node as? [String: Any] else { return }
         for key in object.keys.sorted(by: { order($0) < order($1) }) {
             let value = object[key]!
+            let key = plain(key)
             switch key {
             case "query_block":
                 let id = ((value as? [String: Any])?["select_id"]).map { " #\($0)" } ?? ""
@@ -67,8 +101,11 @@ public enum ExplainPlan {
 
     /// Query blocks and tables first, then the rest in name order, so the plan reads top down.
     private static func order(_ key: String) -> String {
-        (["query_block": "0", "table": "1", "nested_loop": "2"][key] ?? "3") + key
+        (["query_block": "0", "table": "1", "nested_loop": "2"][plain(key)] ?? "3") + key
     }
+
+    /// A key without the number `numberingRepeats` gave it.
+    private static func plain(_ key: String) -> String { String(key.prefix { $0 != "#" }) }
 
     private static func text(_ value: Any) -> String {
         if let list = value as? [Any] { return list.map(text).joined(separator: ", ") }

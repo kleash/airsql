@@ -112,7 +112,10 @@ public struct CopyWriter {
         defer { rowsWritten += 1 }
         switch format {
         case .tsv: return values.map { tsvField($0 ?? options.nullText) }.joined(separator: "\t") + eol
-        case .csv: return values.map { csvField($0 ?? options.nullText) }.joined(separator: options.separator) + eol
+        case .csv:
+            // Text that reads as NULL is quoted: a bare NULL is the real one, which CSV import reads back.
+            return values.map { value in value.map { $0 == options.nullText ? quoted($0) : csvField($0) } ?? csvField(options.nullText) }
+                .joined(separator: options.separator) + eol
         case .json: return (rowsWritten == 0 ? eol : "," + eol) + "  " + jsonObject(values)
         case .jsonLines: return jsonObject(values) + eol
         case .markdown: return "| " + values.map { markdownCell($0 ?? options.nullText) }.joined(separator: " | ") + " |" + eol
@@ -125,11 +128,13 @@ public struct CopyWriter {
             return "  <row>" + eol + fields.joined(separator: eol) + eol + "  </row>" + eol
         case .insert, .insertIgnore, .replace:
             let verb = format == .insert ? "INSERT INTO" : format == .insertIgnore ? "INSERT IGNORE INTO" : "REPLACE INTO"
-            return verb + " " + qualifiedTable + " (" + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ")
-                + ") VALUES (" + zip(columns, values).map { literal($1, $0) }.joined(separator: ", ") + ");" + eol
+            // Generated columns take no value: the server refuses one.
+            let written = columns.indices.filter { !columns[$0].marks.contains(.generated) }
+            return verb + " " + qualifiedTable + " (" + written.map { SQLQuote.identifier(columns[$0].name) }.joined(separator: ", ")
+                + ") VALUES (" + written.map { literal(values[$0], columns[$0]) }.joined(separator: ", ") + ");" + eol
         case .update:
             let keys = keyIndexes
-            let set = columns.indices.filter { !keys.contains($0) || keys.count == columns.count }
+            let set = columns.indices.filter { (!keys.contains($0) || keys.count == columns.count) && !columns[$0].marks.contains(.generated) }
                 .map { SQLQuote.identifier(columns[$0].name) + " = " + literal(values[$0], columns[$0]) }
             return "UPDATE " + qualifiedTable + " SET " + set.joined(separator: ", ") + " WHERE " + condition(values, keys) + ";" + eol
         case .delete: return "DELETE FROM " + qualifiedTable + " WHERE " + condition(values, keyIndexes) + ";" + eol
@@ -268,7 +273,7 @@ public struct CopyWriter {
         xml(text).replacingOccurrences(of: "\r\n", with: "<br>").replacingOccurrences(of: "\n", with: "<br>")
     }
 
-    /// Text for XML and HTML: the five entities, and without the control characters XML 1.0 can't hold.
+    /// Text for XML and HTML: the five entities, and � for the control characters XML 1.0 can't hold.
     func xml(_ text: String) -> String {
         var out = ""
         for scalar in text.unicodeScalars {
@@ -279,7 +284,7 @@ public struct CopyWriter {
             case "\"": out += "&quot;"
             case "'": out += "&apos;"
             case "\t", "\n", "\r": out.unicodeScalars.append(scalar)
-            case _ where scalar.value < 0x20 || scalar.value == 0xFFFE || scalar.value == 0xFFFF: continue
+            case _ where scalar.value < 0x20 || scalar.value == 0xFFFE || scalar.value == 0xFFFF: out += "\u{FFFD}"
             default: out.unicodeScalars.append(scalar)
             }
         }

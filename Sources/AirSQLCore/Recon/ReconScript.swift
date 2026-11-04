@@ -128,7 +128,7 @@ struct ReconScriptBuilder {
         guard !part.definition.isEmpty else { return [] }
         switch (part.kind, part.change) {
         case (.column, .added): return ["ADD COLUMN \(part.definition) " + (part.after.map { "AFTER " + q($0) } ?? "FIRST")]
-        case (.column, .changed): return part.narrowing ? [] : ["MODIFY COLUMN \(part.definition)"]
+        case (.column, .changed): return part.narrowing ? [] : [modify(part)]
         case (.index, .added): return ["ADD \(part.definition)"]
         case (.index, .changed): return [dropIndex(part.name), "ADD \(part.definition)"]
         case (.check, .added): return ["ADD \(part.definition)"]
@@ -143,11 +143,15 @@ struct ReconScriptBuilder {
     private func destructiveClauses(_ part: ReconPart) -> [String] {
         switch (part.kind, part.change) {
         case (.column, .dropped): return ["DROP COLUMN " + q(part.name)]
-        case (.column, .changed): return part.narrowing && !part.definition.isEmpty ? ["MODIFY COLUMN \(part.definition)"] : []
+        case (.column, .changed): return part.narrowing && !part.definition.isEmpty ? [modify(part)] : []
         case (.index, .dropped): return [dropIndex(part.name)]
         case (.check, .dropped): return [dropCheck(part.name)]
         default: return []
         }
+    }
+
+    private func modify(_ part: ReconPart) -> String {
+        "MODIFY COLUMN \(part.definition)" + (part.moved ? part.after.map { " AFTER " + q($0) } ?? " FIRST" : "")
     }
 
     private func dropIndex(_ name: String) -> String { name == "PRIMARY" ? "DROP PRIMARY KEY" : "DROP INDEX " + q(name) }

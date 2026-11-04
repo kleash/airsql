@@ -164,7 +164,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let index = shown[row], entry = values[index]
-        let title = (entry.value ?? "NULL") + "  (\(entry.count.formatted()))"
+        let title = ColumnSummary.label(entry.value, nullText: "NULL") + "  (\(entry.count.formatted()))"
         let box = NSButton(checkboxWithTitle: title.count > 120 ? String(title.prefix(120)) + "…" : title, target: self,
                            action: #selector(toggled(_:)))
         box.tag = index

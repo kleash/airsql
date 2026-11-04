@@ -121,13 +121,21 @@ struct ReconTests {
         #expect(structure.compare(mysql, mariadb).isEmpty)
     }
 
+    @Test func jsonTrueIsNotOne() {
+        func same(_ a: String, _ b: String) -> Bool { ReconTableSQL.same(Array(a.utf8), Array(b.utf8), .json) }
+        #expect(!same(#"{"a": true}"#, #"{"a": 1}"#) && !same("[false]", "[0]"))
+        #expect(same(#"{"a": 1, "b": [true, null]}"#, #"{"b":[true,null],"a":1.0}"#) && !same("[1, 2]", "[2, 1]"))
+    }
+
     @Test func spellingsNormalise() {
         func column(_ type: String, json: Bool = false) -> SchemaColumn {
             SchemaColumn(name: "c", dataType: "", columnType: type, nullable: true, defaultValue: .null, autoIncrement: false,
                          onUpdate: nil, generated: nil, invisible: false, isJSON: json, charset: nil, collation: nil, comment: "")
         }
         #expect(ReconNormal.type(column("int(11)")) == "int")
-        #expect(ReconNormal.type(column("int(10) unsigned zerofill")) == "int unsigned zerofill")
+        #expect(ReconNormal.type(column("int(6) unsigned zerofill")) != ReconNormal.type(column("int(8) unsigned zerofill")))
+        #expect(ReconNormal.type(column("ENUM('A','b')")) == "enum('A','b')")
+        #expect(ReconNormal.type(column("geomcollection")) == ReconNormal.type(column("geometrycollection")))
         #expect(ReconNormal.type(column("tinyint(1)")) == "tinyint")
         #expect(ReconNormal.type(column("year(4)")) == "year")
         #expect(ReconNormal.type(column("longtext", json: true)) == "json")

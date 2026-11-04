@@ -106,10 +106,17 @@ extension SQLEditorView {
     /// tree, the helpers, other apps) go in where they are dropped, as text.
     private func droppedFiles(_ info: NSDraggingInfo) -> [URL] { Self.sqlFiles(info) }
 
-    /// The .sql (and .txt) files being dragged: the editor's and the main window's drops open them in console tabs.
+    /// The files being dragged that the editor's and the main window's drops take to `openFiles`: .sql and .txt, .csv and
+    /// .sql.gz.
     static func sqlFiles(_ info: NSDraggingInfo) -> [URL] {
         let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
-        return (urls ?? []).filter { ["sql", "txt"].contains($0.pathExtension.lowercased()) }
+        return (urls ?? []).filter { ["sql", "txt"].contains($0.pathExtension.lowercased()) || opensInSheet($0) }
+    }
+
+    /// A file for Import CSV… or Run SQL File…, not a console.
+    static func opensInSheet(_ url: URL) -> Bool {
+        let name = url.lastPathComponent.lowercased()
+        return name.hasSuffix(".csv") || name.hasSuffix(".sql.gz")
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

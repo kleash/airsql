@@ -360,6 +360,7 @@ own session, which every console tab of that connection shares.
 - **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
 - Drag a result's tab to put the results in another order.
+- Drag a tab along the strip to move it. Past ⌘9, the **Window** menu lists every tab.
 - Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
 - When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL.
 - **File ▸ Open Recent** lists the .sql files you had open lately.
@@ -414,6 +415,8 @@ on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another;
 While a statement runs, the bar above the results shows which one and for how long, with **Cancel**; the status bar
 lists it too. Cancel stops only that statement: AirSQL checks the server is still running it before it stops it. A
 connection can have a query timeout: a statement that runs longer is stopped the same way, and Messages says so.
+The time shown covers the whole run: waiting its turn, the server's work and fetching every row. After an `UPDATE`,
+Messages counts the rows changed; the server's note beside it says how many matched.
 
 Console tabs of one connection share its session, so while one runs a statement the others wait.
 
@@ -629,8 +632,10 @@ than the safety setting allows.
 ## Folders
 
 Folders group connections in the sidebar. **Connection ▸ New Folder…** makes one (the selected connections move into
-it); right-click a folder to rename or delete it (its connections stay). The editor's **Folder** menu moves a
-connection.
+it); right-click a folder to rename or delete it (its connections stay; Delete asks too). To move connections, drag them onto
+a folder (or onto the list to take them out of one), or use **Connection ▸ Move to Folder**. Right-click the list's empty
+space for New Connection and New Folder. F2 on a connection opens it to rename, and the filter's ↓ and Return go on to
+the first match.
 
 
 ---
@@ -645,7 +650,9 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 ## Find your way
 
 - **Click** a database to see its tables in the database view: rows, the space their data and indexes take, engine,
-  collation, when they last changed and their comment. Click a column's title to sort by it.
+  collation, when they last changed and their comment. Click a column's title to sort by it; AirSQL keeps the order
+  and the widths. **Filter by name** at its top keeps the tables with those letters. Right-click below the rows, or an
+  empty database, for **Create Table…**.
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](https://kleash.github.io/airsql/editors.html));
@@ -653,7 +660,9 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   another of its kind.
 - **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
   open it; double-click again to close it. The console's statements run in the current database ([The SQL console](https://kleash.github.io/airsql/console.html)).
-- **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
+- **Right-click** anything for everything you can do with it; the tab in front stays. Every command is also in the
+  **Database** menu. **Copy Name** quotes it for SQL, **Copy Name Without Quotes** doesn't, and **Copy CREATE** copies
+  the statement that makes it.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
   filter, a connected connection whose name doesn't match shows the objects that do, opened.
@@ -707,7 +716,7 @@ Upper and lower case match as the column's collation says (most ignore case).
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
 running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
 with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
-idle connections. Double-click a row to read its whole statement.
+idle connections. Double-click a row (or press Return) to read its whole statement; Delete offers to kill it.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.
@@ -732,13 +741,17 @@ session, a session of their own, so a long query in a console never holds them u
   key order, so pages follow one another.
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
+  An estimate below what has already loaded is left out (InnoDB's can say 0 of a million rows), and with no figure to go
+  by, Load All and an unindexed sort ask first. After the count comes the time the rows were read: `· read 14:32`.
 - **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
   Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
   while the tab is open. Cancel it in the status bar's activity: what arrived stays, and Load More and Load All carry
   on from there.
 - Anything slow here (a page, a filter, a sort, Load All, Count Exactly, Column Summary) can be stopped with **⌘.**, the
   toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
-- **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
+- Pages are read by offset. If someone adds or deletes rows between pages, a row can repeat or be missing: a notice says
+  so when it happens, and Refresh reads the rows again.
+- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
   until you choose **Off**. Pending changes stay.
 
 ## Filter, search and sort
@@ -758,6 +771,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **Search all columns** (⇧⌘E) finds rows with the text in any column, as HeidiSQL does: text and JSON columns with
   `LIKE`, numbers and dates as text, binary columns by a whole `0x…` value. Tick **Loaded rows only** to search just the
   loaded rows instead.
+- Search and `LIKE` read the text a cell shows, BIT digits and JSON included. Whether they ignore case is the column's
+  collation: `utf8mb4_bin` and other binary ones don't, and JSON follows the connection's.
 - **Quick Filter**: right-click a cell for `=`, `<>`, `<`, `>`, `LIKE` (starts with, ends with, contains), `IS NULL` and
   `IS NOT NULL` with its value, and `IN` / `NOT IN` with every value selected in its column. Each item shows its SQL.
   Hold ⌥ to add the condition to the current filter with `AND`. The clipboard's text is offered too. **Data ▸ Quick
@@ -777,7 +792,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
   repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting
   by a column without an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the
-  loaded rows sort here instead.
+  loaded rows sort here instead, as plain text without case or accents, or by value in number columns: the server's
+  collation can order them otherwise, and an ENUM goes by its text.
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
@@ -906,6 +922,10 @@ These work in a console's results too.
   (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
   In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
   and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.
+  Hidden columns aren't exported, and the sheet says how many are left out. SQL formats leave out generated columns.
+  In CSV a real NULL has no quotes and the text NULL has them, so CSV import tells them apart; TSV has no way to.
+  CSV is UTF-8 without a BOM, which scripts read as it is: Excel for Mac needs **Data ▸ From Text**.
+  XML and HTML can't hold control characters, nor can a workbook: each shows as �.
 
 
 ---
@@ -982,6 +1002,7 @@ copying and editing use the stored value.
   grouped by thousands as your Mac groups them; or **Date from Unix Time** (seconds or milliseconds), in your time zone.
 - Dates: **Short**, **Medium** or **Long Date and Time**, as your Mac writes dates (System Settings ▸ General ▸ Language
   & Region). A DATE column shows the date only. Zero dates, TIME and YEAR stay as stored.
+- A TIMESTAMP cell's tooltip names the session's time zone, which the value is shown in.
 - **Time Zone ▸** (DATETIME and TIMESTAMP columns) moves the values: **From UTC to This Mac's** takes them as UTC and
   shows them in your time zone; **From This Mac's to UTC** does the reverse. A TIMESTAMP arrives in the session's time
   zone, so choose the first one when that is UTC. The header says so (`datetime as medium date, UTC → this Mac's`).
@@ -1090,7 +1111,7 @@ at, virtual foreign keys you added in a table's rows included ([Virtual foreign 
 Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure**, **Open Data** and **Copy Name** (⌘C copies the selected table's name too). Pinch,
+right-click it for **Open Structure**, **Open Data** and **Copy Name** (⌘C copies the selected table's name too), or the empty space to export. Pinch,
 ⌘+ and ⌘− zoom, ⌘0 goes back to actual size and **Fit** shows the whole diagram; ⌘F goes to the find field, where typing
 part of a name selects that table and Return goes to the next. ⌘R reads the schema again. **Export Image…** saves the diagram as a PNG, and **Export
 Mermaid…** as Mermaid text, which many docs sites and wikis draw.
@@ -1112,6 +1133,9 @@ and in a connection's right-click menu in the sidebar.
 (`/opt/homebrew/opt/mysql-client/bin` and the like, on Apple silicon and Intel), `/usr/local/mysql/bin` (MySQL's
 installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
 (MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
+
+A `.csv` dropped on the window or the Dock icon opens Import CSV with the file chosen, and a `.sql.gz` opens Run SQL
+File the same way; nothing runs until you press the sheet's button.
 
 Export, Restore, Run SQL File, Copy to Another Server and Import CSV each open in a window of their own, which you can
 move aside to keep working. Closing it while it runs asks first; disconnecting the connection it uses, or quitting, says
@@ -1187,7 +1211,10 @@ session on each: no file in between.
 3. **Import**. The rows go in one transaction: if one fails (a duplicate key, a value the column refuses), none of the
    file stays, and the message says which records.
 
-Empty fields become NULL unless you untick it. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+Empty fields and a `NULL` without quotes become NULL unless you untick it (AirSQL's own CSV writes the text NULL in
+quotes, so the two come back apart), and a whole `0x…` field in a BLOB or BINARY column becomes its bytes. The file should
+be UTF-8: a field that isn't reads as Windows-1252, and the end of the import says so, as it does when the server gave
+warnings. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
 
 ## Open the mysql command line in Terminal
 
@@ -1268,8 +1295,9 @@ they differ. The two definitions scroll together.
 
 MySQL and MariaDB write the same thing differently, and the compare reads them alike: `int(11)` and `int`, MariaDB's
 JSON (a LONGTEXT with a check) and MySQL's, `CURRENT_TIMESTAMP` and `current_timestamp()`, `NO ACTION` and
-`RESTRICT`, check constraints the two servers name differently. Each flavour writes a view's body its own way,
-though, so the same view on MySQL and on MariaDB can still show as different.
+`RESTRICT`, check constraints the two servers name differently. Each flavour writes a view's or routine's body its own
+way, though (MariaDB adds `COLLATE` to a function's `RETURNS`), so the same one on MySQL and on MariaDB can still show as
+different.
 
 ### Ignore rules
 
@@ -1360,7 +1388,10 @@ line, for a spreadsheet) or **Markdown** (for a ticket). HTML and Markdown list 
 
 - More than 100,000 differing rows in one table are reported as too many to list, without sync statements for that
   table: narrow the compare with a WHERE, or copy the table instead.
-- Partitioning, row formats and system versioning aren't compared.
+- Column order and row formats are compared and synced. Partitioning is only noticed on one side: a table partitioned
+  differently on both reads the same, and no statement adds or removes it. System versioning isn't compared.
+- The data compare reads each side as it goes, not one snapshot: on a busy table it can show rows that changed meanwhile.
+- A FLOAT compares by the text the server gives, about six digits: 1.0000001 and 1.0000002 both read `1`.
 
 
 ---
@@ -1558,9 +1589,10 @@ Every command is in the menu bar, with its shortcut next to it, and right-click 
 the pointer over a menu item to see what it does. A greyed-out item says why it is off.
 
 ⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
-Tab indents, ⌃⇥ moves on.
+Tab indents, ⌥⌘1 goes to the sidebar and ⌥⌘3 to the results. ⌃⇥ and ⌃⇧⇥ show the next and previous tab, as in Safari.
 
-F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar, else the tab shown
+F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar (on a connection, it
+opens Edit…), else the tab shown
 (a console that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
 edited (a console result's) shows its value in the value panel.
 
@@ -1594,12 +1626,17 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Select All | ⌘A |
 | Extend Selection | ⌥↑ |
 | Shrink Selection | ⌥↓ |
+| Copy Name | ⌃⌘C |
+| Copy CREATE | ⌃⇧⌘C |
 | Find… | ⌘F |
 | Find and Replace… | ⌥⌘F |
 | Find Next | ⌘G |
 | Find Previous | ⇧⌘G |
 | Use Selection for Find | ⌘E |
 | Hide Sidebar | ⌃⌘S |
+| Go to Sidebar | ⌥⌘1 |
+| Go to Editor | ⌥⌘2 |
+| Go to Results | ⌥⌘3 |
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
@@ -1621,11 +1658,13 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Close Result | ⌃⌘W |
 | Show Next Result | ⌥⌘] |
 | Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
+| Query Helpers | ⌃⌘H |
 | Go to Line… | ⌃G |
 | Move Up | ⇧⌘↑ |
 | Move Down | ⇧⌘↓ |
@@ -1635,21 +1674,29 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Delete Rows | ⌘⌫ |
 | Set NULL | ⌥⌘N |
 | Apply Changes | ⌘S |
+| Preview SQL… | ⌥⌘S |
 | Revert | ⌥⌘Z |
 | Filter… | ⇧⌘F |
 | Search All Columns | ⇧⌘E |
 | Equal to Selection | ⌃⌘1 |
 | Not Equal to Selection | ⌃⌘2 |
+| Clear Filter | ⌃⌘0 |
+| Sort Ascending | ⌃⌥⌘↑ |
+| Sort Descending | ⌃⌥⌘↓ |
 | Go to Row… | ⌘L |
 | Related Rows | ⌃⌘↓ |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
+| Create Table… | ⌃⌘N |
+| Open Structure | ⌥⌘O |
 | Process List | ⌥⌘P |
 | Connect | ⌘K |
 | Disconnect | ⇧⌘K |
 | Minimize | ⌘M |
 | Show Previous Tab | ⌘{ |
 | Show Next Tab | ⌘} |
+| Show Previous Tab | ⌃⇧⇥ |
+| Show Next Tab | ⌃⇥ |
 | Tab 1 | ⌘1 |
 
 ⌘S saves a console's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in

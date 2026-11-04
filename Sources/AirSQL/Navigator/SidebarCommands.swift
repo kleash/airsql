@@ -85,12 +85,14 @@ extension SidebarController: NSMenuItemValidation {
         let menu = NSMenu(title: "Navigator")
         switch nodes[0].kind {
         case .database:
-            menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, nil, Commands.export, Commands.restore,
+            menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
+                      Commands.export, Commands.restore,
                       Commands.generateLiquibase, Commands.compare, nil, Commands.refresh, Commands.drop])
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
         case .object(_, let object) where object.kind.isTableLike:
-            menu.add([Commands.openData, Commands.openStructure, Commands.copyName, nil, Commands.generateSelect,
+            menu.add([Commands.openData, Commands.openStructure, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, nil,
+                      Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
                       Commands.bulkEdit])
             menu.addItem(NavigatorMenus.maintenance())
@@ -133,6 +135,7 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     @objc func copyName(_ sender: Any?) { put(selectedNodes.compactMap(\.quotedName)) }
+    @objc func copyPlainName(_ sender: Any?) { put(selectedNodes.filter { $0.quotedName != nil }.compactMap(\.name)) }
 
     /// ⌘C: the names of the rows selected, connections' too.
     @objc func copy(_ sender: Any?) { put(copyableNames) }
@@ -200,9 +203,16 @@ extension SidebarController: NSMenuItemValidation {
         NavigatorActions.rename(object, on: open, window: view.window)
     }
 
-    /// F2 in the sidebar: Rename Folder… on a folder, else Rename… on the tree's table or view.
+    /// F2 in the sidebar: Rename Folder… on a folder, Edit… on a connection (its name is the first field), else Rename…
+    /// on the tree's table or view.
     @objc func renameSelection(_ sender: Any?) {
-        if selectedFolderNodeID != nil { main?.renameFolder(sender) } else { renameObject(sender) }
+        if selectedFolderNodeID != nil {
+            main?.renameFolder(sender)
+        } else if selectedConnectionIDs.count == 1 {
+            main?.editConnection(sender)
+        } else {
+            renameObject(sender)
+        }
     }
 
     @objc func copyTable(_ sender: Any?) {
@@ -253,7 +263,7 @@ extension SidebarController: NSMenuItemValidation {
             reason = copyableNames.isEmpty ? "Select a connection, database or object first" : nil
         case Commands.expandAll.action?, Commands.collapseAll.action?:
             reason = selectedNodes.contains { !$0.children.isEmpty } ? nil : "Select a row that has rows under it first"
-        case Commands.renameF2.action? where selectedFolderNodeID != nil:
+        case Commands.renameF2.action? where selectedFolderNodeID != nil || selectedConnectionIDs.count == 1:
             reason = nil
         case Commands.renameF2.action?:
             reason = NavigatorActions.reason(for: Commands.rename.action, objects: selectedObjects, databases: selectedDatabases,

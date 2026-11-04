@@ -52,7 +52,7 @@ extension GridViewer {
             text.defaultParagraphStyle = tabs
             text.textContainerInset = NSSize(width: 8, height: 8)
             text.string = GridCopy.text(source, rows: rows, columns: grid.columnOrder, format: GridCopy.format, headers: true,
-                                        nullText: grid.nullText, database: copyTable.database, table: copyTable.name) + note(rows.count)
+                                        nullText: grid.nullText, database: copyTable.database, table: copyTable.name, noBackslashEscapes: noBackslashEscapes) + note(rows.count)
             text.setAccessibilityIdentifier("grid.text")
             view = scroll
         case .tree:

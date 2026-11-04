@@ -91,14 +91,27 @@ public struct GridAggregate: Equatable {
     }
 
     private func format(_ number: Decimal, digits: Int, _ locale: Locale) -> String {
-        let formatter = NumberFormatter()
-        formatter.locale = locale
-        formatter.numberStyle = .decimal
-        formatter.usesGroupingSeparator = locale.identifier != "en_US_POSIX"
         // As many decimals as the values have (a sum of prices keeps its cents), more for an average or median.
-        formatter.minimumFractionDigits = min(scale, 20)
-        formatter.maximumFractionDigits = min(max(digits, scale), 20)
-        return formatter.string(from: number as NSDecimalNumber) ?? "\(number)"
+        var exact = number, rounded = Decimal()
+        NSDecimalRound(&rounded, &exact, min(max(digits, scale), 20), .bankers)
+        return GridAggregate.laidOut("\(rounded)", fraction: min(scale, 20), grouping: locale.identifier != "en_US_POSIX", locale)
+    }
+
+    /// Plain digits ("-1234.5") in `locale`'s separators, at least `fraction` decimals. NumberFormatter goes through
+    /// Double, which keeps about 15 digits. shortcut: groups of three, as most locales; lakh grouping needs a formatter.
+    static func laidOut(_ plain: String, fraction: Int, grouping: Bool, _ locale: Locale) -> String {
+        let negative = plain.hasPrefix("-"), parts = plain.drop { $0 == "-" }.split(separator: ".", omittingEmptySubsequences: false)
+        var whole = "", digits = Array(parts.first ?? "0")
+        if grouping, let separator = locale.groupingSeparator {
+            while digits.count > 3 {
+                whole = separator + String(digits.suffix(3)) + whole
+                digits.removeLast(3)
+            }
+        }
+        whole = String(digits) + whole
+        let decimals = parts.count > 1 ? String(parts[1]) : ""
+        let padded = decimals + String(repeating: "0", count: max(0, fraction - decimals.count))
+        return (negative ? "-" : "") + whole + (padded.isEmpty ? "" : (locale.decimalSeparator ?? ".") + padded)
     }
 }
 
@@ -167,13 +180,19 @@ public struct ColumnSummary: Equatable {
         self.top = top
     }
 
+    /// A value as a list shows it: quoted when it would pass for NULL or nothing.
+    public static func label(_ value: String?, nullText: String) -> String {
+        guard let value else { return nullText }
+        return value.isEmpty || value == nullText ? "'\(value)'" : value
+    }
+
     /// Worked out from values in memory (a console result's rows); numbers compare as numbers.
     public init(values: [String?], limit: Int = topLimit) {
         var counts: [String?: Int] = [:]
         for value in values { counts[value, default: 0] += 1 }
         let present = counts.keys.compactMap { $0 }
         let numeric = !present.isEmpty && present.allSatisfy { Double($0) != nil }
-        func less(_ a: String, _ b: String) -> Bool { numeric ? Double(a)! < Double(b)! : a < b }
+        func less(_ a: String, _ b: String) -> Bool { numeric ? GridSorting.compare(a, b, number: true) == .orderedAscending : a < b }
         self.init(distinct: present.count, nulls: counts[nil] ?? 0, rows: values.count, minimum: present.min(by: less),
                   maximum: present.max(by: less),
                   top: counts.sorted { $0.value != $1.value ? $0.value > $1.value : ($0.key ?? "") < ($1.key ?? "") }

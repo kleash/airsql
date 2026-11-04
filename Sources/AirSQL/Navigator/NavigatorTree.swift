@@ -130,8 +130,8 @@ extension SidebarController {
             }
             let action = object.kind.isTableLike ? "its data" : "its definition"
             cell.show(TreeIcon.of(object.kind), object.name, count: count, busy: false,
-                      tip: "\(object.name), a \(object.kind.noun): click to see \(action), double-click to open it in a tab, "
-                        + "right-click for more")
+                      tip: "\(object.name), a \(object.kind.noun)\(count.isEmpty ? "" : " of about \(count) rows, the server's estimate"): "
+                        + "click to see \(action), double-click to open it in a tab, right-click for more")
         default:
             break
         }

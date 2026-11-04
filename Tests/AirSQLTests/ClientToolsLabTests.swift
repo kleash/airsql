@@ -221,7 +221,7 @@ struct ClientToolsLabTests {
         let columns = ["id", "name", "note", "country"]
         let rows = try await CSVImport.run(file, options: options, into: session, database: target, table: "people", columns: columns,
                                            mapping: [2, 1, 0, nil], cancellation: Cancellation()) { _ in }
-        #expect(rows == 3)
+        #expect(rows.rows == 3)
         let result = try await session.query("SELECT id, name, note, country FROM \(SQLQuote.identifier(target, "people")) ORDER BY id")
             .first?.rows
         let got = (0..<(result?.rowCount ?? 0)).map { row in (0..<4).map { result?.string(row, $0) ?? "NULL" } }

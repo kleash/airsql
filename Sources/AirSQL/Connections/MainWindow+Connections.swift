@@ -115,6 +115,11 @@ extension MainWindowController {
         }
     }
 
+    /// Connection ▸ Move to Folder: the chosen folder is the item's, none for No Folder.
+    @objc func moveToFolder(_ sender: Any?) {
+        model.move(targetConnections.map(\.id), toFolder: (sender as? NSMenuItem)?.representedObject as? UUID)
+    }
+
     private func askFolderName(title: String, action: String, tip: String, name: String, on window: NSWindow,
                                done: @escaping (String) -> Void) {
         let alert = NSAlert()
@@ -146,6 +151,8 @@ extension MainWindowController {
         case Commands.disconnect.action?:
             let any = connections.contains { isConnected($0.id) }
             return (any, connections.isEmpty ? "Select a connection in the sidebar first" : "Not connected")
+        case Commands.moveToFolder.action?:
+            return (!connections.isEmpty, "Select a connection in the sidebar first")
         case Commands.editConnection.action?:
             return (connections.count == 1 && !sheet, sheet ? "A sheet is open: answer it first"
                 : connections.isEmpty ? "Select a connection in the sidebar first" : "Select only one connection to edit")

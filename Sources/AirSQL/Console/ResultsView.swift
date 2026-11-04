@@ -170,7 +170,7 @@ final class ResultsView: NSView, NSTextFieldDelegate {
 
     func setSummary(_ text: String) {
         summary.stringValue = text
-        summary.toolTip = text.isEmpty ? nil : text
+        summary.toolTip = text.isEmpty ? nil : text + ". The time covers the whole run: waiting its turn, the server's work and fetching every row"
     }
 
     /// While a run is under way: the spinner, its progress and time so far, and Cancel.
