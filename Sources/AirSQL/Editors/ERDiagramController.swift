@@ -55,6 +55,13 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         let menu = NSMenu()
         menu.add([Commands.openStructure, Commands.copyName])
         canvas.menu = menu
+        canvas.blankMenu = NSMenu()
+        for control in [exportImage, exportMermaid] {
+            let item = NSMenuItem(title: control.title, action: control.action, keyEquivalent: "")
+            item.target = self
+            item.toolTip = control.toolTip
+            canvas.blankMenu?.addItem(item)
+        }
         let root = editorLayout(bar: bar, content: scroll)
         root.addSubview(overlay)
         overlay.translatesAutoresizingMaskIntoConstraints = false
@@ -177,8 +184,11 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         NSPasteboard.general.setString(SQLQuote.identifier(table), forType: .string)
     }
 
+    /// ⌘C: the selected box's name.
+    @objc func copy(_ sender: Any?) { copyName(sender) }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        guard item.action == Commands.openStructure.action || item.action == Commands.copyName.action else { return true }
+        guard [Commands.openStructure.action, Commands.copyName.action, Commands.copy.action].contains(item.action) else { return true }
         let enabled = canvas.selected != nil
         item.explain(enabled: enabled, reason: enabled ? nil : "Click a table first")
         return enabled

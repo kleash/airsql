@@ -100,5 +100,7 @@ than the safety setting allows.
 ## Folders
 
 Folders group connections in the sidebar. **Connection ▸ New Folder…** makes one (the selected connections move into
-it); right-click a folder to rename or delete it (its connections stay). The editor's **Folder** menu moves a
-connection.
+it); right-click a folder to rename or delete it (its connections stay; Delete asks too). To move connections, drag them onto
+a folder (or onto the list to take them out of one), or use **Connection ▸ Move to Folder**. Right-click the list's empty
+space for New Connection and New Folder. F2 on a connection opens it to rename, and the filter's ↓ and Return go on to
+the first match.

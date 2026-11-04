@@ -27,6 +27,8 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
     }
     /// Double-click or Return on a table.
     var onOpen: ((String) -> Void)?
+    /// The menu off the boxes.
+    var blankMenu: NSMenu?
 
     static let rowHeight: CGFloat = 17, headerHeight: CGFloat = 24, columnGap: CGFloat = 72, boxGap: CGFloat = 24, margin: CGFloat = 24
     static let shownColumns = 12
@@ -189,7 +191,7 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let name = table(at: convert(event.locationInWindow, from: nil)) else { return nil }
+        guard let name = table(at: convert(event.locationInWindow, from: nil)) else { return blankMenu }
         selected = name
         return super.menu(for: event)
     }

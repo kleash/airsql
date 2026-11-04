@@ -241,6 +241,7 @@ final class TableDataNotice: NSView {
         translatesAutoresizingMaskIntoConstraints = false
         setAccessibilityIdentifier("tableData.notice")
         text.setAccessibilityIdentifier("tableData.noticeText")
+        text.isSelectable = true  // an error to paste into a ticket
         apply.keyEquivalent = ""
         for control in [preview, revert, apply] { control.controlSize = .small }
         let row = NSStackView(views: [text, preview, revert, apply])

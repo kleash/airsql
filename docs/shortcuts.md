@@ -9,9 +9,10 @@ Every command is in the menu bar, with its shortcut next to it, and right-click 
 the pointer over a menu item to see what it does. A greyed-out item says why it is off.
 
 ⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
-Tab indents, ⌃⇥ moves on.
+Tab indents, ⌥⌘1 goes to the sidebar and ⌥⌘3 to the results. ⌃⇥ and ⌃⇧⇥ show the next and previous tab, as in Safari.
 
-F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar, else the tab shown
+F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar (on a connection, it
+opens Edit…), else the tab shown
 (a console that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
 edited (a console result's) shows its value in the value panel.
 

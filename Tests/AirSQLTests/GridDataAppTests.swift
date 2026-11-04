@@ -567,6 +567,7 @@ extension AppTests {
             #expect(tab.responds(to: Commands.undo.action))
             window.makeFirstResponder(tab.bar.whereField)
             #expect(!tab.responds(to: Commands.undo.action) && !tab.responds(to: Commands.redo.action))
+            #expect(!tab.responds(to: Commands.deleteRows.action), "⌘⌫ reaches the text")
             tab.bar.whereField.insertText("region", replacementRange: NSRange(location: 0, length: 0))
             #expect(window.undoManager?.canUndo == true)
             window.undoManager?.undo()

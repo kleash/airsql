@@ -189,6 +189,7 @@ final class EditorOverlay: NSView {
         let ground = SurfaceView(.content)
         addSubview(ground)
         ground.pin(to: self)
+        text.isSelectable = true  // an error to paste into a ticket
         spinner.style = .spinning
         spinner.controlSize = .small
         text.alignment = .center

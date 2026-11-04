@@ -85,7 +85,8 @@ extension TableDataController: NSMenuItemValidation {
     // bar or the find bar.
     override func responds(to selector: Selector!) -> Bool {
         // Text being typed undoes itself: ⌘Z goes on past this tab to the window's undo manager.
-        if selector == Commands.undo.action || selector == Commands.redo.action, view.window?.firstResponder is NSTextView { return false }
+        // Likewise ⌘⌫: off here, it reaches the text as delete to the line's start.
+        if [Commands.undo.action, Commands.redo.action, Commands.deleteRows.action].contains(selector), view.window?.firstResponder is NSTextView { return false }
         return super.responds(to: selector) || viewer.responds(to: selector)
     }
     override func forwardingTarget(for selector: Selector!) -> Any? { viewer.responds(to: selector) ? viewer : nil }

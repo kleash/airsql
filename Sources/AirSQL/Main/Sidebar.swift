@@ -482,13 +482,17 @@ final class SidebarOutlineView: NSOutlineView {
         return !header && selectsRow(for: event) ? sidebar?.contextMenu() : sidebar?.blankMenu()
     }
 
-    /// ⌘F here: a table's own find while one is shown, else the filter.
-    override func performTextFinderAction(_ sender: Any?) {
-        if let table = sidebar?.main?.selectedTab?.shown as? TableDataController, table.isViewLoaded {
-            table.performTextFinderAction(sender)
-        } else if (sender as? NSMenuItem)?.tag ?? NSTextFinder.Action.showFindInterface.rawValue == NSTextFinder.Action.showFindInterface.rawValue {
-            sidebar?.main?.filterSidebar(sender)
-        }
+    /// ⌘F here goes to the filter, unless the tab shown has a find of its own (the window sends it on).
+    override func responds(to selector: Selector!) -> Bool {
+        if selector == #selector(performTextFinderAction(_:)), sidebar?.main?.selectedTab?.shown.responds(to: selector) == true { return false }
+        return super.responds(to: selector)
+    }
+
+    override func performTextFinderAction(_ sender: Any?) { sidebar?.main?.filterSidebar(sender) }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        guard item.action == #selector(performTextFinderAction(_:)) else { return super.validateUserInterfaceItem(item) }
+        return item.tag == NSTextFinder.Action.showFindInterface.rawValue
     }
 
     override func keyDown(with event: NSEvent) {

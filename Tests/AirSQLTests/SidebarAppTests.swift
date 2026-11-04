@@ -14,6 +14,17 @@ extension AppTests.InteractionTests {
         #expect(harness.validate(Commands.processList.item(), in: main.window).target === main.sidebar)
     }
 
+    @Test func commandFInTheSidebarGoesToTheFilter() async throws {
+        let (main, harness, _, work) = await Self.window()
+        defer { work.end() }
+        let window = try #require(main.window)
+        window.makeFirstResponder(main.sidebar.outline)
+        #expect(harness.validate(Commands.find.item(), in: window).target === main.sidebar.outline)
+        #expect(harness.validate(Commands.findNext.item(), in: window).enabled == false)
+        #expect(await call(harness, "key", ["combo": "cmd+f"]).error == nil)
+        #expect((window.firstResponder as? NSText)?.delegate === main.sidebar.filter)
+    }
+
     @Test func theFilterHandsOverToTheList() async throws {
         let (main, _, _, work) = await Self.window()
         defer { work.end() }
@@ -122,5 +133,63 @@ extension AppTests.InteractionTests {
         view.reload()
         #expect(find(NSTextField.self, id: "database.empty", in: view.view)?.isHidden == false)
         #expect(view.contextMenu()?.items.map(\.title) == ["Create Table…", "Refresh"])
+    }
+}
+
+// Tabs: dragging them, the Window menu past nine, and the keys that move the focus.
+extension AppTests.InteractionTests {
+    @Test func aTabDraggedAlongTheStripMoves() async throws {
+        let (main, _, _, work) = await Self.window()
+        defer { work.end() }
+        for title in ["b", "c"] { main.open(FixtureContent(), title: title, connection: nil) }
+        main.window?.layoutIfNeeded()
+        let titles = main.tabs.map(\.title)
+        let bar = main.tabBar
+        bar.clicked(bar.buttons[titles.count - 1], count: 1)
+        let target = bar.buttons[0]
+        bar.drag(to: target.convert(NSPoint(x: target.bounds.midX, y: target.bounds.midY), to: nil))
+        #expect(main.tabs.map(\.title) == [titles[titles.count - 1]] + titles.dropLast())
+        #expect(main.selectedTab?.title == titles[titles.count - 1])
+    }
+
+    @Test func theWindowMenuListsTabsPastNine() async throws {
+        let (main, harness, _, work) = await Self.window()
+        defer { work.end() }
+        while main.tabs.count < 11 { main.open(FixtureContent(), title: "tab \(main.tabs.count + 1)", connection: nil) }
+        let menu = try #require(NSApp.mainMenu?.items.first { $0.title == "Window" }?.submenu)
+        harness.update(menu)
+        let listed = menu.items.filter { $0.action == Commands.tab(1).action && !$0.isHidden }
+        #expect(listed.count == 11 && listed.last?.title == "tab 11" && listed.last?.keyEquivalent == "")
+        // It goes back when the tabs do: the next time it opens the extra items are gone.
+        for tab in main.tabs.suffix(2) { main.close(tab) }
+        harness.update(menu)
+        #expect(menu.items.filter { $0.action == Commands.tab(1).action && !$0.isHidden }.count == 9)
+    }
+
+    @Test func keysPutTheFocusInTheTreeEditorAndResults() async throws {
+        let (main, _, _, work) = await Self.window()
+        defer { work.end() }
+        let window = try #require(main.window)
+        let console = try #require(main.openConsole(text: "SELECT 1", title: nil, connection: Fixtures.production.id).content as? ConsoleViewController)
+        #expect(await eventually(timeout: 5) { window.firstResponder === console.editor })
+        main.focusSidebar(nil)
+        #expect(window.firstResponder === main.sidebar.outline)
+        main.focusEditor(nil)
+        #expect(window.firstResponder === console.editor)
+        #expect(!main.validateMenuItem(Commands.focusResults.item()), "no result yet")
+        #expect(main.validateMenuItem(Commands.focusEditor.item()))
+    }
+
+    @Test func aCSVOrSQLGZOpensItsToolNotAConsole() async throws {
+        #expect(SQLEditorView.opensInSheet(URL(fileURLWithPath: "/a/rows.CSV")))
+        #expect(SQLEditorView.opensInSheet(URL(fileURLWithPath: "/a/dump.sql.gz")))
+        #expect(!SQLEditorView.opensInSheet(URL(fileURLWithPath: "/a/notes.gz")) && !SQLEditorView.opensInSheet(URL(fileURLWithPath: "/a/q.sql")))
+
+        // With no connection chosen it says what to do, and opens no tab.
+        let (main, harness) = appWindow(testModel([Fixtures.local]))
+        await main.openFiles([URL(fileURLWithPath: "/a/rows.csv")]).value
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        #expect(main.window?.attachedSheet != nil && main.tabs.isEmpty)
+        _ = await call(harness, "press", ["title": "OK", "in": "sheet"])
     }
 }

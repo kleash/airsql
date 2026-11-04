@@ -64,6 +64,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             if ["rows", "data", "index"].contains(column.id) { tableColumn.headerCell.alignment = .right }
             table.addTableColumn(tableColumn)
         }
+        table.autosaveName = layoutName("Database tables")  // its widths and sort, for next time
+        table.autosaveTableColumns = true
         table.style = .fullWidth
         table.usesAlternatingRowBackgroundColors = true
         table.allowsMultipleSelection = true

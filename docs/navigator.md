@@ -11,7 +11,9 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 ## Find your way
 
 - **Click** a database to see its tables in the database view: rows, the space their data and indexes take, engine,
-  collation, when they last changed and their comment. Click a column's title to sort by it.
+  collation, when they last changed and their comment. Click a column's title to sort by it; AirSQL keeps the order
+  and the widths. **Filter by name** at its top keeps the tables with those letters. Right-click below the rows, or an
+  empty database, for **Create Table…**.
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](editors.md));
@@ -19,7 +21,9 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   another of its kind.
 - **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
   open it; double-click again to close it. The console's statements run in the current database ([The SQL console](console.md)).
-- **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
+- **Right-click** anything for everything you can do with it; the tab in front stays. Every command is also in the
+  **Database** menu. **Copy Name** quotes it for SQL, **Copy Name Without Quotes** doesn't, and **Copy CREATE** copies
+  the statement that makes it.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
   filter, a connected connection whose name doesn't match shows the objects that do, opened.
@@ -73,7 +77,7 @@ Upper and lower case match as the column's collation says (most ignore case).
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
 running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
 with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
-idle connections. Double-click a row to read its whole statement.
+idle connections. Double-click a row (or press Return) to read its whole statement; Delete offers to kill it.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.

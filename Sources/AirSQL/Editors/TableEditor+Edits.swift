@@ -198,6 +198,24 @@ extension TableEditorController {
         reloadList()
     }
 
+    /// The selected rows' names, for ⌘C.
+    var selectedNames: [String] {
+        list.selectedRowIndexes.compactMap { row in
+            switch section {
+            case .columns: return design.columns[safe: row]?.name
+            case .indexes: return design.indexes[safe: row]?.name
+            case .foreignKeys: return design.foreignKeys[safe: row]?.name
+            case .checks: return design.checks[safe: row]?.name
+            case .options: return nil
+            }
+        }
+    }
+
+    @objc func copy(_ sender: Any?) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(selectedNames.joined(separator: ", "), forType: .string)
+    }
+
     /// `base`, or base_2, base_3…: the first that isn't taken.
     static func unused(_ base: String, in names: [String]) -> String {
         let taken = Set(names.map { $0.lowercased() })

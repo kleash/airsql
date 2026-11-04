@@ -65,5 +65,5 @@ at, virtual foreign keys you added in a table's rows included ([Virtual foreign 
 Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure** and **Copy Name**. **Export Image…** saves the diagram as a PNG, and **Export
+right-click it for **Open Structure** and **Copy Name** (⌘C copies it too), or the empty space to export. **Export Image…** saves the diagram as a PNG, and **Export
 Mermaid…** as Mermaid text, which many docs sites and wikis draw.

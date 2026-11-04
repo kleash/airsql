@@ -114,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func showHelpSite(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.home.url) }
 
     @objc func showGettingStarted(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.gettingStarted.url) }
+    @objc func showShortcuts(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.shortcuts.url) }
 
     @objc func reportProblem(_ sender: Any?) { NSWorkspace.shared.open(HelpPage.reportProblem) }
 
@@ -157,6 +158,7 @@ func appAppearance(_ choice: AppSettings.Appearance) -> NSAppearance? {
 enum HelpPage: String, CaseIterable {
     case home = ""
     case gettingStarted = "getting-started.html"
+    case shortcuts = "shortcuts.html"
     case settings = "settings.html"
     case safety = "settings.html#safety"
     case sqlPreview = "sql-preview.html"

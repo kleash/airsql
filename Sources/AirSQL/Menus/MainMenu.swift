@@ -52,7 +52,7 @@ enum MainMenu {
         menus.edit.addItem(submenu("Find", [Commands.find, Commands.findAndReplace, Commands.findNext, Commands.findPrevious,
                                             Commands.useSelectionForFind].map { $0.item() }))
 
-        menus.view.add([Commands.toggleSidebar, Commands.filterSidebar, nil, Commands.sqlLog, Commands.clearSQLLog,
+        menus.view.add([Commands.toggleSidebar, Commands.filterSidebar, nil, Commands.focusSidebar, Commands.focusEditor, Commands.focusResults, nil, Commands.sqlLog, Commands.clearSQLLog,
                         Commands.activity, Commands.cancelAll, nil, Commands.refresh])
 
         menus.query.add([Commands.runStatement, Commands.runAll, Commands.runAllF9, Commands.runStatementF9, Commands.explain,
@@ -69,7 +69,8 @@ enum MainMenu {
         menus.tools.addItem(submenu("Agents", [Commands.setUpAgents.item(), Commands.agentActivity.item(),
                                                Commands.turnAgentsOff.item()]))
 
-        menus.window.add([Commands.minimize, Commands.zoom, nil, Commands.previousTab, Commands.nextTab, nil])
+        menus.window.add([Commands.minimize, Commands.zoom, nil, Commands.previousTab, Commands.nextTab, Commands.previousTabControl,
+                          Commands.nextTabControl, nil])
         for number in 1...9 {
             let item = Commands.tab(number).item()
             item.isHidden = true  // shown with the tab's title while there is such a tab (`menuNeedsUpdate`)
@@ -81,7 +82,7 @@ enum MainMenu {
         NSApp.windowsMenu = menus.window
 
         // No ⌘?: macOS keeps it for the Help menu's search field.
-        menus.help.add([Commands.help, Commands.gettingStarted, nil, Commands.reportProblem, Commands.copyDiagnostics])
+        menus.help.add([Commands.help, Commands.gettingStarted, Commands.shortcuts, nil, Commands.reportProblem, Commands.copyDiagnostics])
         NSApp.helpMenu = menus.help
 
         // The lanes' items (plan §2.4: each lane adds its own in its Menus+<Lane>.swift).

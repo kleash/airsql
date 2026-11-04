@@ -17,6 +17,7 @@ own session, which every console tab of that connection shares.
   window or on AirSQL's Dock icon, or open them with AirSQL from Finder: they open on the connection shown.
 - **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
+- Drag a tab along the strip to move it. Past ⌘9, the **Window** menu lists every tab.
 - Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
 - When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL.
 - **Query ▸ Change Connection…** runs the console's statements on another connection.

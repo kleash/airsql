@@ -78,6 +78,8 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             column.headerToolTip = "Sort by " + title.lowercased() + "; click again to reverse"
             table.addTableColumn(column)
         }
+        table.autosaveName = layoutName("Processes")  // its widths and sort, for next time
+        table.autosaveTableColumns = true
         table.style = .fullWidth
         table.usesAlternatingRowBackgroundColors = true
         table.allowsMultipleSelection = true
