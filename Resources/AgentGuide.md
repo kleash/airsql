@@ -219,8 +219,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
 - **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
-  every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,
-  Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
+  every table's key, edits like a table tab (`grid.editor`, the pick-lists and foreign key drop-down, Data ▸ Set NULL, Set DEFAULT, Insert
+  Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.

@@ -54,6 +54,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
+| Previous Record | ⌥⌘← |
+| Next Record | ⌥⌘→ |
 | Transpose | ⌥⌘T |
 | Column List… | ⌘J |
 | SQL Log | ⌥⌘L |
@@ -73,13 +75,15 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Show Next Result | ⌥⌘] |
 | Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
-| Go to Line… | ⌃G |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
+| Go to Line… | ⌃G |
+| Move Up | ⇧⌘↑ |
+| Move Down | ⇧⌘↓ |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
-| Delete Rows… | ⌘⌫ |
+| Delete Rows | ⌘⌫ |
 | Set NULL | ⌥⌘N |
 | Apply Changes | ⌘S |
 | Revert | ⌥⌘Z |
@@ -88,8 +92,6 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Equal to Selection | ⌃⌘1 |
 | Not Equal to Selection | ⌃⌘2 |
 | Go to Row… | ⌘L |
-| Move Up | ⇧⌘↑ |
-| Move Down | ⇧⌘↓ |
 | Related Rows | ⌃⌘↓ |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |

@@ -11,7 +11,7 @@ extension TableDataController {
     @objc func pasteWithFormat(_ sender: Any?) { pasteCells(asNewRows: false, asking: true) }
 
     /// The clipboard's text, and whether it says it is CSV.
-    private var clipboard: (text: String, csv: Bool)? {
+    static var clipboard: (text: String, csv: Bool)? {
         let board = NSPasteboard.general
         guard let text = board.string(forType: .string), !text.isEmpty else { return nil }
         return (text, board.types?.contains(NSPasteboard.PasteboardType("public.comma-separated-values-text")) == true)
@@ -19,7 +19,7 @@ extension TableDataController {
 
     /// The clipboard's cells: CSV when it says so, else split on tabs (what Excel, Numbers and grids copy).
     var clipboardCells: [[String]] {
-        clipboard.map { Paste.cells($0.text, separator: $0.csv ? .comma : .auto) } ?? []
+        Self.clipboard.map { Paste.cells($0.text, separator: $0.csv ? .comma : .auto) } ?? []
     }
 
     /// Numbers and dates as the cells show them; the grid's NULL text (what its copies write for NULL) is NULL.
@@ -30,7 +30,7 @@ extension TableDataController {
     private func pasteCells(asNewRows: Bool, format chosen: PasteFormat? = nil, asking: Bool = false) {
         guard let source, editingOff == nil, !AgentGuard.refuses("The clipboard is the person's: agents can't paste. Nothing was pasted.")
         else { return NSSound.beep() }
-        guard let (text, csv) = clipboard else { return NSSound.beep() }
+        guard let (text, csv) = Self.clipboard else { return NSSound.beep() }
         var format = chosen ?? pasteFormat
         if chosen == nil, csv { format.separator = .comma }
         let cells = Paste.cells(text, separator: format.separator)

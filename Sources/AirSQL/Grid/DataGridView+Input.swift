@@ -76,12 +76,19 @@ extension DataGridView {
         // ⇧↩ is Value Panel's shortcut (menus take only ⌘ and ⌃ keys).
         if [36, 76].contains(event.keyCode), flags == .shift {
             sendCommand(Commands.valuePanel.action)
-        } else if event.specialKey == .f2, flags.isEmpty, let cursor = selection.cursor {
-            // F2 edits the focused cell, as in HeidiSQL; one that can't be edited shows its value, as a double click does.
-            if canEdit(cursor) { beginEditing(at: cursor) } else { delegate?.dataGridOpenValue(self) }
+        } else if event.specialKey == .f2, flags.isEmpty {
+            insertNewline(nil)  // as in HeidiSQL
         } else {
             interpretKeyEvents([event])
         }
+    }
+
+    /// F2 is a hidden menu item's too, and even disabled that item takes the key before keyDown: the grid claims it first.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.function, .numericPad])
+        guard event.specialKey == .f2, flags.isEmpty, window?.firstResponder === self else { return super.performKeyEquivalent(with: event) }
+        keyDown(with: event)
+        return true
     }
 
     override func becomeFirstResponder() -> Bool {
@@ -152,10 +159,24 @@ extension DataGridView {
     override func insertTab(_ sender: Any?) { move(.next) }
     override func insertBacktab(_ sender: Any?) { move(.previous) }
 
-    /// Return edits the focused cell.
+    /// Return edits the focused cell; one that can't be edited shows its value, as a double click does.
     override func insertNewline(_ sender: Any?) {
-        if let cursor = selection.cursor { beginEditing(at: cursor) }
+        guard let cursor = selection.cursor else { return }
+        if canEdit(cursor) { beginEditing(at: cursor) } else { delegate?.dataGridOpenValue(self) }
     }
+
+    /// ⌫ on whole rows marks them for deletion, as ⌘⌫ does; on cells it starts editing with nothing typed (nothing is
+    /// lost until Return, as in a spreadsheet).
+    override func deleteBackward(_ sender: Any?) {
+        let wholeRows = !selection.isEmpty && selection.areas.allSatisfy { if case .rows = $0 { return true } else { return false } }
+        if wholeRows {
+            if !sendCommand(Commands.deleteRows.action) { NSSound.beep() }
+        } else if let cursor = selection.cursor {
+            beginEditing(at: cursor, text: "")
+        }
+    }
+
+    override func deleteForward(_ sender: Any?) { deleteBackward(sender) }
 
     /// Typing edits the focused cell, starting from what was typed (spreadsheet behaviour).
     override func insertText(_ insertString: Any) {

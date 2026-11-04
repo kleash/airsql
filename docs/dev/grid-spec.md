@@ -17,8 +17,8 @@ Legend: **H** from HeidiSQL, **D** from DataGrip, **A** AirSQL's own or a fix of
 3. **Always say where an operation runs.** Filter, sort and search show "on server (all rows)" or "local (N loaded
    rows)" in the grid's bar.
 4. **Fast at any size.** Draw only visible cells; fetch in pages off the main thread; shorten long values for display
-   and fetch the full value on demand (H: `LEFT(col,256)` + "[…]"). **Key columns are never shortened**, so edits
-   always address the exact row.
+   only: the whole value is read and kept, a cell shows its first 1,000 characters and "…", and copy, export and the value
+   panel use the whole value. **Key columns are never shortened**, so edits always address the exact row.
 5. **Every action is in a menu, a right-click menu and has a tooltip;** shortcuts are shown in both.
 6. **Typing edits** (spreadsheet behaviour, D). Jump-to-value is ⌘J (column list) and ⌘F (find), not type-ahead.
 
@@ -68,7 +68,7 @@ Legend: **H** from HeidiSQL, **D** from DataGrip, **A** AirSQL's own or a fix of
 | Local column filter: tick values in the header's funnel menu (values from the server with counts for table data, from loaded rows for results) | D | | Results: quick filters, Filter by Values, Search All Columns and Sort by Columns… on the rows in memory; a bar shows the conditions while one is on |
 | Local find: ⌘F highlights matches in loaded rows; "Filter rows" hides the rest; regex, case, whole word; "X of Y matching" | H+D | ⌘F, ⌘G / ⇧⌘G | |
 | Find and replace in loaded rows, in the selection or everywhere; replacements become pending edits | H | ⌥⌘F | |
-| Sort: a header click selects the column; the sort control at the header's right (on hover and when sorted) steps ASC → DESC → off; ⌥-click on it adds a secondary sort; table data sorts on the server (asks first on a table over 1 M rows when the column has no index), results locally (asks above 100,000 rows); sort dialog for many columns | H+D | | |
+| Sort: a header click selects the column; a double click on the header, or a click on the sort control at its right (on hover and when sorted), steps ASC → DESC → off; with ⌥ it adds a secondary sort; table data sorts on the server (asks first on a table over 1 M rows when the column has no index), results locally (asks above 100,000 rows); sort dialog for many columns | H+D | | |
 | Paging: `LIMIT … OFFSET` pages (default 1,000), Next page, Load all (asks above a size you set); estimated total, "Count exactly" | H+D | ⌥⌘↓ next, ⇧⌥⌘↓ all | |
 | Refresh; auto-refresh every N seconds | H+D | ⌘R | |
 
