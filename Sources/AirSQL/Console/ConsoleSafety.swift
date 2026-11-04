@@ -19,8 +19,8 @@ enum ConsoleSafety {
             switch risk.kind {
             case .unboundedWrite where safety.askBeforeUnboundedWrite:
                 let verb = risk.verb == "DELETE" ? "deletes" : "changes"
-                let rows = risk.limited ? "as many rows as its LIMIT says, whichever come first," : "every row"
-                warnings.append("\(risk.verb) without WHERE \(verb) \(rows) of \(risk.object).")
+                warnings.append("\(risk.verb) without WHERE \(verb) " + (risk.limited ? "whichever rows of \(risk.object) come first, "
+                                + "up to its LIMIT." : "every row of \(risk.object)."))
                 let reach = risk.limited ? "rows" : "every row"
                 heading = heading ?? (risk.verb == "DELETE" ? "Delete \(reach) of \(risk.object)?" : "Change \(reach) of \(risk.object)?")
                 destructive = true

@@ -140,7 +140,9 @@ extension AppTests {
             let tip = view.view(view, stringForToolTip: 0, point: NSPoint(x: box.frame.midX, y: box.frame.midY), userData: nil)
             #expect(tip.hasPrefix(long + "\n"))
             let elements = try #require(view.accessibilityChildren() as? [NSAccessibilityElement])
-            #expect(elements.map { $0.accessibilityLabel() ?? "" } == view.boxes.map { "Table \($0.table.name), \($0.table.columns.count) columns" })
+            #expect(elements.map { $0.accessibilityLabel() ?? "" } == view.boxes.map {
+                "Table \($0.table.name), \($0.table.columns.count) columns: " + $0.table.columns.map(\.name).joined(separator: ", ")
+            })
             view.selected = "orders"
             #expect(elements.map { $0.isAccessibilitySelected() } == view.boxes.map { $0.table.name == "orders" })
         }

@@ -84,6 +84,7 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
             element.open = { [weak self] in self?.onOpen?(box.table.name) }
             element.setAccessibilityParent(self)
             element.setAccessibilityRole(.button)
+            element.setAccessibilityHelp("Open the table's structure")
             element.setAccessibilityLabel("Table \(box.table.name), \(box.table.columns.count) columns: "
                                           + box.table.columns.map(\.name).joined(separator: ", "))
             element.setAccessibilityFrameInParentSpace(box.frame)

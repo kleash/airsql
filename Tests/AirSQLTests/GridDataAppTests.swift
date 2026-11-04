@@ -147,7 +147,7 @@ extension AppTests {
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)
             #expect(tab.notice.isHidden && !tab.isEdited && main.selectedTab?.title == "orders")
             // The bar's ? opens the Data Grid page of the help.
-            #expect(find(NSButton.self, id: "help", in: tab.bar)?.identifier?.rawValue == "help:" + HelpPage.dataGrid.rawValue)
+            #expect(find(NSButton.self, id: "help", in: tab.bar)?.identifier?.rawValue == "help:" + HelpPage.tableData.rawValue)
 
             tab.applyFilter("WHERE region = 'EU'")
             await ready { tab.loading != nil }
@@ -844,7 +844,7 @@ extension AppTests {
             let menu = try #require(view.viewer.dataGrid(view.grid, menuFor: .cells))
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title)
                     == ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel", "Record View", "Transpose",
-                        "Column Summary…", "Display As"])
+                        "Column Summary…", "Chart", "Display As"])
         }
 
         @Test func readOnlyConnectionsRefuseEditsAndLongValuesOpenInTheValuePanel() async throws {

@@ -42,7 +42,7 @@ extension ConsoleViewController {
         }
         for warning in outcome.warnings { note(.warning, warning, statement: statement, run: run) }
         if StatementCheck.changesCharset(statement.sql, noBackslashEscapes: session.noBackslashEscapes) {
-            note(.warning, "AirSQL reads every result as UTF-8, so accents will look wrong after this: SET NAMES utf8mb4 puts it right",
+            note(.warning, "AirSQL reads every result as UTF-8, so accents will look wrong after this: SET NAMES utf8mb4 puts it right.",
                  statement: statement, run: run)
         }
         if outcome.error == nil, outcome.results.isEmpty, !run.cancelled { note(.ok, "Done · " + time, statement: statement, run: run) }

@@ -411,7 +411,7 @@ extension AppTests {
             #expect(open.currentDatabase == "airsql_fixture" && popup.title == "airsql_fixture" && popup.isEnabled)
             // The pop-up lists the cached databases, the current one chosen.
             #expect(popup.itemTitles == ["airsql other", "airsql_fixture"] && popup.titleOfSelectedItem == "airsql_fixture")
-            #expect(popup.lastItem?.toolTip == "Run the console's statements in airsql_fixture from now on")
+            #expect(popup.lastItem?.toolTip == "Run this query tab's statements in airsql_fixture from now on")
             // As choosing it does (the harness doesn't reach the toolbar's pop-ups).
             popup.menu?.performActionForItem(at: popup.indexOfItem(withTitle: "airsql other"))
             #expect(open.currentDatabase == "airsql other" && popup.title == "airsql other")
