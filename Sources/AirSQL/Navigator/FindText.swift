@@ -4,7 +4,8 @@ import AppKit
 /// Find Text on Server (scope "nav"): counts, table by table, the rows whose text columns hold a text, on a session of
 /// its own, with progress and Cancel in the status bar. A double-click on a result opens the table's matching rows.
 @MainActor
-final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
+final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate,
+    NSMenuItemValidation {
     struct Match {
         var table: DatabaseObject
         var columns: [String]
@@ -195,6 +196,16 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(SQLQuote.identifier(match.table.database) + "." + SQLQuote.identifier(match.table.name),
                                        forType: .string)
+    }
+
+    /// ⌘C: the chosen table's name.
+    @objc func copy(_ sender: Any?) { copyName(sender) }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard item.action == Commands.copy.action else { return true }
+        let reason = chosen == nil ? "Select a table in the results first" : nil
+        item.explain(enabled: reason == nil, reason: reason)
+        return reason == nil
     }
 
     /// A result's menu: its matching rows (what a double-click opens), all its rows, its name.

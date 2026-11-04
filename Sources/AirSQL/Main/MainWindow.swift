@@ -171,18 +171,34 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         refresh()
     }
 
-    /// Closes `tab` once its content agrees (it may ask about unsaved work first).
-    func close(_ tab: Tab) {
+    /// Closes `tab` once its content agrees (it may ask about unsaved work first), then runs `then`. It is shown first:
+    /// a tab that isn't has no window to ask in, so it would close without asking. Once closed, the tab shown before it
+    /// comes back; if the person keeps it, it stays on show.
+    func close(_ tab: Tab, then: (() -> Void)? = nil) {
         let content = tab.tabContent
+        let before = selectedTab
+        select(tab)
         let finish = { [weak self] (ok: Bool) in
             guard ok, let self, let index = self.tabs.firstIndex(where: { $0 === tab }) else { return }
+            if let reopen = content?.reopen {
+                self.closedTabs.append((tab.connectionID, reopen))
+                self.closedTabs = Array(self.closedTabs.suffix(20))
+            }
             self.tabs.remove(at: index)
             if self.selectedTab === tab {
-                self.selectedTab = self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)]
+                self.selectedTab = self.tabs.first { $0 === before } ?? (self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)])
             }
             self.refresh()
+            then?()
         }
         if let content { content.shouldClose(finish) } else { finish(true) }
+    }
+
+    /// Closes `doomed` one after the other, so each question has the window to itself; a Cancel keeps that tab and the
+    /// rest, and `then` doesn't run.
+    private func close(_ doomed: [Tab], then: (() -> Void)? = nil) {
+        guard let tab = doomed.first else { then?(); return }
+        close(tab) { [weak self] in self?.close(Array(doomed.dropFirst()), then: then) }
     }
 
     func rename(_ tab: Tab, to title: String) {
@@ -211,7 +227,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     /// Brings every part up to date with the model, the tabs and the selection.
     func refresh() {
-        tabBar.show(tabs, selected: selectedTab) { [weak self] tab in self?.model.connection(tab.connectionID)?.colour.color }
+        tabBar.show(tabs, selected: selectedTab) { [weak self] tab in self?.model.connection(tab.connectionID) }
         updateContent()
         updateTint()
         updateStatus()
@@ -257,6 +273,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     private var contentKindKey = ""
+    /// The tabs closed, last at the end, for Reopen Closed Tab.
+    private var closedTabs: [(connection: UUID?, reopen: (MainWindowController) -> Void)] = []
 
     private func updateTint() {
         let colour = activeConnection?.colour.color
@@ -302,7 +320,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     func updateStatus() {
         let connection = activeConnection
-        statusBar.route.show(connection.map(routeText) ?? "", tip: "the route to the server: click for details, right-click to copy")
+        let route = connection.map { $0.marks.isEmpty ? routeText($0) : $0.marks + " · " + routeText($0) }
+        statusBar.route.show(route ?? "", tip: "the route to the server: click for details, right-click to copy")
         let state = connection.flatMap { model.states[$0.id] }
         var server = ""
         if connection != nil {
@@ -364,19 +383,28 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }
             let ids = Set(doomed.map(\.id))
-            ToolSheet.running(on: Array(ids)).forEach { $0.stop() }
-            self.tabs.filter { ids.contains($0.connectionID ?? UUID()) }.forEach { self.close($0) }
-            self.model.delete(ids)
+            self.close(self.tabs.filter { ids.contains($0.connectionID ?? UUID()) }) {
+                ToolSheet.running(on: Array(ids)).forEach { $0.stop() }
+                self.model.delete(ids)
+            }
         }
     }
 
+    /// ⌘W: the tab shown, or with none the window, as in Safari.
     @objc func closeTab(_ sender: Any?) {
-        if let tab = selectedTab { close(tab) }
+        if let tab = selectedTab { close(tab) } else { window?.performClose(sender) }
     }
 
     @objc func closeOtherTabs(_ sender: Any?) {
         guard let keep = selectedTab else { return }
-        tabs.filter { $0 !== keep }.forEach(close)
+        close(tabs.filter { $0 !== keep })
+    }
+
+    @objc func closeAllTabs(_ sender: Any?) { close(tabs) }
+
+    @objc func reopenClosedTab(_ sender: Any?) {
+        closedTabs.removeAll { $0.connection != nil && model.connection($0.connection) == nil }
+        closedTabs.popLast()?.reopen(self)
     }
 
     @objc func duplicateTab(_ sender: Any?) {
@@ -455,10 +483,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.newQuery.action?:
             enabled = activeConnection != nil || sidebar.focusedDatabase != nil
             reason = "Select one connection in the sidebar first"
-        case Commands.closeTab.action?, Commands.renameTab.action?, Commands.renameF2.action?:
+        case Commands.closeTab.action?:
+            item.toolTip = (selectedTab == nil ? Commands.closeWindow : Commands.closeTab).tip
+            return true
+        case Commands.closeAllTabs.action?, Commands.renameTab.action?, Commands.renameF2.action?:
             enabled = selectedTab != nil
             reason = "No tab is open"
-            if item.action != Commands.closeTab.action, let tab = selectedTab, tab.tabContent?.canRename != true {
+            if item.action != Commands.closeAllTabs.action, let tab = selectedTab, tab.tabContent?.canRename != true {
                 enabled = false
                 reason = "This tab is named after what it shows"
             }
@@ -466,6 +497,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 enabled = false  // F2 in a grid is the grid's: it gets the key
                 reason = "F2 edits in the grid"
             }
+        case Commands.quickOpen.action?:
+            enabled = window?.attachedSheet == nil
+            reason = "A sheet is open: answer it first"
+        case Commands.reopenClosedTab.action?:
+            enabled = closedTabs.contains { $0.connection == nil || model.connection($0.connection) != nil }
+            reason = "No closed tab to reopen"
         case Commands.closeOtherTabs.action?:
             enabled = tabs.count > 1
             reason = "Only one tab is open"

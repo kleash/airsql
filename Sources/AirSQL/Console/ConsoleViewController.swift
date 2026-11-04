@@ -139,6 +139,7 @@ final class ConsoleViewController: NSViewController, TabContent {
             tab.title = title
             self?.showResults()
         }
+        results.onClose = { [weak self] in self?.closeResult(nil) }
         results.tabMenu = { [weak self] in self?.resultMenu() ?? NSMenu() }
         messagesView.onOpen = { [weak self] message in self?.reveal(message) }
         view = root
@@ -268,6 +269,13 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     func duplicate() -> NSViewController? {
         ConsoleViewController(model: model, connection: connectionID, text: text)
+    }
+
+    var reopen: ((MainWindowController) -> Void)? {
+        if let fileURL { return { $0.openFiles([fileURL]) } }
+        guard let copy = duplicate() else { return nil }
+        let title = tab?.title ?? "Query", connection = connectionID
+        return { $0.open(copy, title: title, connection: connection) }
     }
 
     var transactionBadge: String? {

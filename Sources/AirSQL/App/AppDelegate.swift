@@ -125,7 +125,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func setUpAgents(_ sender: Any?) { showSettings(pane: .agents) }
 
+    /// ⌘W in a window with no tabs of its own (Settings, SQL Log, Compare); the main window answers for itself.
+    @objc func closeTab(_ sender: Any?) { NSApp.keyWindow?.performClose(sender) }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == Commands.closeTab.action {
+            // A sheet has its own buttons.
+            guard let window = NSApp.keyWindow, window.styleMask.contains(.closable), window.sheetParent == nil else {
+                item.toolTip = NSApp.keyWindow == nil ? "No window is open" : "Answer the sheet first"
+                return false
+            }
+            item.toolTip = Commands.closeWindow.tip
+            return true
+        }
         item.explain(enabled: true, reason: nil)
         return true
     }
@@ -158,6 +170,7 @@ enum HelpPage: String, CaseIterable {
     case tableData = "table-data.html"
     case dataGrid = "data-grid.html"
     case liquibase = "liquibase.html"
+    case troubleshooting = "troubleshooting.html#a-connection-fails"
 
     /// The site: GitHub Pages, built from docs/.
     static let site = URL(string: "https://kleash.github.io/airsql/")!

@@ -7,6 +7,8 @@ extension SQLEditorView {
     /// Puts the text in place as the starting text (not undoable), coloured.
     func setText(_ text: String) {
         string = text
+        undoManager?.removeAllActions()
+        runProblem = nil
         highlightAll()
         (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
     }

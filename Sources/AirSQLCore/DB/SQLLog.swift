@@ -46,7 +46,7 @@ public final class SQLLog {
     }
 
     /// A line of AirSQL's own about a session ("connected: …", "error 1064").
-    func note(_ text: String, context: String) {
+    public func note(_ text: String, context: String) {
         write("-- " + text, context: context)
     }
 

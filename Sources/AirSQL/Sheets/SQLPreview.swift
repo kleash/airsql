@@ -188,7 +188,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
 
     /// `sql` coloured as the mockups colour SQL: reserved words in semibold, calls, names, strings, numbers, and comments
     /// in italic. Words that aren't reserved count as names, since only reserved words can't be one.
-    static func coloured(_ sql: String, font: NSFont, noBackslashEscapes: Bool) -> NSAttributedString {
+    nonisolated static func coloured(_ sql: String, font: NSFont, noBackslashEscapes: Bool) -> NSAttributedString {
         let result = NSMutableAttributedString(string: sql, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
         let tokens = SQLLexer.tokens(sql, noBackslashEscapes: noBackslashEscapes)
         colour(result, tokens: tokens, tokens.indices, text: Array(sql.utf16), font: font)
@@ -196,8 +196,8 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     }
 
     /// Colours `tokens[indices]` of `text` in `string` as `coloured` does: the console's editor colours what changed.
-    static func colour(_ string: NSMutableAttributedString, tokens: [SQLToken], _ indices: Range<Int>, text: [UInt16],
-                       font: NSFont) {
+    nonisolated static func colour(_ string: NSMutableAttributedString, tokens: [SQLToken], _ indices: Range<Int>, text: [UInt16],
+                                   font: NSFont) {
         let semibold = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
         let italic = NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(.italic), size: font.pointSize) ?? font
         for k in indices {

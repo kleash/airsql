@@ -1,4 +1,5 @@
 import AppKit
+import CMariaDB
 import Testing
 @testable import AirSQL
 @testable import AirSQLCore
@@ -112,6 +113,125 @@ extension AppTests {
         }
 
         /// Statements after which the navigator's tree reloads.
+        /// Where a Run failed is underlined and says why on hover, until the text changes.
+        @Test func aFailedRunsPlaceIsUnderlinedUntilTheTextChanges() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor), layout = try #require(editor.layoutManager)
+            editor.setText("SELECT 1\nFORM t")
+            editor.runProblem = SQLProblem(range: 9..<13, message: "The SQL has a syntax error.")
+            func underlined(_ index: Int) -> Bool {
+                layout.temporaryAttribute(.underlineStyle, atCharacterIndex: index, effectiveRange: nil) != nil
+            }
+            #expect(underlined(10) && !underlined(14) && !underlined(2))
+            let glyphs = layout.glyphRange(forCharacterRange: NSRange(location: 10, length: 1), actualCharacterRange: nil)
+            let rect = layout.boundingRect(forGlyphRange: glyphs, in: try #require(editor.textContainer))
+            let over = NSPoint(x: rect.midX + editor.textContainerOrigin.x, y: rect.midY + editor.textContainerOrigin.y)
+            #expect(editor.view(editor, stringForToolTip: 0, point: over, userData: nil) == "The SQL has a syntax error.")
+            #expect(editor.view(editor, stringForToolTip: 0, point: NSPoint(x: 8, y: 10), userData: nil) == "")
+            editor.setSelectedRange(NSRange(location: 8, length: 0))
+            editor.insertText(" ", replacementRange: editor.selectedRange())
+            #expect(editor.runProblem == nil && !underlined(11))
+            // What the text leaves open needs no Run, and goes when it is closed.
+            editor.setText("SELECT (1")
+            editor.check()
+            #expect(underlined(7) && editor.problems.map(\.message) == ["This ( has no closing )"])
+            editor.setSelectedRange(NSRange(location: 9, length: 0))
+            editor.insertText(")", replacementRange: editor.selectedRange())
+            editor.check()
+            #expect(!underlined(7) && editor.problems.isEmpty)
+        }
+
+        /// ⌘Z takes back the text in front of you: each console has its own steps, and an object editor's don't touch them.
+        @Test func eachTextHasItsOwnUndo() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, harness, first) = try await Self.console(model)
+            _ = await call(harness, "type", ["text": "one"])
+            first.editor.undoManager?.removeAllActions()  // a test's typing has no event to end its undo group
+            first.editor.replace(NSRange(location: 3, length: 0), with: " more")
+            #expect(await call(harness, "menu", ["path": "File > New Query"]).error == nil)
+            let second = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(second !== first && main.window?.firstResponder === second.editor)
+            second.editor.replace(NSRange(location: 0, length: 0), with: "two")
+            #expect(first.editor.undoManager !== second.editor.undoManager)
+            #expect(await call(harness, "menu", ["path": "Edit > Undo"]).error == nil)
+            #expect(second.text == "" && first.text == "one more")
+            #expect(await call(harness, "menu", ["path": "Edit > Redo"]).error == nil)
+            #expect(second.text == "two")
+            // A loaded text is a starting point, and only its own editor's.
+            second.editor.setText("loaded")
+            #expect(second.editor.undoManager?.canUndo == false && first.editor.undoManager?.canUndo == true)
+        }
+
+        /// A long server error shows whole, wrapped at the column's width, and its text can be selected.
+        @Test func messagesShowTheWholeText() async throws {
+            let (_, _, console) = try await Self.console()
+            let view = console.messagesView
+            view.frame = NSRect(x: 0, y: 0, width: 700, height: 300)
+            let long = String(repeating: "You have an error in your SQL syntax near here. ", count: 40)
+            view.append(ConsoleMessage(level: .ok, range: nil, line: nil, statement: "", text: "Done"))
+            view.append(ConsoleMessage(level: .error, range: nil, line: 1, statement: "SELECT", text: long))
+            #expect(view.tableView(view.table, heightOfRow: 0) == view.table.rowHeight)
+            let tall = view.tableView(view.table, heightOfRow: 1)
+            let column = try #require(view.table.tableColumns.last)
+            let field = try #require(view.tableView(view.table, viewFor: column, row: 1) as? NSTextField)
+            #expect(field.stringValue == long && field.isSelectable && field.lineBreakMode == .byWordWrapping)
+            field.frame.size.width = column.width
+            #expect(tall >= field.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: column.width, height: 100_000)).height)
+            // Narrower, it takes more lines.
+            column.width /= 2
+            view.tableViewColumnDidResize(Notification(name: NSTableView.columnDidResizeNotification))
+            #expect(view.tableView(view.table, heightOfRow: 1) > tall)
+        }
+
+        /// A result tab's ✕ closes that tab, shown or not; Messages has none; keys go round the bar, Messages included.
+        @Test func resultTabsCloseAndStep() async throws {
+            let (_, harness, console) = try await Self.console()
+            let one = ResultStore(columns: []), two = ResultStore(columns: [])
+            console.addResult(one, title: "One", summary: "")
+            console.addResult(two, title: "Two", summary: "")
+            console.selectResult(console.resultTabs[0])
+            func shown() -> String? { console.selectedResult?.title }
+            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(shown() == "Two")
+            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(shown() == "Messages")
+            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(shown() == "One")
+            #expect(await call(harness, "menu", ["path": "Query > Show Previous Result"]).error == nil)
+            #expect(shown() == "Messages")
+            let buttons = console.results.buttons
+            #expect(buttons.map(\.closeButton.isHidden) == [false, false, true])
+            buttons[0].closeButton.performClick(nil)
+            #expect(console.resultTabs.map(\.title) == ["Two"] && shown() == "Two")
+        }
+
+        /// ⌘F in a result's rows: the find bar works on them as in a table tab, on one result shown on its side too.
+        @Test func findWorksOnAResultsRows() async throws {
+            let (main, harness, console) = try await Self.console()
+            let store = ResultStore(columns: [ResultStore.Column(name: "name", type: MYSQL_TYPE_VAR_STRING)])
+            for name in ["Ann", "Bob", "Anna"] { _ = store.append([Array(name.utf8)]) }
+            console.addResult(store, title: "People", summary: "")
+            console.showResults()
+            let view = try #require(console.resultTabs.first?.view as? ResultGridView)
+            main.window?.makeFirstResponder(view.grid)
+            #expect(await call(harness, "menu", ["path": "Edit > Find > Find…"]).error == nil)
+            #expect(!view.findBar.isHidden && view.findBar.replaceField.isHidden)
+            view.findBar.findField.stringValue = "ann"
+            view.findChanged()
+            #expect(view.findBar.count.stringValue == "2 matching" && view.viewer.highlight != nil)
+            view.findMatch(forward: true)
+            #expect(view.grid.selection.cursor == GridPosition(row: 0, column: 0) && view.findBar.count.stringValue == "1 of 2")
+            view.findMatch(forward: true)
+            #expect(view.grid.selection.cursor == GridPosition(row: 2, column: 0))
+            view.findBar.options.item(at: 4)?.state = .on  // Filter Rows
+            view.findChanged()
+            #expect(view.rows.rowCount == 2)
+            view.findBar.close(nil)
+            #expect(view.findBar.isHidden && view.rows.rowCount == 3 && view.viewer.highlight == nil)
+            let replace = Commands.findAndReplace.item()
+            #expect(!view.validateMenuItem(replace))
+        }
+
         @Test func schemaChangesAreToldApart() {
             #expect(ConsoleViewController.changesSchema("/* new */ create table t (id int)"))
             #expect(ConsoleViewController.changesSchema("DROP VIEW v") && ConsoleViewController.changesSchema("rename table a to b"))
@@ -195,6 +315,19 @@ extension AppTests {
             log.statement("SELECT 2", context: "Shop main:3", noBackslashEscapes: false)
             viewer.refresh()
             #expect(await eventually(timeout: 5) { viewer.lines.count == 3 }, "follows what is added")
+            // A selection outlives the reads, and lines that come after it.
+            let textView = viewer.text
+            #expect(await eventually(timeout: 5) { textView.string.contains("SELECT 2") })
+            let selected = NSRange(location: 3, length: 12)
+            textView.setSelectedRange(selected)
+            viewer.refresh()
+            log.statement("SELECT 3", context: "Shop main:4", noBackslashEscapes: false)
+            #expect(await eventually(timeout: 5) {
+                viewer.refresh()
+                return textView.string.contains("SELECT 3")
+            })
+            #expect(textView.selectedRange() == selected)
+            #expect(textView.string.components(separatedBy: "\n").count == 5, "each line once")
             SQLLogWindowController.clear(log)
             #expect(await eventually(timeout: 5) { !FileManager.default.fileExists(atPath: log.fileURL.path) })
             viewer.refresh()
@@ -473,5 +606,81 @@ extension AppTests {
             _ = try await setup.query("DROP DATABASE \(database)")
             await connection.disconnect()
         }
+    }
+}
+
+// Closing several tabs, and the middle button on a tab.
+extension AppTests.ConsoleAppTests {
+    /// A middle-button release, as the mouse sends it.
+    @MainActor static func middleClick() throws -> NSEvent {
+        let event = CGEvent(mouseEventSource: nil, mouseType: .otherMouseUp, mouseCursorPosition: .zero, mouseButton: .center)
+        return try #require(event.flatMap(NSEvent.init(cgEvent:)))
+    }
+
+    @Test func closeAllTabsAsksAboutEachTabInTurnAndCancelKeepsTheRest() async throws {
+        let (main, harness, first) = try await Self.console()
+        first.editor.string = "SELECT 1;"
+        _ = await call(harness, "menu", ["path": "File > New Query"])
+        let second = try #require(main.selectedTab?.content as? ConsoleViewController)
+        second.editor.string = "SELECT 2;"
+        _ = await call(harness, "menu", ["path": "File > New Query"])
+        #expect(main.tabs.count == 3)
+
+        main.closeAllTabs(nil)
+        // The first tab isn't the one shown when the command comes, and is still asked about, on show.
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        #expect(main.selectedTab?.content === first)
+        _ = await call(harness, "press", ["title": "Don't Save"])
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        #expect(main.selectedTab?.content === second && main.tabs.count == 2)
+        _ = await call(harness, "press", ["title": "Cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(main.tabs.count == 2 && main.selectedTab?.content === second)
+
+        second.editor.string = ""
+        main.closeAllTabs(nil)
+        #expect(await eventually(timeout: 5) { main.tabs.isEmpty })
+    }
+
+    @Test func reopenClosedTabBringsBackAConsolesTextUnderItsName() async throws {
+        let (main, harness, console) = try await Self.console()
+        console.editor.string = "SELECT 'lost';"
+        let title = main.selectedTab?.title
+        main.closeTab(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["title": "Don't Save"])
+        #expect(await eventually(timeout: 5) { main.tabs.isEmpty })
+        main.reopenClosedTab(nil)
+        let back = try #require(main.selectedTab?.content as? ConsoleViewController)
+        #expect(back !== console && back.text == "SELECT 'lost';" && main.selectedTab?.title == title)
+        back.editor.string = ""
+        #expect(!main.validateMenuItem(Commands.reopenClosedTab.item()), "the list is empty again")
+    }
+
+    @Test func theMiddleButtonClosesATabNotShownAfterAskingAndTheOneShownStays() async throws {
+        let (main, harness, first) = try await Self.console()
+        first.editor.string = "SELECT 1;"
+        _ = await call(harness, "menu", ["path": "File > New Query"])
+        let shown = try #require(main.selectedTab)
+        let button = try #require(main.tabBar.buttons.first { $0.tab?.content === first })
+        button.otherMouseUp(with: try Self.middleClick())
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["title": "Don't Save"])
+        #expect(await eventually(timeout: 5) { main.tabs.count == 1 })
+        #expect(main.selectedTab === shown)
+    }
+
+    @Test func theMiddleButtonClosesAResultButNotMessages() async throws {
+        let (_, _, console) = try await Self.console()
+        console.addResult(ConsoleFixtures.customers(rows: 1), title: "Kept", summary: "")
+        console.addResult(ConsoleFixtures.customers(rows: 1), title: "Gone", summary: "")
+        let tab = try #require(console.resultTabs.last)
+        console.selectResult(tab)
+        let button = try #require(console.results.tabButton(for: tab))
+        button.otherMouseUp(with: try Self.middleClick())
+        #expect(console.resultTabs.count == 1 && !console.resultTabs.contains { $0 === tab })
+        let messages = try #require(console.results.tabButton(for: console.messagesTab))
+        messages.otherMouseUp(with: try Self.middleClick())
+        #expect(console.resultTabs.count == 1 && !console.resultTabs.contains { $0 === tab })
     }
 }

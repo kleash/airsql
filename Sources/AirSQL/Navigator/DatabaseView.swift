@@ -227,6 +227,9 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         NSPasteboard.general.setString(selectedObjects.map { SQLQuote.identifier($0.name) }.joined(separator: ", "), forType: .string)
     }
 
+    /// ⌘C: the selected tables' names.
+    @objc func copy(_ sender: Any?) { copyName(sender) }
+
     @objc func copyTable(_ sender: Any?) {
         if let first = selectedObjects.first { NavigatorActions.copyTable(first, on: open, window: view.window) }
     }
@@ -255,8 +258,9 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        let aliases = [Commands.renameF2.action: Commands.rename.action, Commands.copy.action: Commands.copyName.action]
         let reason = item.action == Commands.refresh.action ? nil
-            : NavigatorActions.reason(for: item.action == Commands.renameF2.action ? Commands.rename.action : item.action,
+            : NavigatorActions.reason(for: item.action.flatMap { aliases[$0] } ?? item.action,
                                       objects: selectedObjects, databases: [], open: open, target: open, model: open.model)
         item.explain(enabled: reason == nil, reason: reason)
         return reason == nil

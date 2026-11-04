@@ -4,13 +4,22 @@ import AppKit
 /// The process list (scope "server"): every connection to the server and what it runs, refreshed every few seconds,
 /// read on a session of its own. Kill Query and Kill Connection ask first and then check, on the same session, that the
 /// process still runs what the list showed before they stop it (plan §2.12: a click selects, a double-click shows the
-/// full query, a right-click opens Kill Query…, Kill Connection…, Copy Query, Explain).
+/// full query, a right-click opens Kill Query…, Kill Connection…, Copy Query, Explain). A header sorts, the filter and
+/// Hide Sleeping narrow what the last read found.
 @MainActor
-final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSource, NSTableViewDelegate, NSMenuItemValidation {
+final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSource, NSTableViewDelegate, NSMenuItemValidation,
+    NSSearchFieldDelegate {
     let open: OpenConnection
     let table = ProcessTableView()
     let interval: NSPopUpButton
+    /// The rows shown: of what the last read found, those the filter keeps, in the header's order.
     private(set) var processes: [ServerProcess] = []
+    private var found: [ServerProcess] = []
+    private var readAt = Date()
+    let filter = NSSearchField()
+    lazy var hideSleeping = checkbox("Hide Sleeping", id: "processes.hideSleeping",
+                                     tip: "Leave out connections that are waiting for their next statement", on: false,
+                                     target: self, action: #selector(arrange))
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
     private var session: DBConnection?
@@ -49,12 +58,24 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         bar.spacing = Spacing.unit
         bar.translatesAutoresizingMaskIntoConstraints = false
         status.setAccessibilityIdentifier("processes.status")
+        filter.placeholderString = "Filter"
+        filter.toolTip = "Type words to show only the processes that contain them"
+        filter.setAccessibilityIdentifier("processes.filter")
+        filter.delegate = self
+        filter.sendsSearchStringImmediately = true
+        filter.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        let narrow = NSStackView(views: [status, NSView(), hideSleeping, filter])
+        narrow.spacing = Spacing.unit
+        narrow.translatesAutoresizingMaskIntoConstraints = false
         for (id, title, width) in Self.columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
             column.minWidth = id == "info" ? 200 : 40
             if id == "id" || id == "time" { column.headerCell.alignment = .right }
+            // Time starts with the longest running, the main reason to sort.
+            column.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: id != "time")
+            column.headerToolTip = "Sort by " + title.lowercased() + "; click again to reverse"
             table.addTableColumn(column)
         }
         table.style = .fullWidth
@@ -74,15 +95,15 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        [bar, status, scroll].forEach(root.addSubview)
+        [bar, narrow, scroll].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             bar.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double - 2),
             bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
             bar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.double),
-            status.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: Spacing.half),
-            status.leadingAnchor.constraint(equalTo: bar.leadingAnchor),
-            status.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -Spacing.double),
-            scroll.topAnchor.constraint(equalTo: status.bottomAnchor, constant: Spacing.unit),
+            narrow.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: Spacing.half),
+            narrow.leadingAnchor.constraint(equalTo: bar.leadingAnchor),
+            narrow.trailingAnchor.constraint(equalTo: bar.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: narrow.bottomAnchor, constant: Spacing.unit),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
@@ -152,16 +173,61 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     }
 
     func show(_ list: [ServerProcess]) {
+        found = list
+        readAt = Date()
+        arrange()
+    }
+
+    /// Shows what was found, filtered and in the header's order, keeping the selection.
+    @objc private func arrange() {
         let selected = Set(table.selectedRowIndexes.compactMap { processes[safe: $0]?.id })
-        processes = list
+        let words = filter.stringValue.lowercased().split(separator: " ")
+        processes = found.filter { process in
+            guard hideSleeping.state == .off || process.command != "Sleep" else { return false }
+            let row = Self.columns.map { Self.text(process, $0.0) }.joined(separator: " ").lowercased()
+            return words.allSatisfy(row.contains)
+        }
+        if let sort = table.sortDescriptors.first, let key = sort.key {
+            processes.sort { a, b in
+                let order = Self.compare(a, b, key)
+                return order == .orderedSame ? a.id < b.id : (order == .orderedAscending) == sort.ascending
+            }
+        }
         table.reloadData()
         table.selectRowIndexes(IndexSet(processes.indices.filter { selected.contains(processes[$0].id) }), byExtendingSelection: false)
         updateButtons()
-        let busy = list.filter { $0.info != nil }.count
-        status.stringValue = "\(list.count) connections, \(busy) running a statement · read at "
-            + Date().formatted(date: .omitted, time: .standard)
+        let busy = processes.filter { $0.info != nil }.count
+        status.stringValue = (processes.count == found.count ? "\(found.count)" : "\(processes.count) of \(found.count)")
+            + " connections, \(busy) running a statement · read at " + readAt.formatted(date: .omitted, time: .standard)
         status.toolTip = status.stringValue
     }
+
+    /// Id and Time as numbers, the rest as a person sorts text.
+    private static func compare(_ a: ServerProcess, _ b: ServerProcess, _ key: String) -> ComparisonResult {
+        switch key {
+        case "id": return a.id == b.id ? .orderedSame : a.id < b.id ? .orderedAscending : .orderedDescending
+        case "time": return a.time == b.time ? .orderedSame : a.time < b.time ? .orderedAscending : .orderedDescending
+        default: return text(a, key).localizedStandardCompare(text(b, key))
+        }
+    }
+
+    /// What a column shows for a process.
+    private static func text(_ process: ServerProcess, _ id: String) -> String {
+        switch id {
+        case "id": return String(process.id)
+        case "user": return process.user
+        case "host": return process.host
+        case "db": return process.database ?? ""
+        case "command": return process.command
+        case "time": return String(process.time)
+        case "state": return process.state ?? ""
+        default: return (process.info ?? "").replacingOccurrences(of: "\n", with: " ")
+        }
+    }
+
+    func controlTextDidChange(_ notification: Notification) { arrange() }
+
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) { arrange() }
 
     var selected: [ServerProcess] { table.selectedRowIndexes.compactMap { processes[safe: $0] } }
 
@@ -183,6 +249,13 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         let text = selected.compactMap(\.info).joined(separator: ";\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// ⌘C: the selected rows, tab-separated.
+    @objc func copy(_ sender: Any?) {
+        let rows = selected.map { process in Self.columns.map { Self.text(process, $0.0) }.joined(separator: "\t") }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(rows.joined(separator: "\n"), forType: .string)
     }
 
     @objc func killQuery(_ sender: Any?) { kill(connection: false) }
@@ -252,7 +325,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         switch action {
         case Commands.killQuery.action?, Commands.copyQuery.action?:
             return selected.contains { $0.info != nil } ? nil : "Select a process that is running a statement first"
-        case Commands.killConnection.action?:
+        case Commands.killConnection.action?, Commands.copy.action?:
             return selected.isEmpty ? "Select a process first" : nil
         case Commands.explain.action?:
             return selected.count == 1 && selected[0].info != nil ? nil : "Select one process that is running a statement first"
@@ -274,17 +347,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let process = processes[safe: row], let id = tableColumn?.identifier.rawValue else { return nil }
-        let value: String
-        switch id {
-        case "id": value = String(process.id)
-        case "user": value = process.user
-        case "host": value = process.host
-        case "db": value = process.database ?? ""
-        case "command": value = process.command
-        case "time": value = String(process.time)
-        case "state": value = process.state ?? ""
-        default: value = (process.info ?? "").replacingOccurrences(of: "\n", with: " ")
-        }
+        let value = Self.text(process, id)
         let field = (tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("cell." + id), owner: nil) as? NSTextField)
             ?? NSTextField(labelWithString: "")
         field.identifier = NSUserInterfaceItemIdentifier("cell." + id)

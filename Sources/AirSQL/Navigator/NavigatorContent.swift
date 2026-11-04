@@ -34,6 +34,7 @@ final class PreviewContent: NSViewController, TabContent {
     }
 
     func show(_ content: NSViewController) {
+        (shown as? TableDataController)?.abandoned = true
         (shown as? TableDataController)?.cancelQuery(nil)  // its rows aren't wanted any more
         shown.view.removeFromSuperview()
         shown.removeFromParent()
@@ -51,6 +52,7 @@ final class PreviewContent: NSViewController, TabContent {
     var statusAccessory: NSView? { (shown as? TabContent)?.statusAccessory }
     var isEdited: Bool { (shown as? TabContent)?.isEdited ?? false }
     var transactionBadge: String? { (shown as? TabContent)?.transactionBadge }
+    var reopen: ((MainWindowController) -> Void)? { (shown as? TabContent)?.reopen }
     func shouldClose(_ answer: @escaping (Bool) -> Void) {
         if let content = shown as? TabContent { content.shouldClose(answer) } else { answer(true) }
     }

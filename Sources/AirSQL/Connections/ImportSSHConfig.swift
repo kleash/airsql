@@ -45,6 +45,26 @@ extension MainWindowController {
             box.lineBreakMode = .byTruncatingTail
             return box
         }
+        let alert = NSAlert()
+        alert.messageText = "Import hosts from your ssh config"
+        alert.informativeText = "Each host you tick becomes a connection that tunnels through it to a database on its "
+            + "127.0.0.1:3306. Its settings stay in your ~/.ssh/config, which AirSQL's ssh reads."
+        alert.accessoryView = tickList(boxes)
+        alert.addButton(withTitle: "Import").toolTip = "Make a connection for each ticked host"
+        alert.addButton(withTitle: "Cancel").toolTip = "Make no connections"
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn, let self else { return }
+            let folder = self.sidebar.selectedFolderID
+            let made = zip(hosts, boxes).filter { $0.1.state == .on }.map { SSHConfigImport.connection(for: $0.0, folder: folder) }
+            made.forEach(self.model.save)
+            self.sidebar.reload()
+            self.sidebar.select(made.map(\.id))
+            self.sidebarSelectionChanged()
+        }
+    }
+
+    /// `boxes` in a list that scrolls when they don't fit, for an alert's accessory.
+    func tickList(_ boxes: [NSButton]) -> NSScrollView {
         let stack = NSStackView(views: boxes)
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -59,21 +79,6 @@ extension MainWindowController {
         scroll.hasVerticalScroller = flipped.frame.height > 256
         scroll.borderType = .bezelBorder
         scroll.drawsBackground = false
-        let alert = NSAlert()
-        alert.messageText = "Import hosts from your ssh config"
-        alert.informativeText = "Each host you tick becomes a connection that tunnels through it to a database on its "
-            + "127.0.0.1:3306. Its settings stay in your ~/.ssh/config, which AirSQL's ssh reads."
-        alert.accessoryView = scroll
-        alert.addButton(withTitle: "Import").toolTip = "Make a connection for each ticked host"
-        alert.addButton(withTitle: "Cancel").toolTip = "Make no connections"
-        alert.beginSheetModal(for: window) { [weak self] response in
-            guard response == .alertFirstButtonReturn, let self else { return }
-            let folder = self.sidebar.selectedFolderID
-            let made = zip(hosts, boxes).filter { $0.1.state == .on }.map { SSHConfigImport.connection(for: $0.0, folder: folder) }
-            made.forEach(self.model.save)
-            self.sidebar.reload()
-            self.sidebar.select(made.map(\.id))
-            self.sidebarSelectionChanged()
-        }
+        return scroll
     }
 }

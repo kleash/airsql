@@ -167,9 +167,81 @@ struct ClientToolsTests {
         #expect(ToolCommand(tool: mysql, options: options, server: nil).tlsProblem?.contains("CA file") == true)
         #expect(ToolCommand(tool: maria, options: options, server: nil).tlsProblem == nil)
         options.tls.pinnedFingerprint = "AB:CD"
-        #expect(ToolCommand(tool: maria, options: options, server: nil).tlsProblem?.contains("pinned") == true)
+        #expect(ToolCommand(tool: maria, options: options, server: nil).tlsProblem?.contains("--ssl-fp") == true)
+        #expect(ToolCommand(tool: mysql, options: options, server: nil).tlsProblem?.contains("--ssl-fp") == true)
         options.tls.mode = .off
         #expect(ToolCommand(tool: mysql, options: options, server: nil).tlsProblem == nil)
+    }
+
+    /// A pinned certificate: a tool with --ssl-fp gets the pin whatever the mode; one without runs only against the
+    /// connection's CA file, verifying; else it is refused, and not offered as runnable. Never a run without a check.
+    @Test func aPinIsCheckedByTheToolOrItsCAFileOrTheToolDoesntRun() {
+        var options = ConnectOptions(host: "db.example.com", user: "app", tls: TLSOptions(mode: .required, pinnedFingerprint: "AB:CD"))
+        var pinning = Self.tool("mariadb-dump", .mariadb, [11, 8, 3])
+        pinning.takesFingerprint = true
+        let old = Self.tool("mariadb-dump", .mariadb, [10, 11, 6]), mysql = Self.tool("mysqldump", .mysql, [8, 4, 3])
+        func command(_ tool: ClientTool) -> ToolCommand { ToolCommand(tool: tool, options: options, server: nil) }
+        func argv(_ tool: ClientTool) -> [String] { command(tool).dump(DumpRequest(databases: ["shop"]), optionFile: "/private") }
+
+        for mode in [TLSOptions.Mode.required, .verifyCA, .verifyIdentity] {
+            options.tls.mode = mode
+            #expect(command(pinning).tlsProblem == nil)
+            #expect(argv(pinning).contains("--ssl-fp=AB:CD") && argv(pinning).contains("--ssl"))
+            #expect(command(old).tlsProblem != nil && command(mysql).tlsProblem != nil, "\(mode)")
+        }
+        #expect(ToolCommand.runnable([old, mysql, pinning], options: options, server: nil) == [pinning])
+
+        options.tls.caFile = "/etc/ca.pem"
+        #expect(command(old).tlsProblem == nil && command(mysql).tlsProblem == nil)
+        #expect(argv(old).contains("--ssl-verify-server-cert") && argv(old).contains("--ssl-ca=/etc/ca.pem"))
+        #expect(argv(mysql).contains("--ssl-mode=VERIFY_IDENTITY") && argv(mysql).contains("--ssl-ca=/etc/ca.pem"))
+        options.tls.mode = .required  // a CA file nothing checks against is no check
+        #expect(command(old).tlsProblem != nil && command(mysql).tlsProblem != nil)
+    }
+
+    /// The tick box: off by default, only for a MySQL tool with a pin and no CA file, and TLS stays required.
+    @Test func runningWithoutTheCheckStillRequiresTLSAndIsOnlyForMySQLsTools() {
+        var options = ConnectOptions(host: "db.example.com", user: "app", tls: TLSOptions(mode: .verifyIdentity, pinnedFingerprint: "AB:CD"))
+        var mysql = ToolCommand(tool: Self.tool("mysqldump", .mysql, [8, 4, 3]), options: options, server: nil)
+        var maria = ToolCommand(tool: Self.tool("mariadb-dump", .mariadb, [10, 11, 6]), options: options, server: nil)
+        #expect(!mysql.uncheckedCertificate && mysql.mayRunUnchecked && mysql.tlsProblem != nil && mysql.uncheckedNote == nil)
+        mysql.uncheckedCertificate = true
+        let argv = mysql.dump(DumpRequest(databases: ["shop"]), optionFile: "/private")
+        #expect(mysql.tlsProblem == nil && argv.contains("--ssl-mode=REQUIRED") && !argv.contains("--ssl-mode=DISABLED"))
+        #expect(mysql.uncheckedNote?.contains("without checking") == true)
+
+        let terminal = mysql.terminal(database: "shop", optionFile: "/private")
+        #expect(terminal.contains("--ssl-mode=REQUIRED"), "Terminal's line too")
+
+        // MariaDB's --ssl without a check connects in plain text to a server without TLS: its tools stay blocked.
+        maria.uncheckedCertificate = true
+        #expect(!maria.mayRunUnchecked && maria.tlsProblem != nil && maria.uncheckedNote == nil)
+
+        // No pin, or a CA file to check against: no box, and a tick changes nothing.
+        options.tls.caFile = "/etc/ca.pem"
+        var withCA = ToolCommand(tool: Self.tool("mysqldump", .mysql, [8, 4, 3]), options: options, server: nil)
+        withCA.uncheckedCertificate = true
+        #expect(!withCA.mayRunUnchecked)
+        #expect(withCA.dump(DumpRequest(databases: ["shop"]), optionFile: "/private").contains("--ssl-mode=VERIFY_IDENTITY"))
+        options.tls = TLSOptions(mode: .verifyIdentity)
+        var noPin = ToolCommand(tool: Self.tool("mysqldump", .mysql, [8, 4, 3]), options: options, server: nil)
+        noPin.uncheckedCertificate = true
+        #expect(!noPin.mayRunUnchecked && noPin.tlsProblem != nil)
+    }
+
+    /// Whether a tool takes --ssl-fp comes from its own --help, not its version.
+    @Test func aToolsHelpSaysWhetherItTakesAFingerprint() async throws {
+        let folder = try scratch()
+        func script(_ name: String, version: String, help: String) throws -> String {
+            let path = folder + "/" + name
+            try "#!/bin/sh\ncase \"$1\" in --version) echo '\(version)';; *) echo '\(help)';; esac\n".write(toFile: path, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path)
+            return path
+        }
+        let new = try script("new-dump", version: "mariadb-dump from 11.8.3-MariaDB, client 10.20 for osx (arm64)", help: "  --ssl-fp=name  Server certificate fingerprint")
+        let old = try script("old-dump", version: "mariadb-dump  Ver 10.19 Distrib 10.11.6-MariaDB, for osx (arm64)", help: "  --ssl-verify-server-cert")
+        #expect(await ClientTools.find(.dump, chosen: new, folders: []).first?.takesFingerprint == true)
+        #expect(await ClientTools.find(.dump, chosen: old, folders: []).first?.takesFingerprint == false)
     }
 
     @Test func extraOptionsSplitLikeAShellAndKeepSecretsOff() throws {

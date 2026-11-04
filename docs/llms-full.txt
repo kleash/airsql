@@ -100,8 +100,10 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
 
 - **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
-- **The tabs** hold your queries and tables. Double-click a tab to rename it; right-click it to close others or
-  duplicate it.
+- **The tabs** hold your queries and tables. Double-click a tab to rename it; middle-click it to close it; right-click it
+  to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as
+  it does in Settings, the SQL log and Compare. ⇧⌘T brings back the tab you closed last. ⌘P (**Quick Open…**) goes to a
+  table, view or connection by part of its name.
 - **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
   All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
@@ -360,6 +362,8 @@ own session, which every console tab of that connection shares.
 ## Write SQL
 
 - Keywords, names, strings, numbers and comments have their own colours; the brackets around the cursor are marked.
+- A quote, comment or bracket left open is underlined in red a moment after you stop typing, and hovering over it says
+  what's missing. No server is asked.
 - **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
   keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
   elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
@@ -410,13 +414,19 @@ nothing runs.
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
   tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
+  A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
+  Messages included.
 - Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](https://kleash.github.io/airsql/compare.html#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
 - **Messages** lists what each statement did: its rows or the rows it changed, how long it took, the server's
-  warnings, or its error and the line it points to (that line is marked red beside the editor). Double-click a message
+  warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
+  names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
   to select its statement.
 - A result keeps at most its first 100,000 rows; the tab then says it is cut short.
+- **Edit ▸ Find** (⌘F) with a result's rows focused finds values in them, as in a [table tab](https://kleash.github.io/airsql/table-data.html): ⌘G and ⇧⌘G
+  move between matches, and Options has Match Case, Regular Expression, Whole Words and Filter Rows. Replace is for
+  table tabs.
 - **Filter, search and sort a result** on its rows, at once, without running the query again: right-click a cell for
   **Quick Filter** (the same conditions as in a [table tab](https://kleash.github.io/airsql/table-data.html#filter-search-and-sort), Type a Value…
   included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Sort by
@@ -517,7 +527,8 @@ tabs:
   port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.
-- **TLS**: how the connection is encrypted. **Check the authority and host name** is the safe choice: the server must
+- **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
+  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Check the authority and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
   shows its fingerprint when you connect (see [Trust a server](https://kleash.github.io/airsql/trust-a-server.html)). Add an authority file for a
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
@@ -572,6 +583,20 @@ its own proxy) are used, after what the editor sets.
 makes a connection for each one you tick: an SSH tunnel through that host to a database on `127.0.0.1:3306`, which
 you can then edit.
 
+## Import and export connections
+
+- **File ▸ New Connection from URL…** takes a `mysql://user@host:3306/database` address (or `mariadb://`), from the
+  clipboard when it holds one, and opens the connection's settings to check before you save.
+- **File ▸ Import Connections…** reads the saved connections of Sequel Ace, TablePlus, DBeaver or MySQL Workbench when
+  they are on this Mac, or a file you choose: an AirSQL export, one of those apps' files, or HeidiSQL's exported
+  settings. It lists the MySQL and MariaDB connections with ticks; one that is already here starts unticked.
+- **File ▸ Export Connections…** saves the selected connections, or all of them, to a file for another Mac or a
+  colleague.
+
+Passwords never come along: an export has none, an import doesn't read them, and a password in a URL is left out.
+AirSQL asks for each when you connect. An imported AirSQL file also leaves out what would run by itself: the client
+programs chosen, startup SQL and agent access. TLS starts strict, except for a server on this Mac.
+
 ## Connect and disconnect
 
 Double-click a connection, or select it and choose **Connection ▸ Connect** (⌘K). The status bar shows each step, hop
@@ -605,9 +630,10 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](https://kleash.github.io/airsql/editors.html));
-  **Create Table…** and **New…** make a table or object in the database you right-clicked.
+  **Create Table…** makes a table in the database you right-clicked; **New…** on a group (Tables, Views…) makes
+  another of its kind.
 - **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
-  open it. The console's statements run in the current database ([The SQL console](https://kleash.github.io/airsql/console.html)).
+  open it; double-click again to close it. The console's statements run in the current database ([The SQL console](https://kleash.github.io/airsql/console.html)).
 - **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
@@ -660,7 +686,9 @@ Upper and lower case match as the column's collation says (most ignore case).
 ## See what the server is running
 
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
-running, refreshed every 5 seconds (choose another interval, or Off). Double-click a row to read its whole statement.
+running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
+with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
+idle connections. Double-click a row to read its whole statement.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.
@@ -1135,8 +1163,21 @@ AirSQL removes the file as soon as the tool has read it: once a dump has started
 its input, ten seconds after Terminal starts `mysql`; and anything left behind at the next launch.
 
 Over TCP the tools check TLS the way the connection asks: MySQL's with `--ssl-mode`, MariaDB's with `--ssl` and
-`--ssl-verify-server-cert`. MySQL's tools check certificates only against a CA file; for a connection without one, or
-with a pinned certificate, the sheet says so and AirSQL's own export and runner (which check it as AirSQL does) remain.
+`--ssl-verify-server-cert`. A tool never runs without its certificate check. A certificate you trusted (pinned) is
+checked by MariaDB tools that take `--ssl-fp`, which get its fingerprint; AirSQL asks the tool's `--help` whether it
+does. Other tools run on such a connection only if it has a CA file and checks the authority, against that file.
+MySQL's tools check certificates only against a CA file. When the tool can't check the server, the window says what
+to do and **Use AirSQL's Built-in** switches to AirSQL's own export or runner, which check it as AirSQL does; such a
+tool is never picked for you.
+
+With a certificate you trusted and no CA file, Export, Restore and Run SQL File also offer MySQL's tools an unticked
+box, **Run without checking the certificate**. The connection is encrypted but can't prove it's this server, so the
+login and the dump could be exposed, and a restore's data goes to a server that isn't proved. The tool then runs with
+`--ssl-mode=REQUIRED`, never without TLS; the tick lasts one run, is never saved, clears when you change the tool, and
+the run is noted in the SQL log. MariaDB's older tools don't get the box, as without a check they can't insist on TLS.
+Open in Terminal follows the same rules with an alert each time instead of a box: **Cancel** is the default, and **Open
+Without Checking** goes on with TLS required, saving nothing. Copy to Another Server needs neither: it uses no client
+tool, and AirSQL's own sessions check the certificate on both sides.
 
 Client tools reach SSH and proxy routes through the connection's private socket once AirSQL is connected through them.
 
@@ -1489,8 +1530,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | New Connection… | ⌘N |
 | New Query | ⌘T |
 | Open… | ⌘O |
+| Quick Open… | ⌘P |
 | Close Tab | ⌘W |
 | Close Other Tabs | ⌥⌘W |
+| Close All Tabs | ⌥⇧⌘W |
+| Reopen Closed Tab | ⇧⌘T |
 | Close Window | ⇧⌘W |
 | Save | ⌘S |
 | Save As… | ⇧⌘S |
@@ -1530,6 +1574,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Show Next Result | ⌥⌘] |
+| Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
@@ -1636,6 +1682,8 @@ the common problems.
 
 ## A connection fails
 
+The message offers **Try Again**, **Edit Connection…** and this page.
+
 | AirSQL says | What to do |
 |---|---|
 | Can't find the server | Check the host name, and that you are on the right network or VPN. |
@@ -1645,6 +1693,7 @@ the common problems.
 | The server didn't accept the user name or password | Check both. Through an SSH host, the server sees the SSH host's address, and the account must allow that host. |
 | This user may not log in from this computer's address | An administrator can allow it (the account's host part). |
 | The server only accepts encrypted connections | Turn on TLS for the connection. |
+| The server doesn't offer TLS | Choose **Edit Connection…**, then in the TLS tab set TLS to **Off**, only for a server on this Mac or a network you trust end to end. |
 | The server asked for a login method AirSQL doesn't allow on this connection | A PAM or LDAP account: turn on its plain-text login for the connection, with TLS that proves the server. |
 | The server blocked this computer after too many failed connections | An administrator can unblock it (`FLUSH HOSTS`). |
 
@@ -1922,7 +1971,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
   sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
 - **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
-  `tools.timeLeft`, `tools.cancel`, `tools.run` (Export: the person's). Export `export.content`,
+  `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
+  `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
   `export.chooseTool`, `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`,
   `export.reveal`; Restore `restore.file`,

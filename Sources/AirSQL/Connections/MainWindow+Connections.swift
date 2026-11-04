@@ -149,8 +149,11 @@ extension MainWindowController {
         case Commands.editConnection.action?:
             return (connections.count == 1 && !sheet, sheet ? "A sheet is open: answer it first"
                 : connections.isEmpty ? "Select a connection in the sidebar first" : "Select only one connection to edit")
-        case Commands.newFolder.action?, Commands.importSSHConfig.action?:
+        case Commands.newFolder.action?, Commands.importSSHConfig.action?, Commands.importConnections.action?,
+             Commands.newConnectionFromURL.action?:
             return (!sheet, "A sheet is open: answer it first")
+        case Commands.exportConnections.action?:
+            return (!model.data.connections.isEmpty && !sheet, sheet ? "A sheet is open: answer it first" : "There are no connections yet")
         case Commands.renameFolder.action?, Commands.deleteFolder.action?:
             return (sidebar.selectedFolderNodeID != nil && !sheet, sheet ? "A sheet is open: answer it first"
                 : "Select a folder in the sidebar first")
