@@ -117,11 +117,11 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.controlBackgroundColor.setFill()
+        NSColor.content.setFill()
         dirtyRect.fill()
         // Lines first, under the boxes: from the child's key column to the parent's header.
         let frames = Dictionary(boxes.map { ($0.table.name, $0) }) { first, _ in first }
-        NSColor.tertiaryLabelColor.setStroke()
+        NSColor.secondaryLabelColor.setStroke()
         for link in links {
             guard let child = frames[link.child], let parent = frames[link.parent] else { continue }
             let column = child.table.foreignKeys.first { $0.name == link.name }?.columns.first
@@ -140,15 +140,15 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
                 path.line(to: end)
             }
             path.stroke()
-            NSColor.tertiaryLabelColor.setFill()
-            NSBezierPath(ovalIn: NSRect(x: start.x - 3, y: start.y - 3, width: 6, height: 6)).fill()
+            NSColor.secondaryLabelColor.setFill()
+            for point in [start, end] { NSBezierPath(ovalIn: NSRect(x: point.x - 3, y: point.y - 3, width: 6, height: 6)).fill() }
         }
         for box in boxes where box.frame.intersects(dirtyRect) { draw(box) }
     }
 
     private func draw(_ box: Box) {
         let shape = NSBezierPath(roundedRect: box.frame, xRadius: Radius.card, yRadius: Radius.card)
-        NSColor.windowBackgroundColor.setFill()
+        NSColor.bar.setFill()
         shape.fill()
         let isSelected = box.table.name == selected
         (isSelected ? NSColor.accent : NSColor.separatorColor).setStroke()

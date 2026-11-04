@@ -73,12 +73,15 @@ final class TabBarView: NSView {
     private let scroll = NSScrollView()
     private let strip = FlippedView()
     private let plus = NSButton()
+    private let more = NSButton()
     private(set) var buttons: [TabButton] = []
     private weak var dragged: Tab?
     static let height: CGFloat = 32
     /// Wide enough for a dozen letters of a title (the tooltip has all of it); more tabs scroll sideways.
     static let minimumTabWidth: CGFloat = 140
     static let maximumTabWidth: CGFloat = 220
+    /// What the bar keeps at its end for `+` and the tabs' menu.
+    static let endWidth: CGFloat = Spacing.unit + 44
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -96,7 +99,7 @@ final class TabBarView: NSView {
         let line = Hairline()
         addSubview(line)
         addSubview(scroll)
-        scroll.pin(to: self, insets: NSEdgeInsets(top: 0, left: Spacing.unit, bottom: 0, right: Spacing.unit))
+        scroll.pin(to: self, insets: NSEdgeInsets(top: 0, left: Spacing.unit, bottom: 0, right: Self.endWidth))
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: Self.height),
             line.leadingAnchor.constraint(equalTo: leadingAnchor), line.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -109,7 +112,16 @@ final class TabBarView: NSView {
         plus.action = Commands.newQuery.action
         plus.toolTip = Commands.newQuery.tip + " (⌘T)"
         plus.setAccessibilityIdentifier("tabs.new")
-        strip.addSubview(plus)
+        addSubview(plus)
+        more.bezelStyle = .texturedRounded
+        more.isBordered = false
+        more.image = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: "All Tabs")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        more.target = self
+        more.action = #selector(showAllTabs(_:))
+        more.toolTip = "Choose from all the open tabs, as more are open than fit"
+        more.setAccessibilityIdentifier("tabs.more")
+        addSubview(more)
         setAccessibilityElement(true)
         setAccessibilityRole(.tabGroup)
         setAccessibilityLabel("Tabs")
@@ -146,8 +158,7 @@ final class TabBarView: NSView {
     override func layout() {
         super.layout()
         let height = Self.height
-        let plusWidth: CGFloat = 28
-        let available = max(0, scroll.frame.width - plusWidth - Spacing.half)
+        let available = max(0, scroll.frame.width)
         let width = buttons.isEmpty ? 0
             : min(Self.maximumTabWidth, max(Self.minimumTabWidth, (available / CGFloat(buttons.count)).rounded(.down)))
         var x: CGFloat = 0
@@ -156,8 +167,28 @@ final class TabBarView: NSView {
             button.frame = NSRect(x: x, y: 4, width: width, height: height - 4)
             x += width + 1
         }
-        plus.frame = NSRect(x: x + Spacing.half, y: 4 + (height - 5 - 22) / 2, width: 22, height: 22)
-        strip.frame = NSRect(x: 0, y: 0, width: max(scroll.frame.width, plus.frame.maxX + Spacing.half), height: height)
+        // Past the last tab, or at the bar's end when tabs go out of sight, with the way to reach them.
+        more.isHidden = x - 1 <= available
+        let y = 4 + (height - 5 - 22) / 2
+        more.frame = NSRect(x: bounds.maxX - Spacing.unit - 22, y: y, width: 22, height: 22)
+        plus.frame = NSRect(x: more.isHidden ? scroll.frame.minX + x + Spacing.half : more.frame.minX - 22, y: y, width: 22, height: 22)
+        strip.frame = NSRect(x: 0, y: 0, width: max(scroll.frame.width, x), height: height)
+    }
+
+    @objc private func showAllTabs(_ sender: NSButton) {
+        let menu = NSMenu(title: "Tabs")
+        for button in buttons {
+            guard let tab = button.tab else { continue }
+            let item = menu.addItem(withTitle: tab.title, action: #selector(choseTab(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = tab
+            item.toolTip = "Show this tab"
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    @objc private func choseTab(_ item: NSMenuItem) {
+        if let tab = item.representedObject as? Tab { controller?.select(tab) }
     }
 
     func clicked(_ button: TabButton, count: Int) {

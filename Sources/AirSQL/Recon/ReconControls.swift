@@ -41,6 +41,7 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.toolTip = "Reading the databases on this connection"
+        spinner.isHidden = true  // a hidden spinner keeps no space in the bar
         for view in [popup, databases] as [NSView] { view.translatesAutoresizingMaskIntoConstraints = false }
         popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 150).isActive = true
         // A long connection name is shortened (its menu has all of it) rather than widening the window past its minimum.
@@ -93,6 +94,7 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
     private func loadDatabases() {
         loading?.cancel()
         guard let saved = connection, let connect = ReconWindowController.connect else { return }
+        spinner.isHidden = false
         spinner.startAnimation(nil)
         let window = popup.window
         loading = Task { [weak self] in
@@ -111,6 +113,7 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
             }
             guard let self, !Task.isCancelled else { return }
             self.spinner.stopAnimation(nil)
+            self.spinner.isHidden = true
             self.databases.removeAllItems()
             self.databases.addItems(withObjectValues: names)
             // Why the list is empty, where the person looks for it; a name can still be typed.

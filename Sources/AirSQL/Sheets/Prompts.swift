@@ -105,7 +105,12 @@ func showError(_ message: String, title: String, on window: NSWindow?) {
     let alert = NSAlert()
     alert.alertStyle = .warning
     alert.messageText = title
-    alert.informativeText = message
+    // AppKit gives its text a narrow column, which splits host names and makes a long error a tall one.
+    if message.count > 120 {
+        alert.accessoryView = alertText([label(message, wraps: true)], width: 400)
+    } else {
+        alert.informativeText = message
+    }
     alert.addOK()
     log.error("\(title, privacy: .public): \(message, privacy: .public)")
     if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }

@@ -652,7 +652,7 @@ final class SidebarCell: NSTableCellView {
         dot.isHidden = true
         name.stringValue = title
         name.font = .systemFont(ofSize: 11, weight: .semibold)
-        nameColour = .tertiaryLabelColor
+        nameColour = .quietText
         colour()
         shield.isHidden = true
         lock.isHidden = true

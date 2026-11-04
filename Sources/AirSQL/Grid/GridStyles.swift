@@ -105,6 +105,8 @@ extension NSColor {
         }
         return color
     }
+    /// A find match: dark enough in Deep Water for the light text on it (AA asks 4.5:1).
+    static let gridFound = pair(0xFFF27F, 0x5E5A1E)
     /// Selected cells: the accent at 20 % over the content.
     static let gridSelection = NSColor(name: nil) { appearance in
         var color = NSColor.content

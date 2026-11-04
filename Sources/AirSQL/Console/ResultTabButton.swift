@@ -22,7 +22,10 @@ final class ResultTabButton: NSView {
         title.font = .systemFont(ofSize: 11.5)
         title.lineBreakMode = .byTruncatingMiddle
         title.translatesAutoresizingMaskIntoConstraints = false
-        title.setContentCompressionResistancePriority(.defaultLow + 10, for: .horizontal)
+        title.setContentCompressionResistancePriority(.defaultLow + 2, for: .horizontal)
+        let shortest = title.widthAnchor.constraint(greaterThanOrEqualToConstant: 60)
+        shortest.priority = .defaultLow + 6  // over the bar's wish to show every tab
+        shortest.isActive = true
         pin.image = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Pinned")?
             .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
         pin.contentTintColor = .secondaryLabelColor
@@ -51,7 +54,7 @@ final class ResultTabButton: NSView {
             closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor), closeWidth,
             title.centerYAnchor.constraint(equalTo: centerYAnchor),
-            widthAnchor.constraint(lessThanOrEqualToConstant: 260),
+            widthAnchor.constraint(lessThanOrEqualToConstant: 360),
         ])
         setAccessibilityElement(true)
         setAccessibilityRole(.radioButton)

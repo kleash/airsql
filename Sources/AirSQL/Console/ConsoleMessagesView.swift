@@ -35,12 +35,12 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         borderType = .noBorder
         table.headerView = nil
         table.style = .plain
-        table.rowHeight = 24
+        table.centreText(rowHeight: 24)
         table.usesAutomaticRowHeights = false
         table.allowsMultipleSelection = true
         table.setAccessibilityIdentifier("console.messages")
         table.setAccessibilityLabel("Messages")
-        for (identifier, width) in [("icon", 22.0), ("line", 64.0), ("statement", 260.0), ("text", 420.0)] {
+        for (identifier, width) in [("icon", 22.0), ("line", 64.0), ("statement", 200.0), ("text", 360.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.width = width
             column.resizingMask = identifier == "text" ? .autoresizingMask : .userResizingMask
@@ -78,7 +78,7 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         cell.font = Self.textFont
         cell.wraps = true
         let width = table.tableColumns.last?.width ?? 420
-        let height = max(table.rowHeight, ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 1_000_000)).height) + 6)
+        let height = max(table.rowHeight, ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 1_000_000)).height))
         heights[row] = height
         return height
     }

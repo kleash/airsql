@@ -63,7 +63,7 @@ extension GridViewer {
         }
         let heat = heat, equal = highlightsEqual, highlight = highlight
         let accent = NSColor.accent, good = NSColor.statusOK, bad = NSColor.statusBad, same = NSColor.statusWarning
-        let found = NSColor.findHighlightColor.withAlphaComponent(0.5)
+        let found = NSColor.gridFound
         grid.cellTint = { [weak self] row, column in
             guard let self, !transposed, record == nil, let source else { return nil }
             if let highlight, highlight(row, column) { return found }

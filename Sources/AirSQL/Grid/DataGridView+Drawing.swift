@@ -43,6 +43,8 @@ extension DataGridView {
                 .withSymbolConfiguration(size.applying(colours))
             return boxes[on]
         }
+        // Transposed, a column holds every type: each cell looks as its source column does.
+        let transposed = source as? TransposedSource
         // Attributes and "…" for each look, made once per draw.
         var looks: [Int: (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine)] = [:]
         func look(_ column: Int, _ info: GridColumn, isNull: Bool, deleted: Bool) -> (attributes: [NSAttributedString.Key: Any], ellipsis: CTLine) {
@@ -63,7 +65,7 @@ extension DataGridView {
             let wholeRow = selection.containsRow(row)
             for column in columns {
                 let rect = NSRect(x: offsets[column], y: y, width: offsets[column + 1] - offsets[column], height: rowHeight)
-                let sourceColumn = columnOrder[column], info = source.columns[sourceColumn]
+                let sourceColumn = columnOrder[column], info = transposed?.sourceColumn(row, sourceColumn) ?? source.columns[sourceColumn]
                 let mark = source.mark(row, sourceColumn), position = GridPosition(row: row, column: column)
                 if let fill = marks[mark] {
                     fill.setFill()
@@ -108,7 +110,7 @@ extension DataGridView {
                 if !info.isKey, text.count > limit { text = String(text.prefix(limit)) + "…" }
                 let deleted = mark == .deleted
                 // NULL and what the server fills in at Apply (auto, default, ƒ NOW()) look alike: grey and slanted.
-                let (attributes, ellipsis) = look(sourceColumn, info, isNull: cell == .null || cell.isPlaceholder, deleted: deleted)
+                let (attributes, ellipsis) = look(transposed == nil ? sourceColumn : row * columnCount + sourceColumn, info, isNull: cell == .null || cell.isPlaceholder, deleted: deleted)
                 var line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
                 var width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
                 if width > available {

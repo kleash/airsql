@@ -36,16 +36,25 @@ final class GridEditor: NSTextField, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    private var placedOver = NSRect.zero
+
     /// Over `cell`: the text where the cell's own text was, the field centred in the row.
     func place(over cell: NSRect) {
+        self.placedOver = cell
         let height = min(cell.height, ceil(fittingSize.height))
-        frame = NSRect(x: cell.minX + GridStyles.padding - 2, y: cell.minY + ((cell.height - height) / 2).rounded(),
-                       width: max(20, cell.width - 2 * GridStyles.padding + 4), height: height)
+        let x = cell.minX + GridStyles.padding - 2, inCell = max(20, cell.width - 2 * GridStyles.padding + 4)
+        // Past the cell when the text needs it, as far as the grid shows: then it covers its neighbours.
+        let text = ceil((stringValue as NSString).size(withAttributes: [.font: font as Any]).width) + 8
+        let width = max(inCell, min(text, (superview?.visibleRect.maxX ?? x) - x - 2))
+        drawsBackground = width > inCell
+        backgroundColor = .content
+        frame = NSRect(x: x, y: cell.minY + ((cell.height - height) / 2).rounded(), width: width, height: height)
     }
 
     func controlTextDidChange(_ obj: Notification) {
         changed = true
         problem?.close()
+        place(over: placedOver)
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {

@@ -128,6 +128,7 @@ func summaryView(_ connection: SavedConnection, data: AirSQLData, state: Connect
     name.setAccessibilityIdentifier("summary.name")
     let route = ChipView(connection.routeBadge, style: .neutral)
     route.toolTip = "How AirSQL reaches this server"
+    route.label.setContentCompressionResistancePriority(.required, for: .horizontal)  // the name gives way
     let titleRow = NSStackView(views: [dot, name, route])
     titleRow.spacing = Spacing.unit
     // Connecting or connected: Disconnect in Connect's place, and Return opens a new query.

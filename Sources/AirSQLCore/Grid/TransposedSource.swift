@@ -34,6 +34,11 @@ public final class TransposedSource: GridSource {
         return (rows?[column - 1] ?? column - 1, order[row])
     }
 
+    /// The source's column behind a cell, whose look the cell keeps; nil for the names on the left.
+    public func sourceColumn(_ row: Int, _ column: Int) -> GridColumn? {
+        base(row, column).map { self.base.columns[$0.column] }
+    }
+
     private func sourceRow(_ column: Int) -> Int { rows?[column - 1] ?? column - 1 }
 
     public func cell(_ row: Int, _ column: Int) -> GridCell {

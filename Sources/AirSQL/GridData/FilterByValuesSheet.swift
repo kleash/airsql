@@ -120,7 +120,7 @@ final class FilterByValuesSheet: NSWindowController, NSTableViewDataSource, NSTa
         let none = button("Select None", id: "values.none", tip: "Untick every value shown", target: self, action: #selector(tickNone(_:)))
         let cancel = button("Cancel", id: "values.cancel", tip: "Close without filtering", target: self, action: #selector(cancel(_:)))
         cancel.keyEquivalent = "\u{1b}"
-        okButton = button("Filter", id: "values.ok", tip: "Show only the rows with the ticked values", target: self, action: #selector(ok(_:)))
+        okButton = button("Filter", id: "values.ok", tip: "Show only the rows with the ticked values", target: self, action: #selector(ok(_:)), primary: true)
         okButton.keyEquivalent = "\r"
         okButton.isEnabled = false
         containsButton = button("Contains", id: "values.contains", tip: "Show the rows whose \(column.name) contains the text typed above",

@@ -193,12 +193,16 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     /// sheet's own rows take about 280 pt, so the sheet fits an 800 pt high screen.
     static func tabLimit(screen height: CGFloat) -> CGFloat { max(300, height - 280) }
 
+    /// Every tab but the tallest routes gets this height, so the tab strip stays put from tab to tab.
+    static let tabHeightAtLeast: CGFloat = 460
+
     /// The sheet as tall as what the tab shows now.
     func fitWindow() {
         guard let window, let root = window.contentView else { return }
         if let tabContent, let tabHeight {
             let screen = (window.sheetParent?.screen ?? NSScreen.main)?.visibleFrame.height ?? 775
-            tabHeight.constant = min(tabContent.fittingSize.height + 2 * Self.ringRoom, Self.tabLimit(screen: screen))
+            tabHeight.constant = min(max(tabContent.fittingSize.height + 2 * Self.ringRoom, Self.tabHeightAtLeast),
+                                     Self.tabLimit(screen: screen))
         }
         root.layoutSubtreeIfNeeded()
         let size = root.fittingSize

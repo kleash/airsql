@@ -42,7 +42,7 @@ extension TableEditorController {
             (removeButton, "minus", "Remove Rows", "Remove the selected rows from the design; they go when you apply",
              Commands.deleteRows.action, "tableEditor.remove"),
         ] {
-            control.bezelStyle = .smallSquare
+            control.bezelStyle = .rounded
             control.image = NSImage(systemSymbolName: symbol, accessibilityDescription: name)
             control.target = self
             control.action = action
@@ -138,7 +138,7 @@ extension TableEditorController {
     }
 
     func updateSectionTitles() {
-        let counts = [design.columns.count, design.indexes.count, design.foreignKeys.count, design.checks.count]
+        let counts = [design.columns.count, design.indexes.count, design.foreignKeys.count, design.checks.count + columnCheckRows.count]
         let names = ["Columns", "Indexes", "Foreign keys", "Checks", "Options"]
         for (index, name) in names.enumerated() {
             let count = index < counts.count && counts[index] > 0 ? " · \(counts[index])" : ""

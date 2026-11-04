@@ -233,7 +233,8 @@ final class AgentService {
     private func updateStatus() {
         let allowed = model.data.settings.agentsAllowed
         if let last = events.last {
-            let what = last.client + " · " + last.summary.prefix(40) + (last.outcome == nil ? "…" : "")
+            let summary = last.summary.count > 40 ? last.summary.prefix(39) + "…" : last.summary[...]
+            let what = last.client + " · " + summary + (last.outcome == nil && last.summary.count <= 40 ? "…" : "")
             model.agentStatus = allowed ? what : "Agents off"
         } else {
             model.agentStatus = allowed ? "Agents on" : nil

@@ -55,6 +55,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityLabel("Searching")
+        spinner.isHidden = true  // in the stack, a hidden spinner keeps no space at the bar's end
         status.stringValue = "Type the text, then press Return: AirSQL counts the rows of each table whose text columns hold it. "
             + "Every table is read in full."
         status.toolTip = status.stringValue
@@ -74,6 +75,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         }
         table.style = .fullWidth
         table.stripes = true
+        table.centreText(rowHeight: 24)
         table.dataSource = self
         table.delegate = self
         table.target = self
@@ -119,11 +121,13 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         matches = []
         searched = text
         table.reloadData()
+        spinner.isHidden = false
         spinner.startAnimation(nil)
         search = Task { [weak self] in
             await self?.run(text, in: databases)
             self?.search = nil
             self?.spinner.stopAnimation(nil)
+            self?.spinner.isHidden = true
         }
     }
 

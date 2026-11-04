@@ -47,8 +47,8 @@ final class ReconDetailView: NSObject {
             stack.orientation = .vertical
             stack.alignment = .leading
             stack.spacing = 4
-            stack.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 0, right: 0)
-            text.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -Spacing.unit).isActive = true
+            stack.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 0, right: Spacing.unit)
+            text.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -Spacing.double).isActive = true
             return stack
         }
         structure.isVertical = true

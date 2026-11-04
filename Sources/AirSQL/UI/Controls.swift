@@ -160,6 +160,8 @@ final class RenameField: NSTextField, NSTextFieldDelegate {
 /// System Settings' older panes and AirSCP's forms lay them out.
 final class Form {
     let grid = NSGridView(numberOfColumns: 2, rows: 0)
+    /// The widest label, which `finish` makes the column's width: left to itself the grid's layout is ambiguous there.
+    private(set) var labelWidth: CGFloat = 0
 
     init() {
         grid.translatesAutoresizingMaskIntoConstraints = false
@@ -173,6 +175,7 @@ final class Form {
     func row(_ title: String, _ views: [NSView], caption text: String? = nil) -> NSGridRow {
         let name = label(title.isEmpty ? "" : title + ":")
         name.alignment = .right
+        labelWidth = max(labelWidth, ceil(name.intrinsicContentSize.width))
         // VoiceOver reads the label with the row's first control when that has no title of its own (a field, a pop-up).
         if !title.isEmpty, let control = views.first,
            (control as? NSTextField)?.isEditable == true || control is NSPopUpButton || control is NSSegmentedControl {
@@ -207,7 +210,10 @@ final class Form {
 
     /// Finishes the layout: the first column right-aligned (as wide as its widest label).
     func finish() -> NSGridView {
-        if grid.numberOfColumns > 0 { grid.column(at: 0).xPlacement = .trailing }
+        if grid.numberOfColumns > 0 {
+            grid.column(at: 0).xPlacement = .trailing
+            if labelWidth > 0 { grid.column(at: 0).width = labelWidth }
+        }
         return grid
     }
 }
@@ -312,6 +318,16 @@ final class ReturnTable: ContentTable {
 
     override func keyDown(with event: NSEvent) {
         if [36, 76].contains(event.keyCode) { onReturn() } else { super.keyDown(with: event) }
+    }
+}
+
+extension NSTableView {
+    /// Rows `height` tall with their line of text in the middle: a label used as a cell draws at the top of its frame, so
+    /// the height beyond a line goes to the space between rows.
+    func centreText(rowHeight height: CGFloat) {
+        rowSizeStyle = .custom
+        rowHeight = 16
+        intercellSpacing.height = height - rowHeight
     }
 }
 

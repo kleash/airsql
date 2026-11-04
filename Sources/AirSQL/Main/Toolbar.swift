@@ -94,6 +94,8 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         item.owner = self
         popupItems[popup] = item
         popup.translatesAutoresizingMaskIntoConstraints = false
+        popup.cell?.usesSingleLineMode = true  // a long name would wrap onto a second line
+        popup.cell?.lineBreakMode = .byTruncatingTail
         popup.widthAnchor.constraint(greaterThanOrEqualToConstant: width.0).isActive = true
         popup.widthAnchor.constraint(lessThanOrEqualToConstant: width.1).isActive = true
         update()

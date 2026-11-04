@@ -87,7 +87,7 @@ final class ExportRowsSheet: NSWindowController {
         copyButton = button("Copy", id: "export.copy", tip: "Put the rows on the clipboard in this format", target: self,
                             action: #selector(copyRows(_:)))
         let save = button("Export…", id: "export.save", tip: "Choose a file and write the rows to it", target: self,
-                          action: #selector(saveRows(_:)))
+                          action: #selector(saveRows(_:)), primary: true)
         save.keyEquivalent = "\r"
         let buttons = NSStackView(views: [helpButton(.tableData), NSView(), cancel, copyButton, save])
         buttons.spacing = Spacing.unit

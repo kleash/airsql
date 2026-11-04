@@ -242,7 +242,7 @@ final class TableDataNotice: NSView {
                               action: Commands.previewChanges.action)
     lazy var revert = button("Revert All", id: "tableData.revert", tip: "Throw away every pending change",
                              target: nil, action: #selector(TableDataController.revertAllChanges(_:)))
-    lazy var apply = button("Apply", id: "tableData.apply", tip: Commands.apply.tip, target: nil, action: Commands.apply.action)
+    lazy var apply = button("Apply", id: "tableData.apply", tip: Commands.apply.tip, target: nil, action: Commands.apply.action, primary: true)
     private var kind = Kind.readOnly
 
     init() {
@@ -252,7 +252,7 @@ final class TableDataNotice: NSView {
         text.setAccessibilityIdentifier("tableData.noticeText")
         text.isSelectable = true  // an error to paste into a ticket
         apply.keyEquivalent = ""
-        for control in [preview, revert, apply] { control.controlSize = .small }
+        text.setContentHuggingPriority(.defaultLow, for: .horizontal)  // the buttons at the end of the band
         let row = NSStackView(views: [text, preview, revert, apply])
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit

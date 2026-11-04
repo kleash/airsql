@@ -52,10 +52,10 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         fitButton.action = #selector(fitAll(_:))
         let second = NSView()
         second.setContentHuggingPriority(.init(1), for: .horizontal)
-        let tools = NSStackView(views: [find, fitButton, second])
+        let tools = NSStackView(views: [find, fitButton, summary, second])
         tools.spacing = Spacing.unit
         tools.edgeInsets = NSEdgeInsets(top: 0, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
-        let top = NSStackView(views: [label("Database:"), databases, summary, spacer, exportImage, exportMermaid,
+        let top = NSStackView(views: [label("Database:"), databases, spacer, exportImage, exportMermaid,
                                       helpButton(.editors)])
         top.spacing = Spacing.unit
         top.alignment = .centerY
@@ -70,7 +70,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
-        scroll.backgroundColor = .controlBackgroundColor
+        scroll.backgroundColor = .content
         scroll.allowsMagnification = true  // pinch, and ⌘+ ⌘− ⌘0 below
         scroll.minMagnification = 0.05
         scroll.maxMagnification = 3

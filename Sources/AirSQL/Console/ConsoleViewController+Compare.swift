@@ -82,6 +82,7 @@ extension ConsoleViewController {
         for popup in [with, keys] { popup.widthAnchor.constraint(equalToConstant: 320).isActive = true }
         let form = NSGridView(views: [[label("Compare with:"), with], [label("Match rows on:"), keys]])
         form.rowSpacing = 10
+        form.rowAlignment = .firstBaseline
         form.column(at: 0).xPlacement = .trailing
         form.frame.size = form.fittingSize
         alert.accessoryView = form

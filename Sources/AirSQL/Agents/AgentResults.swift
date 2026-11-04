@@ -101,6 +101,7 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
         }
         table.style = .fullWidth
         table.stripes = true
+        table.centreText(rowHeight: 24)
         table.allowsMultipleSelection = true
         table.dataSource = self
         table.delegate = self

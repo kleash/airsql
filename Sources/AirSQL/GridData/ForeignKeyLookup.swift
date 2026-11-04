@@ -31,6 +31,7 @@ final class ForeignKeyLookup: NSObject, NSSearchFieldDelegate, NSTableViewDataSo
         column.title = title
         table.addTableColumn(column)
         table.headerView = nil
+        table.centreText(rowHeight: 24)
         table.dataSource = self
         table.delegate = self
         table.target = self

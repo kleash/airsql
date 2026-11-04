@@ -30,8 +30,8 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     private let killConnection = button("Kill Connection…", id: "processes.killConnection", tip: Commands.killConnection.tip,
                                         target: nil, action: Commands.killConnection.action)
     static let intervals = [0, 2, 5, 10, 30]
-    private static let columns: [(String, String, CGFloat)] = [("id", "Id", 50), ("user", "User", 80), ("host", "Host", 120),
-        ("db", "Database", 90), ("command", "Command", 76), ("time", "Time", 50), ("state", "State", 120), ("info", "Query", 300)]
+    private static let columns: [(String, String, CGFloat)] = [("id", "Id", 60), ("user", "User", 96), ("host", "Host", 150),
+        ("db", "Database", 100), ("command", "Command", 84), ("time", "Time", 64), ("state", "State", 150), ("info", "Query", 300)]
 
     init(_ open: OpenConnection) {
         self.open = open
@@ -84,6 +84,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         table.stripes = true
         table.allowsMultipleSelection = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
+        table.centreText(rowHeight: 24)
         table.dataSource = self
         table.delegate = self
         table.target = self

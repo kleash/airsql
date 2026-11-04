@@ -150,8 +150,11 @@ final class GridChartView: NSView {
     /// The chart drawn as a PNG (what Save as PNG writes).
     func pngData() -> Data? {
         let size = hosting.bounds.size.width > 50 ? hosting.bounds.size : NSSize(width: 800, height: 500)
+        // The ground as this view's appearance gives it, which a Dark view in a Light app isn't otherwise.
+        var ground = NSColor.content
+        effectiveAppearance.performAsCurrentDrawingAppearance { ground = NSColor.content.solid }
         let renderer = ImageRenderer(content: GridChartBody(spec: spec).frame(width: size.width, height: size.height)
-            .padding(16).background(Color(nsColor: .content.solid)).environment(\.colorScheme, effectiveAppearance.isDark ? .dark : .light))
+            .padding(16).background(Color(nsColor: ground)).environment(\.colorScheme, effectiveAppearance.isDark ? .dark : .light))
         renderer.scale = 2
         guard let image = renderer.cgImage else { return nil }
         return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
@@ -178,7 +181,7 @@ struct GridChartBody: View {
     @State private var hovered: GridChart.Point?
 
     /// The palette's first hue for one series; its eight hues, in order, for pie slices (and grey for "Other").
-    static let series = Color(nsColor: .pair(0x2A78D6, 0x3987E5))
+    static let series = Color(nsColor: .accent)
     static let slices: [Color] = [(0x2A78D6, 0x3987E5), (0xEB6834, 0xD95926), (0x1BAF7A, 0x199E70), (0xEDA100, 0xC98500),
                                   (0xE87BA4, 0xD55181), (0x008300, 0x008300), (0x6250D6, 0x9085E9), (0xE34948, 0xE66767)]
         .map { light, dark in Color(nsColor: .pair(light, dark)) }

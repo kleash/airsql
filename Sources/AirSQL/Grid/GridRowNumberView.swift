@@ -67,7 +67,8 @@ final class GridRowNumberView: NSView {
             NSRect(x: 0, y: top + grid.rowHeight - pixel, width: bounds.width, height: pixel).fill()
         }
         NSColor.separatorColor.setFill()
-        NSRect(x: bounds.width - pixel, y: dirtyRect.minY, width: pixel, height: dirtyRect.height).fill()
+        let lastRowEnd = CGFloat(grid.rowCount) * grid.rowHeight - scrolled
+        NSRect(x: bounds.width - pixel, y: dirtyRect.minY, width: pixel, height: max(0, min(dirtyRect.maxY, lastRowEnd) - dirtyRect.minY)).fill()
     }
 
     // MARK: Mouse

@@ -117,6 +117,8 @@ final class DataGridView: NSView {
         didSet {
             styles = GridStyles(fontSize: fontSize)
             rowHeight = styles.rowHeight
+            // In step with the text, so values measured or sized by hand still fit as they did.
+            columnWidths = columnWidths.map { ceil($0 * fontSize / oldValue) }
             reloadData()
         }
     }

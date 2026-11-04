@@ -156,6 +156,16 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
         return row
     }
 
+    /// Keeps `--socket=…` whole: AppKit would break a line after a hyphen. The text itself stays as it is, to copy.
+    private final class CommandLayout: NSObject, NSLayoutManagerDelegate {
+        func layoutManager(_ layoutManager: NSLayoutManager, shouldBreakLineByWordBeforeCharacterAt charIndex: Int) -> Bool {
+            guard charIndex > 0, let text = layoutManager.textStorage?.string as NSString? else { return true }
+            return text.character(at: charIndex - 1) != 0x2D
+        }
+    }
+
+    private static let commandLayout = CommandLayout()
+
     /// A box of monospaced, selectable text (the command line, the SQL to run), `lines` lines tall at most.
     func codeBox(id: String, tip: String, lines: CGFloat = 4) -> (NSView, NSTextView) {
         let scroll = NSTextView.scrollableTextView()
@@ -171,6 +181,7 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
         text.textContainerInset = NSSize(width: 4, height: 4)
         text.setAccessibilityIdentifier(id)
         text.toolTip = tip
+        text.layoutManager?.delegate = Self.commandLayout
         let line = text.layoutManager?.defaultLineHeight(for: text.font!) ?? 15
         let box = SurfaceView(.content, radius: Radius.control, border: .separatorColor)
         box.translatesAutoresizingMaskIntoConstraints = false

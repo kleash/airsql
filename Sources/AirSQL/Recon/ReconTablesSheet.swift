@@ -63,7 +63,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         }
         table.dataSource = self
         table.delegate = self
-        table.rowHeight = 24
+        table.centreText(rowHeight: 24)
         table.allowsMultipleSelection = true
         table.stripes = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
@@ -92,7 +92,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
                             target: self, action: #selector(cancel(_:)))
         cancel.keyEquivalent = "\u{1b}"
         let done = button("Done", id: "reconTables.done", tip: "Use these choices for the next compare", target: self,
-                          action: #selector(done(_:)))
+                          action: #selector(done(_:)), primary: true)
         done.keyEquivalent = "\r"
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)

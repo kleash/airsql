@@ -90,7 +90,9 @@ final class ResultsView: NSView, NSTextFieldDelegate {
         strip.setHuggingPriority(.defaultHigh, for: .horizontal)
         strip.translatesAutoresizingMaskIntoConstraints = false
         tabsScroll.drawsBackground = false
-        tabsScroll.hasHorizontalScroller = false
+        tabsScroll.hasHorizontalScroller = true
+        tabsScroll.autohidesScrollers = true
+        tabsScroll.scrollerStyle = .overlay
         tabsScroll.verticalScrollElasticity = .none
         tabsScroll.documentView = strip
         tabsScroll.translatesAutoresizingMaskIntoConstraints = false
@@ -104,7 +106,11 @@ final class ResultsView: NSView, NSTextFieldDelegate {
         holder.translatesAutoresizingMaskIntoConstraints = false
         for view in [bar, topLine, line, holder] { addSubview(view) }
         help.controlSize = .small
-        for view in [tabsScroll, spinner, summary, help, cancelButton] { bar.addSubview(view) }
+        // A stack, so the hidden Cancel keeps no space beside the "?".
+        let end = NSStackView(views: [help, cancelButton])
+        end.spacing = Spacing.unit
+        end.translatesAutoresizingMaskIntoConstraints = false
+        for view in [tabsScroll, spinner, summary, end] { bar.addSubview(view) }
         NSLayoutConstraint.activate([
             topLine.topAnchor.constraint(equalTo: topAnchor), topLine.heightAnchor.constraint(equalToConstant: 1),
             topLine.leadingAnchor.constraint(equalTo: leadingAnchor), topLine.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -122,13 +128,11 @@ final class ResultsView: NSView, NSTextFieldDelegate {
             spinner.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             summary.leadingAnchor.constraint(equalTo: spinner.trailingAnchor, constant: Spacing.half),
             summary.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            help.leadingAnchor.constraint(equalTo: summary.trailingAnchor, constant: Spacing.unit),
-            help.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            cancelButton.leadingAnchor.constraint(equalTo: help.trailingAnchor, constant: Spacing.unit),
-            cancelButton.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -Spacing.unit),
-            cancelButton.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
+            end.leadingAnchor.constraint(equalTo: summary.trailingAnchor, constant: Spacing.unit),
+            end.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -Spacing.unit),
+            end.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
         ])
-        // The summary gives way to the tabs, down to a readable part of it; past that the tabs scroll.
+        // The summary gives way to the tabs, down to a readable part of it; then the tabs' titles shorten; then they scroll.
         summary.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         summary.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let fits = tabsScroll.widthAnchor.constraint(equalTo: strip.widthAnchor)
