@@ -443,7 +443,7 @@ enum Commands {
     static let addRow = Command("Add Row", #selector(AirSQLActions.addRow(_:)), "i",
                                 tip: "Add a new row; it is saved when you apply the changes")
     static let duplicateRow = Command("Duplicate Row", #selector(AirSQLActions.duplicateRow(_:)), "d",
-                                      tip: "Add a copy of the selected rows, keys included")
+                                      tip: "Add a copy of the selected rows, leaving AUTO_INCREMENT columns to the server")
     static let duplicateRowWithoutKeys = Command("Duplicate Row Without Keys", #selector(AirSQLActions.duplicateRowWithoutKeys(_:)), "D",
                                                  tip: "Add a copy of the selected rows, leaving their keys to the server")
     static let pasteAsNewRows = Command("Paste as New Rows", #selector(AirSQLActions.pasteAsNewRows(_:)),

@@ -50,8 +50,8 @@ extension TableDataController: DataGridViewDelegate {
             let values = insertValueItems()
             if !values.isEmpty { menu.addItem(MainMenu.submenu("Insert Value", values)) }
             if let column = viewer.focusedCell?.column, foreignKey(column) != nil { menu.add([Commands.chooseReferencedRow]) }
-            menu.add([nil, Commands.addRow, Commands.duplicateRow, Commands.deleteRows, Commands.revert, nil, Commands.previewChanges,
-                      Commands.apply, nil, Commands.exportRows])
+            menu.add([nil, Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, Commands.revert, nil,
+                      Commands.previewChanges, Commands.apply, nil, Commands.exportRows])
         }
         for item in menu.items + (menu.items.compactMap(\.submenu).flatMap(\.items)) where item.target == nil { item.target = self }
         return menu
@@ -89,8 +89,8 @@ extension TableDataController: DataGridViewDelegate {
     @objc func duplicateRow(_ sender: Any?) { duplicate(keepingKeys: true) }
     @objc func duplicateRowWithoutKeys(_ sender: Any?) { duplicate(keepingKeys: false) }
 
-    /// Adds a copy of each selected row; without keys, the key and AUTO_INCREMENT columns are left to the server.
-    /// Generated columns are always left out.
+    /// Adds a copy of each selected row. AUTO_INCREMENT columns (a copied number would fail Apply as a duplicate key)
+    /// and generated ones are always left to the server; without keys, the key columns are too.
     private func duplicate(keepingKeys: Bool) {
         guard let source, editingOff == nil else { return NSSound.beep() }
         var last: UUID?
@@ -98,7 +98,7 @@ extension TableDataController: DataGridViewDelegate {
         for row in viewer.selectedRows() {
             var values: [String: PendingChanges.Value] = [:]
             for (index, column) in source.table.columns.enumerated() where column.generated == nil {
-                if !keepingKeys, source.columns[index].isKey || column.autoIncrement { continue }
+                if column.autoIncrement || !keepingKeys && source.columns[index].isKey { continue }
                 if case .inserted(let id) = source.row(row) {
                     values[column.name] = source.changes.insert(id)?.values[column.name]  // a new row's own values only
                 } else {
@@ -149,6 +149,7 @@ extension TableDataController: DataGridViewDelegate {
     func focus(row: Int?) {
         viewer.backToGrid(nil)
         guard let row, row < grid.rowCount, grid.columnCount > 0 else { return }
+        view.layoutSubtreeIfNeeded()  // the first pending change opens the notice, which takes height from the rows
         grid.selection.select(GridPosition(row: row, column: 0))
         grid.reveal(grid.cellRect(GridPosition(row: row, column: 0)))
         view.window?.makeFirstResponder(grid)

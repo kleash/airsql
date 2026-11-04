@@ -761,8 +761,9 @@ Nothing is written until you apply. Leaving a row writes nothing.
   `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
   or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
 - **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
-  in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, keys
-  included; **Duplicate Row Without Keys** (⇧⌘D) leaves the key and AUTO_INCREMENT columns to the server.
+  in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, and
+  their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
+  key column to the server too.
   **Delete Rows…** (⌘⌫) marks the selected rows for deletion. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the

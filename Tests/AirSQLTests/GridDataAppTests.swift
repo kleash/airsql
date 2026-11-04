@@ -404,6 +404,21 @@ extension AppTests {
             #expect(tab.source?.changes.isEmpty == true)
         }
 
+        /// The first pending change opens the notice over the rows: the new row must still show once it has.
+        @Test func aDuplicatedRowShowsAndLeavesItsAutoIncrementToTheServer() async throws {
+            let session = FakeTableSession()
+            session.rows = (1...60).map { [String($0), "7", "EU", String(100 + $0), "1.00", nil] }
+            let (main, _, tab) = try await Self.tab(session: session, size: NSSize(width: 900, height: 500))
+            tab.grid.selection.selectRow(0)
+            tab.duplicateRow(nil)
+            main.window?.layoutIfNeeded()
+            let copy = tab.grid.rowCount - 1
+            #expect(tab.grid.selection.cursor?.row == copy)
+            #expect(tab.grid.visibleRect.contains(tab.grid.rowRect(copy).intersection(NSRect(x: 0, y: 0, width: 1, height: 1e6))),
+                    "\(tab.grid.visibleRect) \(tab.grid.rowRect(copy))")
+            #expect(tab.source?.cell(copy, 0) == .placeholder("auto") && tab.source?.cell(copy, 2) == .text("EU"))
+        }
+
         @Test func whereBarCompletesColumnNames() async throws {
             let (_, _, tab) = try await Self.tab()
             tab.bar.filterText = "region = 'EU' AND cu"
