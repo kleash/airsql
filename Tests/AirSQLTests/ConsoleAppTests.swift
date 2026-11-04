@@ -195,6 +195,19 @@ extension AppTests {
             log.statement("SELECT 2", context: "Shop main:3", noBackslashEscapes: false)
             viewer.refresh()
             #expect(await eventually(timeout: 5) { viewer.lines.count == 3 }, "follows what is added")
+            // A selection outlives the reads, and lines that come after it.
+            let textView = viewer.text
+            #expect(await eventually(timeout: 5) { textView.string.contains("SELECT 2") })
+            let selected = NSRange(location: 3, length: 12)
+            textView.setSelectedRange(selected)
+            viewer.refresh()
+            log.statement("SELECT 3", context: "Shop main:4", noBackslashEscapes: false)
+            #expect(await eventually(timeout: 5) {
+                viewer.refresh()
+                return textView.string.contains("SELECT 3")
+            })
+            #expect(textView.selectedRange() == selected)
+            #expect(textView.string.components(separatedBy: "\n").count == 5, "each line once")
             SQLLogWindowController.clear(log)
             #expect(await eventually(timeout: 5) { !FileManager.default.fileExists(atPath: log.fileURL.path) })
             viewer.refresh()

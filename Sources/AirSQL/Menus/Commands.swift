@@ -736,6 +736,13 @@ enum Commands {
 }
 
 extension NSMenuItem {
+    /// Close Tab (⌘W) says what it closes here: the tab, or where there is none the window.
+    func showsClosing(tab: Bool) {
+        let command = tab ? Commands.closeTab : Commands.closeWindow
+        title = command.title
+        toolTip = command.tip
+    }
+
     /// Sets the tooltip for the item's state: why it is off (when that is known), else what it does.
     func explain(enabled: Bool, reason: String?) {
         toolTip = (enabled ? nil : reason) ?? Commands.tip(for: self) ?? toolTip

@@ -379,8 +379,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         }
     }
 
+    /// ⌘W: the tab shown, or with none the window, as in Safari.
     @objc func closeTab(_ sender: Any?) {
-        if let tab = selectedTab { close(tab) }
+        if let tab = selectedTab { close(tab) } else { window?.performClose(sender) }
     }
 
     @objc func closeOtherTabs(_ sender: Any?) {
@@ -466,11 +467,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.newQuery.action?:
             enabled = activeConnection != nil || sidebar.focusedDatabase != nil
             reason = "Select one connection in the sidebar first"
-        case Commands.closeTab.action?, Commands.closeAllTabs.action?, Commands.renameTab.action?, Commands.renameF2.action?:
+        case Commands.closeTab.action?:
+            item.showsClosing(tab: selectedTab != nil)
+            return true
+        case Commands.closeAllTabs.action?, Commands.renameTab.action?, Commands.renameF2.action?:
             enabled = selectedTab != nil
             reason = "No tab is open"
-            if item.action != Commands.closeTab.action, item.action != Commands.closeAllTabs.action, let tab = selectedTab,
-               tab.tabContent?.canRename != true {
+            if item.action != Commands.closeAllTabs.action, let tab = selectedTab, tab.tabContent?.canRename != true {
                 enabled = false
                 reason = "This tab is named after what it shows"
             }

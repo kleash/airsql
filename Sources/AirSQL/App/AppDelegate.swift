@@ -124,7 +124,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func setUpAgents(_ sender: Any?) { showSettings(pane: .agents) }
 
+    /// ⌘W in a window with no tabs of its own (Settings, SQL Log, Compare); the main window answers for itself.
+    @objc func closeTab(_ sender: Any?) { NSApp.keyWindow?.performClose(sender) }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == Commands.closeTab.action {
+            item.showsClosing(tab: false)
+            // A sheet has its own buttons.
+            guard let window = NSApp.keyWindow, window.styleMask.contains(.closable), window.sheetParent == nil else {
+                item.toolTip = NSApp.keyWindow == nil ? "No window is open" : "Answer the sheet first"
+                return false
+            }
+            return true
+        }
         item.explain(enabled: true, reason: nil)
         return true
     }

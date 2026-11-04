@@ -6,6 +6,18 @@ import Testing
 // The app shell driven as a person would, through the harness: the first run, the sidebar's commands, tabs, the status
 // bar, Settings, the SQL preview sheet, the Trust and password sheets, and the harness's own tools.
 extension AppTests {
+    @Test func commandWClosesTheMainWindowWhenNoTabIsOpen() throws {
+        let (main, _) = appWindow(testModel(Fixtures.shop))
+        let item = Commands.closeTab.item()
+        #expect(main.validateMenuItem(item) && item.title == "Close Window")
+        main.open(FixtureContent(), title: "Query 1", connection: nil)
+        #expect(main.validateMenuItem(item) && item.title == "Close Tab")
+        main.closeTab(nil)
+        #expect(main.tabs.isEmpty && main.window?.isVisible == true)
+        main.closeTab(nil)
+        #expect(main.window?.isVisible == false)
+    }
+
     @Test func firstRunOffersTheFirstConnection() async throws {
         let model = testModel()
         let (main, harness) = appWindow(model)
