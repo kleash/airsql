@@ -13,6 +13,14 @@ extension TableDesign {
     }
 }
 
+extension TableDesign {
+    /// Its parts as CREATE TABLE lists them, one to a line: what copying rows of the table editor gives.
+    public func definitions(server: SchemaServer) throws -> [String] {
+        let sql = TableSQL(server: server, database: "")
+        return try columns.map(sql.definition) + indexes.map(sql.index) + foreignKeys.map(sql.foreignKey) + checks.map(sql.check)
+    }
+}
+
 struct TableSQL {
     let server: SchemaServer
     let database: String

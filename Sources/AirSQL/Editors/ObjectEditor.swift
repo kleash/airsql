@@ -131,6 +131,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     @objc private func retry(_ sender: Any?) { load() }
 
     func textDidChange(_ notification: Notification) {
+        (codeScroll.verticalRulerView as? LineNumberRuler)?.errorLine = nil
         updateControls()
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
     }

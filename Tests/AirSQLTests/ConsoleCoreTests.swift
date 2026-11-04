@@ -293,3 +293,190 @@ struct ResultSetSourceTests {
         #expect(source.value(0, 4) == "0x" + String(repeating: "FF", count: 300))
     }
 }
+
+/// The local check for unknown names: what it finds, and above all where it says nothing.
+@Suite struct SQLNameCheckTests {
+    static func snapshot(version: String = "8.4.3", caseless: Int = 0) -> SchemaSnapshot {
+        func table(_ name: String, _ columns: [String], kind: SchemaTable.Kind = .table) -> SchemaTable {
+            var table = SchemaTable(name: name, kind: kind)
+            table.columns = columns.map {
+                SchemaColumn(name: $0, dataType: "int", columnType: "int", nullable: true, defaultValue: .none, autoIncrement: false,
+                             onUpdate: nil, generated: nil, invisible: false, isJSON: false, charset: nil, collation: nil, comment: "")
+            }
+            return table
+        }
+        var shop = SchemaDatabase(name: "shop", charset: "utf8mb4", collation: "utf8mb4_bin")
+        shop.tables = [table("orders", ["id", "total", "customer_id", "year", "café"]), table("customers", ["id", "name"]),
+                       table("Order Details", ["id", "order id"]), table("big_view", ["id"], kind: .view), table("broken_view", [], kind: .view)]
+        shop.detailsLoaded = true
+        var names = SchemaDatabase(name: "names_only", charset: "utf8mb4", collation: "utf8mb4_bin")
+        names.tables = [table("t", [])]
+        var system = SchemaDatabase(name: "information_schema", charset: "utf8mb3", collation: "utf8mb3_general_ci")
+        system.tables = [table("TABLES", ["TABLE_NAME"])]
+        system.detailsLoaded = true
+        var snapshot = SchemaSnapshot()
+        snapshot.server = SchemaServer(version: version, lowerCaseTableNames: caseless)
+        snapshot.databases = [shop, names, system]
+        return snapshot
+    }
+
+    /// The words underlined in `sql`.
+    func found(_ sql: String, snapshot: SchemaSnapshot? = snapshot(), database: String? = "shop", changed: Set<String> = []) -> [String] {
+        let text = sql as NSString
+        return SQLNameCheck.problems(in: sql, snapshot: snapshot, database: database, changed: changed)
+            .map { text.substring(with: NSRange($0.range)) }
+    }
+
+    @Test func findsUnknownTablesAndColumns() {
+        #expect(found("SELECT * FROM nosuch") == ["nosuch"])
+        #expect(found("SELECT 1 FROM orders o JOIN nosuch n ON n.id = o.id") == ["nosuch"])
+        #expect(found("SELECT 1 FROM orders, nosuch") == ["nosuch"])
+        #expect(found("SELECT 1 FROM orders o JOIN customers c ON c.id = o.id, nosuch") == ["nosuch"])
+        #expect(found("SELECT * FROM orders WHERE id IN (SELECT id FROM nosuch)") == ["nosuch"])
+        #expect(found("UPDATE nosuch SET a = 1") == ["nosuch"])
+        #expect(found("DELETE FROM nosuch") == ["nosuch"])
+        #expect(found("INSERT INTO nosuch (a) VALUES (1)") == ["nosuch"])
+        #expect(found("SELECT * FROM shop.nosuch") == ["nosuch"])
+        #expect(found("SELECT nope, id FROM orders") == ["nope"])
+        #expect(found("SELECT o.nope, c.name FROM orders o JOIN customers c ON c.id = o.customer_id") == ["nope"])
+        #expect(found("SELECT COUNT(o.nope) FROM orders o") == ["nope"])
+        #expect(found("SELECT id FROM orders WHERE nope = 1 AND total > 2 ORDER BY other_one DESC") == ["nope", "other_one"])
+        #expect(found("UPDATE orders SET nope = 1, total = nada WHERE id = 1") == ["nope", "nada"])
+        #expect(found("INSERT INTO orders (id, nope) VALUES (1, 2)") == ["nope"])
+        #expect(found("SELECT `nope` FROM `orders`") == ["`nope`"])
+        // Each statement of a script, at its place.
+        let text = "SELECT 1;\nSELECT é, nope FROM orders;"
+        let problem = SQLNameCheck.problems(in: text, snapshot: Self.snapshot(), database: "shop").first
+        #expect(problem?.range == ((text as NSString).range(of: "nope").location..<(text as NSString).range(of: "nope").location + 4))
+        #expect(problem?.message.contains("“nope”") == true && problem?.message.contains("“orders”") == true)
+    }
+
+    @Test func validStatementsStayClean() {
+        for sql in [
+            "SELECT 1", "SELECT NOW()", "SELECT 1 FROM DUAL", "SELECT * FROM orders", "SELECT o.* FROM orders o",
+            "SELECT id, total * 2 AS twice, total + 1 plus FROM orders ORDER BY twice, plus",
+            "SELECT id AS 'the id' FROM orders ORDER BY `the id`",
+            "SELECT COUNT(*) n, customer_id FROM orders GROUP BY customer_id HAVING n > 1",
+            "SELECT EXTRACT(YEAR FROM NOW()), TRIM(BOTH 'x' FROM 'y'), SUBSTRING('abc' FROM 1 FOR 2) FROM orders",
+            "SELECT CAST(id AS DECIMAL(10, 2)), CONVERT(id, SIGNED), TIMESTAMPDIFF(MONTH, NOW(), NOW()) FROM orders",
+            "SELECT GROUP_CONCAT(id ORDER BY total SEPARATOR ',') FROM orders",
+            "SELECT CASE WHEN total > 1 THEN id ELSE customer_id END FROM orders",
+            "SELECT DATE '2024-01-01', _utf8mb4'x', CURRENT_DATE, CURRENT_TIMESTAMP, NULL, TRUE FROM orders",
+            "SELECT id FROM orders WHERE total BETWEEN 1 AND 2 AND id IN (1, 2) AND total IS NOT NULL",
+            "SELECT NOW() + INTERVAL 1 DAY FROM orders",
+            "SELECT SQL_NO_CACHE * FROM orders", "SELECT SQL_CALC_FOUND_ROWS id FROM orders LIMIT 1, 2",
+            "SELECT id FROM orders FORCE INDEX (primary_key), customers", "SELECT 1 FROM orders PARTITION (p0) o WHERE o.id = 1",
+            "SELECT o.id FROM orders o WHERE EXISTS (SELECT 1 FROM customers c WHERE c.id = o.customer_id AND total > 1)",
+            "SELECT id FROM orders UNION SELECT id FROM customers ORDER BY id",
+            "SELECT id FROM orders FOR UPDATE OF orders, customers", "SELECT id INTO @a FROM orders", "SELECT id INTO a, b FROM orders",
+            "SELECT id, SUM(total) OVER w FROM orders WINDOW w AS (ORDER BY id), v AS (ORDER BY total)",
+            "SELECT `order id` FROM `Order Details`", "SELECT `Order Details`.`order id` FROM `Order Details`",
+            "SELECT o.id FROM shop.orders o", "SELECT shop.orders.nope FROM shop.orders", "SELECT ID, Total FROM orders",
+            "SELECT `year` FROM orders", "SELECT id FROM big_view", "SELECT nosuch_column FROM broken_view",
+            "SELECT _rowid FROM orders",
+            "UPDATE orders SET total = total + 1 WHERE id = 1 ORDER BY id LIMIT 1",
+            "UPDATE orders o JOIN customers c ON c.id = o.customer_id SET o.total = 1, c.name = 2",
+            "DELETE FROM orders WHERE id = 1", "DELETE o FROM orders o JOIN customers c ON c.id = o.id",
+            "DELETE o, c FROM orders o, customers c", "DELETE FROM a1 USING orders AS a1 JOIN customers AS a2",
+            "INSERT INTO orders VALUES (1, 2)", "INSERT INTO orders (id) VALUES (DEFAULT), (1)", "INSERT orders SET id = 1, total = 2",
+            "INSERT INTO orders (id) SELECT id FROM customers",
+            "INSERT INTO orders (id) VALUES (1) AS new(a) ON DUPLICATE KEY UPDATE total = a, id = VALUES(id)",
+            "REPLACE INTO orders (id) VALUES (1)", "DELETE FROM orders RETURNING id, total", "SELECT id FROM orders o FOR UPDATE OF o, p",
+        ] {
+            #expect(found(sql) == [], "\(sql)")
+        }
+    }
+
+    @Test func silentWhenTheCacheIsNotLoaded() {
+        #expect(found("SELECT * FROM nosuch", snapshot: nil) == [])
+        #expect(found("SELECT * FROM nosuch", snapshot: SchemaSnapshot()) == [])
+        #expect(found("SELECT * FROM nosuch", database: nil) == [])
+        #expect(found("SELECT * FROM nosuch", database: "names_only") == [])
+        #expect(found("SELECT * FROM nosuch", database: "not_in_the_cache") == [])
+    }
+
+    @Test func silentForAnotherDatabaseThatIsNotLoaded() {
+        #expect(found("SELECT * FROM names_only.nosuch") == [])
+        #expect(found("SELECT * FROM elsewhere.nosuch") == [])
+        // USE moves the statements after it, and only those.
+        #expect(found("SELECT * FROM a; USE elsewhere; SELECT * FROM b; USE shop; SELECT * FROM c") == ["a", "c"])
+        // Nor can a column be checked beside a table that isn't known.
+        #expect(found("SELECT nope FROM orders JOIN elsewhere.t") == [])
+        // information_schema's names have no case, whatever the server's rule.
+        #expect(found("SELECT table_name FROM information_schema.tables") == [])
+    }
+
+    @Test func silentForTemporaryAndNewTables() {
+        #expect(found("SELECT * FROM tmp", changed: ["tmp"]) == [])
+        #expect(found("SELECT * FROM TMP", changed: ["tmp"]) == [])
+        // A temporary table may hide a real one.
+        #expect(found("SELECT nope FROM orders", changed: ["orders"]) == [])
+        #expect(found("CREATE TEMPORARY TABLE tmp (a INT); SELECT a FROM tmp; INSERT INTO tmp VALUES (1)") == [])
+        #expect(found("SELECT * FROM `new one`; CREATE TABLE `new one` (a INT)") == [])
+        #expect(found("ALTER TABLE orders ADD extra INT; SELECT extra FROM orders") == [])
+        #expect(found("RENAME TABLE orders TO sales; SELECT * FROM sales") == [])
+        #expect(found("CALL make_tables(); SELECT * FROM tmp") == [])
+        #expect(SQLNameCheck.changedNames(in: "CREATE TEMPORARY TABLE IF NOT EXISTS `Tmp` (a INT)").contains("tmp"))
+        #expect(SQLNameCheck.changedNames(in: "SELECT * FROM tmp").isEmpty)
+        #expect(SQLNameCheck.runsCode("call p()") && !SQLNameCheck.runsCode("SELECT 1"))
+    }
+
+    @Test func silentForCTEsAndDerivedTables() {
+        #expect(found("WITH c AS (SELECT id FROM orders) SELECT id, nope FROM c") == [])
+        #expect(found("WITH RECURSIVE c (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c) SELECT n FROM c") == [])
+        #expect(found("SELECT * FROM orders WHERE id IN (WITH c AS (SELECT 1) SELECT * FROM c)") == [])
+        #expect(found("SELECT d.x, x FROM (SELECT id AS x FROM orders) d") == [])
+        #expect(found("SELECT x, o.nope FROM orders o JOIN (SELECT 1 AS x) d ON 1") == [])
+        #expect(found("SELECT j.a, a FROM orders, JSON_TABLE('[]', '$[*]' COLUMNS (a INT PATH '$')) j") == [])
+        #expect(found("SELECT x FROM orders o, LATERAL (SELECT o.id AS x) l") == [])
+        // Inside a derived table its own tables still count.
+        #expect(found("SELECT * FROM (SELECT * FROM nosuch) d") == ["nosuch"])
+    }
+
+    @Test func columnsWaitForEveryTableInTheStatement() {
+        #expect(found("SELECT nope FROM orders JOIN nosuch") == ["nosuch"])
+        #expect(found("SELECT o.nope FROM orders o JOIN nosuch n") == ["nosuch"])
+        #expect(found("SELECT nope FROM orders WHERE id IN (SELECT id FROM elsewhere.t)") == [])
+        #expect(found("SELECT nope") == [])
+        #expect(found("SELECT nope FROM DUAL") == [])
+        // A correlated subquery reaches the outer table's columns.
+        #expect(found("SELECT 1 FROM orders WHERE EXISTS (SELECT 1 FROM customers WHERE name = total)") == [])
+    }
+
+    @Test func silentForStatementsItDoesNotUnderstand() {
+        for sql in [
+            "SHOW TABLES FROM nosuch", "DESCRIBE nosuch", "EXPLAIN SELECT * FROM nosuch", "SET @a = nosuch", "TRUNCATE nosuch",
+            "CREATE VIEW v AS SELECT nope FROM nosuch", "DROP TABLE nosuch", "(SELECT * FROM nosuch)", "ANALYZE TABLE nosuch",
+            "LOAD DATA INFILE 'x' INTO TABLE nosuch", "/*!50001 SELECT * FROM nosuch */", "SELECT /*!40001 SQL_NO_CACHE */ * FROM nosuch",
+            "SELECT * FROM nosuch WHERE a = 'open", "SELECT (1 FROM nosuch", "SELECT 1) FROM nosuch",
+            "CREATE PROCEDURE p() BEGIN DECLARE a INT; SELECT a FROM orders; SELECT * FROM nosuch; END",
+            "BEGIN NOT ATOMIC SELECT * FROM nosuch; END",
+            "SELECT * FROM \"nosuch\" JOIN orders WHERE nope = 1",
+            "SELECT { fn NOW() }, nope FROM orders", "SELECT café, cafe FROM orders",
+        ] {
+            #expect(found(sql) == [], "\(sql)")
+        }
+    }
+
+    @Test func followsTheServersCaseRule() {
+        #expect(found("SELECT * FROM ORDERS") == ["ORDERS"])
+        #expect(found("SELECT * FROM `Orders`") == ["`Orders`"])
+        #expect(found("SELECT * FROM SHOP.orders") == [])  // that database isn't in the cache, in this case
+        let caseless = Self.snapshot(caseless: 2)
+        #expect(found("SELECT * FROM ORDERS", snapshot: caseless) == [])
+        #expect(found("SELECT * FROM SHOP.`Orders`", snapshot: caseless) == [])
+        #expect(found("SELECT id FROM orders O WHERE o.TOTAL = 1") == [])  // columns never have case
+    }
+
+    /// MariaDB's Sequence engine answers for tables no list shows.
+    @Test func silentForMariaDBsSequenceTables() {
+        let mariadb = Self.snapshot(version: "11.8.3-MariaDB")
+        #expect(found("SELECT seq FROM seq_1_to_10", snapshot: mariadb) == [])
+        #expect(found("SELECT seq FROM seq_1_to_10") == ["seq_1_to_10"])
+    }
+
+    @Test func aLongBrokenScriptStopsAtTheLimit() {
+        let script = String(repeating: "SELECT * FROM nosuch;\n", count: 500)
+        #expect(SQLNameCheck.problems(in: script, snapshot: Self.snapshot(), database: "shop").count == 100)
+    }
+}

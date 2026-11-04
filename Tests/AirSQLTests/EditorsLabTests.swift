@@ -237,4 +237,22 @@ struct EditorsLabTests {
         #expect(diagram.columns.flatMap { $0 }.count == fixture.tables.filter { $0.kind == .table }.count)
         #expect(diagram.mermaid().contains("customers ||--o{ orders"))
     }
+
+    /// A CREATE the server refuses is marked where the server points, in the code as it stands, ; in a body and all.
+    @Test(arguments: servers)
+    func aRefusedCreatePointsAtItsPlaceInTheCode(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        _ = try await session.query("USE " + SQLQuote.identifier(Lab.fixture))  // Apply's first statement: else it's "No database selected"
+        let code = "\n\nCREATE PROCEDURE lane_console2_p()\nBEGIN\n  SELECT 1;\n  SELEC 2;\nEND\n"
+        do {
+            _ = try await session.query(code.trimmingCharacters(in: .whitespacesAndNewlines))
+            Issue.record("the server took it")
+        } catch let error as AirSQLError {
+            let said = error.details.isEmpty ? error.message : error.details
+            let problem = ObjectCode.problem(said, shown: said, in: code, noBackslashEscapes: false)
+            let place = (code as NSString).range(of: "2;").location  // both servers read SELEC as a word and stop at the 2
+            #expect(problem?.range == place..<(place + 1), "\(said)")
+        }
+        await session.close()
+    }
 }

@@ -119,7 +119,7 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
             list.doubleAction = #selector(listDoubleClicked(_:))
             list.setAccessibilityIdentifier("tableEditor.list")
             let menu = NSMenu()
-            menu.add([Commands.addRow, Commands.duplicateRow, Commands.deleteRows])
+            menu.add([Commands.addRow, Commands.duplicateRow, Commands.copy, Commands.paste, Commands.deleteRows])
             list.menu = menu
         }
         // No rows while the columns change: the table view would ask the new section for the old rows' cells.
