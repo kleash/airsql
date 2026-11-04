@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "airsql",
   "display_name": "AirSQL",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Work with your MySQL and MariaDB databases through AirSQL, the Mac app: schemas, read-only queries, profiles, proposed SQL.",
   "long_description": "AirSQL is a native Mac app for MySQL and MariaDB. This bundle starts AirSQL's own MCP server (`AirSQL --mcp`), which talks to the AirSQL running on this Mac. It needs AirSQL installed and **AirSQL ▸ Settings ▸ Agents ▸ Allow AI agents to use AirSQL** turned on; each connection's access (Off, Schema, Schema + read, Schema + read + analytics) is chosen there, and connections start at Off. Agents never see passwords and can't change data: their statements must be provably read-only and run in a read-only transaction on a read-only session, and changes are proposed in a console tab for the person to run.",
   "author": {
