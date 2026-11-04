@@ -37,12 +37,18 @@ extension AppTests {
         /// ENUM, dates, Set DEFAULT, Insert Value, Paste and foreign keys work as in a table tab.
         @Test func aResultsCellsEditByTheirType() async throws {
             let c = { Self.column("customers", "customers", $0, $1) }
-            let (main, _, view) = try await Self.result("SELECT id, balance, status, created, note FROM customers",
+            let (main, harness, view) = try await Self.result("SELECT id, balance, status, created, note FROM customers",
                                                         [c("id", MYSQL_TYPE_LONG), c("balance", MYSQL_TYPE_NEWDECIMAL), c("status", MYSQL_TYPE_VAR_STRING),
                                                          c("created", MYSQL_TYPE_TIMESTAMP), c("note", MYSQL_TYPE_VAR_STRING)],
                                                         rows: [["1", "2.00", "new", "2026-01-02 03:04:05", nil], ["2", "3.00", "active", "2026-01-02 03:04:05", "x"]],
                                                         session: FakeTableSession())
             let edits = try #require(view.edits), grid = view.grid
+            // The real key reaches the viewer up the responder chain: Esc narrows the selection.
+            main.window?.makeFirstResponder(grid)
+            grid.selection.select(GridPosition(row: 0, column: 1))
+            grid.selection.select(GridPosition(row: 1, column: 2), extend: true)
+            _ = await call(harness, "key", ["combo": "escape"])
+            #expect(!grid.selection.contains(GridPosition(row: 1, column: 1)) || !grid.selection.contains(GridPosition(row: 0, column: 1)))
             #expect(view.dataGrid(grid, step: "2026-01-02 03:04:05", at: 9, by: 1, row: 0, column: 3)?.text == "2026-01-03 03:04:05")
 
             grid.selection.select(GridPosition(row: 0, column: 2))
