@@ -16,7 +16,8 @@ session, a session of their own, so a long query in a console never holds them u
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
 - **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
   Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
-  while the tab is open. Cancel it in the status bar's activity.
+  while the tab is open. Cancel it in the status bar's activity: what arrived stays, and Load More and Load All carry
+  on from there.
 - **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
   until you choose **Off**. Pending changes stay.
 
@@ -169,9 +170,11 @@ These work in a console's results too.
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
-  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key columns copied, or by every column. The one
-  you choose becomes ⌘C's format.
+  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
+  didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
   (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
+  In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
+  and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.

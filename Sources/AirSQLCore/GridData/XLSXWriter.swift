@@ -1,13 +1,15 @@
 import Foundation
 
 /// Writes rows as an Excel workbook (.xlsx, grid-spec §6): one sheet, the column names in the first row, numbers
-/// as numbers and everything else as text, NULL as an empty cell. The sheet goes to a temporary file row by row, so an
+/// as numbers (those Excel would round, as text) and everything else as text, NULL as an empty cell. The sheet goes to a temporary file row by row, so an
 /// export of a whole table streams; `finish` packs it with the workbook's other parts into a zip (stored, not deflated:
 /// every spreadsheet app reads that).
 public final class XLSXWriter {
     /// Excel's limits: rows in a sheet, characters in a cell.
     public static let maxRows = 1_048_576
     static let maxCellCharacters = 32_767
+    /// The digits of a number Excel keeps: beyond them it rounds.
+    static let maxNumberDigits = 15
 
     public struct TooManyRows: LocalizedError {
         public var errorDescription: String? {
@@ -23,6 +25,8 @@ public final class XLSXWriter {
     private var size = 0
     private var rows = 0
     private var buffer = Data()
+    /// The cells cut to Excel's limit so far.
+    public private(set) var cutCells = 0
 
     /// Starts a workbook at `url` (written by `finish`); with `headers` the column names are its first row.
     public init(url: URL, columns: [GridColumn], headers: Bool = true) throws {
@@ -53,15 +57,30 @@ public final class XLSXWriter {
                 row += "<c/>"
                 continue
             }
-            if !names, column.kind == .number, CopyWriter.isNumber(value) {
+            if !names, column.kind == .number, CopyWriter.isNumber(value), Self.keepsExactly(value, column) {
                 row += "<c><v>\(value)</v></c>"
             } else {
-                let text = value.count > Self.maxCellCharacters ? String(value.prefix(Self.maxCellCharacters)) : value
+                var text = value
+                // Excel counts UTF-16 units; half an emoji at the cut becomes a replacement character.
+                if value.utf16.count > Self.maxCellCharacters {
+                    text = String(decoding: value.utf16.prefix(Self.maxCellCharacters), as: UTF16.self)
+                    cutCells += 1
+                }
                 row += "<c t=\"inlineStr\"><is><t xml:space=\"preserve\">\(Self.escaped(text))</t></is></c>"
             }
         }
         write(row + "</row>")
         if buffer.count > 1 << 20 { try flush() }
+    }
+
+    /// Whether Excel holds a number as it is: FLOAT and DOUBLE are its own kind of number, an exact one needs at most
+    /// `maxNumberDigits` significant digits (18446744073709551615 would become …600).
+    static func keepsExactly(_ value: String, _ column: GridColumn) -> Bool {
+        let type = column.type.lowercased()
+        if ["float", "double", "real"].contains(where: type.hasPrefix) { return true }
+        var digits = Substring(value)
+        if digits.contains(".") { while digits.last == "0" { digits.removeLast() } }
+        return digits.filter(\.isNumber).drop { $0 == "0" }.count <= maxNumberDigits
     }
 
     /// Writes the workbook to `url`.

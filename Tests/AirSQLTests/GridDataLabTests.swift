@@ -246,6 +246,86 @@ struct GridDataLabTests {
         }
     }
 
+    /// A BIGINT UNSIGNED and a DECIMAL as the server sends them reach the workbook whole; a 20 KB BLOB says it was cut.
+    @Test(arguments: servers)
+    func excelKeepsWhatTheServerSends(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let result = try #require(try await session.query("SELECT CAST(18446744073709551615 AS UNSIGNED) AS id, "
+                                                          + "CAST(1234567890123456.78 AS DECIMAL(20,2)) AS amount, 42 AS plain, "
+                                                          + "CAST(REPEAT('ab', 10000) AS BINARY) AS photo").first?.rows)
+        await session.close()
+        let source = ResultSetSource(result)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("rows.xlsx")
+        let writer = try XLSXWriter(url: url, columns: source.columns)
+        try writer.add(source.columns.indices.map { TableDataSource.text(result, 0, $0) })
+        try writer.finish()
+        #expect(writer.cutCells == 1)
+        let sheet = try GridDataTests().run("/usr/bin/unzip", ["-p", url.path, "xl/worksheets/sheet1.xml"])
+        #expect(sheet.contains(">18446744073709551615</t>") && sheet.contains(">1234567890123456.78</t>") && sheet.contains("<c><v>42</v></c>"))
+    }
+
+    /// Copy As DELETE of part of a composite key names the whole key, so it removes the one row selected.
+    @Test(arguments: servers)
+    func copyAsDeleteAddressesOnlyTheRowsSelected(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            _ = try await session.query("INSERT INTO \(Self.database).pairs VALUES (1, UNHEX(REPEAT('11', 16)), 'd')")
+            let source = try await loaded("pairs", snapshot, on: session)
+            let sql = await MainActor.run {
+                GridCopy.text(source, rows: [0], columns: [0, 2], format: .delete, headers: false, nullText: "NULL",
+                              database: Self.database, table: "pairs")
+            }
+            #expect(sql.contains("`shop` = 1 AND `tag` = X'"))
+            let update = await MainActor.run {
+                GridCopy.text(source, rows: [0], columns: [2], format: .update, headers: false, nullText: "NULL",
+                              database: Self.database, table: "pairs")
+            }
+            #expect(update.contains("SET `note` = 'a' WHERE `shop` = 1 AND `tag` = X'"))
+            let done = try await session.query(String(sql.dropLast(2))).last?.affectedRows
+            #expect(done == 1)
+
+            // A console result that shows part of the key: the server flags `shop` as a key, but it alone isn't one.
+            let query = "SELECT shop, note FROM \(Self.database).pairs WHERE note = 'b'"
+            let store = try #require(try await session.query(query).first?.rows)
+            let result = ResultEditSource(store)
+            result.setEditing(ResultEditing(sql: query, store: store, snapshot: snapshot, defaultDatabase: Self.database), snapshot: snapshot)
+            #expect(result.columns[0].isKey)
+            let copied = await MainActor.run {
+                GridCopy.text(result, rows: [0], columns: [0, 1], format: .delete, headers: false, nullText: "NULL",
+                              database: Self.database, table: "pairs")
+            }
+            #expect(copied.contains("WHERE `shop` = 1 AND `note` = 'b';"))
+        }
+    }
+
+    /// Load All's batches leave more to load until the end of the stream: one that stops there says so.
+    @Test(arguments: servers)
+    func aStoppedLoadAllStillHasMore(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            let source = TableDataSource(database: Self.database, table: try #require(snapshot.table(Self.database, "items")))
+            let batch = try #require(try await session.query(source.pageSQL(offset: 0, limit: 2)).first?.rows)
+            source.append(batch, requested: nil)
+            #expect(source.loadedRows == 2 && source.hasMore)
+            let rest = try #require(try await session.query(source.pageSQL(offset: 2, limit: nil)).first?.rows)
+            source.append(rest, requested: nil)
+            source.finishLoading()
+            #expect(source.loadedRows == 3 && !source.hasMore)
+        }
+    }
+
+    /// DATE, DATETIME and TIMESTAMP as the server writes them find their place on a chart's axis.
+    @Test(arguments: servers)
+    func chartsPlaceTheServersDates(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let dates = try await rows("SELECT CAST('2026-03-01' AS DATE) UNION ALL SELECT CAST('2026-01-15 10:30:00.25' AS DATETIME(2)) "
+                                   + "UNION ALL SELECT CAST('2025-12-31 23:59:59' AS DATETIME)", on: session).map { $0[0] }
+        await session.close()
+        let points = GridChart.series(dates: dates, ys: [1, 2, 3])
+        #expect(points.map(\.y) == [3, 2, 1] && points.map(\.label) == [dates[2], dates[1], dates[0]])
+    }
+
     /// What the server sends for dates and BIT adds up to nothing; DECIMAL and exponents do.
     @Test(arguments: servers)
     func statusFiguresAddUpOnlyWholeNumbers(_ server: Lab.Server) async throws {

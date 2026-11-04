@@ -136,6 +136,24 @@ struct GridDataTests {
         }
     }
 
+    @Test func excelKeepsLongNumbersAsTextAndCountsCutCells() throws {
+        let url = URL(fileURLWithPath: try scratch()).appendingPathComponent("rows.xlsx")
+        let columns = [GridColumn(name: "id", type: "bigint unsigned", kind: .number), GridColumn(name: "amount", type: "decimal(30,10)", kind: .number),
+                       GridColumn(name: "ratio", type: "double", kind: .number), GridColumn(name: "photo", type: "blob", kind: .binary)]
+        let writer = try XLSXWriter(url: url, columns: columns)
+        try writer.add(["18446744073709551615", "1234567890.1234567", "1.7976931348623157e308", "0x" + String(repeating: "AB", count: 20_000)])
+        try writer.add(["123456789012345", "12345.5000000000", "0.1", String(repeating: "😀", count: 20_000)])
+        try writer.add(["0", "-0.0000000000", "1", String(repeating: "x", count: XLSXWriter.maxCellCharacters)])
+        try writer.finish()
+        let sheet = try run("/usr/bin/unzip", ["-p", url.path, "xl/worksheets/sheet1.xml"])
+        #expect(sheet.contains(">18446744073709551615</t>") && sheet.contains(">1234567890.1234567</t>"))
+        #expect(sheet.contains("<c><v>1.7976931348623157e308</v></c>") && sheet.contains("<c><v>123456789012345</v></c>"))
+        #expect(sheet.contains("<c><v>12345.5000000000</v></c>") && sheet.contains("<c><v>-0.0000000000</v></c>"))
+        #expect(writer.cutCells == 2)
+        let lengths = try XMLDocument(xmlString: sheet).nodes(forXPath: "//*[local-name()='t']").map { ($0.stringValue ?? "").utf16.count }
+        #expect(lengths.max() == XLSXWriter.maxCellCharacters)
+    }
+
     @Test func crcMatchesTheStandard() {
         var crc = CRC32()
         crc.update(Data("123456789".utf8))
