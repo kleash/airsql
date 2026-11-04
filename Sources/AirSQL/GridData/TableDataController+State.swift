@@ -107,7 +107,7 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.pasteAsNewRows.action, Commands.pasteWithFormat.action, #selector(paste(_:)):
             if !editable { return (false, readOnly) }
             return (NSPasteboard.general.string(forType: .string)?.isEmpty == false, "Copy some cells first")
-        case Commands.apply.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
+        case Commands.apply.action, Commands.save.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
             return (pending && loading == nil, pending ? "Wait until the rows have loaded" : "No changes are pending")
         case Commands.revert.action:
             let (keys, inserts) = selectedRows()
@@ -117,6 +117,7 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.redo.action: return (source.changes.canRedo, "Nothing to redo")
         case Commands.loadMore.action, Commands.loadAll.action:
             return (source.hasMore && loading == nil, source.hasMore ? "Wait until the rows have loaded" : "Every row is loaded")
+        case Commands.cancelQuery.action: return (canCancel, "Nothing is running in this tab")
         case Commands.countRows.action: return (loading == nil, "Wait until the rows have loaded")
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.sortAscending.action,
              Commands.sortDescending.action:

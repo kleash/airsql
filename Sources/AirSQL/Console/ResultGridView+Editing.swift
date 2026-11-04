@@ -182,7 +182,6 @@ extension ResultGridView {
     func editingState(_ menuItem: NSMenuItem) -> (Bool, String?)? {
         guard let edits else { return nil }
         switch menuItem.action {
-        case #selector(AirSQLActions.saveQuery(_:)): return (false, "Apply or revert the result's changes first (⌘S applies them)")
         case Commands.setNull.action:
             if let off = editingOff { return (false, off) }
             let cells = viewer.selectedCells(limit: 10_000).filter { edits.canEdit(rows.baseRow($0.row), $0.column) }
@@ -191,7 +190,7 @@ extension ResultGridView {
             return editingOff.map { (false, $0) } ?? (!selectedRows.isEmpty, "Select the rows first")
         case Commands.revert.action:
             return (selectedRows.contains(where: edits.isChanged), "The selected rows have no pending changes")
-        case Commands.apply.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
+        case Commands.apply.action, Commands.save.action, Commands.previewChanges.action, #selector(revertAllChanges(_:)):
             return (!edits.isEmpty, "No changes are pending")
         case Commands.undo.action: return (edits.canUndo, "Nothing to undo")
         case Commands.redo.action: return (edits.canRedo, "Nothing to redo")

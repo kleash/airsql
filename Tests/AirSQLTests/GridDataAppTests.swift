@@ -40,7 +40,23 @@ final class FakeTableSession: TableSession {
         return session
     }
 
+    /// Holds a statement until Cancel stops it; the statements Cancel was told to stop.
+    var hold: (String) -> Bool = { _ in false }
+    var held: CheckedContinuation<Void, Never>?
+    var cancelled: [String] = []
+
+    func cancel(statement: String?) async throws -> CancelResult {
+        cancelled.append(statement ?? "")
+        held?.resume()
+        held = nil
+        return .cancelled
+    }
+
     func query(_ sql: String, rowCap: Int) async throws -> [StatementResult] {
+        if hold(sql) {
+            await withCheckedContinuation { held = $0 }
+            throw AirSQLError(.other, "Query execution was interrupted")
+        }
         func result(_ columns: [ResultStore.Column], _ values: [[String?]]) -> [StatementResult] {
             let store = ResultStore(columns: columns)
             for row in values { _ = store.append(row.map { $0.map { Array($0.utf8) } }) }
@@ -419,6 +435,107 @@ extension AppTests {
             #expect(tab.source?.cell(copy, 0) == .placeholder("auto") && tab.source?.cell(copy, 2) == .text("EU"))
         }
 
+        /// The table a single click shows in the preview tab, the focus still in the tree.
+        static func preview(_ table: String = "orders", in main: MainWindowController, connection: SavedConnection,
+                            session: FakeTableSession = FakeTableSession()) async throws -> TableDataController {
+            let context = try await recordedEditorContext(connection)
+            let controller = TableDataController(model: main.model, context: context, database: "airsql_fixture", table: table)
+            controller.openSession = { session }
+            main.preview(controller, title: table, connection: connection.id)
+            main.window?.layoutIfNeeded()
+            await ready { controller.loading != nil || (controller.source == nil && controller.problem == nil) }
+            main.window?.makeFirstResponder(main.sidebar.outline)
+            return controller
+        }
+
+        @Test func thePreviewTabTakesTheTableTabsCommands() async throws {
+            let connection = SavedConnection(name: "Local", host: "127.0.0.1", user: "app")
+            let (main, _) = appWindow(testModel([connection]))
+            let tab = try await Self.preview(in: main, connection: connection)
+            // AppKit's walk for a menu item (NSApp.keyWindow stays nil in the tests).
+            func target(_ action: Selector) -> AnyObject? {
+                var responder = main.window?.firstResponder
+                while let next = responder {
+                    if next.responds(to: action) { return next }
+                    if let found = next.supplementalTarget(forAction: action, sender: nil) as AnyObject? { return found }
+                    responder = next.nextResponder
+                }
+                return nil
+            }
+            for command in [Commands.find, Commands.filter, Commands.searchAllColumns, Commands.addRow, Commands.columnList,
+                            Commands.transpose, Commands.loadMore] {
+                #expect(target(command.action) === tab, "\(command.title): \(String(describing: target(command.action)))")
+            }
+            let transpose = Commands.transpose.item()
+            #expect(tab.validateMenuItem(transpose))
+            tab.bar.transposeButton.performClick(nil)
+            #expect(tab.viewer.transposed)
+            #expect(tab.bar.transposeButton.image != nil)
+            let menu = tab.viewer.dataGrid(tab.grid, menuFor: .row(0))
+            #expect(menu?.items.contains { $0.action == Commands.transpose.action } == true)
+        }
+
+        @Test func anotherTableClickedKeepsThePreviewsPendingChanges() async throws {
+            let connection = SavedConnection(name: "Local", host: "127.0.0.1", user: "app")
+            let (main, _) = appWindow(testModel([connection]))
+            let tab = try await Self.preview(in: main, connection: connection)
+            tab.keep(.text("US"), row: 0, column: 2)
+            #expect(main.tabBar.buttons.first?.toolTip?.contains("(unsaved)") == true, "the tab's dot")
+            let other = try await Self.preview("customers", in: main, connection: connection, session: .customers())
+            #expect(main.tabs.count == 2 && main.tabs.first?.shown === tab && main.selectedTab?.shown === other)
+            #expect(main.unfinishedWork().contains { $0.hasPrefix("orders on Local: 1 pending change") })
+            let context = try await recordedEditorContext(connection)
+            #expect(main.openTableData("orders", database: "airsql_fixture", context: context) === main.tabs.first, "not a second tab on it")
+            tab.revertAllChanges(nil)
+            _ = try await Self.preview("customers", in: main, connection: connection, session: .customers())
+            #expect(main.tabs.count == 2, "with nothing pending it is a preview again")
+        }
+
+        @Test func cancelStopsTheTabsReadsAloneAndSaysSo() async throws {
+            let session = FakeTableSession()
+            let (main, _, tab) = try await Self.tab(session: session)
+            let cancel = Commands.cancelQuery.item()
+            #expect(!tab.validateMenuItem(cancel) && cancel.toolTip == "Nothing is running in this tab")
+            // Count Exactly stops without a word; the rows stay and the tab can read again.
+            session.hold = { $0.hasPrefix("SELECT COUNT(*)") }
+            tab.countRows(nil)
+            #expect(await eventually(timeout: 5) { session.held != nil })
+            #expect(tab.validateMenuItem(cancel) && main.model.activity.running.map(\.title) == ["Counting the rows of orders"])
+            tab.cancelQuery(nil)
+            #expect(await eventually(timeout: 5) { tab.loading == nil })
+            #expect(session.cancelled == [tab.source?.countSQL] && tab.problem == nil && main.model.activity.running.isEmpty)
+            // A new filter's page, stopped from Activity: the tab says the rows aren't those asked for, and Refresh brings them.
+            session.hold = { $0.contains("WHERE") }
+            tab.applyFilter("region = 'EU'")
+            #expect(await eventually(timeout: 5) { session.held != nil })
+            main.model.activity.cancelAll()
+            #expect(await eventually(timeout: 5) { tab.loading == nil })
+            #expect(tab.problem?.hasPrefix("Cancelled") == true && tab.grid.rowCount == 3)
+            session.hold = { _ in false }
+            tab.refresh(nil)
+            #expect(await eventually(timeout: 5) { tab.problem == nil })
+            // Closing the tab stops what it was reading.
+            session.hold = { $0.hasPrefix("SELECT COUNT(*)") }
+            tab.countRows(nil)
+            #expect(await eventually(timeout: 5) { session.held != nil })
+            tab.shouldClose { _ in }
+            #expect(await eventually(timeout: 5) { tab.loading == nil })
+        }
+
+        /// AppKit tries only File ▸ Save for ⌘S, so it must act on a table tab's and an edited result's changes.
+        @Test func commandSAppliesATablesChanges() async throws {
+            let session = FakeTableSession()
+            let (_, harness, tab) = try await Self.tab(session: session)
+            let save = Commands.save.item()
+            #expect(!tab.validateMenuItem(save) && save.toolTip == "No changes are pending")
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            tab.keep(.text("US"), row: 0, column: 2)
+            #expect(tab.validateMenuItem(save))
+            #expect(await call(harness, "key", ["combo": "cmd+s"]).error == nil)
+            #expect(await eventually(timeout: 5) { tab.source?.changes.isEmpty == true })
+            #expect(session.statements.contains { $0.hasPrefix("UPDATE") })
+        }
+
         @Test func whereBarCompletesColumnNames() async throws {
             let (_, _, tab) = try await Self.tab()
             tab.bar.filterText = "region = 'EU' AND cu"
@@ -567,7 +684,7 @@ extension AppTests {
             #expect(view.grid.sortOrder.isEmpty && view.rows.cell(0, 0) == .text("10482"))
             let menu = try #require(view.viewer.dataGrid(view.grid, menuFor: .cells))
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title)
-                    == ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel", "Record View",
+                    == ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel", "Record View", "Transpose",
                         "Column Summary…", "Display As"])
         }
 

@@ -6,8 +6,11 @@ extension MainWindowController {
     /// (Find Text on Server's matches) in a new tab.
     @discardableResult
     func openTableData(_ table: String, database: String, context: EditorContext, condition: String? = nil) -> Tab {
-        if condition == nil, let tab = tabs.first(where: {
-            ($0.content as? TableDataController)?.shows(context.connection.id, database, table) == true
+        // A preview with pending changes counts: a second tab on the table would edit the same changes. A plain one doesn't.
+        if condition == nil, let tab = tabs.first(where: { tab in
+            (tab.shown as? TableDataController).map {
+                $0.shows(context.connection.id, database, table) && ($0 === tab.content || $0.isEdited)
+            } == true
         }) {
             select(tab)
             return tab

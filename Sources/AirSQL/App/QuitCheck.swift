@@ -10,7 +10,7 @@ extension MainWindowController {
     func unfinishedWork() -> [String] {
         var lines: [String] = [], transactions: Set<UUID> = []
         for tab in tabs {
-            if let table = tab.content as? TableDataController, let changes = table.source?.changes, !changes.isEmpty,
+            if let table = tab.shown as? TableDataController, let changes = table.source?.changes, !changes.isEmpty,
                model.data.safety(for: table.context.connection).warnOnClose {
                 let count = changes.rowCount
                 lines.append("\(table.tableName) on \(table.context.connection.displayName): \(count.formatted()) pending "

@@ -11,6 +11,7 @@ final class TableDataBar: NSView, NSTextViewDelegate {
     let whereField = ConditionView.make()
     let recentButton = NSButton()
     let clearButton = NSButton()
+    let transposeButton = NSButton()
     let searchField = NSSearchField()
     let loadedOnly = checkbox("Loaded rows only", id: "tableData.loadedOnly",
                               tip: "Search only the rows loaded so far, without asking the server", on: false, target: nil, action: nil)
@@ -25,7 +26,10 @@ final class TableDataBar: NSView, NSTextViewDelegate {
     }
 
     var busy = false {
-        didSet { busy ? spinner.startAnimation(nil) : spinner.stopAnimation(nil) }
+        didSet {
+            busy ? spinner.startAnimation(nil) : spinner.stopAnimation(nil)
+            window?.toolbar?.validateVisibleItems()  // Cancel
+        }
     }
 
     init() {
@@ -50,6 +54,8 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         configure(clearButton, symbol: "xmark.circle.fill", id: "tableData.clearFilter", tip: "Show every row again",
                   action: #selector(clearFilter(_:)))
         clearButton.isHidden = true
+        configure(transposeButton, symbol: "rectangle.landscape.rotate", id: "tableData.transpose",
+                  tip: "\(Commands.transpose.tip) (\(Commands.transpose.shortcut))", action: #selector(transposeRows(_:)))
         searchField.placeholderString = "Search all columns"
         searchField.toolTip = "Find rows with this text in any column; press Return to search"
         searchField.setAccessibilityIdentifier("tableData.search")
@@ -62,9 +68,9 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityIdentifier("tableData.busy")
-        spinner.toolTip = "Rows are loading from the server"
+        spinner.toolTip = "Rows are loading from the server: ⌘. cancels"
         let row = NSStackView(views: [scope, whereLabel, whereField.box, clearButton, recentButton, searchField, loadedOnly, spinner,
-                                      helpButton(.dataGrid)])
+                                      transposeButton, helpButton(.dataGrid)])
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.setCustomSpacing(Spacing.half, after: whereLabel)
@@ -122,6 +128,8 @@ final class TableDataBar: NSView, NSTextViewDelegate {
     @objc func clearFilter(_ sender: Any?) {
         owner?.applyFilter("")
     }
+
+    @objc private func transposeRows(_ sender: Any?) { owner?.viewer.transposeGrid(sender) }
 
     @objc private func searchEntered(_ sender: Any?) {
         owner?.search(searchField.stringValue, loadedOnly: loadedOnly.state == .on)

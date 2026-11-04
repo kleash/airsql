@@ -58,7 +58,7 @@ extension AppTests {
             #expect(view.source.mark(0, 1) == .edited && view.source.mark(1, 0) == .deleted && !view.notice.isHidden)
             #expect(view.notice.text.stringValue.hasPrefix("2 rows have pending changes"))
             let save = Commands.save.item()
-            #expect(view.responds(to: save.action) && !view.validateMenuItem(save))
+            #expect(view.responds(to: save.action) && view.validateMenuItem(save))
             view.undo(nil)
             #expect(view.source.mark(1, 0) == GridMark.none)
             view.redo(nil)
@@ -227,6 +227,7 @@ extension AppTests {
             await ready { view.edits?.editing == nil }
             view.keep(.text("ann@example.net"), row: 0, column: 1)
             #expect(view.edits?.pendingRows == 1)
+            #expect(view.validateMenuItem(Commands.save.item()), "⌘S applies them while the rows have the keyboard")
             #expect(main.unfinishedWork().contains { $0.hasPrefix("Edits to 1 row in the results of") && $0.hasSuffix("thrown away") })
             console.dropUnpinnedResults()
             #expect(console.resultTabs.count == 1 && !tab.pinned)

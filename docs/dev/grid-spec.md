@@ -10,7 +10,8 @@ Legend: **H** from HeidiSQL, **D** from DataGrip, **A** AirSQL's own or a fix of
 ## 1. Principles
 
 1. **Nothing is lost by accident.** Edits are pending until Apply (⌘S); leaving a row never writes (fixes HeidiSQL
-   auto-post, forum t=45206). Closing a tab, switching table or disconnecting with pending edits asks.
+   auto-post, forum t=45206). Closing a tab or disconnecting with pending edits asks; switching table in the preview tab
+   leaves that tab open with its edits, and a new preview takes over.
 2. **One editing model everywhere.** Grid cells, Transpose, Record view and the value panel edit the same pending
    change set.
 3. **Always say where an operation runs.** Filter, sort and search show "on server (all rows)" or "local (N loaded

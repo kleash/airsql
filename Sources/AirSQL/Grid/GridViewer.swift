@@ -745,8 +745,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
         menu.addItem(.separator())
         switch target {
-        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.columnSummary])
-        case .row: menu.add([Commands.recordView, Commands.valuePanel])
+        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.transpose, Commands.columnSummary])
+        case .row: menu.add([Commands.recordView, Commands.transpose, Commands.valuePanel])
         case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.freeze, Commands.columnList, Commands.heatmap])
         }
         if !transposed, record == nil { menu.addItem(Self.displayMenu()) }

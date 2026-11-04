@@ -315,12 +315,17 @@ struct DBLabTests {
         let a = try await connected(options), b = try await connected(options)
         #expect(try await a.cancel() == .notRunning)
 
-        let slow = Task { try await a.query("SELECT SLEEP(20) FROM (SELECT 1 UNION ALL SELECT 2) AS t") }
+        let sql = "SELECT SLEEP(20) FROM (SELECT 1 UNION ALL SELECT 2) AS t"
+        let slow = Task { try await a.query(sql) }
         let other = Task { try await b.query("SELECT SLEEP(3)") }
         let start = Date()
         var result = CancelResult.notRunning
         _ = try await eventually(timeout: 5) {
-            if a.isBusy { result = try await a.cancel() }
+            if a.isBusy {
+                // A table tab's Cancel names its statement, and leaves another tab's on the shared session alone.
+                #expect(try await a.cancel(statement: "SELECT 1") == .notRunning)
+                result = try await a.cancel(statement: sql)
+            }
             return result != .notRunning
         }
         #expect(result == .cancelled)

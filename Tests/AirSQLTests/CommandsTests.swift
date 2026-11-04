@@ -18,7 +18,7 @@ struct CommandsTests {
             owners[combo(command), default: []].append(command.title)
         }
         let shared = owners.filter { $0.value.count > 1 }
-        // ⌘S: Save in a console, Apply Changes in a table tab (one of them is enabled at a time). F9 and ⌃F9 are hidden
+        // ⌘S: AppKit tries only the first, Save, which applies a table tab's changes too; Apply Changes shows the shortcut. F9 and ⌃F9 are hidden
         // second shortcuts of Run All and Run Statement.
         #expect(shared.keys.sorted() == ["⌘S"], "\(shared)")
         #expect(Set(owners["⌘S"] ?? []) == ["Save", "Apply Changes"])

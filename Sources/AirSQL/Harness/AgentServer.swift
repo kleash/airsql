@@ -505,11 +505,10 @@ final class AgentServer {
         // window's first, for every key: Return presses the default button), then the menu bar's, else the window.
         var handled = window.performKeyEquivalent(with: down)
         if !handled, !keys.modifiers.intersection([.command, .control]).isEmpty || keys.base.unicodeScalars.first.map({ $0.value >= 0xF700 }) == true {
-            for item in menuItems(for: keys) {
+            if let item = menuItems(for: keys).first {
                 let check = validate(item, in: window)
                 if check.enabled, let target = check.target, let action = item.action {
                     handled = NSApp.sendAction(action, to: target, from: item)
-                    break
                 }
             }
         }
@@ -524,7 +523,7 @@ final class AgentServer {
         }
     }
 
-    /// The menu-bar items with this shortcut, in menu order (the first enabled one acts, as in AppKit).
+    /// The menu-bar items with this shortcut, in menu order (the first one decides, enabled or not, as in AppKit).
     func menuItems(for keys: KeyCombo) -> [NSMenuItem] {
         func walk(_ menu: NSMenu) -> [NSMenuItem] {
             menu.items.flatMap { item -> [NSMenuItem] in

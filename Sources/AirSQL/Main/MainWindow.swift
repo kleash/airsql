@@ -191,7 +191,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     @objc private func tabContentChanged(_ notification: Notification) {
-        guard tabs.contains(where: { $0.content === notification.object as AnyObject }) else { return }
+        guard tabs.contains(where: { $0.content === notification.object as AnyObject || $0.shown === notification.object as AnyObject })
+        else { return }
         refresh()
     }
 
@@ -427,7 +428,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// the toolbar's Run does.
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
         if [Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action].contains(action) { return sidebar }
-        if let content = selectedTab?.content, content.isViewLoaded, content.responds(to: action) {
+        if let content = selectedTab?.shown, content.isViewLoaded, content.responds(to: action) {
             return content
         }
         return super.supplementalTarget(forAction: action, sender: sender)

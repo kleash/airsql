@@ -152,8 +152,9 @@ public final class DBConnection: @unchecked Sendable {
     private var _server: ServerInfo?
     private var serverStatus: UInt32 = 0
     private var _transactionStarted: Date?
-    /// The tag of the statement on the wire.
+    /// The tag of the statement on the wire, and its text.
     private var running: String?
+    private var runningSQL: String?
     /// Cancels under way: a new statement waits for them, so a KILL QUERY meant for the last one can't hit it.
     private var cancels = 0
     /// The user-level lock the session holds (GET_LOCK) so another session can tell it apart from every other: Cancel
@@ -209,10 +210,11 @@ public final class DBConnection: @unchecked Sendable {
     }
 
     /// Stops the running statement: through a short side connection that checks it reaches the same server and that
-    /// the session's thread still runs this statement (by its tag), then KILL QUERY (MariaDB: KILL QUERY ID).
-    public func cancel() async throws -> CancelResult {
+    /// the session's thread still runs this statement (by its tag), then KILL QUERY (MariaDB: KILL QUERY ID). With
+    /// `statement`, only if that is what runs: the table tabs share a session, and one must not stop another's Apply.
+    public func cancel(statement: String? = nil) async throws -> CancelResult {
         let target: (tag: String, threadID: UInt64, lockName: String?, flavor: ServerInfo.Flavor)? = state.locked {
-            guard let running, let server = _server else { return nil }
+            guard let running, let server = _server, statement == nil || statement == runningSQL else { return nil }
             cancels += 1
             return (running, server.threadID, lockName, server.flavor)
         }
@@ -496,9 +498,10 @@ public final class DBConnection: @unchecked Sendable {
         let noBackslashEscapes = state.locked {
             while cancels > 0 { state.wait() }
             running = tag
+            runningSQL = sql
             return serverStatus & UInt32(SERVER_STATUS_NO_BACKSLASH_ESCAPES) != 0
         }
-        defer { state.locked { running = nil } }
+        defer { state.locked { (running, runningSQL) = (nil, nil) } }
         if logged { log.statement(sql, context: "\(context):\(number)", noBackslashEscapes: noBackslashEscapes) }
         let text = tag + " " + sql
         let start = Date()

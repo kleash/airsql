@@ -34,6 +34,7 @@ final class PreviewContent: NSViewController, TabContent {
     }
 
     func show(_ content: NSViewController) {
+        (shown as? TableDataController)?.cancelQuery(nil)  // its rows aren't wanted any more
         shown.view.removeFromSuperview()
         shown.removeFromParent()
         shown = content
@@ -56,9 +57,11 @@ final class PreviewContent: NSViewController, TabContent {
 }
 
 extension MainWindowController {
-    /// Shows `content` in the window's preview tab (made the first time), named `title`.
+    /// Shows `content` in the window's preview tab (made the first time), named `title`. A preview with pending changes
+    /// stays open as a tab, with its dot, and a new preview takes over.
     func preview(_ content: NSViewController, title: String, connection: UUID) {
-        if let tab = tabs.first(where: { $0.content is PreviewContent }), let preview = tab.content as? PreviewContent {
+        if let tab = tabs.first(where: { $0.content is PreviewContent && $0.tabContent?.isEdited == false }),
+           let preview = tab.content as? PreviewContent {
             preview.show(content)
             tab.connectionID = connection
             tab.title = title

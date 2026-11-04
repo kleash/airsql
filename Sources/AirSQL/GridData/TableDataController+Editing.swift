@@ -168,6 +168,8 @@ extension TableDataController: DataGridViewDelegate {
     // MARK: Apply
 
     @objc func applyChanges(_ sender: Any?) { startApply(preview: false) }
+    /// ⌘S: AppKit stops at the first item with a shortcut, enabled or not, and that is File ▸ Save.
+    @objc func saveQuery(_ sender: Any?) { applyChanges(sender) }
     @objc func previewChanges(_ sender: Any?) { startApply(preview: true) }
 
     /// Shows the SQL first when asked, when Settings ▸ Safety wants it (Production connections), when an agent asked for

@@ -283,7 +283,7 @@ enum Commands {
                                         tip: "Close every tab but the one shown; asks first about unsaved work")
     static let closeWindow = Command("Close Window", #selector(NSWindow.performClose(_:)), "W",
                                      tip: "Close the window; connections stay open")
-    static let save = Command("Save", #selector(AirSQLActions.saveQuery(_:)), "s", tip: "Save the console's text to its .sql file")
+    static let save = Command("Save", #selector(AirSQLActions.saveQuery(_:)), "s", tip: "Save the console's text to its .sql file, or apply a table's pending changes")
     static let saveAs = Command("Save As…", #selector(AirSQLActions.saveQueryAs(_:)), "S",
                                 tip: "Save the console's text to a new .sql file")
     static let duplicateTab = Command("Duplicate Tab", #selector(AirSQLActions.duplicateTab(_:)),

@@ -6,6 +6,7 @@ protocol TableSession: AnyObject {
     var noBackslashEscapes: Bool { get }
     func query(_ sql: String, rowCap: Int) async throws -> [StatementResult]
     func stream(_ sql: String, batchRows: Int, batch: @escaping (ResultStore) throws -> Void) async throws
+    func cancel(statement: String?) async throws -> CancelResult
 }
 
 extension DBConnection: TableSession {}
@@ -56,6 +57,8 @@ final class TableDataController: NSViewController, TabContent {
     var dataLength: Int?
     /// A load under way (a page, Load All, Refresh, Apply): one at a time.
     var loading: Task<Void, Never>?
+    /// That load in Activity, when Cancel can stop it (a read, not Apply).
+    private var activity: Activity?
     /// The data session's NO_BACKSLASH_ESCAPES, as filters quote their values for it (read at each load).
     var noBackslashEscapes = false
     /// The data session's sql_mode and time zone, which decide what a value may be (read with the first page).
@@ -209,14 +212,14 @@ final class TableDataController: NSViewController, TabContent {
         let limit = more ? rowsPerPage : max(rowsPerPage, rows ?? 0)
         let sql = source.pageSQL(offset: more ? source.loadedRows : 0, limit: limit)
         let filter = source.filter
-        bar.busy = true
+        beginRead("Loading the rows of \(tableName)")
         loading = Task {
             do {
                 let session = try await openSession()
                 noBackslashEscapes = session.noBackslashEscapes
                 bar.whereField.noBackslashEscapes = noBackslashEscapes
                 if editContext == nil { editContext = try await readEditContext(session) }
-                let page = try await session.query(sql, rowCap: limit).first?.rows
+                let page = try await stoppable(session, sql) { try await session.query(sql, rowCap: limit).first?.rows }
                 if !more {
                     source.reset(keepingSaved: keepingSaved)
                     labels = [:]
@@ -225,6 +228,9 @@ final class TableDataController: NSViewController, TabContent {
                 problem = nil
                 if !more { remember() }
                 if total?.filter != filter { total = try? await estimate(session, filter: filter) }
+            } catch where Task.isCancelled {
+                // Load More's rows just stay as they are.
+                if !more { problem = "Cancelled, so these aren't the rows you asked for. Refresh (⌘R) loads them." }
             } catch {
                 problem = "The rows didn't load: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
             }
@@ -236,34 +242,79 @@ final class TableDataController: NSViewController, TabContent {
     func loadAllRows() {
         guard let source, loading == nil, source.hasMore else { return }
         let sql = source.pageSQL(offset: source.loadedRows, limit: nil)
-        bar.busy = true
         let stop = StopFlag()
-        let activity = model.activity.start("Loading every row of \(tableName)", connection: context.connection.id) { stop.set() }
+        beginRead("Loading every row of \(tableName)", stop: stop)
         loading = Task {
             do {
                 let session = try await openSession()
-                try await session.stream(sql, batchRows: 10_000) { page in
-                    // Throwing here stops the statement on the server, as Cancel does.
-                    if stop.isSet { throw CancellationError() }
-                    DispatchQueue.main.async {
-                        source.append(page, requested: nil)
-                        self.viewer.reloadData()
-                        self.updateBars()
+                try await stoppable(session, sql) {
+                    try await session.stream(sql, batchRows: 10_000) { page in
+                        // Throwing here stops the statement on the server, as Cancel does.
+                        if stop.isSet { throw CancellationError() }
+                        DispatchQueue.main.async {
+                            source.append(page, requested: nil)
+                            self.viewer.reloadData()
+                            self.updateBars()
+                        }
                     }
                 }
                 await MainActor.run { source.finishLoading() }
-            } catch is CancellationError {
+            } catch where Task.isCancelled {
             } catch {
                 problem = "Not every row loaded: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
             }
-            activity.end()
             finishLoading()
         }
     }
 
-    private func finishLoading() {
+    /// The spinner, and a line in Activity whose Cancel stops the load.
+    private func beginRead(_ title: String, stop: StopFlag? = nil) {
+        activity = model.activity.start(title, connection: context.connection.id) { [weak self] in
+            stop?.set()
+            self?.reloadWhenDone = false
+            self?.loading?.cancel()
+            self?.view.window?.toolbar?.validateVisibleItems()
+        }
+        bar.busy = true
+    }
+
+    private func endRead() {
+        activity?.end()
+        activity = nil
         loading = nil
         bar.busy = false
+    }
+
+    /// Runs `work`, which sends `sql`. Cancelled, `sql` is stopped on the server, and nothing else: it may be waiting behind
+    /// another tab's statement on the shared session, so Cancel keeps asking until it has run.
+    private func stoppable<T>(_ session: TableSession, _ sql: String, _ work: () async throws -> T) async throws -> T {
+        try Task.checkCancellation()
+        let finished = StopFlag()
+        defer { finished.set() }
+        return try await withTaskCancellationHandler(operation: work) {
+            Task { @MainActor [weak self] in
+                while !finished.isSet {
+                    switch try? await session.cancel(statement: sql) {
+                    case .notRunning?:
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                    case .unsafe(let reason)?:
+                        self?.problem = "AirSQL couldn't stop the statement safely: \(reason) Disconnect to stop it."
+                        self?.updateBars()
+                        return
+                    default:
+                        return
+                    }
+                }
+            }
+        }
+    }
+
+    /// Cancel (⌘.): the read under way, as Activity's Cancel does.
+    @objc func cancelQuery(_ sender: Any?) { activity?.cancel() }
+    var canCancel: Bool { activity?.canCancel == true }
+
+    private func finishLoading() {
+        endRead()
         if !wantedLabels.isEmpty { readLabels() }
         // The grid gets the source with its first rows, so it sizes the columns to their values, not only their names.
         if let source, viewer.source !== source, source.loadedRows > 0 || !source.hasMore { viewer.show(source) }
@@ -284,7 +335,7 @@ final class TableDataController: NSViewController, TabContent {
     private func estimate(_ session: TableSession, filter: String) async throws -> (rows: Int, exact: Bool, filter: String)? {
         guard let source, GridFilter.condition(filter).isEmpty else { return nil }
         let sql = source.estimateSQL(noBackslashEscapes: session.noBackslashEscapes)
-        guard let store = try await session.query(sql, rowCap: 1).first?.rows, store.rowCount > 0,
+        guard let store = try await stoppable(session, sql, { try await session.query(sql, rowCap: 1).first?.rows }), store.rowCount > 0,
               let rows = store.string(0, 0).flatMap({ Int($0) }) else { return nil }
         dataLength = store.columns.count > 1 ? store.string(0, 1).flatMap { Int($0) } : nil
         return (rows, false, filter)
@@ -294,18 +345,19 @@ final class TableDataController: NSViewController, TabContent {
     @objc func countRows(_ sender: Any?) {
         guard let source, loading == nil else { return }
         let sql = source.countSQL, filter = source.filter
-        bar.busy = true
+        beginRead("Counting the rows of \(tableName)")
         loading = Task {
             do {
                 let session = try await openSession()
-                if let store = try await session.query(sql, rowCap: 1).first?.rows, let count = store.string(0, 0).flatMap({ Int($0) }) {
+                if let store = try await stoppable(session, sql, { try await session.query(sql, rowCap: 1).first?.rows }),
+                   let count = store.string(0, 0).flatMap({ Int($0) }) {
                     total = (count, true, filter)
                 }
+            } catch where Task.isCancelled {
             } catch {
                 problem = "The rows weren't counted: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
             }
-            loading = nil
-            bar.busy = false
+            endRead()
             updateBars()
         }
     }
@@ -319,25 +371,26 @@ final class TableDataController: NSViewController, TabContent {
         let summary = source.summarySQL(column), top = source.topValuesSQL(column, limit: ColumnSummary.topLimit)
         let start = { [weak self] in
             guard let self, loading == nil else { return done(.failure(AirSQLError(.other, "Wait for the rows to load, then ask again."))) }
-            bar.busy = true
-            let activity = model.activity.start("Summing up \(name) in \(tableName)", connection: context.connection.id)
+            beginRead("Summing up \(name) in \(tableName)")
             loading = Task {
                 do {
                     let session = try await open()
-                    guard let counts = try await session.query(summary, rowCap: 1).first?.rows, counts.rowCount > 0, counts.columns.count == 5,
-                          let values = try await session.query(top, rowCap: ColumnSummary.topLimit).first?.rows else {
+                    guard let counts = try await self.stoppable(session, summary, { try await session.query(summary, rowCap: 1).first?.rows }),
+                          counts.rowCount > 0, counts.columns.count == 5,
+                          let values = try await self.stoppable(session, top, { try await session.query(top, rowCap: ColumnSummary.topLimit).first?.rows })
+                    else {
                         throw AirSQLError(.other, "The server sent no counts.")
                     }
                     func number(_ index: Int) -> Int { counts.string(0, index).flatMap { Int($0) } ?? 0 }
                     let most = (0..<values.rowCount).map { (TableDataSource.text(values, $0, 0), values.string($0, 1).flatMap { Int($0) } ?? 0) }
                     done(.success(ColumnSummary(distinct: number(0), nulls: number(1), rows: number(4), minimum: TableDataSource.text(counts, 0, 2),
                                                 maximum: TableDataSource.text(counts, 0, 3), top: most)))
+                } catch where Task.isCancelled {
+                    done(.failure(AirSQLError(.cancelled, "Not counted.")))
                 } catch {
                     done(.failure(error))
                 }
-                activity.end()
-                self.loading = nil
-                self.bar.busy = false
+                self.endRead()
                 self.updateBars()
             }
         }
@@ -399,7 +452,11 @@ final class TableDataController: NSViewController, TabContent {
     var isEdited: Bool { source?.changes.isEmpty == false }
     var statusAccessory: NSView? { viewer.status }
 
-    func shouldClose(_ answer: @escaping (Bool) -> Void) {
+    func shouldClose(_ closes: @escaping (Bool) -> Void) {
+        let answer = { [weak self] (close: Bool) in
+            if close { self?.cancelQuery(nil) }  // a read for a tab that's gone only holds up the shared session
+            closes(close)
+        }
         guard let source, !source.changes.isEmpty, model.data.safety(for: context.connection).warnOnClose,
               let window = view.window else { return answer(true) }
         let alert = NSAlert()

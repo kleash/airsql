@@ -55,6 +55,8 @@ final class Tab {
     }
 
     var tabContent: TabContent? { content as? TabContent }
+    /// What the tab shows: for the preview tab, what it holds now.
+    var shown: NSViewController { (content as? PreviewContent)?.shown ?? content }
 }
 
 /// The strip of tabs above the content (plan §2.4): each tab's title (cut with an ellipsis, the full title in its

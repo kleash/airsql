@@ -17,6 +17,8 @@ session, a session of their own, so a long query in a console never holds them u
 - **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
   Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
   while the tab is open. Cancel it in the status bar's activity.
+- Anything slow here (a page, a filter, a sort, Load All, Count Exactly, Column Summary) can be stopped with **⌘.**, the
+  toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
 - **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
   until you choose **Off**. Pending changes stay.
 
@@ -136,6 +138,8 @@ says why; so are views. Generated columns can't be edited.
 
 ## Apply changes
 
+- A table a single click shows, in the preview tab, keeps its pending changes when you click another table: the tab
+  stays open with its dot, and the next table gets a preview of its own.
 - **Data ▸ Apply Changes** (⌘S) writes every pending change in one transaction on the data session: deletes first (in
   batches of 500), then edits, then new rows. Each statement must change exactly its rows. If one changes another
   number (someone else changed or deleted the row since it was loaded) or the server refuses one, everything is rolled

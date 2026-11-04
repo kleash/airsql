@@ -158,10 +158,10 @@ extension AppTests {
                     },
                     doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
-                           "Add Row", "Duplicate Row", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
-                           "Value Panel", "Record View", "Column Summary…", "Display As"],
+                           "Add Row", "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
+                           "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set DEFAULT", "Insert Value", "Add Row",
-                              "Duplicate Row", "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Column Summary…"]),
+                              "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…"]),
             // Near a header's left (its sort control is at the right), the column made wider than its values: a
             // double-click fits it to them, as on its border.
             Surface(name: "Table rows: column header",
@@ -196,9 +196,9 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultViewer(main)?.valuePanel != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel",
-                           "Record View", "Column Summary…", "Display As"],
+                           "Record View", "Transpose", "Column Summary…", "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Export Rows…", "Value Panel", "Record View",
-                              "Column Summary…"]),
+                              "Transpose", "Column Summary…"]),
             // A console result of one table with its key: a double-click edits the cell.
             Surface(name: "Editable result cell",
                     place: { main, _ in
@@ -223,7 +223,7 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultGrid(main).editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Delete Rows…", "Revert",
-                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Column Summary…", "Display As"],
+                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
                     // email is NOT NULL: Set NULL is off, saying so.
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Delete Rows…", "Export Rows…", "Value Panel",
                               "Record View", "Column Summary…"]),
@@ -258,8 +258,8 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.containsRow(1) },
                     doubleClicked: { main, _ in resultViewer(main)?.record == 1 },
                     // In Record View now (the double-click), so without Display As.
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Value Panel"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Value Panel"]),
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Transpose", "Value Panel"],
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Transpose", "Value Panel"]),
             // View As ▸ Tree: the result's first row, an object (so Copy, of a value, is off).
             Surface(name: "JSON tree",
                     place: { main, _ in
