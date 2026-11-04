@@ -642,7 +642,7 @@ extension AppTests {
             #expect(console.messagesView.messages.map(\.level) == [.ok, .ok])
             #expect(console.messagesView.messages.first?.line == 2)
 
-            #expect(await call(harness, "menu", ["path": "Query > Transaction Mode > Manual"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Query > Transaction Mode > Manual Commit"]).error == nil)
             _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
             #expect(!console.autocommit)
             _ = await call(harness, "type", ["text": "\nINSERT INTO \(database).t VALUES (1), (2);"])

@@ -37,7 +37,7 @@ extension AppTests.AgentGateUITests {
         #expect(try await count() == "1", "the person's approval ran it")
 
         // Manual mode from the agent: SET autocommit = 0 waits for the person, who approves it.
-        #expect(await agentCall(service, "menu", ["path": "Query > Transaction Mode > Manual"]).error == nil)
+        #expect(await agentCall(service, "menu", ["path": "Query > Transaction Mode > Manual Commit"]).error == nil)
         _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
         #expect(Self.preview(main)?.window?.title == "Run this statement for Claude Code?")
         #expect(await call(harness, "press", ["id": "preview.run"]).error == nil)
@@ -56,7 +56,7 @@ extension AppTests.AgentGateUITests {
         #expect(console.session?.inTransaction == true && console.messagesView.messages.last?.level == .error)
         #expect(try await count() == "1", "not committed")
         // The person's own Rollback asks nobody.
-        #expect(await call(harness, "menu", ["path": "Query > Rollback"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Query > Roll Back"]).error == nil)
         _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
         #expect(main.window?.attachedSheet == nil && console.session?.inTransaction == false)
         _ = try await setup.query("DROP DATABASE \(database)")
