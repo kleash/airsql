@@ -222,3 +222,18 @@ extension AppTests {
         }
     }
 }
+
+extension AppTests {
+    @MainActor @Suite struct ShortcutsWindowTests {
+        @Test func listsTheCommandsAndNarrows() throws {
+            _ = NSApplication.shared
+            let shown = ShortcutsWindowController.show()
+            defer { shown.close() }
+            #expect(shown.text.string.contains("⌘T\tNew Query"))
+            let filter = try #require(shown.window?.contentView?.subviews.compactMap { $0 as? NSSearchField }.first)
+            filter.stringValue = "new query"
+            shown.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            #expect(shown.text.string == "⌘T\tNew Query")
+        }
+    }
+}

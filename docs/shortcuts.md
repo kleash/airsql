@@ -6,7 +6,8 @@ nav_order: 90
 # Keyboard shortcuts
 
 Every command is in the menu bar, with its shortcut next to it, and right-click menus show the same commands. Hold
-the pointer over a menu item to see what it does. A greyed-out item says why it is off.
+the pointer over a menu item to see what it does. A greyed-out item says why it is off. **Help ▸ Keyboard Shortcuts**
+lists them all in the app, narrowed as you type.
 
 ⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
 Tab indents, ⌥⌘1 goes to the sidebar and ⌥⌘3 to the results. ⌃⇥ and ⌃⇧⇥ show the next and previous tab, as in Safari.

@@ -83,7 +83,7 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         whereRow.setHuggingPriority(.defaultLow, for: .horizontal)
         spacer.isHidden = true
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        row.setViews([scope, whereRow, spacer, searchField, loadedOnly, spinner, transposeButton, helpButton(.dataGrid)], in: .leading)
+        row.setViews([scope, whereRow, spacer, searchField, loadedOnly, spinner, transposeButton, helpButton(.tableData)], in: .leading)
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.unit)

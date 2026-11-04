@@ -11,6 +11,8 @@ import AppKit
     @objc optional func showHelpSite(_ sender: Any?)
     @objc optional func showGettingStarted(_ sender: Any?)
     @objc optional func showShortcuts(_ sender: Any?)
+    @objc optional func showOfflineHelp(_ sender: Any?)
+    @objc optional func showReleaseNotes(_ sender: Any?)
     @objc optional func focusSidebar(_ sender: Any?)
     @objc optional func focusEditor(_ sender: Any?)
     @objc optional func focusResults(_ sender: Any?)
@@ -721,7 +723,11 @@ enum Commands {
     static let help = Command("AirSQL Help", #selector(AirSQLActions.showHelpSite(_:)),
                               tip: "Open AirSQL Help on the web: every task step by step, with pictures")
     static let shortcuts = Command("Keyboard Shortcuts", #selector(AirSQLActions.showShortcuts(_:)),
-                                   tip: "Open the list of every shortcut in AirSQL Help")
+                                   tip: "Show every shortcut, in a list you can narrow as you type")
+    static let offlineHelp = Command("AirSQL Help Offline", #selector(AirSQLActions.showOfflineHelp(_:)),
+                                     tip: "Open the text of AirSQL Help kept in the app, for when the site can't be reached")
+    static let releaseNotes = Command("Release Notes", #selector(AirSQLActions.showReleaseNotes(_:)),
+                                      tip: "Open the list of versions on GitHub: what changed, and the newest to download")
     static let gettingStarted = Command("Getting Started", #selector(AirSQLActions.showGettingStarted(_:)),
                                         tip: "Open the first steps in AirSQL Help: add a connection, run a query, edit rows")
     static let reportProblem = Command("Report a Problem", #selector(AirSQLActions.reportProblem(_:)),
@@ -759,7 +765,7 @@ enum Commands {
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
-        help, gettingStarted, shortcuts, reportProblem, copyDiagnostics, agentGuide,
+        help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
     ]
 
     /// The command with this action (and tag, for the actions several commands share).

@@ -5,6 +5,8 @@ import Combine
 /// Settings ▸ Agents: whether AI agents may use AirSQL, each connection's access, the folder their exports go to, and
 /// adding AirSQL to Claude Code or Gemini CLI (plan §2.8). Only the person changes these: agents can't.
 final class AgentsPane: SettingsPaneController {
+    override var helpPage: HelpPage { .agents }
+
     /// Where agents' exports go: inside AirSQL's folder, so macOS asks nothing (R18).
     static var exportFolder: URL { AgentTarget.exportFolder }
     /// The program agents start: this AirSQL's own, with --mcp.

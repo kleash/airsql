@@ -118,7 +118,9 @@ extension ConnectionEditor {
                  caption: draft.route == .direct ? nil : "As the last SSH host or the proxy reaches it, often 127.0.0.1 or a private address.")
         if draft.route == .direct {
             form.row("Socket", [text(\.socket, placeholder: "none: TCP", id: "editor.socket",
-                                     tip: "Type the path of a server's own socket on this Mac (Homebrew, MAMP, DBngin)")],
+                                     tip: "Type the path of a server's own socket on this Mac (Homebrew, MAMP, DBngin)"),
+                                button("Find", id: "editor.findSocket", tip: "Look for a server's socket in the usual places on "
+                                       + "this Mac", target: self, action: #selector(findSocket(_:)))],
                      caption: "For a server on this Mac: its socket file, used instead of the host and port.")
         }
         form.row("User", [text(\.user, placeholder: draft.askPassword ? "asked at each connect" : "root", id: "editor.user",
@@ -130,6 +132,7 @@ extension ConnectionEditor {
         password.translatesAutoresizingMaskIntoConstraints = false
         password.widthAnchor.constraint(equalToConstant: 200).isActive = true
         password.isEnabled = !draft.askPassword
+        if draft.askPassword { password.toolTip = "Off while Ask at each connect is ticked: nothing is saved" }
         bind(password) { [weak self] in self?.password = password.stringValue }
         let ask = toggle("Ask at each connect", \.askPassword, id: "editor.askPassword",
                          tip: "Ask for the user and password at each connect and never save them") { [weak self] in self?.refreshTab() }

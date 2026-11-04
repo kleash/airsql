@@ -44,6 +44,10 @@ devices on it. If you chose **Don't Allow**: System Settings ▸ Privacy & Secur
 
 It needs macOS 13.1 or later. Downloads from the releases page and Homebrew are notarized and open normally.
 
+## No help pages show
+
+The help is on the web. On a Mac that can't reach it, **Help ▸ AirSQL Help Offline** opens the same text, kept in the app.
+
 ## Report a problem
 
 **Help ▸ Report a Problem** opens a form on GitHub with your AirSQL and macOS versions filled in. **Help ▸ Copy

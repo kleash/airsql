@@ -64,6 +64,7 @@ cp vendor/out/universal/lib/libmariadb.3.dylib "$app/Contents/Frameworks/"
 cp -R Resources/Licenses "$app/Contents/Resources/"
 # What agents read through the guide tool and MCP's instructions.
 cp Resources/AgentGuide.md "$app/Contents/Resources/"
+cp docs/llms-full.txt "$app/Contents/Resources/AirSQL Help.txt"
 cp NOTICE "$app/Contents/Resources/Licenses/NOTICE.txt"
 
 # Inside out: the library, then the app.

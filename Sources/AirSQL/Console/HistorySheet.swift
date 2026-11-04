@@ -89,7 +89,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         insertButton.keyEquivalent = "\r"
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let buttons = NSStackView(views: [clear, status, spacer, cancel, insertButton])
+        let buttons = NSStackView(views: [helpButton(.console), clear, status, spacer, cancel, insertButton])
         buttons.spacing = Spacing.unit
         buttons.translatesAutoresizingMaskIntoConstraints = false
         empty.alignment = .center

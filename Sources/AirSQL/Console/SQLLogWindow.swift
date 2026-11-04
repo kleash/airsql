@@ -58,7 +58,7 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
                             action: #selector(revealLog(_:)))
         let clear = button("Clear Log…", id: "sqlLog.clear", tip: Commands.clearSQLLog.tip, target: self,
                            action: #selector(clearSQLLog(_:)))
-        let bar = NSStackView(views: [filter, status, NSView(), reveal, clear])
+        let bar = NSStackView(views: [filter, status, NSView(), reveal, clear, helpButton(.sqlLog)])
         bar.spacing = Spacing.unit
         filter.widthAnchor.constraint(equalToConstant: 280).isActive = true
         let root = SurfaceView(.ground)

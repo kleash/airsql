@@ -13,6 +13,29 @@ sidebar, and its summary shows where it goes and how it logs in.
 Passwords stay in your Keychain. A connection coloured **Production** starts with stricter safety checks
 ([Settings](settings.md#safety)).
 
+## No server yet?
+
+To try AirSQL with nothing installed but [Docker](https://www.docker.com/products/docker-desktop/), start a throwaway
+MariaDB on this Mac:
+
+```sh
+docker run --name try-mariadb -e MARIADB_ROOT_PASSWORD=try-it -p 127.0.0.1:3306:3306 -d mariadb:11
+```
+
+Add a connection to host `127.0.0.1`, user `root`, password `try-it`, then open
+[demo-shop.sql](https://github.com/kleash/airsql/blob/main/scripts/demo-shop.sql) with **File ▸ Open…** and press **Run
+All** (⇧⌘↩): it fills a small shop to look around in. `docker rm -f try-mariadb` removes it all.
+
+## Run a query
+
+Double-click the connection to connect, then choose **File ▸ New Query** (⌘T). Pick a database in the toolbar, type a
+statement, and press ⌘↩: the results show under the editor. See [Query tabs](console.md).
+
+## Edit rows
+
+Click a table in the sidebar to see its rows, and double-click a cell to change it. Your edits wait, marked in the grid,
+until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes them back. See [Table data](table-data.md).
+
 ## The window
 
 - **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
@@ -21,7 +44,7 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
   to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as
   it does in Settings, the SQL log and Compare. ⇧⌘T brings back the tab you closed last. ⌘P (**Quick Open…**) goes to a
   table, view or connection by part of its name.
-- **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
+- **The toolbar** (right-click it for **Icon and Text**, or **View ▸ Customize Toolbar…**) shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
   All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Roll Back and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
 - **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to

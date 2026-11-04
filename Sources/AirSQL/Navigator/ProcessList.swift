@@ -64,7 +64,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         filter.delegate = self
         filter.sendsSearchStringImmediately = true
         filter.widthAnchor.constraint(equalToConstant: 200).isActive = true
-        let narrow = NSStackView(views: [status, NSView(), hideSleeping, filter])
+        let narrow = NSStackView(views: [status, NSView(), hideSleeping, filter, helpButton(.navigator)])
         narrow.spacing = Spacing.unit
         narrow.translatesAutoresizingMaskIntoConstraints = false
         for (id, title, width) in Self.columns {

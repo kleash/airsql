@@ -62,7 +62,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         self.go = go
         stopButton = stop
         updateButtons()
-        let bar = NSStackView(views: [field, scope, go, stop, spinner])
+        let bar = NSStackView(views: [field, scope, go, stop, spinner, helpButton(.navigator)])
         bar.spacing = Spacing.unit
         bar.translatesAutoresizingMaskIntoConstraints = false
         for (id, title, width) in [("table", "Table", 260.0), ("columns", "Columns", 260.0), ("rows", "Matching rows", 110.0)] {

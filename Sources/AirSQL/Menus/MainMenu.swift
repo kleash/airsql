@@ -82,7 +82,8 @@ enum MainMenu {
         NSApp.windowsMenu = menus.window
 
         // No ⌘?: macOS keeps it for the Help menu's search field.
-        menus.help.add([Commands.help, Commands.gettingStarted, Commands.shortcuts, nil, Commands.reportProblem, Commands.copyDiagnostics])
+        menus.help.add([Commands.help, Commands.offlineHelp, Commands.gettingStarted, Commands.shortcuts, Commands.releaseNotes, nil,
+                        Commands.reportProblem, Commands.copyDiagnostics])
         NSApp.helpMenu = menus.help
 
         // The lanes' items (plan §2.4: each lane adds its own in its Menus+<Lane>.swift).

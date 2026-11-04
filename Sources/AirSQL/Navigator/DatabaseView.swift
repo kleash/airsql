@@ -84,7 +84,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        [title, spinner, caption, filter, scroll, empty].forEach(root.addSubview)
+        let help = helpButton(.navigator)
+        [title, spinner, caption, filter, help, scroll, empty].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             title.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double),
             title.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
@@ -92,8 +93,10 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             spinner.centerYAnchor.constraint(equalTo: title.centerYAnchor),
             spinner.trailingAnchor.constraint(lessThanOrEqualTo: filter.leadingAnchor, constant: -Spacing.unit),
             filter.centerYAnchor.constraint(equalTo: title.centerYAnchor),
-            filter.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.double),
+            filter.trailingAnchor.constraint(equalTo: help.leadingAnchor, constant: -Spacing.unit),
             filter.widthAnchor.constraint(equalToConstant: 200),
+            help.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+            help.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.double),
             caption.topAnchor.constraint(equalTo: title.bottomAnchor, constant: Spacing.half),
             caption.leadingAnchor.constraint(equalTo: title.leadingAnchor),
             caption.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -Spacing.double),
