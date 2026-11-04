@@ -55,11 +55,14 @@ public struct ClientTool: Equatable, Sendable {
     public var version: ToolVersion?
     /// The program is there and can be run (a chosen path may not be).
     public var found: Bool
+    /// It takes --ssl-fp, so it can check a pinned certificate itself (MariaDB's newer tools, as its --help says).
+    public var takesFingerprint: Bool
 
-    public init(path: String, version: ToolVersion?, found: Bool = true) {
+    public init(path: String, version: ToolVersion?, found: Bool = true, takesFingerprint: Bool = false) {
         self.path = path
         self.version = version
         self.found = found
+        self.takesFingerprint = takesFingerprint
     }
 
     /// "mariadb-dump".
@@ -132,6 +135,14 @@ public enum ClientTools {
         return result.status == 0 ? ToolVersion.parse(result.output) : nil
     }
 
+    /// `path` with what it says of itself: its version and, for MariaDB's tools, whether it takes --ssl-fp.
+    private static func tool(at path: String, found: Bool = true) async -> ClientTool {
+        guard found else { return ClientTool(path: path, version: nil, found: false) }
+        let version = await version(of: path)
+        let help = version?.family == .mariadb ? await Runner.run([path, "--help"], timeout: 5).output : ""
+        return ClientTool(path: path, version: version, takesFingerprint: help.contains("--ssl-fp="))
+    }
+
     /// The tools of `kind` on this Mac with their versions: `chosen` (Settings, or a connection's own) first when it is
     /// set, then those found, by family and newest first. A chosen path that isn't there is still listed, without a version.
     public static func find(_ kind: ClientTool.Kind, chosen: String = "",
@@ -139,7 +150,7 @@ public enum ClientTools {
         var paths = candidates(kind, in: folders)
         if !chosen.isEmpty { paths.removeAll { $0 == chosen } }
         var tools: [ClientTool] = []
-        for path in paths { tools.append(ClientTool(path: path, version: await version(of: path))) }
+        for path in paths { tools.append(await tool(at: path)) }
         // By family (MariaDB, MySQL), each newest first.
         tools.sort { a, b in
             let (familyA, familyB) = (a.version?.family.rawValue ?? "~", b.version?.family.rawValue ?? "~")
@@ -147,8 +158,7 @@ public enum ClientTools {
             return (b.version?.numbers ?? []).lexicographicallyPrecedes(a.version?.numbers ?? [])
         }
         if !chosen.isEmpty {
-            let found = FileManager.default.isExecutableFile(atPath: chosen)
-            tools.insert(ClientTool(path: chosen, version: found ? await version(of: chosen) : nil, found: found), at: 0)
+            tools.insert(await tool(at: chosen, found: FileManager.default.isExecutableFile(atPath: chosen)), at: 0)
         }
         return tools
     }

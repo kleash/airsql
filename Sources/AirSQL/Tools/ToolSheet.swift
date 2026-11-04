@@ -24,6 +24,14 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
     let timeLeft = label("", font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
     let bar = NSProgressIndicator()
     let spinner = NSProgressIndicator()
+    /// Shown when the tool chosen can't run: AirSQL's own way checks the certificate as the connection does.
+    let useBuiltIn = button("Use AirSQL's Built-in", id: "tools.useBuiltIn",
+                            tip: "Switch to AirSQL's own way, which checks the server's certificate as the connection does",
+                            target: nil, action: nil)
+    private weak var toolPopup: NSPopUpButton?
+    /// Run once without the certificate check, when the tool can't make it (`ToolCommand.mayRunUnchecked`): unticked by
+    /// default, never saved, cleared after each run and when the tool changes.
+    let unchecked = checkbox("Run without checking the certificate", id: "tools.unchecked", tip: "", on: false, target: nil, action: nil)
     let runButton: NSButton
     let cancelButton: NSButton
     private(set) var running = false
@@ -45,6 +53,9 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
+        useBuiltIn.target = self
+        useBuiltIn.action = #selector(useBuiltInPressed(_:))
+        useBuiltIn.isHidden = true
         runButton.target = self
         runButton.action = #selector(runPressed(_:))
         runButton.keyEquivalent = "\r"
@@ -73,6 +84,8 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
     func setFormEnabled(_ enabled: Bool) {}
     /// Whether the work writes to `connection`, so a connection made read-only since the window opened stops it.
     var writes: Bool { false }
+    /// What the tick box risks (Export and Restore's).
+    var uncheckedTip: String { "" }
     /// The saved connections the work goes through.
     var connections: Set<UUID> { [connection.id] }
 
@@ -172,9 +185,49 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
     /// Fills a Tool pop-up: `tools` (two can have one title: the menu's own `addItem` would drop one), then AirSQL's own
     /// way, `builtIn` saying what that does.
     func fill(_ menu: NSPopUpButton, tools: [ClientTool], builtIn: String) {
+        toolPopup = menu
         menu.removeAllItems()
         for tool in tools { menu.menu?.addItem(withTitle: tool.title, action: nil, keyEquivalent: "").toolTip = tool.path }
         menu.menu?.addItem(withTitle: "AirSQL (built in)", action: nil, keyEquivalent: "").toolTip = builtIn
+    }
+
+    /// The Tool pop-up's note with, under it, the way out when the tool chosen can't run (`useBuiltIn`).
+    func toolNote(_ note: NSTextField) -> NSView {
+        unchecked.isHidden = true
+        unchecked.toolTip = uncheckedTip
+        let stack = NSStackView(views: [note, unchecked, useBuiltIn])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 4
+        return stack
+    }
+
+    /// `tool`'s command for this run, with the tick box's answer.
+    func toolCommand(_ tool: ClientTool, server: ServerInfo?) -> ToolCommand {
+        var command = ToolCommand(tool: tool, options: options, server: server)
+        command.uncheckedCertificate = unchecked.state == .on
+        return command
+    }
+
+    /// Shows the tick box if the tool may use it, and warns while it is ticked.
+    func showUnchecked(_ command: ToolCommand?, note: NSTextField) {
+        unchecked.isHidden = command?.mayRunUnchecked != true
+        guard command?.uncheckedNote != nil else { return }
+        note.stringValue = "This run won't check the server's certificate: it needs TLS, but can't prove which server it reaches."
+        note.textColor = .statusWarning
+    }
+
+    /// Notes a run without the check in the SQL log, off the main thread.
+    func logUnchecked(_ command: ToolCommand?) {
+        guard let text = command?.uncheckedNote else { return }
+        let context = connection.displayName + " tools"
+        DispatchQueue.global(qos: .utility).async { SQLLog.shared.note(text, context: context) }
+    }
+
+    @objc private func useBuiltInPressed(_ sender: Any?) {
+        guard let toolPopup else { return }
+        toolPopup.selectItem(at: toolPopup.numberOfItems - 1)
+        toolPopup.sendAction(toolPopup.action, to: toolPopup.target)
     }
 
     /// Asks for a program anywhere on this Mac, starting in Homebrew's folder, which Finder hides; `done` gets it with
@@ -213,6 +266,7 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
         started = Date()
         activity = model.activity.start(title, connection: connection.id) { cancellation.cancel() }
         setFormEnabled(false)
+        unchecked.isEnabled = false
         runButton.isEnabled = false
         runButton.toolTip = "It is running: wait for it, or Stop it"
         cancelButton.title = "Stop"
@@ -247,6 +301,11 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
     /// The work ended: `message` says how (in red when it failed), and the sheet can run again or be closed.
     func finish(_ message: String, failed: Bool) {
         running = false
+        if unchecked.state == .on {
+            unchecked.state = .off  // each run is ticked anew
+            unchecked.sendAction(unchecked.action, to: unchecked.target)
+        }
+        unchecked.isEnabled = true
         cancellation = nil
         activity?.end()
         activity = nil
@@ -268,6 +327,7 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
     /// sheet as it was before `begin`.
     func idle() {
         running = false
+        unchecked.isEnabled = true
         cancellation = nil
         activity?.end()
         activity = nil
@@ -287,6 +347,8 @@ class ToolSheet: NSWindowController, NSWindowDelegate {
 
     @objc private func runPressed(_ sender: Any?) {
         guard !running, runButton.isEnabled else { return }
+        // Going without the check is the person's call (plan §2.8).
+        if unchecked.state == .on, AgentGuard.refuses("Only the person at the Mac can run without checking the certificate.") { return }
         if writes, model.connection(connection.id)?.readOnly == true {
             return finish("\(connection.displayName) is read-only now: turn that off in the connection's settings to write to it",
                           failed: true)

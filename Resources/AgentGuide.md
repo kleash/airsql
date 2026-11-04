@@ -240,7 +240,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
   sheet `reconTables.list`, `reconTables.all`, `reconTables.done`, `reconTables.cancel`.
 - **Client tools sheets** (windows of their own on screen, which these tools treat as sheets): `tools.heading`, `tools.objects` (`tools.include.<name>`), `tools.status`,
-  `tools.timeLeft`, `tools.cancel`, `tools.run` (Export: the person's). Export `export.content`,
+  `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
+  `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
   `export.chooseTool`, `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`,
   `export.reveal`; Restore `restore.file`,

@@ -58,7 +58,7 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
         options.spacing = 4
         form.row("Options", [options]).yPlacement = .top
         let grid = form.finish()
-        grid.setContentHuggingPriority(.defaultHigh, for: .vertical)  // its rows stay together at the top
+        grid.setContentHuggingPriority(.init(749), for: .vertical)  // its rows stay together at the top
         databaseField.widthAnchor.constraint(equalToConstant: 260).isActive = true
         // Long connection names are shortened in the menu's button, whole in the menu.
         targetMenu.widthAnchor.constraint(lessThanOrEqualToConstant: 320).isActive = true

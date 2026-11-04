@@ -41,17 +41,44 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
             do {
                 let tools = await ClientTools.find(.client, chosen: saved.clientPath.isEmpty ? main.model.data.settings.clientPath
                                                                                              : saved.clientPath)
-                guard let tool = ClientTools.best(tools, for: nil) else {
+                guard let tool = ClientTools.best(ToolCommand.runnable(tools, options: options, server: nil), for: nil)
+                        ?? ClientTools.best(tools, for: nil) else {
                     throw AirSQLError(.other, "AirSQL found no mysql or mariadb program. Install MySQL's or MariaDB's client tools "
                         + "(for example with Homebrew), or choose one in Settings ▸ Client Tools.")
                 }
-                let command = ToolCommand(tool: tool, options: options, server: nil)
+                var command = ToolCommand(tool: tool, options: options, server: nil)
+                if command.tlsProblem != nil, command.mayRunUnchecked {
+                    let alert = Self.uncheckedAlert(name: saved.displayName)
+                    guard await alert.beginSheetModal(for: window) == .alertSecondButtonReturn else { return }
+                    command.uncheckedCertificate = true  // this time only: nothing is saved
+                }
                 if let problem = command.tlsProblem { throw AirSQLError(.tls, problem) }
+                if let note = command.uncheckedNote {
+                    let context = saved.displayName + " tools"
+                    DispatchQueue.global(qos: .utility).async { SQLLog.shared.note(note, context: context) }
+                }
                 try await ToolRun.openInTerminal(command, database: saved.database, name: saved.displayName)
             } catch {
                 showError(error.localizedDescription, title: "Can't open Terminal", on: window)
             }
         }
+    }
+
+    /// Asks each time Terminal would open without the certificate check: Cancel is the default, and going on is marked
+    /// destructive, so it is the person's alone.
+    static func uncheckedAlert(name: String) -> NSAlert {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Open Terminal without checking the certificate?"
+        alert.informativeText = "This tool can't check the certificate you trusted for \(name). The connection stays encrypted, "
+            + "but it can't prove it's this server, so your login and what you type could be exposed."
+        let cancel = alert.addButton(withTitle: "Cancel")
+        cancel.toolTip = "Don't open Terminal"
+        cancel.keyEquivalent = "\r"  // AppKit gives a Cancel button Esc, even as the first one: here it is the default
+        let open = alert.addButton(withTitle: "Open Without Checking")
+        open.hasDestructiveAction = true
+        open.toolTip = "Open Terminal this once with TLS required but no certificate check"
+        return alert
     }
 
     /// The connection the sheets work on: the window's, or, from the navigator (a database's or table's menu, or while

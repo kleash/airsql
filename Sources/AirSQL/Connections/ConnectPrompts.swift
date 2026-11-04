@@ -161,10 +161,30 @@ extension Connector {
         }
     }
 
-    /// Says why connecting failed, with ssh's or the server's own last words.
-    func showConnectError(_ error: AirSQLError, connection: String, on window: NSWindow?) {
+    /// Says why connecting failed, with ssh's or the server's own last words, and offers what to do next.
+    func showConnectError(_ error: AirSQLError, connection saved: SavedConnection, on window: NSWindow?) {
         let details = error.details.split(whereSeparator: \.isNewline).suffix(3).joined(separator: "\n")
-        showError(error.message + (details.isEmpty ? "" : "\n\n" + details), title: "Can't connect to “\(connection)”", on: window)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Can't connect to “\(saved.displayName)”"
+        alert.informativeText = error.message + (details.isEmpty ? "" : "\n\n" + details)
+        alert.addButton(withTitle: "Try Again").toolTip = "Connect again with the same settings"
+        alert.addButton(withTitle: "Edit Connection…").toolTip = "Open the connection's settings"
+        alert.addButton(withTitle: "Troubleshooting").toolTip = "Open the help page on what to do about failed connections"
+        let close = alert.addButton(withTitle: "Close")
+        close.toolTip = "Close this message"
+        close.keyEquivalent = "\u{1b}"
+        let answered: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            switch response {
+            case .alertFirstButtonReturn: self?.connect(saved.id, on: window)
+            case .alertSecondButtonReturn:
+                let main = window?.windowController as? MainWindowController ?? (NSApp.delegate as? AppDelegate)?.main
+                if let current = self?.model.connection(saved.id) { main?.edit(current, isNew: false, on: window) }
+            case .alertThirdButtonReturn: NSWorkspace.shared.open(HelpPage.troubleshooting.url)
+            default: break
+            }
+        }
+        if let window { alert.beginSheetModal(for: window, completionHandler: answered) } else { answered(alert.runModal()) }
     }
 }
 

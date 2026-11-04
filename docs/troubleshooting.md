@@ -10,6 +10,8 @@ the common problems.
 
 ## A connection fails
 
+The message offers **Try Again**, **Edit Connection…** and this page.
+
 | AirSQL says | What to do |
 |---|---|
 | Can't find the server | Check the host name, and that you are on the right network or VPN. |
@@ -19,6 +21,7 @@ the common problems.
 | The server didn't accept the user name or password | Check both. Through an SSH host, the server sees the SSH host's address, and the account must allow that host. |
 | This user may not log in from this computer's address | An administrator can allow it (the account's host part). |
 | The server only accepts encrypted connections | Turn on TLS for the connection. |
+| The server doesn't offer TLS | Choose **Edit Connection…**, then in the TLS tab set TLS to **Off**, only for a server on this Mac or a network you trust end to end. |
 | The server asked for a login method AirSQL doesn't allow on this connection | A PAM or LDAP account: turn on its plain-text login for the connection, with TLS that proves the server. |
 | The server blocked this computer after too many failed connections | An administrator can unblock it (`FLUSH HOSTS`). |
 
