@@ -202,6 +202,21 @@ extension AppTests {
         _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
     }
 
+    /// Import lists a file's connections with ticks: one that is already here starts unticked.
+    @Test func importListsAFilesConnectionsAndLeavesOutThoseAlreadyHere() async throws {
+        var here = SavedConnection(name: "Here", host: "db.example.com", user: "app")
+        here.database = "shop"
+        let model = testModel([here])
+        let (main, harness) = appWindow(model)
+        let file = URL(fileURLWithPath: try scratch() + "/connections.json")
+        try ConnectionImport.export([here, SavedConnection(name: "New", host: "other.example.com", user: "app")]).write(to: file)
+        main.importConnections(from: file)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["title": "Import"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(model.data.connections.map(\.displayName).sorted() == ["Here", "New"])
+    }
+
     /// A connect that fails says why in a sheet, and the sidebar marks the connection; Disconnect is off again.
     @Test func aFailedConnectIsReported() async throws {
         var nowhere = SavedConnection(name: "Nowhere", host: "127.0.0.1", port: 1, user: "root")

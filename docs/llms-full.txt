@@ -573,6 +573,20 @@ its own proxy) are used, after what the editor sets.
 makes a connection for each one you tick: an SSH tunnel through that host to a database on `127.0.0.1:3306`, which
 you can then edit.
 
+## Import and export connections
+
+- **File ▸ New Connection from URL…** takes a `mysql://user@host:3306/database` address (or `mariadb://`), from the
+  clipboard when it holds one, and opens the connection's settings to check before you save.
+- **File ▸ Import Connections…** reads the saved connections of Sequel Ace, TablePlus, DBeaver or MySQL Workbench when
+  they are on this Mac, or a file you choose: an AirSQL export, one of those apps' files, or HeidiSQL's exported
+  settings. It lists the MySQL and MariaDB connections with ticks; one that is already here starts unticked.
+- **File ▸ Export Connections…** saves the selected connections, or all of them, to a file for another Mac or a
+  colleague.
+
+Passwords never come along: an export has none, an import doesn't read them, and a password in a URL is left out.
+AirSQL asks for each when you connect. An imported AirSQL file also leaves out what would run by itself: the client
+programs chosen, startup SQL and agent access. TLS starts strict, except for a server on this Mac.
+
 ## Connect and disconnect
 
 Double-click a connection, or select it and choose **Connection ▸ Connect** (⌘K). The status bar shows each step, hop

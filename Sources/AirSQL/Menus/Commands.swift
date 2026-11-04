@@ -29,6 +29,9 @@ import AppKit
     @objc optional func runSQLFile(_ sender: Any?)
     @objc optional func importCSV(_ sender: Any?)
     @objc optional func importSSHConfig(_ sender: Any?)
+    @objc optional func importConnections(_ sender: Any?)
+    @objc optional func exportConnections(_ sender: Any?)
+    @objc optional func newConnectionFromURL(_ sender: Any?)
 
     // Edit
     @objc optional func copyWithHeaders(_ sender: Any?)
@@ -302,6 +305,12 @@ enum Commands {
                                    tip: "Load rows from a CSV file into a table, choosing which column goes where")
     static let importSSHConfig = Command("Import from ~/.ssh/config…", #selector(AirSQLActions.importSSHConfig(_:)),
                                          tip: "Make connections that tunnel through the SSH hosts in your ~/.ssh/config")
+    static let importConnections = Command("Import Connections…", #selector(AirSQLActions.importConnections(_:)),
+                                           tip: "Add connections from another app or an export file, without passwords")
+    static let exportConnections = Command("Export Connections…", #selector(AirSQLActions.exportConnections(_:)),
+                                           tip: "Save the selected connections, or all of them, to a file, without passwords")
+    static let newConnectionFromURL = Command("New Connection from URL…", #selector(AirSQLActions.newConnectionFromURL(_:)),
+                                              tip: "Make a connection from a mysql:// address")
 
     // MARK: Edit
     static let undo = Command("Undo", sel("undo:"), "z", tip: "Undo the last change")
@@ -673,7 +682,7 @@ enum Commands {
         about, settings, hide, hideOthers, showAll, quit,
         newConnection, newQuery, open, closeTab, closeOtherTabs, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
-        runSQLFile, importCSV, importSSHConfig,
+        runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
