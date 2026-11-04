@@ -34,7 +34,7 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
             box.controlSize = .small
         }
         matchCase.toolTip = "Find only text with the same capitals"
-        regex.toolTip = "Read what to find as a regular expression (ICU, as NSRegularExpression)"
+        regex.toolTip = "Read what to find as a regular expression, such as ^id_[0-9]+"
         matchCase.setAccessibilityIdentifier("find.matchCase")
         regex.setAccessibilityIdentifier("find.regex")
         let previous = icon("chevron.left", "Previous Match", "Show the previous match (⇧⌘G)", #selector(previousMatch(_:)), "find.previous")

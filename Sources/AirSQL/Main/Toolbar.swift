@@ -41,7 +41,6 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         (transactionPopup.cell as? NSPopUpButtonCell)?.altersStateOfSelectedItem = false
         for command in [Commands.autoCommit, Commands.manualCommit] {
             let item = command.item()
-            item.title = "Tx: " + command.title
             transactionPopup.menu?.addItem(item)
         }
         transactionPopup.menu?.addItem(.separator())
@@ -65,19 +64,21 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         switch identifier {
-        case .connection: return popupItem(identifier, connectionPopup, label: "Connection", width: (140, 220))
-        case .database: return popupItem(identifier, databasePopup, label: "Database", width: (110, 170))
-        case .transactionMode: return popupItem(identifier, transactionPopup, label: "Transaction Mode", width: (110, 130))
+        // The customizing sheet shows its own copies: the pop-ups stay in the toolbar.
+        case .connection: return popupItem(identifier, flag ? connectionPopup : NSPopUpButton(), label: "Connection", width: (140, 220))
+        case .database: return popupItem(identifier, flag ? databasePopup : NSPopUpButton(), label: "Database", width: (110, 170))
+        case .transactionMode: return popupItem(identifier, flag ? transactionPopup : NSPopUpButton(), label: "Transaction Mode",
+                                                width: (110, 130))
         case .run: return CommandToolbarItem(identifier, Commands.runStatement, title: "Run", symbol: "play.fill", primary: true,
-                                             reason: "Open a console tab to run SQL")
-        case .runAll: return CommandToolbarItem(identifier, Commands.runAll, title: "Run All", symbol: "forward.end.fill",
-                                                iconOnly: true, reason: "Open a console tab to run SQL")
-        case .explain: return CommandToolbarItem(identifier, Commands.explain, title: "Explain", symbol: "list.bullet.indent",
-                                                 iconOnly: true, reason: "Open a console tab to explain a statement")
-        case .commit: return CommandToolbarItem(identifier, Commands.commit, title: "Commit", symbol: "checkmark.circle",
-                                                iconOnly: true, reason: "No transaction is open in this tab")
-        case .rollback: return CommandToolbarItem(identifier, Commands.rollback, title: "Rollback",
-                                                  symbol: "arrow.uturn.backward.circle", iconOnly: true,
+                                             reason: "Open a query tab (⌘T) to run SQL")
+        case .runAll: return CommandToolbarItem(identifier, Commands.runAll, title: "Run All", symbol: "play.square.stack",
+                                                iconOnly: true, reason: "Open a query tab (⌘T) to run SQL")
+        case .explain: return CommandToolbarItem(identifier, Commands.explain, title: "Explain", symbol: "text.magnifyingglass",
+                                                 iconOnly: true, reason: "Open a query tab (⌘T) to explain a statement")
+        // In words: the riskiest buttons here, and a tick or an arrow reads as OK or Undo.
+        case .commit: return CommandToolbarItem(identifier, Commands.commit, title: "Commit", symbol: nil,
+                                                reason: "No transaction is open in this tab")
+        case .rollback: return CommandToolbarItem(identifier, Commands.rollback, title: "Roll Back", symbol: nil,
                                                   reason: "No transaction is open in this tab")
         case .cancel: return CommandToolbarItem(identifier, Commands.cancelQuery, title: "Cancel", symbol: "stop.fill",
                                                 iconOnly: true, reason: "Nothing is running in this tab")
@@ -134,7 +135,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
             for title in titles {
                 let item = NSMenuItem(title: title, action: names.contains(title) ? #selector(databaseChosen(_:)) : nil, keyEquivalent: "")
                 item.target = self
-                item.toolTip = names.contains(title) ? "Run the console's statements in \(title) from now on"
+                item.toolTip = names.contains(title) ? "Run this query tab's statements in \(title) from now on"
                     : "Not one of the databases listed: choose one"
                 databasePopup.menu?.addItem(item)
             }
@@ -144,7 +145,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         databasePopup.toolTip = active == nil ? "Choose a connection first"
             : open == nil ? "Connect first: the list shows the server's databases"
             : open?.snapshot.databases.isEmpty != false ? "No databases to choose: the schema is loading, or none can be shown"
-            : "Choose the database the console's statements run in (USE); the sidebar shows it in bold"
+            : "Choose the database this query tab's statements run in (USE); the sidebar shows it in bold"
         validateResponders()
         for (popup, item) in popupItems { item.toolTip = popup.toolTip }
     }
@@ -154,10 +155,10 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
     func validateResponders() {
         let manual = Commands.manualCommit.item()
         let (canSetMode, why) = Commands.manualCommit.availability(from: transactionPopup, item: manual,
-                                                                   otherwise: "Open a console tab to choose how it commits")
+                                                                   otherwise: "Open a query tab (⌘T) to choose how it commits")
         transactionPopup.selectItem(at: manual.state == .on ? 1 : 0)
         transactionPopup.isEnabled = canSetMode
-        transactionPopup.toolTip = canSetMode ? "Choose Auto-commit or Manual, and how the console's transactions see others' "
+        transactionPopup.toolTip = canSetMode ? "Choose Auto-commit or Manual, and how this query tab's transactions see others' "
             + "changes (the isolation level)" : why
         popupItems[transactionPopup]?.toolTip = transactionPopup.toolTip
     }

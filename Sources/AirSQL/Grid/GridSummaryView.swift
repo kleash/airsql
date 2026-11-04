@@ -49,7 +49,7 @@ final class GridSummaryView: NSViewController {
         let small = NSFont.systemFont(ofSize: 11.5)
         switch result {
         case .failure(let error):
-            stack.addArrangedSubview(label((error as? AirSQLError)?.message ?? error.localizedDescription, font: small,
+            stack.addArrangedSubview(label(error.localizedDescription, font: small,
                                            color: .statusBad, wraps: true))
             return
         case .success(let summary):

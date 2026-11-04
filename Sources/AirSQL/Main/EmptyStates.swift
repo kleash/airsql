@@ -58,6 +58,14 @@ func firstRunView() -> NSView {
     let add = button("Add Connection…", id: "firstRun.addConnection", tip: Commands.newConnection.tip + " (⌘N)",
                      target: nil, action: Commands.newConnection.action, primary: true)
     add.keyEquivalent = "\r"
+    let importing = button("Import Connections…", id: "firstRun.import", tip: Commands.importConnections.tip, target: nil,
+                           action: Commands.importConnections.action)
+    let sshConfig = button("Import from SSH Config…", id: "firstRun.importSSH", tip: Commands.importSSHConfig.tip, target: nil,
+                           action: Commands.importSSHConfig.action)
+    let guide = button("Getting Started", id: "firstRun.guide", tip: Commands.gettingStarted.tip, target: nil,
+                       action: Commands.gettingStarted.action)
+    let actions = NSStackView(views: [add, importing, sshConfig])
+    actions.spacing = Spacing.unit
     let agentsTitle = label("Set up agents", font: .systemFont(ofSize: 15, weight: .semibold))
     let agentsText = label("Let Claude Code, Gemini CLI or another MCP client read your schemas and run read-only queries, at "
                            + "the access you choose for each connection. Agents are off until you turn them on.",
@@ -67,19 +75,21 @@ func firstRunView() -> NSView {
     let tips = NSStackView(views: [
         tip("cursorarrow.click.2", "Double-click a connection to connect; right-click it for everything else."),
         tip("return", "⌘↩ runs the statement at the cursor. Nothing is written until you press Run or Apply."),
-        tip("shield.lefthalf.filled", "Settings ▸ Safety decides what asks first; Production connections start strict."),
+        tip("shield.lefthalf.filled", "Settings ▸ Safety decides what asks first; a connection coloured Production starts "
+            + "strict: every write shows its SQL and asks."),
+        tip("questionmark.circle", "No server yet? Getting Started shows how to run one on this Mac and try AirSQL on sample data."),
     ])
     tips.orientation = .vertical
     tips.alignment = .leading
     tips.spacing = Spacing.unit
     let top = NSStackView(views: [symbol, title])
     top.spacing = 12
-    let stack = NSStackView(views: [top, intro, add, Hairline(.softSeparator), agentsTitle, agentsText, agents,
-                                    Hairline(.softSeparator), tips])
+    let stack = NSStackView(views: [top, intro, actions, Hairline(.softSeparator), agentsTitle, agentsText, agents,
+                                    Hairline(.softSeparator), tips, guide])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 12
-    stack.setCustomSpacing(Spacing.double, after: add)
+    stack.setCustomSpacing(Spacing.double, after: actions)
     stack.setCustomSpacing(Spacing.double, after: agents)
     for line in stack.arrangedSubviews where line is Hairline {
         line.heightAnchor.constraint(equalToConstant: 1).isActive = true
@@ -107,7 +117,9 @@ func selectConnectionView() -> NSView {
     let title = label("Select a connection", font: .systemFont(ofSize: 15, weight: .semibold))
     let text = label("Select a connection in the sidebar to see its details, or double-click it to connect.",
                      font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
-    let stack = NSStackView(views: [title, text])
+    let add = button("New Connection…", id: "selectConnection.add", tip: Commands.newConnection.tip + " (⌘N)", target: nil,
+                     action: Commands.newConnection.action)
+    let stack = NSStackView(views: [title, text, add])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = Spacing.unit

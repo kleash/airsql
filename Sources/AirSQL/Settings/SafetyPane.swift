@@ -77,7 +77,7 @@ final class SafetyPane: SettingsPaneController {
                              tip: "Put every switch and limit on this pane back to AirSQL's defaults") { [weak self] in
             self?.model.data.settings.safety = SafetySettings()
             self?.reloadPane()
-        }], caption: "A connection can override these in its Safety tab. One coloured Production starts strict: console writes "
+        }], caption: "A connection can override these in its Safety tab. One coloured Production starts strict: writes from a query tab "
             + "ask, Apply shows its SQL, tables need their names typed, agents get 1,000 rows and 15 seconds. Read-only is a "
             + "switch of each connection.")
     }

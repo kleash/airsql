@@ -129,7 +129,7 @@ extension AppTests.AgentGateUITests {
         let typing = Task { await agentCall(service, "type", ["text": "DELETE FROM orders"]) }
         #expect(await eventually(timeout: 5) { Self.preview(main) != nil })
         let sheet = try #require(Self.preview(main))
-        #expect(sheet.window?.title == "Put this text in a console of Production · shop?")
+        #expect(sheet.window?.title == "Put this text in a query tab of Production · shop?")
         let content = try #require(sheet.window?.contentView)
         #expect(find(NSTextView.self, id: "preview.sql", in: content)?.string == "DELETE FROM orders", "the text exactly")
         #expect(await agentCall(service, "press", ["id": "preview.run"]).error != nil)

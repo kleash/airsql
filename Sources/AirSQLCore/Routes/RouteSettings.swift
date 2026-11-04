@@ -136,3 +136,14 @@ public enum RouteFolder {
         return path + "/" + digest.prefix(6).map { String(format: "%02x", $0) }.joined()
     }
 }
+
+/// A server on this Mac, by the socket file its installer usually leaves.
+public enum LocalServer {
+    /// Homebrew, MacPorts-style and the installers' defaults, then MAMP and DBngin.
+    public static let usualSockets = ["/tmp/mysql.sock", "/tmp/mysqld.sock", "/opt/homebrew/var/mysql/mysql.sock", "/usr/local/var/mysql/mysql.sock",
+                               "/var/mysql/mysql.sock", "/Applications/MAMP/tmp/mysql/mysql.sock", "/tmp/mysql_3306.sock"]
+
+    public static func socket(in paths: [String] = usualSockets) -> String? {
+        paths.first { (try? FileManager.default.attributesOfItem(atPath: $0))?[.type] as? FileAttributeType == .typeSocket }
+    }
+}

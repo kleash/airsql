@@ -54,7 +54,7 @@ A read-only connection offers none of these.
 
 ## Write SQL from the tree
 
-These open a console tab with the SQL in it, built from the names AirSQL read; nothing runs until you press Run.
+These open a query tab with the SQL in it, built from the names AirSQL read; nothing runs until you press Run.
 
 - **Generate SELECT**, **Generate INSERT** and **Generate UPDATE** on a table's or view's menu (in the sidebar or the
   database view) write a statement with its columns. A `?` marks each value for you to fill in: INSERT leaves out the

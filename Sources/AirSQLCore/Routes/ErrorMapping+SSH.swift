@@ -64,6 +64,6 @@ extension ErrorMapping {
             return error(.disconnected, "An SSH host closed the connection. Check that it is an SSH server, and the proxy if "
                 + "the route uses one.")
         }
-        return error(.other, lines.last ?? "ssh ended with status \(status).")
+        return error(.other, lines.last.map { "ssh couldn't connect: \($0)" } ?? "ssh ended with status \(status).")
     }
 }

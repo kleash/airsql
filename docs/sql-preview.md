@@ -15,5 +15,5 @@ dropping or renaming, restoring a dump, and sync scripts.
 - When an **agent** asked for the change, the sheet names it. Nothing runs until you approve it; **Decline** refuses it.
 - **Save as Liquibase changeset** (a table's edited rows, the table and object editors, dropping, emptying or renaming
   in the sidebar, and sync scripts) saves the statements as a changeset in a changelog once they have run (see
-  [Liquibase changelogs](liquibase.md)). In the console, use **Query ▸ Save as Changeset…**.
+  [Liquibase changelogs](liquibase.md)). In the query tab, use **Query ▸ Save as Changeset…**.
 - **Copy SQL** copies the statements. **Cancel** changes nothing.

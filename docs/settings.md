@@ -28,7 +28,7 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 - **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
   row is then held in memory.
 - **NULL shown as**: how empty values look in the grid, open grids' too.
-- **Transpose results with one row**: a console result with a single row opens turned on its side, one line per
+- **Transpose results with one row**: a query result with a single row opens turned on its side, one line per
   column (on by default).
 
 ## Connections
@@ -44,7 +44,7 @@ below, in its Safety tab), and a connection coloured Production starts with a st
 | Setting | Default | Production |
 |---|---|---|
 | Ask before UPDATE or DELETE without WHERE | on | on |
-| Ask before any write from the console | off | on |
+| Ask before any write from the query tab | off | on |
 | Show the SQL before the grid's Apply | off | on |
 | Ask before DROP or TRUNCATE (a database's name is always typed) | on | on, table names typed too |
 | Ask before restoring into a database that has tables | on | on |

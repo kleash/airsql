@@ -196,7 +196,7 @@ extension TableDataController: DataGridViewDelegate {
                 session = try await openSession()
             } catch {
                 loading = nil
-                return showError((error as? AirSQLError)?.message ?? error.localizedDescription,
+                return showError(error.localizedDescription,
                                  title: "AirSQL couldn't reach the server", on: view.window)
             }
             loading = nil
@@ -251,12 +251,19 @@ extension TableDataController: DataGridViewDelegate {
         }
         Self.applying.insert(connection)
         bar.busy = true
-        let activity = model.activity.start("Applying changes to \(tableName)", connection: connection)
+        let stop = ApplyStop()
+        stop.session = session
+        let activity = model.activity.start("Applying changes to \(tableName)", connection: connection) { [weak self] in
+            stop.stop()
+            self?.view.window?.toolbar?.validateVisibleItems()
+        }
+        self.activity = activity
         loading = Task {
             defer { Self.applying.remove(connection) }
             do {
                 var insertIDs: [UInt64] = [], warnings = 0
                 try await PendingChanges.apply(statements) { sql in
+                    try stop.starting(sql)
                     let result = try await session.query(sql, rowCap: 1).last
                     warnings += result?.warnings ?? 0
                     if sql.hasPrefix("INSERT ") { insertIDs.append(result?.insertID ?? 0) }
@@ -285,6 +292,7 @@ extension TableDataController: DataGridViewDelegate {
                     edited.append(rows)
                 }
                 activity.end()
+                self.activity = nil
                 loading = nil
                 if patched, source.patch(edited, deleted: deleted) {
                     viewer.reloadData()
@@ -299,6 +307,7 @@ extension TableDataController: DataGridViewDelegate {
                 }
             } catch {
                 activity.end()
+                self.activity = nil
                 loading = nil
                 bar.busy = false
                 if let failure = error as? ApplyFailure { point(at: failure) }

@@ -161,7 +161,7 @@ final class TextContent: NSViewController, TabContent {
                 let text = try await load()
                 self?.textView.string = text
             } catch {
-                self?.caption.stringValue = "Couldn't read it: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+                self?.caption.stringValue = "Couldn't read it: " + error.localizedDescription
                 self?.caption.textColor = .statusBad
             }
             self?.spinner.stopAnimation(nil)

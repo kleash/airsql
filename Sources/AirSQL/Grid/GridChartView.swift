@@ -12,6 +12,7 @@ final class GridChartView: NSView {
     private weak var viewer: GridViewer?
     let kind = NSPopUpButton()
     let xColumn = NSPopUpButton()
+    private let xTip = "Choose the column for the labels or the x axis"
     let yColumn = NSPopUpButton()
     private let hosting = NSHostingView(rootView: GridChartBody(spec: .empty))
     private let empty = label("", font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
@@ -32,7 +33,7 @@ final class GridChartView: NSView {
             kind.item(at: GridChart.Kind.pie.rawValue)?.isEnabled = false
             kind.item(at: GridChart.Kind.pie.rawValue)?.toolTip = "Pie charts need macOS 14 or later"
         }
-        xColumn.toolTip = "Choose the column for the labels or the x axis"
+        xColumn.toolTip = xTip
         xColumn.setAccessibilityIdentifier("chart.x")
         yColumn.toolTip = "Choose the number column the chart draws"
         yColumn.setAccessibilityIdentifier("chart.y")
@@ -104,6 +105,7 @@ final class GridChartView: NSView {
         let y = numbers[yColumn.indexOfSelectedItem], x = labels.indices.contains(xColumn.indexOfSelectedItem) ? labels[xColumn.indexOfSelectedItem] : nil
         let ys = viewer.numbers(y)
         xColumn.isEnabled = chosen != .histogram
+        xColumn.toolTip = chosen == .histogram ? "Off for a histogram: its x axis is the numbers themselves" : xTip
         var points: [GridChart.Point], byDate = false, byRow = false
         switch chosen {
         case .bar, .pie:

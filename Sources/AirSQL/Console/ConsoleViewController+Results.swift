@@ -46,10 +46,10 @@ extension ConsoleViewController {
         guard rows > 0, connection.map({ model.data.safety(for: $0).warnOnClose }) ?? true, let window = view.window else {
             return answer(true)
         }
-        ConsoleClosing.alert(window, "Throw away the edits to \(rows == 1 ? "a row" : "\(rows.formatted()) rows")?",
+        ConsoleClosing.alert(window, "Discard the edits to \(rows == 1 ? "a row" : "\(rows.formatted()) rows")?",
                              "They aren't applied yet: only Apply (⌘S with the result's rows focused) writes them, and closing "
                                 + "loses them.",
-                             buttons: [("Throw Away", "Close and lose the edits"), ("Cancel", "Keep it open to apply the edits")],
+                             buttons: [("Discard", "Close and lose the edits"), ("Cancel", "Keep it open to apply the edits")],
                              destructive: 0) { answer($0 == 0) }
     }
 
@@ -93,19 +93,28 @@ extension ConsoleViewController {
     func emptyResults() -> NSView {
         let view = NSView()
         let text: String
+        var next: Command?
         if isConnected {
             text = "Run the statement at the cursor with ⌘↩, or every statement with ⇧⌘↩: the results show here."
         } else if let connection {
             text = "Connect to “\(connection.displayName)” to run SQL: double-click it in the sidebar."
         } else if model.data.connections.isEmpty {
             text = "Add a connection with File ▸ New Connection… (⌘N) to run SQL."
+            next = Commands.newConnection
         } else {
-            text = "Choose a connection for this console with Query ▸ Change Connection… to run SQL."
+            text = "Choose a connection for this tab with Query ▸ Change Connection… to run SQL."
+            next = Commands.changeConnection
         }
         let words = label(text, font: .systemFont(ofSize: 12.5), color: .secondaryLabelColor, wraps: true)
         words.alignment = .center
         words.setAccessibilityIdentifier("console.empty")
         view.addSubview(words)
+        if let next {
+            let action = button(next.title, id: "console.emptyAction", tip: next.tip, target: nil, action: next.action)
+            view.addSubview(action)
+            NSLayoutConstraint.activate([action.topAnchor.constraint(equalTo: words.bottomAnchor, constant: Spacing.unit),
+                                         action.centerXAnchor.constraint(equalTo: view.centerXAnchor)])
+        }
         NSLayoutConstraint.activate([
             words.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             words.centerYAnchor.constraint(equalTo: view.centerYAnchor),

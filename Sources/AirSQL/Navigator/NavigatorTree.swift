@@ -234,7 +234,8 @@ final class TreeCell: NSTableCellView {
         count.isHidden = value.isEmpty
         setBusy(busy)
         toolTip = tip
-        setAccessibilityLabel(text)
+        setAccessibilityLabel(bold ? text + ", current database" : text)
+        setAccessibilityHelp(tip)
     }
 
     func showMessage(_ text: String, busy: Bool) {

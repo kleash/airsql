@@ -5,7 +5,7 @@ nav_order: 13
 
 # Read the data in a grid
 
-A table's rows and a console's results show in the same grid. These parts of it help you read what is there: the
+A table's rows and a query's results show in the same grid. These parts of it help you read what is there: the
 status bar's figures, the value panel, Record View, Transpose, other ways to show a column, colours, text, charts, and
 a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
 [A table's rows](table-data.md).
@@ -15,8 +15,8 @@ a column's summary. Loading, filtering, editing, copying and exporting a table's
 Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:
 
 - a gold key: the primary key, or the unique key the grid uses to find a row when there is no primary key;
-- a grey key: another unique key; an outline key: an index;
-- an arrow: a foreign key.
+- a 1 in a circle: another unique key; an outline key: an index;
+- a chain link: a foreign key.
 
 After the type, **auto** marks an auto-increment column, **generated** a generated one, **default** a column with a
 default value, and **null** a column that allows NULL. Hold the pointer over a header for all of this in words and the
@@ -47,7 +47,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
-  each query in the console, so they open as you left them.
+  each query in the query tab, so they open as you left them.
 - **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
   goes back to the size in Settings ▸ Grid.
 
@@ -59,9 +59,9 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
   (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
-  console result shows the grid again, as does an Apply that deletes the row.
+  query result shows the grid again, as does an Apply that deletes the row.
 - **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the button at the end of a table's grid bar) turns rows
-  into columns, with the column names down the left: handy for comparing a few wide rows. A console result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
+  into columns, with the column names down the left: handy for comparing a few wide rows. A query result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.
 
 ## Show a column another way
@@ -107,5 +107,5 @@ copying and editing use the stored value.
 **Data ▸ Column Summary…** (also on a header's right-click menu) counts the focused column's distinct values and NULLs,
 finds its smallest and largest values, and lists its 50 most frequent values with how often each appears. For a table
 the server works this out over all its rows within the filter; it asks first when the table is larger than 2 GB.
-Click a value to show only the rows that hold it (it is added to the filter). For a console result it counts the rows
+Click a value to show only the rows that hold it (it is added to the filter). For a query result it counts the rows
 you have.

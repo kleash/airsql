@@ -64,40 +64,40 @@ struct ListColumn {
 extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
     /// The columns of each list section.
     func listColumns(_ section: Section) -> [ListColumn] {
-        let mark = ListColumn(id: "mark", title: "#", width: 30, tip: "The row's place; + marks a new one, • a changed one")
+        let mark = ListColumn(id: "mark", title: "#", width: 30, tip: "Shows the row's place: + marks a new one, • a changed one")
         switch section {
         case .columns:
-            return [mark, ListColumn(id: "name", title: "Name", width: 150, minimum: 100, tip: "The column's name"),
-                    ListColumn(id: "type", title: "Type", width: 120, minimum: 100, tip: "The column's type, from those this server has"),
+            return [mark, ListColumn(id: "name", title: "Name", width: 150, minimum: 100, tip: "Name the column"),
+                    ListColumn(id: "type", title: "Type", width: 120, minimum: 100, tip: "Choose the column's type, from those this server has"),
                     ListColumn(id: "length", title: "Length / values", width: 140, minimum: 100,
-                               tip: "The length, the digits and decimals, or ENUM and SET values, as the type takes them"),
-                    ListColumn(id: "unsigned", title: "Unsigned", width: 64, tip: "Numbers from zero up only"),
-                    ListColumn(id: "null", title: "NULL", width: 44, tip: "The column may hold NULL"),
+                               tip: "Set the length, the digits and decimals, or ENUM and SET values, as the type takes them"),
+                    ListColumn(id: "unsigned", title: "Unsigned", width: 64, tip: "Allow only numbers from zero up"),
+                    ListColumn(id: "null", title: "NULL", width: 44, tip: "Allow NULL in the column"),
                     ListColumn(id: "default", title: "Default", width: 150, minimum: 80,
-                               tip: "Empty for none, NULL, 'text', a number or an expression; a generated column's expression"),
+                               tip: "Set the default: empty for none, NULL, 'text', a number or an expression; a generated column's expression"),
                     ListColumn(id: "extra", title: "Extra", width: 190, minimum: 135,
-                               tip: "Counts up by itself, follows updates, or is generated"),
+                               tip: "Make it count up by itself, follow updates, or be generated"),
                     ListColumn(id: "collation", title: "Collation", width: 170, minimum: 150,
-                               tip: "How text is compared and sorted; empty for the table's"),
-                    ListColumn(id: "comment", title: "Comment", width: 200, minimum: 70, tip: "A note kept with the column")]
+                               tip: "Choose how text is compared and sorted; empty for the table's"),
+                    ListColumn(id: "comment", title: "Comment", width: 200, minimum: 70, tip: "Keep a note with the column")]
         case .indexes:
-            return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "The index's name"),
-                    ListColumn(id: "kind", title: "Kind", width: 110, tip: "Primary key, unique, plain, full-text or spatial"),
+            return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "Name the index"),
+                    ListColumn(id: "kind", title: "Kind", width: 110, tip: "Choose primary key, unique, plain, full-text or spatial"),
                     ListColumn(id: "columns", title: "Columns", width: 300, minimum: 150,
-                               tip: "Its columns in order, separated by commas; name(10) indexes the first 10 characters, DESC sorts down"),
-                    ListColumn(id: "comment", title: "Comment", width: 220, minimum: 80, tip: "A note kept with the index")]
+                               tip: "List its columns in order, with commas; name(10) indexes the first 10 characters, DESC sorts down"),
+                    ListColumn(id: "comment", title: "Comment", width: 220, minimum: 80, tip: "Keep a note with the index")]
         case .foreignKeys:
-            return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "The key's name"),
-                    ListColumn(id: "columns", title: "Columns", width: 160, minimum: 100, tip: "This table's columns, separated by commas"),
-                    ListColumn(id: "references", title: "References", width: 170, minimum: 110, tip: "The table they point at"),
+            return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "Name the key"),
+                    ListColumn(id: "columns", title: "Columns", width: 160, minimum: 100, tip: "List this table's columns, with commas"),
+                    ListColumn(id: "references", title: "References", width: 170, minimum: 110, tip: "Choose the table they point at"),
                     ListColumn(id: "referencedColumns", title: "Its columns", width: 150, minimum: 100,
-                               tip: "The columns there, in the same order, separated by commas"),
-                    ListColumn(id: "onUpdate", title: "On update", width: 110, tip: "What happens to these rows when that key changes"),
-                    ListColumn(id: "onDelete", title: "On delete", width: 110, tip: "What happens to these rows when that row goes")]
+                               tip: "List the columns there, in the same order, with commas"),
+                    ListColumn(id: "onUpdate", title: "On update", width: 110, tip: "Choose what happens to these rows when that key changes"),
+                    ListColumn(id: "onDelete", title: "On delete", width: 110, tip: "Choose what happens to these rows when that row goes")]
         case .checks, .options:
-            return [mark, ListColumn(id: "name", title: "Name", width: 180, minimum: 100, tip: "The check's name"),
-                    ListColumn(id: "clause", title: "Condition", width: 380, minimum: 200, tip: "What every row must satisfy, as SQL"),
-                    ListColumn(id: "enforced", title: "Enforced", width: 70, tip: "MySQL can keep a check without enforcing it")]
+            return [mark, ListColumn(id: "name", title: "Name", width: 180, minimum: 100, tip: "Name the check"),
+                    ListColumn(id: "clause", title: "Condition", width: 380, minimum: 200, tip: "Write what every row must satisfy, as SQL"),
+                    ListColumn(id: "enforced", title: "Enforced", width: 70, tip: "Enforce the check; MySQL can keep one without enforcing it")]
         }
     }
 

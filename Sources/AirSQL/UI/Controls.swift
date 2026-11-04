@@ -3,6 +3,19 @@ import AppKit
 // Small makers for the controls every screen uses, so each one gets its tooltip, accessibility id and Auto Layout
 // behaviour (text never cut: it hugs, resists compression, or truncates with an ellipsis and a tooltip) the same way.
 
+/// Tells VoiceOver something that happened away from the focus: a run that ended, a test's result.
+@MainActor
+func announce(_ text: String) {
+    NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
+                         userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+}
+
+/// `object`'s animator, or `object` itself under Reduce Motion.
+@MainActor
+func gently<Object: NSAnimatablePropertyContainer>(_ object: Object) -> Object {
+    NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? object : object.animator()
+}
+
 /// A text label. `wraps`: wraps within its width; else one line, truncated with an ellipsis (`truncates`) or never
 /// shorter than its text.
 func label(_ text: String, font: NSFont = .systemFont(ofSize: NSFont.systemFontSize), color: NSColor = .labelColor,

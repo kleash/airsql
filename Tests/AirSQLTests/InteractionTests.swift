@@ -160,9 +160,9 @@ extension AppTests {
                     doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Cut", "Paste", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
                            "Related Rows", "Add Row", "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
-                           "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
+                           "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Cut", "Quick Filter", "Set DEFAULT", "Insert Value", "Related Rows", "Add Row",
-                              "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…"]),
+                              "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart"]),
             // Near a header's left (its sort control is at the right): a double-click sorts by the column.
             Surface(name: "Table rows: column header",
                     place: { main, _ in
@@ -182,9 +182,9 @@ extension AppTests {
                     // region: not a key (Use as Label) nor a foreign key (Add Virtual Foreign Key…).
                     menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
                            "Clear Filter", "Use as Label", "Add Virtual Foreign Key…", "Remove Virtual Foreign Key", "Column Summary…",
-                           "Hide Column", "Freeze", "Column List…", "Heatmap", "Display As"],
+                           "Hide Column", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
-                              "Use as Label", "Add Virtual Foreign Key…", "Column Summary…", "Hide Column", "Freeze", "Column List…"]),
+                              "Use as Label", "Add Virtual Foreign Key…", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Chart"]),
             Surface(name: "Grid cell",
                     place: { main, _ in
                         let grid = resultGrid(main)
@@ -195,9 +195,9 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultViewer(main)?.valuePanel != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel",
-                           "Record View", "Transpose", "Column Summary…", "Display As"],
+                           "Record View", "Transpose", "Column Summary…", "Chart", "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Export Rows…", "Value Panel", "Record View",
-                              "Transpose", "Column Summary…"]),
+                              "Transpose", "Column Summary…", "Chart"]),
             // A console result of one table with its key: a double-click edits the cell.
             Surface(name: "Editable result cell",
                     place: { main, _ in
@@ -222,10 +222,10 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultGrid(main).editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Cut", "Paste", "Set NULL", "Set DEFAULT", "Insert Value", "Delete Rows", "Revert",
-                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
+                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Display As"],
                     // email is NOT NULL: Set NULL is off, saying so.
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Cut", "Set DEFAULT", "Insert Value", "Delete Rows", "Export Rows…", "Value Panel",
-                              "Record View", "Column Summary…"]),
+                              "Record View", "Column Summary…", "Chart"]),
             // A console result's header: its rows sort and filter here.
             Surface(name: "Grid column header",
                     place: { main, _ in
@@ -240,9 +240,9 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.containsColumn(1) },
                     doubleClicked: { main, _ in !resultGrid(main).sortOrder.isEmpty },
                     menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
-                           "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Display As"],
+                           "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
-                              "Column Summary…", "Hide Column", "Freeze", "Column List…"]),
+                              "Column Summary…", "Hide Column", "Freeze", "Column List…", "Chart"]),
             Surface(name: "Grid row number",
                     place: { main, _ in
                         let grid = resultGrid(main)
@@ -286,7 +286,7 @@ extension AppTests {
                     place: { main, _ in statusItem(main.statusBar.transaction) },
                     clicked: { $0.statusBar.transaction.shown?.isShown == true },
                     doubleClicked: { main, _ in main.statusBar.transaction.shown?.isShown == true },
-                    menu: ["Copy", "Commit", "Rollback"], enabled: ["Copy"]),
+                    menu: ["Copy", "Commit", "Roll Back"], enabled: ["Copy"]),
             Surface(name: "Status bar: activity",
                     place: { main, _ in statusItem(main.statusBar.activity) },
                     clicked: { $0.statusBar.activity.shown?.isShown == true },
@@ -334,7 +334,7 @@ extension AppTests {
                         if let tab = main.tabs.first(where: { $0.content is AgentResultsContent }) { main.select(tab) }
                         return opened
                     },
-                    menu: ["Open in New Console", "Copy"], enabled: ["Open in New Console", "Copy"]),
+                    menu: ["Open in New Query", "Copy"], enabled: ["Open in New Query", "Copy"]),
         ] + navigatorSurfaces
 
         /// A window in the state every row starts from: the shop's connections, Production connected, a transaction

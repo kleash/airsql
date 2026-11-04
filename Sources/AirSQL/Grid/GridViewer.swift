@@ -647,16 +647,22 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         case #selector(copySummary(_:)):
             item.explain(enabled: status.aggregate != nil, reason: "Select some cells first")
             return status.aggregate != nil
-        case #selector(goToRow(_:)): return grid.rowCount > 0
+        case #selector(goToRow(_:)):
+            item.explain(enabled: grid.rowCount > 0, reason: "There are no rows to go to")
+            return grid.rowCount > 0
         case #selector(showColumnSummary(_:)):
             item.explain(enabled: !focusedColumns.isEmpty, reason: "Select a column first")
             return !focusedColumns.isEmpty
-        case #selector(showColumnList(_:)): return source != nil
+        case #selector(showColumnList(_:)):
+            item.explain(enabled: source != nil, reason: "Wait until the rows have loaded")
+            return source != nil
         case #selector(viewAs(_:)):
             item.state = item.tag == presentation.rawValue ? .on : .off
+            item.explain(enabled: source != nil, reason: "Wait until the rows have loaded")
             return source != nil
         case #selector(showChart(_:)):
             item.state = presentation == .chart ? .on : .off
+            item.explain(enabled: source != nil, reason: "Wait until the rows have loaded")
             return source != nil
         case #selector(toggleHeatmap(_:)):
             let all = grid.selection.areas.contains(.all)
@@ -667,6 +673,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             return !columns.isEmpty
         case #selector(highlightEqualValues(_:)):
             item.state = highlightsEqual ? .on : .off
+            item.explain(enabled: source != nil, reason: "Wait until the rows have loaded")
             return source != nil
         case #selector(displayAs(_:)):
             let display = GridDisplay.allCases.indices.contains(item.tag) ? GridDisplay.allCases[item.tag] : .standard
@@ -766,9 +773,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
         menu.addItem(.separator())
         switch target {
-        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.transpose, Commands.columnSummary])
+        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.transpose, Commands.columnSummary, Commands.chart])
         case .row: menu.add([Commands.recordView, Commands.transpose, Commands.valuePanel])
-        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.freeze, Commands.columnList, Commands.heatmap])
+        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.freeze, Commands.columnList, Commands.heatmap,
+                                Commands.chart])
         }
         if !transposed, record == nil { menu.addItem(Self.displayMenu()) }
         return menu

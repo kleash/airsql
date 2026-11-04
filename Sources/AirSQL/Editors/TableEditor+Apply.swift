@@ -104,7 +104,7 @@ extension TableEditorController {
             renameTab()
             if applied, saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, server.noBackslashEscapes) }
             if let failure {
-                let message = (failure as? AirSQLError).map { $0.message + "\n\n" + $0.details } ?? failure.localizedDescription
+                let message = failure.localizedDescription
                 let state = done == 0 ? "Nothing was changed." : "The first \(done) of \(change.statements.count) statements ran and stay "
                     + "done; the SQL below the table now shows what is left to do."
                 showError(message + "\n\n" + state, title: "The server didn't apply the changes", on: view.window)

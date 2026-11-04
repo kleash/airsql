@@ -17,7 +17,7 @@ extension ConsoleViewController {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "sql") ?? .plainText]
         panel.nameFieldStringValue = (fileURL?.deletingPathExtension().lastPathComponent ?? tab?.title ?? "Query") + ".sql"
-        panel.message = "Save the console's SQL in a file"
+        panel.message = "Save the tab's SQL in a file"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .OK, let url = panel.url else { return done(false) }
             self.write(self.text, to: url, done: done)
@@ -55,7 +55,7 @@ extension ConsoleViewController {
                          target: nil, action: nil)
         menu.frame = NSRect(x: 0, y: 0, width: 280, height: 26)
         menu.translatesAutoresizingMaskIntoConstraints = true
-        ConsoleClosing.alert(window, "Run this console's statements on another connection",
+        ConsoleClosing.alert(window, "Run this tab's statements on another connection",
                              "Results and the transaction stay with the connection they belong to.",
                              buttons: [("Change", "Use the connection chosen above"), ("Cancel", "Keep the connection it has")],
                              destructive: nil, accessory: menu) { [weak self] choice in

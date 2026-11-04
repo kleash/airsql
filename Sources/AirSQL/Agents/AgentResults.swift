@@ -95,6 +95,9 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
         for (id, title, width) in Self.columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
+            column.headerToolTip = ["time": "When the agent ran it", "client": "Which agent ran it",
+                                    "sql": "The statement; double-click to open it in a new query tab",
+                                    "outcome": "What came of it: rows, or an error"][id]
             column.width = id == "time" ? max(width, Self.timeWidth) : width
             column.minWidth = id == "sql" ? 160 : 50
             table.addTableColumn(column)
@@ -228,7 +231,7 @@ final class AgentResultsContent: NSViewController, TabContent, NSTableViewDataSo
 
     // MARK: Commands
 
-    /// A double-click, or Query ▸ Open in New Console: the statements in a new console tab, to edit and run yourself.
+    /// A double-click, or Query ▸ Open in New Query: the statements in a new console tab, to edit and run yourself.
     @objc func openInNewConsole(_ sender: Any?) {
         let picked = sender is NSTableView ? runs[safe: table.clickedRow].map { [$0] } ?? selected : selected
         guard !picked.isEmpty, let main = view.window?.windowController as? MainWindowController else { return }

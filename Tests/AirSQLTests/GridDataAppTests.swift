@@ -147,7 +147,7 @@ extension AppTests {
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)
             #expect(tab.notice.isHidden && !tab.isEdited && main.selectedTab?.title == "orders")
             // The bar's ? opens the Data Grid page of the help.
-            #expect(find(NSButton.self, id: "help", in: tab.bar)?.identifier?.rawValue == "help:" + HelpPage.dataGrid.rawValue)
+            #expect(find(NSButton.self, id: "help", in: tab.bar)?.identifier?.rawValue == "help:" + HelpPage.tableData.rawValue)
 
             tab.applyFilter("WHERE region = 'EU'")
             await ready { tab.loading != nil }
@@ -269,6 +269,24 @@ extension AppTests {
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             #expect(session.statements.count == sent && tab.grid.selection.cursor == GridPosition(row: 0, column: 4))
             _ = await call(harness, "press", ["title": "OK"])
+        }
+
+        @Test func stoppingAnApplyLeavesCommitAlone() async throws {
+            let session = FakeTableSession()
+            let stop = ApplyStop()
+            stop.session = session
+            try stop.starting("START TRANSACTION")
+            try stop.starting("COMMIT")
+            stop.stop()  // COMMIT is running: nothing is sent, and only ROLLBACK may follow
+            #expect(throws: AirSQLError.self) { try stop.starting("UPDATE t SET a = 1") }
+            try stop.starting("ROLLBACK")
+            await Task.yield()
+            #expect(session.cancelled.isEmpty)
+            let second = ApplyStop()
+            second.session = session
+            try second.starting("UPDATE t SET a = 1")
+            second.stop()
+            #expect(await eventually { session.cancelled == ["UPDATE t SET a = 1"] })
         }
 
         @Test func previewShowsTheSQLAndWarnsBeforeApply() async throws {
@@ -826,7 +844,7 @@ extension AppTests {
             let menu = try #require(view.viewer.dataGrid(view.grid, menuFor: .cells))
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title)
                     == ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel", "Record View", "Transpose",
-                        "Column Summary…", "Display As"])
+                        "Column Summary…", "Chart", "Display As"])
         }
 
         @Test func readOnlyConnectionsRefuseEditsAndLongValuesOpenInTheValuePanel() async throws {

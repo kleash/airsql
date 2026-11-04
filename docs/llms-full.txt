@@ -33,7 +33,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, table commands, find text and the process list.
 - [A table's rows](https://kleash.github.io/airsql/table-data.html): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html): the status bar's figures, the value panel, Record View, Transpose, Display
-  As, heatmaps, View As, charts and Column Summary, in a table's rows and a console's results.
+  As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
 - [Change tables, views and routines](https://kleash.github.io/airsql/editors.html): the table editor, views and routines as CREATE code, and the ER
   diagram.
 - [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
@@ -44,6 +44,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
   the access you choose.
 - [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html): a database as formatted SQL changesets, and any change saved as one.
 - [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): every command's shortcut.
+- [Accessibility](https://kleash.github.io/airsql/accessibility.html): VoiceOver, the keyboard, motion and text size.
 - [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): what AirSQL connects to, where passwords are kept, what agents may do.
 - [Troubleshooting](https://kleash.github.io/airsql/troubleshooting.html): when a connection fails, and how to report a problem.
 
@@ -96,6 +97,29 @@ sidebar, and its summary shows where it goes and how it logs in.
 Passwords stay in your Keychain. A connection coloured **Production** starts with stricter safety checks
 ([Settings](https://kleash.github.io/airsql/settings.html#safety)).
 
+## No server yet?
+
+To try AirSQL with nothing installed but [Docker](https://www.docker.com/products/docker-desktop/), start a throwaway
+MariaDB on this Mac:
+
+```sh
+docker run --name try-mariadb -e MARIADB_ROOT_PASSWORD=try-it -p 127.0.0.1:3306:3306 -d mariadb:11
+```
+
+Add a connection to host `127.0.0.1`, user `root`, password `try-it`, then open
+[demo-shop.sql](https://github.com/kleash/airsql/blob/main/scripts/demo-shop.sql) with **File ▸ Open…** and press **Run
+All** (⇧⌘↩): it fills a small shop to look around in. `docker rm -f try-mariadb` removes it all.
+
+## Run a query
+
+Double-click the connection to connect, then choose **File ▸ New Query** (⌘T). Pick a database in the toolbar, type a
+statement, and press ⌘↩: the results show under the editor. See [Query tabs](https://kleash.github.io/airsql/console.html).
+
+## Edit rows
+
+Click a table in the sidebar to see its rows, and double-click a cell to change it. Your edits wait, marked in the grid,
+until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes them back. See [Table data](https://kleash.github.io/airsql/table-data.html).
+
 ## The window
 
 - **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
@@ -104,8 +128,8 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
   to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as
   it does in Settings, the SQL log and Compare. ⇧⌘T brings back the tab you closed last. ⌘P (**Quick Open…**) goes to a
   table, view or connection by part of its name.
-- **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
-  All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
+- **The toolbar** (right-click it for **Icon and Text**, or **View ▸ Customize Toolbar…**) shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
+  All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Roll Back and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
 - **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to
   cancel), what agents are doing, and the SQL log. Click an item for details; right-click it to copy it. When the
@@ -148,7 +172,7 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 - **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
   row is then held in memory.
 - **NULL shown as**: how empty values look in the grid, open grids' too.
-- **Transpose results with one row**: a console result with a single row opens turned on its side, one line per
+- **Transpose results with one row**: a query result with a single row opens turned on its side, one line per
   column (on by default).
 
 ## Connections
@@ -164,7 +188,7 @@ below, in its Safety tab), and a connection coloured Production starts with a st
 | Setting | Default | Production |
 |---|---|---|
 | Ask before UPDATE or DELETE without WHERE | on | on |
-| Ask before any write from the console | off | on |
+| Ask before any write from the query tab | off | on |
 | Show the SQL before the grid's Apply | off | on |
 | Ask before DROP or TRUNCATE (a database's name is always typed) | on | on, table names typed too |
 | Ask before restoring into a database that has tables | on | on |
@@ -220,7 +244,7 @@ dropping or renaming, restoring a dump, and sync scripts.
 - When an **agent** asked for the change, the sheet names it. Nothing runs until you approve it; **Decline** refuses it.
 - **Save as Liquibase changeset** (a table's edited rows, the table and object editors, dropping, emptying or renaming
   in the sidebar, and sync scripts) saves the statements as a changeset in a changelog once they have run (see
-  [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html)). In the console, use **Query ▸ Save as Changeset…**.
+  [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html)). In the query tab, use **Query ▸ Save as Changeset…**.
 - **Copy SQL** copies the statements. **Cancel** changes nothing.
 
 
@@ -255,7 +279,7 @@ Source: https://kleash.github.io/airsql/sql-log.html
 # The SQL log
 
 AirSQL writes every statement it sends to a server into one file on your Mac, just before the statement goes out.
-Use it to see exactly what AirSQL did: what the console ran, what a table edit applied, what the navigator asked the
+Use it to see exactly what AirSQL did: what a query tab ran, what a table edit applied, what the navigator asked the
 server for.
 
 ## Where it is
@@ -271,7 +295,7 @@ one before, and a new file starts. It stays on your Mac: AirSQL sends it nowhere
 
 - the time;
 - the connection's name;
-- the session: **main** (console tabs), **data** (table tabs and their edits), **schema** (the navigator), **agent**
+- the session: **main** (query tabs), **data** (table tabs and their edits), **schema** (the navigator), **agent**
   (AI agents), **tools** (client tools and compare), **cancel** (the short connection that stops a running statement);
 - the statement's number in that session. The server sees the same number in a comment at the start of the statement,
   `/* airsql:main:12 */`, so you can find it in the server's process list.
@@ -347,24 +371,23 @@ Source: https://kleash.github.io/airsql/console.html
 
 # The SQL console
 
-A console tab is where you write and run SQL on one connection. Its statements run one at a time, on the connection's
-own session, which every console tab of that connection shares.
+A query tab (the SQL console) is where you write and run SQL on one connection. Its statements run one at a time, on the connection's
+own session, which every query tab of that connection shares.
 
-## Open a console
+## Open a query tab
 
-- **File ▸ New Query** (⌘T), the **+** at the end of the tabs, or **New Query** on a connection's menu opens an empty
-  console on the selected connection. **New Query** on a database's menu (or ⌘T while a database is selected in the
+- **File ▸ New Query** (⌘T), the **+** at the end of the tabs, or **New Query** on a connection's menu opens an empty query tab on the selected connection. **New Query** on a database's menu (or ⌘T while a database is selected in the
   sidebar) makes that database the current one first.
-- **File ▸ Open…** (⌘O) opens .sql files, each in a console of its own. You can also drop .sql files anywhere on the
+- **File ▸ Open…** (⌘O) opens .sql files, each in a query tab of its own. You can also drop .sql files anywhere on the
   window or on AirSQL's Dock icon, or open them with AirSQL from Finder: they open on the connection shown.
-- **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
+- **File ▸ Save** (⌘S) saves the tab's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
 - Drag a result's tab to put the results in another order.
 - Drag a tab along the strip to move it. Past ⌘9, the **Window** menu lists every tab.
-- Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
-- When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL.
+- Double-click a query tab's tab (or press F2 while its editor has the focus) to give it a name of your own.
+- When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL.
 - **File ▸ Open Recent** lists the .sql files you had open lately.
-- **Query ▸ Change Connection…** runs the console's statements on another connection.
+- **Query ▸ Change Connection…** runs the tab's statements on another connection.
 
 ## Write SQL
 
@@ -418,13 +441,13 @@ connection can have a query timeout: a statement that runs longer is stopped the
 The time shown covers the whole run: waiting its turn, the server's work and fetching every row. After an `UPDATE`,
 Messages counts the rows changed; the server's note beside it says how many matched.
 
-Console tabs of one connection share its session, so while one runs a statement the others wait.
+Query tabs of one connection share its session, so while one runs a statement the others wait.
 
 ### The current database
 
 Statements run in the connection's current database, which the toolbar's database pop-up shows and the sidebar shows in
 bold. Choose another in the pop-up, double-click one in the sidebar, or type `USE`: all three change the same one, for
-every console tab of the connection. A database chosen in the pop-up or the sidebar is made current with `USE` just
+every query tab of the connection. A database chosen in the pop-up or the sidebar is made current with `USE` just
 before the next statement runs (Messages shows it), so a run under way is never switched midway; if that `USE` fails,
 nothing runs.
 
@@ -469,12 +492,11 @@ unique key whose columns can't be NULL); so can an inner join's when every table
   with a bar over the rows counting them; **Undo**, **Redo**, **Revert** and **Revert All** take them back.
 - **Apply** (⌘S while the rows have the keyboard, or the bar's button) writes them in one transaction on the
   connection's data session, each statement checked to change exactly its row. A join's changes always show the SQL
-  first; so do changes on connections whose **Settings ▸ Safety** asks for the preview, and deletes that cascade. If the
-  console has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
+  first; so do changes on connections whose **Settings ▸ Safety** asks for the preview, and deletes that cascade. If the query tab has a transaction open, Apply asks you to commit or roll it back first, so it doesn't wait for its locks.
 - After Apply, the edited rows are read back from the server, so the result shows what was stored; deleted rows go.
   New rows and pasting are for a table tab: open the table to add rows.
-- Edits not applied are never thrown away unasked: the next run keeps their result tab, and disconnecting asks first;
-  so do closing the result, closing the console and quitting, unless the connection's Safety settings don't warn on
+- Edits not applied are never discarded unasked: the next run keeps their result tab, and disconnecting asks first;
+  so do closing the result, closing the query tab and quitting, unless the connection's Safety settings don't warn on
   close.
 - On a read-only connection nothing can be edited.
 
@@ -483,21 +505,21 @@ unique key whose columns can't be NULL); so can an inner join's when every table
 Select one or more `INSERT … VALUES` statements of one table (or put the cursor in one) and choose **Query ▸ Edit as
 Table** (also in the editor's right-click menu). The table opens in its tab with each row as a new row, a pending
 change: strings and numbers as their values, `NULL`, `DEFAULT`, and anything else (such as `NOW()`) as SQL the server
-works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the console.
+works out. Change them as you like, then **Apply**: it always shows the SQL first. Nothing runs from the query tab.
 
 ## Transactions
 
-- **Tx: Auto-commit** (the toolbar's Tx pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
-  **Manual**, your changes wait in a transaction until you press **Commit**, or **Rollback** to undo them. Leaving
+- **Auto-commit** (the toolbar's transaction pop-up, or Query ▸ Transaction Mode) commits each statement by itself. In
+  **Manual**, your changes wait in a transaction until you press **Commit**, or **Roll Back** to undo them. Leaving
   Manual with changes waiting asks first whether to commit them or roll them back.
-- The **isolation level** (in the Tx pop-up, or Query ▸ Isolation Level) sets how the console's transactions see
-  others' changes: Read Uncommitted, Read Committed, Repeatable Read or Serializable, set on the console's session with
+- The **isolation level** (in the transaction pop-up, or Query ▸ Isolation Level) sets how the tab's transactions see
+  others' changes: Read Uncommitted, Read Committed, Repeatable Read or Serializable, set on the tab's session with
   `SET SESSION TRANSACTION ISOLATION LEVEL`. Until you choose one, the server's own applies (usually Repeatable Read).
-- The toolbar's Run, Commit, Rollback and Cancel are on only when the console can do them now; when one is off, its
+- The toolbar's Run, Commit, Roll Back and Cancel are on only when the query tab can do them now; when one is off, its
   tooltip says why (not connected, no transaction open, nothing running).
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
-- Closing the connection's last console with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
+- Closing the connection's last query tab with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
 - Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes and result edits not yet
   applied.
 
@@ -516,7 +538,7 @@ shows in a sheet, with what it will do:
 
 ## History, the SQL log, plans and profiles
 
-- **Query ▸ Query History** (⌘Y) lists the statements run on the console's connection, newest first. Type to search;
+- **Query ▸ Query History** (⌘Y) lists the statements run on the tab's connection, newest first. Type to search;
   Return or a double-click puts one in the editor at the cursor, and a click shows it whole below the list. Click a
   header to sort, ⌘-click to select several; a right-click also opens them in a new tab or deletes them from the
   history. Passwords in statements are masked before they are kept, as in the SQL log.
@@ -550,9 +572,9 @@ tabs:
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.
 - **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
-  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Check the authority and host name** is the safe choice: the server must
+  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Encrypt, check certificate and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
-  shows its fingerprint when you connect (see [Trust a server](https://kleash.github.io/airsql/trust-a-server.html)). Add an authority file for a
+  shows its fingerprint when you connect (see [Trust a server](https://kleash.github.io/airsql/trust-a-server.html)). Add a CA certificate for a
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
@@ -561,12 +583,12 @@ tabs:
   connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
   why it can't be used).
 - **Safety**: safety checks of the connection's own: every switch and limit of [Settings ▸ Safety](https://kleash.github.io/airsql/settings.html#safety),
-  starting from the ones that applied, with a shield beside its name in the sidebar.
+  starting from the ones that applied, with a slider mark beside its name in the sidebar.
 - **Agents**: what AI agents may do with this connection.
 
 A **read-only** connection's sessions are read-only on the server, and AirSQL itself runs on it only statements it can
 prove only read: SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN (as [read-only queries](https://kleash.github.io/airsql/read-only-queries.html)
-decide), and USE. Anything else is refused before it is sent, with the reason, from the console, the navigator, a
+decide), and USE. Anything else is refused before it is sent, with the reason, from the query tab, the navigator, a
 compare's sync script, Restore, Run SQL File and CSV import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
 it. A table tab's WHERE filter goes through the same check, within the whole SELECT it runs in, so a condition can't
 call a function such as `SLEEP` or `GET_LOCK` there. Open in Terminal starts `mysql` with a read-only session. The
@@ -693,7 +715,7 @@ A read-only connection offers none of these.
 
 ## Write SQL from the tree
 
-These open a console tab with the SQL in it, built from the names AirSQL read; nothing runs until you press Run.
+These open a query tab with the SQL in it, built from the names AirSQL read; nothing runs until you press Run.
 
 - **Generate SELECT**, **Generate INSERT** and **Generate UPDATE** on a table's or view's menu (in the sidebar or the
   database view) write a statement with its columns. A `?` marks each value for you to fill in: INSERT leaves out the
@@ -733,7 +755,7 @@ Source: https://kleash.github.io/airsql/table-data.html
 # A table's rows
 
 A table tab shows a table's or view's rows in the data grid. They load a page at a time from the connection's data
-session, a session of their own, so a long query in a console never holds them up. Edits wait until you apply them.
+session, a session of their own, so a long query in a query tab never holds them up. Edits wait until you apply them.
 
 ## Load rows
 
@@ -756,11 +778,14 @@ session, a session of their own, so a long query in a console never holds them u
 
 ## Filter, search and sort
 
+**Filter** and **Search** hide the rows that don't match; **Find** (⌘F) leaves every row and moves between matches.
+**Find Text on Server** looks through every table, not only this one.
+
 The chip at the left of the grid bar always says where filtering runs: **On server** (every row of the table, loaded or
 not) or **Local** (only the rows loaded so far, at once, with no query).
 
-- **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
-  fine. It is coloured as SQL, as in the console, and the field grows as the condition wraps, up to eight lines (then
+- **Filter**: type a condition, as you would after WHERE, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
+  fine. It is coloured as SQL, as in the query tab, and the field grows as the condition wraps, up to eight lines (then
   it scrolls); ⌥↩ starts a new line. Suggestions show as you type: columns, then operators,
   then the column's values (read from its first 10,000 rows), then AND and OR. ↑ and ↓ choose, Tab inserts, ⎋ closes, and
   ⌥⎋ brings them up anywhere. The clock (or ⌥↓ in the field) lists the table's last
@@ -865,11 +890,11 @@ Nothing is written until you apply. Leaving a row writes nothing.
 - Pending changes have their colours: an edited cell amber, a new row green, a row to delete struck through in red.
   The bar under the grid bar counts them.
 - **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes (a paste or a multi-cell edit is one step);
-  **Revert** (⌥⌘Z) throws away the selected rows' changes, **Revert All** every one.
+  **Revert** (⌥⌘Z) discards the selected rows' changes, **Revert All** every one.
 - Pending changes are kept on disk as you make them. If AirSQL quits or the Mac restarts, they come back the next time
   you open the table, marked "Kept from before".
 - Closing the tab with pending changes asks whether to keep them for later or throw them away. Quitting AirSQL lists,
-  in one sheet, the tables with pending changes and any console transaction still open (which is rolled back).
+  in one sheet, the tables with pending changes and any transaction still open in a query tab (which is rolled back).
 
 ### Which tables can be edited
 
@@ -908,9 +933,9 @@ says why; so are views. Generated columns can't be edited.
 
 ## Copy and export
 
-These work in a console's results too.
+These work in a query's results too.
 
-- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a console
+- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a query tab
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
@@ -934,7 +959,7 @@ Source: https://kleash.github.io/airsql/data-grid.html
 
 # Read the data in a grid
 
-A table's rows and a console's results show in the same grid. These parts of it help you read what is there: the
+A table's rows and a query's results show in the same grid. These parts of it help you read what is there: the
 status bar's figures, the value panel, Record View, Transpose, other ways to show a column, colours, text, charts, and
 a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
 [A table's rows](https://kleash.github.io/airsql/table-data.html).
@@ -944,8 +969,8 @@ a column's summary. Loading, filtering, editing, copying and exporting a table's
 Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:
 
 - a gold key: the primary key, or the unique key the grid uses to find a row when there is no primary key;
-- a grey key: another unique key; an outline key: an index;
-- an arrow: a foreign key.
+- a 1 in a circle: another unique key; an outline key: an index;
+- a chain link: a foreign key.
 
 After the type, **auto** marks an auto-increment column, **generated** a generated one, **default** a column with a
 default value, and **null** a column that allows NULL. Hold the pointer over a header for all of this in words and the
@@ -976,7 +1001,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
-  each query in the console, so they open as you left them.
+  each query in the query tab, so they open as you left them.
 - **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
   goes back to the size in Settings ▸ Grid.
 
@@ -988,9 +1013,9 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
   (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
-  console result shows the grid again, as does an Apply that deletes the row.
+  query result shows the grid again, as does an Apply that deletes the row.
 - **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the button at the end of a table's grid bar) turns rows
-  into columns, with the column names down the left: handy for comparing a few wide rows. A console result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
+  into columns, with the column names down the left: handy for comparing a few wide rows. A query result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.
 
 ## Show a column another way
@@ -1036,7 +1061,7 @@ copying and editing use the stored value.
 **Data ▸ Column Summary…** (also on a header's right-click menu) counts the focused column's distinct values and NULLs,
 finds its smallest and largest values, and lists its 50 most frequent values with how often each appears. For a table
 the server works this out over all its rows within the filter; it asks first when the table is larger than 2 GB.
-Click a value to show only the rows that hold it (it is added to the filter). For a console result it counts the rows
+Click a value to show only the rows that hold it (it is added to the filter). For a query result it counts the rows
 you have.
 
 
@@ -1067,7 +1092,7 @@ parts, chosen at the top:
 - **Options**: the table's name, engine, default collation, row format, next AUTO_INCREMENT number and comment.
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
-green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Discard** takes back all of them.
+green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Revert** takes back all of them.
 Drag columns to put them in another order, or press ⇧⌘↑ and ⇧⌘↓. ⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
 as new rows.
 
@@ -1098,7 +1123,7 @@ server keeps it, to edit as text.
 - MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
   function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
   apply again, and **Revert** puts the old code back.
-- The code has the console's editor: line numbers, completion, Comment Lines (⌘/), Format SQL and the matching bracket.
+- The code has the tab's editor: line numbers, completion, Comment Lines (⌘/), Format SQL and the matching bracket.
 - When the server refuses the code, the place it points to is underlined in red, with the message on hover, until you
   change the text.
 - Renaming it in the code makes the new one and then drops the old one.
@@ -1273,7 +1298,7 @@ a session of its own. The compare only reads; nothing changes until you run the 
    window's activity list.
 
 The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
-much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
+much of the data had to come over the network. The list shows what differs first: **only source** and **only target**
 for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
 Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
 they differ. The two definitions scroll together.
@@ -1363,9 +1388,8 @@ values: after running the script, compare again to copy their values. After a sy
 In a [console](https://kleash.github.io/airsql/console.html), **Compare With…** (a result tab's right-click menu, or **Query ▸ Compare With…**) compares
 the result shown with another one, row by row:
 
-- **Compare with** offers the other result tabs of the window, this console's nearest first (a result from another
-  console tab, such as the same query on another server, carries that tab's name), then the tables and views of the
-  console's database.
+- **Compare with** offers the other result tabs of the window, this tab's nearest first (a result from another
+  query tab, such as the same query on another server, carries that tab's name), then the tables and views of the tab's database.
 - **Match rows on** says which columns tell rows apart: the result's key when it has one, a single column, or every
   column (rows then differ only as being on one side). Rows with the same values there are the same row; when several
   share them, they pair up in the order they come.
@@ -1423,7 +1447,7 @@ The connection must be connected in AirSQL for an agent to read it.
 | Level | Agents may |
 |---|---|
 | Off | not see the connection at all |
-| Schema | read databases, tables, columns, keys and indexes, and find columns by name; put SQL into a console tab |
+| Schema | read databases, tables, columns, keys and indexes, and find columns by name; put SQL into a query tab |
 | Schema + read | also run read-only queries and see query plans, within the row cap and time limit of Settings ▸ Safety |
 | Schema + read + analytics | also profile tables, get ten times the rows and four times the time, and save results to files |
 
@@ -1436,7 +1460,7 @@ no agent can, whatever it asks.
   EXPLAIN, without locking clauses, `INTO`, hints or functions such as `SLEEP` ([what passes](https://kleash.github.io/airsql/read-only-queries.html)).
 - It then runs on a session of its own that the server keeps read-only, inside a read-only transaction that is rolled
   back, with a time limit. Even a statement that slipped past the check can't write.
-- To change something, an agent puts the SQL into a console tab. Nothing runs until you press Run.
+- To change something, an agent puts the SQL into a query tab. Nothing runs until you press Run.
 - For more safety still, connect with a database user that can only read.
 
 ## Agents in AirSQL's windows
@@ -1444,15 +1468,15 @@ no agent can, whatever it asks.
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
 Whatever that would change waits for you:
 
-- Anything that would run on a server (Run in a console, Apply, a compare's sync, Restore, Copy, CSV import, Commit)
+- Anything that would run on a server (Run in a query tab, Apply, a compare's sync, Restore, Copy, CSV import, Commit)
   first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
   can only decline. Statements that AirSQL proves only read run without asking.
 - Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,
   startup SQL or safety settings, nor save files, start an export, save a password, trust a certificate, paste from
   your clipboard, quit AirSQL or press a button marked destructive (Don't Save, Disconnect with a transaction open).
-  Text an agent types into a console of a Production connection is shown to you first.
+  Text an agent types into a query tab of a Production connection is shown to you first.
 - On connections whose agent access doesn't include reading, grids and results, the filters their values go into,
-  the console's messages (a server's error can quote a value) and the SQL preview's statements are hidden from the
+  the tab's messages (a server's error can quote a value) and the SQL preview's statements are hidden from the
   agent's snapshots and screenshots; the SQL log's text always is. A cell's right-click menu never shows an agent the
   cell's value or your clipboard's text.
 
@@ -1468,7 +1492,7 @@ for every call since AirSQL opened, with how it ended. A call that reads a datab
 **View ▸ Agent Results** opens the connection's Agent tab: every statement agents ran on it with `run_queries`, newest
 last, and under the list the rows the selected one got, read-only and no more than the agent got. Double-click a
 `run_queries` call in Agent Activity to open the tab at its statements. Double-click a statement (or choose **Query ▸
-Open in New Console**) to put it in a new console tab, where you can change it and run it yourself. The tab keeps the
+Open in New Query**) to put it in a new query tab, where you can change it and run it yourself. The tab keeps the
 last 100 statements since AirSQL opened.
 
 ## Files agents save
@@ -1497,7 +1521,7 @@ with your own `liquibase` (`liquibase update`, `liquibase rollback-count 1`…).
 
 **Tools ▸ Generate Liquibase Changelog…** writes a changelog of a database of the connection the window is about.
 
-- **Content**: **DDL** writes the objects' structure, **DML** their rows, **DDL + DML** both.
+- **Content**: **Structure** writes the objects' DDL, **Rows** their rows as DML, **Both** the two.
 - The list holds the database's tables, views, procedures, functions, triggers, events and sequences, each ticked.
   Untick what you don't want; space ticks the selected rows, double-click ticks one, and the right-click menu
   includes all, none or the selected rows; the filter above the list narrows it, and all and none then mean the
@@ -1544,7 +1568,7 @@ differently from how it runs here, AirSQL says so and doesn't write it.
 ## Save a change as a changeset
 
 When the [SQL preview](https://kleash.github.io/airsql/sql-preview.html) shows a change (the table editor, a view or routine, a sync script), tick
-**Save as Liquibase changeset**: once the change has run, a sheet shows the changeset. In the console, select the
+**Save as Liquibase changeset**: once the change has run, a sheet shows the changeset. In the query tab, select the
 statements (or put the insertion point in one) and choose **Query ▸ Save as Changeset…**. In the compare window,
 **Save as Changeset…** (or **Query ▸ Save as Changeset…** in its “Sync script” tab) saves the sync script: a changeset
 per structure step and one per run of row changes on a table, destructive steps saying so in their `--comment`.
@@ -1581,20 +1605,50 @@ added column, DROP INDEX and DROP FOREIGN KEY for added keys, RENAME back. Row c
 
 ---
 
+Source: https://kleash.github.io/airsql/accessibility.html
+
+# Accessibility
+
+AirSQL is built from the Mac's own controls wherever it can be, and labels the ones it draws itself for VoiceOver.
+
+## VoiceOver
+
+- The data grid reads as a table: its column names and types, cell values, sort order and row counts, and which rows
+  are changed, added or marked for deletion.
+- A connection says its state and its marks (Production, read-only) in words, not only by its colour.
+- AirSQL announces what happens away from the focus: a statement's error or note, a Test Connection result, and the end
+  of a Find Text search.
+- In the ER diagram each table reads with its columns; pressing it opens its structure.
+
+## Keyboard
+
+Every command is in the menu bar, and **Help ▸ Keyboard Shortcuts** lists them all. ⌥⌘1, ⌥⌘2 and ⌥⌘3 go to the sidebar,
+the editor and the results; ⌃⇥ moves between tabs. To show, hide and find columns in a grid without the mouse, use
+**View ▸ Column List**.
+
+## Motion and text size
+
+Sidebar and tree animations stop under **Reduce Motion**. ⌘+ and ⌘− change the text size of the SQL editor and the grid
+in focus; the rest of the window stays at its size.
+
+
+---
+
 Source: https://kleash.github.io/airsql/shortcuts.html
 
 # Keyboard shortcuts
 
 Every command is in the menu bar, with its shortcut next to it, and right-click menus show the same commands. Hold
-the pointer over a menu item to see what it does. A greyed-out item says why it is off.
+the pointer over a menu item to see what it does. A greyed-out item says why it is off. **Help ▸ Keyboard Shortcuts**
+lists them all in the app, narrowed as you type.
 
 ⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
 Tab indents, ⌥⌘1 goes to the sidebar and ⌥⌘3 to the results. ⌃⇥ and ⌃⇧⇥ show the next and previous tab, as in Safari.
 
 F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar (on a connection, it
 opens Edit…), else the tab shown
-(a console that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
-edited (a console result's) shows its value in the value panel.
+(a query tab that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
+edited (a query result's) shows its value in the value panel.
 
 The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delete.
 
@@ -1699,8 +1753,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Show Next Tab | ⌃⇥ |
 | Tab 1 | ⌘1 |
 
-⌘S saves a console's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
-HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Rollback have no shortcut,
+⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
+HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,
 so a slip of the fingers never commits.
 
 
@@ -1774,8 +1828,8 @@ Source: https://kleash.github.io/airsql/troubleshooting.html
 
 # Troubleshooting
 
-AirSQL says what went wrong in plain words, with the server's own error under **Details**. Here is what to do about
-the common problems.
+AirSQL says what went wrong in plain words, followed by the server's own error with its number. Here is what to do
+about the common problems.
 
 ## A connection fails
 
@@ -1812,6 +1866,10 @@ devices on it. If you chose **Don't Allow**: System Settings ▸ Privacy & Secur
 ## AirSQL doesn't open
 
 It needs macOS 13.1 or later. Downloads from the releases page and Homebrew are notarized and open normally.
+
+## No help pages show
+
+The help is on the web. On a Mac that can't reach it, **Help ▸ AirSQL Help Offline** opens the same text, kept in the app.
 
 ## Report a problem
 
@@ -1953,7 +2011,7 @@ its own:
   Decline (`preview.cancel`), and `wait {until: no_sheet}` for their answer. A console run of statements that are all
   proven read-only (see read-only) runs without asking.
 - **Statements on the person's sessions** that what you did sends, and that aren't proven read-only (a Commit, a
-  Rollback, the transaction mode, a Kill), wait in the same sheet, one by one.
+  Roll Back, the transaction mode, a Kill), wait in the same sheet, one by one.
 - **A read-only connection** refuses in the console (and the navigator, a sync, Restore and CSV import) any statement
   that isn't proven read-only, a bare USE aside, before anything asks: there is nothing to approve. A table tab's WHERE
   filter must pass the same check inside its SELECT. Open in Terminal starts a read-only session there; the process

@@ -259,7 +259,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         runButton.keyEquivalent = "\r"
         runButton.hasDestructiveAction = request.destructive
         runButton.toolTip = request.typeToConfirm.map { "Type “\($0)” first" }
-            ?? (request.text != nil ? "Put the text in the console's editor: nothing runs"
+            ?? (request.text != nil ? "Put the text in the query tab's editor: nothing runs"
                 : "Run these statements now" + (request.change.statements.count > 1 ? ", in this order" : ""))
         runButton.isEnabled = request.typeToConfirm == nil
         let spacer = NSView()

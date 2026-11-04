@@ -10,8 +10,7 @@ extension ConsoleViewController {
         let time = milliseconds(outcome.duration)
         if !statement.range.isEmpty { lastOutcome = outcome }
         if let error = outcome.error {
-            var text = run.cancelled && error.kind == .cancelled ? "Cancelled · \(time)" : error.message
-            if !error.details.isEmpty, error.kind != .cancelled { text += " " + error.details }
+            let text = run.cancelled && error.kind == .cancelled ? "Cancelled · \(time)" : error.localizedDescription
             note(.error, text, statement: statement, run: run, line: outcome.errorLine)
             if self.text == run.text {
                 if let line = outcome.errorLine { resultsRuler?.errorLine = line }
@@ -43,7 +42,7 @@ extension ConsoleViewController {
         }
         for warning in outcome.warnings { note(.warning, warning, statement: statement, run: run) }
         if StatementCheck.changesCharset(statement.sql, noBackslashEscapes: session.noBackslashEscapes) {
-            note(.warning, "AirSQL reads every result as UTF-8, so accents will look wrong after this: SET NAMES utf8mb4 puts it right",
+            note(.warning, "AirSQL reads every result as UTF-8, so accents will look wrong after this: SET NAMES utf8mb4 puts it right.",
                  statement: statement, run: run)
         }
         if outcome.error == nil, outcome.results.isEmpty, !run.cancelled { note(.ok, "Done · " + time, statement: statement, run: run) }
@@ -78,6 +77,7 @@ extension ConsoleViewController {
         }
         let sql = statement?.sql.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         messagesView.append(ConsoleMessage(level: level, range: range, line: first, statement: sql, text: text))
+        if level != .ok { announce(text) }
         if level == .error || level == .info || (level == .warning && statement == nil) || resultTabs.isEmpty {
             selectedResult = messagesTab
         }

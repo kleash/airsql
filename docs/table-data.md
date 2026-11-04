@@ -6,7 +6,7 @@ nav_order: 12
 # A table's rows
 
 A table tab shows a table's or view's rows in the data grid. They load a page at a time from the connection's data
-session, a session of their own, so a long query in a console never holds them up. Edits wait until you apply them.
+session, a session of their own, so a long query in a query tab never holds them up. Edits wait until you apply them.
 
 ## Load rows
 
@@ -29,11 +29,14 @@ session, a session of their own, so a long query in a console never holds them u
 
 ## Filter, search and sort
 
+**Filter** and **Search** hide the rows that don't match; **Find** (⌘F) leaves every row and moves between matches.
+**Find Text on Server** looks through every table, not only this one.
+
 The chip at the left of the grid bar always says where filtering runs: **On server** (every row of the table, loaded or
 not) or **Local** (only the rows loaded so far, at once, with no query).
 
-- **WHERE**: type a condition, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
-  fine. It is coloured as SQL, as in the console, and the field grows as the condition wraps, up to eight lines (then
+- **Filter**: type a condition, as you would after WHERE, for example `status = 'paid' AND total > 100`, and press Return. A leading `WHERE` is
+  fine. It is coloured as SQL, as in the query tab, and the field grows as the condition wraps, up to eight lines (then
   it scrolls); ⌥↩ starts a new line. Suggestions show as you type: columns, then operators,
   then the column's values (read from its first 10,000 rows), then AND and OR. ↑ and ↓ choose, Tab inserts, ⎋ closes, and
   ⌥⎋ brings them up anywhere. The clock (or ⌥↓ in the field) lists the table's last
@@ -138,11 +141,11 @@ Nothing is written until you apply. Leaving a row writes nothing.
 - Pending changes have their colours: an edited cell amber, a new row green, a row to delete struck through in red.
   The bar under the grid bar counts them.
 - **Undo** (⌘Z) and **Redo** (⇧⌘Z) step through the pending changes (a paste or a multi-cell edit is one step);
-  **Revert** (⌥⌘Z) throws away the selected rows' changes, **Revert All** every one.
+  **Revert** (⌥⌘Z) discards the selected rows' changes, **Revert All** every one.
 - Pending changes are kept on disk as you make them. If AirSQL quits or the Mac restarts, they come back the next time
   you open the table, marked "Kept from before".
 - Closing the tab with pending changes asks whether to keep them for later or throw them away. Quitting AirSQL lists,
-  in one sheet, the tables with pending changes and any console transaction still open (which is rolled back).
+  in one sheet, the tables with pending changes and any transaction still open in a query tab (which is rolled back).
 
 ### Which tables can be edited
 
@@ -181,9 +184,9 @@ says why; so are views. Generated columns can't be edited.
 
 ## Copy and export
 
-These work in a console's results too.
+These work in a query's results too.
 
-- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a console
+- **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a query tab
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,

@@ -6,15 +6,16 @@ nav_order: 90
 # Keyboard shortcuts
 
 Every command is in the menu bar, with its shortcut next to it, and right-click menus show the same commands. Hold
-the pointer over a menu item to see what it does. A greyed-out item says why it is off.
+the pointer over a menu item to see what it does. A greyed-out item says why it is off. **Help ▸ Keyboard Shortcuts**
+lists them all in the app, narrowed as you type.
 
 ⇥ Tab moves from field to field and list to list, from the sidebar on into the tab that shows. In the SQL editor, where
 Tab indents, ⌥⌘1 goes to the sidebar and ⌥⌘3 to the results. ⌃⇥ and ⌃⇧⇥ show the next and previous tab, as in Safari.
 
 F2 renames what has the focus, as in HeidiSQL: the table, view or folder selected in the sidebar (on a connection, it
 opens Edit…), else the tab shown
-(a console that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
-edited (a console result's) shows its value in the value panel.
+(a query tab that isn't saved in a file). In a grid, F2 edits the focused cell, as Return does; a cell that can't be
+edited (a query result's) shows its value in the value panel.
 
 The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delete.
 
@@ -119,6 +120,6 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Show Next Tab | ⌃⇥ |
 | Tab 1 | ⌘1 |
 
-⌘S saves a console's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
-HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Rollback have no shortcut,
+⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
+HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,
 so a slip of the fingers never commits.

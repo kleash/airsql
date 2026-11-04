@@ -427,6 +427,24 @@ extension AppTests {
             _ = await call(harness, "press", ["title": "OK"])
             #expect(try await schemaSession.rows("SELECT name FROM \(database).items") == [["Anna"]], "\(lab)")
             tab.revertAllChanges(nil)
+
+            // Another session holds the row: Cancel stops the waiting Apply, which rolls back and keeps the edit.
+            _ = try await schemaSession.query("START TRANSACTION")
+            _ = try await schemaSession.query("UPDATE \(database).items SET price = 9 WHERE id = 1")
+            tab.source?.set(.text("Waits"), row: 0, column: 1)
+            tab.changesDidChange()
+            tab.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Apply"])
+            #expect(await eventually(timeout: 10) { tab.canCancel }, "\(lab)")
+            try await Task.sleep(nanoseconds: 500_000_000)  // into the lock wait
+            tab.cancelQuery(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 20])  // well before the server's lock timeout
+            #expect(tab.source?.changes.rowCount == 1 && tab.loading == nil, "\(lab)")
+            _ = await call(harness, "press", ["title": "OK"])
+            _ = try await schemaSession.query("ROLLBACK")
+            #expect(try await schemaSession.rows("SELECT name FROM \(database).items") == [["Anna"]], "\(lab)")
+            tab.revertAllChanges(nil)
             _ = try await schemaSession.query("DROP DATABASE \(database)")
         }
 
