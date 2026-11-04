@@ -41,6 +41,8 @@ public struct DumpRequest: Equatable, Sendable {
 /// read, passed first as --defaults-file so ~/.my.cnf and /etc/my.cnf aren't read at all; where to connect and how
 /// to check TLS follow on the command line, which never holds a secret.
 public struct ToolCommand: Sendable {
+    /// This run goes without the certificate check, as the person ticked (`mayRunUnchecked`); never saved.
+    public var uncheckedCertificate = false
     public var tool: ClientTool
     public var options: ConnectOptions
     public var server: ServerInfo?
@@ -90,7 +92,12 @@ public struct ToolCommand: Sendable {
             case .required: args = ["--ssl", "--skip-ssl-verify-server-cert"]
             case .verifyCA, .verifyIdentity: args = ["--ssl", "--ssl-verify-server-cert"]
             }
+            // The pin is the check, as in AirSQL's own sessions: a wrong certificate is refused whatever the mode.
+            if mode != .off, tool.takesFingerprint, let pin = pin {
+                args = ["--ssl", "--skip-ssl-verify-server-cert", "--ssl-fp=" + pin]
+            }
         }
+        if uncheckedCertificate && mayRunUnchecked { args = ["--ssl-mode=REQUIRED"] }
         guard mode != .off else { return args }
         if let file = options.tls.caFile, !file.isEmpty { args.append("--ssl-ca=" + file) }
         if let file = options.tls.certFile, !file.isEmpty { args.append("--ssl-cert=" + file) }
@@ -98,18 +105,41 @@ public struct ToolCommand: Sendable {
         return args
     }
 
-    /// Why the tools can't connect as safely as AirSQL does, if they can't: a pinned certificate (the tools can't pin),
-    /// or MySQL's tools asked to check a certificate without a CA file (they don't read macOS's trusted certificates).
+    private var pin: String? { options.tls.pinnedFingerprint.flatMap { $0.isEmpty ? nil : $0 } }
+
+    /// Whether the person may run this tool once without its certificate check (Export and Restore's tick box): it can't
+    /// check the pin and there is no CA file. Only MySQL's tools: `--ssl-mode=REQUIRED` refuses a server without TLS,
+    /// where MariaDB's `--ssl` without a check quietly connects in plain text.
+    public var mayRunUnchecked: Bool {
+        if case .socket = options.endpoint { return false }
+        return family == .mysql && pin != nil && options.tls.mode != .off && (options.tls.caFile ?? "").isEmpty
+    }
+
+    /// The SQL log's line for a run without the check; nil for any other run.
+    public var uncheckedNote: String? {
+        uncheckedCertificate && mayRunUnchecked ? "\(tool.name) run without checking the server's certificate (TLS required)" : nil
+    }
+
+    /// Those of `tools` that can run on this connection now: usable, and able to check its certificate.
+    public static func runnable(_ tools: [ClientTool], options: ConnectOptions, server: ServerInfo?) -> [ClientTool] {
+        tools.filter { ClientTools.fit($0, server: server).isUsable && ToolCommand(tool: $0, options: options, server: server).tlsProblem == nil }
+    }
+
+    /// Why the tool can't check the server as this connection asks, if it can't, and what to do: a pinned certificate needs
+    /// a tool that takes --ssl-fp, or the connection's CA file to check against; MySQL's tools asked to check a
+    /// certificate need a CA file (they don't read macOS's trusted certificates). No tool runs without its check.
     public var tlsProblem: String? {
         if case .socket = options.endpoint { return nil }
         let tls = options.tls
-        guard tls.mode != .off else { return nil }
-        if let pin = tls.pinnedFingerprint, !pin.isEmpty {
-            return "The client tools can't check this server's pinned certificate. AirSQL's built-in export and Run SQL File can."
+        guard tls.mode != .off, !(uncheckedCertificate && mayRunUnchecked) else { return nil }
+        let hasCA = !(tls.caFile ?? "").isEmpty, verifies = tls.mode == .verifyCA || tls.mode == .verifyIdentity
+        if pin != nil, !tool.takesFingerprint, !(hasCA && verifies) {
+            return "\(tool.name) can't check the certificate you trusted for this server. Use AirSQL's built-in, choose a "
+                + "newer MariaDB tool (one that takes --ssl-fp), or add the server's CA file in the connection's TLS settings."
         }
-        if family == .mysql && (tls.mode == .verifyCA || tls.mode == .verifyIdentity) && (tls.caFile ?? "").isEmpty {
-            return "MySQL's tools check certificates only against a CA file, and this connection has none. Add one in the "
-                + "connection's TLS settings, or use AirSQL's built-in export and Run SQL File."
+        if family == .mysql && verifies && !hasCA {
+            return "MySQL's tools check certificates only against a CA file, and this connection has none. Use AirSQL's "
+                + "built-in, or add one in the connection's TLS settings."
         }
         return nil
     }

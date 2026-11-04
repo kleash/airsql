@@ -10,6 +10,8 @@ public struct ConsoleOutcome {
     public var error: AirSQLError?
     /// The line of the console's text the error points to, when the server names one.
     public var errorLine: Int?
+    /// The place in the console's text the error points to, when it can be found.
+    public var problem: SQLProblem?
     public var duration: TimeInterval = 0
 
     public init(statement: SQLStatement) {
@@ -44,8 +46,11 @@ public enum ConsoleRunner {
             outcome.results = try await session.query(statement.sql, rowCap: rowCap, timeout: timeout)
         } catch {
             let failure = error as? AirSQLError ?? AirSQLError(.other, error.localizedDescription)
-            outcome.errorLine = ConsoleScript.errorLine(failure.details.isEmpty ? failure.message : failure.details,
-                                                        statement: statement, in: text)
+            let said = failure.details.isEmpty ? failure.message : failure.details
+            outcome.errorLine = ConsoleScript.errorLine(said, statement: statement, in: text)
+            let shown = failure.details.isEmpty ? failure.message : failure.message + " " + failure.details
+            outcome.problem = ConsoleScript.problem(said, shown: shown, statement: statement,
+                                                    noBackslashEscapes: session.noBackslashEscapes)
             outcome.error = failure
         }
         outcome.duration = Date().timeIntervalSince(started)

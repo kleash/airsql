@@ -122,7 +122,8 @@ class SettingsPaneController: NSViewController {
         let root = NSView()
         root.addSubview(grid)
         root.addSubview(help)
-        grid.setContentHuggingPriority(.defaultHigh, for: .vertical)
+        // Below controls' compression resistance (750): at a tie pop-ups and buttons are squeezed to 20 pt.
+        grid.setContentHuggingPriority(.init(749), for: .vertical)
         NSLayoutConstraint.activate([
             root.widthAnchor.constraint(equalToConstant: Self.width),
             grid.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.triple),

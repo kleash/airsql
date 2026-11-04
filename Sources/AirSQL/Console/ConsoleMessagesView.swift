@@ -16,14 +16,17 @@ struct ConsoleMessage {
 }
 
 /// The Messages tab (plan §2.6): each statement of the runs with its rows or rows affected, time, warnings, or the
-/// error and the line it points to. A click selects a message, a double-click selects its statement in the editor, a
-/// right-click copies it.
+/// error and the line it points to, wrapped so the whole of it shows. A click selects a message, a double-click selects
+/// its statement in the editor, a click on the selected one's text starts selecting that text, a right-click copies it.
 @MainActor
 final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
-    let table = NSTableView()
+    let table = MessagesTable()
     private(set) var messages: [ConsoleMessage] = []
     /// A double-click on a message: show its statement.
     var onOpen: ((ConsoleMessage) -> Void)?
+    /// Row heights measured at the text column's width: a run's every message is asked for at each new one.
+    private var heights: [Int: CGFloat] = [:]
+    private static let textFont = NSFont.systemFont(ofSize: 12)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -63,10 +66,27 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
 
     func clear() {
         messages = []
+        heights = [:]
         table.reloadData()
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int { messages.count }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        if let height = heights[row] { return height }
+        let cell = NSTextFieldCell(textCell: messages[row].text)
+        cell.font = Self.textFont
+        cell.wraps = true
+        let width = table.tableColumns.last?.width ?? 420
+        let height = max(table.rowHeight, ceil(cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: width, height: 1_000_000)).height) + 6)
+        heights[row] = height
+        return height
+    }
+
+    func tableViewColumnDidResize(_ notification: Notification) {
+        heights = [:]
+        table.noteHeightOfRows(withIndexesChanged: IndexSet(messages.indices))
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let identifier = tableColumn?.identifier else { return nil }
@@ -81,11 +101,12 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
             }
             image.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
             image.contentTintColor = color
+            image.imageAlignment = .alignTop
             return image
         }
         let field = NSTextField(labelWithString: "")
         field.lineBreakMode = .byTruncatingTail
-        field.font = .systemFont(ofSize: 12)
+        field.font = Self.textFont
         switch identifier.rawValue {
         case "line":
             field.stringValue = message.line.map { "Line \($0)" } ?? ""
@@ -97,7 +118,8 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         default:
             field.stringValue = message.text
             field.textColor = message.level == .error ? .statusBad : .labelColor
-            field.toolTip = message.text
+            field.lineBreakMode = .byWordWrapping
+            field.isSelectable = true
         }
         return field
     }
@@ -125,6 +147,15 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         }.joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+/// Messages' table: a first click selects the row, and a double-click stays the table's; only a single click on the
+/// selected row's text reaches the text, to select some of it.
+final class MessagesTable: NSTableView {
+    override func validateProposedFirstResponder(_ responder: NSResponder, for event: NSEvent?) -> Bool {
+        guard responder is NSTextField, let event else { return super.validateProposedFirstResponder(responder, for: event) }
+        return event.clickCount == 1 && isRowSelected(row(at: convert(event.locationInWindow, from: nil)))
     }
 }
 

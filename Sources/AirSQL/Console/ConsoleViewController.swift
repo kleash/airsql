@@ -139,6 +139,7 @@ final class ConsoleViewController: NSViewController, TabContent {
             tab.title = title
             self?.showResults()
         }
+        results.onClose = { [weak self] in self?.closeResult(nil) }
         results.tabMenu = { [weak self] in self?.resultMenu() ?? NSMenu() }
         messagesView.onOpen = { [weak self] message in self?.reveal(message) }
         view = root

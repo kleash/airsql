@@ -107,7 +107,20 @@ AirSQL removes the file as soon as the tool has read it: once a dump has started
 its input, ten seconds after Terminal starts `mysql`; and anything left behind at the next launch.
 
 Over TCP the tools check TLS the way the connection asks: MySQL's with `--ssl-mode`, MariaDB's with `--ssl` and
-`--ssl-verify-server-cert`. MySQL's tools check certificates only against a CA file; for a connection without one, or
-with a pinned certificate, the sheet says so and AirSQL's own export and runner (which check it as AirSQL does) remain.
+`--ssl-verify-server-cert`. A tool never runs without its certificate check. A certificate you trusted (pinned) is
+checked by MariaDB tools that take `--ssl-fp`, which get its fingerprint; AirSQL asks the tool's `--help` whether it
+does. Other tools run on such a connection only if it has a CA file and checks the authority, against that file.
+MySQL's tools check certificates only against a CA file. When the tool can't check the server, the window says what
+to do and **Use AirSQL's Built-in** switches to AirSQL's own export or runner, which check it as AirSQL does; such a
+tool is never picked for you.
+
+With a certificate you trusted and no CA file, Export, Restore and Run SQL File also offer MySQL's tools an unticked
+box, **Run without checking the certificate**. The connection is encrypted but can't prove it's this server, so the
+login and the dump could be exposed, and a restore's data goes to a server that isn't proved. The tool then runs with
+`--ssl-mode=REQUIRED`, never without TLS; the tick lasts one run, is never saved, clears when you change the tool, and
+the run is noted in the SQL log. MariaDB's older tools don't get the box, as without a check they can't insist on TLS.
+Open in Terminal follows the same rules with an alert each time instead of a box: **Cancel** is the default, and **Open
+Without Checking** goes on with TLS required, saving nothing. Copy to Another Server needs neither: it uses no client
+tool, and AirSQL's own sessions check the certificate on both sides.
 
 Client tools reach SSH and proxy routes through the connection's private socket once AirSQL is connected through them.

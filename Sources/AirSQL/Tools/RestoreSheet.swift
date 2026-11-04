@@ -44,7 +44,7 @@ final class RestoreSheet: ToolSheet {
         goOn.toolTip = "Run every statement, skipping those that fail, and say how many failed"
         stopOnError.setAccessibilityIdentifier("restore.stopOnError")
         goOn.setAccessibilityIdentifier("restore.continue")
-        for control in [databaseMenu, stopOnError, goOn, toolMenu] as [NSControl] {
+        for control in [databaseMenu, stopOnError, goOn, toolMenu, unchecked] as [NSControl] {
             control.target = self
             control.action = #selector(formChanged(_:))
         }
@@ -73,7 +73,7 @@ final class RestoreSheet: ToolSheet {
         errors.spacing = 4
         form.row("On error", [errors]).yPlacement = .top
         form.row("Tool", [toolMenu, chooseTool])
-        form.grid.addRow(with: [NSGridCell.emptyContentView, fit]).topPadding = -4
+        form.grid.addRow(with: [NSGridCell.emptyContentView, toolNote(fit)]).topPadding = -4
         fit.preferredMaxLayoutWidth = 460
         let grid = form.finish()
         grid.column(at: 1).width = 470
@@ -137,8 +137,10 @@ final class RestoreSheet: ToolSheet {
         databaseMenu.selectItem(withTitle: connection.database)
         if databaseMenu.indexOfSelectedItem < 0, !databases.isEmpty { databaseMenu.selectItem(at: 0) }
         fill(toolMenu, tools: tools, builtIn: Self.builtInTip)
-        let picked = tools.firstIndex { $0.path == connection.clientPath }
-            ?? ClientTools.best(tools, for: server).flatMap { best in tools.firstIndex { $0 == best } }
+        // Only a tool that can run now is picked for the person, the one kept for the connection first.
+        let runnable = ToolCommand.runnable(tools, options: options, server: server)
+        let picked = (runnable.first { $0.path == connection.clientPath } ?? ClientTools.best(runnable, for: server))
+            .flatMap { best in tools.firstIndex { $0 == best } }
         toolMenu.selectItem(at: builtInFirst ? tools.count : picked ?? tools.count)
         loading(nil)
         formChanged(nil)
@@ -168,8 +170,14 @@ final class RestoreSheet: ToolSheet {
 
     private var database: String { databaseMenu.titleOfSelectedItem ?? "" }
 
+    override var uncheckedTip: String {
+        "Run this once without the check: the connection is encrypted but can't prove it's this server, so the login could be "
+            + "exposed and the file's data goes to a server that isn't proved"
+    }
+
     @objc private func formChanged(_ sender: Any?) {
-        if sender is NSButton, let radio = sender as? NSButton {
+        if sender as? NSPopUpButton === toolMenu { unchecked.state = .off }
+        if let radio = sender as? NSButton, radio !== unchecked {
             stopOnError.state = radio === goOn ? .off : .on
             goOn.state = radio === goOn ? .on : .off
         }
@@ -181,13 +189,17 @@ final class RestoreSheet: ToolSheet {
         copyButton.isHidden = tool == nil  // AirSQL's own runner has no command to copy
         if let tool {
             let fitness = ClientTools.fit(tool, server: server)
-            fit.stringValue = ToolCommand(tool: tool, options: options, server: server).tlsProblem ?? fitness.message
+            let problem = toolCommand(tool, server: server).tlsProblem
+            fit.stringValue = problem ?? fitness.message
             switch fitness {
             case .good: fit.textColor = .statusOK
             case .warning: fit.textColor = .statusWarning
             case .unusable: fit.textColor = .statusBad
             }
-            let argv = ToolCommand(tool: tool, options: options, server: server).restore(into: database,
+            if problem != nil { fit.textColor = .statusBad }
+            useBuiltIn.isHidden = problem == nil && fitness.isUsable
+            showUnchecked(toolCommand(tool, server: server), note: fit)
+            let argv = toolCommand(tool, server: server).restore(into: database,
                                                                                        continueOnError: goOn.state == .on,
                                                                                        optionFile: "/private")
             let source = file.map { ToolCommand.shellWord($0.path) } ?? "‹file›"
@@ -195,6 +207,8 @@ final class RestoreSheet: ToolSheet {
             command?.string = (compressed ? "/usr/bin/gzip -dc " + source + " | " : "")
                 + ToolCommand.display(argv, optionFile: "/private") + (compressed ? "" : " < " + source)
         } else {
+            useBuiltIn.isHidden = true
+            showUnchecked(nil, note: fit)
             fit.stringValue = tools.isEmpty ? "No mysql or mariadb found on this Mac: AirSQL runs the statements itself."
                 : "AirSQL runs the statements itself, one at a time, through this connection."
             fit.textColor = .secondaryLabelColor
@@ -214,7 +228,7 @@ final class RestoreSheet: ToolSheet {
             reason = "Choose the file to run first"
         } else if let tool {
             if case .unusable(let why) = ClientTools.fit(tool, server: server) { reason = why }
-            if let problem = ToolCommand(tool: tool, options: options, server: server).tlsProblem { reason = problem }
+            if let problem = toolCommand(tool, server: server).tlsProblem { reason = problem }
         }
         runButton.isEnabled = reason == nil
         runButton.toolTip = reason ?? "Run the file's statements in “\(database)”"
@@ -306,6 +320,7 @@ final class RestoreSheet: ToolSheet {
                                                 + (tool?.title ?? "AirSQL") + (goOn.state == .on ? ", going on past errors." : ", stopping at the first error.")
                                                 + (notable.isEmpty ? "" : " These are the file's statements that choose where it writes."))
             request.actionTitle = builtInFirst ? "Run" : "Restore"
+            if unchecked.state == .on { warnings.append("The server's certificate isn't checked on this run.") }
             request.warnings = warnings
             request.destructive = !warnings.isEmpty
             SQLPreviewSheet.show(request, connection: connection, on: window) { result in
@@ -327,7 +342,8 @@ final class RestoreSheet: ToolSheet {
 
     private func start(_ file: URL, database: String) {
         let options = self.options
-        let command = tool.map { ToolCommand(tool: $0, options: options, server: server) }
+        let command = tool.map { toolCommand($0, server: server) }
+        logUnchecked(command)
         let continueOnError = goOn.state == .on
         let cancellation = begin("Running \(file.lastPathComponent) in \(database)")
         let updates = Throttle()

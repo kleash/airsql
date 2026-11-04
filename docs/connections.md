@@ -17,7 +17,8 @@ tabs:
   port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.
-- **TLS**: how the connection is encrypted. **Check the authority and host name** is the safe choice: the server must
+- **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
+  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Check the authority and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
   shows its fingerprint when you connect (see [Trust a server](trust-a-server.md)). Add an authority file for a
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
@@ -71,6 +72,20 @@ its own proxy) are used, after what the editor sets.
 **File ▸ Import from ~/.ssh/config…** asks you to pick the file (it opens on `~/.ssh/config`), lists its hosts, and
 makes a connection for each one you tick: an SSH tunnel through that host to a database on `127.0.0.1:3306`, which
 you can then edit.
+
+## Import and export connections
+
+- **File ▸ New Connection from URL…** takes a `mysql://user@host:3306/database` address (or `mariadb://`), from the
+  clipboard when it holds one, and opens the connection's settings to check before you save.
+- **File ▸ Import Connections…** reads the saved connections of Sequel Ace, TablePlus, DBeaver or MySQL Workbench when
+  they are on this Mac, or a file you choose: an AirSQL export, one of those apps' files, or HeidiSQL's exported
+  settings. It lists the MySQL and MariaDB connections with ticks; one that is already here starts unticked.
+- **File ▸ Export Connections…** saves the selected connections, or all of them, to a file for another Mac or a
+  colleague.
+
+Passwords never come along: an export has none, an import doesn't read them, and a password in a URL is left out.
+AirSQL asks for each when you connect. An imported AirSQL file also leaves out what would run by itself: the client
+programs chosen, startup SQL and agent access. TLS starts strict, except for a server on this Mac.
 
 ## Connect and disconnect
 

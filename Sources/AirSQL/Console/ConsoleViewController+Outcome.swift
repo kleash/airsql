@@ -13,7 +13,13 @@ extension ConsoleViewController {
             var text = run.cancelled && error.kind == .cancelled ? "Cancelled · \(time)" : error.message
             if !error.details.isEmpty, error.kind != .cancelled { text += " " + error.details }
             note(.error, text, statement: statement, run: run, line: outcome.errorLine)
-            if let line = outcome.errorLine, self.text == run.text { resultsRuler?.errorLine = line }
+            if self.text == run.text {
+                if let line = outcome.errorLine { resultsRuler?.errorLine = line }
+                if let problem = outcome.problem {
+                    editor.runProblem = problem
+                    editor.scrollRangeToVisible(NSRange(problem.range))
+                }
+            }
         } else if run.cancelled {
             note(.warning, "Cancelled · \(time): what came back may be cut short", statement: statement, run: run)
         }

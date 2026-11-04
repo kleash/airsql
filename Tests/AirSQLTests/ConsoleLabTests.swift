@@ -28,6 +28,7 @@ struct ConsoleLabTests {
         let bad = await ConsoleRunner.run(statements[1], in: text, on: session)
         #expect(bad.error?.kind == .syntax, "\(String(describing: bad.error))")
         #expect(bad.errorLine == 4, "\(bad.error?.message ?? "")")
+        #expect(bad.problem?.range == (text as NSString).range(of: "FORM").location..<(text as NSString).range(of: "FORM").location + 4)
         let warned = await run("SELECT CAST('abc' AS SIGNED)", on: session)
         #expect(warned.warnings.first?.contains("1292") == true, "\(warned.warnings)")
         #expect(await run("SELECT 2", on: session).warnings.isEmpty)

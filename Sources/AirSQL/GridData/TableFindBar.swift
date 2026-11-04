@@ -1,12 +1,26 @@
 import AirSQLCore
 import AppKit
 
+/// What a find bar searches: a table tab's loaded rows, or a console result's rows.
+@MainActor
+protocol FindBarOwner: AnyObject {
+    var findBar: TableFindBar { get }
+    var viewer: GridViewer { get }
+    var grid: DataGridView { get }
+    /// The rows shown, as the grid's rows count them.
+    var findRows: GridSource? { get }
+    func focusedValues() -> QuickFilter.Focus?
+    func findChanged()
+    func findClosed()
+    func replaceMatch(all: Bool)
+}
+
 /// Find (⌘F) and Find and Replace (⌥⌘F) in the loaded rows (grid-spec §4): the next and previous match (⌘G, ⇧⌘G),
 /// "X of Y" cells, options for case, regular expressions, whole words and Filter Rows (hide the rows without a match);
 /// replacements become pending edits. Hidden until asked for; Esc or Done hides it.
 @MainActor
 final class TableFindBar: NSView, NSSearchFieldDelegate {
-    weak var owner: TableDataController?
+    weak var owner: FindBarOwner?
     let findField = NSSearchField()
     let replaceField = NSTextField()
     let options = NSPopUpButton(frame: .zero, pullsDown: true)
@@ -121,9 +135,9 @@ final class TableFindBar: NSView, NSSearchFieldDelegate {
     }
 }
 
-extension TableDataController {
-    /// ⌘F, ⌥⌘F, ⌘G, ⇧⌘G and ⌘E (Use Selection for Find) in the table tab: the find bar over the loaded rows.
-    override func performTextFinderAction(_ sender: Any?) {
+extension FindBarOwner {
+    /// ⌘F, ⌥⌘F, ⌘G, ⇧⌘G and ⌘E (Use Selection for Find): the find bar over the rows.
+    func findAction(_ sender: Any?) {
         let tag = (sender as? NSMenuItem)?.tag ?? NSTextFinder.Action.showFindInterface.rawValue
         switch NSTextFinder.Action(rawValue: tag) {
         case .showReplaceInterface: findBar.show(replacing: true)
@@ -135,6 +149,58 @@ extension TableDataController {
         default: findBar.show(replacing: false)
         }
     }
+
+    /// The matching cells in grid order (rows, then display columns).
+    func matches() -> [GridPosition] {
+        guard let rows = findRows else { return [] }
+        let find = findBar.find
+        guard let expression = find.expression else { return [] }
+        let columns = viewer.shownColumns  // the grid's own would be Transpose's while it's on
+        var found: [GridPosition] = []
+        for row in 0..<rows.rowCount {
+            for display in columns.indices where find.matches(rows.value(row, columns[display]), expression) {
+                found.append(GridPosition(row: row, column: display))
+            }
+        }
+        return found
+    }
+
+    func updateFindCount() {
+        let found = matches(), cursor = grid.selection.cursor
+        if findBar.findField.stringValue.isEmpty {
+            findBar.setCount("")
+        } else if findBar.find.expression == nil {
+            findBar.setCount("Not a valid regular expression")
+        } else if let cursor, let index = found.firstIndex(of: cursor) {
+            findBar.setCount("\((index + 1).formatted()) of \(found.count.formatted())")
+        } else {
+            findBar.setCount(found.isEmpty ? "No matches" : "\(found.count.formatted()) matching")
+        }
+    }
+
+    /// Selects the next (or previous) matching cell after the focused one, wrapping around (in the grid: out of Transpose
+    /// and Record View).
+    func findMatch(forward: Bool) {
+        if findBar.isHidden { findBar.show(replacing: false) }
+        viewer.backToGrid(nil)
+        let found = matches()
+        guard !found.isEmpty else {
+            updateFindCount()
+            return NSSound.beep()
+        }
+        let cursor = grid.selection.cursor ?? GridPosition(row: forward ? -1 : grid.rowCount, column: 0)
+        func before(_ a: GridPosition, _ b: GridPosition) -> Bool { a.row < b.row || (a.row == b.row && a.column < b.column) }
+        let target = forward ? found.first { before(cursor, $0) } ?? found[0] : found.last { before($0, cursor) } ?? found[found.count - 1]
+        grid.selection.select(target)
+        grid.reveal(grid.cellRect(target))
+        updateFindCount()
+    }
+}
+
+extension TableDataController: FindBarOwner {
+    var findRows: GridSource? { source }
+
+    override func performTextFinderAction(_ sender: Any?) { findAction(sender) }
 
     /// The text or an option changed: the rows again when Filter Rows is on, the matches tinted, and the count.
     func findChanged() {
@@ -177,51 +243,6 @@ extension TableDataController {
         }
         viewer.reloadData()
         updateBars()
-    }
-
-    /// The matching cells in grid order (rows, then display columns).
-    private func matches() -> [GridPosition] {
-        guard let source else { return [] }
-        let find = findBar.find
-        guard let expression = find.expression else { return [] }
-        var found: [GridPosition] = []
-        for row in 0..<source.rowCount {
-            for display in 0..<grid.columnCount where find.matches(source.value(row, grid.sourceColumn(display)), expression) {
-                found.append(GridPosition(row: row, column: display))
-            }
-        }
-        return found
-    }
-
-    private func updateFindCount() {
-        let found = matches(), cursor = grid.selection.cursor
-        if findBar.findField.stringValue.isEmpty {
-            findBar.setCount("")
-        } else if findBar.find.expression == nil {
-            findBar.setCount("Not a valid regular expression")
-        } else if let cursor, let index = found.firstIndex(of: cursor) {
-            findBar.setCount("\((index + 1).formatted()) of \(found.count.formatted())")
-        } else {
-            findBar.setCount(found.isEmpty ? "No matches" : "\(found.count.formatted()) matching")
-        }
-    }
-
-    /// Selects the next (or previous) matching cell after the focused one, wrapping around (in the grid: out of Transpose
-    /// and Record View).
-    func findMatch(forward: Bool) {
-        if findBar.isHidden { findBar.show(replacing: false) }
-        viewer.backToGrid(nil)
-        let found = matches()
-        guard !found.isEmpty else {
-            updateFindCount()
-            return NSSound.beep()
-        }
-        let cursor = grid.selection.cursor ?? GridPosition(row: forward ? -1 : grid.rowCount, column: 0)
-        func before(_ a: GridPosition, _ b: GridPosition) -> Bool { a.row < b.row || (a.row == b.row && a.column < b.column) }
-        let target = forward ? found.first { before(cursor, $0) } ?? found[0] : found.last { before($0, cursor) } ?? found[found.count - 1]
-        grid.selection.select(target)
-        grid.reveal(grid.cellRect(target))
-        updateFindCount()
     }
 
     /// Replaces the match in the focused cell (then shows the next), or in every loaded cell: pending edits.

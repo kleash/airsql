@@ -168,7 +168,7 @@ final class Connector {
                 model.states[id] = nil
             } else {
                 model.states[id] = .failed(failure.message)
-                showConnectError(failure, connection: saved.displayName, on: window)
+                showConnectError(failure, connection: saved, on: window)
             }
         }
     }

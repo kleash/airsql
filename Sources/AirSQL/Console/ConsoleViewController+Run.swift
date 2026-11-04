@@ -123,6 +123,7 @@ extension ConsoleViewController {
         if run.kind == .run, run.statements.contains(where: { !$0.range.isEmpty }) {
             dropUnpinnedResults()
             resultsRuler?.errorLine = nil
+            editor.runProblem = nil
         }
         running = run
         changeShared { $0.runner = documentID }
@@ -206,7 +207,12 @@ extension ConsoleViewController {
         if text == run.text { editor.flash(NSRange(statement.range)) }
         let table = await ConsoleRunner.run(SQLStatement(sql: ExplainPlan.tableSQL(statement.sql)), in: run.text, on: session)
         if let error = table.error {
-            note(.error, error.message + (error.details.isEmpty ? "" : " " + error.details), statement: statement, run: run)
+            let shown = error.message + (error.details.isEmpty ? "" : " " + error.details)
+            note(.error, shown, statement: statement, run: run)
+            if self.text == run.text {
+                editor.runProblem = ConsoleScript.problem(error.details.isEmpty ? error.message : error.details, shown: shown,
+                                                          statement: statement, noBackslashEscapes: session.noBackslashEscapes)
+            }
             return
         }
         let (sql, json) = ExplainPlan.treeSQL(statement.sql, server: session.server)

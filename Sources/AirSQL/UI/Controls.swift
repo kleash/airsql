@@ -103,8 +103,11 @@ func textField(_ value: String, placeholder: String, id: String, tip: String, wi
     field.toolTip = tip
     field.setAccessibilityIdentifier(id)
     field.translatesAutoresizingMaskIntoConstraints = false
+    // Not scrollable: "…" at rest, where a scrollable cell cuts the text mid-letter. Its field editor still scrolls.
     field.lineBreakMode = .byTruncatingTail
-    field.cell?.isScrollable = true
+    field.cell?.isScrollable = false
+    field.cell?.usesSingleLineMode = true
+    field.cell?.truncatesLastVisibleLine = true
     if let width { field.widthAnchor.constraint(equalToConstant: width).isActive = true }
     return field
 }

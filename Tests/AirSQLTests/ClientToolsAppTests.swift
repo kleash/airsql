@@ -102,6 +102,69 @@ extension AppTests {
             #expect(await Self.text(harness, "export.command").contains("/Volumes/Tools/"))
         }
 
+        /// A connection whose certificate the tools can't check: no such tool is picked, and one picked by hand says what
+        /// to do, can't run, and has its way out.
+        @Test func aToolThatCantCheckTheCertificateIsntPickedAndHasAWayOut() async throws {
+            let (main, _) = Self.window()
+            var options = ConnectOptions(host: "db.example.com", user: "app", tls: TLSOptions(pinnedFingerprint: "AB:CD"))
+            options.name = "Pinned"
+            let sheet = ExportSheet(model: main.model, connection: ToolFixtures.local, options: options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
+            let root = try #require(sheet.window?.contentView)
+            let menu = try #require(find(NSPopUpButton.self, id: "export.tool", in: root))
+            #expect(menu.titleOfSelectedItem == "AirSQL (built in)" && sheet.useBuiltIn.isHidden)
+            menu.selectItem(at: 0)
+            _ = menu.sendAction(menu.action, to: menu.target)
+            #expect(!sheet.useBuiltIn.isHidden && !sheet.runButton.isEnabled)
+            sheet.useBuiltIn.performClick(nil)
+            #expect(menu.titleOfSelectedItem == "AirSQL (built in)" && sheet.useBuiltIn.isHidden)
+        }
+
+        /// The tick box on Export and on Restore: unticked, Run stays off; a tick lasts one run and goes with the tool.
+        @Test func theCertificateTickBoxIsOffByDefaultAndLastsOneRun() async throws {
+            let (main, _) = Self.window()
+            let options = ConnectOptions(host: "db.example.com", user: "app", tls: TLSOptions(pinnedFingerprint: "AB:CD"))
+            let mysql = ClientTool(path: "/opt/homebrew/bin/mysql", version: ToolVersion(family: .mysql, numbers: [9, 6, 0]))
+            let export = ExportSheet(model: main.model, connection: ToolFixtures.local, options: options)
+            export.show(on: main.window!, loads: false)
+            defer { export.close() }
+            export.show(server: ToolFixtures.server, tools: ToolFixtures.dumps, databases: ToolFixtures.databases())
+            let restore = RestoreSheet(model: main.model, connection: ToolFixtures.local, options: options, builtIn: false)
+            restore.show(on: main.window!, loads: false)
+            defer { restore.close() }
+            restore.show(server: ToolFixtures.server, tools: [mysql], databases: ["shop"])
+            restore.use(URL(fileURLWithPath: "/tmp/dump.sql"))
+            let exportRoot = try #require(export.window?.contentView), restoreRoot = try #require(restore.window?.contentView)
+            let exportMenu = try #require(find(NSPopUpButton.self, id: "export.tool", in: exportRoot))
+            let restoreMenu = try #require(find(NSPopUpButton.self, id: "restore.tool", in: restoreRoot))
+            for (sheet, menu, index) in [(export as ToolSheet, exportMenu, 1), (restore as ToolSheet, restoreMenu, 0)] {
+                menu.selectItem(at: index)  // MySQL's tool
+                _ = menu.sendAction(menu.action, to: menu.target)
+                #expect(!sheet.unchecked.isHidden && sheet.unchecked.state == .off && !sheet.runButton.isEnabled)
+                #expect(sheet.unchecked.toolTip?.contains("can't prove") == true)
+                sheet.unchecked.performClick(nil)
+                #expect(sheet.unchecked.state == .on)
+                _ = menu.sendAction(menu.action, to: menu.target)
+                #expect(sheet.unchecked.state == .off, "choosing a tool clears it")
+                sheet.unchecked.performClick(nil)
+                sheet.finish("Done", failed: false)
+                #expect(sheet.unchecked.state == .off && !sheet.runButton.isEnabled, "a run clears it")
+                #expect(sheet.status.stringValue == "Done")
+            }
+            #expect(restore.unchecked.toolTip?.contains("isn't proved") == true)
+            #expect(export.runButton.toolTip?.isEmpty == false)
+        }
+
+        /// Open in Terminal's question: Cancel first (the default), going on marked so only the person can choose it.
+        @Test func terminalAsksEachTimeWithCancelAsTheDefault() {
+            let alert = ToolsResponder.uncheckedAlert(name: "Shop")
+            #expect(alert.buttons.map(\.title) == ["Cancel", "Open Without Checking"])
+            #expect(alert.buttons[0].keyEquivalent == "\r" && alert.buttons[1].hasDestructiveAction)
+            #expect(alert.informativeText.contains("can't prove"))
+        }
+
         @Test func copyCommandIsThereOnlyWhileThereIsACommand() async throws {
             let (main, _) = Self.window()
             let sheet = Self.exportSheet(on: main)
