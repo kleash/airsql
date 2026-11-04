@@ -232,6 +232,15 @@ struct ExplainPlanTests {
                     Table c (access type: eq_ref, rows: 1)
             """)
         #expect(ExplainPlan.tree(fromJSON: "not json") == "not json")
+        // MariaDB 10.5 and 10.6 repeat the key, in the join's order; a quote in a value doesn't end its string.
+        let repeated = #"{"query_block": {"table": {"table_name": "o", "rows": 2}, "table": {"table_name": "c", "#
+            + #""attached_condition": "c.a = '\"table\": 1'"}, "table": {"table_name": "i"}}}"#
+        #expect(ExplainPlan.tree(fromJSON: repeated) == #"""
+            Query block
+                Table o (rows: 2)
+                Table c (attached condition: c.a = '"table": 1')
+                Table i
+            """#)
         #expect(ExplainPlan.treeSQL("SELECT 1", server: nil).json)
         func server(_ flavor: ServerInfo.Flavor, _ number: Int) -> ServerInfo {
             ServerInfo(flavor: flavor, version: "", versionNumber: number, threadID: 1, tls: nil, certificate: nil)

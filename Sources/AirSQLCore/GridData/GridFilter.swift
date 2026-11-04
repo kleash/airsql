@@ -23,6 +23,10 @@ public struct GridCondition: Equatable, Sendable {
     public func sql(noBackslashEscapes: Bool = false) -> String {
         let name = SQLQuote.identifier(column.name), value = values.first ?? nil
         func literal(_ value: String) -> String { column.literal(value, noBackslashEscapes: noBackslashEscapes) }
+        // What = and IN compare with the cell: a FLOAT holds more digits than its text, so 3.14159 never equals it as
+        // a number, and MySQL's JSON never equals a string; both are compared as the server writes them.
+        let exact = column.kind == .json ? "CAST(\(name) AS BINARY)"
+            : column.type.lowercased().hasPrefix("float") ? "(CAST(\(name) AS CHAR) + 0)" : name
         func like(_ prefix: String, _ suffix: String) -> String {
             // '!' escapes % and _ in the value (a backslash means something else under NO_BACKSLASH_ESCAPES), and
             // ESCAPE '!' keeps a backslash of the value from being LIKE's own escape.
@@ -38,8 +42,8 @@ public struct GridCondition: Equatable, Sendable {
         let listed = values.compactMap { $0 }.map(literal).joined(separator: ", ")
         let hasNull = values.contains { $0 == nil }
         switch op {
-        case .equals: return value.map { name + " = " + literal($0) } ?? name + " IS NULL"
-        case .notEquals: return value.map { name + " <> " + literal($0) } ?? name + " IS NOT NULL"
+        case .equals: return value.map { exact + " = " + literal($0) } ?? name + " IS NULL"
+        case .notEquals: return value.map { exact + " <> " + literal($0) } ?? name + " IS NOT NULL"
         case .less: return name + " < " + (value.map(literal) ?? "NULL")
         case .greater: return name + " > " + (value.map(literal) ?? "NULL")
         case .startsWith: return like("", "%")
@@ -47,10 +51,10 @@ public struct GridCondition: Equatable, Sendable {
         case .contains: return like("%", "%")
         case .isIn:
             if listed.isEmpty { return name + " IS NULL" }
-            return hasNull ? "(\(name) IN (\(listed)) OR \(name) IS NULL)" : "\(name) IN (\(listed))"
+            return hasNull ? "(\(exact) IN (\(listed)) OR \(name) IS NULL)" : "\(exact) IN (\(listed))"
         case .notIn:
             if listed.isEmpty { return name + " IS NOT NULL" }
-            return hasNull ? "(\(name) NOT IN (\(listed)) AND \(name) IS NOT NULL)" : "\(name) NOT IN (\(listed))"
+            return hasNull ? "(\(exact) NOT IN (\(listed)) AND \(name) IS NOT NULL)" : "\(exact) NOT IN (\(listed))"
         case .isNull: return name + " IS NULL"
         case .isNotNull: return name + " IS NOT NULL"
         }

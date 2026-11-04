@@ -31,6 +31,15 @@ struct GridFilterTests {
         #expect(GridCondition(price, .equals, ["1 OR 1=1"]).sql() == "`price` = '1 OR 1=1'")
     }
 
+    @Test func floatsAndJSONCompareAsTheServerWritesThem() {
+        let float = GridColumn(name: "f", type: "float unsigned", kind: .number), json = GridColumn(name: "j", kind: .json)
+        #expect(GridCondition(float, .equals, ["3.14"]).sql() == "(CAST(`f` AS CHAR) + 0) = 3.14")
+        #expect(GridCondition(float, .isIn, ["3.14", nil]).sql() == "((CAST(`f` AS CHAR) + 0) IN (3.14) OR `f` IS NULL)")
+        #expect(GridCondition(json, .notEquals, ["[1]"]).sql() == "CAST(`j` AS BINARY) <> '[1]'")
+        #expect(GridCondition(json, .equals, [nil]).sql() == "`j` IS NULL")
+        #expect(GridCondition(json, .contains, ["a"]).sql() == "`j` LIKE '%a%'")
+    }
+
     @Test(arguments: [false, true])
     func hostileValuesStayQuoted(noBackslashEscapes: Bool) {
         for value in Hostile.values {

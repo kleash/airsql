@@ -14,13 +14,17 @@ session, a session of their own, so a long query in a console never holds them u
   key order, so pages follow one another.
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
+  An estimate below what has already loaded is left out (InnoDB's can say 0 of a million rows), and with no figure to go
+  by, Load All and an unindexed sort ask first. After the count comes the time the rows were read: `· read 14:32`.
 - **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
   Above **Settings ▸ Grid ▸ Load All asks above** rows (100,000 at first) it asks first: every row is held in memory
   while the tab is open. Cancel it in the status bar's activity: what arrived stays, and Load More and Load All carry
   on from there.
 - Anything slow here (a page, a filter, a sort, Load All, Count Exactly, Column Summary) can be stopped with **⌘.**, the
   toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
-- **View ▸ Refresh** (⌘R) loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
+- Pages are read by offset. If someone adds or deletes rows between pages, a row can repeat or be missing: a notice says
+  so when it happens, and Refresh reads the rows again.
+- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
   until you choose **Off**. Pending changes stay.
 
 ## Filter, search and sort

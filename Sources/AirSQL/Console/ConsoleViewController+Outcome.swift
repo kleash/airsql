@@ -30,6 +30,7 @@ extension ConsoleViewController {
                 number += 1
                 let count = "\(rows.rowCount.formatted()) row\(rows.rowCount == 1 ? "" : "s")"
                 let summary = time + " · " + count + (rows.capped ? " (the first \(rows.rowCount.formatted()))" : "")
+                    + " · read " + GridStatusView.time(Date())
                 if outcome.error == nil { note(.ok, count + (rows.capped ? ", the first only" : "") + " · " + time, statement: statement, run: run) }
                 addResult(rows, title: title.map { number > 1 ? "\($0) (\(number))" : $0 }, summary: summary,
                           query: number > 1 ? "\(statement.sql) (\(number))" : statement.sql)

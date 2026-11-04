@@ -30,6 +30,10 @@ public final class TableDataSource: GridSource {
     public private(set) var loadedRows = 0
     /// Whether the last page was full: there may be more rows.
     public private(set) var hasMore = true
+    /// Whether the next page starts with the last loaded row again (`nextPageSQL`), and whether one didn't: the rows
+    /// moved between pages, so one may repeat or be missing, until they load again.
+    private var overlapping = false
+    public private(set) var shifted = false
     /// The loaded rows shown while the local filter is on.
     private var shown: [Int]?
     /// New rows Apply wrote, read back from the server with what it filled in (the AUTO_INCREMENT key, defaults):
@@ -89,6 +93,13 @@ public final class TableDataSource: GridSource {
         return sql
     }
 
+    /// The SELECT of up to `limit` rows after the loaded ones (no limit: nil), by offset, which can't follow rows that
+    /// others add or delete meanwhile. It starts one row early, so `append` can tell.
+    public func nextPageSQL(limit: Int?) -> String {
+        overlapping = loadedRows > 0
+        return overlapping ? pageSQL(offset: loadedRows - 1, limit: limit.map { $0 + 1 }) : pageSQL(offset: 0, limit: limit)
+    }
+
     /// `SELECT COUNT(*)` with the filter: Count Rows Exactly.
     public var countSQL: String { "SELECT COUNT(*)" + from }
 
@@ -131,6 +142,8 @@ public final class TableDataSource: GridSource {
         pageStarts = []
         loadedRows = 0
         hasMore = true
+        overlapping = false
+        shifted = false
         applyLocalFilter()
     }
 
@@ -142,10 +155,16 @@ public final class TableDataSource: GridSource {
             let keys = Set((0..<page.rowCount).map { row in key.map { Self.text(page, row, $0) ?? "" } })
             saved.removeAll { store in keys.contains(key.map { Self.text(store, 0, $0) ?? "" }) }
         }
+        let repeats = overlapping && page.rowCount > 0 && (key ?? Array(columns.indices)).allSatisfy {
+            value(loaded: loadedRows - 1, $0) == Self.text(page, 0, $0)
+        }
+        if overlapping, !repeats { shifted = true }
+        overlapping = false
         if page.rowCount > 0 {
             pages.append(page)
-            pageStarts.append(loadedRows)
-            loadedRows += page.rowCount
+            // A repeat of the last row takes that row's place; a page that doesn't start with it loses nothing.
+            pageStarts.append(loadedRows - (repeats ? 1 : 0))
+            loadedRows += page.rowCount - (repeats ? 1 : 0)
         }
         hasMore = requested.map { page.rowCount >= $0 } ?? true || page.capped
         applyLocalFilter()

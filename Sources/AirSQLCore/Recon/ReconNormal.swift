@@ -5,11 +5,17 @@ import Foundation
 enum ReconNormal {
     private static let integers = ["tinyint", "smallint", "mediumint", "int", "bigint"]
 
-    /// A column's type: lowercase, MariaDB's JSON (LONGTEXT with a check) as json, without integer display widths
-    /// (MySQL 8.0.19+ drops them) or YEAR's (4).
+    /// A column's type: lowercase (but for ENUM and SET values, where case counts), MariaDB's JSON (LONGTEXT with a
+    /// check) as json, MySQL 8's geomcollection as geometrycollection, without integer display widths (MySQL 8.0.19+
+    /// drops them, but keeps ZEROFILL's, which change the cells) or YEAR's (4).
     static func type(_ column: SchemaColumn) -> String {
         if column.isJSON { return "json" }
         var type = column.columnType.lowercased()
+        if type.hasPrefix("enum(") || type.hasPrefix("set("), let open = column.columnType.firstIndex(of: "(") {
+            return column.columnType[..<open].lowercased() + column.columnType[open...]
+        }
+        if type == "geomcollection" { return "geometrycollection" }
+        if type.contains("zerofill") { return type }
         for name in integers + ["year"] where type.hasPrefix(name + "(") {
             if let close = type.firstIndex(of: ")") {
                 type = name + type[type.index(after: close)...]

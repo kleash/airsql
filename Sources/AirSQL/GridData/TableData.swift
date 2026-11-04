@@ -46,7 +46,7 @@ extension TableDataController {
         autoRefresh = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.loading == nil, self.grid.editor == nil, self.view.window != nil else { return }
-                self.refresh(nil)
+                self.reloadRows()
             }
         }
     }

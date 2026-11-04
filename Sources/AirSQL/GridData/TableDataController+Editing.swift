@@ -259,6 +259,7 @@ extension TableDataController: DataGridViewDelegate {
                 let patch = patchQueries(source.changes, noBackslashEscapes: session.noBackslashEscapes)
                 let deleted = source.changes.state.deletes
                 source.changes = PendingChanges(keyColumns: source.changes.keyColumns)
+                if total?.exact == true { total = nil }  // a count from before this Apply
                 changesDidChange()
                 if saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, session.noBackslashEscapes) }
                 var saved: [ResultStore] = []

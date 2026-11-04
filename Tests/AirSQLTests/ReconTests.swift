@@ -127,7 +127,9 @@ struct ReconTests {
                          onUpdate: nil, generated: nil, invisible: false, isJSON: json, charset: nil, collation: nil, comment: "")
         }
         #expect(ReconNormal.type(column("int(11)")) == "int")
-        #expect(ReconNormal.type(column("int(10) unsigned zerofill")) == "int unsigned zerofill")
+        #expect(ReconNormal.type(column("int(6) unsigned zerofill")) != ReconNormal.type(column("int(8) unsigned zerofill")))
+        #expect(ReconNormal.type(column("ENUM('A','b')")) == "enum('A','b')")
+        #expect(ReconNormal.type(column("geomcollection")) == ReconNormal.type(column("geometrycollection")))
         #expect(ReconNormal.type(column("tinyint(1)")) == "tinyint")
         #expect(ReconNormal.type(column("year(4)")) == "year")
         #expect(ReconNormal.type(column("longtext", json: true)) == "json")

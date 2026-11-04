@@ -56,6 +56,8 @@ final class TableDataController: NSViewController, TabContent {
     var total: (rows: Int, exact: Bool, filter: String)?
     /// The table's size on the server in bytes, from the estimate (Column Summary asks first above 2 GB).
     var dataLength: Int?
+    /// When the rows on screen were read (Load More's are newer).
+    var readAt: Date?
     /// A load under way (a page, Load All, Refresh, Apply): one at a time.
     var loading: Task<Void, Never>?
     /// That load in Activity, when Cancel can stop it (a read, not Apply).
@@ -226,7 +228,9 @@ final class TableDataController: NSViewController, TabContent {
     func loadRows(more: Bool, through rows: Int? = nil, keepingSaved: Bool = false) {
         guard let source, loading == nil else { return }
         let limit = more ? rowsPerPage : max(rowsPerPage, rows ?? 0)
-        let sql = source.pageSQL(offset: more ? source.loadedRows : 0, limit: limit)
+        let sql = more ? source.nextPageSQL(limit: limit) : source.pageSQL(offset: 0, limit: limit)
+        // Load More's first row repeats the last one loaded (`nextPageSQL`).
+        let requested = more && source.loadedRows > 0 ? limit + 1 : limit
         let filter = source.filter
         beginRead("Loading the rows of \(tableName)")
         loading = Task {
@@ -235,12 +239,13 @@ final class TableDataController: NSViewController, TabContent {
                 noBackslashEscapes = session.noBackslashEscapes
                 bar.whereField.noBackslashEscapes = noBackslashEscapes
                 if editContext == nil { editContext = try await readEditContext(session) }
-                let page = try await stoppable(session, sql) { try await session.query(sql, rowCap: limit).first?.rows }
+                let page = try await stoppable(session, sql) { try await session.query(sql, rowCap: requested).first?.rows }
                 if !more {
                     source.reset(keepingSaved: keepingSaved)
                     labels = [:]
+                    readAt = Date()
                 }
-                if let page { source.append(page, requested: limit) }
+                if let page { source.append(page, requested: requested) }
                 problem = nil
                 if !more { remember() }
                 if total?.filter != filter { total = try? await estimate(session, filter: filter) }
@@ -257,7 +262,7 @@ final class TableDataController: NSViewController, TabContent {
     /// Loads every row that's left, in batches as they arrive (Load All).
     func loadAllRows() {
         guard let source, loading == nil, source.hasMore else { return }
-        let sql = source.pageSQL(offset: source.loadedRows, limit: nil)
+        let sql = source.nextPageSQL(limit: nil)
         let stop = StopFlag()
         beginRead("Loading every row of \(tableName)", stop: stop)
         loading = Task {
@@ -347,6 +352,15 @@ final class TableDataController: NSViewController, TabContent {
         }
     }
 
+    /// The rows as far as anyone can tell: every row, once loaded, or the count or estimate. None under a filter, or
+    /// when the estimate is below what has loaded: InnoDB's can say 0 of a million rows.
+    var knownTotal: (rows: Int, exact: Bool)? {
+        guard let source else { return nil }
+        if !source.hasMore { return (source.keptRows, true) }
+        guard let total, total.filter == source.filter, total.exact || total.rows >= source.loadedRows else { return nil }
+        return (total.rows, total.exact)
+    }
+
     /// The table's estimated rows and its size (information_schema); none under a filter, which they say nothing about.
     private func estimate(_ session: TableSession, filter: String) async throws -> (rows: Int, exact: Bool, filter: String)? {
         guard let source, GridFilter.condition(filter).isEmpty else { return nil }
@@ -410,11 +424,14 @@ final class TableDataController: NSViewController, TabContent {
                 self.updateBars()
             }
         }
-        guard let bytes = dataLength, bytes > 2 << 30, let window = view.window else { return start() }
+        // The size comes with the row estimate: if that is wrong, so may this be.
+        let unknown = source.filter.isEmpty && knownTotal == nil
+        guard unknown || dataLength ?? 0 > 2 << 30, let window = view.window else { return start() }
         let alert = NSAlert()
         alert.messageText = "Sum up \(name) on the server?"
-        alert.informativeText = "\(tableName) holds \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)): "
-            + "Column Summary reads every row, which can take a while and load the server."
+        let size = unknown ? "The server's figures for \(tableName) are out of date, so its size isn't known"
+            : "\(tableName) holds \(ByteCountFormatter.string(fromByteCount: Int64(dataLength ?? 0), countStyle: .file))"
+        alert.informativeText = size + ": Column Summary reads every row, which can take a while and load the server."
         alert.addButton(withTitle: "Sum Up").toolTip = "Count the column's values on the server"
         alert.addButton(withTitle: "Cancel").toolTip = "Close without counting"
         alert.beginSheetModal(for: window) { response in
@@ -433,10 +450,12 @@ final class TableDataController: NSViewController, TabContent {
     /// Load All: asks first above Settings ▸ Grid's number of rows.
     @objc func loadAll(_ sender: Any?) {
         guard let source, source.hasMore else { return }
-        guard let total, total.rows > model.data.settings.loadAllAsksAbove, let window = view.window else { return loadAllRows() }
+        let known = knownTotal
+        guard known.map({ $0.rows > model.data.settings.loadAllAsksAbove }) ?? true, let window = view.window else { return loadAllRows() }
         let alert = NSAlert()
-        alert.messageText = "Load all \(total.exact ? "" : "about ")\(total.rows.formatted()) rows?"
-        alert.informativeText = "They are held in memory while the tab is open. A filter shows fewer rows."
+        alert.messageText = known.map { "Load all \($0.exact ? "" : "about ")\($0.rows.formatted()) rows?" } ?? "Load every row that's left?"
+        alert.informativeText = (known == nil ? "How many there are isn't known. " : "")
+            + "They are held in memory while the tab is open. A filter shows fewer rows."
         alert.addButton(withTitle: "Load All")
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { [weak self] response in
@@ -444,12 +463,42 @@ final class TableDataController: NSViewController, TabContent {
         }
     }
 
-    /// Refresh (⌘R): the rows loaded so far again, from the server.
+    /// Refresh (⌘R): the table's columns, then the rows loaded so far again, from the server.
     @objc func refresh(_ sender: Any?) {
         guard loading == nil else { return }
-        guard let source else { return open() }
+        guard source != nil else { return open() }
+        let (database, table, schema) = (self.database, tableName, context.schema)
+        bar.busy = true
+        loading = Task {
+            try? await schema.refresh([.table(database: database, name: table)])
+            loading = nil
+            if let info = schema.snapshot.table(database, table) { adopt(info) }
+            guard !abandoned else { return }
+            reloadRows()
+        }
+    }
+
+    /// The rows loaded so far again, from the server; Refresh Every's timer stops at this.
+    func reloadRows() {
+        guard loading == nil, let source else { return }
         total = nil
         loadRows(more: false, through: source.loadedRows, keepingSaved: true)
+    }
+
+    /// A table whose columns or keys changed since the tab read them, keeping the filter, the sort and pending changes
+    /// (which name their key, so a changed key leaves them, and the old columns, until they are applied or reverted).
+    private func adopt(_ info: SchemaTable) {
+        guard let old = source, info != old.table, old.changes.isEmpty || info.editingKey == old.table.editingKey else { return }
+        let fresh = TableDataSource(database: database, table: info)
+        let names = Set(fresh.columns.map(\.name))
+        fresh.filter = old.filter
+        fresh.sort = old.sort.filter { names.contains($0.column) }
+        fresh.changes = old.changes
+        source = fresh
+        editContext = nil
+        grid.sortOrder = fresh.sort.compactMap { key in
+            fresh.columns.firstIndex { $0.name == key.column }.map { DataGridView.Sort(column: $0, ascending: key.ascending) }
+        }
     }
 
     /// Keeps the WHERE bar's filter and the sort for the next time the table opens, the filter among the recent ones.

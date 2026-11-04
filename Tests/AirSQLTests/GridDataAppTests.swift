@@ -143,7 +143,7 @@ extension AppTests {
             tab.viewer.backToGrid(nil)
             tab.viewer.toggleValuePanel(nil)
             #expect(tab.grid.rowCount == 3 && tab.source?.cell(1, 2) == .text("US"))
-            #expect(tab.bar.scope.text == "On server · all rows" && tab.viewer.status.rows.stringValue == "3 rows")
+            #expect(tab.bar.scope.text == "On server · all rows" && tab.viewer.status.rows.stringValue.hasPrefix("3 rows"))
             #expect(session.statements.first?.hasSuffix("FROM `airsql_fixture`.`orders` ORDER BY `id` ASC LIMIT 1000") == true)
             #expect(tab.notice.isHidden && !tab.isEdited && main.selectedTab?.title == "orders")
             // The bar's ? opens the Data Grid page of the help.
@@ -200,7 +200,7 @@ extension AppTests {
             #expect(session.statements.suffix(2) == ["COMMIT", "SELECT `id`, `customer_id`, `region`, `number`, `total`, `parent_id` "
                                                       + "FROM `airsql_fixture`.`orders` WHERE `id` IN (2)"])
             // The server's value (its collation kept the case it likes) shows, the deleted row is gone, nothing reloaded.
-            #expect(tab.grid.rowCount == 2 && tab.source?.cell(1, 2) == .text("EU") && tab.viewer.status.rows.stringValue == "2 rows")
+            #expect(tab.grid.rowCount == 2 && tab.source?.cell(1, 2) == .text("EU") && tab.viewer.status.rows.stringValue.hasPrefix("2 rows"))
             #expect(!tab.bar.busy && tab.source?.changes.isEmpty == true)
             // Refresh loads them all again.
             var sent = session.statements.count
