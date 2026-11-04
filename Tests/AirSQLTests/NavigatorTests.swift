@@ -362,6 +362,26 @@ extension AppTests {
             #expect(menu.items.allSatisfy { $0.toolTip?.isEmpty == false && $0.target === findText })
         }
 
+        @Test func findTextResultsSortByTheirHeadersAndKeepTheSelection() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let findText = FindTextContent(open, database: nil)
+            main.open(findText, title: "Find Text", connection: id)
+            findText.matches = [("a", 9), ("c", 100), ("b", 20)].map {
+                FindTextContent.Match(table: DatabaseObject(.table, "shop", $0.0), columns: ["x"], rows: $0.1)
+            }
+            findText.table.reloadData()
+            findText.table.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
+            let rows = try #require(findText.table.tableColumn(withIdentifier: .init("rows"))?.sortDescriptorPrototype)
+            #expect(!rows.ascending, "the most matches first")
+            findText.table.sortDescriptors = [rows]
+            #expect(findText.matches.map(\.rows) == [100, 20, 9], "as numbers, not text")
+            #expect(findText.table.selectedRow == 0, "the selected match moved with its row")
+            findText.table.sortDescriptors = [NSSortDescriptor(key: "table", ascending: true)]
+            #expect(findText.matches.map(\.table.name) == ["a", "b", "c"])
+        }
+
         @Test func dropShowsTheSQLAndAsksForTheNameOnProduction() async throws {
             let model = testModel(Fixtures.shop)
             let (main, harness) = appWindow(model)

@@ -169,11 +169,6 @@ extension ReconWindowController {
         }
     }
 
-    @objc func showTables(_ sender: Any?) {
-        guard let result, let window else { return }
-        ReconTablesSheet.show(for: self, tables: result.objects.filter { $0.kind == .table }, on: window)
-    }
-
     private func put(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)

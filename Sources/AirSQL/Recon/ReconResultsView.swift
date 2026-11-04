@@ -7,10 +7,17 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     weak var window: ReconWindowController? { didSet { detail.window = window } }
     let view = NSView()
     let summary = NSStackView()
-    let list = NSTableView()
+    let list = ReturnTable()
     let detail = ReconDetailView()
+    /// The result's objects the filter and Hide Matching keep.
     private(set) var objects: [ReconObject] = []
+    private var ordered: [ReconObject] = []
     private let split = NSSplitView()
+    private lazy var filter = ListFilter("Filter Objects", id: "recon.filter", tip: "Type part of a name to show only those objects",
+                                         list: list) { [weak self] in self?.arrange() }
+    private lazy var hideMatching = checkbox("Hide Matching", id: "recon.hideMatching", tip: "Show only the objects that differ",
+                                             on: false, target: self, action: #selector(hideMatchingToggled(_:)))
+    private let listBar = NSStackView()
 
     /// The list's first width, wide enough for names, when nothing is remembered (the window calls it once laid out).
     func placeDivider() {
@@ -36,6 +43,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         list.delegate = self
         list.target = self
         list.doubleAction = #selector(open(_:))
+        list.onReturn = { [weak self] in self?.open(nil) }
         list.setAccessibilityIdentifier("recon.list")
         list.setAccessibilityLabel("Compared objects")
         list.menu = NSMenu()
@@ -46,7 +54,17 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         split.isVertical = true
         split.dividerStyle = .thin
         split.autosaveName = layoutName("Compare split")
-        split.addArrangedSubview(scroll)
+        listBar.setViews([filter, hideMatching], in: .leading)
+        listBar.spacing = Spacing.unit
+        listBar.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.unit)
+        listBar.setHuggingPriority(.defaultHigh, for: .vertical)
+        hideMatching.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let side = NSStackView(views: [listBar, scroll])
+        side.orientation = .vertical
+        side.distribution = .fill
+        side.spacing = 0
+        for view in side.arrangedSubviews { view.widthAnchor.constraint(equalTo: side.widthAnchor).isActive = true }
+        split.addArrangedSubview(side)
         split.addArrangedSubview(detail.view)
         scroll.widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
         detail.view.widthAnchor.constraint(greaterThanOrEqualToConstant: 520).isActive = true
@@ -67,23 +85,39 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     /// compare the details say what to do.
     func show(_ result: ReconResult?) {
         summary.isHidden = result == nil
+        listBar.isHidden = result == nil
         guard let result else {
-            objects = []
-            list.reloadData()
+            ordered = []
+            arrange()
             detail.showStart()
             return
         }
-        objects = result.objects.sorted { Self.rank($0) < Self.rank($1) }
+        ordered = result.objects.sorted { Self.rank($0) < Self.rank($1) }
         // Only on the target, and views and the like that differ, when there are any (the mockup's five boxes otherwise).
         let tints = [NSColor.statusOK, .statusWarning, .statusBad, .statusBad, .statusWarning, .statusWarning]
         summary.setViews(ReconReport.summary(result).enumerated().filter { $0.offset < 3 || $0.offset == 4 || $0.element.value != "0" }
             .map { index, item in Self.box(item.value, item.label, tint: tints[index], zero: item.value == "0") } + [Self.box(ActivityPopover.elapsed(result.duration), "\(result.rowsChecked.formatted()) rows checked, "
                       + Self.share(result.rowsFetched, of: result.rowsChecked) + " fetched", tint: .labelColor, zero: false)],
                          in: .leading)
-        list.reloadData()
-        list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        arrange()
+        if !objects.isEmpty { list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false) }
         detail.show(objects.first, result: result)
     }
+
+    /// Lists what the filter and Hide Matching keep; what stays listed stays selected.
+    private func arrange() {
+        let text = filter.stringValue
+        let chosen = Set(selected.map(Self.key))
+        objects = ordered.filter { object in
+            (hideMatching.state == .off || object.differs) && (text.isEmpty || GridFilter.matches(text, [object.name, object.targetName]))
+        }
+        list.reloadData()
+        list.selectRowIndexes(IndexSet(objects.indices.filter { chosen.contains(Self.key(objects[$0])) }), byExtendingSelection: false)
+    }
+
+    private static func key(_ object: ReconObject) -> String { "\(object.kind) \(object.name)" }
+
+    @objc private func hideMatchingToggled(_ sender: Any?) { arrange() }
 
     func update() { detail.update() }
 
@@ -141,10 +175,11 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         window?.update()
     }
 
-    /// Double click: the object's rows when they differ, else its structure.
+    /// Double click and Return: the object's rows when they differ, else its structure.
     @objc private func open(_ sender: Any?) {
-        guard list.clickedRow >= 0, let result = window?.result else { return }
-        detail.show(objects[list.clickedRow], result: result, data: objects[list.clickedRow].data?.differs == true)
+        let row = list.clickedRow >= 0 ? list.clickedRow : list.selectedRow
+        guard objects.indices.contains(row), let result = window?.result else { return }
+        detail.show(objects[row], result: result, data: objects[row].data?.differs == true)
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {

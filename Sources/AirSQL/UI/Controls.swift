@@ -256,6 +256,47 @@ extension NSTableView {
     }
 }
 
+/// A filter over a list. Return and ↓ go to the list, so a sheet's default button doesn't run from it.
+final class ListFilter: NSSearchField, NSSearchFieldDelegate {
+    private weak var list: NSTableView?
+    private let onChange: () -> Void
+
+    init(_ placeholder: String, id: String, tip: String, list: NSTableView, onChange: @escaping () -> Void) {
+        self.list = list
+        self.onChange = onChange
+        super.init(frame: .zero)
+        placeholderString = placeholder
+        toolTip = tip
+        setAccessibilityIdentifier(id)
+        translatesAutoresizingMaskIntoConstraints = false
+        sendsSearchStringImmediately = true
+        target = self
+        action = #selector(changed(_:))
+        delegate = self
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    @objc private func changed(_ sender: Any?) { onChange() }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.insertNewline(_:)) || selector == #selector(NSResponder.moveDown(_:)),
+              let list else { return false }
+        window?.makeFirstResponder(list)
+        if list.selectedRow < 0, list.numberOfRows > 0 { list.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false) }
+        return true
+    }
+}
+
+/// A table whose Return and Enter do what its double-click does.
+final class ReturnTable: NSTableView {
+    var onReturn: () -> Void = {}
+
+    override func keyDown(with event: NSEvent) {
+        if [36, 76].contains(event.keyCode) { onReturn() } else { super.keyDown(with: event) }
+    }
+}
+
 extension NSEdgeInsets {
     static func all(_ value: CGFloat) -> NSEdgeInsets { NSEdgeInsets(top: value, left: value, bottom: value, right: value) }
 }

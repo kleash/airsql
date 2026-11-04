@@ -15,8 +15,8 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
     let open: OpenConnection
     let field = NSSearchField()
     let scope: NSPopUpButton
-    let table = NSTableView()
-    private(set) var matches: [Match] = []
+    let table = ReturnTable()
+    var matches: [Match] = []
     private(set) var searched = ""
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
@@ -69,6 +69,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
             column.width = width
+            column.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: id != "rows")
             table.addTableColumn(column)
         }
         table.style = .fullWidth
@@ -77,6 +78,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         table.delegate = self
         table.target = self
         table.doubleAction = #selector(openMatch(_:))
+        table.onReturn = { [weak self] in self?.openMatch(nil) }
         table.menu = resultMenu()
         table.setAccessibilityIdentifier("find.results")
         table.setAccessibilityLabel("Tables with matches")
@@ -165,7 +167,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
                 let count = results.first?.rows.flatMap { $0.string(0, 0) }.flatMap { Int($0) } ?? 0
                 if count > 0 {
                     matches.append(Match(table: object, columns: columns, rows: count))
-                    table.reloadData()
+                    arrange()
                 }
             }
             status.stringValue = "\(matches.count) of \(tables.count) tables hold “\(text)”. Double-click one to see its rows."
@@ -219,16 +221,38 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         return menu
     }
 
+    /// The matches in the header's order; what is selected stays selected.
+    private func arrange() {
+        if let sort = table.sortDescriptors.first, let key = sort.key {
+            let chosen = Set(table.selectedRowIndexes.compactMap { matches[safe: $0]?.table })
+            matches.sort { a, b in
+                let order = key == "rows" ? (a.rows == b.rows ? .orderedSame : a.rows < b.rows ? .orderedAscending : .orderedDescending)
+                    : Self.text(a, key).localizedStandardCompare(Self.text(b, key))
+                return sort.ascending ? order == .orderedAscending : order == .orderedDescending
+            }
+            table.reloadData()
+            table.selectRowIndexes(IndexSet(matches.indices.filter { chosen.contains(matches[$0].table) }), byExtendingSelection: false)
+        } else {
+            table.reloadData()
+        }
+    }
+
+    /// What a column shows for a match.
+    private static func text(_ match: Match, _ id: String) -> String {
+        switch id {
+        case "table": return match.table.database + "." + match.table.name
+        case "columns": return match.columns.joined(separator: ", ")
+        default: return match.rows.formatted()
+        }
+    }
+
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) { arrange() }
+
     func numberOfRows(in tableView: NSTableView) -> Int { matches.count }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let match = matches[safe: row], let id = tableColumn?.identifier.rawValue else { return nil }
-        let value: String
-        switch id {
-        case "table": value = match.table.database + "." + match.table.name
-        case "columns": value = match.columns.joined(separator: ", ")
-        default: value = match.rows.formatted()
-        }
+        let value = Self.text(match, id)
         let field = NSTextField(labelWithString: value)
         field.lineBreakMode = .byTruncatingTail
         field.toolTip = value
