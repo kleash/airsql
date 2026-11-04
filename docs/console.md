@@ -76,6 +76,8 @@ nothing runs.
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
   tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
+  A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
+  Messages included.
 - Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.

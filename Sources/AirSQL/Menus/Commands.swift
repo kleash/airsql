@@ -77,6 +77,8 @@ import AppKit
     @objc optional func renameResult(_ sender: Any?)
     @objc optional func closeResult(_ sender: Any?)
     @objc optional func closeOtherResults(_ sender: Any?)
+    @objc optional func showNextResult(_ sender: Any?)
+    @objc optional func showPreviousResult(_ sender: Any?)
     @objc optional func exportResult(_ sender: Any?)
     @objc optional func compareResult(_ sender: Any?)
     @objc optional func toggleComment(_ sender: Any?)
@@ -425,6 +427,10 @@ enum Commands {
     static let renameResult = Command("Rename Result…", #selector(AirSQLActions.renameResult(_:)),
                                       tip: "Give this result tab a name of your own")
     static let closeResult = Command("Close Result", #selector(AirSQLActions.closeResult(_:)), tip: "Close this result tab")
+    static let nextResult = Command("Show Next Result", #selector(AirSQLActions.showNextResult(_:)), "]", [.command, .option],
+                                    tip: "Show the next result tab, or Messages")
+    static let previousResult = Command("Show Previous Result", #selector(AirSQLActions.showPreviousResult(_:)), "[", [.command, .option],
+                                        tip: "Show the previous result tab, or Messages")
     static let closeOtherResults = Command("Close Other Results", #selector(AirSQLActions.closeOtherResults(_:)),
                                            tip: "Close every result tab but this one")
     static let exportResult = Command("Export Result…", #selector(AirSQLActions.exportResult(_:)),
@@ -681,7 +687,7 @@ enum Commands {
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
-        closeOtherResults, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
+        closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,

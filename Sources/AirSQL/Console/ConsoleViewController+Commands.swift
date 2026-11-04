@@ -120,6 +120,8 @@ extension ConsoleViewController: NSMenuItemValidation {
                 return (false, "This is the only result tab")
             }
             return (currentResult != nil, "Run a query first: there is no result tab yet")
+        case #selector(showNextResult(_:)), #selector(showPreviousResult(_:)):
+            return (!resultTabs.isEmpty, "Run a query first: there is no result tab yet")
         case #selector(exportResult(_:)):
             if currentResult?.view is ResultGridView { return (true, "") }
             return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This result has no rows to export")

@@ -182,6 +182,28 @@ extension AppTests {
             #expect(view.tableView(view.table, heightOfRow: 1) > tall)
         }
 
+        /// A result tab's ✕ closes that tab, shown or not; Messages has none; keys go round the bar, Messages included.
+        @Test func resultTabsCloseAndStep() async throws {
+            let (_, harness, console) = try await Self.console()
+            let one = ResultStore(columns: []), two = ResultStore(columns: [])
+            console.addResult(one, title: "One", summary: "")
+            console.addResult(two, title: "Two", summary: "")
+            console.selectResult(console.resultTabs[0])
+            func shown() -> String? { console.selectedResult?.title }
+            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(shown() == "Two")
+            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(shown() == "Messages")
+            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(shown() == "One")
+            #expect(await call(harness, "menu", ["path": "Query > Show Previous Result"]).error == nil)
+            #expect(shown() == "Messages")
+            let buttons = console.results.buttons
+            #expect(buttons.map(\.closeButton.isHidden) == [false, false, true])
+            buttons[0].closeButton.performClick(nil)
+            #expect(console.resultTabs.map(\.title) == ["Two"] && shown() == "Two")
+        }
+
         @Test func schemaChangesAreToldApart() {
             #expect(ConsoleViewController.changesSchema("/* new */ create table t (id int)"))
             #expect(ConsoleViewController.changesSchema("DROP VIEW v") && ConsoleViewController.changesSchema("rename table a to b"))

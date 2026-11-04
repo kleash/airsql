@@ -70,6 +70,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Comment Lines | ⌘/ |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
+| Show Next Result | ⌥⌘] |
+| Show Previous Result | ⌥⌘[ |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
