@@ -67,11 +67,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Show Next Result | ⌥⌘] |
+| Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
-| Show Next Result | ⌥⌘] |
-| Show Previous Result | ⌥⌘[ |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
