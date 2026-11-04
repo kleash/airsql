@@ -73,6 +73,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         recordBar.setViews([close], in: .trailing)
         recordBar.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
         recordBar.setHuggingPriority(.defaultHigh, for: .vertical)
+        grid.scrollView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(stretchRecordValues),
+                                               name: NSView.frameDidChangeNotification, object: grid.scrollView)
         let barGround = SurfaceView(.bar)
         recordBar.addSubview(barGround, positioned: .below, relativeTo: nil)
         barGround.pin(to: recordBar)
@@ -86,13 +89,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    override func setFrameSize(_ newSize: NSSize) {
-        super.setFrameSize(newSize)
-        stretchRecordValues()
-    }
-
     /// Record View's values get the width the names leave, when it opens (once the grid is laid out) and as it grows.
-    private func stretchRecordValues() {
+    @objc private func stretchRecordValues() {
         guard record != nil, grid.columnWidths.count == 2 else { return }
         let room = floor(grid.scrollView.contentSize.width - grid.columnWidths[0])
         if room > grid.columnWidths[1] { grid.columnWidths[1] = room }

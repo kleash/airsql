@@ -282,10 +282,18 @@ extension AppTests {
 
     @Test func recordViewShowsOneRowAndStepsThroughThem() async throws {
         let source = FakeGridSource(rows: 3, columns: 5)
-        let (_, harness, content) = viewerWindow(source)
+        let (main, harness, content) = viewerWindow(source)
         let viewer = content.viewer, grid = viewer.grid
         grid.selection.select(GridPosition(row: 1, column: 2))
         #expect(await call(harness, "menu", ["path": "View > Record View"]).error == nil)
+        // The values fill what the names leave.
+        #expect(await eventually { grid.columnWidths.reduce(0, +) >= grid.scrollView.contentSize.width - 1 },
+                "\(grid.columnWidths) in \(grid.scrollView.contentSize.width)")
+        let shown = try #require(main.window)
+        shown.setContentSize(NSSize(width: shown.frame.width + 300, height: shown.frame.height))
+        shown.layoutIfNeeded()
+        #expect(await eventually { grid.columnWidths.reduce(0, +) >= grid.scrollView.contentSize.width - 1 },
+                "\(grid.columnWidths) in \(grid.scrollView.contentSize.width), after growing")
         #expect(viewer.record == 1 && grid.columnCount == 2 && grid.rowCount == 5)
         #expect(grid.source?.columns.map(\.name) == ["Column", "Value"] && grid.source?.cell(2, 1) == source.cell(1, 2))
         #expect(viewer.recordLabel.stringValue == "Row 2 of 3" && grid.selection.cursor == GridPosition(row: 2, column: 1))
