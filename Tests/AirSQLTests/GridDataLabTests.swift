@@ -85,6 +85,8 @@ struct GridDataLabTests {
         try await withTables(server) { session, snapshot in
             let source = try await loaded("items", snapshot, on: session)
             #expect(source.key == [0] && source.rowCount == 3)
+            // The WHERE bar's sample of a column's values, on each server's parser.
+            #expect(try await session.rows(source.sampleValuesSQL(0, limit: 2)).count == 2)
             let hostile = "x'; DROP TABLE items; -- \\ \u{0} 😀"
             source.set(.text(hostile), row: 0, column: 1)
             source.set(.text("0x0102"), row: 0, column: 3)
