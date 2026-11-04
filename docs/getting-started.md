@@ -40,7 +40,7 @@ until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes th
 
 - **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
-- **The tabs** hold your queries and tables. Double-click a tab to rename it; middle-click it to close it; right-click it
+- **The tabs** hold your queries and tables. When more are open than fit, the arrow at the end of the strip lists them all. Double-click a tab to rename it; middle-click it to close it; right-click it
   to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as
   it does in Settings, the SQL log and Compare. ⇧⌘T brings back the tab you closed last. ⌘P (**Quick Open…**) goes to a
   table, view or connection by part of its name.
