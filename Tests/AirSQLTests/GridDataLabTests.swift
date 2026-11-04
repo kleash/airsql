@@ -216,6 +216,47 @@ struct GridDataLabTests {
         await session.close()
     }
 
+    /// A backslash in a contains, starts-with or Search All Columns value is an ordinary character, in both sql_modes.
+    @Test(arguments: servers)
+    func aBackslashInAFilterIsJustABackslash(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            let items = "\(Self.database).items", odd = SQLQuote.identifier(Self.odd)
+            _ = try await session.query("DELETE FROM \(items)")
+            _ = try await session.query("INSERT INTO \(items) (id, \(odd)) VALUES (1, '\\\\slashed\\\\'), (2, 'C:\\\\temp'), (3, 'C:temp'), "
+                                        + "(4, 'abc%'), (5, 'abc\\\\def')")
+            let source = try await loaded("items", snapshot, on: session)
+            let name = source.columns[1]
+            let mode = try await rows("SELECT @@SESSION.sql_mode", on: session)[0][0] ?? ""
+            for noBackslashEscapes in [false, true] {
+                if noBackslashEscapes { _ = try await session.query("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES')") }
+                func ids(_ condition: String) async throws -> [String?] {
+                    try await rows("SELECT id FROM \(items) WHERE \(condition) ORDER BY id", on: session).map { $0[0] }
+                }
+                func sql(_ op: GridCondition.Operator, _ value: String) -> String {
+                    GridCondition(name, op, [value]).sql(noBackslashEscapes: noBackslashEscapes)
+                }
+                #expect(try await ids(sql(.contains, #"\slashed\"#)) == ["1"])
+                #expect(try await ids(sql(.contains, #"C:\temp"#)) == ["2"])
+                #expect(try await ids(sql(.startsWith, #"abc\"#)) == ["5"])
+                #expect(try await ids(sql(.endsWith, #"\"#)) == ["1"])
+                let search = try #require(GridFilter.search(#"C:\t"#, in: [name], noBackslashEscapes: noBackslashEscapes))
+                #expect(try await ids(search) == ["2"])
+            }
+            _ = try await session.query("SET SESSION sql_mode = '\(mode)'")
+        }
+    }
+
+    /// What the server sends for dates and BIT adds up to nothing; DECIMAL and exponents do.
+    @Test(arguments: servers)
+    func statusFiguresAddUpOnlyWholeNumbers(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let dates = try await rows("SELECT CAST('2026-11-03' AS DATE) UNION ALL SELECT CAST('1000-01-01' AS DATE)", on: session).map { $0[0] }
+        #expect(GridAggregate(dates).text(.sum) == nil && GridAggregate(dates).text(.minimum) == "1000-01-01")
+        let prices = try await rows("SELECT CAST(1.50 AS DECIMAL(5,2)) UNION ALL SELECT CAST(-2.25 AS DECIMAL(5,2))", on: session).map { $0[0] }
+        #expect(GridAggregate(prices).copyText(.sum) == "-0.75")
+        await session.close()
+    }
+
     @Test(arguments: servers)
     func binaryAndCompositeKeysAddressTheirRows(_ server: Lab.Server) async throws {
         try await withTables(server) { session, snapshot in

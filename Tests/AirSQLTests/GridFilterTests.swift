@@ -16,6 +16,8 @@ struct GridFilterTests {
         #expect(GridCondition(price, .less, ["10"]).sql() == "`price` < 10")
         #expect(GridCondition(price, .greater, ["1e3"]).sql() == "`price` > 1e3")
         #expect(GridCondition(name, .startsWith, ["An"]).sql() == "`name` LIKE 'An%'")
+        #expect(GridCondition(name, .contains, [#"C:\temp"#]).sql() == #"`name` LIKE '%C:\\temp%' ESCAPE '!'"#)
+        #expect(GridCondition(name, .contains, [#"C:\temp"#]).sql(noBackslashEscapes: true) == #"`name` LIKE '%C:\temp%' ESCAPE '!'"#)
         #expect(GridCondition(name, .endsWith, ["nn"]).sql() == "`name` LIKE '%nn'")
         #expect(GridCondition(name, .contains, ["n"]).sql() == "`name` LIKE '%n%'")
         #expect(GridCondition(name, .contains, ["50%_off!"]).sql() == "`name` LIKE '%50!%!_off!!%' ESCAPE '!'")
