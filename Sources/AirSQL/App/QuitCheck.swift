@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 // Quit asks first about what it would leave unfinished, as its menu item promises (plan §2.10): tables with pending
-// changes, console transactions still open and console results' edits not applied, in one sheet.
+// changes, console transactions still open, console results' edits not applied and client tools running, in one sheet.
 extension MainWindowController {
     /// A line for each thing Quit leaves unfinished: a table's pending changes (kept for the next time it opens), a
     /// connection's open console transaction (rolled back as AirSQL disconnects) and a console's results' edits not
@@ -30,7 +30,7 @@ extension MainWindowController {
                 }
             }
         }
-        return lines
+        return lines + ToolSheet.open.filter(\.running).map { "“\($0.window?.title ?? "")”, still running: it is stopped" }
     }
 }
 
@@ -44,10 +44,10 @@ extension AppDelegate {
         let alert = NSAlert()
         alert.messageText = "Quit AirSQL with work that isn't finished?"
         alert.informativeText = lines.map { "• " + $0 }.joined(separator: "\n")
-        alert.addButton(withTitle: "Quit").toolTip = "Quit now: open transactions are rolled back and results' edits thrown away; "
-            + "tables' pending changes are kept"
+        alert.addButton(withTitle: "Quit").toolTip = "Quit now: open transactions are rolled back, results' edits thrown away and "
+            + "running tools stopped; tables' pending changes are kept"
         alert.addButton(withTitle: "Cancel").toolTip = "Keep AirSQL open to apply, commit or roll back first"
-        alert.buttons[0].hasDestructiveAction = lines.contains { $0.hasSuffix("rolled back") || $0.hasSuffix("thrown away") }
+        alert.buttons[0].hasDestructiveAction = lines.contains { $0.hasSuffix("rolled back") || $0.hasSuffix("thrown away") || $0.hasSuffix("stopped") }
         guard let window = main.window, window.isVisible, window.attachedSheet == nil else {
             return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
         }

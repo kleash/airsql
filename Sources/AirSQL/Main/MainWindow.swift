@@ -364,6 +364,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }
             let ids = Set(doomed.map(\.id))
+            ToolSheet.running(on: Array(ids)).forEach { $0.stop() }
             self.tabs.filter { ids.contains($0.connectionID ?? UUID()) }.forEach { self.close($0) }
             self.model.delete(ids)
         }

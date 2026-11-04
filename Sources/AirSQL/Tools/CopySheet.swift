@@ -45,6 +45,8 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    override var connections: Set<UUID> { Set([connection.id, target?.id].compactMap { $0 }) }
+
     override func makeForm() -> NSView {
         let form = Form()
         form.row("To", [targetMenu])
