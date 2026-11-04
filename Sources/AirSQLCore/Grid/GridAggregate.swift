@@ -34,7 +34,8 @@ public struct GridAggregate: Equatable {
     /// The most decimals a value has: sums show as many.
     private var scale = 0
 
-    public init<Values: Sequence>(_ values: Values) where Values.Element == String? {
+    /// `numbers` false: the values only look like numbers (BIT's digits), so they don't add up.
+    public init<Values: Sequence>(_ values: Values, numbers canAddUp: Bool = true) where Values.Element == String? {
         var texts: [String] = []
         for value in values {
             if let value { texts.append(value) } else { nulls += 1 }
@@ -43,7 +44,7 @@ public struct GridAggregate: Equatable {
         distinct = Set(texts).count
         guard !texts.isEmpty else { return }
         let numbers = texts.map(Self.number)
-        if numbers.allSatisfy({ $0 != nil }) {
+        if canAddUp, numbers.allSatisfy({ $0 != nil }) {
             let sorted = numbers.compactMap { $0 }.sorted()
             let total = sorted.reduce(Decimal(0), +)
             sum = total
@@ -59,11 +60,11 @@ public struct GridAggregate: Equatable {
         }
     }
 
-    /// A value as a number, the way MySQL writes them ("-12.50", "1e3"); nil when it isn't one.
+    /// A value as a number, the way MySQL writes them ("-12.50", "1e3"); nil when it isn't one. The whole text must
+    /// be one: `Decimal(string:)` alone reads "2026-11-03" as 2026.
     static func number(_ text: String) -> Decimal? {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        guard let first = trimmed.unicodeScalars.first, CharacterSet(charactersIn: "+-.0123456789").contains(first),
-              trimmed.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "+-.0123456789eE").contains($0) }) else { return nil }
+        guard trimmed.range(of: #"^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil else { return nil }
         return Decimal(string: trimmed, locale: Locale(identifier: "en_US_POSIX"))
     }
 

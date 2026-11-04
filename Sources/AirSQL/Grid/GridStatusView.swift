@@ -80,7 +80,9 @@ final class GridStatusView: NSStackView {
     @objc private func addUp() {
         guard let grid = viewer?.grid, let source = grid.source, grid.selection.cursor != nil else { return }
         if let cells = grid.selection.cells(rows: grid.rowCount, columns: grid.columnCount, limit: Self.limit) {
-            aggregate = GridAggregate(cells.map { source.value($0.row, grid.sourceColumn($0.column)) })
+            let columns = Set(cells.map { grid.sourceColumn($0.column) })
+            aggregate = GridAggregate(cells.map { source.value($0.row, grid.sourceColumn($0.column)) },
+                                      numbers: !columns.contains { source.columns[$0].type.lowercased().hasPrefix("bit") })
         } else {
             aggregate = nil
         }
