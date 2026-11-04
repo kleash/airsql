@@ -36,7 +36,8 @@ extension ConsoleViewController {
                           query: number > 1 ? "\(statement.sql) (\(number))" : statement.sql)
             } else if outcome.error == nil {
                 let affected = result.changedRows
-                let text = writes ? "\(affected.formatted()) row\(affected == 1 ? "" : "s") changed" : "Done"
+                let word = result.info?.contains("Changed:") == true ? "changed" : "affected"
+                let text = writes ? "\(affected.formatted()) row\(affected == 1 ? "" : "s") \(word)" : "Done"
                 note(.ok, text + " · " + time + (result.info.map { " · " + $0 } ?? ""), statement: statement, run: run)
             }
         }
