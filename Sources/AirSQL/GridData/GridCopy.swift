@@ -50,7 +50,17 @@ enum GridCopy {
     static func text(_ source: GridSource, rows: [Int], columns: [Int], format: CopyFormat, headers: Bool, nullText: String,
                      database: String? = nil, table: String = "table") -> String {
         let options = CopyOptions(headers: headers, nullText: format == .tsv || format == .csv ? nullText : "NULL")
-        var writer = CopyWriter(format, columns: columns.map { source.columns[$0] }, database: database, table: table, options: options)
+        // UPDATE and DELETE need the whole key, copied or not: part of one addresses more rows than were selected.
+        let columns = format == .update || format == .delete
+            ? columns + source.columns.indices.filter { source.columns[$0].isKey && !columns.contains($0) } : columns
+        var written = columns.map { source.columns[$0] }
+        // A result's flags mark part of a composite key too: only the tables it can edit have their whole key in it.
+        if let editing = (source as? ResultEditSource)?.editing {
+            for (index, column) in columns.enumerated() {
+                written[index].isKey = editing.sources.contains { $0.keyColumns.contains(column) }
+            }
+        }
+        var writer = CopyWriter(format, columns: written, database: database, table: table, options: options)
         var text = writer.header()
         for row in rows { text += writer.row(columns.map { source.value(row, $0) }) }
         return text + writer.footer()
