@@ -44,6 +44,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
   the access you choose.
 - [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html): a database as formatted SQL changesets, and any change saved as one.
 - [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): every command's shortcut.
+- [Accessibility](https://kleash.github.io/airsql/accessibility.html): VoiceOver, the keyboard, motion and text size.
 - [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): what AirSQL connects to, where passwords are kept, what agents may do.
 - [Troubleshooting](https://kleash.github.io/airsql/troubleshooting.html): when a connection fails, and how to report a problem.
 
@@ -571,9 +572,9 @@ tabs:
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.
 - **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
-  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Check the authority and host name** is the safe choice: the server must
+  servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Encrypt, check certificate and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
-  shows its fingerprint when you connect (see [Trust a server](https://kleash.github.io/airsql/trust-a-server.html)). Add an authority file for a
+  shows its fingerprint when you connect (see [Trust a server](https://kleash.github.io/airsql/trust-a-server.html)). Add a CA certificate for a
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
@@ -582,7 +583,7 @@ tabs:
   connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
   why it can't be used).
 - **Safety**: safety checks of the connection's own: every switch and limit of [Settings ▸ Safety](https://kleash.github.io/airsql/settings.html#safety),
-  starting from the ones that applied, with a shield beside its name in the sidebar.
+  starting from the ones that applied, with a slider mark beside its name in the sidebar.
 - **Agents**: what AI agents may do with this connection.
 
 A **read-only** connection's sessions are read-only on the server, and AirSQL itself runs on it only statements it can
@@ -968,8 +969,8 @@ a column's summary. Loading, filtering, editing, copying and exporting a table's
 Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:
 
 - a gold key: the primary key, or the unique key the grid uses to find a row when there is no primary key;
-- a grey key: another unique key; an outline key: an index;
-- an arrow: a foreign key.
+- a 1 in a circle: another unique key; an outline key: an index;
+- a chain link: a foreign key.
 
 After the type, **auto** marks an auto-increment column, **generated** a generated one, **default** a column with a
 default value, and **null** a column that allows NULL. Hold the pointer over a header for all of this in words and the
@@ -1297,7 +1298,7 @@ a session of its own. The compare only reads; nothing changes until you run the 
    window's activity list.
 
 The summary says how many tables match, differ in structure, or are only on one side, how many rows differ, and how
-much of the data had to come over the network. The list shows what differs first: **only left** and **only right**
+much of the data had to come over the network. The list shows what differs first: **only source** and **only target**
 for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
 Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
 they differ. The two definitions scroll together.
@@ -1520,7 +1521,7 @@ with your own `liquibase` (`liquibase update`, `liquibase rollback-count 1`…).
 
 **Tools ▸ Generate Liquibase Changelog…** writes a changelog of a database of the connection the window is about.
 
-- **Content**: **DDL** writes the objects' structure, **DML** their rows, **DDL + DML** both.
+- **Content**: **Structure** writes the objects' DDL, **Rows** their rows as DML, **Both** the two.
 - The list holds the database's tables, views, procedures, functions, triggers, events and sequences, each ticked.
   Untick what you don't want; space ticks the selected rows, double-click ticks one, and the right-click menu
   includes all, none or the selected rows; the filter above the list narrows it, and all and none then mean the
@@ -1600,6 +1601,35 @@ added column, DROP INDEX and DROP FOREIGN KEY for added keys, RENAME back. Row c
 - Liquibase reads `${name}` in a changeset as a property it may replace; text like that in your data or routines is
   replaced when you define such a property.
 - Generated columns are left out of the INSERTs: their values follow from the others.
+
+
+---
+
+Source: https://kleash.github.io/airsql/accessibility.html
+
+# Accessibility
+
+AirSQL is built from the Mac's own controls wherever it can be, and labels the ones it draws itself for VoiceOver.
+
+## VoiceOver
+
+- The data grid reads as a table: its column names and types, cell values, sort order and row counts, and which rows
+  are changed, added or marked for deletion.
+- A connection says its state and its marks (Production, read-only) in words, not only by its colour.
+- AirSQL announces what happens away from the focus: a statement's error or note, a Test Connection result, and the end
+  of a Find Text search.
+- In the ER diagram each table reads with its columns; pressing it opens its structure.
+
+## Keyboard
+
+Every command is in the menu bar, and **Help ▸ Keyboard Shortcuts** lists them all. ⌥⌘1, ⌥⌘2 and ⌥⌘3 go to the sidebar,
+the editor and the results; ⌃⇥ moves between tabs. To show, hide and find columns in a grid without the mouse, use
+**View ▸ Column List**.
+
+## Motion and text size
+
+Sidebar and tree animations stop under **Reduce Motion**. ⌘+ and ⌘− change the text size of the SQL editor and the grid
+in focus; the rest of the window stays at its size.
 
 
 ---
