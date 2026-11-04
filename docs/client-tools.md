@@ -16,9 +16,13 @@ and in a connection's right-click menu in the sidebar.
 installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
 (MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
 
-Each sheet says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
+Export, Restore, Run SQL File, Copy to Another Server and Import CSV each open in a window of their own, which you can
+move aside to keep working. Closing it while it runs asks first; disconnecting the connection it uses, or quitting, says
+it is running and stops it.
+
+Each window says how well its tool suits the server: **✓ suits the server**, a warning (another family's tool, or an
 older version than the server), or why it can't be used (not there, too old: AirSQL needs MySQL 5.7 or MariaDB 10.3
-tools or newer). The tool you pick in a sheet is remembered for that connection: it shows, and can be changed, in the
+tools or newer). The tool you pick in one is remembered for that connection: it shows, and can be changed, in the
 connection editor's Options tab.
 
 No tools at all? Install MySQL's or MariaDB's client tools (for example `brew install mysql-client`), then choose
@@ -36,7 +40,7 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
    events.
 3. Pick the tool, where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
 4. The box under the form shows the exact command line. **Copy Command** copies it.
-5. **Export**. The sheet shows the table being written, the bytes so far and the time left. **Stop** ends it.
+5. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
 
 The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
 or failed export never leaves half a file.

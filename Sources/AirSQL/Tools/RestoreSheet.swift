@@ -49,6 +49,8 @@ final class RestoreSheet: ToolSheet {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    override var writes: Bool { true }
+
     // MARK: Form
 
     override func makeForm() -> NSView {

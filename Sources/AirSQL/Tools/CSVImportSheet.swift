@@ -50,6 +50,8 @@ final class CSVImportSheet: ToolSheet {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    override var writes: Bool { true }
+
     override func makeForm() -> NSView {
         let form = Form()
         form.row("File", [fileLabel, choose])

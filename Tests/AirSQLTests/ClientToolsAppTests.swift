@@ -87,6 +87,43 @@ extension AppTests {
             #expect(toolsMenu.items.map(\.title).starts(with: ["Open in Terminal", "Export…", "Restore…", "Copy to Another Server…"]))
         }
 
+        @Test func aToolIsAWindowOfItsOwnThatAsksBeforeClosingOnWorkUnderWay() async throws {
+            let (main, harness) = Self.window()
+            let sheet = Self.exportSheet(on: main)
+            let window = try #require(sheet.window)
+            #expect(window.sheetParent == nil && main.window?.attachedSheet == nil && window.styleMask.contains(.closable))
+            #expect(!window.title.isEmpty)
+            // The same tool again comes to the front: no second window.
+            let again = ExportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            again.show(on: main.window!, loads: false)
+            #expect(ToolSheet.open.filter { $0.opener === main.window }.count == 1)
+
+            _ = sheet.begin("Exporting shop")
+            #expect(ToolSheet.running(on: [ToolFixtures.local.id]).count == 1 && ToolSheet.running(on: [UUID()]).isEmpty)
+            #expect(main.unfinishedWork().contains { $0.hasSuffix("it is stopped") })
+            window.performClose(nil)
+            #expect(await eventually(timeout: 5) { window.attachedSheet != nil } && window.isVisible, "it asks and stays")
+            _ = await call(harness, "press", ["title": "Keep Running"])
+            #expect(await eventually(timeout: 5) { window.attachedSheet == nil } && sheet.running)
+            sheet.finish("Done", failed: false)
+            window.performClose(nil)
+            #expect(await eventually(timeout: 5) { !window.isVisible } && !ToolSheet.open.contains { $0 === sheet })
+        }
+
+        @Test func aWriteRefusesAConnectionMadeReadOnlySinceTheWindowOpened() async throws {
+            let (main, harness) = Self.window()
+            let sheet = RestoreSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options, builtIn: true)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(server: ToolFixtures.server, tools: ToolFixtures.clients, databases: ["shop"])
+            sheet.use(URL(fileURLWithPath: "/tmp/dump.sql"))
+            var saved = ToolFixtures.local
+            saved.readOnly = true
+            main.model.save(saved)
+            _ = await call(harness, "press", ["id": "tools.run"])
+            #expect(sheet.status.stringValue.contains("read-only now"))
+        }
+
         @Test func theExportSheetShowsTheCommandItRunsAndWhyItCantRunYet() async throws {
             let (main, harness) = Self.window()
             let sheet = Self.exportSheet(on: main)
