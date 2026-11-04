@@ -22,7 +22,7 @@ Passwords stay in your Keychain. A connection coloured **Production** starts wit
   it does in Settings, the SQL log and Compare. ⇧⌘T brings back the tab you closed last. ⌘P (**Quick Open…**) goes to a
   table, view or connection by part of its name.
 - **The toolbar** shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
-  All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Rollback and Cancel. A button that can't act
+  All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Roll Back and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
 - **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to
   cancel), what agents are doing, and the SQL log. Click an item for details; right-click it to copy it. When the

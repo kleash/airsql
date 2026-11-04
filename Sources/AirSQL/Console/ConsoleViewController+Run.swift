@@ -116,7 +116,7 @@ extension ConsoleViewController {
             return done?() ?? ()
         }
         guard shared.runner == nil || shared.runner == documentID else {
-            note(.warning, "Another console tab is running a statement on this connection: they share one session, so this one "
+            note(.warning, "Another query tab is running a statement on this connection: they share one session, so this one "
                  + "waits until it ends.")
             return done?() ?? ()
         }

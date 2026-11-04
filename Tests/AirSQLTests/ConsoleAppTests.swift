@@ -46,7 +46,7 @@ extension AppTests {
             #expect(button(.commit)?.isEnabled == false && button(.commit)?.toolTip == "No transaction is open in this tab")
             #expect(button(.cancel)?.isEnabled == false && button(.cancel)?.toolTip == "Nothing is running in this tab")
             #expect(!tx.isEnabled && tx.toolTip?.hasPrefix("Connect first: double-click") == true)
-            #expect(tx.itemTitles == ["Tx: Auto-commit", "Tx: Manual", "", "Isolation Level", "Read Uncommitted", "Read Committed",
+            #expect(tx.itemTitles == ["Auto-commit", "Manual Commit", "", "Isolation Level", "Read Uncommitted", "Read Committed",
                                       "Repeatable Read", "Serializable"])
             // Connected, with a statement typed: Run can run and says what it does; there is still nothing to commit.
             let connection = Connection(options: ConnectOptions(host: "127.0.0.1", port: 1, user: "nobody"))
@@ -55,7 +55,7 @@ extension AppTests {
             console.editor.setText("SELECT 1")
             toolbar.validateVisibleItems()
             #expect(button(.run)?.isEnabled == true && button(.run)?.toolTip == Commands.runStatement.tip + " (⌘↩)")
-            #expect(button(.commit)?.isEnabled == false && tx.isEnabled && tx.title == "Tx: Auto-commit")
+            #expect(button(.commit)?.isEnabled == false && tx.isEnabled && tx.title == "Auto-commit")
         }
 
         @Test func newQueryStartsConnectingADisconnectedConnection() async throws {
@@ -536,7 +536,7 @@ extension AppTests {
             }
             let (main, _) = appWindow(testModel(Fixtures.shop))
             main.openConsole(text: "SELECT 1", title: "orders.sql", connection: nil)
-            #expect(empty(main) == "Choose a connection for this console with Query ▸ Change Connection… to run SQL.")
+            #expect(empty(main) == "Choose a connection for this tab with Query ▸ Change Connection… to run SQL.")
             let model = testModel()
             let (first, _) = appWindow(model)
             first.openConsole(text: "SELECT 1", title: "orders.sql", connection: nil)

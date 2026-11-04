@@ -125,7 +125,7 @@ its own:
   Decline (`preview.cancel`), and `wait {until: no_sheet}` for their answer. A console run of statements that are all
   proven read-only (see read-only) runs without asking.
 - **Statements on the person's sessions** that what you did sends, and that aren't proven read-only (a Commit, a
-  Rollback, the transaction mode, a Kill), wait in the same sheet, one by one.
+  Roll Back, the transaction mode, a Kill), wait in the same sheet, one by one.
 - **A read-only connection** refuses in the console (and the navigator, a sync, Restore and CSV import) any statement
   that isn't proven read-only, a bare USE aside, before anything asks: there is nothing to approve. A table tab's WHERE
   filter must pass the same check inside its SELECT. Open in Terminal starts a read-only session there; the process

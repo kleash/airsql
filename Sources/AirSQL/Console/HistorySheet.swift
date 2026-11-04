@@ -146,7 +146,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             self.table.reloadData()
             if !found.isEmpty { self.table.selectRowIndexes([0], byExtendingSelection: false) }
             self.status.stringValue = found.isEmpty ? "" : "\(found.count.formatted()) statement\(found.count == 1 ? "" : "s")"
-            self.empty.stringValue = words.isEmpty ? "Nothing has run on this connection yet: statements you run in a console show here."
+            self.empty.stringValue = words.isEmpty ? "Nothing has run on this connection yet: statements you run in a query tab show here."
                 : "No statement has these words."
             self.empty.isHidden = !found.isEmpty
             self.insertButton.isEnabled = !found.isEmpty
@@ -240,7 +240,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         let insert = NSMenuItem(title: "Insert", action: #selector(insertSelected(_:)), keyEquivalent: "")
         insert.toolTip = "Put the statement in the editor at the cursor"
         let tab = NSMenuItem(title: "Open in New Tab", action: #selector(openSelected(_:)), keyEquivalent: "")
-        tab.toolTip = "Put the statement in a new console tab, to read it before running it"
+        tab.toolTip = "Put the statement in a new query tab, to read it before running it"
         let copy = Commands.copy.item()
         let remove = NSMenuItem(title: "Delete from History", action: #selector(deleteSelected(_:)), keyEquivalent: "")
         remove.toolTip = "Forget the selected statements on this Mac"

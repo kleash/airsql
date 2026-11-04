@@ -96,7 +96,7 @@ enum MainMenu {
         addReconItems(menus)
 
         // Last in View, as on every Mac.
-        menus.view.add([nil, Commands.fullScreen])
+        menus.view.add([nil, Commands.customizeToolbar, Commands.fullScreen])
 
         let bar = NSMenu()
         for menu in menus.inOrder {
@@ -104,8 +104,49 @@ enum MainMenu {
             item.submenu = menu
             item.isHidden = menu.items.isEmpty
             bar.addItem(item)
+            OffReasons.watch(menu)
         }
         return bar
+    }
+}
+
+/// Says why a menu item is off when nothing where the focus is answers it. AppKit then greys the item without asking
+/// any validator, so its tooltip would stay "what it does" (or a closed tab's reason).
+@MainActor
+final class OffReasons: NSObject, NSMenuDelegate {
+    static let shared = OffReasons()
+
+    /// By the menu bar's menu the item is in.
+    private static let reasons = [
+        "File": "Open a tab first: double-click a connection, or press ⌘T in one",
+        "Edit": "Click in a grid, an editor or a list first",
+        "View": "Open a tab with a grid or a query first",
+        "Query": "Open a query tab first: File ▸ New Query (⌘T)",
+        "Data": "Open a table or a query's result first",
+        "Database": "Connect, then select a database or table in the sidebar",
+        "Connection": "Select a connection in the sidebar first",
+        "Tools": "Select a connection in the sidebar first",
+    ]
+    private static let inCompare: Set<Selector> = [Commands.syncScript.action, Commands.exportReport.action,
+                                                   Commands.copySyncScript.action, Commands.leaveOutOfCompare.action]
+
+    /// Tells `menu` and its submenus, but not those that make their own items, or the system's.
+    static func watch(_ menu: NSMenu) {
+        menu.delegate = menu.delegate ?? shared
+        for submenu in menu.items.compactMap(\.submenu) where submenu.delegate == nil && submenu !== NSApp.servicesMenu {
+            watch(submenu)
+        }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        menu.update()
+        var top = menu
+        while let parent = top.supermenu, parent.supermenu != nil { top = parent }
+        for item in menu.items where !item.isEnabled {
+            guard let action = item.action, NSApp.target(forAction: action, to: item.target, from: item) == nil else { continue }
+            let reason = Self.inCompare.contains(action) ? "Open Tools ▸ Compare… first" : Self.reasons[top.title]
+            item.toolTip = reason ?? Commands.tip(for: item)
+        }
     }
 }
 
@@ -126,6 +167,8 @@ final class WindowMenu: NSObject, NSMenuDelegate {
         let main = windows.lazy.compactMap { $0.windowController as? MainWindowController }.first
         main?.updateWindowMenu(menu)
     }
+
+    func menuWillOpen(_ menu: NSMenu) { OffReasons.shared.menuWillOpen(menu) }
 }
 
 /// The Colour menu of a connection (the menu bar's and the sidebar's): None, then each colour with its dot.

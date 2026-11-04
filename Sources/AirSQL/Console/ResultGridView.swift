@@ -169,8 +169,8 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         let alert = NSAlert()
         alert.messageText = "Sort \(source.rowCount.formatted()) rows here?"
         alert.informativeText = "Sorting this many rows takes a moment. An ORDER BY in the query sorts them on the server."
-        alert.addButton(withTitle: "Sort")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Sort").toolTip = "Sort the result's rows on this Mac"
+        alert.addButton(withTitle: "Cancel").toolTip = "Leave the rows as they are"
         alert.beginSheetModal(for: window) { response in
             if response == .alertFirstButtonReturn { sort() }
         }

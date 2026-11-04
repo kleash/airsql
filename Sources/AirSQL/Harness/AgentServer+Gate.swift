@@ -39,8 +39,8 @@ extension AgentServer {
     func checkPersonAllows(_ text: String, into view: NSView?) async throws {
         guard let agent = AgentGate.agent, let saved = AgentGuard.productionConsole(view), let window = main?.window else { return }
         var request = SQLPreviewRequest(change: ChangeSQL(title: "Text from \(agent)", statements: [text], connection: saved.id),
-                                        heading: "Put this text in a console of \(saved.displayName)?",
-                                        caption: "\(agent) wants to type it into a production console. Nothing runs: it goes "
+                                        heading: "Put this text in a query tab of \(saved.displayName)?",
+                                        caption: "\(agent) wants to type it into a production query tab. Nothing runs: it goes "
                                             + "into the editor, for you to check and run yourself.")
         request.agent = agent
         request.actionTitle = "Put It In"

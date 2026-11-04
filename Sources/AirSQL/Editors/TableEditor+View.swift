@@ -173,7 +173,7 @@ extension TableEditorController {
         applyButton.isEnabled = reason == nil
         applyButton.toolTip = reason ?? "Show the SQL in the preview sheet, then run it on the server (⌘S)"
         discardButton.isEnabled = !isBusy && isEdited && before != nil
-        discardButton.toolTip = discardButton.isEnabled ? "Throw away your changes and show the table as the server has it"
+        discardButton.toolTip = discardButton.isEnabled ? "Discard your changes and show the table as the server has it"
             : (isBusy ? "Wait until the server has answered" : "Nothing to discard")
         addButton.isEnabled = !isBusy && section != .options
         removeButton.isEnabled = !isBusy && section != .options && !list.selectedRowIndexes.isEmpty

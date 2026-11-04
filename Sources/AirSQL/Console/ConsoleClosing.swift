@@ -55,7 +55,7 @@ enum ConsoleClosing {
 
     private static func unsaved(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {
         guard console.isEdited else { return finish(console, answer: answer, true) }
-        let name = console.tab?.title ?? "this console"
+        let name = console.tab?.title ?? "this tab"
         alert(window, "Save the changes to “\(name)”?",
               console.fileURL == nil ? "The text isn't saved in a file; it's lost if you don't save it."
                 : "Your changes since it was last saved are lost if you don't save them.",

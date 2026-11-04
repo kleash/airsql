@@ -26,7 +26,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [Browse a server](navigator.md): the tree, the database view, table commands, find text and the process list.
 - [A table's rows](table-data.md): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](data-grid.md): the status bar's figures, the value panel, Record View, Transpose, Display
-  As, heatmaps, View As, charts and Column Summary, in a table's rows and a console's results.
+  As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
 - [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, and the ER
   diagram.
 - [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy

@@ -257,8 +257,8 @@ extension TableDataController {
         let alert = NSAlert()
         alert.messageText = "Sort \(source.loadedRows.formatted()) loaded rows here?"
         alert.informativeText = "Sorting this many rows takes a moment. Untick Loaded rows only to sort every row on the server."
-        alert.addButton(withTitle: "Sort")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Sort").toolTip = "Sort the loaded rows on this Mac"
+        alert.addButton(withTitle: "Cancel").toolTip = "Leave the rows as they are"
         alert.beginSheetModal(for: window) { response in
             if response == .alertFirstButtonReturn { apply() }
         }
@@ -309,8 +309,8 @@ extension TableDataController {
         alert.messageText = "Sort " + (known.map { "\($0.exact ? "" : "about ")\($0.rows.formatted()) rows" } ?? "every row") + " by \(column)?"
         alert.informativeText = "\(column) has no index, so the server sorts every row before it sends the first page. That can "
             + "take a while and load the server."
-        alert.addButton(withTitle: "Sort")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Sort").toolTip = "Ask the server to sort every row"
+        alert.addButton(withTitle: "Cancel").toolTip = "Leave the rows as they are"
         alert.beginSheetModal(for: window) { response in
             if response == .alertFirstButtonReturn { apply() }
         }

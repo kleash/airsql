@@ -454,8 +454,8 @@ final class TableDataController: NSViewController, TabContent {
         alert.messageText = known.map { "Load all \($0.exact ? "" : "about ")\($0.rows.formatted()) rows?" } ?? "Load every row that's left?"
         alert.informativeText = (known == nil ? "How many there are isn't known. " : "")
             + "They are held in memory while the tab is open. A filter shows fewer rows."
-        alert.addButton(withTitle: "Load All")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Load All").toolTip = "Read every row that's left into this tab"
+        alert.addButton(withTitle: "Cancel").toolTip = "Keep only the rows loaded so far"
         alert.beginSheetModal(for: window) { [weak self] response in
             if response == .alertFirstButtonReturn { self?.loadAllRows() }
         }
@@ -531,12 +531,13 @@ final class TableDataController: NSViewController, TabContent {
         guard let source, !source.changes.isEmpty, model.data.safety(for: context.connection).warnOnClose,
               let window = view.window else { return answer(true) }
         let alert = NSAlert()
-        alert.messageText = "Apply the changes to \(tableName) before closing?"
-        alert.informativeText = "\(source.changes.rowCount.formatted()) rows have pending changes. Kept, they come back the next "
-            + "time you open the table."
-        alert.addButton(withTitle: "Keep for Later")
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Throw Away")
+        alert.messageText = "Keep the changes to \(tableName) for later?"
+        let rows = source.changes.rowCount
+        alert.informativeText = (rows == 1 ? "1 row has" : "\(rows.formatted()) rows have") + " pending changes, not applied. "
+            + "Kept, they come back the next time you open the table."
+        alert.addButton(withTitle: "Keep for Later").toolTip = "Close the tab; the changes come back with the table, still not applied"
+        alert.addButton(withTitle: "Cancel").toolTip = "Keep the tab open"
+        alert.addButton(withTitle: "Discard").toolTip = "Close the tab and lose the changes"
         alert.buttons[2].hasDestructiveAction = true
         alert.beginSheetModal(for: window) { [weak self] response in
             switch response {

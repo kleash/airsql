@@ -6,7 +6,7 @@ import AppKit
 extension MainWindowController {
     /// A line for each thing Quit leaves unfinished: a table's pending changes (kept for the next time it opens), a
     /// connection's open console transaction (rolled back as AirSQL disconnects) and a console's results' edits not
-    /// applied (thrown away). Connections whose Safety settings don't warn on close are left out.
+    /// applied (discarded). Connections whose Safety settings don't warn on close are left out.
     func unfinishedWork() -> [String] {
         var lines: [String] = [], transactions: Set<UUID> = []
         for tab in tabs {
@@ -26,7 +26,7 @@ extension MainWindowController {
                 let rows = console.pendingResultRows
                 if rows > 0 {
                     lines.append("Edits to \(rows.formatted()) row\(rows == 1 ? "" : "s") in the results of “\(tab.title)”, not "
-                                 + "applied: they are thrown away")
+                                 + "applied: they are discarded")
                 }
             }
         }
@@ -44,10 +44,10 @@ extension AppDelegate {
         let alert = NSAlert()
         alert.messageText = "Quit AirSQL with work that isn't finished?"
         alert.informativeText = lines.map { "• " + $0 }.joined(separator: "\n")
-        alert.addButton(withTitle: "Quit").toolTip = "Quit now: open transactions are rolled back, results' edits thrown away and "
+        alert.addButton(withTitle: "Quit").toolTip = "Quit now: open transactions are rolled back, results' edits discarded and "
             + "running tools stopped; tables' pending changes are kept"
         alert.addButton(withTitle: "Cancel").toolTip = "Keep AirSQL open to apply, commit or roll back first"
-        alert.buttons[0].hasDestructiveAction = lines.contains { $0.hasSuffix("rolled back") || $0.hasSuffix("thrown away") || $0.hasSuffix("stopped") }
+        alert.buttons[0].hasDestructiveAction = lines.contains { $0.hasSuffix("rolled back") || $0.hasSuffix("discarded") || $0.hasSuffix("stopped") }
         guard let window = main.window, window.isVisible, window.attachedSheet == nil else {
             return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
         }

@@ -233,7 +233,7 @@ extension ResultGridView {
         if let off = editingOff { return showError(off + ".", title: title, on: window) }
         // A transaction open in the console may hold these rows: Apply's own would wait for it.
         if transactionOpen() {
-            return showError("The console has a transaction open. Commit or roll it back first, so Apply doesn't wait for its locks.",
+            return showError("This query tab has a transaction open. Commit or roll it back first, so Apply doesn't wait for its locks.",
                              title: title, on: window)
         }
         let statements: [PendingChanges.Statement]

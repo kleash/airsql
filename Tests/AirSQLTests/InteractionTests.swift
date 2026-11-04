@@ -286,7 +286,7 @@ extension AppTests {
                     place: { main, _ in statusItem(main.statusBar.transaction) },
                     clicked: { $0.statusBar.transaction.shown?.isShown == true },
                     doubleClicked: { main, _ in main.statusBar.transaction.shown?.isShown == true },
-                    menu: ["Copy", "Commit", "Rollback"], enabled: ["Copy"]),
+                    menu: ["Copy", "Commit", "Roll Back"], enabled: ["Copy"]),
             Surface(name: "Status bar: activity",
                     place: { main, _ in statusItem(main.statusBar.activity) },
                     clicked: { $0.statusBar.activity.shown?.isShown == true },
@@ -334,7 +334,7 @@ extension AppTests {
                         if let tab = main.tabs.first(where: { $0.content is AgentResultsContent }) { main.select(tab) }
                         return opened
                     },
-                    menu: ["Open in New Console", "Copy"], enabled: ["Open in New Console", "Copy"]),
+                    menu: ["Open in New Query", "Copy"], enabled: ["Open in New Query", "Copy"]),
         ] + navigatorSurfaces
 
         /// A window in the state every row starts from: the shop's connections, Production connected, a transaction

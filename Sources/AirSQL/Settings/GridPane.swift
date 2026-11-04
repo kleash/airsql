@@ -20,7 +20,7 @@ final class GridPane: SettingsPaneController {
                                         placeholder: "NULL", width: 120)],
                  caption: "Only how it looks: an empty text is still different from NULL.")
         form.row("", [toggle("Transpose results with one row", id: "settings.transposeSingleRow",
-                             tip: "Show a console result with a single row turned on its side, one line per column",
+                             tip: "Show a query result with a single row turned on its side, one line per column",
                              \.transposeSingleRow)],
                  caption: "Transpose (⌥⌘T) turns any grid back and forth.")
     }

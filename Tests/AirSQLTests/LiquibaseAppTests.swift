@@ -211,7 +211,7 @@ extension AppTests {
             let save = try #require(items.first { $0.action == Commands.saveAsChangeset.action })
             let responder = try Self.responder(of: main)
             #expect(responder.validateMenuItem(generate))
-            #expect(!responder.validateMenuItem(save) && save.toolTip == "Open a console tab with the statements to save")
+            #expect(!responder.validateMenuItem(save) && save.toolTip == "Open a query tab with the statements to save")
             #expect(SQLPreviewSheet.changesetWriter != nil, "the preview sheet offers Save as Liquibase changeset")
         }
 
