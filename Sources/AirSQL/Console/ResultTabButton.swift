@@ -2,7 +2,7 @@ import AppKit
 
 /// One result tab on the results bar (mockup's .rtab): its label in a capsule when shown, a pin when pinned, a ✕ unless
 /// it is Messages. Clicks are handled here, without AppKit's tracking loop: a click shows it, a double-click renames it,
-/// a right-click opens its menu.
+/// a middle-click closes it, a right-click opens its menu.
 @MainActor
 final class ResultTabButton: NSView {
     private weak var bar: ResultsView?
@@ -69,7 +69,7 @@ final class ResultTabButton: NSView {
         pinWidth.constant = tab.pinned ? 14 : 0
         closeButton.isHidden = !tab.content.isRenamable
         closeWidth.constant = tab.content.isRenamable ? 14 : 0
-        let what = tab.content.isRenamable ? "click to show it, double-click to rename it, right-click to pin or close it"
+        let what = tab.content.isRenamable ? "click to show it, double-click to rename it, middle-click to close it, right-click for more"
             : "click to show what each statement did"
         toolTip = tab.label + (tab.pinned ? " (pinned)" : "") + ": " + what
         setAccessibilityLabel(tab.label)
@@ -91,6 +91,11 @@ final class ResultTabButton: NSView {
     override func mouseDown(with event: NSEvent) {
         guard editor == nil else { return super.mouseDown(with: event) }
         bar?.clicked(self, count: event.clickCount)
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard event.buttonNumber == 2 else { return super.otherMouseUp(with: event) }
+        bar?.close(self)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? { bar?.menu(for: self) }

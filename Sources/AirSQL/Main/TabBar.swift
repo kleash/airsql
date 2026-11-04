@@ -22,6 +22,8 @@ protocol TabContent: AnyObject {
     var canDuplicate: Bool { get }
     /// A copy for Duplicate Tab.
     func duplicate() -> NSViewController?
+    /// What brings the tab back for Reopen Closed Tab, asked for as it closes; nil: it can't come back.
+    var reopen: ((MainWindowController) -> Void)? { get }
 }
 
 extension TabContent {
@@ -33,6 +35,7 @@ extension TabContent {
     func shouldClose(_ answer: @escaping (Bool) -> Void) { answer(true) }
     var canDuplicate: Bool { false }
     func duplicate() -> NSViewController? { nil }
+    var reopen: ((MainWindowController) -> Void)? { nil }
 }
 
 extension Notification.Name {
@@ -58,8 +61,9 @@ final class Tab {
 }
 
 /// The strip of tabs above the content (plan §2.4): each tab's title (cut with an ellipsis, the full title in its
-/// tooltip), its unsaved dot or close button, and the connection's colour along the top of the active tab. A click
-/// shows a tab, a double-click renames it, a right-click opens its menu; "+" opens a new query.
+/// tooltip), its unsaved dot or close button, and the connection's colour along its top; when one title is open on two
+/// connections, the connection's name after it. A click
+/// shows a tab, a double-click renames it, a middle-click closes it, a right-click opens its menu; "+" opens a new query.
 @MainActor
 final class TabBarView: NSView {
     weak var controller: MainWindowController?
@@ -111,15 +115,17 @@ final class TabBarView: NSView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     /// Shows `tabs`, `selected` active.
-    func show(_ tabs: [Tab], selected: Tab?, colour: (Tab) -> NSColor?) {
+    func show(_ tabs: [Tab], selected: Tab?, connection: (Tab) -> SavedConnection?) {
         while buttons.count > tabs.count { buttons.removeLast().removeFromSuperview() }
         while buttons.count < tabs.count {
             let button = TabButton(bar: self)
             strip.addSubview(button)
             buttons.append(button)
         }
+        // The same table on Production and Staging must not look the same.
+        let clashing = Dictionary(grouping: tabs, by: \.title).filter { Set($0.value.map(\.connectionID)).count > 1 }
         for (button, tab) in zip(buttons, tabs) {
-            button.update(tab, selected: tab === selected, colour: colour(tab))
+            button.update(tab, selected: tab === selected, connection: connection(tab), namesConnection: clashing[tab.title] != nil)
         }
         needsLayout = true
         if let index = tabs.firstIndex(where: { $0 === selected }) {
@@ -161,12 +167,12 @@ final class TabBarView: NSView {
         controller?.rename(tab, to: title)
     }
 
-    /// The tab's menu (plan §2.12): Close, Close Others, Duplicate, Rename, Reveal in Finder, Change Connection.
+    /// The tab's menu (plan §2.12): Close, Close Others, Close All, Duplicate, Rename, Reveal in Finder, Change Connection.
     func menu(for button: TabButton) -> NSMenu {
         if let tab = button.tab { controller?.select(tab) }
         let menu = NSMenu(title: "Tab")
-        menu.add([Commands.closeTab, Commands.closeOtherTabs, Commands.duplicateTab, Commands.renameTab, nil,
-                  Commands.revealInFinder, Commands.changeConnection])
+        menu.add([Commands.closeTab, Commands.closeOtherTabs, Commands.closeAllTabs, Commands.duplicateTab, Commands.renameTab,
+                  nil, Commands.revealInFinder, Commands.changeConnection])
         return menu
     }
 }
@@ -186,7 +192,8 @@ final class TabButton: NSView {
     private let dot = DotView(diameter: 6)
     private var editor: RenameField?
     private var selected = false
-    private var colour: NSColor?
+    private var connection: SavedConnection?
+    private var namesConnection = false
     private var hovering = false
 
     init(bar: TabBarView) {
@@ -227,27 +234,35 @@ final class TabButton: NSView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func update(_ tab: Tab, selected: Bool, colour: NSColor?) {
+    func update(_ tab: Tab, selected: Bool, connection: SavedConnection?, namesConnection: Bool) {
         self.tab = tab
         self.selected = selected
-        self.colour = colour
-        title.stringValue = tab.title
+        self.connection = connection
+        self.namesConnection = namesConnection
+        let name = connection.map(\.displayName)
+        title.stringValue = tab.title + (namesConnection ? name.map { " · " + $0 } ?? "" : "")
         title.textColor = selected ? .labelColor : .secondaryLabelColor
         let edited = tab.tabContent?.isEdited ?? false
         dot.isHidden = !edited || hovering
         close.isHidden = edited && !hovering
-        toolTip = tab.title + (edited ? " (unsaved)" : "") + ": click to show it, double-click to rename it, right-click for more"
-        setAccessibilityLabel(tab.title)
+        let place = name.map { " on " + $0 + (connection?.marks.isEmpty == false ? " (\(connection?.marks ?? ""))" : "") } ?? ""
+        toolTip = tab.title + place + (edited ? " (unsaved)" : "") + ": click to show it, double-click to rename it, middle-click to close it, right-click for more"
+        setAccessibilityLabel(tab.title + place)
         setAccessibilityValue(selected ? 1 : 0)
         setAccessibilityHelp(toolTip)
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        let colour = connection?.colour.color
         guard selected else {
             if hovering {
                 NSColor.hover.setFill()
                 NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 3), xRadius: Radius.control, yRadius: Radius.control).fill()
+            }
+            if let colour {
+                colour.setFill()
+                NSRect(x: Radius.control, y: bounds.height - 2, width: bounds.width - 2 * Radius.control, height: 2).fill()
             }
             return
         }
@@ -280,12 +295,17 @@ final class TabButton: NSView {
 
     private func setHover(_ on: Bool) {
         hovering = on
-        if let tab { update(tab, selected: selected, colour: colour) }
+        if let tab { update(tab, selected: selected, connection: connection, namesConnection: namesConnection) }
     }
 
     override func mouseDown(with event: NSEvent) {
         guard editor == nil else { return super.mouseDown(with: event) }
         bar?.clicked(self, count: event.clickCount)
+    }
+
+    override func otherMouseUp(with event: NSEvent) {
+        guard event.buttonNumber == 2 else { return super.otherMouseUp(with: event) }
+        closeClicked()
     }
 
     override func menu(for event: NSEvent) -> NSMenu? { bar?.menu(for: self) }

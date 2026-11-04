@@ -133,13 +133,23 @@ extension MainWindowController {
     }
 
     @objc func createObject(_ sender: Any?) {
-        // The kind: the item's (the navigator's New… on a folder), else New Object's choice (by its tag).
-        let item = sender as? NSMenuItem
+        // The kind: New Object's choice (by its tag), else that of what is selected in the tree (New…).
+        let tag = (sender as? NSMenuItem)?.tag ?? 0
+        if tag == 0, selectedTreeKind == .table { return createTable(sender) }
         guard let (context, database) = editorTarget,
-              let kind = (item?.representedObject as? String).flatMap(ObjectKind.init(rawValue:))
-                ?? item.flatMap({ ObjectKind.allCases.indices.contains($0.tag - 1) ? ObjectKind.allCases[$0.tag - 1] : nil }),
+              let kind = ObjectKind.allCases.indices.contains(tag - 1) ? ObjectKind.allCases[tag - 1]
+                : selectedTreeKind.flatMap({ ObjectKind(rawValue: $0.rawValue) }),
               let database = database ?? context.firstDatabase() else { return }
         openObjectEditor(kind, name: nil, database: database, context: context)
+    }
+
+    /// The kind of the group or object selected in the tree, which New… makes another of.
+    private var selectedTreeKind: DatabaseObject.Kind? {
+        switch sidebar.treeSelection?.nodes.first?.kind {
+        case .category(_, _, let kind)?: return kind
+        case .object(_, let object)?: return object.kind
+        default: return nil
+        }
     }
 
     /// Whether an editor command can run now, and why not (nil: not an editor command).
@@ -151,6 +161,10 @@ extension MainWindowController {
         guard let context = Editors.context(connection, in: model) else { return (false, "Connect to \(connection.displayName) first") }
         if item.action == Commands.createObject.action, context.schema.snapshot.databases.isEmpty, connection.database.isEmpty {
             return (false, "The server has no database to create it in")
+        }
+        if item.action == Commands.createObject.action, item.tag == 0 {
+            guard let kind = selectedTreeKind else { return (false, "Select a group such as Views in the tree, or use New Object") }
+            if kind == .sequence { return (false, "Sequences have no editor: write CREATE SEQUENCE in a console") }
         }
         return (true, nil)
     }

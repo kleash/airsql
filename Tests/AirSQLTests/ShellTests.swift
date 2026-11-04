@@ -6,6 +6,48 @@ import Testing
 // The app shell driven as a person would, through the harness: the first run, the sidebar's commands, tabs, the status
 // bar, Settings, the SQL preview sheet, the Trust and password sheets, and the harness's own tools.
 extension AppTests {
+    @Test func tabsNameTheirConnectionWhenTheirTitlesClash() throws {
+        let (main, _) = appWindow(testModel(Fixtures.shop))
+        main.open(FixtureContent(), title: "orders", connection: Fixtures.production.id)
+        main.open(FixtureContent(), title: "orders", connection: Fixtures.staging.id)
+        main.open(FixtureContent(), title: "customers", connection: Fixtures.staging.id)
+        let titles = main.tabBar.buttons.map { find(NSTextField.self, in: $0)?.stringValue ?? "" }
+        #expect(titles[0].hasPrefix("orders · ") && titles[1].hasPrefix("orders · ") && titles[0] != titles[1])
+        #expect(titles[2] == "customers")
+        let tip = main.tabBar.buttons[0].toolTip ?? ""
+        #expect(tip.contains(Fixtures.production.displayName) && tip.contains("Production"))
+        #expect(main.tabBar.buttons[0].accessibilityLabel()?.contains("Production") == true)
+    }
+
+    @Test func aConnectionsStateAndMarksArePutInWords() {
+        var connection = Fixtures.production
+        connection.colour = .production
+        connection.readOnly = true
+        #expect(connection.marks == "Production, read-only")
+        let cell = SidebarCell()
+        cell.show(connection, state: .connected(server: "MariaDB 11.8.3"))
+        let label = cell.accessibilityLabel() ?? ""
+        #expect(label.contains("Production, read-only") && label.contains("Connected to MariaDB 11.8.3"))
+        #expect(cell.toolTip?.contains("double-click to connect") == false)
+        cell.show(connection, state: .failed("refused"))
+        #expect(cell.accessibilityLabel()?.contains("Not connected: refused") == true)
+        #expect(cell.toolTip?.contains("try again") == true)
+        cell.show(connection, state: nil)
+        #expect(cell.toolTip?.contains("double-click to connect") == true)
+    }
+
+    @Test func commandWClosesTheMainWindowWhenNoTabIsOpen() throws {
+        let (main, _) = appWindow(testModel(Fixtures.shop))
+        let item = Commands.closeTab.item()
+        #expect(main.validateMenuItem(item) && item.toolTip == Commands.closeWindow.tip)
+        main.open(FixtureContent(), title: "Query 1", connection: nil)
+        #expect(main.validateMenuItem(item) && item.toolTip == Commands.closeTab.tip)
+        main.closeTab(nil)
+        #expect(main.tabs.isEmpty && main.window?.isVisible == true)
+        main.closeTab(nil)
+        #expect(main.window?.isVisible == false)
+    }
+
     @Test func firstRunOffersTheFirstConnection() async throws {
         let model = testModel()
         let (main, harness) = appWindow(model)
@@ -156,7 +198,7 @@ extension AppTests {
         let work = model.activity.start("Exporting shop", connection: Fixtures.production.id) { cancelled = true }
         #expect(await eventually { main.statusBar.agent.isHidden == false && main.statusBar.activity.isHidden == false })
         let status = await call(harness, "snapshot", ["include": ["status", "activity"]])["status"] as? [String: Any] ?? [:]
-        #expect(status["route"] as? String == "SSH tunnel to db.example.com")
+        #expect(status["route"] as? String == "Production · SSH tunnel to db.example.com", "its mark in words, then the route")
         #expect(status["server"] as? String == "MariaDB 11.8.3")
         #expect(status["transaction"] as? String == "Transaction open · 2 changes")
         #expect(status["activity"] as? String == "Exporting shop")

@@ -169,7 +169,7 @@ extension AppTests.AgentGateUITests {
             if let person { return text(await call(person, "snapshot", arguments)) }
             return text(await agentCall(service, "snapshot", arguments))
         }
-        #expect(await eventually(timeout: 5) { viewer.lines.count == 1 })
+        #expect(await eventually(timeout: 5) { !viewer.text.string.isEmpty })
         #expect(await sees(harness, in: "window:SQL Log").contains("Nordlicht"), "the person reads the log")
         #expect(await !sees(in: "window:SQL Log").contains("Nordlicht"), "no agent does")
 

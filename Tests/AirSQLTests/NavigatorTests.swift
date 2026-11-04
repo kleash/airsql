@@ -127,6 +127,149 @@ extension AppTests {
             #expect(open.snapshot.database("airsql_fixture")?.table("orders")?.columns.isEmpty == false)
         }
 
+        @Test func newOnAGroupMakesOneOfItsKindAndSaysWhyNotOtherwise() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let outline = main.sidebar.outline
+            let fixture = try #require(main.sidebar.treeNodes[.database(id, "airsql_fixture")])
+            outline.expandItem(fixture)
+            func select(_ kind: SidebarNode.Kind) throws {
+                let row = outline.row(forItem: try #require(main.sidebar.treeNodes[kind]))
+                outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            }
+            let new = Commands.createObject.item()
+
+            try select(.database(id, "airsql_fixture"))
+            #expect(main.validateEditorItem(new)?.enabled == false)
+            #expect(main.validateEditorItem(new)?.reason?.isEmpty == false)
+
+            try select(.category(id, "airsql_fixture", .view))
+            #expect(main.validateEditorItem(new)?.enabled == true)
+            main.createObject(new)
+            #expect(await eventually(timeout: 5) { main.selectedTab?.content is ObjectEditorController })
+
+            try select(.category(id, "airsql_fixture", .table))
+            main.createObject(new)
+            #expect(await eventually(timeout: 5) { main.selectedTab?.content is TableEditorController })
+        }
+
+        /// A click previews at once; arrow keys wait for the row they stop on.
+        @Test func arrowingThroughTheTreeReadsOnlyTheRowItStopsOn() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let outline = main.sidebar.outline
+            let first = try #require(open.snapshot.database("airsql_fixture")?.tables.map(\.name).sorted().first)
+            let start = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", first)))?.row)
+            outline.selectRowIndexes(IndexSet(integer: start), byExtendingSelection: false)
+            let shown = main.selectedTab?.title
+            #expect(shown != nil)
+            // The arrow as the run loop hands it over: the current event while the outline takes it.
+            let arrow = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                      windowNumber: main.window?.windowNumber ?? 0, context: nil,
+                                                      characters: "\u{F701}", charactersIgnoringModifiers: "\u{F701}",
+                                                      isARepeat: false, keyCode: 125))
+            for _ in 0..<2 {
+                NSApp.postEvent(arrow, atStart: true)
+                let event = try #require(NSApp.nextEvent(matching: .keyDown, until: .distantFuture, inMode: .default, dequeue: true))
+                outline.keyDown(with: event)
+            }
+            // The rest of the run's selections aren't arrow keys.
+            let other = try #require(NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0,
+                                                        windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0))
+            NSApp.postEvent(other, atStart: true)
+            _ = NSApp.nextEvent(matching: .applicationDefined, until: .distantFuture, inMode: .default, dequeue: true)
+            let stopped = try #require(outline.item(atRow: start + 2) as? SidebarNode)
+            #expect(outline.selectedRow == start + 2)
+            #expect(main.selectedTab?.title == shown, "nothing read yet")
+            guard case .object(_, let object) = stopped.kind else { throw AirSQLError(.other, "not an object") }
+            #expect(await eventually(timeout: 5) { main.selectedTab?.title == object.name })
+        }
+
+        @Test func theProcessListSortsFiltersAndHidesSleepers() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let list = ProcessListContent(open)
+            main.open(list, title: "Processes", connection: id)
+            _ = await eventually(timeout: 10) { !list.isRefreshing }
+            func process(_ id: UInt64, _ user: String, _ command: String, time: Int) -> ServerProcess {
+                ServerProcess(id: id, user: user, host: "h", database: nil, command: command, time: time, state: nil,
+                              info: command == "Sleep" ? nil : "SELECT \(id)", queryID: nil)
+            }
+            list.show([process(1, "ann", "Sleep", time: 900), process(2, "bob", "Query", time: 9),
+                       process(3, "cid", "Query", time: 100)])
+            list.table.selectRowIndexes(IndexSet(integer: 1), byExtendingSelection: false)
+
+            // Time compares as a number, and the header's first click puts the longest first.
+            let time = try #require(list.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("time")))
+            list.table.sortDescriptors = [try #require(time.sortDescriptorPrototype)]
+            #expect(list.processes.map(\.id) == [1, 3, 2])
+            #expect(list.selected.map(\.id) == [2], "the selection follows its row")
+
+            list.hideSleeping.state = .on
+            list.hideSleeping.sendAction(list.hideSleeping.action, to: list.hideSleeping.target)
+            #expect(list.processes.map(\.id) == [3, 2])
+            list.filter.stringValue = "SELECT 3"
+            list.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            #expect(list.processes.map(\.id) == [3])
+
+            list.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+            list.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("3\tcid\th") == true)
+        }
+
+        @Test func commandCCopiesTheNamesOfTheRowsSelected() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let copy = Commands.copy.item()
+            main.sidebar.select([id])
+            #expect(main.sidebar.validateMenuItem(copy))
+            main.sidebar.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string) == Fixtures.production.displayName)
+            let row = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders")))?.row)
+            main.sidebar.outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            main.sidebar.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string) == "`orders`")
+        }
+
+        @Test func quickOpenFindsTablesAndConnectionsByPartOfTheirName() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, harness) = appWindow(model)
+            _ = await openReplayed(model, id)
+            #expect(await call(harness, "menu", ["path": "File > Quick Open…"]).error == nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let sheet = try #require(main.window?.attachedSheet?.windowController as? QuickOpenSheet)
+            #expect(sheet.shown.contains { $0.place == "Connection" } && sheet.shown.contains { $0.name == "orders" })
+            sheet.field.stringValue = "ORDERS"
+            sheet.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+            #expect(sheet.shown.first?.name == "orders" && sheet.table.selectedRow == 0)
+            let editor = NSTextView()
+            #expect(sheet.control(sheet.field, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))))
+            #expect(await eventually(timeout: 5) { main.window?.attachedSheet == nil && main.tabs.contains { $0.title == "orders" } })
+            #expect(main.selectedTab?.content is TableDataController)
+        }
+
+        @Test func aDoubleClickOnADatabaseOpensItAndAnotherClosesIt() async throws {
+            let id = Fixtures.production.id
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let fixture = try #require(main.sidebar.treeNodes[.database(id, "airsql_fixture")])
+            main.sidebar.treeDoubleClicked(fixture)
+            #expect(await eventually(timeout: 5) { main.sidebar.outline.isItemExpanded(fixture) })
+            #expect(open.currentDatabase == "airsql_fixture")
+            main.sidebar.treeDoubleClicked(fixture)
+            #expect(await eventually(timeout: 5) { !main.sidebar.outline.isItemExpanded(fixture) })
+        }
+
         /// Every navigator screen and dialog, light and dark, at the window's smallest and usual size: every control says
         /// what it does, and nothing is cut, crosses a rounded edge or overlaps.
         @Test func everyScreenIsExplainedAndTidy() async throws {

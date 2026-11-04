@@ -10,11 +10,13 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
     private static var shown: SQLLogWindowController?
     let log: SQLLog
     private let filter = NSSearchField()
-    private let text: NSTextView
+    let text: NSTextView
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private(set) var lines: [String] = []
     private var offset: UInt64 = 0
     private var reading = false
+    /// The text must be made again from all the lines: the filter changed, or the file did.
+    private var needsRebuild = true
     private var timer: Timer?
     /// Lines kept on screen: the newest.
     static let lineLimit = 5_000
@@ -82,7 +84,9 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    /// Reads what was added to the file since the last read (all of it after it was cleared or started again).
+    /// Reads what was added to the file since the last read (all of it after it was cleared or started again) and adds
+    /// it to the text; nothing new leaves the text and its selection alone. One update at a time, colouring off the main
+    /// thread: a filter typed meanwhile is picked up as it ends.
     func refresh() {
         guard !reading else { return }
         reading = true
@@ -97,27 +101,59 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
                 try? handle.seek(toOffset: UInt64(max(0, start)))
                 return (handle.readDataToEndOfFile(), size)
             }.value
-            reading = false
-            if size < offset { lines = [] }
+            if size < offset {
+                lines = []
+                needsRebuild = true
+            }
             offset = size
-            guard !data.isEmpty else { return show() }
-            lines += String(decoding: data, as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
-            if lines.count > Self.lineLimit { lines.removeFirst(lines.count - Self.lineLimit) }
-            show()
+            var new = String(decoding: data, as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+            if new.count >= Self.lineLimit { needsRebuild = true }
+            lines += new
+            let dropped = Array(lines.prefix(max(0, lines.count - Self.lineLimit)))
+            lines.removeFirst(dropped.count)
+            repeat {
+                let rebuild = needsRebuild
+                needsRebuild = false
+                await show(rebuild ? nil : new, dropped: rebuild ? [] : dropped)
+                new = []
+            } while needsRebuild
+            reading = false
         }
     }
 
-    /// The lines that match the filter, coloured: the time and context grey, the statement as SQL.
-    private func show() {
+    /// `new`, coloured, goes after the lines shown and `dropped` leaves the top; `new` nil: all the lines, from the start.
+    private func show(_ new: [String]?, dropped: [String]) async {
         let words = filter.stringValue.lowercased().split(separator: " ").map(String.init)
-        let shown = words.isEmpty ? lines : lines.filter { line in words.allSatisfy { line.lowercased().contains($0) } }
+        let matches = { (line: String) in words.allSatisfy { line.lowercased().contains($0) } }
+        let matching = lines.filter(matches).count
         status.stringValue = lines.isEmpty ? "Nothing sent yet: statements show here once you connect"
-            : words.isEmpty ? "\(lines.count.formatted()) lines" : "\(shown.count.formatted()) of \(lines.count.formatted()) lines"
+            : words.isEmpty ? "\(lines.count.formatted()) lines" : "\(matching.formatted()) of \(lines.count.formatted()) lines"
         status.toolTip = status.stringValue  // whole, when a narrow window shortens it
+        let added = (new ?? lines).filter(matches)
+        guard new == nil || !added.isEmpty || !dropped.isEmpty else { return }
+        let coloured = await Task.detached { Coloured(text: Self.coloured(added)) }.value.text
+        guard let storage = text.textStorage else { return }
         let atEnd = text.enclosingScrollView.map { $0.documentVisibleRect.maxY >= text.bounds.maxY - 20 } ?? true
+        if new == nil {
+            storage.setAttributedString(coloured)
+        } else {
+            storage.append(coloured)
+            let string = storage.string as NSString
+            var end = 0
+            for _ in dropped.filter(matches) { end = NSMaxRange(string.lineRange(for: NSRange(location: end, length: 0))) }
+            storage.deleteCharacters(in: NSRange(location: 0, length: end))
+        }
+        if atEnd { text.scrollToEndOfDocument(nil) }
+    }
+
+    /// Handed over once by the task that made it, then only read.
+    private struct Coloured: @unchecked Sendable { let text: NSAttributedString }
+
+    /// The lines coloured: the time and context grey, the statement as SQL.
+    private nonisolated static func coloured(_ lines: [String]) -> NSAttributedString {
         let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
         let result = NSMutableAttributedString()
-        for line in shown {
+        for line in lines {
             // "2026-11-03 14:03:12.345 [Shop production main:12] SELECT …"
             let split = line.range(of: "] ").map { line.distance(from: line.startIndex, to: $0.upperBound) } ?? 0
             let head = String(line.prefix(split)), sql = String(line.dropFirst(split))
@@ -129,11 +165,13 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
             }
             result.append(NSAttributedString(string: "\n", attributes: [.font: font]))
         }
-        text.textStorage?.setAttributedString(result)
-        if atEnd { text.scrollToEndOfDocument(nil) }
+        return result
     }
 
-    func controlTextDidChange(_ notification: Notification) { show() }
+    func controlTextDidChange(_ notification: Notification) {
+        needsRebuild = true
+        refresh()
+    }
 
     @objc private func revealLog(_ sender: Any?) {
         NSWorkspace.shared.activateFileViewerSelecting([log.fileURL])

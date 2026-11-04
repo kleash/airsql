@@ -15,9 +15,10 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](editors.md));
-  **Create Table…** and **New…** make a table or object in the database you right-clicked.
+  **Create Table…** makes a table in the database you right-clicked; **New…** on a group (Tables, Views…) makes
+  another of its kind.
 - **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
-  open it. The console's statements run in the current database ([The SQL console](console.md)).
+  open it; double-click again to close it. The console's statements run in the current database ([The SQL console](console.md)).
 - **Right-click** anything for everything you can do with it. Every command is also in the **Database** menu.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
@@ -70,7 +71,9 @@ Upper and lower case match as the column's collation says (most ignore case).
 ## See what the server is running
 
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
-running, refreshed every 5 seconds (choose another interval, or Off). Double-click a row to read its whole statement.
+running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
+with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
+idle connections. Double-click a row to read its whole statement.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.

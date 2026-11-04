@@ -51,7 +51,7 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     /// A single click shows the row in the preview tab: a database's tables, a table's rows, an object's definition.
-    func showSelectedObject() {
+    @objc func showSelectedObject() {
         guard let main, let (open, nodes) = treeSelection, nodes.count == 1 else { return }
         switch nodes[0].kind {
         case .database(_, let name):
@@ -64,12 +64,13 @@ extension SidebarController: NSMenuItemValidation {
         }
     }
 
-    /// A double-click makes a database current and opens it, opens or closes a group, opens an object in its own tab.
+    /// A double-click makes a database current and opens or closes it, opens or closes a group, opens an object in its
+    /// own tab.
     func treeDoubleClicked(_ node: SidebarNode) {
         switch node.kind {
         case .database(let id, let name):
             model.openConnection(id)?.currentDatabase = name
-            outline.expandItem(node)
+            fallthrough
         case .category:
             if outline.isItemExpanded(node) { outline.animator().collapseItem(node) } else { outline.animator().expandItem(node) }
         case .object(_, let object):
@@ -131,8 +132,16 @@ extension SidebarController: NSMenuItemValidation {
         NavigatorActions.runRoutine(routine, on: open, main: main)
     }
 
-    @objc func copyName(_ sender: Any?) {
-        let names = selectedNodes.compactMap(\.quotedName)
+    @objc func copyName(_ sender: Any?) { put(selectedNodes.compactMap(\.quotedName)) }
+
+    /// ⌘C: the names of the rows selected, connections' too.
+    @objc func copy(_ sender: Any?) { put(copyableNames) }
+
+    private var copyableNames: [String] {
+        selectedNodes.compactMap { $0.quotedName ?? model.connection($0.connectionID)?.displayName }
+    }
+
+    private func put(_ names: [String]) {
         guard !names.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(names.joined(separator: ", "), forType: .string)
@@ -240,6 +249,8 @@ extension SidebarController: NSMenuItemValidation {
         case Commands.refresh.action?:
             let open = selection != nil || selectedConnectionIDs.contains { model.openConnection($0) != nil }
             reason = open ? nil : "Select a connected connection or something in its tree first"
+        case Commands.copy.action?:
+            reason = copyableNames.isEmpty ? "Select a connection, database or object first" : nil
         case Commands.expandAll.action?, Commands.collapseAll.action?:
             reason = selectedNodes.contains { !$0.children.isEmpty } ? nil : "Select a row that has rows under it first"
         case Commands.renameF2.action? where selectedFolderNodeID != nil:

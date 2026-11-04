@@ -56,6 +56,8 @@ final class TableDataController: NSViewController, TabContent {
     var dataLength: Int?
     /// A load under way (a page, Load All, Refresh, Apply): one at a time.
     var loading: Task<Void, Never>?
+    /// The preview tab moved on while this was opening: its rows aren't read.
+    var abandoned = false
     /// The data session's NO_BACKSLASH_ESCAPES, as filters quote their values for it (read at each load).
     var noBackslashEscapes = false
     /// The data session's sql_mode and time zone, which decide what a value may be (read with the first page).
@@ -171,7 +173,7 @@ final class TableDataController: NSViewController, TabContent {
                 updateBars()
             }
             loading = nil
-            guard let source else { return }
+            guard let source, !abandoned else { return }
             // A saved filter the read-only check refuses stays in the bar, unused, and no rows load until it changes.
             if refusesOnReadOnly(source) {
                 source.filter = ""
@@ -398,6 +400,14 @@ final class TableDataController: NSViewController, TabContent {
 
     var isEdited: Bool { source?.changes.isEmpty == false }
     var statusAccessory: NSView? { viewer.status }
+
+    var reopen: ((MainWindowController) -> Void)? {
+        let (table, database, connection) = (tableName, database, context.connection)
+        return { main in
+            guard let context = Editors.context(connection, in: main.model) else { return NSSound.beep() }
+            main.openTableData(table, database: database, context: context)
+        }
+    }
 
     func shouldClose(_ answer: @escaping (Bool) -> Void) {
         guard let source, !source.changes.isEmpty, model.data.safety(for: context.connection).warnOnClose,

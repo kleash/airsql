@@ -315,6 +315,19 @@ extension AppTests {
             log.statement("SELECT 2", context: "Shop main:3", noBackslashEscapes: false)
             viewer.refresh()
             #expect(await eventually(timeout: 5) { viewer.lines.count == 3 }, "follows what is added")
+            // A selection outlives the reads, and lines that come after it.
+            let textView = viewer.text
+            #expect(await eventually(timeout: 5) { textView.string.contains("SELECT 2") })
+            let selected = NSRange(location: 3, length: 12)
+            textView.setSelectedRange(selected)
+            viewer.refresh()
+            log.statement("SELECT 3", context: "Shop main:4", noBackslashEscapes: false)
+            #expect(await eventually(timeout: 5) {
+                viewer.refresh()
+                return textView.string.contains("SELECT 3")
+            })
+            #expect(textView.selectedRange() == selected)
+            #expect(textView.string.components(separatedBy: "\n").count == 5, "each line once")
             SQLLogWindowController.clear(log)
             #expect(await eventually(timeout: 5) { !FileManager.default.fileExists(atPath: log.fileURL.path) })
             viewer.refresh()
@@ -593,5 +606,81 @@ extension AppTests {
             _ = try await setup.query("DROP DATABASE \(database)")
             await connection.disconnect()
         }
+    }
+}
+
+// Closing several tabs, and the middle button on a tab.
+extension AppTests.ConsoleAppTests {
+    /// A middle-button release, as the mouse sends it.
+    @MainActor static func middleClick() throws -> NSEvent {
+        let event = CGEvent(mouseEventSource: nil, mouseType: .otherMouseUp, mouseCursorPosition: .zero, mouseButton: .center)
+        return try #require(event.flatMap(NSEvent.init(cgEvent:)))
+    }
+
+    @Test func closeAllTabsAsksAboutEachTabInTurnAndCancelKeepsTheRest() async throws {
+        let (main, harness, first) = try await Self.console()
+        first.editor.string = "SELECT 1;"
+        _ = await call(harness, "menu", ["path": "File > New Query"])
+        let second = try #require(main.selectedTab?.content as? ConsoleViewController)
+        second.editor.string = "SELECT 2;"
+        _ = await call(harness, "menu", ["path": "File > New Query"])
+        #expect(main.tabs.count == 3)
+
+        main.closeAllTabs(nil)
+        // The first tab isn't the one shown when the command comes, and is still asked about, on show.
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        #expect(main.selectedTab?.content === first)
+        _ = await call(harness, "press", ["title": "Don't Save"])
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        #expect(main.selectedTab?.content === second && main.tabs.count == 2)
+        _ = await call(harness, "press", ["title": "Cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(main.tabs.count == 2 && main.selectedTab?.content === second)
+
+        second.editor.string = ""
+        main.closeAllTabs(nil)
+        #expect(await eventually(timeout: 5) { main.tabs.isEmpty })
+    }
+
+    @Test func reopenClosedTabBringsBackAConsolesTextUnderItsName() async throws {
+        let (main, harness, console) = try await Self.console()
+        console.editor.string = "SELECT 'lost';"
+        let title = main.selectedTab?.title
+        main.closeTab(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["title": "Don't Save"])
+        #expect(await eventually(timeout: 5) { main.tabs.isEmpty })
+        main.reopenClosedTab(nil)
+        let back = try #require(main.selectedTab?.content as? ConsoleViewController)
+        #expect(back !== console && back.text == "SELECT 'lost';" && main.selectedTab?.title == title)
+        back.editor.string = ""
+        #expect(!main.validateMenuItem(Commands.reopenClosedTab.item()), "the list is empty again")
+    }
+
+    @Test func theMiddleButtonClosesATabNotShownAfterAskingAndTheOneShownStays() async throws {
+        let (main, harness, first) = try await Self.console()
+        first.editor.string = "SELECT 1;"
+        _ = await call(harness, "menu", ["path": "File > New Query"])
+        let shown = try #require(main.selectedTab)
+        let button = try #require(main.tabBar.buttons.first { $0.tab?.content === first })
+        button.otherMouseUp(with: try Self.middleClick())
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        _ = await call(harness, "press", ["title": "Don't Save"])
+        #expect(await eventually(timeout: 5) { main.tabs.count == 1 })
+        #expect(main.selectedTab === shown)
+    }
+
+    @Test func theMiddleButtonClosesAResultButNotMessages() async throws {
+        let (_, _, console) = try await Self.console()
+        console.addResult(ConsoleFixtures.customers(rows: 1), title: "Kept", summary: "")
+        console.addResult(ConsoleFixtures.customers(rows: 1), title: "Gone", summary: "")
+        let tab = try #require(console.resultTabs.last)
+        console.selectResult(tab)
+        let button = try #require(console.results.tabButton(for: tab))
+        button.otherMouseUp(with: try Self.middleClick())
+        #expect(console.resultTabs.count == 1 && !console.resultTabs.contains { $0 === tab })
+        let messages = try #require(console.results.tabButton(for: console.messagesTab))
+        messages.otherMouseUp(with: try Self.middleClick())
+        #expect(console.resultTabs.count == 1 && !console.resultTabs.contains { $0 === tab })
     }
 }

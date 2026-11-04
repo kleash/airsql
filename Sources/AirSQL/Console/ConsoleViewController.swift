@@ -271,6 +271,13 @@ final class ConsoleViewController: NSViewController, TabContent {
         ConsoleViewController(model: model, connection: connectionID, text: text)
     }
 
+    var reopen: ((MainWindowController) -> Void)? {
+        if let fileURL { return { $0.openFiles([fileURL]) } }
+        guard let copy = duplicate() else { return nil }
+        let title = tab?.title ?? "Query", connection = connectionID
+        return { $0.open(copy, title: title, connection: connection) }
+    }
+
     var transactionBadge: String? {
         guard let session, session.inTransaction else { return nil }
         var badge = "Transaction open"
