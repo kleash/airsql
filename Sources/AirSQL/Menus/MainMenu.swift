@@ -141,6 +141,10 @@ enum ConnectionMenus {
         return MainMenu.submenu("Colour", items)
     }
 
+    static func moveMenu() -> NSMenuItem {
+        MainMenu.submenu("Move to Folder", [], delegate: MoveToFolderMenu.shared)
+    }
+
     /// An 8 pt dot of `color` for a menu item.
     static func dotImage(_ color: NSColor) -> NSImage {
         NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
@@ -148,5 +152,24 @@ enum ConnectionMenus {
             NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
             return true
         }
+    }
+}
+
+/// Connection ▸ Move to Folder: the folders, made as the menu opens.
+@MainActor
+final class MoveToFolderMenu: NSObject, NSMenuDelegate {
+    static let shared = MoveToFolderMenu()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        menu.addItem(Commands.moveToFolder.item())
+        let main = NSApp.target(forAction: Commands.moveToFolder.action, to: nil, from: nil) as? MainWindowController
+        for folder in main?.model.data.folders.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) ?? [] {
+            let item = Commands.moveToFolder.item()
+            item.title = folder.name
+            item.representedObject = folder.id
+            menu.addItem(item)
+        }
+        menu.add([nil, Commands.newFolder])
     }
 }

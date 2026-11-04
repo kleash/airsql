@@ -335,8 +335,11 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     }
 
     func contextMenu() -> NSMenu? {
-        guard !selected.isEmpty else { return nil }
         let menu = NSMenu(title: "Process")
+        guard !selected.isEmpty else {
+            menu.add([Commands.refresh])
+            return menu
+        }
         menu.add([Commands.killQuery, Commands.killConnection, nil, Commands.copyQuery, Commands.explain])
         return menu
     }
@@ -367,10 +370,23 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     }
 }
 
-/// The process list: a right-click selects the row under the pointer first and opens the process menu.
+/// The process list: a right-click selects the row under the pointer first and opens the process menu; Return shows the
+/// query, Delete offers to stop it (the connection, when it isn't running one).
 @MainActor
 final class ProcessTableView: NSTableView {
     weak var owner: ProcessListContent?
 
-    override func menu(for event: NSEvent) -> NSMenu? { selectsRow(for: event) ? owner?.contextMenu() : nil }
+    override func menu(for event: NSEvent) -> NSMenu? {
+        if !selectsRow(for: event) { deselectAll(nil) }
+        return owner?.contextMenu()
+    }
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 36, 76: owner?.showQuery(self)
+        case 51, 117:
+            if owner?.selected.contains(where: { $0.info != nil }) == true { owner?.killQuery(self) } else { owner?.killConnection(self) }
+        default: super.keyDown(with: event)
+        }
+    }
 }

@@ -103,7 +103,7 @@ extension AppTests {
                             && main.model.states[Fixtures.production.id] == .connected(server: "MariaDB 11.8.3")
                     },
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
-                           "Compare…", "Colour", "Delete…"],
+                           "Compare…", "Colour", "Move to Folder", "Delete…"],
                     enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour",
                               "Delete…"]),
             Surface(name: "Folder in the sidebar",

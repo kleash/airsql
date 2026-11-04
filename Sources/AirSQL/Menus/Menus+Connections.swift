@@ -9,5 +9,6 @@ extension MainMenu {
         menus.file.insertItem(Commands.importConnections.item(), at: 3)
         menus.file.insertItem(Commands.exportConnections.item(), at: 4)
         menus.connection.add([nil, Commands.newFolder, Commands.renameFolder, Commands.deleteFolder])
+        menus.connection.addItem(ConnectionMenus.moveMenu())
     }
 }

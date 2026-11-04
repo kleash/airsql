@@ -47,7 +47,7 @@ enum NavigatorActions {
             return tableLike.isEmpty ? "Select a table or view in the tree first" : nil
         case Commands.openObject.action?:
             return objects.contains { !$0.kind.isTableLike } ? nil : "Select a routine, trigger or event first"
-        case Commands.copyName.action?:
+        case Commands.copyName.action?, Commands.copyPlainName.action?:
             return objects.isEmpty && databases.isEmpty ? "Select a database or object first" : nil
         case Commands.copyCreate.action?:
             return objects.count == 1 ? nil : "Select one object first"

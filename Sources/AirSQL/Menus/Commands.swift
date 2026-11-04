@@ -175,6 +175,8 @@ import AppKit
     @objc optional func newFolder(_ sender: Any?)
     @objc optional func renameFolder(_ sender: Any?)
     @objc optional func deleteFolder(_ sender: Any?)
+    @objc optional func moveToFolder(_ sender: Any?)
+    @objc optional func copyPlainName(_ sender: Any?)
 
     // Tools
     @objc optional func exportDatabase(_ sender: Any?)
@@ -343,6 +345,8 @@ enum Commands {
     static let shrinkSelection = Command("Shrink Selection", #selector(AirSQLActions.shrinkSelection(_:)), down, .option,
                                          tip: "Shrink the grid's selection back: everything, the row, the column, the cell")
     static let copyName = Command("Copy Name", #selector(AirSQLActions.copyName(_:)), tip: "Copy the selected object's name, quoted for SQL")
+    static let copyPlainName = Command("Copy Name Without Quotes", #selector(AirSQLActions.copyPlainName(_:)),
+                                       tip: "Copy the selected object's name as it is, for chat or code")
     static let copyColumnName = Command("Copy Column Name", #selector(AirSQLActions.copyColumnNames(_:)),
                                         tip: "Copy the name of the selected column")
     static let copyCreate = Command("Copy CREATE", #selector(AirSQLActions.copyCreateStatement(_:)),
@@ -631,6 +635,8 @@ enum Commands {
                                    tip: "Make a sidebar folder for connections; the selected connections move into it")
     static let renameFolder = Command("Rename Folder…", #selector(AirSQLActions.renameFolder(_:)),
                                       tip: "Give the selected sidebar folder another name (F2)")
+    static let moveToFolder = Command("No Folder", #selector(AirSQLActions.moveToFolder(_:)),
+                                      tip: "Move the selected connections here")
     static let deleteFolder = Command("Delete Folder…", #selector(AirSQLActions.deleteFolder(_:)),
                                       tip: "Remove the selected folder; its connections stay, outside any folder")
 
@@ -698,7 +704,7 @@ enum Commands {
         newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
         runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
-        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyColumnName, copyCreate,
+        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
@@ -715,7 +721,7 @@ enum Commands {
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
         killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
-        renameFolder, deleteFolder,
+        renameFolder, deleteFolder, moveToFolder,
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, mainWindow, bringAllToFront, tab(1),
@@ -736,6 +742,7 @@ enum Commands {
 
     /// Menu items that only open a submenu, by title.
     static let submenus: [String: String] = [
+        "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",
         "Copy As": "Copy the selected cells as TSV, CSV, Markdown, JSON, SQL and more",

@@ -231,7 +231,12 @@ final class AgentServer {
         }
         chain.append(NSApp)
         if let delegate = NSApp.delegate { chain.append(delegate) }
-        return chain.first { $0.responds(to: action) }
+        // As AppKit walks it: a responder that can't do it may name another that can.
+        for responder in chain {
+            if responder.responds(to: action) { return responder }
+            if let extra = (responder as? NSResponder)?.supplementalTarget(forAction: action, sender: nil) { return extra as AnyObject }
+        }
+        return nil
     }
 
     // MARK: Buttons and fields

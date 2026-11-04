@@ -90,6 +90,15 @@ final class AppModel: ObservableObject {
         return result
     }
 
+    /// Puts these connections in a folder (nil: outside any).
+    func move(_ ids: [UUID], toFolder folder: UUID?) {
+        for id in ids {
+            guard var connection = connection(id), connection.folderID != folder else { continue }
+            connection.folderID = folder
+            save(connection)
+        }
+    }
+
     /// A copy of a connection named "<name> copy", with its saved passwords (the database's, its SSH hosts', its
     /// proxy's), saved after it.
     @discardableResult
