@@ -1634,7 +1634,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Equal to Selection | ⌃⌘1 |
 | Not Equal to Selection | ⌃⌘2 |
 | Go to Row… | ⌘L |
-| Move Up, Move Down (table editor) | ⇧⌘↑, ⇧⌘↓ |
+| Move Up | ⇧⌘↑ |
+| Move Down | ⇧⌘↓ |
 | Related Rows | ⌃⌘↓ |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
