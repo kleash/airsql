@@ -161,6 +161,27 @@ extension AppTests {
             #expect(second.editor.undoManager?.canUndo == false && first.editor.undoManager?.canUndo == true)
         }
 
+        /// A long server error shows whole, wrapped at the column's width, and its text can be selected.
+        @Test func messagesShowTheWholeText() async throws {
+            let (_, _, console) = try await Self.console()
+            let view = console.messagesView
+            view.frame = NSRect(x: 0, y: 0, width: 700, height: 300)
+            let long = String(repeating: "You have an error in your SQL syntax near here. ", count: 40)
+            view.append(ConsoleMessage(level: .ok, range: nil, line: nil, statement: "", text: "Done"))
+            view.append(ConsoleMessage(level: .error, range: nil, line: 1, statement: "SELECT", text: long))
+            #expect(view.tableView(view.table, heightOfRow: 0) == view.table.rowHeight)
+            let tall = view.tableView(view.table, heightOfRow: 1)
+            let column = try #require(view.table.tableColumns.last)
+            let field = try #require(view.tableView(view.table, viewFor: column, row: 1) as? NSTextField)
+            #expect(field.stringValue == long && field.isSelectable && field.lineBreakMode == .byWordWrapping)
+            field.frame.size.width = column.width
+            #expect(tall >= field.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: column.width, height: 100_000)).height)
+            // Narrower, it takes more lines.
+            column.width /= 2
+            view.tableViewColumnDidResize(Notification(name: NSTableView.columnDidResizeNotification))
+            #expect(view.tableView(view.table, heightOfRow: 1) > tall)
+        }
+
         @Test func schemaChangesAreToldApart() {
             #expect(ConsoleViewController.changesSchema("/* new */ create table t (id int)"))
             #expect(ConsoleViewController.changesSchema("DROP VIEW v") && ConsoleViewController.changesSchema("rename table a to b"))
