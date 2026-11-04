@@ -27,8 +27,9 @@ extension AppTests {
         /// A window launched on `window`'s saved tabs.
         private static func relaunched(_ model: AppModel, _ window: SavedWindow, in url: URL) async throws
             -> (MainWindowController, AgentServer) {
-            try ConsoleTabStore.save(window, to: url)
             let (main, harness) = appWindow(model)
+            ConsoleDocuments.shared.saveNow()  // a save still due from the last test would overwrite the file below
+            try ConsoleTabStore.save(window, to: url)
             ConsoleDocuments.shared.restore(into: main)
             await ConsoleDocuments.shared.restoring?.value
             return (main, harness)
