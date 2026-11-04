@@ -73,8 +73,13 @@ extension SidebarController: NSMenuItemValidation {
             fallthrough
         case .category:
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
-        case .object(_, let object):
+        case .object(let id, let object):
+            // The double-click's first click showed it in the preview: its own tab takes over, leaving no second copy.
+            let preview = main?.tabs.first {
+                $0.content is PreviewContent && $0.tabContent?.isEdited == false && $0.title == object.name && $0.connectionID == id
+            }
             if object.kind.isTableLike { openData(nil) } else { openObject(nil) }
+            if let preview { main?.close(preview) }
         default:
             break
         }

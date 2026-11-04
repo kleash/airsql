@@ -89,15 +89,17 @@ extension AppTests {
             view.reload()
             #expect(view.rows.count == 8)
             #expect(main.selectedTab?.title == "airsql_fixture")
-            // A click on a table shows it in the same tab; a double-click opens a tab of its own.
+            // A click on a table shows it in the same tab; a double-click gives it a tab of its own.
             let orders = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders"))))
             _ = await call(harness, "click", ["x": orders.point.0, "y": orders.point.1])
             #expect(main.tabs.count == 1 && main.selectedTab?.title == "orders")
             _ = await call(harness, "click", ["x": orders.point.0, "y": orders.point.1, "count": 2])
-            #expect(main.tabs.count == 2 && main.selectedTab?.content is TableDataController)
+            // It takes over from the preview: no second tab of the same table.
+            #expect(await eventually(timeout: 5) { main.tabs.count == 1 })
+            #expect(main.selectedTab?.content is TableDataController)
             // Open Data on the same table shows that tab again.
             main.sidebar.openData(nil)
-            #expect(main.tabs.count == 2 && main.selectedTab?.content is TableDataController)
+            #expect(main.tabs.count == 1 && main.selectedTab?.content is TableDataController)
         }
 
         @Test func theDatabaseViewsColumnsFitTheWindowAtItsDefaultSize() async throws {
