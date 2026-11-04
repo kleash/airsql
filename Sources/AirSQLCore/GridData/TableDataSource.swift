@@ -75,10 +75,12 @@ public final class TableDataSource: GridSource {
     }
 
     /// The SELECT of `limit` rows from `offset` (no limit: nil): every column by name (invisible ones too), the filter,
-    /// and the sort, else the key's order, so pages follow one another.
+    /// and the sort, then the key for rows the sort leaves equal, so pages follow one another without repeating or
+    /// missing a row. The key goes the way of the sort's last column: an index on that column still serves both.
     public func pageSQL(offset: Int, limit: Int?) -> String {
         var sql = "SELECT " + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") + from
-        let order = sort.isEmpty ? (key ?? []).map { TableViewSettings.SortKey(column: columns[$0].name, ascending: true) } : sort
+        let ties = (key ?? []).map { columns[$0].name }.filter { name in !sort.contains { $0.column == name } }
+        let order = sort + ties.map { TableViewSettings.SortKey(column: $0, ascending: sort.last?.ascending ?? true) }
         if !order.isEmpty { sql += " ORDER BY " + GridSorting.orderBy(order) }
         if let limit { sql += " LIMIT \(limit)" }
         if offset > 0 { sql += (limit == nil ? " LIMIT 18446744073709551615" : "") + " OFFSET \(offset)" }

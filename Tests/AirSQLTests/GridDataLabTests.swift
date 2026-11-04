@@ -197,6 +197,25 @@ struct GridDataLabTests {
         }
     }
 
+    /// Pages of a sort with many equal values follow one another: the key breaks the ties (MySQL 8.4 repeated and
+    /// missed rows without it).
+    @Test(arguments: servers)
+    func sortedPagesNeitherRepeatNorMissARow(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let cache = SchemaCache(source: session, includes: { $0 == Lab.fixture })
+        try await cache.load()
+        let source = TableDataSource(database: Lab.fixture, table: try #require(cache.snapshot.table(Lab.fixture, "big")))
+        for ascending in [true, false] {
+            source.sort = [.init(column: "flag", ascending: ascending)]
+            var seen = Set<String?>()
+            for page in 0..<3 {
+                for row in try await rows(source.pageSQL(offset: page * 1_000, limit: 1_000), on: session) { seen.insert(row[0]) }
+            }
+            #expect(seen.count == 3_000)
+        }
+        await session.close()
+    }
+
     @Test(arguments: servers)
     func binaryAndCompositeKeysAddressTheirRows(_ server: Lab.Server) async throws {
         try await withTables(server) { session, snapshot in

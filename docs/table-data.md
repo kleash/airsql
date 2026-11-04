@@ -49,9 +49,10 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
   to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
-  and the minus takes it away. Rows sort on the server. On a table of over a million rows, sorting by a column without
-  an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the loaded rows sort here
-  instead.
+  and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
+  repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting
+  by a column without an index asks first (**Settings ▸ Safety**, on at first). With **Loaded rows only** ticked, the
+  loaded rows sort here instead.
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
