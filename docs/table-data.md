@@ -136,11 +136,18 @@ says why; so are views. Generated columns can't be edited.
 ## Apply changes
 
 - **Data ▸ Apply Changes** (⌘S) writes every pending change in one transaction on the data session: deletes first (in
-  batches of 500), then edits, then new rows. Each statement must change exactly its rows. If one changes another
-  number (someone else changed or deleted the row since it was loaded) or the server refuses one, everything is rolled
-  back, nothing is applied, and the grid selects the row; when the server's error names a column ("Data too long for
-  column 'note'", "Column 'name' cannot be null", a duplicate value of a unique key), it selects that cell. Reload the
-  row, or fix the value, then apply again.
+  batches of 500), then edits, then new rows. Each edit's `UPDATE` names the row by its key and the edited cells by the
+  values you loaded (`` `price` <=> 10 ``), and each statement must change exactly its rows. If one changes another
+  number (someone else changed a cell you edited, or deleted the row, since it was loaded) or the server refuses one,
+  everything is rolled back, nothing is applied, and the grid selects the row; when the server's error names a column
+  ("Data too long for column 'note'", "Column 'name' cannot be null", a duplicate value of a unique key), it selects
+  that cell. Fix the value and apply again; if someone else got there first, revert the change, reload the rows and
+  make it again. Changes kept over a restart are checked the same way.
+- What Apply can't check: FLOAT, TIMESTAMP, JSON, spatial and vector values, dates with a zero month or day and values
+  over 64 KB don't compare exactly, so edits to those go by the key alone and overwrite what is there; the preview
+  names them. A change that only differs in case or trailing spaces can pass on a column whose collation ignores
+  those. Rows to delete go by their key: someone else's change to a row doesn't stop its delete, and neither does a
+  change to a column you didn't edit stop your edit.
 - **Preview SQL…** shows the statements first, in the [SQL preview](sql-preview.md). The preview also comes first on
   connections where **Settings ▸ Safety ▸ Show the SQL before the grid's Apply** is on (every Production connection),
   and whenever there is a warning: a table on MyISAM, Aria, MEMORY or another engine that can't roll back, or deletes

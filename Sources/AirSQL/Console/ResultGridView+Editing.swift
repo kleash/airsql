@@ -238,8 +238,7 @@ extension ResultGridView {
         }
         let count = edits.pendingRows
         var request = SQLPreviewRequest(change: change, heading: "Apply \(count) \(count == 1 ? "change" : "changes") to \(names)?",
-                                        caption: "They run in one transaction. If a row was changed or deleted by someone else since "
-                                            + "the query read it, nothing is applied.")
+                                        caption: TableEditing.applyCaption(reading: "the query read it", unchecked: edits.uncheckedColumns))
         request.warnings = warnings
         request.destructive = edits.changes.contains { !$0.state.deletes.isEmpty }
         request.noBackslashEscapes = values.noBackslashEscapes

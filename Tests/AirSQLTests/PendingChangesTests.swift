@@ -6,7 +6,7 @@ import Testing
 /// the rows each must change, the rollback when one changes another number, which tables can be edited, and the copy
 /// kept on disk for a crash.
 struct PendingChangesTests {
-    static let columns = [GridColumn(name: "id", type: "int", kind: .number, isKey: true), GridColumn(name: "name"),
+    static let columns = [GridColumn(name: "id", type: "int", kind: .number, isKey: true), GridColumn(name: "name", type: "varchar(20)"),
                           GridColumn(name: "price", type: "decimal", kind: .number)]
 
     func sql(_ changes: PendingChanges, noBackslashEscapes: Bool = false) throws -> [String] {
@@ -25,8 +25,8 @@ struct PendingChangesTests {
         let statements = try changes.statements(database: "shop", table: "items", columns: Self.columns, noBackslashEscapes: false)
         #expect(statements.map(\.sql) == [
             "DELETE FROM `shop`.`items` WHERE `id` IN (5, 7)",
-            "UPDATE `shop`.`items` SET `name` = NULL WHERE `id` = 1",
-            "UPDATE `shop`.`items` SET `name` = 'Bob', `price` = 9.90 WHERE `id` = 2",
+            "UPDATE `shop`.`items` SET `name` = NULL WHERE `id` = 1 AND `name` <=> 'Ann'",
+            "UPDATE `shop`.`items` SET `name` = 'Bob', `price` = 9.90 WHERE `id` = 2 AND `name` <=> 'Bo' AND `price` <=> 9",
             "INSERT INTO `shop`.`items` (`name`, `price`) VALUES ('Cy', DEFAULT)",
             "INSERT INTO `shop`.`items` () VALUES ()",
         ])
@@ -73,6 +73,57 @@ struct PendingChangesTests {
         #expect(changes.isDeleted(["1"]))
     }
 
+    @Test func editsNameTheValueTheyReplaceWhereItComparesExactly() throws {
+        let columns = [GridColumn(name: "id", type: "int", kind: .number), GridColumn(name: "note", type: "text"),
+                       GridColumn(name: "ratio", type: "float", kind: .number), GridColumn(name: "rate", type: "double", kind: .number),
+                       GridColumn(name: "at", type: "timestamp(3)", kind: .date), GridColumn(name: "day", type: "date", kind: .date),
+                       GridColumn(name: "doc", type: "json", kind: .json), GridColumn(name: "spot", type: "point", kind: .binary),
+                       GridColumn(name: "pic", type: "blob", kind: .binary)]
+        func update(_ column: String, original: String?) throws -> (sql: String, unchecked: [String]) {
+            var changes = PendingChanges(keyColumns: ["id"])
+            changes.set(.text("0"), column: column, key: ["1"], original: original)
+            let sql = try changes.statements(database: "d", table: "t", columns: columns, noBackslashEscapes: false)[0].sql
+            return (sql, changes.uncheckedColumns(columns))
+        }
+        #expect(try update("rate", original: "0.1").sql.hasSuffix("WHERE `id` = 1 AND `rate` <=> 0.1"))
+        #expect(try update("pic", original: "0x00FF").sql.hasSuffix("AND `pic` <=> X'00FF'"))
+        #expect(try update("day", original: "2024-02-10").sql.hasSuffix("AND `day` <=> '2024-02-10'"))
+        for (column, value) in [("ratio", "0.1"), ("at", "2024-01-01 00:00:00.000"), ("doc", "{}"), ("spot", "0x00"),
+                                ("day", "0000-00-00"), ("day", "2024-02-00")] {
+            let unchecked = try update(column, original: value)
+            #expect(unchecked.sql.hasSuffix("WHERE `id` = 1") && unchecked.unchecked == [column])
+            // NULL compares in any column.
+            #expect(try update(column, original: nil).sql.hasSuffix("AND `\(column)` <=> NULL"))
+        }
+        let long = try update("note", original: String(repeating: "x", count: PendingChanges.originalLimit + 1))
+        #expect(long.sql.hasSuffix("WHERE `id` = 1") && long.unchecked == ["note"])
+
+        // A key's edit is checked by the key; the first edit's original stands; going back to it forgets it.
+        var changes = PendingChanges(keyColumns: ["id"])
+        changes.set(.text("2"), column: "id", key: ["1"], original: "1")
+        changes.set(.text("a"), column: "note", key: ["1"], original: "was")
+        changes.set(.text("b"), column: "note", key: ["1"], original: "reloaded")
+        #expect(try changes.statements(database: "d", table: "t", columns: columns, noBackslashEscapes: false)[0].sql
+                == "UPDATE `d`.`t` SET `id` = 2, `note` = 'b' WHERE `id` = 1 AND `note` <=> 'was'")
+        #expect(changes.uncheckedColumns(columns).isEmpty)
+        changes.set(.text("reloaded"), column: "note", key: ["1"], original: "reloaded")
+        #expect(changes.state.originals[["1"]]?["note"] == nil)
+        changes.revert([["1"]])
+        #expect(changes.state.originals.isEmpty)
+    }
+
+    @Test func savedChangesKeepWhatTheyReplaceAndOldOnesStillLoad() throws {
+        var changes = PendingChanges(keyColumns: ["id"])
+        changes.set(.text("a"), column: "name", key: ["1"], original: nil)
+        let state = try JSONDecoder().decode(PendingChanges.State.self, from: JSONEncoder().encode(changes.state))
+        #expect(state == changes.state && state.originals[["1"]]?["name"] == .null)
+        // 1.0.0's file: nothing to compare with, so its edits go by the key and the preview says so.
+        let old = try JSONDecoder().decode(PendingChanges.State.self, from: Data(#"{"edits":[["1"],{"name":{"text":{"_0":"a"}}}],"inserts":[],"deletes":[]}"#.utf8))
+        let restored = PendingChanges(keyColumns: ["id"], state: old)
+        #expect(try sql(restored) == ["UPDATE `shop`.`items` SET `name` = 'a' WHERE `id` = 1"])
+        #expect(restored.uncheckedColumns(Self.columns) == ["name"])
+    }
+
     @Test func compositeKeysAndBatchesOfFiveHundred() throws {
         var changes = PendingChanges(keyColumns: ["shop", "sku"])
         changes.delete((0..<1_001).map { ["1", String(format: "s%04d", $0)] })
@@ -81,7 +132,7 @@ struct PendingChangesTests {
                                             noBackslashEscapes: false)
         #expect(statements.map(\.expectedRows) == [500, 500, 1, 1])
         #expect(statements[0].sql.hasPrefix("DELETE FROM `db`.`t` WHERE (`shop`, `sku`) IN ((1, 's0000'), (1, 's0001'), "))
-        #expect(statements[3].sql == "UPDATE `db`.`t` SET `name` = 'x' WHERE `shop` = 2 AND `sku` = 'it\\'s'")
+        #expect(statements[3].sql == "UPDATE `db`.`t` SET `name` = 'x' WHERE `shop` = 2 AND `sku` = 'it\\'s' AND `name` <=> NULL")
     }
 
     @Test(arguments: [false, true])
@@ -111,7 +162,7 @@ struct PendingChangesTests {
         let failure = await #expect(throws: ApplyFailure.self) {
             try await PendingChanges.apply(statements) { sql in
                 ran.append(sql)
-                return sql.hasSuffix("= 2") ? 0 : 1
+                return sql.contains("`id` = 2") ? 0 : 1
             }
         }
         #expect(ran == ["START TRANSACTION"] + statements.map(\.sql) + ["ROLLBACK"])

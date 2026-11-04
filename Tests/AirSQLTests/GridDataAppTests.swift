@@ -162,7 +162,7 @@ extension AppTests {
             await ready { tab.loading != nil }
             #expect(session.statements.suffix(6).first == "START TRANSACTION")
             #expect(session.statements.contains("DELETE FROM `airsql_fixture`.`orders` WHERE `id` IN (3)"))
-            #expect(session.statements.contains("UPDATE `airsql_fixture`.`orders` SET `total` = 5 WHERE `id` = 1"))
+            #expect(session.statements.contains("UPDATE `airsql_fixture`.`orders` SET `total` = 5 WHERE `id` = 1 AND `total` <=> 12.50"))
             #expect(session.statements.contains("COMMIT"))
             await ready { tab.loading != nil }
             #expect(tab.source?.changes.isEmpty == true && tab.notice.isHidden && !tab.isEdited)
@@ -198,7 +198,7 @@ extension AppTests {
 
         @Test func aMismatchRollsBackAndPointsAtTheRow() async throws {
             let session = FakeTableSession()
-            session.changed = { $0.hasSuffix("`id` = 2") ? 0 : 1 }
+            session.changed = { $0.contains("WHERE `id` = 2") ? 0 : 1 }
             let (main, harness, tab) = try await Self.tab(session: session)
             tab.source?.set(.text("x"), row: 0, column: 2)
             tab.source?.set(.text("y"), row: 1, column: 2)
@@ -214,7 +214,7 @@ extension AppTests {
         @Test func aServerErrorNamingAColumnPointsAtTheCell() async throws {
             let session = FakeTableSession()
             session.refuse = { sql in
-                sql.hasSuffix("`id` = 2") ? ErrorMapping.map(code: 1406, message: "Data too long for column 'region' at row 1") : nil
+                sql.contains("WHERE `id` = 2") ? ErrorMapping.map(code: 1406, message: "Data too long for column 'region' at row 1") : nil
             }
             let (main, harness, tab) = try await Self.tab(session: session)
             tab.source?.set(.text("5"), row: 0, column: 4)
@@ -245,7 +245,7 @@ extension AppTests {
             tab.previewChanges(nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             let sql = shownText("preview.sql", in: main.window?.attachedSheet) ?? ""
-            #expect(sql.contains("UPDATE `airsql_fixture`.`orders` SET `customer_id` = NULL WHERE `id` = 1;"))
+            #expect(sql.contains("UPDATE `airsql_fixture`.`orders` SET `customer_id` = NULL WHERE `id` = 1 AND `customer_id` <=> 7;"))
             #expect(sql.contains("INSERT INTO `airsql_fixture`.`orders` (`region`, `number`, `total`) VALUES ('EU', 7, 1);"))
             #expect(shownText("preview.heading", in: main.window?.attachedSheet) == "Apply 2 changes to airsql_fixture.orders?")
             _ = await call(harness, "press", ["title": "Cancel"])

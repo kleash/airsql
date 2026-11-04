@@ -2,7 +2,8 @@ import Foundation
 
 /// A table's changes waiting for Apply (plan §2.5, grid-spec §5): edited cells, new rows and rows to delete. Rows are
 /// addressed by their key (the primary key, or a unique key whose columns are all NOT NULL), whose values the grid never
-/// shortens, so every statement names exactly its row. Nothing here touches the server: `statements` gives the SQL and
+/// shortens, so every statement names exactly its row; an edit also names the value it replaces, so someone else's
+/// change to that cell makes it match no row. Nothing here touches the server: `statements` gives the SQL and
 /// the rows each statement must change, which `apply` checks in one transaction. Every change can be undone until then.
 public struct PendingChanges: Equatable {
     /// A row by its key's values (text as the server sends it; "0x…" for binary), in `keyColumns` order.
@@ -35,8 +36,19 @@ public struct PendingChanges: Equatable {
         public var edits: [Key: [String: Value]] = [:]
         public var inserts: [Insert] = []
         public var deletes: Set<Key> = []
+        /// The values edits replace, as loaded (`.null` or `.text`): what Apply expects to find. One may be missing:
+        /// a very long value, or changes saved by version 1.0.0.
+        public var originals: [Key: [String: Value]] = [:]
 
         public init() {}
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            edits = try container.decode([Key: [String: Value]].self, forKey: .edits)
+            inserts = try container.decode([Insert].self, forKey: .inserts)
+            deletes = try container.decode(Set<Key>.self, forKey: .deletes)
+            originals = try container.decodeIfPresent([Key: [String: Value]].self, forKey: .originals) ?? [:]
+        }
     }
 
     public let keyColumns: [String]
@@ -67,12 +79,24 @@ public struct PendingChanges: Equatable {
 
     // MARK: Changing
 
-    /// Sets a loaded row's cell; back to its loaded value (`original`, nil for NULL), the edit goes away.
+    /// The longest loaded value Apply compares: one past it isn't worth doubling the UPDATE and pending.json for.
+    static let originalLimit = 65_536
+
+    /// Sets a loaded row's cell; back to its loaded value (`original`, nil for NULL), the edit goes away. The first
+    /// edit's `original` stays: it is what the person saw, as a reload doesn't show through a pending edit.
     public mutating func set(_ value: Value, column: String, key: Key, original: String?) {
         change { state in
-            var row = state.edits[key] ?? [:]
-            row[column] = value == (original.map(Value.text) ?? .null) ? nil : value
+            var row = state.edits[key] ?? [:], originals = state.originals[key] ?? [:]
+            let loaded = original.map(Value.text) ?? .null
+            if value == loaded {
+                row[column] = nil
+                originals[column] = nil
+            } else {
+                if row[column] == nil, (original?.utf8.count ?? 0) <= Self.originalLimit { originals[column] = loaded }
+                row[column] = value
+            }
             state.edits[key] = row.isEmpty ? nil : row
+            state.originals[key] = originals.isEmpty ? nil : originals
         }
     }
 
@@ -105,6 +129,7 @@ public struct PendingChanges: Equatable {
         change { state in
             for key in keys {
                 state.edits[key] = nil
+                state.originals[key] = nil
                 state.deletes.remove(key)
             }
             state.inserts.removeAll { inserts.contains($0.id) }
@@ -211,6 +236,10 @@ public struct PendingChanges: Equatable {
             let values = state.edits[key] ?? [:]
             let set = try ordered(values).map { SQLQuote.identifier($0) + " = " + (try literal(values[$0]!, $0, .update(key))) }
             let condition = zip(keyColumns, keyLiterals(key)).map { SQLQuote.identifier($0) + " = " + $1 }
+                + ordered(values).compactMap { name -> String? in
+                    guard let original = checkedOriginal(key, name, column(name)) else { return nil }
+                    return SQLQuote.identifier(name) + " <=> " + column(name).literal(original.text, noBackslashEscapes: noBackslashEscapes)
+                }
             statements.append(Statement(sql: "UPDATE \(name) SET " + set.joined(separator: ", ") + " WHERE "
                                         + condition.joined(separator: " AND "), expectedRows: 1, target: .update(key)))
         }
@@ -221,5 +250,40 @@ public struct PendingChanges: Equatable {
                                         + ") VALUES (" + values.joined(separator: ", ") + ")", expectedRows: 1, target: .insert(insert.id)))
         }
         return statements
+    }
+
+    /// The value an edit's UPDATE expects to find: nil when it can't check one. A key's edit needs none: the key is
+    /// in the WHERE already.
+    private func checkedOriginal(_ key: Key, _ name: String, _ column: GridColumn) -> Value? {
+        guard !keyColumns.contains(name), let original = state.originals[key]?[name],
+              column.comparesExactly(original.text) else { return nil }
+        return original
+    }
+
+    /// The edited columns Apply can't check for someone else's change, in `columns`' order: those edits go by the key
+    /// alone. The preview says so.
+    public func uncheckedColumns(_ columns: [GridColumn]) -> [String] {
+        let edits = state.edits.filter { !state.deletes.contains($0.key) }
+        return columns.filter { column in
+            !keyColumns.contains(column.name)
+                && edits.contains { $0.value[column.name] != nil && checkedOriginal($0.key, column.name, column) == nil }
+        }.map(\.name)
+    }
+}
+
+extension GridColumn {
+    /// Whether a value read from this column finds itself again as a literal in a WHERE. Not FLOAT (shown rounded),
+    /// TIMESTAMP (shown in the session's time zone: an hour repeats when the clocks go back), JSON (the server's own
+    /// form), spatial and vector values, or a date with a zero month or day (strict MySQL refuses it as a literal).
+    func comparesExactly(_ value: String?) -> Bool {
+        guard let value else { return true }
+        let type = type.lowercased()
+        guard !type.isEmpty else { return false }
+        switch kind {
+        case .json: return false
+        case .binary: return type.contains("binary") || type.contains("blob")
+        case .date: return !type.hasPrefix("timestamp") && !value.contains("-00")
+        default: return !type.hasPrefix("float")
+        }
     }
 }

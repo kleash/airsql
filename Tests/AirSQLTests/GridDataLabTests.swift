@@ -128,6 +128,75 @@ struct GridDataLabTests {
         }
     }
 
+    /// You load price 1.50, a colleague sets 20, you set 15: their 20 stays. A column you didn't edit doesn't matter.
+    @Test(arguments: servers)
+    func anEditedCellChangedBySomeoneElseRollsEverythingBack(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, snapshot in
+            let other = try await connected(server)
+            let source = try await loaded("items", snapshot, on: session)
+            source.set(.text("15"), row: 0, column: 2)
+            source.set(.text("Bo"), row: 1, column: 1)
+            source.set(.text("0xAB"), row: 0, column: 3)
+            source.set(.text("110"), row: 0, column: 4)
+            _ = try await other.query("UPDATE \(Self.database).items SET price = 20 WHERE id = 1")
+            let failure = await #expect(throws: ApplyFailure.self) { try await apply(source, on: session) }
+            #expect(failure?.statement.target == .update(["1"]) && failure?.changed == 0)
+            #expect(failure?.errorDescription?.contains("nothing was applied") == true)
+            let after = try await rows("SELECT id, \(SQLQuote.identifier(Self.odd)), price FROM \(Self.database).items WHERE id < 3 ORDER BY id",
+                                       on: session)
+            #expect(after == [["1", "Ann", "20.00"], ["2", "Bob", "2.00"]])
+
+            // Changes restored after a restart are checked too.
+            let restored = try await loaded("items", snapshot, on: session)
+            restored.changes = PendingChanges(keyColumns: ["id"], state: source.changes.state)
+            await #expect(throws: ApplyFailure.self) { try await apply(restored, on: session) }
+
+            // Someone else's change to another column, and values that compare exactly, let the edit through.
+            source.changes.revertAll()
+            let fresh = try await loaded("items", snapshot, on: session)
+            fresh.set(.text("15"), row: 0, column: 2)
+            fresh.set(.text("0xAB"), row: 0, column: 3)
+            fresh.set(.text("110"), row: 0, column: 4)
+            fresh.set(.text("x"), row: 1, column: 3)  // NULL before
+            _ = try await other.query("UPDATE \(Self.database).items SET \(SQLQuote.identifier(Self.odd)) = 'Anna' WHERE id = 1")
+            await other.close()
+            try await apply(fresh, on: session)
+            #expect(try await rows("SELECT \(SQLQuote.identifier(Self.odd)), price, HEX(photo), BIN(flags) FROM \(Self.database).items "
+                                   + "WHERE id = 1", on: session) == [["Anna", "15.00", "AB", "110"]])
+        }
+    }
+
+    /// Every type's loaded value finds itself in the WHERE, or the edit goes by the key: no false conflict, and no
+    /// refusal from a strict server, which MySQL gives a zero date as a literal.
+    @Test(arguments: servers)
+    func everyTypeAppliesWithoutAFalseConflict(_ server: Lab.Server) async throws {
+        try await withTables(server) { session, _ in
+            let table = "\(Self.database).types"
+            let mode = try await rows("SELECT @@SESSION.sql_mode", on: session)[0][0] ?? ""
+            for statement in [
+                "SET SESSION sql_mode = ''",
+                "CREATE TABLE \(table) (id INT PRIMARY KEY, a DATE, b DATETIME(3), c TIMESTAMP(3) NULL, d TIME(2), e YEAR, f FLOAT, "
+                    + "g DOUBLE, h DECIMAL(30,10), i BIT(5), j ENUM('x','y'), k SET('x','y'), l JSON, m POINT, n BINARY(4), "
+                    + "o VARCHAR(20), p TEXT, q BIGINT UNSIGNED, r CHAR(3), s TINYINT(1)) ENGINE=InnoDB",
+                "INSERT INTO \(table) VALUES (1, '0000-00-00', '2024-01-00 10:00:00.123', '2024-03-31 01:30:00.125', '-838:59:59.00', "
+                    + "2024, 0.1, 0.1, 123456789012345678.1234567891, b'00101', 'y', 'x,y', '{\"a\": 1.50}', POINT(1, 2), X'0102', "
+                    + "'it''s \\\\ %', 'é😀', 18446744073709551615, 'ab', 1), "
+                    + "(2, '2024-02-29', '2024-02-29 23:59:59.999', NULL, '00:00:00.50', 1901, 16777217, 1.7976931348623157e308, "
+                    + "-0.0000000001, b'0', 'x', '', '[]', NULL, X'00000000', '', '', 0, '', 0)",
+                "SET SESSION sql_mode = '\(mode)'",
+            ] { _ = try await session.query(statement) }
+            let cache = SchemaCache(source: session, includes: { $0 == Self.database })
+            try await cache.load()
+            for column in 1...19 {
+                let source = try await loaded("types", cache.snapshot, on: session)
+                let bit = source.columns[column].name == "i", set = ["j", "k"].contains(source.columns[column].name)
+                let value: PendingChanges.Value = source.columns[column].name == "o" ? .text("edited") : .null
+                for row in 0..<2 { source.set(bit || set ? .text(bit ? "1" : "x") : value, row: row, column: column) }
+                try await apply(source, on: session)
+            }
+        }
+    }
+
     @Test(arguments: servers)
     func binaryAndCompositeKeysAddressTheirRows(_ server: Lab.Server) async throws {
         try await withTables(server) { session, snapshot in

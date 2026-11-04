@@ -6,6 +6,15 @@ public enum TableEditing {
     /// Engines whose changes a ROLLBACK undoes.
     static let transactional: Set<String> = ["innodb", "xtradb", "rocksdb", "tokudb", "ndb", "ndbcluster"]
 
+    /// What the SQL preview says about Apply's check for someone else's change; `reading` is what it compares with.
+    public static func applyCaption(reading: String, unchecked: [String]) -> String {
+        let caption = "They run in one transaction. If someone else changed a cell you edited or deleted a row since "
+            + "\(reading), nothing is applied."
+        guard !unchecked.isEmpty else { return caption }
+        return caption + " Edits to " + unchecked.joined(separator: ", ") + " aren't checked: FLOAT, TIMESTAMP, JSON, spatial, "
+            + "zero-date and very long values don't compare exactly, so these overwrite what is there now."
+    }
+
     /// What the SQL preview warns about before Apply: a table whose engine can't roll back, and the tables that
     /// deleting rows also changes through ON DELETE CASCADE (and SET NULL), following the cascades.
     public static func warnings(_ table: SchemaTable, database: String, deleting: Bool, in snapshot: SchemaSnapshot) -> [String] {
@@ -38,8 +47,8 @@ public enum TableEditing {
     }
 }
 
-/// Apply stopped: a statement changed another number of rows than it should (someone else changed or deleted the
-/// row since it was loaded) or the server refused it. Nothing was applied: the transaction was rolled back.
+/// Apply stopped: a statement changed another number of rows than it should (someone else changed an edited cell or
+/// deleted the row since it was loaded) or the server refused it. Nothing was applied: the transaction was rolled back.
 public struct ApplyFailure: LocalizedError {
     public var statement: PendingChanges.Statement
     /// The rows it changed instead, when it ran.
@@ -52,7 +61,7 @@ public struct ApplyFailure: LocalizedError {
         if let changed {
             let rows = statement.expectedRows == 1 ? "This row" : "One of these rows"
             return "\(rows) was changed or deleted by someone else since it was loaded (the statement changed \(changed) "
-                + "of \(statement.expectedRows)), so nothing was applied. Reload the rows, then apply again."
+                + "of \(statement.expectedRows)), so nothing was applied. Revert the change, reload the rows, then make it again."
         }
         let message = (error as? AirSQLError)?.message ?? error?.localizedDescription ?? "The server refused a statement."
         return message + " Nothing was applied."

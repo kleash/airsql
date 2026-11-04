@@ -182,17 +182,26 @@ public final class ResultEditSource: GridSource {
             guard !changes[index].isEmpty else { return [] }
             let table = tables[index]
             let types = Dictionary(table.columns.map { ($0.name, ColumnType($0)) }, uniquingKeysWith: { first, _ in first })
-            let columns = table.columns.map { column -> GridColumn in
-                var shown = GridColumn(name: column.name, kind: TableDataSource.kind(column))
-                shown.describe(table)
-                return shown
-            }
-            return try changes[index].statements(database: editing.sources[index].database, table: table.name, columns: columns,
+            return try changes[index].statements(database: editing.sources[index].database, table: table.name, columns: gridColumns(index),
                                                  noBackslashEscapes: context.noBackslashEscapes) { text, column in
                 guard let type = types[column] else { throw EditError("\(table.name) has no column \(column) any more") }
                 return try type.literal(text, context)
             }
         }
+    }
+
+    /// A table's columns as the statements need them.
+    private func gridColumns(_ index: Int) -> [GridColumn] {
+        tables[index].columns.map { column in
+            var shown = GridColumn(name: column.name, kind: TableDataSource.kind(column))
+            shown.describe(tables[index])
+            return shown
+        }
+    }
+
+    /// The edited columns Apply can't check for someone else's change (`PendingChanges.uncheckedColumns`).
+    public var uncheckedColumns: [String] {
+        changes.indices.flatMap { changes[$0].uncheckedColumns(gridColumns($0)) }
     }
 
     /// The row an Apply failure is about, and its column when the failure names one: the statement's table decides
