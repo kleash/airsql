@@ -105,7 +105,7 @@ extension AppTests {
             let other = middle(4, 1)
             let menu = await call(harness, "click", ["x": other.0, "y": other.1, "button": "right"])
             #expect(list.selectedRow == 4, "a right-click selects the row it is on: \(menu.error ?? "")")
-            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Delete Rows…"])
+            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Move Up", "Move Down", "Delete Rows…"])
             // Paste waits for rows copied.
             #expect((menu["menu"] as? [[String: Any]])?.filter { $0["enabled"] as? Bool != true }.map { $0["title"] as? String } == ["Paste"])
             _ = await call(harness, "menu", ["path": "context > Delete Rows…"])
@@ -210,6 +210,15 @@ extension AppTests {
             #expect(other.list.selectedRow == 1)
             other.undo.undo()
             #expect(other.design.columns.count == before)
+            // ⇧⌘↑ and ⇧⌘↓ move what's selected, and stop at the ends.
+            let first = other.design.columns[0].name, second = other.design.columns[1].name
+            other.list.selectRowIndexes([1], byExtendingSelection: false)
+            other.moveRowsUp(nil)
+            #expect(other.design.columns.prefix(2).map(\.name) == [second, first] && other.list.selectedRow == 0)
+            other.moveRowsUp(nil)
+            #expect(other.design.columns[0].name == second)
+            other.moveRowsDown(nil)
+            #expect(other.design.columns.prefix(2).map(\.name) == [first, second] && other.list.selectedRow == 1)
             // Text copied elsewhere since is not rows.
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString("x", forType: .string)
@@ -258,9 +267,20 @@ extension AppTests {
             let reply = await call(harness, "click", ["x": point.0, "y": point.1])
             #expect(diagram.canvas.selected == "orders", "\(reply.error ?? "") at \(point); canvas \(diagram.canvas.convert(diagram.canvas.bounds, to: nil))")
             let menu = await call(harness, "click", ["x": point.0, "y": point.1, "button": "right"])
-            #expect(titles(menu["menu"]) == ["Open Structure", "Copy Name"])
+            #expect(titles(menu["menu"]) == ["Open Structure", "Open Data", "Copy Name"])
             diagram.copy(nil)
             #expect(NSPasteboard.general.string(forType: .string) == "`orders`")
+            diagram.find.stringValue = "CUSTOM"
+            diagram.findTable(nil)
+            #expect(diagram.canvas.selected == "customer_emails" || diagram.canvas.selected == "customers")
+            diagram.fitAll(nil)
+            let fitted = diagram.scroll.magnification
+            #expect(fitted > 0 && fitted <= 3)
+            diagram.zoomIn(nil)
+            #expect(diagram.scroll.magnification > fitted)
+            diagram.zoomReset(nil)
+            #expect(diagram.scroll.magnification == 1)
+            diagram.canvas.selected = "orders"
             _ = await call(harness, "click", ["x": point.0, "y": point.1, "count": 2])
             #expect(main.selectedTab?.title == "orders · structure")
             #expect(diagram.canvas.png().map { NSBitmapImageRep(data: $0)?.pixelsWide ?? 0 } == Int(diagram.canvas.bounds.width * 2))

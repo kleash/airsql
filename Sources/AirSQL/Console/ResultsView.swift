@@ -73,6 +73,10 @@ final class ResultsView: NSView, NSTextFieldDelegate {
     /// selected first).
     var onSelect: ((ResultTab) -> Void)?
     var onRename: ((ResultTab, String) -> Void)?
+    /// A result's tab was dragged over another's: it takes that place.
+    var onMove: ((ResultTab, ResultTab) -> Void)?
+    /// The tab under way: the buttons change tabs as the order changes, but the drag stays with the button pressed.
+    private var dragging: ResultTab?
     var onClose: (() -> Void)?
     var tabMenu: (() -> NSMenu)?
     static let barHeight: CGFloat = 30
@@ -185,6 +189,18 @@ final class ResultsView: NSView, NSTextFieldDelegate {
         onSelect?(tab)
         if count == 2, tab.content.isRenamable { button.beginRename() }
     }
+
+    func dragged(_ button: ResultTabButton, to point: NSPoint) {
+        guard let tab = dragging ?? button.tab, tab.content.isRenamable else { return }
+        dragging = tab
+        let place = strip.convert(point, from: nil)
+        if let other = buttons.first(where: { $0.frame.minX <= place.x && place.x < $0.frame.maxX })?.tab, other !== tab,
+           other.content.isRenamable {
+            onMove?(tab, other)
+        }
+    }
+
+    func dragEnded() { dragging = nil }
 
     func renamed(_ button: ResultTabButton, to title: String) {
         guard let tab = button.tab else { return }

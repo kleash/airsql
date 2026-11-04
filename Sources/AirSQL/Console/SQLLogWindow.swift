@@ -46,6 +46,9 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
         text.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
         text.textContainerInset = NSSize(width: 8, height: 8)
         text.setAccessibilityIdentifier("sqlLog.text")
+        text.usesFindBar = true
+        text.isIncrementalSearchingEnabled = true
+        window.initialFirstResponder = text  // where ⌘F finds; the filter's field has no find bar
         filter.placeholderString = "Filter: words a line contains"
         filter.toolTip = "Type words to show only the lines that contain them"
         filter.setAccessibilityIdentifier("sqlLog.filter")

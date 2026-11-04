@@ -55,6 +55,11 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         code.usesFindBar = true
         code.isIncrementalSearchingEnabled = true
         code.delegate = self
+        code.completions = { [weak self] text, caret in
+            guard let self else { return (caret..<caret, []) }
+            return SQLCompletion.suggestions(text: text, caret: caret, snapshot: self.context.schema.snapshot, database: self.database,
+                                             noBackslashEscapes: self.code.noBackslashEscapes)
+        }
         code.setAccessibilityIdentifier("objectEditor.code")
         code.toolTip = "Edit the \(kind.rawValue)'s CREATE statement, then Apply"
 

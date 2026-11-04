@@ -294,6 +294,21 @@ extension TableEditorController {
         return (2...).lazy.map { base + "_\($0)" }.first { !taken.contains($0.lowercased()) }!
     }
 
+    // MARK: Moving columns
+
+    @objc func moveRowsUp(_ sender: Any?) {
+        guard let first = list.selectedRowIndexes.first, canMoveRows, first > 0 else { return }
+        moveColumns(list.selectedRowIndexes, to: first - 1)
+    }
+
+    @objc func moveRowsDown(_ sender: Any?) {
+        guard let last = list.selectedRowIndexes.last, canMoveRows, last + 1 < design.columns.count else { return }
+        moveColumns(list.selectedRowIndexes, to: last + 2)
+    }
+
+    /// Not while a cell is being typed in: there ⇧⌘↑ and ⇧⌘↓ are the text's.
+    var canMoveRows: Bool { !isBusy && section == .columns && !list.selectedRowIndexes.isEmpty && !(view.window?.firstResponder is NSText) }
+
     // MARK: Dragging columns into a new order
 
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {

@@ -122,6 +122,10 @@ import AppKit
     @objc optional func clearSort(_ sender: Any?)
     @objc optional func sortColumns(_ sender: Any?)
     @objc optional func goToRow(_ sender: Any?)
+    @objc optional func goToLine(_ sender: Any?)
+    @objc optional func moveRowsUp(_ sender: Any?)
+    @objc optional func moveRowsDown(_ sender: Any?)
+    @objc optional func toggleWordWrap(_ sender: Any?)
     @objc optional func showRelatedRows(_ sender: Any?)
     @objc optional func showColumnSummary(_ sender: Any?)
     @objc optional func loadMore(_ sender: Any?)
@@ -460,6 +464,13 @@ enum Commands {
     static let shiftRight = Command("Shift Right", #selector(AirSQLActions.indentLines(_:)), "]", tip: "Indent the selected lines")
     static let shiftLeft = Command("Shift Left", #selector(AirSQLActions.outdentLines(_:)), "[",
                                    tip: "Take one indent off the selected lines")
+    static let moveRowsUp = Command("Move Up", #selector(AirSQLActions.moveRowsUp(_:)), up, [.command, .shift],
+                                    tip: "Move the selected columns one place up in the table")
+    static let moveRowsDown = Command("Move Down", #selector(AirSQLActions.moveRowsDown(_:)), down, [.command, .shift],
+                                      tip: "Move the selected columns one place down in the table")
+    static let goToLine = Command("Go to Line…", #selector(AirSQLActions.goToLine(_:)), "g", .control, tip: "Go to a line of the SQL by its number")
+    static let wordWrap = Command("Word Wrap", #selector(AirSQLActions.toggleWordWrap(_:)),
+                                  tip: "Wrap long lines at the editor's edge instead of scrolling sideways")
     static let helpers = Command("Query Helpers", #selector(AirSQLActions.toggleHelpers(_:)),
                                  tip: "Show or hide the columns, functions and keywords beside the editor")
 
@@ -706,6 +717,7 @@ enum Commands {
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
+        goToLine, wordWrap, moveRowsUp, moveRowsDown,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,

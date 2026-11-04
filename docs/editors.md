@@ -27,7 +27,7 @@ parts, chosen at the top:
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
 green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Discard** takes back all of them.
-⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
+Drag columns to put them in another order, or press ⇧⌘↑ and ⇧⌘↓. ⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
 as new rows.
 
 Under the lists, the SQL that Apply would run updates as you type. When something can't work yet (a VARCHAR without a
@@ -57,6 +57,7 @@ server keeps it, to edit as text.
 - MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
   function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
   apply again, and **Revert** puts the old code back.
+- The code has the console's editor: line numbers, completion, Comment Lines (⌘/), Format SQL and the matching bracket.
 - When the server refuses the code, the place it points to is underlined in red, with the message on hover, until you
   change the text.
 - Renaming it in the code makes the new one and then drops the old one.
@@ -69,5 +70,7 @@ at, virtual foreign keys you added in a table's rows included ([Virtual foreign 
 Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure** and **Copy Name** (⌘C copies the selected table's name too). **Export Image…** saves the diagram as a PNG, and **Export
+right-click it for **Open Structure**, **Open Data** and **Copy Name** (⌘C copies the selected table's name too). Pinch,
+⌘+ and ⌘− zoom, ⌘0 goes back to actual size and **Fit** shows the whole diagram; ⌘F goes to the find field, where typing
+part of a name selects that table and Return goes to the next. ⌘R reads the schema again. **Export Image…** saves the diagram as a PNG, and **Export
 Mermaid…** as Mermaid text, which many docs sites and wikis draw.

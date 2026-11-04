@@ -43,3 +43,5 @@ lost, reconnected (and whether an open transaction was rolled back), the number 
 - **Results**: rows never go into the log.
 
 Very long statements (an import's big `INSERT`) are cut after 60,000 bytes.
+
+⌘F opens a find bar over the log while its text has the focus.

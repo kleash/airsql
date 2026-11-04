@@ -103,6 +103,16 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     var fontSize: CGFloat { font?.pointSize ?? 13 }
 
+    /// Long lines wrap at the editor's edge, or run on and scroll sideways.
+    func setWraps(_ wraps: Bool) {
+        guard let scroll = enclosingScrollView, let container = textContainer else { return }
+        isHorizontallyResizable = !wraps
+        scroll.hasHorizontalScroller = !wraps
+        container.widthTracksTextView = wraps
+        container.size = NSSize(width: wraps ? scroll.contentSize.width : .greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
+        if wraps { setFrameSize(NSSize(width: scroll.contentSize.width, height: frame.height)) }
+    }
+
     override func performTextFinderAction(_ sender: Any?) {
         guard let onFind, let tag = (sender as? NSValidatedUserInterfaceItem)?.tag, let action = NSTextFinder.Action(rawValue: tag)
         else { return super.performTextFinderAction(sender) }

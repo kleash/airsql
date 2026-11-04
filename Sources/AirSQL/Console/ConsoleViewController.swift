@@ -144,6 +144,12 @@ final class ConsoleViewController: NSViewController, TabContent {
             results.heightAnchor.constraint(greaterThanOrEqualToConstant: ResultsView.barHeight + 90),
         ])
         results.onSelect = { [weak self] tab in self?.selectResult(tab) }
+        results.onMove = { [weak self] tab, other in
+            guard let self, let from = self.resultTabs.firstIndex(where: { $0 === tab }),
+                  let to = self.resultTabs.firstIndex(where: { $0 === other }) else { return }
+            self.resultTabs.insert(self.resultTabs.remove(at: from), at: to)
+            self.showResults()
+        }
         results.onRename = { [weak self] tab, title in
             tab.title = title
             self?.showResults()
@@ -162,6 +168,9 @@ final class ConsoleViewController: NSViewController, TabContent {
         observers.append(model.$data.map(\.settings.editorFontSize).removeDuplicates().dropFirst().sink { [weak self] size in
             guard let self, self.zoomedSize == nil else { return }
             self.editor.setFontSize(CGFloat(size))
+        })
+        observers.append(model.$data.map(\.settings.editorWraps).removeDuplicates().sink { [weak self] wraps in
+            self?.editor.setWraps(wraps)
         })
     }
 
@@ -312,6 +321,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     /// The console now shows `url`, saved with `text`.
     func setFile(_ url: URL, savedText: String) {
         fileURL = url
+        NSDocumentController.shared.noteNewRecentDocumentURL(url)
         self.savedText = savedText
         shownEdited = isEdited
         if let tab { mainWindow?.rename(tab, to: url.lastPathComponent) }

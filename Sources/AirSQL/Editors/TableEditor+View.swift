@@ -234,6 +234,9 @@ extension TableEditorController {
         case Commands.addRow.action?, Commands.duplicateRow.action?, Commands.deleteRows.action?:
             enabled = !isBusy && section != .options && (item.action == Commands.addRow.action || !list.selectedRowIndexes.isEmpty)
             reason = section == .options ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"
+        case Commands.moveRowsUp.action?, Commands.moveRowsDown.action?:
+            enabled = canMoveRows
+            reason = section == .columns ? "Select a column first" : "Show the columns first"
         case Commands.copy.action?:
             enabled = canCopyRows
             reason = section == .options ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"

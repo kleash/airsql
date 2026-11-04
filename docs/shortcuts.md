@@ -73,6 +73,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Show Next Result | ⌥⌘] |
 | Show Previous Result | ⌥⌘[ |
 | Comment Lines | ⌘/ |
+| Go to Line… | ⌃G |
 | Shift Right | ⌘] |
 | Shift Left | ⌘[ |
 | Add Row | ⌘I |
@@ -87,6 +88,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Equal to Selection | ⌃⌘1 |
 | Not Equal to Selection | ⌃⌘2 |
 | Go to Row… | ⌘L |
+| Move Up, Move Down (table editor) | ⇧⌘↑, ⇧⌘↓ |
 | Related Rows | ⌃⌘↓ |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |

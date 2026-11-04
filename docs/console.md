@@ -17,8 +17,10 @@ own session, which every console tab of that connection shares.
   window or on AirSQL's Dock icon, or open them with AirSQL from Finder: they open on the connection shown.
 - **File ▸ Save** (⌘S) saves the console's text to its file; **Save As…** to a new one. A tab with unsaved text shows a
   dot instead of its close button.
+- Drag a result's tab to put the results in another order.
 - Double-click a console's tab (or press F2 while its editor has the focus) to give it a name of your own.
 - When you quit, the open consoles are kept, unsaved text included, and come back the next time you open AirSQL.
+- **File ▸ Open Recent** lists the .sql files you had open lately.
 - **Query ▸ Change Connection…** runs the console's statements on another connection.
 
 ## Write SQL
@@ -43,6 +45,10 @@ own session, which every console tab of that connection shares.
 - **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression** and **Match
   Case**. With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
+- Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete
+  between an empty pair takes both.
+- **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. **View ▸ Word Wrap** (also in Settings ▸ Editor) wraps
+  long lines at the editor's edge.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
   (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
 - **Query ▸ Format SQL** (⌥⇧⌘F) puts each main clause on a line of its own and reserved words in capitals. It changes
@@ -164,8 +170,9 @@ shows in a sheet, with what it will do:
 ## History, the SQL log, plans and profiles
 
 - **Query ▸ Query History** (⌘Y) lists the statements run on the console's connection, newest first. Type to search;
-  Return or a double-click puts one in the editor at the cursor. Passwords in statements are masked before they are
-  kept, as in the SQL log.
+  Return or a double-click puts one in the editor at the cursor, and a click shows it whole below the list. Click a
+  header to sort, ⌘-click to select several; a right-click also opens them in a new tab or deletes them from the
+  history. Passwords in statements are masked before they are kept, as in the SQL log.
 - **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](sql-log.md).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it: as the
   server's table, or as a tree (MySQL's own tree; MariaDB's plan made into one).

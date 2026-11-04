@@ -84,6 +84,20 @@ public final class QueryHistory: @unchecked Sendable {
         queue.async { [self] in try? FileManager.default.removeItem(at: file(connection)) }
     }
 
+    /// Forgets these statements of the connection's history; the rest stay as they are.
+    public func remove(_ entries: [HistoryEntry], from connection: UUID) {
+        queue.async { [self] in
+            let url = file(connection), encoder = JSONEncoder()
+            let data = read(url).filter { !entries.contains($0) }.reduce(into: Data()) { result, entry in
+                guard let line = try? encoder.encode(entry) else { return }
+                result.append(line)
+                result.append(0x0A)
+            }
+            try? data.write(to: url, options: .atomic)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        }
+    }
+
     /// Waits for the writes asked for so far (tests).
     public func flush() { queue.sync {} }
 

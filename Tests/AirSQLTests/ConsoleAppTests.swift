@@ -112,6 +112,65 @@ extension AppTests {
             #expect(editor.string == "SELECT 1")
         }
 
+        /// Openers bring their partners, outside strings; closers step over them; Delete takes an empty pair; ⌘Z undoes it.
+        @Test func bracketsAndQuotesCloseThemselves() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            func type(_ text: String) { for c in text { editor.insertText(String(c), replacementRange: editor.selectedRange()) } }
+            editor.setText("")
+            type("(")
+            #expect(editor.string == "()" && editor.selectedRange().location == 1)
+            type("'a")
+            #expect(editor.string == "('a')")
+            type("(")
+            #expect(editor.string == "('a(')", "no pair inside a string")
+            type("'")
+            type(")")
+            #expect(editor.string == "('a(')" && editor.selectedRange().location == 6, "both steps went over")
+            editor.setText("()")
+            editor.setSelectedRange(NSRange(location: 1, length: 0))
+            editor.deleteBackward(nil)
+            #expect(editor.string == "")
+            editor.setText("a b")
+            editor.setSelectedRange(NSRange(location: 2, length: 1))
+            type("`")
+            #expect(editor.string == "a `b`" && editor.selectedRange() == NSRange(location: 3, length: 1))
+            editor.setText("abc")
+            editor.setSelectedRange(NSRange(location: 0, length: 0))
+            type("(")
+            #expect(editor.string == "(abc", "before a word it stays one")
+        }
+
+        /// A dragged result takes the place of the tab it is over; Messages stays where it is.
+        @Test func resultTabsReorderByDragging() async throws {
+            let (_, _, console) = try await Self.console()
+            for title in ["One", "Two", "Three"] { console.addResult(ConsoleFixtures.customers(rows: 1), title: title, summary: "") }
+            console.showResults()
+            console.view.window?.layoutIfNeeded()
+            let one = try #require(console.results.tabButton(for: console.resultTabs[0]))
+            let three = try #require(console.results.tabButton(for: console.resultTabs[2]))
+            let place = three.convert(NSPoint(x: three.bounds.midX, y: three.bounds.midY), to: nil)
+            console.results.dragged(one, to: place)
+            console.results.dragged(one, to: place)  // still over the same place: nothing more moves
+            console.results.dragEnded()
+            #expect(console.resultTabs.map(\.title) == ["Two", "Three", "One"])
+        }
+
+        @Test func goToLineAndWordWrap() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            editor.setText("one\ntwo\nthree")
+            editor.goTo(line: 3)
+            #expect(editor.selectedRange().location == 8)
+            editor.goTo(line: 99)
+            #expect(editor.selectedRange().location == 13)
+            console.toggleWordWrap(nil)
+            #expect(editor.textContainer?.widthTracksTextView == true && !editor.isHorizontallyResizable)
+            #expect(editor.enclosingScrollView?.hasHorizontalScroller == false)
+            console.toggleWordWrap(nil)
+            #expect(editor.textContainer?.widthTracksTextView == false && editor.isHorizontallyResizable)
+        }
+
         /// An unknown table is underlined from the schema cache a moment after the typing, with no session; Run isn't held back.
         @Test func anUnknownTableIsUnderlinedAndSaysWhatWasNotFound() async throws {
             let (_, _, console) = try await Self.console()

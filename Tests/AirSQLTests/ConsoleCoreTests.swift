@@ -266,6 +266,18 @@ struct ResultSetSourceTests {
     }
 }
 
+@Suite struct QueryHistoryRemoveTests {
+    @Test func removesOnlyTheChosenStatements() async throws {
+        let history = QueryHistory(directory: URL(fileURLWithPath: try scratch()))
+        let id = UUID()
+        for sql in ["SELECT 1", "SELECT 2", "SELECT 3"] { history.add(HistoryEntry(sql: sql, connection: id)) }
+        history.flush()
+        let all = await history.entries(id)
+        history.remove([all[1]], from: id)
+        #expect(await history.entries(id).map(\.sql) == ["SELECT 3", "SELECT 1"])
+    }
+}
+
 /// The local check for unknown names: what it finds, and above all where it says nothing.
 @Suite struct SQLNameCheckTests {
     static func snapshot(version: String = "8.4.3", caseless: Int = 0) -> SchemaSnapshot {

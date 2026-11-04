@@ -82,6 +82,7 @@ extension AgentGate {
         let plain = AppSettings()
         part.appearance = plain.appearance
         part.editorFontSize = plain.editorFontSize
+        part.editorWraps = plain.editorWraps
         part.gridFontSize = plain.gridFontSize
         part.rowsPerPage = plain.rowsPerPage
         part.nullText = plain.nullText

@@ -8,12 +8,18 @@ extension MainMenu {
     /// are P0's already.
     static func addConsoleItems(_ menus: Menus) {
         insert(Commands.open, after: Commands.newQuery, in: menus.file)
+        let recent = submenu("Open Recent", [])
+        recent.toolTip = "Open a .sql file you had open lately"
+        recent.submenu?.delegate = RecentFiles.shared
+        let open = menus.file.items.firstIndex { $0.action == Commands.open.action } ?? 0
+        menus.file.insertItem(recent, at: open + 1)
         insert(Commands.save, after: Commands.closeWindow, in: menus.file)
         insert(Commands.saveAs, after: Commands.save, in: menus.file)
 
-        menus.edit.add([nil, Commands.toggleComment, Commands.shiftRight, Commands.shiftLeft])
+        menus.data.add([nil, Commands.moveRowsUp, Commands.moveRowsDown])
+        menus.edit.add([nil, Commands.toggleComment, Commands.shiftRight, Commands.shiftLeft, Commands.goToLine])
 
-        menus.view.add([nil, Commands.helpers, Commands.bigger, Commands.smaller, Commands.actualSize])
+        menus.view.add([nil, Commands.helpers, Commands.wordWrap, Commands.bigger, Commands.smaller, Commands.actualSize])
 
         insert(Commands.runSelection, after: Commands.runStatement, in: menus.query)
         let mode = menus.query.items.firstIndex { $0.title == "Transaction Mode" } ?? menus.query.items.count - 1

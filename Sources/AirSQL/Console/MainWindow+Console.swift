@@ -65,7 +65,9 @@ extension MainWindowController: AgentConsoles {
                     continue
                 }
                 switch read {
-                case .success(let text): openConsole(text: text, title: nil, connection: connection, fileURL: url)
+                case .success(let text):
+                    openConsole(text: text, title: nil, connection: connection, fileURL: url)
+                    NSDocumentController.shared.noteNewRecentDocumentURL(url)
                 case .failure(let error):
                     showError(error.localizedDescription, title: "AirSQL couldn't open “\(url.lastPathComponent)”", on: window)
                 }
@@ -99,4 +101,35 @@ extension ConsoleViewController: AgentConsole {
         return AgentConsoleRun(sql: outcome.statement.sql, finished: Date(), error: outcome.error?.message, rows: rows,
                                affectedRows: rows == nil ? outcome.results.last?.affectedRows : nil)
     }
+}
+
+/// File ▸ Open Recent: the system's list of recent files, built each time the menu opens.
+@MainActor
+final class RecentFiles: NSObject, NSMenuDelegate {
+    static let shared = RecentFiles()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let urls = NSDocumentController.shared.recentDocumentURLs
+        for url in urls {
+            let item = NSMenuItem(title: url.lastPathComponent, action: #selector(openRecent(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = url
+            item.toolTip = "Open " + url.path
+            menu.addItem(item)
+        }
+        if !urls.isEmpty { menu.addItem(.separator()) }
+        let clear = NSMenuItem(title: "Clear Menu", action: urls.isEmpty ? nil : #selector(clearRecent(_:)), keyEquivalent: "")
+        clear.target = self
+        clear.toolTip = urls.isEmpty ? "No files opened lately" : "Forget the files in this list"
+        menu.addItem(clear)
+    }
+
+    @objc private func openRecent(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL,
+              let main = (NSApp.keyWindow?.windowController ?? NSApp.mainWindow?.windowController) as? MainWindowController else { return }
+        main.openFiles([url])
+    }
+
+    @objc private func clearRecent(_ sender: Any?) { NSDocumentController.shared.clearRecentDocuments(sender) }
 }

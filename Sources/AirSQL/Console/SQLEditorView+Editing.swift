@@ -127,6 +127,30 @@ extension SQLEditorView {
         return true
     }
 
+    /// Go to Line… (⌃G): the line that messages name.
+    @objc func goToLine(_ sender: Any?) {
+        guard let window, window.attachedSheet == nil else { return }
+        let lines = string.utf16.reduce(1) { $0 + ($1 == 0x0A ? 1 : 0) }
+        askText("Go to Line", message: "Type a line number from 1 to \(lines.formatted())", placeholder: "\(lines)", action: "Go",
+                id: "goToLine.text", on: window) { [weak self] text in
+            guard let line = Int(text.trimmingCharacters(in: .whitespaces)) else { return }
+            self?.goTo(line: line)
+        }
+    }
+
+    /// Puts the cursor at the start of the line, the nearest there is, and shows it.
+    func goTo(line: Int) {
+        let text = string as NSString
+        var start = 0
+        for _ in 1..<max(line, 1) {
+            let next = NSMaxRange(text.lineRange(for: NSRange(location: start, length: 0)))
+            guard next > start else { break }
+            start = next
+        }
+        setSelectedRange(NSRange(location: start, length: 0))
+        scrollRangeToVisible(selectedRange())
+    }
+
     /// The editor's menu (plan §2.12): Run Statement, Run Selection, Explain, Format SQL, Comment Lines, Edit as Table,
     /// Cut, Copy, Paste. A right-click outside the selection moves the cursor there first, as a click would.
     override func menu(for event: NSEvent) -> NSMenu? {

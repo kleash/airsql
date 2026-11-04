@@ -93,6 +93,16 @@ final class ResultTabButton: NSView {
         bar?.clicked(self, count: event.clickCount)
     }
 
+    override func mouseDragged(with event: NSEvent) {
+        guard editor == nil else { return super.mouseDragged(with: event) }
+        bar?.dragged(self, to: event.locationInWindow)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard editor == nil else { return super.mouseUp(with: event) }
+        bar?.dragEnded()
+    }
+
     override func otherMouseUp(with event: NSEvent) {
         guard event.buttonNumber == 2 else { return super.otherMouseUp(with: event) }
         bar?.close(self)

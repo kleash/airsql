@@ -201,6 +201,8 @@ public struct AppSettings: Codable, Equatable {
     public var safety = SafetySettings()
     /// Settings ▸ Editor: the SQL editor's font size in points (SF Mono).
     public var editorFontSize = 13.0
+    /// Settings ▸ Editor: long lines wrap at the editor's edge instead of scrolling sideways.
+    public var editorWraps = false
     /// Settings ▸ Grid: the grid's font size, rows per page, and how NULL is shown.
     public var gridFontSize = 12.0
     public var rowsPerPage = 1_000
@@ -233,6 +235,7 @@ public struct AppSettings: Codable, Equatable {
         appearance = try value(.appearance, defaults.appearance)
         safety = try value(.safety, defaults.safety)
         editorFontSize = try value(.editorFontSize, defaults.editorFontSize)
+        editorWraps = try value(.editorWraps, defaults.editorWraps)
         gridFontSize = try value(.gridFontSize, defaults.gridFontSize)
         rowsPerPage = try value(.rowsPerPage, defaults.rowsPerPage)
         nullText = try value(.nullText, defaults.nullText)

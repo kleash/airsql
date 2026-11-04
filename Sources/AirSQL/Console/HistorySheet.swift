@@ -2,11 +2,14 @@ import AirSQLCore
 import AppKit
 
 /// Query History (⌘Y, plan §2.6): the statements run on the console's connection, newest first; typing narrows them
-/// down. A click selects one, a double-click or Return puts it in the editor at the cursor, a right-click copies it.
+/// down and a header sorts them. A click selects one and shows it whole below the list, a double-click or Return puts
+/// it in the editor at the cursor, a right-click offers the rest.
 @MainActor
 final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate, NSMenuDelegate {
     private let connection: UUID
     private let insert: (String) -> Void
+    private let openInTab: (String) -> Void
+    private let preview = NSTextView.scrollableTextView()
     private let search = NSSearchField()
     private let table = NSTableView()
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
@@ -25,9 +28,10 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         return formatter
     }()
 
-    init(connection: UUID, insert: @escaping (String) -> Void) {
+    init(connection: UUID, insert: @escaping (String) -> Void, openInTab: @escaping (String) -> Void) {
         self.connection = connection
         self.insert = insert
+        self.openInTab = openInTab
         super.init(nibName: nil, bundle: nil)
         title = "Query History"
     }
@@ -49,12 +53,14 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             column.width = width
             column.minWidth = minimum
             if identifier == "time" { column.resizingMask = .userResizingMask }
+            column.sortDescriptorPrototype = NSSortDescriptor(key: identifier, ascending: identifier != "time")
             table.addTableColumn(column)
         }
         table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         table.style = .inset
         table.usesAlternatingRowBackgroundColors = true
         table.rowHeight = 22
+        table.allowsMultipleSelection = true
         table.dataSource = self
         table.delegate = self
         table.target = self
@@ -67,6 +73,14 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
         scroll.translatesAutoresizingMaskIntoConstraints = false
+        let code = preview.documentView as! NSTextView
+        code.isEditable = false
+        code.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        code.textContainerInset = NSSize(width: 4, height: 4)
+        code.toolTip = "Read the selected statement whole; select part of it to copy"
+        code.setAccessibilityIdentifier("history.preview")
+        preview.borderType = .bezelBorder
+        preview.translatesAutoresizingMaskIntoConstraints = false
         let clear = button("Clear History…", id: "history.clear", tip: "Forget every statement run on this connection",
                            target: self, action: #selector(clearHistory(_:)))
         let cancel = button("Cancel", id: "history.cancel", tip: "Close the history without inserting anything",
@@ -82,16 +96,24 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         empty.setAccessibilityIdentifier("history.empty")
         insertButton.isEnabled = false
         let root = SurfaceView(.ground)
-        for view in [search, scroll, buttons, empty] { root.addSubview(view) }
+        for view in [search, scroll, preview, buttons, empty] { root.addSubview(view) }
+        let width = root.widthAnchor.constraint(equalToConstant: 760), height = root.heightAnchor.constraint(equalToConstant: 520)
+        width.priority = .defaultLow
+        height.priority = .defaultLow
         NSLayoutConstraint.activate([
-            root.widthAnchor.constraint(equalToConstant: 760), root.heightAnchor.constraint(equalToConstant: 440),
+            width, height, root.widthAnchor.constraint(greaterThanOrEqualToConstant: 620),
+            root.heightAnchor.constraint(greaterThanOrEqualToConstant: 400),
             search.topAnchor.constraint(equalTo: root.topAnchor, constant: 16),
             search.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
             search.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
             scroll.topAnchor.constraint(equalTo: search.bottomAnchor, constant: 10),
             scroll.leadingAnchor.constraint(equalTo: search.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: search.trailingAnchor),
-            buttons.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 12),
+            preview.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 8),
+            preview.leadingAnchor.constraint(equalTo: search.leadingAnchor),
+            preview.trailingAnchor.constraint(equalTo: search.trailingAnchor),
+            preview.heightAnchor.constraint(equalTo: scroll.heightAnchor, multiplier: 0.4),
+            buttons.topAnchor.constraint(equalTo: preview.bottomAnchor, constant: 12),
             buttons.leadingAnchor.constraint(equalTo: search.leadingAnchor),
             buttons.trailingAnchor.constraint(equalTo: search.trailingAnchor),
             buttons.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -16),
@@ -120,6 +142,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             let found = await QueryHistory.shared.entries(connection, matching: words)
             guard let self, !Task.isCancelled else { return }
             self.entries = found
+            self.sortEntries()
             self.table.reloadData()
             if !found.isEmpty { self.table.selectRowIndexes([0], byExtendingSelection: false) }
             self.status.stringValue = found.isEmpty ? "" : "\(found.count.formatted()) statement\(found.count == 1 ? "" : "s")"
@@ -131,6 +154,35 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     }
 
     func controlTextDidChange(_ notification: Notification) { load() }
+
+    private func sortEntries() {
+        guard let sort = table.sortDescriptors.first else { return }
+        let result = { (entry: HistoryEntry) in entry.error == nil ? entry.rows ?? -1 : -2 }
+        entries.sort { a, b in
+            let (first, second) = sort.ascending ? (a, b) : (b, a)
+            switch sort.key {
+            case "sql": return first.sql.localizedStandardCompare(second.sql) == .orderedAscending
+            case "result": return result(first) < result(second)
+            default: return first.date < second.date
+            }
+        }
+    }
+
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        sortEntries()
+        table.reloadData()
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        (preview.documentView as? NSTextView)?.string = selectedSQL
+    }
+
+    private var selectedEntries: [HistoryEntry] { table.selectedRowIndexes.filter { entries.indices.contains($0) }.map { entries[$0] } }
+    /// The selected statements, as a script when there are several.
+    private var selectedSQL: String {
+        let all = selectedEntries.map(\.sql)
+        return all.count > 1 ? all.joined(separator: ";\n") + ";" : all.first ?? ""
+    }
 
     /// ↑ and ↓ in the search field choose in the list; Return inserts.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
@@ -182,27 +234,47 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        if table.clickedRow >= 0 { table.selectRowIndexes([table.clickedRow], byExtendingSelection: false) }
+        if table.clickedRow >= 0, !table.selectedRowIndexes.contains(table.clickedRow) {
+            table.selectRowIndexes([table.clickedRow], byExtendingSelection: false)
+        }
         let insert = NSMenuItem(title: "Insert", action: #selector(insertSelected(_:)), keyEquivalent: "")
         insert.toolTip = "Put the statement in the editor at the cursor"
+        let tab = NSMenuItem(title: "Open in New Tab", action: #selector(openSelected(_:)), keyEquivalent: "")
+        tab.toolTip = "Put the statement in a new console tab, to read it before running it"
         let copy = Commands.copy.item()
-        for item in [insert, copy] {
+        let remove = NSMenuItem(title: "Delete from History", action: #selector(deleteSelected(_:)), keyEquivalent: "")
+        remove.toolTip = "Forget the selected statements on this Mac"
+        for item in [insert, tab, copy, remove] {
             item.target = self
             menu.addItem(item)
         }
     }
 
     @objc func copy(_ sender: Any?) {
-        guard entries.indices.contains(table.selectedRow) else { return }
+        guard !selectedEntries.isEmpty else { return }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(entries[table.selectedRow].sql, forType: .string)
+        NSPasteboard.general.setString(selectedSQL, forType: .string)
     }
 
     @objc private func insertSelected(_ sender: Any?) {
-        guard entries.indices.contains(table.selectedRow) else { return }
-        let sql = entries[table.selectedRow].sql
+        guard !selectedEntries.isEmpty else { return }
+        let sql = selectedSQL
         close(nil)
         insert(sql)
+    }
+
+    @objc private func openSelected(_ sender: Any?) {
+        guard !selectedEntries.isEmpty else { return }
+        let sql = selectedSQL
+        close(nil)
+        openInTab(sql)
+    }
+
+    @objc private func deleteSelected(_ sender: Any?) {
+        // The gate (plan §2.8): the history is the person's record.
+        guard !selectedEntries.isEmpty, !AgentGuard.refuses("The history is the person's: only they can change it.") else { return }
+        QueryHistory.shared.remove(selectedEntries, from: connection)
+        load()
     }
 
     @objc private func clearHistory(_ sender: Any?) {
@@ -224,16 +296,31 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     }
 }
 
+/// The sheet opens with the focus in its search field, where ⌘C with nothing selected there would do nothing: it copies
+/// the highlighted row, as the sheet promises.
+private final class HistoryPanel: NSPanel {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.charactersIgnoringModifiers == "c",
+           let field = firstResponder as? NSTextView, field.selectedRange().length == 0, let sheet = contentViewController as? HistorySheet {
+            sheet.copy(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+}
+
 extension ConsoleViewController {
     @objc func showHistory(_ sender: Any?) {
         guard let id = connectionID, let window = view.window, window.attachedSheet == nil else { return }
-        let sheet = HistorySheet(connection: id) { [weak self] sql in
+        let sheet = HistorySheet(connection: id, insert: { [weak self] sql in
             guard let self else { return }
             self.view.window?.makeFirstResponder(self.editor)
             self.editor.insertText(sql, replacementRange: self.editor.selectedRange())
-        }
-        let panel = NSPanel(contentViewController: sheet)
-        panel.styleMask = [.titled]
+        }, openInTab: { [weak self] sql in
+            self?.mainWindow?.openConsole(text: sql, title: nil, connection: id)
+        })
+        let panel = HistoryPanel(contentViewController: sheet)
+        panel.styleMask = [.titled, .resizable]
         window.beginSheet(panel)
     }
 }

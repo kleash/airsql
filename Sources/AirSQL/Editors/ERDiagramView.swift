@@ -15,6 +15,8 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
 
     private(set) var boxes: [Box] = []
     private var links: [ERDiagram.Link] = []
+    /// The menu away from any box.
+    var emptyMenu: NSMenu?
     /// A table's box for VoiceOver (the canvas is their group; its value is the selected table).
     private var elements: [NSAccessibilityElement] = []
     var selected: String? {
@@ -189,7 +191,7 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
-        guard let name = table(at: convert(event.locationInWindow, from: nil)) else { return nil }
+        guard let name = table(at: convert(event.locationInWindow, from: nil)) else { return emptyMenu }
         selected = name
         return super.menu(for: event)
     }
