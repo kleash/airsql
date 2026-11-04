@@ -246,6 +246,72 @@ extension AppTests {
         grid.endEditing(commit: false)
     }
 
+    /// A disabled menu item with F2 takes the key before keyDown (so the harness's "key" can't show this): the grid must claim it.
+    @Test func gridClaimsF2BeforeTheMenu() {
+        let (_, _, content) = gridWindow(FakeGridSource.large())
+        content.editable = true
+        let grid = content.grid, f2 = String(UnicodeScalar(NSF2FunctionKey)!)
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.function], timestamp: 0, windowNumber: grid.window!.windowNumber,
+                                     context: nil, characters: f2, charactersIgnoringModifiers: f2, isARepeat: false, keyCode: 120)!
+        grid.window?.makeFirstResponder(grid)
+        grid.selection.select(GridPosition(row: 1, column: 1))
+        #expect(grid.window?.performKeyEquivalent(with: event) == true && grid.editor?.position == GridPosition(row: 1, column: 1))
+        grid.endEditing(commit: false)
+    }
+
+    /// Esc steps back one thing at a time.
+    @Test func escStepsBackInTheGrid() {
+        let result = ResultGridView(source: ChangingGridSource(rows: 3, columns: 3), table: (nil, "table"), nullText: "NULL", fontSize: 12)
+        let viewer = result.viewer, grid = result.grid
+        grid.selection.select(GridPosition(row: 0, column: 0))
+        grid.selection.select(GridPosition(row: 2, column: 1), extend: true)
+        result.findBar.show(replacing: false)
+        viewer.transposeGrid(nil)
+        viewer.cancelOperation(nil)
+        #expect(result.findBar.isHidden && viewer.transposed)
+        viewer.cancelOperation(nil)
+        #expect(!viewer.transposed)
+        grid.selection.select(GridPosition(row: 0, column: 0))
+        grid.selection.select(GridPosition(row: 2, column: 1), extend: true)
+        let cursor = grid.selection.cursor
+        viewer.cancelOperation(nil)
+        #expect(grid.selection.cursor == cursor && grid.selection.areas.count == 1 && cursor.map(grid.selection.contains) == true)
+        #expect(!grid.selection.contains(GridPosition(row: 1, column: 0)))
+    }
+
+    /// ⌫ on a cell starts its edit empty; Return on one that can't be edited shows its value instead of beeping.
+    @Test func deleteKeyAndReturnOnCells() {
+        let (_, _, content) = gridWindow(FakeGridSource.large())
+        let grid = content.grid
+        grid.window?.makeFirstResponder(grid)
+        grid.selection.select(GridPosition(row: 1, column: 1))
+        grid.deleteBackward(nil)
+        #expect(grid.editor == nil)  // read-only
+        content.editable = true
+        grid.deleteBackward(nil)
+        #expect(grid.editor?.stringValue == "" && grid.editor?.changed == true)
+        grid.endEditing(commit: false)
+        #expect(content.edits.isEmpty)
+    }
+
+    /// A result with no rows says so; a filter that hides every row offers to clear it; Text and Chart cover the note.
+    @Test func resultWithoutRowsSaysSo() {
+        let empty = ResultGridView(source: ChangingGridSource(rows: 0, columns: 2), table: (nil, "table"), nullText: "NULL", fontSize: 12)
+        #expect(!empty.emptyNote.isHidden && empty.emptyNote.text.stringValue == "This result has no rows." && empty.emptyNote.clear.isHidden)
+        empty.viewer.present(.text)
+        #expect(empty.emptyNote.isHidden)
+        empty.viewer.present(.table)
+        #expect(!empty.emptyNote.isHidden)
+
+        let result = ResultGridView(source: ChangingGridSource(rows: 3, columns: 2), table: (nil, "table"), nullText: "NULL", fontSize: 12)
+        #expect(result.emptyNote.isHidden)
+        result.filterBar.searchField.stringValue = "nothing has this"
+        result.reorder()
+        #expect(!result.emptyNote.isHidden && result.emptyNote.text.stringValue == "No rows match the filter or search.")
+        result.emptyNote.clear.performClick(nil)
+        #expect(result.emptyNote.isHidden && result.grid.rowCount == 3)
+    }
+
     @Test func gridHeaderResizesFitsAndMovesColumns() {
         let (_, _, content) = gridWindow(FakeGridSource.large())
         let grid = content.grid, header = grid.header!
@@ -262,6 +328,16 @@ extension AppTests {
 
         header.mouseDown(with: event(.leftMouseDown, header.edges(1).right, clicks: 2))  // auto-fit
         #expect(grid.columnWidths[1] < width + 30)
+
+        // A double click on the header selects, then sorts by the column; a divider's doesn't sort.
+        #expect(!content.events.contains { $0.hasPrefix("sort") })
+        let middle = (header.edges(2).left + header.edges(2).right) / 2 - 20
+        header.mouseDown(with: event(.leftMouseDown, middle))
+        header.mouseUp(with: event(.leftMouseUp, middle))
+        #expect(grid.selection.areas == [.columns(2...2)] && !content.events.contains { $0.hasPrefix("sort") })
+        header.mouseDown(with: event(.leftMouseDown, middle, clicks: 2))
+        header.mouseUp(with: event(.leftMouseUp, middle, clicks: 2))
+        #expect(content.events.last == "sort \(grid.columnOrder[2]) false")
 
         let start = (header.edges(1).left + header.edges(1).right) / 2, target = header.edges(3).right - 5
         header.mouseDown(with: event(.leftMouseDown, start))

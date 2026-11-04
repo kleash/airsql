@@ -54,6 +54,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
+| Previous Record | ⌥⌘← |
+| Next Record | ⌥⌘→ |
 | Transpose | ⌥⌘T |
 | Column List… | ⌘J |
 | SQL Log | ⌥⌘L |
@@ -78,7 +80,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
-| Delete Rows… | ⌘⌫ |
+| Delete Rows | ⌘⌫ |
 | Set NULL | ⌥⌘N |
 | Apply Changes | ⌘S |
 | Revert | ⌥⌘Z |

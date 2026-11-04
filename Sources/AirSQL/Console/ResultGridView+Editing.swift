@@ -137,6 +137,12 @@ extension ResultGridView {
 
     @objc func setCellNull(_ sender: Any?) { setSelected { _ in .null } }
 
+    /// Cut: copies the selected cells, then clears them (NULL where the column allows it), as pending edits.
+    @objc func cut(_ sender: Any?) {
+        viewer.copy(sender)
+        setSelected { [edits] in edits?.nullable($0) == true ? .null : .text("") }
+    }
+
     @objc func deleteRows(_ sender: Any?) {
         guard let edits, edits.canDelete, editingOff == nil else { return NSSound.beep() }
         edits.delete(selectedRows)
@@ -176,7 +182,7 @@ extension ResultGridView {
     }
 
     private static let editingActions: Set<Selector> = [
-        Commands.setNull.action, Commands.deleteRows.action, Commands.revert.action, Commands.apply.action,
+        Commands.setNull.action, Commands.cut.action, Commands.deleteRows.action, Commands.revert.action, Commands.apply.action,
         Commands.previewChanges.action, #selector(revertAllChanges(_:)), Commands.undo.action, Commands.redo.action,
     ]
 
@@ -188,6 +194,9 @@ extension ResultGridView {
             if let off = editingOff { return (false, off) }
             let cells = viewer.selectedCells(limit: 10_000).filter { edits.canEdit(rows.baseRow($0.row), $0.column) }
             return (cells.contains { edits.nullable($0.column) }, cells.isEmpty ? "Select cells you can edit first" : "These columns can't be NULL")
+        case Commands.cut.action:
+            if let off = editingOff { return (false, off) }
+            return (viewer.selectedCells(limit: 10_000).contains { edits.canEdit(rows.baseRow($0.row), $0.column) }, "Select cells you can edit first")
         case Commands.deleteRows.action:
             return editingOff.map { (false, $0) } ?? (!selectedRows.isEmpty, "Select the rows first")
         case Commands.revert.action:

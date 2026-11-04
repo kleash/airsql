@@ -105,9 +105,9 @@ extension AppTests {
             let other = middle(4, 1)
             let menu = await call(harness, "click", ["x": other.0, "y": other.1, "button": "right"])
             #expect(list.selectedRow == 4, "a right-click selects the row it is on: \(menu.error ?? "")")
-            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Delete Rows…"])
+            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Delete Rows"])
             #expect((menu["menu"] as? [[String: Any]])?.allSatisfy { $0["enabled"] as? Bool == true } == true)
-            _ = await call(harness, "menu", ["path": "context > Delete Rows…"])
+            _ = await call(harness, "menu", ["path": "context > Delete Rows"])
             #expect(list.numberOfRows == 5 && editor.sqlText.string.contains("DROP COLUMN `total`"))
         }
 

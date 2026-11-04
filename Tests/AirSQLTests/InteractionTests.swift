@@ -158,13 +158,12 @@ extension AppTests {
                         (main.selectedTab?.content as? TableDataController)?.grid.selection.cursor == GridPosition(row: 1, column: 2)
                     },
                     doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
-                           "Add Row", "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows…", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Cut", "Paste", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
+                           "Related Rows", "Add Row", "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
                            "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Set DEFAULT", "Insert Value", "Add Row",
-                              "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows…", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…"]),
-            // Near a header's left (its sort control is at the right), the column made wider than its values: a
-            // double-click fits it to them, as on its border.
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Cut", "Paste", "Quick Filter", "Set DEFAULT", "Insert Value", "Related Rows", "Add Row",
+                              "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…"]),
+            // Near a header's left (its sort control is at the right): a double-click sorts by the column.
             Surface(name: "Table rows: column header",
                     place: { main, _ in
                         guard let tab = try? await GridDataAppTests.open(in: main, connection: Fixtures.local) else { return nil }
@@ -178,8 +177,7 @@ extension AppTests {
                         (main.selectedTab?.content as? TableDataController)?.grid.selection.containsColumn(2) == true
                     },
                     doubleClicked: { main, _ in
-                        guard let grid = (main.selectedTab?.content as? TableDataController)?.grid else { return false }
-                        return grid.columnWidths[grid.columnOrder[2]] < 400
+                        (main.selectedTab?.content as? TableDataController)?.source?.sort.isEmpty == false
                     },
                     // region: not a key (Use as Label) nor a foreign key (Add Virtual Foreign Key…).
                     menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
@@ -223,10 +221,10 @@ extension AppTests {
                     },
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultGrid(main).editor != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Set NULL", "Delete Rows…", "Revert",
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Cut", "Set NULL", "Delete Rows", "Revert",
                            "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Display As"],
                     // email is NOT NULL: Set NULL is off, saying so.
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Delete Rows…", "Export Rows…", "Value Panel",
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Cut", "Delete Rows", "Export Rows…", "Value Panel",
                               "Record View", "Column Summary…"]),
             // A console result's header: its rows sort and filter here.
             Surface(name: "Grid column header",
@@ -240,10 +238,7 @@ extension AppTests {
                         return windowPoint(NSRect(x: left + 10, y: 0, width: 20, height: header.bounds.height), in: header)
                     },
                     clicked: { main in resultGrid(main).selection.containsColumn(1) },
-                    doubleClicked: { main, _ in
-                        let grid = resultGrid(main)
-                        return grid.columnWidths[grid.columnOrder[1]] < 300
-                    },
+                    doubleClicked: { main, _ in !resultGrid(main).sortOrder.isEmpty },
                     menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
                            "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
