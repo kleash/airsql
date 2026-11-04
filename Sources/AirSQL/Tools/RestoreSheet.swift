@@ -22,6 +22,10 @@ final class RestoreSheet: ToolSheet {
     private var command: NSTextView?
     private let builtInFirst: Bool
     private var server: ServerInfo?
+    private lazy var copyButton = button("Copy Command", id: "restore.copyCommand", tip: "Copy the command line (it holds no password)",
+                                         target: self, action: #selector(copyCommand(_:)))
+    private let chooseTool = button("Choose…", id: "restore.chooseTool", tip: "Choose a mysql or mariadb program anywhere on this Mac",
+                                    target: nil, action: nil)
     private var tools: [ClientTool] = []
     private var file: URL?
     private var fileSize: Int64 = 0
@@ -33,6 +37,8 @@ final class RestoreSheet: ToolSheet {
         heading.stringValue = (builtIn ? "Run a SQL file on " : "Restore into ") + connection.displayName
         choose.target = self
         choose.action = #selector(chooseFile(_:))
+        chooseTool.target = self
+        chooseTool.action = #selector(chooseProgram(_:))
         stopOnError.state = .on
         stopOnError.toolTip = "End at the first statement that fails; what ran before it stays"
         goOn.toolTip = "Run every statement, skipping those that fail, and say how many failed"
@@ -49,6 +55,8 @@ final class RestoreSheet: ToolSheet {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    override var writes: Bool { true }
+
     // MARK: Form
 
     override func makeForm() -> NSView {
@@ -64,7 +72,7 @@ final class RestoreSheet: ToolSheet {
         errors.alignment = .leading
         errors.spacing = 4
         form.row("On error", [errors]).yPlacement = .top
-        form.row("Tool", [toolMenu])
+        form.row("Tool", [toolMenu, chooseTool])
         form.grid.addRow(with: [NSGridCell.emptyContentView, fit]).topPadding = -4
         fit.preferredMaxLayoutWidth = 460
         let grid = form.finish()
@@ -83,18 +91,18 @@ final class RestoreSheet: ToolSheet {
     }
 
     override func extraButtons() -> [NSButton] {
-        [button("Copy Command", id: "restore.copyCommand", tip: "Copy the command line (it holds no password)", target: self,
-                action: #selector(copyCommand(_:)))]
+        [copyButton]
     }
 
     override func setFormEnabled(_ enabled: Bool) {
-        for control in [choose, databaseMenu, stopOnError, goOn, toolMenu] as [NSControl] {
+        for control in [choose, databaseMenu, stopOnError, goOn, toolMenu, chooseTool] as [NSControl] {
             control.isEnabled = enabled
         }
         let why = "It is running: wait for it, or Stop it"
         choose.toolTip = enabled ? "Choose the .sql or .sql.gz file to run" : why
         databaseMenu.toolTip = enabled ? "Choose the database the file runs in" : why
         toolMenu.toolTip = enabled ? "Choose the program that runs the file" : why
+        chooseTool.toolTip = enabled ? "Choose a mysql or mariadb program anywhere on this Mac" : why
     }
 
     // MARK: Loading
@@ -128,18 +136,27 @@ final class RestoreSheet: ToolSheet {
         for item in databaseMenu.itemArray { item.toolTip = "Run the file in \(item.title)" }
         databaseMenu.selectItem(withTitle: connection.database)
         if databaseMenu.indexOfSelectedItem < 0, !databases.isEmpty { databaseMenu.selectItem(at: 0) }
-        toolMenu.removeAllItems()
-        for tool in tools {
-            toolMenu.addItem(withTitle: tool.title)
-            toolMenu.lastItem?.toolTip = tool.path
-        }
-        toolMenu.addItem(withTitle: "AirSQL (built in)")
-        toolMenu.lastItem?.toolTip = "Run the statements in AirSQL itself: no client tools needed"
+        fill(toolMenu, tools: tools, builtIn: Self.builtInTip)
         let picked = tools.firstIndex { $0.path == connection.clientPath }
             ?? ClientTools.best(tools, for: server).flatMap { best in tools.firstIndex { $0 == best } }
         toolMenu.selectItem(at: builtInFirst ? tools.count : picked ?? tools.count)
         loading(nil)
         formChanged(nil)
+    }
+
+    private static let builtInTip = "Run the statements in AirSQL itself: no client tools needed"
+
+    @objc private func chooseProgram(_ sender: Any?) {
+        chooseProgram(.client) { [weak self] in self?.use(tool: $0) }
+    }
+
+    /// Adds `tool` (Choose…'s) to the menu and uses it.
+    func use(tool: ClientTool) {
+        tools.removeAll { $0.path == tool.path }
+        tools.insert(tool, at: 0)
+        fill(toolMenu, tools: tools, builtIn: Self.builtInTip)
+        toolMenu.selectItem(at: 0)
+        formChanged(toolMenu)
     }
 
     // MARK: Changes
@@ -161,6 +178,7 @@ final class RestoreSheet: ToolSheet {
             latest.clientPath = tool.path
             model.save(latest)
         }
+        copyButton.isHidden = tool == nil  // AirSQL's own runner has no command to copy
         if let tool {
             let fitness = ClientTools.fit(tool, server: server)
             fit.stringValue = ToolCommand(tool: tool, options: options, server: server).tlsProblem ?? fitness.message

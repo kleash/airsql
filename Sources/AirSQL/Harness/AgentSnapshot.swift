@@ -196,6 +196,7 @@ extension AgentServer {
         let main = self.main?.window
         return (main.map { [$0] } ?? []) + otherWindows().filter { window in
             window !== main && window.isVisible && window.sheetParent == nil && !(window.windowController is MainWindowController)
+                && !(window.windowController is ToolSheet)
                 && !window.title.isEmpty && !window.className.contains("Popover")
         }
     }
@@ -203,18 +204,22 @@ extension AgentServer {
     /// Whether `window` (or the window it is a sheet of) is one of `appWindows`.
     func isOurs(_ window: NSWindow?) -> Bool {
         var root = window
-        while let parent = root?.sheetParent { root = parent }
+        while let parent = root?.sheetParent ?? (root?.windowController as? ToolSheet)?.opener { root = parent }
         if let child = root, child.className.contains("Popover"), let parent = child.parent { root = parent }
         return root.map { root in appWindows.contains { $0 === root } } ?? false
     }
 
-    /// The sheets on `window`, outermost first.
+    /// The sheets on `window`, outermost first, and the client tools' windows opened from it, which agents work with
+    /// as sheets (each followed by its own sheets).
     func sheets(of window: NSWindow) -> [NSWindow] {
         var result: [NSWindow] = []
-        var current = window.attachedSheet
-        while let sheet = current {
-            result.append(sheet)
-            current = sheet.attachedSheet
+        for root in [window] + ToolSheet.open.filter({ $0.opener === window }).compactMap(\.window) {
+            if root !== window { result.append(root) }
+            var current = root.attachedSheet
+            while let sheet = current {
+                result.append(sheet)
+                current = sheet.attachedSheet
+            }
         }
         return result
     }
@@ -263,7 +268,7 @@ extension AgentServer {
                 fields.append(field)
             }
         }
-        var json: [String: Any] = ["kind": sheet.sheetParent == nil ? "alert" : "sheet", "buttons": buttons, "fields": fields]
+        var json: [String: Any] = ["kind": sheet.sheetParent == nil && !(sheet.windowController is ToolSheet) ? "alert" : "sheet", "buttons": buttons, "fields": fields]
         json["title"] = texts.first ?? sheet.title
         if texts.count > 1 { json["text"] = texts.dropFirst().joined(separator: "\n") }
         return json

@@ -18,24 +18,29 @@ extension MainWindowController {
         }
     }
 
-    /// Disconnects the selected connections, asking first when a tab of theirs has an open transaction or edits.
+    /// Disconnects the selected connections, asking first when a tab of theirs has an open transaction or edits, or a
+    /// client tool is working through one of them (disconnecting stops it: a route it uses would go from under it).
     @objc func disconnect(_ sender: Any?) {
         let ids = targetConnections.map(\.id).filter(isConnected)
         let busy = tabs.filter { tab in
             ids.contains(tab.connectionID ?? UUID()) && (tab.tabContent?.isEdited == true || tab.tabContent?.transactionBadge != nil
                 || (tab.content as? ConsoleViewController)?.pendingResultRows ?? 0 > 0)
         }
-        guard !busy.isEmpty, let window else { return ids.forEach(model.connector.disconnect) }
+        let tools = ToolSheet.running(on: ids)
+        guard !busy.isEmpty || !tools.isEmpty, let window else { return ids.forEach(model.connector.disconnect) }
         let alert = NSAlert()
         alert.messageText = ids.count == 1 ? "Disconnect “\(model.connection(ids[0])?.displayName ?? "")”?" : "Disconnect \(ids.count) connections?"
-        alert.informativeText = "\(busy.count == 1 ? "A tab has" : "\(busy.count) tabs have") an open transaction or edits "
-            + "that aren't applied. Disconnecting rolls the transaction back and the edits can't be applied any more."
+        alert.informativeText = ((busy.isEmpty ? [] : ["\(busy.count == 1 ? "A tab has" : "\(busy.count) tabs have") an open "
+            + "transaction or edits that aren't applied. Disconnecting rolls the transaction back and the edits can't be "
+            + "applied any more."]) + tools.map { "“\($0.window?.title ?? "")” is running: disconnecting stops it." })
+            .joined(separator: "\n")
         let disconnect = alert.addButton(withTitle: "Disconnect")
         disconnect.hasDestructiveAction = true
-        disconnect.toolTip = "Close the connection; the open transaction is rolled back"
+        disconnect.toolTip = "Close the connection: an open transaction is rolled back and running tools stop"
         alert.addButton(withTitle: "Cancel").toolTip = "Stay connected"
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
+            ToolSheet.running(on: ids).forEach { $0.stop() }
             ids.forEach { self?.model.connector.disconnect($0) }
         }
     }

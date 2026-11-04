@@ -4,9 +4,15 @@ import AppKit
 /// What the client tools' sheets (Export, Restore and Run SQL File, Copy to Another Server, Import CSV) share: a heading,
 /// the sheet's own form, the command line or what will run, a progress row and the buttons. Work runs off the main
 /// thread and is listed in the status bar's Activity with Cancel (plan §2.11); while it runs, the sheet's controls are
-/// off with a tooltip saying why, and Cancel becomes Stop.
+/// off with a tooltip saying why, and Cancel becomes Stop. Each is a window of its own, to move aside and keep working in
+/// the main window; closing it, disconnecting and quitting ask first while its work runs.
 @MainActor
-class ToolSheet: NSWindowController {
+class ToolSheet: NSWindowController, NSWindowDelegate {
+    /// The tools' windows open now, which also keeps them until they close.
+    private(set) static var open: [ToolSheet] = []
+    /// Those whose work uses one of `ids`.
+    static func running(on ids: [UUID]) -> [ToolSheet] { open.filter { $0.running && !$0.connections.isDisjoint(with: ids) } }
+
     let model: AppModel
     let connection: SavedConnection
     let options: ConnectOptions
@@ -24,7 +30,8 @@ class ToolSheet: NSWindowController {
     private var cancellation: Cancellation?
     private var activity: Activity?
     private var started = Date()
-    private var retained: ToolSheet?
+    /// The main window it was opened from.
+    private(set) weak var opener: NSWindow?
 
     init(model: AppModel, connection: SavedConnection, options: ConnectOptions, width: CGFloat, action: String, actionTip: String) {
         self.model = model
@@ -32,10 +39,12 @@ class ToolSheet: NSWindowController {
         self.options = options
         self.width = width
         runButton = button(action, id: "tools.run", tip: actionTip, target: nil, action: nil, primary: true)
-        cancelButton = button("Cancel", id: "tools.cancel", tip: "Close the sheet: nothing runs", target: nil, action: nil)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 300), styleMask: [.titled], backing: .buffered,
-                              defer: true)
+        cancelButton = button("Cancel", id: "tools.cancel", tip: "Close the window: nothing runs", target: nil, action: nil)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 300), styleMask: [.titled, .closable, .miniaturizable],
+                              backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
         super.init(window: window)
+        window.delegate = self
         runButton.target = self
         runButton.action = #selector(runPressed(_:))
         runButton.keyEquivalent = "\r"
@@ -62,18 +71,30 @@ class ToolSheet: NSWindowController {
     func run() {}
     /// Turns the form's controls on or off while work runs.
     func setFormEnabled(_ enabled: Bool) {}
+    /// Whether the work writes to `connection`, so a connection made read-only since the window opened stops it.
+    var writes: Bool { false }
+    /// The saved connections the work goes through.
+    var connections: Set<UUID> { [connection.id] }
 
     // MARK: Showing
 
-    /// Shows the sheet on `parent` and loads what it needs (tests fill it themselves: `loads` false).
+    /// Shows the window over `parent` and loads what it needs (tests fill it themselves: `loads` false); the same tool
+    /// for the same connection, already open, comes to the front instead.
     func show(on parent: NSWindow, loads: Bool = true) {
         guard let window else { return }
+        window.title = heading.stringValue
+        if let same = Self.open.first(where: { $0.opener === parent && $0.connection.id == connection.id && $0.window?.title == window.title }) {
+            same.window?.makeKeyAndOrderFront(nil)
+            return
+        }
         window.contentView = makeContent()
         window.setContentSize(window.contentView!.fittingSize)
         window.initialFirstResponder = runButton
         window.autorecalculatesKeyViewLoop = true  // Tab goes through every control, in order
-        retained = self
-        parent.beginSheet(window)
+        opener = parent
+        Self.open.append(self)
+        window.setFrameTopLeftPoint(NSPoint(x: parent.frame.midX - window.frame.width / 2, y: parent.frame.maxY - 52))
+        window.makeKeyAndOrderFront(nil)
         if loads { load() }
     }
 
@@ -146,6 +167,34 @@ class ToolSheet: NSWindowController {
         return (box, text)
     }
 
+    // MARK: The Tool pop-up
+
+    /// Fills a Tool pop-up: `tools` (two can have one title: the menu's own `addItem` would drop one), then AirSQL's own
+    /// way, `builtIn` saying what that does.
+    func fill(_ menu: NSPopUpButton, tools: [ClientTool], builtIn: String) {
+        menu.removeAllItems()
+        for tool in tools { menu.menu?.addItem(withTitle: tool.title, action: nil, keyEquivalent: "").toolTip = tool.path }
+        menu.menu?.addItem(withTitle: "AirSQL (built in)", action: nil, keyEquivalent: "").toolTip = builtIn
+    }
+
+    /// Asks for a program anywhere on this Mac, starting in Homebrew's folder, which Finder hides; `done` gets it with
+    /// its version.
+    func chooseProgram(_ kind: ClientTool.Kind, done: @escaping (ClientTool) -> Void) {
+        guard let window else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.treatsFilePackagesAsDirectories = true
+        panel.showsHiddenFiles = true
+        panel.directoryURL = URL(fileURLWithPath: "/opt/homebrew/opt")
+        panel.message = "Choose the \(kind.names.joined(separator: " or ")) program."
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let path = panel.url?.path else { return }
+            Task { @MainActor in
+                if let tool = await ClientTools.find(kind, chosen: path, folders: []).first { done(tool) }
+            }
+        }
+    }
+
     // MARK: Running
 
     /// Says what the sheet is doing while it loads (a spinner), or that it is ready (nil).
@@ -210,7 +259,7 @@ class ToolSheet: NSWindowController {
         status.textColor = failed ? .statusBad : .labelColor
         setFormEnabled(true)
         cancelButton.title = "Close"
-        cancelButton.toolTip = "Close the sheet"
+        cancelButton.toolTip = "Close the window"
         runButton.isEnabled = true
         updateRunButton()
     }
@@ -228,7 +277,7 @@ class ToolSheet: NSWindowController {
         timeLeft.stringValue = ""
         setFormEnabled(true)
         cancelButton.title = "Cancel"
-        cancelButton.toolTip = "Close the sheet: nothing runs"
+        cancelButton.toolTip = "Close the window: nothing runs"
         runButton.isEnabled = true
         updateRunButton()
     }
@@ -238,24 +287,49 @@ class ToolSheet: NSWindowController {
 
     @objc private func runPressed(_ sender: Any?) {
         guard !running, runButton.isEnabled else { return }
+        if writes, model.connection(connection.id)?.readOnly == true {
+            return finish("\(connection.displayName) is read-only now: turn that off in the connection's settings to write to it",
+                          failed: true)
+        }
         run()
     }
 
     @objc private func cancelPressed(_ sender: Any?) {
-        if running {
-            cancellation?.cancel()
-            activity?.cancel()
-            status.stringValue = "Stopping…"
-            return
-        }
-        close()
+        if running { stop() } else { close() }
     }
 
-    /// Ends the sheet.
-    override func close() {
-        if let sheet = window, let parent = sheet.sheetParent { parent.endSheet(sheet) }
-        retained = nil
+    /// Stops the work: what has run stays run.
+    func stop() {
+        cancellation?.cancel()
+        activity?.cancel()
+        status.stringValue = "Stopping…"
     }
+
+    /// Ends the window.
+    override func close() {
+        Self.open.removeAll { $0 === self }
+        super.close()
+    }
+
+    /// The close button and Close Window: work under way asks first, and `close` does the rest, as Cancel's does.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard running else {
+            close()
+            return false
+        }
+        let alert = NSAlert()
+        alert.messageText = "Stop “\(sender.title)”?"
+        alert.informativeText = "It is still running. If you stop it, what has run stays run."
+        alert.addButton(withTitle: "Keep Running").toolTip = "Let the work finish"
+        alert.addButton(withTitle: "Stop").toolTip = "Stop the work now: what has run stays run"
+        alert.beginSheetModal(for: sender) { [weak self] in
+            if $0 == .alertSecondButtonReturn, self?.running == true { self?.stop() }
+        }
+        return false
+    }
+
+    /// ⌘W: the main menu's Close Tab closes this window while it is in front.
+    @objc func closeTab(_ sender: Any?) { window?.performClose(sender) }
 
     // MARK: Words
 
