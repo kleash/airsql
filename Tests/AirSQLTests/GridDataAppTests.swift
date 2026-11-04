@@ -564,8 +564,9 @@ extension AppTests {
 
         /// ⌫ on rows selected by their numbers marks them, as ⌘⌫ does; ⌘X copies the cells and clears them, pending.
         @Test func deleteKeyMarksRowsAndCutClearsCells() async throws {
-            let (_, _, tab) = try await Self.tab()
+            let (main, _, tab) = try await Self.tab()
             let source = try #require(tab.source)
+            main.window?.makeFirstResponder(tab.grid)  // ⌫ only reaches the grid when it has the focus
             tab.grid.selection.selectRow(0)
             tab.grid.deleteBackward(nil)
             #expect(source.changes.isDeleted(try #require(source.rowKey(0))))
