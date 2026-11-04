@@ -364,6 +364,12 @@ own session, which every console tab of that connection shares.
 - Keywords, names, strings, numbers and comments have their own colours; the brackets around the cursor are marked.
 - A quote, comment or bracket left open is underlined in red a moment after you stop typing, and hovering over it says
   what's missing. No server is asked.
+- A table or column that isn't in the schema AirSQL has read is underlined in red the same way, and hovering over it
+  says what wasn't found. It's only advice: **Run** still runs, and nothing is sent to the server to check. When
+  AirSQL isn't sure it says nothing: a database whose details aren't loaded yet, temporary tables and tables made or
+  altered in the same text or session, CTEs, derived tables, and any statement other than a plain SELECT, INSERT,
+  REPLACE, UPDATE or DELETE. Columns are checked only when every table in the statement is known. If a table is new,
+  **Refresh** the schema and the underline goes.
 - **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
   keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
   elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
@@ -1027,6 +1033,8 @@ parts, chosen at the top:
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
 green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Discard** takes back all of them.
+⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
+as new rows.
 
 Under the lists, the SQL that Apply would run updates as you type. When something can't work yet (a VARCHAR without a
 length, two columns of one name, an emoji in a name, which the server would keep as `?`), it says what to fix instead.
@@ -1055,6 +1063,8 @@ server keeps it, to edit as text.
 - MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
   function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
   apply again, and **Revert** puts the old code back.
+- When the server refuses the code, the place it points to is underlined in red, with the message on hover, until you
+  change the text.
 - Renaming it in the code makes the new one and then drops the old one.
 
 ## The ER diagram
@@ -1065,7 +1075,7 @@ at, virtual foreign keys you added in a table's rows included ([Virtual foreign 
 Tables with no keys come last.
 
 Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure** and **Copy Name**. **Export Image…** saves the diagram as a PNG, and **Export
+right-click it for **Open Structure** and **Copy Name** (⌘C copies the selected table's name too). **Export Image…** saves the diagram as a PNG, and **Export
 Mermaid…** as Mermaid text, which many docs sites and wikis draw.
 
 

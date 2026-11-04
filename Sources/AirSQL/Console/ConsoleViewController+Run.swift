@@ -176,6 +176,13 @@ extension ConsoleViewController {
                 : ConsoleScript.title(of: statement, in: run.text, after: previous, noBackslashEscapes: session.noBackslashEscapes)
             show(outcome, title: title, run: run, session: session)
             if outcome.error == nil, Self.changesSchema(statement.sql) { schemaChanged = true }
+            let names = SQLNameCheck.changedNames(in: statement.sql), code = SQLNameCheck.runsCode(statement.sql)
+            if !names.isEmpty || code {
+                changeShared {
+                    $0.changedNames.formUnion(names)
+                    $0.ranCode = $0.ranCode || code
+                }
+            }
             if outcome.error != nil || run.cancelled {
                 let left = run.statements.count - index - 1
                 if left > 0 { note(.info, "Stopped: the \(left) statement\(left == 1 ? "" : "s") after it didn't run.") }

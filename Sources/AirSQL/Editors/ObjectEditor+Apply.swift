@@ -51,7 +51,7 @@ extension ObjectEditorController {
         let work = activity.start(change.title, connection: context.connection.id) {
             Task { _ = try? await running.session?.cancel() }
         }
-        let context = self.context, kind = self.kind, database = self.database, oldName = name
+        let context = self.context, kind = self.kind, database = self.database, oldName = name, sent = code.string
         Task {
             var failure: Error?
             var done = 0
@@ -76,6 +76,15 @@ extension ObjectEditorController {
             }
             isBusyNow(false)
             if let failure {
+                if let error = failure as? AirSQLError, done < change.statements.count, change.statements[done].hasPrefix("CREATE"),
+                   code.string == sent {
+                    let said = error.details.isEmpty ? error.message : error.details
+                    code.runProblem = ObjectCode.problem(said, shown: error.details.isEmpty ? error.message : error.message + " " + error.details,
+                                                         in: sent, noBackslashEscapes: server.noBackslashEscapes)
+                    (codeScroll.verticalRulerView as? LineNumberRuler)?.errorLine = code.runProblem.map {
+                        sent.utf16.prefix($0.range.lowerBound).filter { $0 == 0x0A }.count + 1
+                    }
+                }
                 let message = (failure as? AirSQLError).map { $0.message + "\n\n" + $0.details } ?? failure.localizedDescription
                 let dropped = change.statements.prefix(done).contains { $0.hasPrefix("DROP ") }
                 showError(message + "\n\n" + (dropped ? "The old \(kind.rawValue) was dropped before the new code failed: fix the code "
