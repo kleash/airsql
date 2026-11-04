@@ -185,11 +185,13 @@ extension ResultGridView {
     /// The rows shown: those meeting every condition and holding the search's text, in the sort's order; matches tinted.
     func reorder() {
         let search = filterBar.searchField.stringValue, conditions = conditions, source = source, columns = source.columns.indices
+        let find = findBar.find, expression = findBar.isHidden || !findBar.filtersRows ? nil : find.expression
         var shown: [Int]?
-        if !conditions.isEmpty || !search.isEmpty {
+        if !conditions.isEmpty || !search.isEmpty || expression != nil {
             shown = (0..<source.rowCount).filter { row in
                 conditions.allSatisfy { $0.condition.matches(source.value(row, $0.column)) }
                     && (search.isEmpty || GridFilter.matches(search, columns.map { source.value(row, $0) }))
+                    && (expression == nil || columns.contains { find.matches(source.value(row, $0), expression) })
             }
         }
         let keys = viewer.sortOrder
@@ -201,7 +203,7 @@ extension ResultGridView {
         reordered.order = shown
         // In the grid: Record View's row and Transpose's columns would be other rows now.
         viewer.backToGrid(nil)
-        viewer.highlight = search.isEmpty ? nil : { row, column in GridFilter.matches(search, [reordered.value(row, column)]) }
+        updateHighlight()
         viewer.reloadData()
         filterBar.show(conditions.map(\.condition), shown: reordered.rowCount, of: source.rowCount)
         let idle = conditions.isEmpty && search.isEmpty && filterBar.searchField.currentEditor() == nil
@@ -211,10 +213,26 @@ extension ResultGridView {
         if let responder = window?.firstResponder as? NSView, responder.isDescendant(of: filterBar) { window?.makeFirstResponder(grid) }
     }
 
+    /// Tints the cells holding Search All Columns' text and the find bar's matches.
+    private func updateHighlight() {
+        let search = filterBar.searchField.stringValue, find = findBar.find, rows = rows
+        let expression = findBar.isHidden ? nil : find.expression
+        guard !search.isEmpty || expression != nil else {
+            viewer.highlight = nil
+            return
+        }
+        viewer.highlight = { row, column in
+            let value = rows.value(row, column)
+            return expression.map { find.matches(value, $0) } == true || !search.isEmpty && GridFilter.matches(search, [value])
+        }
+    }
+
     /// Whether a filter or sort command can run now, and why not; nil for the others.
     func filterState(_ item: NSMenuItem) -> (Bool, String?)? {
         let focus = viewer.focusedCell != nil
         switch item.action {
+        case Commands.find.action where item.tag == Commands.findAndReplace.tag:
+            return (false, "Replace works in a table tab: a result's rows can only be found here")
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.filterPrompt.action:
             return (focus, "Select a cell first")
         case Commands.quickFilter.action:
@@ -231,6 +249,28 @@ extension ResultGridView {
         default: return nil
         }
     }
+}
+
+extension ResultGridView: FindBarOwner {
+    var findRows: GridSource? { rows }
+
+    override func performTextFinderAction(_ sender: Any?) { findAction(sender) }
+
+    /// The text or an option changed: the tint and the count, and the rows when Filter Rows is or was on.
+    func findChanged() {
+        let filtered = !findBar.isHidden && findBar.filtersRows
+        if filtered || findFiltered { reorder() } else { updateHighlight() }
+        findFiltered = filtered
+        updateFindCount()
+    }
+
+    func findClosed() {
+        findChanged()
+        window?.makeFirstResponder(grid)
+    }
+
+    /// Never asked for: Find and Replace is off here (`filterState`).
+    func replaceMatch(all: Bool) { NSSound.beep() }
 }
 
 extension ResultGridView: NSMenuItemValidation {

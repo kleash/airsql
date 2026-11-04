@@ -18,6 +18,9 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     private let table: (database: String?, name: String)
     /// The bar over the rows, and its conditions on the source's columns (ANDed).
     let filterBar = ResultFilterBar()
+    let findBar = TableFindBar()
+    /// Whether the find bar's Filter Rows was hiding rows at the last change.
+    var findFiltered = false
     var conditions: [(column: Int, condition: GridCondition)] = []
     /// Editing a console result: the connection it was run on (nil: not connected), the app (for Settings ▸ Safety),
     /// whether the console has a transaction open, and the data session's sql_mode and time zone once read.
@@ -65,11 +68,12 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         filterBar.show([], shown: source.rowCount, of: source.rowCount)
         // The filter bar shows while a filter or a search is on (⇧⌘E opens it), and an edited result's notice while its
         // changes wait; hidden, they take no room.
-        let bars = NSStackView(views: [filterBar, notice])
+        findBar.owner = self
+        let bars = NSStackView(views: [filterBar, findBar, notice])
         bars.orientation = .vertical
         bars.spacing = 0
         bars.translatesAutoresizingMaskIntoConstraints = false
-        for bar in [filterBar, notice] as [NSView] { bar.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true }
+        for bar in [filterBar, findBar, notice] as [NSView] { bar.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true }
         filterBar.isHidden = true
         notice.owner = self
         addSubview(bars)

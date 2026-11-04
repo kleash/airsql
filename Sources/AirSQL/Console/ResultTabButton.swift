@@ -12,6 +12,8 @@ final class ResultTabButton: NSView {
     let closeButton = NSButton()
     private var selected = false
     private var editor: RenameField?
+    private var pinWidth: NSLayoutConstraint!
+    private var closeWidth: NSLayoutConstraint!
 
     init(bar: ResultsView) {
         self.bar = bar
@@ -38,10 +40,8 @@ final class ResultTabButton: NSView {
         addSubview(pin)
         addSubview(title)
         addSubview(closeButton)
-        let pinWidth = pin.widthAnchor.constraint(equalToConstant: 0)
-        pinWidth.identifier = "pinWidth"
-        let closeWidth = closeButton.widthAnchor.constraint(equalToConstant: 0)
-        closeWidth.identifier = "closeWidth"
+        pinWidth = pin.widthAnchor.constraint(equalToConstant: 0)
+        closeWidth = closeButton.widthAnchor.constraint(equalToConstant: 0)
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: 22),
             pin.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
@@ -66,9 +66,9 @@ final class ResultTabButton: NSView {
         title.stringValue = tab.label
         title.textColor = selected ? .labelColor : .secondaryLabelColor
         pin.isHidden = !tab.pinned
-        constraints.first { $0.identifier == "pinWidth" }?.constant = tab.pinned ? 14 : 0
+        pinWidth.constant = tab.pinned ? 14 : 0
         closeButton.isHidden = !tab.content.isRenamable
-        constraints.first { $0.identifier == "closeWidth" }?.constant = tab.content.isRenamable ? 14 : 0
+        closeWidth.constant = tab.content.isRenamable ? 14 : 0
         let what = tab.content.isRenamable ? "click to show it, double-click to rename it, right-click to pin or close it"
             : "click to show what each statement did"
         toolTip = tab.label + (tab.pinned ? " (pinned)" : "") + ": " + what

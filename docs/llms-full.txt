@@ -422,6 +422,9 @@ nothing runs.
   names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
   to select its statement.
 - A result keeps at most its first 100,000 rows; the tab then says it is cut short.
+- **Edit ▸ Find** (⌘F) with a result's rows focused finds values in them, as in a [table tab](https://kleash.github.io/airsql/table-data.html): ⌘G and ⇧⌘G
+  move between matches, and Options has Match Case, Regular Expression, Whole Words and Filter Rows. Replace is for
+  table tabs.
 - **Filter, search and sort a result** on its rows, at once, without running the query again: right-click a cell for
   **Quick Filter** (the same conditions as in a [table tab](https://kleash.github.io/airsql/table-data.html#filter-search-and-sort), Type a Value…
   included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Sort by

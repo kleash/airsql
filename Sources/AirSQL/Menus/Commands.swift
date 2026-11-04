@@ -336,7 +336,7 @@ enum Commands {
                               tip: "Find text in the editor, or values in the grid's loaded rows")
     static let findAndReplace = Command("Find and Replace…", #selector(NSResponder.performTextFinderAction(_:)), "f", [.command, .option],
                                         tag: NSTextFinder.Action.showReplaceInterface.rawValue,
-                                        tip: "Find and replace text in the editor, or values in the grid as pending edits")
+                                        tip: "Find and replace text in the editor, or values in a table tab as pending edits")
     static let findNext = Command("Find Next", #selector(NSResponder.performTextFinderAction(_:)), "g",
                                   tag: NSTextFinder.Action.nextMatch.rawValue, tip: "Show the next match")
     static let findPrevious = Command("Find Previous", #selector(NSResponder.performTextFinderAction(_:)), "G",

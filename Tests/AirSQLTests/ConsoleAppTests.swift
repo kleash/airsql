@@ -1,4 +1,5 @@
 import AppKit
+import CMariaDB
 import Testing
 @testable import AirSQL
 @testable import AirSQLCore
@@ -202,6 +203,33 @@ extension AppTests {
             #expect(buttons.map(\.closeButton.isHidden) == [false, false, true])
             buttons[0].closeButton.performClick(nil)
             #expect(console.resultTabs.map(\.title) == ["Two"] && shown() == "Two")
+        }
+
+        /// ⌘F in a result's rows: the find bar works on them as in a table tab, on one result shown on its side too.
+        @Test func findWorksOnAResultsRows() async throws {
+            let (main, harness, console) = try await Self.console()
+            let store = ResultStore(columns: [ResultStore.Column(name: "name", type: MYSQL_TYPE_VAR_STRING)])
+            for name in ["Ann", "Bob", "Anna"] { _ = store.append([Array(name.utf8)]) }
+            console.addResult(store, title: "People", summary: "")
+            console.showResults()
+            let view = try #require(console.resultTabs.first?.view as? ResultGridView)
+            main.window?.makeFirstResponder(view.grid)
+            #expect(await call(harness, "menu", ["path": "Edit > Find > Find…"]).error == nil)
+            #expect(!view.findBar.isHidden && view.findBar.replaceField.isHidden)
+            view.findBar.findField.stringValue = "ann"
+            view.findChanged()
+            #expect(view.findBar.count.stringValue == "2 matching" && view.viewer.highlight != nil)
+            view.findMatch(forward: true)
+            #expect(view.grid.selection.cursor == GridPosition(row: 0, column: 0) && view.findBar.count.stringValue == "1 of 2")
+            view.findMatch(forward: true)
+            #expect(view.grid.selection.cursor == GridPosition(row: 2, column: 0))
+            view.findBar.options.item(at: 4)?.state = .on  // Filter Rows
+            view.findChanged()
+            #expect(view.rows.rowCount == 2)
+            view.findBar.close(nil)
+            #expect(view.findBar.isHidden && view.rows.rowCount == 3 && view.viewer.highlight == nil)
+            let replace = Commands.findAndReplace.item()
+            #expect(!view.validateMenuItem(replace))
         }
 
         @Test func schemaChangesAreToldApart() {
