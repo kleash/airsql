@@ -211,6 +211,22 @@ extension AppTests {
             _ = await call(harness, "press", ["title": "OK"])
         }
 
+        @Test func figuresAndChartsSayTheyCoverTheLoadedRows() async throws {
+            let (_, _, tab) = try await Self.tab()
+            let viewer = tab.viewer, source = try #require(tab.source)
+            viewer.grid.selection.selectColumn(4)
+            viewer.status.update()
+            #expect(!viewer.status.figure.title.contains("loaded") && viewer.chartCoverage == nil)
+            // A Load All that stopped: a batch came, and the end of the stream didn't.
+            source.append(ResultStore(columns: []), requested: nil)
+            viewer.status.update()
+            #expect(viewer.status.figure.title.hasPrefix("Sum of loaded rows "))
+            #expect(viewer.chartCoverage == "Covers the first \(source.rowCount) rows loaded, not the whole table")
+            viewer.grid.selection.select(GridPosition(row: 0, column: 4))
+            viewer.status.update()
+            #expect(!viewer.status.figure.title.contains("loaded"))
+        }
+
         @Test func aServerErrorNamingAColumnPointsAtTheCell() async throws {
             let session = FakeTableSession()
             session.refuse = { sql in
