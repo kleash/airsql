@@ -198,22 +198,93 @@ extension TableEditorController {
         reloadList()
     }
 
-    /// The selected rows' names, for ⌘C.
-    var selectedNames: [String] {
-        list.selectedRowIndexes.compactMap { row in
-            switch section {
-            case .columns: return design.columns[safe: row]?.name
-            case .indexes: return design.indexes[safe: row]?.name
-            case .foreignKeys: return design.foreignKeys[safe: row]?.name
-            case .checks: return design.checks[safe: row]?.name
-            case .options: return nil
-            }
+    // MARK: Copying rows, between tables too
+
+    /// The rows last copied, while the pasteboard still holds them; as a design of their own, so ⌘V is Duplicate's.
+    private static var copied: (changeCount: Int, rows: TableDesign)?
+
+    private var copiedRows: TableDesign? {
+        guard let copied = Self.copied, copied.changeCount == NSPasteboard.general.changeCount else { return nil }
+        let rows = copied.rows
+        switch section {
+        case .columns: return rows.columns.isEmpty ? nil : rows
+        case .indexes: return rows.indexes.isEmpty ? nil : rows
+        case .foreignKeys: return rows.foreignKeys.isEmpty ? nil : rows
+        case .checks: return rows.checks.isEmpty ? nil : rows
+        case .options: return nil
         }
     }
 
+    var canCopyRows: Bool { section != .options && !list.selectedRowIndexes.isEmpty }
+    var canPasteRows: Bool { !isBusy && copiedRows != nil }
+
+    /// As text the rows are the lines of a CREATE TABLE; ⌘V in a table editor adds the rows themselves.
     @objc func copy(_ sender: Any?) {
+        guard canCopyRows else { return }
+        let selected = list.selectedRowIndexes
+        var rows = TableDesign(name: design.name)
+        switch section {
+        case .columns: rows.columns = selected.filter { $0 < design.columns.count }.map { design.columns[$0] }
+        case .indexes: rows.indexes = selected.filter { $0 < design.indexes.count }.map { design.indexes[$0] }
+        case .foreignKeys: rows.foreignKeys = selected.filter { $0 < design.foreignKeys.count }.map { design.foreignKeys[$0] }
+        case .checks, .options: rows.checks = selected.filter { $0 < design.checks.count }.map { design.checks[$0] }
+        }
+        // A row still being typed may not write as SQL yet: its name is all there is to say.
+        let names = rows.columns.map(\.name) + rows.indexes.map(\.name) + rows.foreignKeys.map(\.name) + rows.checks.map(\.name)
+        let text = (try? rows.definitions(server: server)) ?? names
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(selectedNames.joined(separator: ", "), forType: .string)
+        NSPasteboard.general.setString(text.joined(separator: ",\n"), forType: .string)
+        Self.copied = (NSPasteboard.general.changeCount, rows)
+    }
+
+    /// Adds the copied rows as new ones, after the selection, under names of their own.
+    @objc func paste(_ sender: Any?) {
+        guard canPasteRows, let rows = copiedRows else { return }
+        endEditing()
+        var first = 0, count = 0
+        update { table in
+            switch section {
+            case .columns:
+                first = (list.selectedRowIndexes.last ?? table.columns.count - 1) + 1
+                count = rows.columns.count
+                for (offset, row) in rows.columns.enumerated() {
+                    var column = row
+                    column.original = nil
+                    column.name = Self.unused(column.name, in: table.columns.map(\.name))
+                    column.autoIncrement = false
+                    table.columns.insert(column, at: first + offset)
+                }
+            case .indexes:
+                first = table.indexes.count
+                count = rows.indexes.count
+                for row in rows.indexes {
+                    var index = row
+                    index.original = nil
+                    index.name = Self.unused(index.name, in: table.indexes.map(\.name))
+                    table.indexes.append(index)
+                }
+            case .foreignKeys:
+                first = table.foreignKeys.count
+                count = rows.foreignKeys.count
+                for row in rows.foreignKeys {
+                    var key = row
+                    key.original = nil
+                    key.name = Self.unused(key.name, in: table.foreignKeys.map(\.name))
+                    table.foreignKeys.append(key)
+                }
+            case .checks, .options:
+                first = table.checks.count
+                count = rows.checks.count
+                for row in rows.checks {
+                    var check = row
+                    check.original = nil
+                    check.name = Self.unused(check.name, in: table.checks.map(\.name))
+                    table.checks.append(check)
+                }
+            }
+        }
+        reloadList()
+        list.selectRowIndexes(IndexSet(integersIn: first..<(first + count)), byExtendingSelection: false)
     }
 
     /// `base`, or base_2, base_3…: the first that isn't taken.

@@ -240,8 +240,11 @@ extension TableEditorController {
                 reason = "Finish typing in the cell first"
             }
         case Commands.copy.action?:
-            enabled = !selectedNames.isEmpty
-            reason = "Select a row first"
+            enabled = canCopyRows
+            reason = section == .options ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"
+        case Commands.paste.action?:
+            enabled = canPasteRows
+            reason = "Copy rows of this list first, here or in another table"
         default:
             break
         }

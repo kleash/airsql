@@ -184,7 +184,6 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         NSPasteboard.general.setString(SQLQuote.identifier(table), forType: .string)
     }
 
-    /// ⌘C: the selected box's name.
     @objc func copy(_ sender: Any?) { copyName(sender) }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {

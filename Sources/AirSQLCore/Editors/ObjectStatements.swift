@@ -60,6 +60,16 @@ public enum ObjectCode {
         return statements
     }
 
+    /// Where a server's error about the object's CREATE points in `code` (`ConsoleScript.problem`): the whole text is one
+    /// statement, however many ; a routine's body holds, and the OR REPLACE Apply may add leaves its lines as they are.
+    public static func problem(_ message: String, shown: String, in code: String, noBackslashEscapes: Bool) -> SQLProblem? {
+        let sql = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed = code.range(of: sql) else { return nil }
+        let start = code[..<trimmed.lowerBound].utf16.count
+        let statement = SQLStatement(range: start..<(start + sql.utf16.count), end: start + sql.utf16.count, sql: sql)
+        return ConsoleScript.problem(message, shown: shown, statement: statement, noBackslashEscapes: noBackslashEscapes)
+    }
+
     /// Whether replacing this kind of object on this server first drops it, so that failing code leaves nothing.
     public static func dropsFirst(_ kind: ObjectKind, server: SchemaServer) -> Bool {
         kind != .view && server.flavour == .mysql

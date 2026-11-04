@@ -12,7 +12,11 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
 
     private weak var compare: ReconWindowController?
     private var rows: [Row]
+    /// The indexes in `rows` the filter keeps, in order.
+    private var shown: [Int]
     private let table = NSTableView()
+    private lazy var filter = ListFilter("Filter Tables", id: "reconTables.filter", tip: "Type part of a name to show only those tables",
+                                         list: table) { [weak self] in self?.applyFilter() }
     private var retainUntilClosed: ReconTablesSheet?
     private static let columns: [(id: String, title: String, width: CGFloat, tip: String)] = [
         ("include", "Compare", 64, "Compare this table; untick to leave it out"),
@@ -22,8 +26,8 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         ("filter", "WHERE", 240, "A condition both sides' rows must meet, such as created_at >= '2026-01-01'; empty for every row"),
     ]
 
-    static func show(for owner: ReconWindowController, tables: [ReconObject], on window: NSWindow) {
-        let sheet = ReconTablesSheet(owner: owner, tables: tables.filter { $0.status != .onlyInTarget }.map(\.name))
+    static func show(for owner: ReconWindowController, tables: [String], on window: NSWindow) {
+        let sheet = ReconTablesSheet(owner: owner, tables: tables)
         sheet.retainUntilClosed = sheet
         window.beginSheet(sheet.window!)
     }
@@ -34,6 +38,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         rows = (tables + owner.options.tables.keys.filter { !known.contains($0) }).sorted {
             $0.localizedStandardCompare($1) == .orderedAscending
         }.map { Row(name: $0, choice: owner.options.choice($0)) }
+        shown = Array(rows.indices)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 520), styleMask: [.titled, .resizable],
                               backing: .buffered, defer: false)
         window.minSize = NSSize(width: 760, height: 360)
@@ -59,6 +64,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         table.dataSource = self
         table.delegate = self
         table.rowHeight = 24
+        table.allowsMultipleSelection = true
         table.usesAlternatingRowBackgroundColors = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.setAccessibilityIdentifier("reconTables.list")
@@ -79,7 +85,9 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        let all = button("Compare All", id: "reconTables.all", tip: "Tick every table", target: self, action: #selector(tickAll(_:)))
+        filter.widthAnchor.constraint(equalToConstant: 240).isActive = true
+        let all = button("Compare All", id: "reconTables.all", tip: "Tick every table shown", target: self, action: #selector(tickAll(_:)))
+        let none = button("Compare None", id: "reconTables.none", tip: "Untick every table shown", target: self, action: #selector(tickNone(_:)))
         let cancel = button("Cancel", id: "reconTables.cancel", tip: "Close without changing what the next compare looks at",
                             target: self, action: #selector(cancel(_:)))
         cancel.keyEquivalent = "\u{1b}"
@@ -88,8 +96,8 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         done.keyEquivalent = "\r"
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let buttons = NSStackView(views: [helpButton(.compare), all, spacer, cancel, done])
-        let stack = NSStackView(views: [heading, note, scroll, buttons])
+        let buttons = NSStackView(views: [helpButton(.compare), all, none, spacer, cancel, done])
+        let stack = NSStackView(views: [heading, note, filter, scroll, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = Spacing.unit + 4
@@ -100,15 +108,22 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         return root
     }
 
-    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+    private func applyFilter() {
+        let text = filter.stringValue
+        shown = rows.indices.filter { text.isEmpty || GridFilter.matches(text, [rows[$0].name]) }
+        table.deselectAll(nil)
+        table.reloadData()
+    }
+
+    func numberOfRows(in tableView: NSTableView) -> Int { shown.count }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let id = tableColumn?.identifier.rawValue else { return nil }
-        let item = rows[row]
+        let index = shown[row], item = rows[index]
         if id == "include" {
             let box = checkbox("", id: "reconTables.include", tip: "Compare \(item.name)", on: item.choice.included,
                                target: self, action: #selector(toggled(_:)))
-            box.tag = row
+            box.tag = index
             return box
         }
         if id == "name" {
@@ -127,7 +142,7 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         field.isBordered = false
         field.drawsBackground = false
         field.font = id == "filter" ? NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular) : NSFont.systemFont(ofSize: 12)
-        field.tag = row
+        field.tag = index
         field.identifier = NSUserInterfaceItemIdentifier(id)
         field.delegate = self
         return field
@@ -151,32 +166,31 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
         rows[sender.tag].choice.included = sender.state == .on
     }
 
-    /// The rows a menu command acts on: the clicked one, with the rest of the selection when it is part of it.
+    /// The table's rows a menu command acts on: the clicked one, with the rest of the selection when it is part of it.
     private var chosenRows: IndexSet {
         let clicked = table.clickedRow
         guard clicked >= 0 else { return table.selectedRowIndexes }
         return table.selectedRowIndexes.contains(clicked) ? table.selectedRowIndexes : IndexSet(integer: clicked)
     }
 
-    private func include(_ rows: IndexSet, _ included: Bool) {
-        for row in rows where self.rows.indices.contains(row) { self.rows[row].choice.included = included }
-        table.reloadData(forRowIndexes: rows, columnIndexes: IndexSet(integer: 0))
+    private func include(_ tableRows: IndexSet, _ included: Bool) {
+        for row in tableRows where shown.indices.contains(row) { rows[shown[row]].choice.included = included }
+        table.reloadData(forRowIndexes: tableRows, columnIndexes: IndexSet(integer: 0))
     }
 
     @objc func toggleClicked(_ sender: Any?) {
         let row = table.clickedRow >= 0 ? table.clickedRow : table.selectedRow
-        guard rows.indices.contains(row) else { return }
-        include(IndexSet(integer: row), !rows[row].choice.included)
+        guard shown.indices.contains(row) else { return }
+        include(IndexSet(integer: row), !rows[shown[row]].choice.included)
     }
 
     @objc func includeChosen(_ sender: Any?) { include(chosenRows, true) }
 
     @objc func leaveOutChosen(_ sender: Any?) { include(chosenRows, false) }
 
-    @objc private func tickAll(_ sender: Any?) {
-        for index in rows.indices { rows[index].choice.included = true }
-        table.reloadData()
-    }
+    @objc private func tickAll(_ sender: Any?) { include(IndexSet(shown.indices), true) }
+
+    @objc private func tickNone(_ sender: Any?) { include(IndexSet(shown.indices), false) }
 
     @objc private func cancel(_ sender: Any?) { close(saving: false) }
 

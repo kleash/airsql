@@ -228,7 +228,7 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         }
         let noResult = window.result == nil ? "Compare first: then there is something to show" : nil
         set(compare, window.compareBlocked, "Compare the two databases (⌘R)")
-        set(tables, window.result == nil ? "Compare once to list the tables, then choose which to compare" : nil,
+        set(tables, window.tablesBlocked,
             "Choose the tables to compare, columns to leave out, a WHERE per table and renamed tables")
         set(export, noResult, Commands.exportReport.tip)
         set(changeset, noResult, "Save the sync script as a Liquibase changeset")

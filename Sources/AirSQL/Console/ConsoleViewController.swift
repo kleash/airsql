@@ -31,6 +31,10 @@ final class ConsoleViewController: NSViewController, TabContent {
         var isolation: IsolationLevel?
         /// The main session, once a console has used it.
         var session: DBConnection?
+        /// Names of tables CREATE, ALTER, DROP or RENAME touched on it: temporary tables are only known from here.
+        var changedNames = Set<String>()
+        /// CALL or EXECUTE ran on it, so it may hold temporary tables nothing here can name.
+        var ranCode = false
     }
     static var shared: [UUID: Shared] = [:]
     /// The width Query Helpers last had, in any tab.
@@ -91,6 +95,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         if fileURL != nil { savedText = text }
         super.init(nibName: nil, bundle: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(sessionChanged(_:)), name: .consoleSessionDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(schemaChanged), name: .openConnectionDidChange, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -108,6 +113,10 @@ final class ConsoleViewController: NSViewController, TabContent {
             let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }
             return SQLCompletion.suggestions(text: text, caret: caret, snapshot: snapshot, database: self.database,
                                              noBackslashEscapes: self.editor.noBackslashEscapes)
+        }
+        editor.nameContext = { [weak self] in
+            guard let self, let id = self.connectionID, !self.shared.ranCode else { return nil }
+            return (Self.schemaCache(id)?.snapshot, self.database, self.shared.changedNames)
         }
         split.isVertical = false
         split.dividerStyle = .thin
@@ -226,7 +235,11 @@ final class ConsoleViewController: NSViewController, TabContent {
     @objc private func sessionChanged(_ notification: Notification) {
         guard notification.object as? UUID == connectionID else { return }
         contentChanged()
+        editor?.checkLater()
     }
+
+    /// The schema or the current database may have changed: what's unknown may have too.
+    @objc private func schemaChanged() { editor?.checkLater() }
 
     /// Tells the tab bar and the status bar.
     func contentChanged() {
