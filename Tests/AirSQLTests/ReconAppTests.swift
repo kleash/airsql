@@ -144,6 +144,100 @@ extension AppTests {
             controller.window?.endSheet(sheet.window!)
         }
 
+        @Test func theTablesSheetFiltersAndSelectsSeveral() throws {
+            let controller = Self.window(Self.result())
+            controller.showTables(nil)
+            let sheet = try #require(controller.window?.attachedSheet?.windowController as? ReconTablesSheet)
+            let content = try #require(sheet.window?.contentView)
+            let table = try #require(find(NSTableView.self, id: "reconTables.list", in: content))
+            let filter = try #require(find(ListFilter.self, id: "reconTables.filter", in: content))
+            defer { controller.window?.endSheet(sheet.window!) }
+            #expect(table.allowsMultipleSelection)
+            let everything = table.numberOfRows
+            func ticked(_ row: Int) -> Bool { (table.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSButton)?.state == .on }
+            filter.stringValue = "orders"
+            filter.sendAction(filter.action, to: filter.target)
+            #expect(table.numberOfRows > 0 && table.numberOfRows < everything)
+            // Compare None reaches only the tables shown; a row's checkbox speaks for its own table.
+            let none = try #require(find(NSButton.self, id: "reconTables.none", in: content))
+            none.sendAction(none.action, to: none.target)
+            #expect(!ticked(0))
+            filter.stringValue = ""
+            filter.sendAction(filter.action, to: filter.target)
+            #expect(table.numberOfRows == everything)
+            let unticked = (0..<everything).filter { !ticked($0) }
+            #expect(!unticked.isEmpty && unticked.count < everything)
+            let all = try #require(find(NSButton.self, id: "reconTables.all", in: content))
+            all.sendAction(all.action, to: all.target)
+            #expect((0..<everything).allSatisfy(ticked))
+        }
+
+        @Test func tablesOpensBeforeACompareOnceThereIsASource() {
+            let controller = Self.window(nil)
+            ReconWindowController.connect = { _, _ in throw CancellationError() }
+            defer { ReconWindowController.connect = nil }
+            #expect(controller.tablesBlocked == nil, "a long first run can be limited")
+            controller.source.choose(nil)
+            #expect(controller.tablesBlocked == "Choose a connection and a database for the source first")
+        }
+
+        @Test func theListFiltersHidesMatchesAndKeepsItsSelection() throws {
+            let controller = Self.window(Self.result())
+            let content = try #require(controller.window?.contentView)
+            let results = controller.results
+            let filter = try #require(find(ListFilter.self, id: "recon.filter", in: content))
+            let hide = try #require(find(NSButton.self, id: "recon.hideMatching", in: content))
+            let everything = results.objects.count
+            #expect(results.objects.contains { !$0.differs })
+            hide.state = .on
+            hide.sendAction(hide.action, to: hide.target)
+            #expect(results.objects.allSatisfy(\.differs) && results.objects.count < everything)
+            hide.state = .off
+            hide.sendAction(hide.action, to: hide.target)
+            #expect(results.objects.count == everything)
+            let orders = try #require(results.objects.firstIndex { $0.name == "orders" })
+            results.list.selectRowIndexes(IndexSet(integer: orders), byExtendingSelection: false)
+            filter.stringValue = "ORDERS"
+            filter.sendAction(filter.action, to: filter.target)
+            #expect(results.objects.allSatisfy { $0.name.lowercased().contains("orders") || $0.targetName.lowercased().contains("orders") })
+            #expect(results.selected.map(\.name) == ["orders"])
+            filter.stringValue = "no such object"
+            filter.sendAction(filter.action, to: filter.target)
+            #expect(results.objects.isEmpty && results.selected.isEmpty)
+            filter.stringValue = ""
+            filter.sendAction(filter.action, to: filter.target)
+            #expect(results.objects.count == everything)
+        }
+
+        @Test func returnInTheListOpensTheObjectAsADoubleClickDoes() throws {
+            let controller = Self.window(Self.result())
+            let results = controller.results
+            let row = try #require(results.objects.firstIndex { $0.data?.differs == true })
+            results.list.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            results.detail.tabs.selectedSegment = 0
+            results.list.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                                                        context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+                                                        keyCode: 36)!)
+            #expect(results.detail.tabs.selectedSegment == 1)
+        }
+
+        @Test func theTwoDefinitionsScrollTogetherAsFarAsEachGoes() throws {
+            let controller = Self.window(Self.result(), size: ReconWindowController.minimumSize)
+            let detail = controller.results.detail
+            let long = (1...200).map { "line \($0)" }.joined(separator: "\n")
+            for (side, text) in [(detail.left, long), (detail.right, long + "\n" + long)] {
+                let view = try #require(side.documentView as? NSTextView)
+                view.string = text
+                view.layoutManager?.ensureLayout(for: view.textContainer!)
+            }
+            detail.left.contentView.scroll(to: NSPoint(x: 0, y: 300))
+            #expect(detail.right.contentView.bounds.origin.y == 300)
+            // The longer side goes on past the shorter one's end, and isn't pulled back.
+            detail.right.contentView.scroll(to: NSPoint(x: 0, y: 5000))
+            #expect(detail.right.contentView.bounds.origin.y == 5000)
+            #expect(detail.left.contentView.bounds.origin.y > 300 && detail.left.contentView.bounds.origin.y < 5000)
+        }
+
         @Test func compareWindowIsTidyInLightAndDark() {
             var problems: [String] = []
             for appearance in [NSAppearance.Name.aqua, .darkAqua] {
@@ -278,6 +372,34 @@ extension AppTests.ReconAppTests {
         #expect(trust.error == nil, "\(trust.error ?? "")")
         #expect(await eventually(timeout: 30) { controller.source.databases.numberOfItems > 0 })
         #expect(model.states[mysql.id] == .connected(server: "MySQL " + Lab.mysql84.version), "\(String(describing: model.states[mysql.id]))")
+    }
+
+    /// Tables… before any compare reads the source's tables (not its views), so a long first run can be limited.
+    @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests")) func tablesListsTheSourceBeforeACompare() async throws {
+        let setup = try await ReconLabTests.session(Lab.mariadb114)
+        try await ReconLabTests.database(setup, "lane_tools2_src", ReconLabTests.shopSource)
+        let lab = SavedConnection(name: "Lab MariaDB", host: "127.0.0.1", port: Lab.mariadb114.port, user: "airsql")
+        ReconWindowController.connect = { saved, _ in
+            Connection(options: ConnectOptions(name: saved.name, host: saved.host, port: saved.port ?? 3306, user: saved.user,
+                                               password: Lab.airsql.password, tls: TLSOptions(mode: .off)),
+                       log: ReconLabTests.log)
+        }
+        defer { ReconWindowController.connect = nil }
+        let controller = ReconWindowController(model: testModel([lab]))
+        keptWindows.append(controller)
+        let window = try #require(controller.window)
+        window.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+        controller.source.choose(lab, database: "lane_tools2_src")
+        controller.showTables(nil)
+        #expect(await eventually(timeout: 30) { window.attachedSheet != nil })
+        let sheet = try #require(window.attachedSheet)
+        let content = try #require(sheet.contentView)
+        let list = try #require(find(NSTableView.self, id: "reconTables.list", in: content))
+        #expect(list.numberOfRows > 0)
+        #expect(!controller.isRunning)
+        window.endSheet(sheet)
+        _ = try await setup.query("DROP DATABASE lane_tools2_src")
+        await setup.close()
     }
 
     /// The whole path against the lab: both sides' databases listed, Compare with its activity, the result shown, and

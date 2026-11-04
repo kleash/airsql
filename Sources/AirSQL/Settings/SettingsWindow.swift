@@ -61,7 +61,7 @@ enum SettingsPane: String, CaseIterable {
 
 /// The Settings window: one pane per toolbar button; changes are saved as they are made.
 @MainActor
-final class SettingsWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let tabs = NSTabViewController()
 
     init(model: AppModel) {
@@ -84,6 +84,7 @@ final class SettingsWindowController: NSWindowController {
         window.title = SettingsPane.general.title
         window.toolbarStyle = .preference
         super.init(window: window)
+        window.delegate = self
         window.center()
         if let name = layoutName("Settings") { window.setFrameAutosaveName(name) }
     }
@@ -93,6 +94,9 @@ final class SettingsWindowController: NSWindowController {
     func show(_ pane: SettingsPane) {
         tabs.selectedTabViewItemIndex = SettingsPane.allCases.firstIndex(of: pane) ?? 0
     }
+
+    /// Ends the edit under way, so a value typed last is saved.
+    func windowWillClose(_ notification: Notification) { window?.makeFirstResponder(nil) }
 }
 
 /// A Settings pane: a form of controls bound to `model.data.settings`, 560 points wide, with its "?" button.
@@ -153,6 +157,7 @@ class SettingsPaneController: NSViewController {
         bindings.append(binding)
         control.target = binding
         control.action = #selector(Binding.act(_:))
+        control.cell?.sendsActionOnEndEditing = true
     }
 
     func toggle(_ title: String, id: String, tip: String, _ path: WritableKeyPath<AppSettings, Bool>) -> NSButton {
