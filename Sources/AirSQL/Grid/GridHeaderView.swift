@@ -237,8 +237,11 @@ final class GridHeaderView: NSView {
             grid.delegate?.dataGrid(grid, sortBy: grid.columnOrder[column], adding: flags.contains(.option))
             return
         }
-        // A double click on the header fits the column to its values, as one on its border does (HeidiSQL's too).
-        if event.clickCount == 2 { return grid.autoFit(column) }
+        // Double-clicking the header acts as its sort control does (the first click has selected the column, the native rule).
+        if event.clickCount == 2, flags.isDisjoint(with: [.shift, .command]) {
+            grid.delegate?.dataGrid(grid, sortBy: grid.columnOrder[column], adding: flags.contains(.option))
+            return
+        }
         grid.selection.selectColumn(column, extend: flags.contains(.shift), add: flags.contains(.command))
         drag = .move(column: column, startX: point.x)
     }
@@ -299,7 +302,7 @@ final class GridHeaderView: NSView {
         } else if let column, let info = grid.source?.columns[grid.columnOrder[column]] {
             toolTip = funnel(at: point, column) != nil ? "Filter by \(info.name)'s values"
                 : isInSortControl(point, column) ? "Sort by \(info.name); ⌥-click to add it to the sort"
-                : "Select the column; drag to move it; double-click to fit its values\n" + info.details
+                : "Select the column; drag to move it; double-click to sort by it\n" + info.details
         } else {
             toolTip = nil
         }

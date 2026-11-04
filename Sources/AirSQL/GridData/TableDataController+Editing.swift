@@ -45,11 +45,13 @@ extension TableDataController: DataGridViewDelegate {
         case .row:
             menu.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, Commands.revert])
         case .cells:
+            menu.add([Commands.cut, Commands.paste, nil])
             menu.addItem(quickFilterItem())
             menu.add([Commands.clearFilter, nil, Commands.setNull, Commands.setDefault])
             let values = insertValueItems()
             if !values.isEmpty { menu.addItem(MainMenu.submenu("Insert Value", values)) }
             if let column = viewer.focusedCell?.column, foreignKey(column) != nil { menu.add([Commands.chooseReferencedRow]) }
+            menu.add([Commands.relatedRows])
             menu.add([nil, Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.deleteRows, Commands.revert, nil,
                       Commands.previewChanges, Commands.apply, nil, Commands.exportRows])
         }
@@ -121,6 +123,12 @@ extension TableDataController: DataGridViewDelegate {
 
     @objc func setCellNull(_ sender: Any?) { setSelected { _ in .null } }
     @objc func setCellDefault(_ sender: Any?) { setSelected { _ in .default } }
+
+    /// Cut: copies the selected cells, then clears them (NULL where the column allows it), as pending edits.
+    @objc func cut(_ sender: Any?) {
+        viewer.copy(sender)
+        setSelected { [source] in source?.table.columns[$0].nullable == true ? .null : .text("") }
+    }
 
     /// Revert (⌥⌘Z): the selected rows' changes.
     @objc func revertChanges(_ sender: Any?) {

@@ -136,6 +136,13 @@ extension ResultGridView {
     private var selectedRows: [Int] { viewer.selectedRows().map(rows.baseRow) }
 
     @objc func setCellNull(_ sender: Any?) { setSelected { _ in .null } }
+    @objc func setCellDefault(_ sender: Any?) { setSelected { _ in .default } }
+
+    /// Cut: copies the selected cells, then clears them (NULL where the column allows it), as pending edits.
+    @objc func cut(_ sender: Any?) {
+        viewer.copy(sender)
+        setSelected { [edits] in edits?.nullable($0) == true ? .null : .text("") }
+    }
 
     @objc func deleteRows(_ sender: Any?) {
         guard let edits, edits.canDelete, editingOff == nil else { return NSSound.beep() }
@@ -177,7 +184,8 @@ extension ResultGridView {
     }
 
     private static let editingActions: Set<Selector> = [
-        Commands.setNull.action, Commands.deleteRows.action, Commands.revert.action, Commands.apply.action,
+        Commands.setNull.action, Commands.setDefault.action, Commands.insertValue.action, Commands.chooseReferencedRow.action,
+        Commands.cut.action, Commands.paste.action, Commands.deleteRows.action, Commands.revert.action, Commands.apply.action,
         Commands.previewChanges.action, #selector(revertAllChanges(_:)), Commands.undo.action, Commands.redo.action,
     ]
 
@@ -189,6 +197,15 @@ extension ResultGridView {
             if let off = editingOff { return (false, off) }
             let cells = viewer.selectedCells(limit: 10_000).filter { edits.canEdit(rows.baseRow($0.row), $0.column) }
             return (cells.contains { edits.nullable($0.column) }, cells.isEmpty ? "Select cells you can edit first" : "These columns can't be NULL")
+        case Commands.paste.action:
+            if let off = editingOff { return (false, off) }
+            return (TableDataController.clipboard != nil, "Copy some cells first")
+        case Commands.chooseReferencedRow.action:
+            if let off = editingOff { return (false, off) }
+            return (viewer.focusedCell.map { foreignKey($0.column) != nil } ?? false, "Select a cell of a foreign key column first")
+        case Commands.cut.action, Commands.setDefault.action, Commands.insertValue.action:
+            if let off = editingOff { return (false, off) }
+            return (viewer.selectedCells(limit: 10_000).contains { edits.canEdit(rows.baseRow($0.row), $0.column) }, "Select cells you can edit first")
         case Commands.deleteRows.action:
             return editingOff.map { (false, $0) } ?? (!selectedRows.isEmpty, "Select the rows first")
         case Commands.revert.action:

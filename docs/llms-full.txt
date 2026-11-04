@@ -450,8 +450,10 @@ unique key whose columns can't be NULL); so can an inner join's when every table
 `GROUP BY`, `DISTINCT`, `UNION`, a subquery in `FROM`, a self-join, a column worked out by the query, or a row of the
 "one" side of a join that shows in several result rows).
 
-- Double-click a cell (or start typing) to change it; **Set NULL** (⌥⌘N) and, in a one-table result, **Delete Rows…**
-  (⌘⌫) work as in a table tab. Values are checked by their column's type as you type. Changes wait, marked in colour,
+- Double-click a cell (or start typing) to change it. As in a table tab, a boolean toggles, ENUM and SET pick from their
+  members, ↑ and ↓ step a date, and a foreign key has its drop-down. **Cut** (⌘X), **Paste** (⌘V), **Set NULL** (⌥⌘N),
+  **Set DEFAULT**, **Insert Value** and, in a one-table result, **Delete Rows** (⌘⌫) work too. Paste fills the rows the
+  result has, and pastes nothing if a value doesn't fit its column. Values are checked by their column's type as you type. Changes wait, marked in colour,
   with a bar over the rows counting them; **Undo**, **Redo**, **Revert** and **Revert All** take them back.
 - **Apply** (⌘S while the rows have the keyboard, or the bar's button) writes them in one transaction on the
   connection's data session, each statement checked to change exactly its row. A join's changes always show the SQL
@@ -765,8 +767,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   current filter (the 1,000 most frequent). Tick the ones to show, or type part of a value and press **Contains**. The
   funnel opens over the rows and replaces its own earlier choice, so you can widen it again. In
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
-- **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
-  to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
+- **Sort**: double-click a header, or click the arrow at its right, to sort by that column, ascending, then descending,
+  then not at all; hold ⌥ to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
   repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting
@@ -781,8 +783,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 
 Nothing is written until you apply. Leaving a row writes nothing.
 
-- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). Return keeps the edit, Esc
-  cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
+- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). ⌫ starts with the cell empty.
+  Return keeps the edit, Esc cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
   the same way.
 - **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
   number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't
@@ -813,7 +815,8 @@ Nothing is written until you apply. Leaving a row writes nothing.
   in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, and
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
-  **Delete Rows…** (⌘⌫) marks the selected rows for deletion. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
@@ -946,8 +949,8 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
 - **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
-- Drag a header to move its column, drag its right edge to resize it, and double-click the edge, or the header, to fit
-  its values.
+- Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
+- Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the console, so they open as you left them.
 - **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
@@ -959,7 +962,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
   as a JSON tree, as hex, or as a picture when the bytes are an image. It follows the cell you select. A double-click
   on a cell you can't edit opens it too.
 - **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
-  (or **View ▸ Previous Record** and **Next Record**) move between rows; **Back to the Grid** returns. A double-click
+  (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
   console result shows the grid again, as does an Apply that deletes the row.
 - **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the button at the end of a table's grid bar) turns rows
@@ -1602,6 +1605,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
+| Previous Record | ⌥⌘← |
+| Next Record | ⌥⌘→ |
 | Transpose | ⌥⌘T |
 | Column List… | ⌘J |
 | SQL Log | ⌥⌘L |
@@ -1628,7 +1633,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |
-| Delete Rows… | ⌘⌫ |
+| Delete Rows | ⌘⌫ |
 | Set NULL | ⌥⌘N |
 | Apply Changes | ⌘S |
 | Preview SQL… | ⌥⌘S |
@@ -2004,8 +2009,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
 - **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
-  every table's key, edits like a table tab (`grid.editor`, Data ▸ Set NULL, Delete Rows in a one-table result, Undo,
-  Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
+  every table's key, edits like a table tab (`grid.editor`, the pick-lists and foreign key drop-down, Data ▸ Set NULL, Set DEFAULT, Insert
+  Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
 - **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.

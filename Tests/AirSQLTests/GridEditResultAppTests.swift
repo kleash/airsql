@@ -34,6 +34,56 @@ extension AppTests {
                                database: table.isEmpty ? "" : "airsql_fixture", type: type)
         }
 
+        /// ENUM, dates, Set DEFAULT, Insert Value, Paste and foreign keys work as in a table tab.
+        @Test func aResultsCellsEditByTheirType() async throws {
+            let c = { Self.column("customers", "customers", $0, $1) }
+            let (main, harness, view) = try await Self.result("SELECT id, balance, status, created, note FROM customers",
+                                                        [c("id", MYSQL_TYPE_LONG), c("balance", MYSQL_TYPE_NEWDECIMAL), c("status", MYSQL_TYPE_VAR_STRING),
+                                                         c("created", MYSQL_TYPE_TIMESTAMP), c("note", MYSQL_TYPE_VAR_STRING)],
+                                                        rows: [["1", "2.00", "new", "2026-01-02 03:04:05", nil], ["2", "3.00", "active", "2026-01-02 03:04:05", "x"]],
+                                                        session: FakeTableSession())
+            let edits = try #require(view.edits), grid = view.grid
+            // The real key reaches the viewer up the responder chain: Esc narrows the selection.
+            main.window?.makeFirstResponder(grid)
+            grid.selection.select(GridPosition(row: 0, column: 1))
+            grid.selection.select(GridPosition(row: 1, column: 2), extend: true)
+            _ = await call(harness, "key", ["combo": "escape"])
+            #expect(!grid.selection.contains(GridPosition(row: 1, column: 1)) || !grid.selection.contains(GridPosition(row: 0, column: 1)))
+            #expect(view.dataGrid(grid, step: "2026-01-02 03:04:05", at: 9, by: 1, row: 0, column: 3)?.text == "2026-01-03 03:04:05")
+
+            grid.selection.select(GridPosition(row: 0, column: 2))
+            let item = NSMenuItem()
+            item.representedObject = "gone"
+            view.pickMember(item)
+            #expect(edits.value(0, 2) == "gone")
+            view.setCellDefault(nil)
+            #expect(edits.mark(0, 2) == .edited)
+
+            grid.selection.select(GridPosition(row: 1, column: 3))
+            #expect(!view.insertValueItems().isEmpty)
+
+            let board = NSPasteboard.general
+            board.clearContents()
+            board.setString("5\tactive\n6\tnew\n7\tnew", forType: .string)  // the third row is past the result's last
+            grid.selection.select(GridPosition(row: 0, column: 1))
+            view.paste(nil)
+            #expect(edits.value(0, 1) == "5" && edits.value(0, 2) == "active" && edits.value(1, 1) == "6" && edits.value(1, 2) == "new")
+            board.clearContents()
+            board.setString("not a number", forType: .string)
+            view.paste(nil)
+            #expect(edits.value(0, 1) == "5" && main.window?.attachedSheet != nil)
+            main.window?.attachedSheet.map { main.window?.endSheet($0) }
+
+            let o = { Self.column("orders", "orders", $0, $1) }
+            let (_, _, orders) = try await Self.result("SELECT id, region, customer_id FROM orders",
+                                                       [o("id", MYSQL_TYPE_LONGLONG), o("region", MYSQL_TYPE_VAR_STRING), o("customer_id", MYSQL_TYPE_LONG)],
+                                                       rows: [["1", "EU", "2"]], session: FakeTableSession())
+            orders.grid.selection.select(GridPosition(row: 0, column: 2))
+            #expect(orders.foreignKey(2)?.columns == [2] && orders.dataGrid(orders.grid, edit: 0, column: 2, typed: nil) && orders.lookup != nil)
+            orders.lookup?.popover.close()
+            #expect(!orders.dataGrid(orders.grid, edit: 0, column: 2, typed: "7"))  // typing edits the key as text
+        }
+
         @Test func aOneTableResultEditsAndAppliesLikeATable() async throws {
             let session = FakeTableSession()
             session.columns = [.init(name: "id", type: MYSQL_TYPE_LONG), .init(name: "email", type: MYSQL_TYPE_VAR_STRING),

@@ -110,6 +110,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private(set) weak var summaryShown: GridSummaryView?
     /// View As or Chart (`GridViewer+Views`): what the body shows, and the view shown in place of the grid.
     var presentation = Presentation.table
+    /// The host's find bar, for Esc.
+    weak var findBar: TableFindBar?
+    /// Called when View As changes what the body shows.
+    var didPresent: (() -> Void)?
     var presented: NSView?
     /// The source as the grid shows it untransposed: with its display types.
     private(set) var displayed: GridSource?
@@ -754,6 +758,17 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
         if !transposed, record == nil { menu.addItem(Self.displayMenu()) }
         return menu
+    }
+
+    /// Esc steps back: it closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
+    override func cancelOperation(_ sender: Any?) {
+        if let findBar, !findBar.isHidden {
+            findBar.close(sender)
+        } else if transposed || record != nil {
+            backToGrid(sender)
+        } else if let cursor = grid.selection.cursor {
+            grid.selection.select(cursor)
+        }
     }
 
     /// Sorting is the host's, by its own columns: not while the grid shows them on their side.

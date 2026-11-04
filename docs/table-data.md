@@ -53,8 +53,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   current filter (the 1,000 most frequent). Tick the ones to show, or type part of a value and press **Contains**. The
   funnel opens over the rows and replaces its own earlier choice, so you can widen it again. In
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
-- **Sort**: the arrow at a header's right sorts by that column, ascending, then descending, then not at all; ⌥-click it
-  to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
+- **Sort**: double-click a header, or click the arrow at its right, to sort by that column, ascending, then descending,
+  then not at all; hold ⌥ to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
   repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting
@@ -69,8 +69,8 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 
 Nothing is written until you apply. Leaving a row writes nothing.
 
-- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). Return keeps the edit, Esc
-  cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
+- **Edit a cell**: type over it, double-click it, or press Return or F2 (as in HeidiSQL). ⌫ starts with the cell empty.
+  Return keeps the edit, Esc cancels, Tab moves to the next cell. Select several cells and type: each gets the value its column takes. Record View and Transpose edit
   the same way.
 - **Values are checked as you keep them**, by the column's type and the server's sql_mode, as Apply will write them: a
   number too big for its column, a third decimal in `DECIMAL(10,2)`, a day the month doesn't have, a word that isn't
@@ -101,7 +101,8 @@ Nothing is written until you apply. Leaving a row writes nothing.
   in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, and
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
-  **Delete Rows…** (⌘⌫) marks the selected rows for deletion. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
