@@ -261,6 +261,13 @@ extension TableDataController: FindBarOwner {
     func replaceMatch(all: Bool) {
         guard let source, editingOff == nil else { return NSSound.beep() }
         viewer.backToGrid(nil)
+        // A cut value would go back as its start: what is replaced must be the whole of it, which may hold more matches too.
+        let rows = all ? Array(0..<source.rowCount) : grid.selection.cursor.map { [$0.row] } ?? []
+        readWhole(rows, columns: viewer.shownColumns) { [weak self] in self?.replaceInWholeValues(all: all) }
+    }
+
+    private func replaceInWholeValues(all: Bool) {
+        guard let source else { return }
         let find = findBar.find, replacement = findBar.replaceField.stringValue
         guard let expression = find.expression else { return NSSound.beep() }
         let targets = all ? matches() : grid.selection.cursor.map { [$0] } ?? []

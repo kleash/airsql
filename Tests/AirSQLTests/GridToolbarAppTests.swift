@@ -133,6 +133,63 @@ extension AppTests {
             #expect(NSPasteboard.general.string(forType: .string)?.contains(whole) == true)
         }
 
+        /// What comes back from a replace is the whole value: a cut one written back would lose the rest on Apply.
+        @Test func replacingInACutCellKeepsTheWholeValue() async throws {
+            for all in [true, false] {
+                let (_, _, tab, _, whole) = try await Self.cutTab()
+                tab.grid.selection.select(GridPosition(row: 0, column: tab.grid.columnOrder.firstIndex(of: 3) ?? 3))
+                tab.findBar.findField.stringValue = "note"
+                tab.findChanged()
+                tab.findBar.replaceField.stringValue = "memo"
+                tab.replaceMatch(all: all)
+                await ready { tab.loading != nil }
+                let source = try #require(tab.source)
+                #expect(source.value(0, 3) == whole.replacingOccurrences(of: "note", with: "memo"))
+                #expect(!source.isCut(0, 3))
+            }
+        }
+
+        /// A match past the cut is replaced too, and a value that can't be read whole isn't touched.
+        @Test func replaceAllReadsCutValuesThatDontMatchInTheirStart() async throws {
+            let (_, _, tab, _, whole) = try await Self.cutTab()
+            tab.findBar.findField.stringValue = "end"
+            tab.findChanged()
+            tab.findBar.replaceField.stringValue = "stop"
+            tab.replaceMatch(all: true)
+            await ready { tab.loading != nil }
+            #expect(tab.source?.value(0, 3) == whole.replacingOccurrences(of: "end", with: "stop"))
+        }
+
+        @Test func aReplaceThatCantReadTheWholeValueChangesNothing() async throws {
+            let (_, _, tab, session, _) = try await Self.cutTab()
+            session.edited = []
+            tab.grid.selection.select(GridPosition(row: 0, column: tab.grid.columnOrder.firstIndex(of: 3) ?? 3))
+            tab.findBar.findField.stringValue = "note"
+            tab.findChanged()
+            tab.findBar.replaceField.stringValue = "memo"
+            tab.replaceMatch(all: true)
+            await ready { tab.loading != nil }
+            #expect(tab.source?.changes.isEmpty == true && tab.problem != nil)
+        }
+
+        @Test func aQuickFilterRefusesACutValueAmongTheSelectedCells() async throws {
+            let (_, _, tab, _, _) = try await Self.cutTab()
+            let column = tab.grid.columnOrder.firstIndex(of: 3) ?? 3
+            tab.grid.selection.select(GridPosition(row: 1, column: column))
+            #expect(!tab.filtersOnCutValue)
+            tab.grid.selection.select(GridPosition(row: 0, column: column))
+            tab.grid.selection.select(GridPosition(row: 1, column: column), extend: true)
+            #expect(tab.filtersOnCutValue)
+        }
+
+        @Test func viewAsTextShowsCutValuesWhole() async throws {
+            let (_, _, tab, _, whole) = try await Self.cutTab()
+            tab.viewer.present(.text)
+            await ready { tab.loading != nil }
+            let text = try #require(find(NSTextView.self, id: "grid.text", in: tab.view))
+            #expect(text.string.contains(whole))
+        }
+
         @Test func duplicatingARowWithACutCellCopiesItsWholeValue() async throws {
             let (_, _, tab, _, whole) = try await Self.cutTab()
             tab.grid.selection.selectRow(0)

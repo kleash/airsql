@@ -81,7 +81,7 @@ extension TableDataController: NSMenuItemValidation {
             reason = QuickFilter.reason(GridCondition.Operator.allCases[menuItem.tag], focusedValues())
             enabled = reason == nil
         }
-        if Self.exactValueActions.contains(menuItem.action), let cell = viewer.focusedCell, source?.isCut(cell.row, cell.column) == true {
+        if Self.exactValueActions.contains(menuItem.action), filtersOnCutValue {
             (enabled, reason) = (false, "Only the start of this value is loaded: Load Full Cell first")
         }
         menuItem.explain(enabled: enabled, reason: reason)

@@ -597,8 +597,9 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     /// Open URL: the focused cell's web address in the browser.
     @objc func openCellURL(_ sender: Any?) {
-        guard let url = focusedURL else { return NSSound.beep() }
-        NSWorkspace.shared.open(url)
+        guard focusedURL != nil, let cell = focusedCell else { return NSSound.beep() }
+        let open = { [self] in if let url = focusedURL { NSWorkspace.shared.open(url) } }
+        if let readWhole { readWhole([cell.row], [cell.column], open) } else { open() }
     }
 
     private var focusedURL: URL? {

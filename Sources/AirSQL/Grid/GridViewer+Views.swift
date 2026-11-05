@@ -24,6 +24,14 @@ extension GridViewer {
 
     /// Shows the rows as `next`, in place of what the body shows now.
     func present(_ next: Presentation) {
+        // The text can be SQL to copy: cut values whole first. A failed read says why, and leaves the view as it is.
+        if next == .text, let source, let readWhole {
+            return readWhole(Array(0..<min(source.rowCount, Self.presentedLimit)), shownColumns) { [weak self] in self?.presentNow(next) }
+        }
+        presentNow(next)
+    }
+
+    private func presentNow(_ next: Presentation) {
         guard source != nil else { return }
         defer {
             didPresent?()
