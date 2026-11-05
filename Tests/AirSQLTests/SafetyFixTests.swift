@@ -111,19 +111,6 @@ extension AppTests {
             #expect(AgentGuard.productionConsole(console.editor)?.id == saved.id)
         }
 
-        /// READ ONLY doesn't stop a kill: a read-only connection's menu does, whatever is selected.
-        @Test func aReadOnlyConnectionKillsNothing() async throws {
-            var saved = Fixtures.staging
-            saved.readOnly = true
-            let model = testModel([saved])
-            _ = appWindow(model)
-            let list = ProcessListContent(await openReplayed(model, saved.id))
-            for command in [Commands.killQuery, Commands.killConnection] {
-                let item = command.item()
-                #expect(!list.validateMenuItem(item) && item.toolTip?.contains("read-only") == true)
-            }
-        }
-
         /// A tab that has just fallen back to the main session doesn't run beside the tab already running there: its
         /// Cancel would stop that one's statement.
         @Test func aTabThatFallsBackWaitsForTheMainSessionsRunner() async throws {

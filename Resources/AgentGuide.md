@@ -113,7 +113,7 @@ failure, and every reply after an action carries the sheet it opened, if any.
   (answers with the menu it opens). Points come from `snapshot` frames or a scale-1 screenshot.
 - `wait {until: sheet | no_sheet | popover | idle | text, text?, timeout?}`: idle means nothing runs.
 
-Open and Save panels can't be driven: press Cancel, or leave them to the person.
+Open and Save panels can't be driven: `press` Cancel, or leave them to the person. Every other tool is refused there.
 
 ## gate
 
@@ -133,10 +133,10 @@ its own:
   list's Kill (the person's sheet) still works, as it changes no data.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
-  whether agents are allowed, the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
+  whether agents are allowed, which connections there are (none can be deleted for you), the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
   rows per page, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
   Ask before agents change anything is on. The Settings window is to look at.
-- **Files, the clipboard, trust:** you can't save a console's file, start an export, save a Liquibase changelog, save
+- **Files, the clipboard, trust:** you can't save a console's file, open a client in Terminal, start an export, save a Liquibase changelog, save
   or remember a password, trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or
   `set` for text, and run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a
   transaction open, Delete, Clear) is the person's call, and so is Quit. The connection editor opens for you, but its
@@ -147,7 +147,8 @@ its own:
   control keys (⌃K, ⌃T, ⌃Y) are refused there: use `type` or `set`.
 - **Data you may not read is hidden:** on connections below Schema + read, grids, query results (and the value panel,
   View As, charts, Column Summary and the status bar's figure), the filters a value goes into (`result.filter`,
-  `tableData.where`, `values.list`, `quickFilter.value`), the process list, a compare's rows and sync script, the
+  `tableData.where`, `values.list`, `quickFilter.value`), the process list and its selected statement (`processes.statement`), Export Rows' and Import's
+  previews (`export.preview`, `csv.preview`), a table's note in the tree (`console.insightNote`), a compare's rows and sync script, the
   console's Messages (`console.messages`: a server's error can quote a value), an EXPLAIN's tree (`console.planTree`)
   and the SQL preview's statements (`preview.sql`) are covered in screenshots ("Hidden from agents") and left out of
   snapshots (`hidden`: no value, title or help; `set` still types into a hidden field). The SQL log's text
