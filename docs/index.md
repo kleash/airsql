@@ -24,6 +24,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [The SQL console](console.md): write and run SQL, results, transactions, history and the SQL log.
 - [Connections and routes](connections.md): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](navigator.md): the tree, the database view, table commands, find text and the process list.
+- [Users and roles](users.md): list, add, change and drop logins and roles, their privileges, limits and passwords.
 - [A table's rows](table-data.md): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](data-grid.md): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.

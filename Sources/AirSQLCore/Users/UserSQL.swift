@@ -149,6 +149,11 @@ public struct UserSQL {
         return statements
     }
 
+    /// The session's own password, with the account's login method kept. All a session with an expired password may run.
+    func ownPassword(_ password: String) -> String {
+        mariaDB ? "SET PASSWORD = PASSWORD(\(text(password)))" : "ALTER USER USER() IDENTIFIED BY \(text(password))"
+    }
+
     public func drop(_ account: ServerAccount) -> String { (account.isRole ? "DROP ROLE " : "DROP USER ") + quoted(account) }
 
     /// What the person typed that can't go to the server, in words; nil when it can.
@@ -217,7 +222,9 @@ public struct UserSQL {
             if was == nil || (role.admin && was?.admin == false) {
                 statements.append("GRANT \(quoted(role)) TO \(quoted(account))" + (role.admin ? " WITH ADMIN OPTION" : ""))
             } else if !role.admin && was?.admin == true {
-                statements.append("REVOKE ADMIN OPTION FOR \(quoted(role)) FROM \(quoted(account))")
+                // MySQL has no REVOKE ADMIN OPTION: the role is taken away and given back.
+                statements += mariaDB ? ["REVOKE ADMIN OPTION FOR \(quoted(role)) FROM \(quoted(account))"]
+                    : ["REVOKE \(quoted(role)) FROM \(quoted(account))", "GRANT \(quoted(role)) TO \(quoted(account))"]
             }
         }
         if old.defaultRoles != new.defaultRoles, !account.isRole {

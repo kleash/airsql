@@ -145,6 +145,10 @@ import Testing
         new.defaultRoles = ["c"]
         old.defaultRoles = []
         #expect(mysql.changes(account(), from: old, to: new) == ["SET DEFAULT ROLE 'c'@'%' TO 'bob'@'%'"])
+        old.roles[0].admin = true
+        old.defaultRoles = ["c"]
+        #expect(mysql.changes(account(), from: old, to: new) == ["REVOKE 'c'@'%' FROM 'bob'@'%'", "GRANT 'c'@'%' TO 'bob'@'%'"],
+                "MySQL has no REVOKE ADMIN OPTION")
     }
 
     @Test func theListReadsAccountsWithoutAnyHash() {
@@ -371,6 +375,41 @@ import Testing
         await session.close()
     }
 
+    @Test(arguments: servers) func anExpiredLoginChangesItsPasswordAndNothingElseRuns(server: Lab.Server) async throws {
+        let (admin, sql) = try await session(server)
+        let account = ServerAccount(user: "lane_users_expired", host: "%")
+        _ = try? await admin.query(sql.drop(account))
+        var expired = account
+        expired.expired = true
+        _ = try await admin.query(sql.create(expired, password: "old-Pass1"))
+        var options = DBLab.options(server)
+        options.user = account.user
+        options.password = "old-Pass1"
+        let log = SQLLog(fileURL: URL(fileURLWithPath: NSTemporaryDirectory() + UUID().uuidString + "/SQL.log"))
+        let refused = DBConnection(options: options, role: .tools, log: log)
+        await #expect {
+            _ = try await refused.connect()
+        } throws: { error in
+            let error = error as? AirSQLError
+            return error?.kind == .authFailed && [1820, 1862].contains(error?.code ?? 0)
+        }
+        await refused.close()
+
+        options.newPassword = "new-S3cret'1"
+        let changing = DBConnection(options: options, role: .tools, log: log)
+        _ = try await changing.connect()
+        await changing.close()
+        options.newPassword = nil
+        options.password = "new-S3cret'1"
+        let after = DBConnection(options: options, role: .tools, log: log)
+        _ = try await after.connect()
+        #expect(try await after.rows("SELECT 1").first?.first == "1", "it works as any session")
+        await after.close()
+        #expect(!(try String(contentsOf: log.fileURL, encoding: .utf8)).contains("S3cret"))
+        _ = try await admin.query(sql.drop(account))
+        await admin.close()
+    }
+
     @Test(arguments: servers) func theAccountsListHoldsNoHash(server: Lab.Server) async throws {
         let (session, _) = try await session(server)
         let results = try await session.query(UserSQL.accounts(mariaDB: server.flavor == .mariadb))
@@ -503,9 +542,18 @@ extension AppTests {
             #expect(NSPasteboard.general.string(forType: .string) == nil, "agents can't copy it")
         }
 
+        @Test func anExpiredPasswordIsOnlyChangedWhereWritesAre() {
+            var saved = Fixtures.local
+            #expect(saved.usersRefusal == nil)
+            saved.readOnly = true
+            #expect(saved.usersRefusal != nil)
+            let error = ErrorMapping.map(code: 1820, message: "You must SET PASSWORD before executing this statement")
+            #expect(error.kind == .authFailed && error.message.hasPrefix("The password has expired"))
+        }
+
         @Test func theTreeHasAUsersRowAndModifyGrantsFollowsTheSelection() async throws {
             let model = testModel([Fixtures.local])
-            let (main, _) = appWindow(model)
+            let (main, harness) = appWindow(model)
             let open = await openReplayed(model, Fixtures.local.id)
             main.sidebar.reload()
             let outline = main.sidebar.outline
@@ -518,6 +566,9 @@ extension AppTests {
             #expect(main.sidebar.treeMenu(main.sidebar.selectedNodes).items.map(\.title) == ["Users and Roles"])
             main.showUsers(open)
             #expect(main.tabs.count == 1, "the tab it has")
+            main.close(try #require(main.tabs.first))
+            #expect(await call(harness, "menu", ["path": "Database > Users and Roles"]).error == nil, "the menu bar reaches it")
+            #expect(main.selectedTab?.shown is UsersContent)
             let database = NavigatorActions.reason(for: Commands.modifyGrants.action, objects: [], databases: ["d"], open: open, target: open, model: model)
             #expect(database == nil, "\(database ?? "")")
             let two = NavigatorActions.reason(for: Commands.modifyGrants.action, objects: [], databases: ["d", "e"], open: open, target: open, model: model)
@@ -629,7 +680,7 @@ extension AppTests {
             // Drop asks for the name.
             await select("lane_users_clone")
             users.dropUser(nil)
-            #expect(await call(harness, "set", ["id": "preview.confirm", "value": "lane_users_clone"]).error == nil)
+            #expect(await call(harness, "set", ["id": "preview.confirm", "value": "lane_users_clone@%"]).error == nil)
             #expect(await call(harness, "press", ["id": "preview.run"]).error == nil)
             #expect(await eventually(timeout: 20) { !users.list.rows.contains { $0.cells["user"] == "lane_users_clone" } })
 
@@ -638,6 +689,43 @@ extension AppTests {
             let written = try String(contentsOf: log.fileURL, encoding: .utf8)
             #expect(written.contains("CREATE USER") && written.contains("<secret>"))
             #expect(!written.contains("S3cret"), "the SQL log masks it")
+        }
+
+        @Test func connectingWithAnExpiredPasswordAsksForANewOneAndKeepsNothing() async throws {
+            let server = Lab.mariadb114
+            let admin = DBConnection(options: DBLab.options(server), role: .tools, log: DBLab.log)
+            try await admin.connect()
+            _ = try await admin.query("DROP USER IF EXISTS 'lane_users_exp'@'%'")
+            _ = try await admin.query("CREATE USER 'lane_users_exp'@'%' IDENTIFIED BY 'old-Pass1' PASSWORD EXPIRE")
+            var saved = SavedConnection(name: "Expired", host: "127.0.0.1", port: server.port!, user: "lane_users_exp")
+            saved.tls.mode = .off
+            let model = testModel([saved])
+            model.setSavedPassword(saved.id.uuidString, "old-Pass1")
+            let (main, harness) = appWindow(model)
+            model.connector.connect(saved.id, on: main.window)
+            #expect(await eventually(timeout: 20) { main.window?.attachedSheet != nil })
+            #expect(await call(harness, "set", ["id": "password.new", "value": "new-Pass1"]).error == nil)
+            #expect(await call(harness, "set", ["id": "password.repeat", "value": "new-Pass1"]).error == nil)
+            #expect(await call(harness, "press", ["title": "Change"]).error == nil)
+            #expect(await eventually(timeout: 20) { model.connector.open[saved.id] != nil }, "the connect goes on with it")
+            #expect(model.savedPassword(saved.id.uuidString) == "old-Pass1", "nothing here stores a password")
+            model.connector.disconnect(saved.id)
+
+            // Read-only says what it said, and changes nothing.
+            _ = try await admin.query("ALTER USER 'lane_users_exp'@'%' PASSWORD EXPIRE")
+            var locked = saved
+            locked.readOnly = true
+            let other = testModel([locked])
+            other.setSavedPassword(locked.id.uuidString, "new-Pass1")
+            let (second, _) = appWindow(other)
+            other.connector.connect(locked.id, on: second.window)
+            #expect(await eventually(timeout: 20) {
+                if case .failed(let text)? = other.states[locked.id] { return text.contains("expired") }
+                return false
+            })
+            #expect((second.window?.attachedSheet?.contentView).flatMap { find(NSSecureTextField.self, in: $0) } == nil, "it says so, and asks for nothing")
+            _ = try await admin.query("DROP USER 'lane_users_exp'@'%'")
+            await admin.close()
         }
 
         private static func text(in view: NSView) -> String {

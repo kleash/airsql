@@ -1,18 +1,20 @@
 import AirSQLCore
 import AppKit
 
-extension OpenConnection {
+extension SavedConnection {
     /// Why this connection's users can't be changed from here; nil: they can. Accounts decide who reaches a server, so
-    /// read-only, Production and agents all say no, and it fails closed.
+    /// read-only, Production and agents all say no.
     var usersRefusal: String? {
         if AgentGate.agent != nil { return "Only the person at the Mac can change users, roles and grants: nothing was changed." }
-        guard let saved = model?.connection(id) else { return "Connect to the server again first" }
-        if saved.readOnly { return "“\(saved.displayName)” is read-only: users can't be changed" }
-        if saved.colour == .production || saved.safety == .production {
-            return "“\(saved.displayName)” is Production: users can't be changed from here"
-        }
+        if readOnly { return "“\(displayName)” is read-only: users can't be changed" }
+        if colour == .production || safety == .production { return "“\(displayName)” is Production: users can't be changed from here" }
         return nil
     }
+}
+
+extension OpenConnection {
+    /// It fails closed: a connection it can't find can't be changed.
+    var usersRefusal: String? { model?.connection(id).map { $0.usersRefusal } ?? "Connect to the server again first" }
 }
 
 /// The user manager (scope "server"): the server's logins and roles, with what the selected one holds. New, Edit and
@@ -220,8 +222,7 @@ final class UsersContent: NSViewController, TabContent, NSMenuItemValidation {
 
     @objc func newUser(_ sender: Any?) {
         guard !refused() else { return }
-        var account = ServerAccount(user: "", host: "%")
-        account.hasPassword = true
+        let account = ServerAccount(user: "", host: "%")
         present(nil, account, AccountGrants(), base: AccountGrants())
     }
 
@@ -288,7 +289,7 @@ final class UsersContent: NSViewController, TabContent, NSMenuItemValidation {
                                         caption: "It can't log in again, and what it holds is gone. Sessions it has open stay until they end.")
         request.actionTitle = "Drop"
         request.destructive = true
-        request.typeToConfirm = first.user
+        request.typeToConfirm = first.name
         request.noBackslashEscapes = sql.noBackslashEscapes
         if chosen.contains(where: { $0.user == open.connection.options.user }) {
             request.warnings.append("This is the login AirSQL is using: the next connection with it will fail.")

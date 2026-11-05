@@ -37,6 +37,7 @@ final class PreviewContent: NSViewController, TabContent {
         (shown as? TableDataController)?.abandoned = true
         (shown as? TableDataController)?.cancelQuery(nil)  // its rows aren't wanted any more
         (shown as? HostContent)?.release()
+        (shown as? UsersContent)?.release()
         shown.view.removeFromSuperview()
         shown.removeFromParent()
         shown = content

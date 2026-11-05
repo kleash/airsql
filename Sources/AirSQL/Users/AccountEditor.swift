@@ -382,6 +382,8 @@ final class GrantsTree: NSViewController, NSOutlineViewDataSource, NSOutlineView
         outline.rowHeight = 22
         outline.dataSource = self
         outline.delegate = self
+        outline.target = self
+        outline.doubleAction = #selector(toggleLevel(_:))
         outline.setAccessibilityIdentifier("users.privileges")
         outline.setAccessibilityLabel("Privileges")
         let scroll = NSScrollView()
@@ -452,6 +454,11 @@ final class GrantsTree: NSViewController, NSOutlineViewDataSource, NSOutlineView
     @objc private func tickChanged(_ sender: NSButton) {
         guard let row = sender.cell?.representedObject as? Row, let privilege = row.privilege else { return }
         set(privilege, on: row.level, sender.state == .on)
+    }
+
+    @objc private func toggleLevel(_ sender: Any?) {
+        guard let row = outline.item(atRow: outline.clickedRow) as? Row, row.privilege == nil else { return }
+        if outline.isItemExpanded(row) { gently(outline).collapseItem(row) } else { gently(outline).expandItem(row) }
     }
 
     @objc private func addLevel(_ sender: Any?) {
