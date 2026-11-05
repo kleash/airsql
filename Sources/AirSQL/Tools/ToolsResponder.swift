@@ -32,6 +32,15 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
 
     @objc func importCSV(_ sender: Any?) { open { CSVImportSheet(model: $0, connection: $1, options: $2) } }
 
+    @objc func importClipboard(_ sender: Any?) {
+        open({ CSVImportSheet(model: $0, connection: $1, options: $2) }, then: { ($0 as? CSVImportSheet)?.pasteRows(nil) })
+    }
+
+    /// Copy Result to Table…: `rows` (the column names first) into a table of the window's connection.
+    func copyToTable(rows: [[String?]], title: String) {
+        open({ CSVImportSheet(model: $0, connection: $1, options: $2) }, then: { ($0 as? CSVImportSheet)?.use(rows: rows, title: title) })
+    }
+
     @objc func openInTerminal(_ sender: Any?) {
         guard let main, let window = main.window, let saved = main.activeConnection else { return }
         Task {
@@ -102,10 +111,10 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         }
     }
 
-    /// A .csv or .sql.gz dropped or opened from Finder: Import CSV… or Run SQL File… with the file chosen; nothing runs
-    /// until the person presses the sheet's button.
+    /// A .csv, .xlsx, .json or .sql.gz dropped or opened from Finder: Import File… or Run SQL File… with the file chosen;
+    /// nothing runs until the person presses the sheet's button.
     func open(file url: URL) {
-        let csv = url.pathExtension.lowercased() == "csv"
+        let csv = ["csv", "tsv", "xlsx", "json", "jsonl"].contains(url.pathExtension.lowercased())
         let (enabled, reason) = availability(csv ? #selector(importCSV(_:)) : #selector(runSQLFile(_:)))
         guard enabled else {
             return showError(reason ?? "Select a connection in the sidebar first", title: "AirSQL can't open “\(url.lastPathComponent)” yet",
@@ -130,7 +139,7 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
     func availability(_ action: Selector?) -> (Bool, String?) {
         guard let main else { return (false, nil) }
         // Copy to Another Server only reads this connection: its sheet checks the one it writes to.
-        let writes = [#selector(restoreDatabase(_:)), #selector(runSQLFile(_:)), #selector(importCSV(_:))]
+        let writes = [#selector(restoreDatabase(_:)), #selector(runSQLFile(_:)), #selector(importCSV(_:)), #selector(importClipboard(_:))]
         if main.window?.attachedSheet != nil { return (false, "A sheet is open: answer it first") }
         guard let connection else {
             return (false, main.selectedConnections.count > 1 ? "Select only one connection" : "Select a connection in the sidebar first")

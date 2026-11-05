@@ -5,7 +5,7 @@
 	<!-- build.sh sets CFBundleShortVersionString and CFBundleVersion from VERSION. -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
-	<!-- .sql files open in console tabs, from Finder's Open With and dropped on the Dock icon; .csv and .sql.gz open their tool's sheet when dropped there. -->
+	<!-- .sql files open in console tabs, from Finder's Open With and dropped on the Dock icon; .csv, .xlsx and .sql.gz open their tool's sheet when dropped there. -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -30,6 +30,7 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.comma-separated-values-text</string>
+				<string>org.openxmlformats.spreadsheetml.sheet</string>
 			</array>
 		</dict>
 		<dict>

@@ -48,6 +48,8 @@ import AppKit
     @objc optional func revealInFinder(_ sender: Any?)
     @objc optional func runSQLFile(_ sender: Any?)
     @objc optional func importCSV(_ sender: Any?)
+    @objc optional func importClipboard(_ sender: Any?)
+    @objc optional func copyResultToTable(_ sender: Any?)
     @objc optional func importSSHConfig(_ sender: Any?)
     @objc optional func importConnections(_ sender: Any?)
     @objc optional func exportConnections(_ sender: Any?)
@@ -379,8 +381,12 @@ enum Commands {
                                         tip: "Show the tab's .sql file in Finder")
     static let runSQLFile = Command("Run SQL File…", #selector(AirSQLActions.runSQLFile(_:)),
                                     tip: "Run the statements of a .sql or .sql.gz file on this connection, with progress")
-    static let importCSV = Command("Import CSV…", #selector(AirSQLActions.importCSV(_:)),
-                                   tip: "Load rows from a CSV file into a table, choosing which column goes where")
+    static let importCSV = Command("Import File…", #selector(AirSQLActions.importCSV(_:)),
+                                   tip: "Load rows from a CSV, Excel or JSON file into a table or a new one, choosing which column goes where")
+    static let importClipboard = Command("Import from Clipboard…", #selector(AirSQLActions.importClipboard(_:)),
+                                         tip: "Load the rows on the clipboard into a table or a new one")
+    static let copyResultToTable = Command("Copy Result to Table…", #selector(AirSQLActions.copyResultToTable(_:)),
+                                           tip: "Copy this result's rows into a table or a new one")
     static let importSSHConfig = Command("Import from ~/.ssh/config…", #selector(AirSQLActions.importSSHConfig(_:)),
                                          tip: "Make connections that tunnel through the SSH hosts in your ~/.ssh/config")
     static let importConnections = Command("Import Connections…", #selector(AirSQLActions.importConnections(_:)),
@@ -887,7 +893,7 @@ enum Commands {
         about, settings, hide, hideOthers, showAll, quit,
         newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
-        runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
+        runSQLFile, importCSV, importClipboard, copyResultToTable, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, pastePlain, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,

@@ -33,7 +33,7 @@ extension MainMenu {
         menus.query.add([nil, Commands.formatSQL, Commands.history, Commands.sessions, Commands.profile, Commands.editAsTable, nil, Commands.keepResults, Commands.resultWindow, Commands.rerunResult,
                          Commands.copyResultQuery, Commands.pinResult,
                          Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, Commands.nextResult,
-                         Commands.previousResult, Commands.exportResult, Commands.compareResult])
+                         Commands.previousResult, Commands.exportResult, Commands.copyResultToTable, Commands.compareResult])
         let code = submenu("Code", [Commands.showContextActions, Commands.goToDeclaration, Commands.findUsages, Commands.renameSymbol,
                                     Commands.quickDocumentation, Commands.parameterInfo, nil, Commands.nextProblem, Commands.previousProblem,
                                     Commands.showProblem, nil, Commands.previewAffectedRows].map { $0?.item() ?? .separator() })

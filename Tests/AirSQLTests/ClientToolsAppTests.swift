@@ -83,7 +83,7 @@ extension AppTests {
             // The menu bar has the lane's items, each saying what it does.
             let bar = try #require(NSApp.mainMenu)
             let file = try #require(bar.item(withTitle: "File")?.submenu), toolsMenu = try #require(bar.item(withTitle: "Tools")?.submenu)
-            #expect(file.item(withTitle: "Run SQL File…") != nil && file.item(withTitle: "Import CSV…") != nil)
+            #expect(file.item(withTitle: "Run SQL File…") != nil && file.item(withTitle: "Import File…") != nil)
             #expect(toolsMenu.items.map(\.title).starts(with: ["Open in Terminal", "Export…", "Restore…", "Copy to Another Server…"]))
         }
 
@@ -313,7 +313,7 @@ extension AppTests {
             sheet.show(databases: ToolFixtures.databases())
             sheet.show(columns: ToolFixtures.customerColumns)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the CSV file first")
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose a file first, or Paste the rows")
             let file = URL(fileURLWithPath: try scratch() + "/people.csv")
             try "Email;NAME;phone\nada@example.com;Ada Lovelace;\n".write(to: file, atomically: true, encoding: .utf8)
             sheet.use(file)
@@ -328,6 +328,54 @@ extension AppTests {
             _ = await call(harness, "set", ["id": "csv.map.name", "value": "Leave out (its default)"])
             _ = await call(harness, "set", ["id": "csv.map.email", "value": "Leave out (its default)"])
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the field at least one column takes")
+        }
+
+        /// New Table… proposes the CREATE TABLE from every value; the text can be edited, and only a CREATE TABLE is taken.
+        @Test func theImportSheetProposesANewTableAndShowsTheRows() async throws {
+            let (main, harness) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            let content = try #require(sheet.window?.contentView)
+            let file = URL(fileURLWithPath: try scratch() + "/new orders.csv")
+            try "id;total\n1;2,50\n2;3,75\n".write(to: file, atomically: true, encoding: .utf8)
+            sheet.use(file)
+            _ = await call(harness, "set", ["id": "csv.table", "value": "New Table…"])
+            let ddl = try #require(find(NSTextView.self, id: "csv.ddl", in: content))
+            _ = await eventually(timeout: 5) { ddl.string.contains("`total`") }
+            #expect(ddl.string.contains("`new_orders`") && ddl.string.contains("`total` VARCHAR(32)"), "\(ddl.string)")
+            _ = await eventually(timeout: 5) { sheet.runButton.isEnabled }
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            let preview = try #require(find(NSTableView.self, id: "csv.preview", in: content))
+            #expect(preview.numberOfRows == 2 && preview.numberOfColumns == 2)
+            // The decimal comma turns the column into a number, and a new table has no rows to delete.
+            _ = await call(harness, "press", ["id": "csv.decimalComma"])
+            _ = await eventually(timeout: 5) { ddl.string.contains("DECIMAL(3,2)") }
+            #expect(ddl.string.contains("`total` DECIMAL(3,2)"), "\(ddl.string)")
+            #expect(try #require(find(NSButton.self, id: "csv.emptyFirst", in: content)).isEnabled == false)
+            ddl.string = "DROP TABLE orders"
+            ddl.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: ddl))
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("CREATE TABLE") == true)
+        }
+
+        /// JSON brings its own names; a file with no text format turns the text controls off.
+        @Test func theImportSheetTakesJSONAndOffersOnlyWhatFits() async throws {
+            let (main, _) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            sheet.show(columns: ToolFixtures.customerColumns)
+            let content = try #require(sheet.window?.contentView)
+            let file = URL(fileURLWithPath: try scratch() + "/people.json")
+            try #"[{"name": "Ada", "email": null}]"#.write(to: file, atomically: true, encoding: .utf8)
+            sheet.use(file)
+            _ = await eventually(timeout: 5) { sheet.runButton.isEnabled }
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            #expect(try #require(find(NSPopUpButton.self, id: "csv.separator", in: content)).isEnabled == false)
+            #expect(try #require(find(NSButton.self, id: "csv.header", in: content)).isEnabled == false)
+            #expect(try #require(find(NSTableView.self, id: "csv.preview", in: content)).numberOfRows == 1)
         }
 
         @Test func theCSVFormSaysWhyItIsOffWhileItRuns() async throws {
