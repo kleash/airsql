@@ -92,7 +92,7 @@ Source: https://kleash.github.io/airsql/getting-started.html
 
 ## Add your first connection
 
-Choose **File ▸ New Connection…** (⌘N), or **Add Connection…** on the first screen: the connection appears in the
+Choose **File ▸ New Connection…** (⌘N), or **New Connection…** on the first screen: the connection appears in the
 sidebar, and its summary shows where it goes and how it logs in.
 
 Passwords stay in your Keychain. A connection coloured **Production** starts with stricter safety checks
@@ -314,9 +314,10 @@ server for.
 
 ## Where to read it
 
-While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
-or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
-window.
+Click **SQL Log** at the right of the status bar, or choose **View ▸ SQL Log** (⌥⌘L), and while a server is connected the
+log shows under the tabs; the same again closes it. It starts closed, so the rows keep their room. Drag its top edge to
+give it more. The icons beside it open it in a window of its own, where you can filter it, show the file in Finder and
+clear it. With nothing connected, ⌥⌘L opens that window.
 
 ## Where it is
 
@@ -464,7 +465,7 @@ session of its own, so a long query in one tab leaves the others free.
 - **Snippets** keep SQL to use again. **Query ▸ Save as Snippet…** saves the selection or the statement, with a name, a
   folder and an abbreviation of your own. In the SQL, `$name$` is a field, `$END$` is where the cursor ends, `$SELECTION$`
   the selected text and `$$` a dollar. They're kept in AirSQL's settings on this Mac. A snippet with `$SELECTION$` is also in
-  **Edit ▸ Surround With**.
+  **Edit ▸ SQL ▸ Surround With**.
 - **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names (or of the
   table selected in the tree, when it names none), the server's functions by kind, the keywords, your **Snippets** and the
   built-in ones, and the connection's **History** by day, each with a bar as long as it took. Double-click one to put it
@@ -485,29 +486,29 @@ session of its own, so a long query in one tab leaves the others free.
 - Text pasted inside a `'string'` is escaped so its quotes don't end the string; **Paste Without Formatting** keeps it as copied.
 - Return after `(` indents one level, and between `(` and `)` puts the `)` on a line of its own.
 - The `BEGIN` or `CASE` and `END` of a block are marked when the cursor is on one of them.
-- **Edit ▸ Surround With** wraps the selection or the word at the cursor in brackets, a subquery, `CASE`, `COALESCE` or backticks.
-- **Edit ▸ Paste from History** lists the last ten texts you copied or cut in an editor. They're kept in memory only, until you quit.
-- **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
+- **Edit ▸ SQL ▸ Surround With** wraps the selection or the word at the cursor in brackets, a subquery, `CASE`, `COALESCE` or backticks.
+- **Edit ▸ SQL ▸ Paste from History** lists the last ten texts you copied or cut in an editor. They're kept in memory only, until you quit.
+- **Edit ▸ SQL ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
-- **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
+- **Edit ▸ SQL ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
   (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
-- **Edit ▸ Lines** works on the selected lines, or the cursor's: **Duplicate Line** (⌃D), **Delete Line** (⌃⇧K), **Move Line Up** and
+- **Edit ▸ SQL ▸ Lines** works on the selected lines, or the cursor's: **Duplicate Line** (⌃D), **Delete Line** (⌃⇧K), **Move Line Up** and
   **Down** (⌥⇧↑, ⌥⇧↓), **Join Lines** (⌃⇧J; a line ending in a `--` comment, or a line break inside a string, stays), **Sort Lines** and
   **Reverse Lines**. ⌘C with nothing selected copies the line.
-- **Edit ▸ Statements** has **Next Statement** and **Previous Statement** (⌃⌥↓, ⌃⌥↑), **Select Statement** (⌃⌘A) and **Move Statement
+- **Edit ▸ SQL ▸ Statements** has **Next Statement** and **Previous Statement** (⌃⌥↓, ⌃⌥↑), **Select Statement** (⌃⌘A) and **Move Statement
   Up** and **Down** (⌃⇧↑, ⌃⇧↓). **Extend Selection** (⌥↑) grows the selection by syntax: the word, the list item or condition, the
   clause, the brackets, the statement, then everything; **Shrink Selection** (⌥↓) takes those steps back.
-- **Edit ▸ Comment Selection** (⌥⌘/) puts `/* */` around the selection, or takes it away. **Toggle Case** (⌃⇧U) puts the selection or
+- **Edit ▸ SQL ▸ Comment Selection** (⌥⌘/) puts `/* */` around the selection, or takes it away. **Toggle Case** (⌃⇧U) puts the selection or
   the word at the cursor in capitals, or in small letters. **Complete Statement** (⌃⇧↩) closes its brackets, adds its `;` and starts a
   new line.
-- **Edit ▸ Carets** lets you type in several places at once. **Select Next Occurrence** (⌥⌘G) selects the word at the cursor, then
+- **Edit ▸ SQL ▸ Carets** lets you type in several places at once. **Select Next Occurrence** (⌥⌘G) selects the word at the cursor, then
   adds a caret at each next place its text appears; **Select All Occurrences** (⌃⌘G) does them all. **Add Caret to Each Line** (⌥⇧G)
   puts one at the end of each selected line, **Add Caret Above** and **Below** (⌃⌥⇧↑, ⌃⌥⇧↓) one on the next line, and ⌥⇧-click one
   where you click. ⌥-drag selects a block, as does a plain drag in **Column Selection Mode** (⌘*), where ⇧↑ and ⇧↓ add carets too.
   Typing, deleting and moving happen at every caret. Copy takes a line from each, and Paste gives each caret its line when the
   counts match. Escape, or a click, goes back to one caret.
 - **Folding**: a triangle in the margin marks what can fold: a statement, brackets or a comment of several lines, or the lines between
-  `-- region` and `-- endregion`. Click it, or use **Edit ▸ Folding**: **Fold** and **Unfold** (⌃⌥←, ⌃⌥→), **Fold All** and **Unfold All**
+  `-- region` and `-- endregion`. Click it, or use **Edit ▸ SQL ▸ Folding**: **Fold** and **Unfold** (⌃⌥←, ⌃⌥→), **Fold All** and **Unfold All**
   (⌃⌥⇧←, ⌃⌥⇧→). The text stays whole: Run, Copy, Find and Save see all of it, and a click on **…**, moving the cursor into a fold, or an
   edit touching it opens it.
 - The cursor's line has a band and, when the text has several statements, the statement it's in has a light shade: that's what ⌘↩
@@ -574,10 +575,10 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
 |---|---|
 | The statement at the cursor, or the selected text | ⌘↩ (or ⌃F9) |
 | Only the selected text | Query ▸ Run Selection |
-| The selected text as it stands, not split on `;` | Query ▸ Run Selection as One Statement |
-| The smallest query in brackets around the cursor | Query ▸ Run Subquery |
-| The statement at the cursor and every one after it | Query ▸ Run from Cursor |
-| The rows of a SELECT, straight to a .csv, .tsv or .json file | Query ▸ Run to File… |
+| The selected text as it stands, not split on `;` | Query ▸ Run Special ▸ Run Selection as One Statement |
+| The smallest query in brackets around the cursor | Query ▸ Run Special ▸ Run Subquery |
+| The statement at the cursor and every one after it | Query ▸ Run Special ▸ Run from Cursor |
+| The rows of a SELECT, straight to a .csv, .tsv or .json file | Query ▸ Run Special ▸ Run to File… |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
@@ -635,15 +636,15 @@ share the current database too.
 
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
-  tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
-  A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
+  tabs, unless you **pin** one (right-click it, or Query ▸ Result ▸ Pin Result); a result with edits not yet applied stays too.
+  A tab's ✕ closes it. **Query ▸ Result ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
   Messages included.
-- **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
+- **Query ▸ Result ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
   which keeps its name and pin. **Copy Result's Query** copies the statement. **View ▸ Refresh Every** does it every few
   seconds, for a statement that only reads, until it fails or you choose Off.
 - **Open Result in Window** moves a result to a window of its own, to keep beside the query. Closing it with edits not
   applied asks first.
-- **Query ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
+- **Query ▸ Result ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
 - Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](https://kleash.github.io/airsql/compare.html#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
@@ -825,7 +826,7 @@ its own proxy) are used, after what the editor sets.
 
 ## Import hosts from ~/.ssh/config
 
-**File ▸ Import from ~/.ssh/config…** asks you to pick the file (it opens on `~/.ssh/config`), lists its hosts, and
+**File ▸ Import from SSH Config…** asks you to pick the file (it opens on `~/.ssh/config`), lists its hosts, and
 makes a connection for each one you tick: an SSH tunnel through that host to a database on `127.0.0.1:3306`, which
 you can then edit.
 
@@ -985,14 +986,14 @@ Double-click a match to go there. **Replace in Tabs** changes the tabs only, wit
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
 tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: choose **Stop at 1,000** or **Stop at 100,000** to
-stop counting a table early. The status bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
+stop counting a table early. The status bar shows how far it is, and the stop button or Cancel ends it. Double-click a table in the list, or press Return, to see its
 matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
 Upper and lower case match as the column's collation says (most ignore case). The menu beside it chooses **Contains**, **Is exactly**, **Wildcards** (`%` and `_`) or a **Regular expression**, and
 **Match case** tells capitals from small letters whatever the column's collation.
 
 ## See what the server is running
 
-**Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
+**Process List** (⌥⌘P, or the button under the sidebar) lists every connection to the server and the statement it is
 running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
 with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
 idle connections. The selected process's whole statement shows under the list; double-click a row (or press Return) to
@@ -1007,7 +1008,7 @@ read-only connection too: they change no data.
 
 ## The host page
 
-Click a connected connection, or choose **Database ▸ Server Home**, for a page on the server. Its top line says what the
+Click a connected connection, or choose **Database ▸ Server ▸ Server Home**, for a page on the server. Its top line says what the
 server is, how you reach it and how long it has been up. A click on a row selects it; right-click for its menu.
 
 - **Databases**: each with its size, how many tables, views, routines, triggers and events it has, when it last changed
@@ -1040,7 +1041,7 @@ space.
   database's total counts it more than once.
 
 Reading a table's size makes the server open that table, so AirSQL reads one database at a time, on a session of its own.
-The status bar shows how far it is, and **Stop** or Cancel there ends it; what was read stays. The sizes then also show in
+The status bar shows how far it is, and the stop button or Cancel there ends it; what was read stays. The sizes then also show in
 the database view and the host page.
 
 InnoDB's sizes and row counts are estimates, and you see only what your login can see, and the databases the connection
@@ -1083,7 +1084,7 @@ there, and closing the tab asks about them.
   key order, so pages follow one another. A table with an AUTO_INCREMENT key opens newest first, until you sort it
   (**Settings ▸ Grid ▸ Open tables newest first**).
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
-  estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
+  estimate until you click **Count Exactly** (**Data ▸ Pages ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
   An estimate below what has already loaded is left out (InnoDB's can say 0 of a million rows), and with no figure to go
   by, Load All and an unindexed sort ask first. After the count comes the time the rows were read: `· read 14:32`.
 - **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
@@ -1108,10 +1109,10 @@ there, and closing the tab asks about them.
 - **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds or a number you type (**Custom…**),
   until you choose **Off**. Pending changes stay.
 
-**Data ▸ Order By…** takes any ORDER BY, expressions included; a click on a header's sort control replaces it. On a
+**Data ▸ Sort ▸ Order By…** takes any ORDER BY, expressions included; a click on a header's sort control replaces it. On a
 read-only connection it's checked like a typed filter.
 
-**Data ▸ Copy Query** copies the SELECT the tab runs, with its filter and sort, and **Open Query in Console** opens it in
+**Data ▸ Copy Table's Query** copies the SELECT the tab runs, with its filter and sort, and **Open Table's Query in a Tab** opens it in
 a new query tab.
 
 ## Filter, search and sort
@@ -1151,7 +1152,7 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
 - **Sort**: double-click a header, or click the arrow at its right, to sort by that column, ascending, then descending,
   then not at all. To sort by several columns, ⇧-click the next column's arrow (⌥ works too, and ⌥-double-click on a
-  header), or right-click its header for **Add to Sort**; each arrow shows its place in the order. **Data ▸ Sort by
+  header), or right-click its header for **Add to Sort**; each arrow shows its place in the order. **Data ▸ Sort ▸ Sort by
   Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
@@ -1188,12 +1189,12 @@ Nothing is written until you apply. Leaving a row writes nothing.
   - A foreign key shows the rows of the table it refers to, each as "label (key)", the label being that table's
     first text column, or the one you chose with **Use as Label** (below). They are searched on the server as you
     type, by label or by key, 100 at a time, so a big table is never listed whole. Return or a double click puts the
-    key in the cell. **Data ▸ Choose Referenced Row…** opens the same list.
+    key in the cell. **Data ▸ Foreign Keys ▸ Choose Referenced Row…** opens the same list.
 - **The value panel** (⇧↩) edits the selected cell too: ⌘↩ or clicking elsewhere keeps the text as a pending edit,
   Esc puts the cell's value back. A value the column refuses stays there, and the panel says why. Its **⋯** menu has
   **Format JSON** and **Compact JSON**, **Load from File…** (a file's bytes in a binary column, else its UTF-8 text)
   and **Save to File…**.
-- **Data ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
+- **Data ▸ Set Value ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
   `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
   or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
 - **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
@@ -1213,7 +1214,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
   what separates the cells (lines of commas or semicolons without tabs may be CSV), the decimal mark (numbers such as
   `1,234`), and the order of day, month and year (dates such as `03/04/2026`). **Data ▸ Paste with Format…** always
   asks.
-- **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
+- **Data ▸ Foreign Keys ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
   the selected row; choosing one opens that table filtered to them.
 
 ### Foreign key labels and virtual foreign keys
@@ -1317,10 +1318,11 @@ a column's summary. Loading, filtering, editing, copying and exporting a table's
 
 A table tab and a console result each have a row of buttons over the rows: the actions that are also in the menu bar, kept
 beside the work. The buttons act on the grid under them, wherever the focus is. Hold the pointer over one to see what it
-does, or why it's dimmed. A table's has Refresh, Refresh Every, Add Row, Duplicate Row, Delete Rows, Revert, Preview SQL
-and Apply; every grid has Find, the Column List, Sort by Columns, the Value Panel, Record View, Transpose, View As and
+does, or why it's dimmed. A table's has the Data, Structure, DDL switch, Refresh, Refresh Every, Add Row, Duplicate Row, Delete Rows and Apply; Revert
+and Preview SQL are on the bar that shows with pending changes. Every grid has Find, the Column List, Sort by Columns, the Value Panel, Record View, Transpose, View As and
 Chart. A console result adds Pin, Compare With and Export, and shows its editing buttons only when it can be edited. When
-the tab is narrow, the buttons at the end step out; the menu bar still has them.
+the tab is narrow, what doesn't fit moves to the **»** menu at the end of the row, the same at that width however you got there;
+Add Row, Delete Rows, Apply, Find and Sort stay longest.
 
 ## The header
 
@@ -1353,8 +1355,8 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **Edit ▸ Extend Selection** (⌥↑) grows the selection from the focused cell to its column, then its row, then
   everything; **Shrink Selection** (⌥↓) goes back the same way.
 - Hold ⇧ to scroll a mouse wheel across, and ⌥ to scroll five times as far.
-- **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
-- **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
+- **Data ▸ Columns ▸ Hide Column** hides the selected columns. A column comes back where it was.
+- **Data ▸ Columns ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
 - Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
@@ -1378,7 +1380,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 
 ## Show a column another way
 
-**Data ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
+**Data ▸ Columns ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
 copying and editing use the stored value.
 
 - Numbers: **Number with Grouping**; **Decimal Places ▸** rounds them (half up) to none, 1, 2, 3 or 4 decimal places,
@@ -1400,7 +1402,7 @@ you set in **Settings ▸ Grid ▸ Date format**, such as `dd/MM/yyyy HH:mm`.
 
 ## Other commands on cells and columns
 
-- **Data ▸ Hide Other Columns** keeps only the selected columns on show; **View ▸ Reset View** puts the columns, the sort
+- **Data ▸ Columns ▸ Hide Other Columns** keeps only the selected columns on show; **View ▸ Reset View** puts the columns, the sort
   and the filter back as they come.
 - **Data ▸ Open URL** opens a cell holding a web address in your browser.
 - **Data ▸ Compare Cells** opens a tab showing how two selected cells differ, line by line.
@@ -1491,7 +1493,7 @@ connection of their own, and the editor reads the table back from the server.
 
 ## Views, procedures, functions, triggers and events
 
-Open one from the tree, or start a new one from **Database ▸ New Object**. The editor shows its CREATE statement, as the
+Open one from the tree, or start a new one from **Database ▸ New Object ▸ New Object**. The editor shows its CREATE statement, as the
 server keeps it, to edit as text, with its head as fields above it:
 
 - **Procedures and functions**: name, return type, data access, security, deterministic, comment, and the parameters, which **+**, **−**
@@ -1520,7 +1522,7 @@ the fields turn off until it is.
 
 ## The ER diagram
 
-**Database ▸ ER Diagram** draws a database's tables with their keys. Tables that point at nothing come first on the left,
+**Database ▸ Diagram ▸ ER Diagram** draws a database's tables with their keys. Tables that point at nothing come first on the left,
 and each table sits right of the tables its foreign keys point at; lines go from a key's column to the table it points
 at, virtual foreign keys you added in a table's rows included ([Virtual foreign keys](https://kleash.github.io/airsql/table-data.html#foreign-key-labels-and-virtual-foreign-keys)).
 Tables with no keys come last.
@@ -1703,7 +1705,7 @@ and 0, and nested values go in as their JSON.
 
 ### Copy a result into a table
 
-Right-click a result ▸ **Copy Result to Table…** (or **Query ▸ Copy Result to Table…**) opens the same window with the
+Right-click a result ▸ **Copy Result to Table…** (or **Query ▸ Result ▸ Copy Result to Table…**) opens the same window with the
 selected rows, or all of them, into a table of this connection or a new one. NULLs, empty text and bytes stay apart.
 
 AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
@@ -1907,7 +1909,7 @@ values: after running the script, compare again to copy their values. After a sy
 
 ## Compare two results, or a result with a table
 
-In a [console](https://kleash.github.io/airsql/console.html), **Compare With…** (a result tab's right-click menu, or **Query ▸ Compare With…**) compares
+In a [console](https://kleash.github.io/airsql/console.html), **Compare With…** (a result tab's right-click menu, or **Query ▸ Result ▸ Compare Result With…**) compares
 the result shown with another one, row by row:
 
 - **Compare with** offers the other result tabs of the window, this tab's nearest first (a result from another
@@ -2133,7 +2135,7 @@ Source: https://kleash.github.io/airsql/users.html
 
 # Users and roles
 
-**Users and Roles** lists a server's logins and roles and changes them. Open it from **Database ▸ Users and Roles**, from
+**Users and Roles** lists a server's logins and roles and changes them. Open it from **Database ▸ Users ▸ Users and Roles**, from
 a connection's right-click menu, or with a click on the **Users and Roles** row at the end of its tree.
 
 The list shows each account's name, host, kind, login method, whether it has a password (never what it is), whether it's
@@ -2730,7 +2732,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   its own rows (Data ▸ Quick Filter, Filter by Values…, Sort by Columns…, Search All Columns): its bar
   `result.filterBar`, shown while a filter or search is on, has `result.scope`, `result.filter` (the conditions as SQL),
   `result.clearFilter` and `result.search` (Return searches).
-- **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
+- **Table tab** (a table's rows: Database ▸ Open Definition Data or a double-click in the tree; a single click shows them in the
   preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition:
   set it, then key `return` applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
   `tableData.busy`; the notice `tableData.notice` (`tableData.noticeText`, `tableData.preview`, `tableData.revert`,
@@ -2740,25 +2742,26 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `export.format`, `export.headers`, `export.null`, `export.separator`, `export.quote`, `export.encoding`, `export.crlf`, `export.joinLines`, `export.open`, `export.copy`, `export.save` (the person's),
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
   `values.cancel`; Data ▸ Quick Filter ▸ Type a Value… `quickFilter.operator`, `quickFilter.value`, `quickFilter.add`
-  (then press Filter); Data ▸ Sort by Columns… `sort.column.N`, `sort.direction.N`, `sort.up.N`, `sort.down.N`,
+  (then press Filter); Data ▸ Sort ▸ Sort by Columns… `sort.column.N`, `sort.direction.N`, `sort.up.N`, `sort.down.N`,
   `sort.remove.N` (N from 0, the first sort column first), `sort.add`, `sort.ok`, `sort.cancel`. Edits wait as pending changes until Apply. Typing a value checks it by the column's type first. Return
   or a double-click on an ENUM cell shows its values as a menu; on a SET cell a checklist `grid.set` (`grid.set.member`
   checkboxes, `grid.set.done`, `grid.set.cancel`); on a foreign key cell the referenced rows `grid.lookup`
   (`grid.lookup.search`, `grid.lookup.rows`; Return picks); a one-column foreign key's cell shows the referenced row's
   label after its value. A column header's menu (and the Data menu) has Use as Label, Add Virtual Foreign Key… (a sheet
-  with `virtualKey.table`; kept on this Mac, never in the database) and Remove Virtual Foreign Key. Data ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
+  with `virtualKey.table`; kept on this Mac, never in the database) and Remove Virtual Foreign Key. Data ▸ Set Value ▸ Insert Value ▸ puts in NOW(), UUID() and the like;
   Paste, Paste as New Rows and Paste with Format… (its sheet `pasteFormat.separator`, `pasteFormat.decimal`,
   `pasteFormat.dateOrder`) are the person's (the clipboard is). Query ▸ Edit as Table opens the selected INSERT
   statements in their table's tab as new rows; Apply then shows the SQL preview. Quit is the person's too: it lists pending changes
   and open transactions first.
 - **Console result editing**: a console result of a one-table SELECT that includes the key, or of an inner join with
-  every table's key, edits like a table tab (`grid.editor`, the pick-lists and foreign key drop-down, Data ▸ Set NULL, Set DEFAULT, Insert
+  every table's key, edits like a table tab (`grid.editor`, the pick-lists and foreign key drop-down, Data ▸ Set Value ▸ Set NULL, Set DEFAULT, Insert
   Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
-- **SQL log** (under the tabs while a server is connected, or its window): `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`,
-  `sqlLog.window`.
-- **Table tab's switch**: `tableData.page` (Data, Structure, DDL); View ▸ Table Page does the same.
+- **SQL log** (View ▸ SQL Log: under the tabs while a server is connected, closed at first; or its window): `sqlLog.text`, `sqlLog.reveal`,
+  `sqlLog.clear`, `sqlLog.window`; the window also has `sqlLog.filter`.
+- **Table tab's switch**: `tableData.page` (Data, Structure, DDL); View ▸ Table Page does the same. Toolbar buttons that don't fit are hidden
+  and listed by `grid.toolbar.more`; use their commands in the menu bar.
 - **Sidebar**: `sidebar.filter` (part of a name, or `/a regular expression/`), `sidebar.databaseFilter`, `sidebar.favourites`, `sidebar.options`,
   each row's `tree.star`; View ▸ Tree holds the choices (saving them is the person's while Ask before agents change anything is on).
 - **Quick Open** (`quickOpen.field`, `quickOpen.list`, `quickOpen.open`): commands listed there are refused to agents; use the `menu` tool.
