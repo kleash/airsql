@@ -20,6 +20,9 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
 
+- **Checks**: what the editor underlines while you type (see [Checks while you type](console.md#checks-while-you-type)).
+  All are on at first; turn off any you don't want.
+
 ## Grid
 
 - **Text size**: the grid's (12 pt at first), open grids' too. ⌘+, ⌘− and ⌘0 change it the same way for the grid with

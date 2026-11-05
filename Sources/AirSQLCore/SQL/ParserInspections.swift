@@ -94,9 +94,10 @@ public enum SQLInspections {
     public static func problems(_ analysis: SQLAnalysis, readOnly: Bool = false, disabled: Set<String> = [], noBackslashEscapes: Bool = false) -> [SQLProblem] {
         var check = Check(analysis: analysis, noBackslashEscapes: noBackslashEscapes)
         check.run(readOnly: readOnly)
-        return check.found.filter { !disabled.contains($0.code) }.sorted {
+        let found = check.found.filter { !disabled.contains($0.code) }.sorted {
             ($0.range.lowerBound, $1.severity.rawValue) < ($1.range.lowerBound, $0.severity.rawValue)
         }
+        return Array(found.prefix(ConsoleScript.unclosedLimit))
     }
 
     private struct Check {

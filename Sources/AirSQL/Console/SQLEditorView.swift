@@ -25,8 +25,18 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     private var unclosed: [SQLProblem] = [] { didSet { if unclosed != oldValue { underlineProblems() } } }
     /// What the check for unknown names reads, as of now; nil: it stays silent (an object editor, no connection).
     var nameContext: (() -> (snapshot: SchemaSnapshot?, database: String?, changed: Set<String>)?)?
-    /// Tables and columns the schema cache doesn't have (`SQLNameCheck`), as of the last pause in the typing.
-    private var unknownNames: [SQLProblem] = [] { didSet { if unknownNames != oldValue { underlineProblems() } } }
+    /// What `SQLInspections` said, as of the last pause in the typing.
+    var inspected: [SQLProblem] = [] { didSet { if inspected != oldValue { underlineProblems() } } }
+    /// The text as last read (`SQLAnalysis`), for Option-Return and the Code menu.
+    var insight: SQLAnalysis?
+    /// What the console gives the Code menu: see `ConsoleViewController.wireInsight`.
+    var insightHooks = InsightHooks()
+    var insightTicket: InsightTicket?
+    var usageMarks: [NSRange] = []
+    var notePopover: NSPopover?
+    /// What the last note said, for the tests.
+    var shownNote = ""
+    var problemStripe: ProblemStripe?
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
     /// Its own, not the window's: Undo in one console must never change another's hidden text, and an object editor's
@@ -149,6 +159,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
             highlight()
         }
         clearMarks()
+        clearUsageMarks()
         runProblem = nil
         checkLater()
         (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
@@ -206,7 +217,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     // MARK: Problems (underlined in red, the message on hover)
 
-    var problems: [SQLProblem] { [runProblem].compactMap { $0 } + unclosed + unknownNames }
+    var problems: [SQLProblem] { [runProblem].compactMap { $0 } + unclosed + inspected }
 
     /// A pause first: `(` is only a problem if nothing follows it.
     func checkLater() {
@@ -217,18 +228,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     @objc func check() {
         let text = string, noBackslashEscapes = noBackslashEscapes
         unclosed = ConsoleScript.unclosed(in: text, noBackslashEscapes: noBackslashEscapes)
-        guard let context = nameContext?() else {
-            unknownNames = []
-            return
-        }
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            let found = SQLNameCheck.problems(in: text, snapshot: context.snapshot, database: context.database, changed: context.changed,
-                                              noBackslashEscapes: noBackslashEscapes)
-            DispatchQueue.main.async {
-                guard let self, self.string == text else { return }  // the check after this edit is on its way
-                self.unknownNames = found
-            }
-        }
+        inspect(text, noBackslashEscapes: noBackslashEscapes)
     }
 
     /// Draws `problems` again. The hover areas are fixed rectangles, so they're remade whenever the text moves.
@@ -242,14 +242,14 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         toolTip = tip
         for problem in problems where problem.range.upperBound <= length {
             let range = NSRange(problem.range)
-            layout.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.thick.rawValue, .underlineColor: NSColor.statusBad],
-                                          forCharacterRange: range)
+            layout.addTemporaryAttributes(Self.underline(problem.severity), forCharacterRange: range)
             let glyphs = layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
             let none = NSRange(location: NSNotFound, length: 0)
             layout.enumerateEnclosingRects(forGlyphRange: glyphs, withinSelectedGlyphRange: none, in: container) { rect, _ in
                 self.addToolTip(rect.offsetBy(dx: self.textContainerOrigin.x, dy: self.textContainerOrigin.y), owner: self, userData: nil)
             }
         }
+        problemsChanged()
     }
 
     func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
@@ -275,6 +275,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         guard !stillSelecting else { return }
         clearMarks()
         markMatchingBracket()
+        markUsagesLater()
         onSelectionChange?()
     }
 

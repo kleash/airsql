@@ -414,3 +414,47 @@ public enum SQLIntentions {
 public struct SQLRenameError: Error, Equatable {
     public var message: String
 }
+
+/// The words of a routine's blocks: BEGIN with its END, CASE, IF, LOOP, REPEAT and WHILE with theirs.
+public enum SQLBlocks {
+    /// The word at `caret` and its partner, if it's one of a pair.
+    public static func pair(at caret: Int, tokens: [SQLToken], text: String) -> [Range<Int>] {
+        let utf16 = Array(text.utf16)
+        var stack: [Range<Int>] = [], pairs: [(Range<Int>, Range<Int>)] = []
+        let words = tokens.filter { $0.kind == .word && $0.range.upperBound <= utf16.count }
+        func upper(_ index: Int) -> String { index < words.count ? String(decoding: utf16[words[index].range], as: UTF16.self).uppercased() : "" }
+        var index = 0
+        while index < words.count {
+            var word = upper(index), range = words[index].range
+            if word.hasPrefix("END$") {  // END$$: the delimiter is part of the word to the lexer
+                word = "END"
+                range = range.lowerBound..<(range.lowerBound + 3)
+            }
+            switch word {
+            case "BEGIN", "CASE", "LOOP", "REPEAT", "WHILE":
+                if !(word == "REPEAT" && next(range, utf16) == 0x28) { stack.append(range) }
+            case "IF":
+                // IF( is a function and IF EXISTS isn't a block; a block's IF is followed by THEN somewhere.
+                if next(range, utf16) != 0x28, !["EXISTS", "NOT"].contains(upper(index + 1)) { stack.append(range) }
+            case "END":
+                let closes = ["IF", "CASE", "LOOP", "REPEAT", "WHILE"].contains(upper(index + 1))
+                if let open = stack.popLast() { pairs.append((open, closes ? range.lowerBound..<words[index + 1].range.upperBound : range)) }
+                if closes { index += 1 }
+            default:
+                break
+            }
+            index += 1
+        }
+        for (open, close) in pairs where open.lowerBound <= caret && caret <= open.upperBound || close.lowerBound <= caret && caret <= close.upperBound {
+            return [open, close]
+        }
+        return []
+    }
+
+    /// The first thing after `range`, past spaces.
+    private static func next(_ range: Range<Int>, _ text: [UInt16]) -> UInt16? {
+        var i = range.upperBound
+        while i < text.count, SQLLexer.isSpace(text[i]) { i += 1 }
+        return i < text.count ? text[i] : nil
+    }
+}

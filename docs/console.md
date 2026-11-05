@@ -29,12 +29,8 @@ own session, which every query tab of that connection shares.
 - Keywords, names, strings, numbers and comments have their own colours; the brackets around the cursor are marked.
 - A quote, comment or bracket left open is underlined in red a moment after you stop typing, and hovering over it says
   what's missing. No server is asked.
-- A table or column that isn't in the schema AirSQL has read is underlined in red the same way, and hovering over it
-  says what wasn't found. It's only advice: **Run** still runs, and nothing is sent to the server to check. When
-  AirSQL isn't sure it says nothing: a database whose details aren't loaded yet, temporary tables and tables made or
-  altered in the same text or session, CTEs, derived tables, and any statement other than a plain SELECT, INSERT,
-  REPLACE, UPDATE or DELETE. Columns are checked only when every table in the statement is known. If a table is new,
-  **Refresh** the schema and the underline goes.
+- AirSQL reads what you write a moment after you stop typing, and underlines what it finds: see
+  [Checks while you type](#checks-while-you-type).
 - **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
   keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
   elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
@@ -57,6 +53,48 @@ own session, which every query tab of that connection shares.
   `DELIMITER` block are left alone. If it couldn't do that, it leaves the SQL as it was and says so.
 - **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
+
+## Checks while you type
+
+AirSQL parses your SQL as you type and compares it with the schema it has read. Nothing is sent to the server, and it's
+only advice: **Run** still runs. Red marks what the server will refuse, yellow what will run but probably not as you
+meant, and dotted grey what could be tidier. Hovering over an underline says why, marks beside the scroller show where
+the problems are, and **Query ▸ Code ▸ Next Problem** (⌥F2) and **Previous Problem** (⌥⇧F2) go through them.
+
+It looks for:
+
+- Syntax errors, such as a missing table after FROM or WHERE after ORDER BY.
+- Tables, columns and procedures that aren't in the schema, inside subqueries, WITH queries and derived tables too; a
+  column in two joined tables; an alias used twice; a subquery in FROM with no alias.
+- `= NULL`, which is never true; `COUNT (*)` with a space, which MySQL refuses; the wrong number of arguments to common
+  functions; aggregates in WHERE, ON or GROUP BY, or inside each other; columns that aren't in GROUP BY.
+- INSERT rows that don't match the columns; NULL into a NOT NULL column; a value for a generated column.
+- UPDATE and DELETE without WHERE, or joined without ON; writes on a read-only connection, which AirSQL will refuse.
+- WITH queries nothing reads, conditions that are always the same, and a redundant ASC, ELSE NULL or alias.
+
+When AirSQL isn't sure it says nothing: a database whose details aren't loaded yet, temporary tables and tables made or
+altered in the same text or session, code in `/*! … */` comments, and routine bodies. Turn any check off in
+**Settings ▸ Editor**. If a table is new, **Refresh** the schema and the underline goes.
+
+## Work with the code
+
+Everything here is in **Query ▸ Code**, and none of it changes anything on the server.
+
+- **Fixes and Actions…** (⌥↩) lists what can be done at the cursor: the fixes for what's underlined there (the closest
+  name for a typo, `IS NULL`, qualifying an ambiguous column, refreshing the schema, writing the ALTER TABLE for a
+  missing column), and changes such as quoting or qualifying a name, adding a table alias, expanding `*` to its columns,
+  moving a subquery to WITH, and splitting or merging INSERTs or removing one of their columns. Each is one step of Undo.
+- **Go to Declaration** (⌘B) jumps to where an alias or WITH query is declared, and opens a table or routine.
+- **Find Usages…** (⌥F7) lists every place in the text that means the name at the cursor. The other places are also
+  tinted when you stop on a name, and BEGIN, CASE and IF are tinted with their END.
+- **Rename Name…** (⇧F6) changes an alias, WITH query, column alias or `@variable` everywhere it's used. On a table or
+  column it changes the text and writes the `RENAME TABLE` or `ALTER TABLE … RENAME COLUMN` above the statement, for you
+  to read and run.
+- **Quick Documentation** (F1) shows a table's columns and keys, a column's type and default, or a function's signature.
+- **Parameter Info** (⌥⌘I) shows what each argument of a call is for, or which column each value of an INSERT row goes
+  to, with the one at the cursor in bold.
+- **Preview Rows to Change** (⌥⌘↩) shows, as a result, the rows the UPDATE or DELETE at the cursor would touch, with an
+  UPDATE's new values first, up to 1,000 of them. Only a SELECT runs.
 
 ## Run it
 

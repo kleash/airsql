@@ -34,7 +34,7 @@ public struct SQLReference: Sendable {
 }
 
 /// A column a row source offers.
-public struct SQLColumnInfo: Sendable {
+public struct SQLColumnInfo {
     public var name: String
     /// The column's type, when it comes from the schema.
     public var type: String?
@@ -43,7 +43,7 @@ public struct SQLColumnInfo: Sendable {
 }
 
 /// A table, CTE or derived table visible in a scope.
-public struct SQLRowSource: Sendable {
+public struct SQLRowSource {
     public enum Kind: Sendable { case table, cte, derived, opaque }
 
     public var kind: Kind
@@ -66,7 +66,7 @@ public struct SQLRowSource: Sendable {
 }
 
 /// What one SELECT block, or a write, can see.
-public final class SQLScope: @unchecked Sendable {
+public final class SQLScope {
     public let parent: SQLScope?
     /// Everything that belongs to this block.
     public var extent: Range<Int>
@@ -100,7 +100,7 @@ public final class SQLScope: @unchecked Sendable {
 }
 
 /// A name that's wrong, found while resolving: `SQLNameCheck` and the inspections say it.
-public struct SQLNameIssue: Sendable {
+public struct SQLNameIssue {
     public enum Kind: Sendable {
         case unknownTable(database: String)
         /// `place`: "“orders”" or "the tables this statement uses".
@@ -125,7 +125,7 @@ public struct SQLNameIssue: Sendable {
 
 /// A script read and resolved: `SQLParser`'s trees, what each name stands for and what's wrong with the names. Works
 /// without a schema too: then aliases, CTEs and their columns still resolve, and nothing is reported.
-public struct SQLAnalysis: Sendable {
+public struct SQLAnalysis {
     public var statements: [SQLParsedStatement] = []
     /// By position.
     public var references: [SQLReference] = []
