@@ -373,8 +373,8 @@ Source: https://kleash.github.io/airsql/console.html
 
 # The SQL console
 
-A query tab (the SQL console) is where you write and run SQL on one connection. Its statements run one at a time, on the connection's
-own session, which every query tab of that connection shares.
+A query tab (the SQL console) is where you write and run SQL on one connection. Its statements run one at a time, on a
+session of its own, so a long query in one tab leaves the others free.
 
 ## Open a query tab
 
@@ -389,8 +389,11 @@ own session, which every query tab of that connection shares.
 - Double-click a query tab's tab (or press F2 while its editor has the focus) to give it a name of your own.
 - When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL. The
   other tabs come back too: see [Getting back to your tabs](https://kleash.github.io/airsql/navigator.html#getting-back-to-your-tabs).
-- **File ▸ Open Recent** lists the .sql files you had open lately.
-- **Query ▸ Change Connection…** runs the tab's statements on another connection.
+- **File ▸ Open Recent** lists the .sql files you had open lately. A file opens on the connection you last used it with.
+- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Messages says so; Save writes UTF-8.
+- If a file changes on disk, its tab follows, and ⌘Z brings back what it showed; with unsaved edits, Messages warns instead.
+- **Query ▸ Change Connection…** runs the tab's statements on another connection. A tab with no connection, such as a
+  file opened with nothing selected, takes the one the toolbar shows.
 
 ## Write SQL
 
@@ -466,11 +469,17 @@ own session, which every query tab of that connection shares.
 |---|---|
 | The statement at the cursor, or the selected text | ⌘↩ (or ⌃F9) |
 | Only the selected text | Query ▸ Run Selection |
+| The selected text as it stands, not split on `;` | Query ▸ Run Selection as One Statement |
+| The smallest query in brackets around the cursor | Query ▸ Run Subquery |
+| The statement at the cursor and every one after it | Query ▸ Run from Cursor |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
-on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another; a run stops at the first error.
+on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another. If one fails with others to come, a
+sheet asks whether to **Stop**, **Skip** it, or **Skip All** that fail from there on. Each
+statement that ran then shows a tick, or a cross if it failed, and its time at the end of its line, until you change it
+or run again.
 
 While a statement runs, the bar above the results shows which one and for how long, with **Cancel**; the status bar
 lists it too. Cancel stops only that statement: AirSQL checks the server is still running it before it stops it. A
@@ -478,15 +487,40 @@ connection can have a query timeout: a statement that runs longer is stopped the
 The time shown covers the whole run: waiting its turn, the server's work and fetching every row. After an `UPDATE`,
 Messages counts the rows changed; the server's note beside it says how many matched.
 
-Query tabs of one connection share its session, so while one runs a statement the others wait.
+If you've gone to another app and a run of 10 seconds or more ends, AirSQL's Dock icon bounces once and a notification
+says which tab finished. It never shows the SQL. Turn the notification off in System Settings ▸ Notifications.
+
+### Parameters
+
+A statement with `?` or `:name` in its code, not in a string or comment, asks for their values before it runs. The same
+`:name` takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
+become code. The tab remembers the values for the next run. AirSQL fills them in before sending, so Messages, the SQL
+log and the history show the final SQL, and the read-only and safety checks see it too.
+
+### Sessions
+
+Each query tab opens its own session the first time it runs something, and closes it when the tab closes. So each tab
+has its own transaction and current database, and several tabs can run at once; Cancel stops only the tab's own
+statement. A temporary table belongs to one session, so another tab can't see it.
+
+To see temporary tables across tabs, turn on **Query tabs share one session** on the connection's Options tab. The
+connection's query tabs then use one session, with one transaction and one database, and while one runs a statement the
+others wait.
+
+If the server is within five connections of its `max_connections`, or refuses another, a tab shares the connection's
+main session instead of opening its own, and Messages says so.
+
+If a tab's session is lost, the next Run says so, and says if an open transaction was rolled back, and runs nothing.
+Run again to open a new session.
 
 ### The current database
 
-Statements run in the connection's current database, which the toolbar's database pop-up shows and the sidebar shows in
-bold. Choose another in the pop-up, double-click one in the sidebar, or type `USE`: all three change the same one, for
-every query tab of the connection. A database chosen in the pop-up or the sidebar is made current with `USE` just
-before the next statement runs (Messages shows it), so a run under way is never switched midway; if that `USE` fails,
-nothing runs.
+Statements run in the tab's current database, which the toolbar's database pop-up shows and the sidebar shows in bold
+while the tab is on show. Choose another in the pop-up, double-click one in the sidebar, or type `USE`: all three change
+it for the tab on show, and the other tabs keep theirs. A new tab starts in the database shown. A database chosen in the
+pop-up or the sidebar is made current with `USE` just before the next statement runs (Messages shows it), so a run under
+way is never switched midway; if that `USE` fails, nothing runs. On a connection whose tabs share one session, they
+share the current database too.
 
 ## Results and Messages
 
@@ -495,10 +529,14 @@ nothing runs.
   tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
   A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
   Messages included.
-- Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
+- **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
+  which keeps its name and pin. **Copy Result's Query** copies the statement. **View ▸ Refresh Every** does it every few
+  seconds, for a statement that only reads, until it fails or you choose Off.
+- **Query ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
+- Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](https://kleash.github.io/airsql/compare.html#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
-- **Messages** lists what each statement did: its rows or the rows it changed, how long it took, the server's
+- **Messages** lists when and what each statement did: its rows or the rows it changed, how long it took, the server's
   warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
   names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
   to select its statement.
@@ -556,7 +594,10 @@ works out. Change them as you like, then **Apply**: it always shows the SQL firs
   tooltip says why (not connected, no transaction open, nothing running).
 - While a transaction is open, the status bar says so, with the number of rows changed, and how long it has been open
   once that passes the time set in Settings ▸ Safety.
-- Closing the connection's last query tab with a transaction open asks first: **Commit**, **Roll Back** or keep the tab.
+- Closing a query tab with a transaction open asks first: **Commit**, **Roll Back** or keep the tab. On a connection
+  whose tabs share one session, only its last tab asks.
+- New sessions start in Auto-commit at the server's isolation level, unless the connection's Options tab says **Start
+  query tabs in Manual Commit** or chooses an **Isolation level**.
 - Quitting AirSQL with a transaction open asks first too, in one sheet with any table changes and result edits not yet
   applied.
 
@@ -578,10 +619,20 @@ shows in a sheet, with what it will do:
 - **Query ▸ Query History** (⌘Y) lists the statements run on the tab's connection, newest first. Type to search;
   Return or a double-click puts one in the editor at the cursor, and a click shows it whole below the list. Click a
   header to sort, ⌘-click to select several; a right-click also opens them in a new tab or deletes them from the
-  history. Passwords in statements are masked before they are kept, as in the SQL log.
+  history. Passwords in statements are masked before they are kept, as in the SQL log. **All connections** searches
+  every connection's statements, with a column saying which.
+- **File ▸ Local History…** lists the states a .sql file was saved in (the last 50, kept on this Mac only). Click one to read
+  it; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
+- **Query ▸ Sessions…** lists every session AirSQL has open on the connection: what uses it, its thread on the server, its
+  database, and whether it is running or holds a transaction.
 - **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](https://kleash.github.io/airsql/sql-log.html).
-- **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it: as the
-  server's table, or as a tree (MySQL's own tree; MariaDB's plan made into one).
+- **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it. **Operations**
+  lists the steps as a tree with the server's rows and cost; click a header to sort the steps of each level, and the
+  steps that take a large share are marked in orange. **Table** is the server's EXPLAIN, **Tree** the steps as text and
+  **Raw** the server's own answer, to copy.
+- **Query ▸ Explain Analyze** (⌥⇧⌘E) runs the statement and adds what really happened: rows read, time and loops. It uses
+  `ANALYZE FORMAT=JSON` on MariaDB and `EXPLAIN ANALYZE` on MySQL 8.0.18 or later. As it really runs the statement, a
+  read-only connection refuses it, and a statement that may write always asks first.
 - **Query ▸ Profile** runs the statement and shows where the server spent its time. On MySQL 8 and later it reads
   performance_schema: the statement's stages where the server records them, else its own figures (time, lock time,
   rows examined and sent, temporary tables, sorts and full scans). Elsewhere it shows SHOW PROFILE's steps, as it does
@@ -615,7 +666,7 @@ tabs:
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
-- **Options**: read-only (below), the compressed protocol, a query timeout, the databases shown (names or patterns
+- **Options**: read-only (below), the compressed protocol, a query timeout, how query tabs use sessions and start their transactions (see [Sessions](https://kleash.github.io/airsql/console.html#sessions)), the databases shown (names or patterns
   such as `shop, reports_*`), startup SQL that runs after each login (for example `SET time_zone = '+00:00';`), and the
   connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
   why it can't be used).
@@ -973,6 +1024,9 @@ says why; so are views. Generated columns can't be edited.
   ("Data too long for column 'note'", "Column 'name' cannot be null", a duplicate value of a unique key), it selects
   that cell. Fix the value and apply again; if someone else got there first, revert the change, reload the rows and
   make it again. Changes kept over a restart are checked the same way.
+- **Manual Commit** (the toolbar's transaction pop-up, or Query ▸ Transaction Mode) moves the table tab to a session of its
+  own. Each Apply then writes into a transaction left open, and the rows you read show those changes, until **Commit** or
+  **Roll Back**. Each Apply is still all or nothing. Closing the tab or quitting with the transaction open asks first.
 - What Apply can't check: FLOAT, TIMESTAMP, JSON, spatial and vector values, dates with a zero month or day and values
   over 64 KB don't compare exactly, so edits to those go by the key alone and overwrite what is there; the preview
   names them. A change that only differs in case or trailing spaces can pass on a column whose collation ignores
@@ -1769,9 +1823,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Run All | F9 |
 | Run Statement | ⌃F9 |
 | Explain | ⌥⌘E |
+| Explain Analyze | ⌥⇧⌘E |
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Run Result Again | ⇧⌘R |
 | Close Result | ⌃⌘W |
 | Show Next Result | ⌥⌘] |
 | Show Previous Result | ⌥⌘[ |

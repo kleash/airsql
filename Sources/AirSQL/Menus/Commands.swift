@@ -82,6 +82,15 @@ import AppKit
     @objc optional func formatSQL(_ sender: Any?)
     @objc optional func showHistory(_ sender: Any?)
     @objc optional func changeConnection(_ sender: Any?)
+    @objc optional func rerunResult(_ sender: Any?)
+    @objc optional func runSelectionWhole(_ sender: Any?)
+    @objc optional func toggleKeepResults(_ sender: Any?)
+    @objc optional func showSessions(_ sender: Any?)
+    @objc optional func showLocalHistory(_ sender: Any?)
+    @objc optional func runFromCaret(_ sender: Any?)
+    @objc optional func runSubquery(_ sender: Any?)
+    @objc optional func explainAnalyze(_ sender: Any?)
+    @objc optional func copyResultQuery(_ sender: Any?)
     @objc optional func profileQuery(_ sender: Any?)
     @objc optional func saveAsChangeset(_ sender: Any?)
     @objc optional func editAsTable(_ sender: Any?)
@@ -439,6 +448,14 @@ enum Commands {
     static let runStatement = Command("Run Statement", #selector(AirSQLActions.runStatement(_:)), "\r",
                                       tip: "Run the statement at the cursor, or the selected text")
     static let runSelection = Command("Run Selection", #selector(AirSQLActions.runSelection(_:)), tip: "Run the selected text only")
+    static let runSelectionWhole = Command("Run Selection as One Statement", #selector(AirSQLActions.runSelectionWhole(_:)),
+                                           tip: "Send the selected text as it stands, without splitting it on semicolons")
+    static let keepResults = Command("Keep Results of Each Run", #selector(AirSQLActions.toggleKeepResults(_:)),
+                                     tip: "Open each run's results in new tabs, leaving the earlier ones in place")
+    static let runFromCaret = Command("Run from Cursor", #selector(AirSQLActions.runFromCaret(_:)),
+                                      tip: "Run the statement at the cursor and every statement after it")
+    static let runSubquery = Command("Run Subquery", #selector(AirSQLActions.runSubquery(_:)),
+                                     tip: "Run only the smallest query in brackets around the cursor")
     static let runAll = Command("Run All", #selector(AirSQLActions.runAll(_:)), "\r", [.command, .shift],
                                 tip: "Run every statement in the tab, one after another")
     static let runAllF9 = Command("Run All", #selector(AirSQLActions.runAll(_:)), f9, [], hidden: true,
@@ -447,6 +464,8 @@ enum Commands {
                                         tip: "Run the statement at the cursor, or the selected text (⌃F9)")
     static let explain = Command("Explain", #selector(AirSQLActions.explain(_:)), "e", [.command, .option],
                                  tip: "Show how the server would run the statement at the cursor, without running it")
+    static let explainAnalyze = Command("Explain Analyze", #selector(AirSQLActions.explainAnalyze(_:)), "e", [.command, .option, .shift],
+                                        tip: "Run the statement at the cursor and show what the server really did, with rows and times")
     static let cancelQuery = Command("Cancel", #selector(AirSQLActions.cancelQuery(_:)), ".",
                                      tip: "Stop the statement that is running in this tab")
     static let commit = Command("Commit", #selector(AirSQLActions.commit(_:)), tip: "Make the open transaction's changes permanent")
@@ -461,6 +480,10 @@ enum Commands {
                                    tip: "Tidy the SQL's spacing and keyword case; values and comments stay as they are")
     static let history = Command("Query History", #selector(AirSQLActions.showHistory(_:)), "y",
                                  tip: "Search the statements run on this connection and insert one again")
+    static let sessions = Command("Sessions…", #selector(AirSQLActions.showSessions(_:)),
+                                  tip: "List the sessions open on this connection and what each is doing")
+    static let localHistory = Command("Local History…", #selector(AirSQLActions.showLocalHistory(_:)),
+                                      tip: "See the states this file was saved in and bring one back")
     static let changeConnection = Command("Change Connection…", #selector(AirSQLActions.changeConnection(_:)),
                                           tip: "Run this tab's statements on another connection")
     static let profile = Command("Profile", #selector(AirSQLActions.profileQuery(_:)),
@@ -469,6 +492,10 @@ enum Commands {
                                          tip: "Save the selected statements as a Liquibase changeset in a changelog")
     static let editAsTable = Command("Edit as Table", #selector(AirSQLActions.editAsTable(_:)),
                                      tip: "Open the selected INSERT statements as a grid to edit")
+    static let rerunResult = Command("Run Result Again", #selector(AirSQLActions.rerunResult(_:)), "r", [.command, .shift],
+                                     tip: "Run the shown result's statement again and show the new rows in its tab")
+    static let copyResultQuery = Command("Copy Result's Query", #selector(AirSQLActions.copyResultQuery(_:)),
+                                         tip: "Copy the statement the shown result came from")
     static let pinResult = Command("Pin Result", #selector(AirSQLActions.pinResult(_:)),
                                    tip: "Keep this result tab: the next run opens a new one")
     static let renameResult = Command("Rename Result…", #selector(AirSQLActions.renameResult(_:)),
@@ -753,8 +780,8 @@ enum Commands {
         toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
-        runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
-        isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
+        runStatement, runSelection, runSelectionWhole, keepResults, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
+        isolation, formatSQL, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,

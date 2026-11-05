@@ -105,22 +105,25 @@ extension ApplyFailure {
 
 extension PendingChanges {
     /// Runs `statements` in one transaction through `run` (which returns each statement's affected rows): each must
-    /// change exactly its rows, else everything rolls back and `ApplyFailure` names the statement.
-    public static func apply(_ statements: [Statement], run: (String) async throws -> UInt64) async throws {
-        _ = try await run("START TRANSACTION")
+    /// change exactly its rows, else everything rolls back and `ApplyFailure` names the statement. `inOpenTransaction`:
+    /// they join the transaction already open and stay uncommitted; a savepoint takes back only their own.
+    public static func apply(_ statements: [Statement], inOpenTransaction: Bool = false, run: (String) async throws -> UInt64) async throws {
+        let undo = inOpenTransaction ? "ROLLBACK TO SAVEPOINT airsql_apply" : "ROLLBACK"
+        _ = try await run(inOpenTransaction ? "SAVEPOINT airsql_apply" : "START TRANSACTION")
         for statement in statements {
             let changed: UInt64
             do {
                 changed = try await run(statement.sql)
             } catch {
-                _ = try? await run("ROLLBACK")
+                _ = try? await run(undo)
                 throw ApplyFailure(statement: statement, changed: nil, error: error)
             }
             guard changed == UInt64(statement.expectedRows) else {
-                _ = try? await run("ROLLBACK")
+                _ = try? await run(undo)
                 throw ApplyFailure(statement: statement, changed: changed, error: nil)
             }
         }
+        guard !inOpenTransaction else { return }
         do {
             _ = try await run("COMMIT")
         } catch {

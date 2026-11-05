@@ -56,7 +56,8 @@ final class ConsoleDocuments {
                 guard !console.closing, console.syncScript == nil, console.fileURL != nil || !text.isEmpty else { return nil }
                 saved = SavedConsole(id: console.documentID, title: tab.title, connection: console.connectionID,
                                      path: console.fileURL?.path, text: console.isEdited || console.fileURL == nil ? text : nil,
-                                     caret: console.isViewLoaded ? console.editor.selectedRange().location : 0)
+                                     caret: console.isViewLoaded ? console.editor.selectedRange().location : 0,
+                                     database: console.chosenDatabase)
             } else if let place = tab.place {
                 saved = SavedConsole(id: tab.id, title: tab.title, connection: tab.connectionID, path: nil, text: nil, caret: 0,
                                      place: place, preview: tab.content is PreviewContent ? true : nil)
@@ -97,7 +98,7 @@ final class ConsoleDocuments {
                 let window = ConsoleTabStore.load(from: url)
                 return (window.tabs.compactMap { console in
                     if console.place != nil { return (console, "", "") }
-                    let file = console.path.flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
+                    let file = console.path.flatMap { path in (try? Data(contentsOf: URL(fileURLWithPath: path))).map { ConsoleScript.decoded($0).text } }
                     guard let text = console.text ?? file else { return nil }
                     return (console, text, file ?? "")
                 }, window.sidebar)
@@ -114,6 +115,7 @@ final class ConsoleDocuments {
                                                            text: text, fileURL: console.path.map { URL(fileURLWithPath: $0) },
                                                            documentID: console.id)
                     if console.path != nil { controller.savedText = file }
+                    controller.chosenDatabase = console.database
                     tab = main.open(controller, title: console.title, connection: controller.connectionID)
                     controller.editor.setSelectedRange(NSRange(location: min(console.caret, (text as NSString).length), length: 0))
                     changed(controller)

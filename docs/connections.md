@@ -24,7 +24,7 @@ tabs:
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
-- **Options**: read-only (below), the compressed protocol, a query timeout, the databases shown (names or patterns
+- **Options**: read-only (below), the compressed protocol, a query timeout, how query tabs use sessions and start their transactions (see [Sessions](console.md#sessions)), the databases shown (names or patterns
   such as `shop, reports_*`), startup SQL that runs after each login (for example `SET time_zone = '+00:00';`), and the
   connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
   why it can't be used).

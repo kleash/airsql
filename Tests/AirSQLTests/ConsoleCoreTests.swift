@@ -492,3 +492,136 @@ struct ResultSetSourceTests {
         #expect(SQLNameCheck.problems(in: script, snapshot: Self.snapshot(), database: "shop").count == 100)
     }
 }
+
+/// The plan's steps, from either of the servers' forms.
+@Suite struct ExplainPlanNodesTests {
+    @Test func mysqlsTreeBecomesStepsWithTheirFigures() throws {
+        let nodes = ExplainPlan.nodes(from: """
+            -> Nested loop inner join  (cost=4.50 rows=2) (actual time=0.10..9.00 rows=2 loops=1)
+                -> Table scan on c  (cost=0.50 rows=2) (actual time=0.05..0.10 rows=2 loops=1)
+                -> Filter: (o.id > 1)  (cost=2.00 rows=1) (actual time=4.00..4.40 rows=1 loops=2)
+                    -> Index lookup on o using k (c=c.id)  (cost=2.00 rows=1)
+            """, json: false)
+        let root = try #require(nodes.first)
+        #expect(nodes.count == 1 && root.operation == "Nested loop inner join")
+        #expect(root.cost == 4.5 && root.rows == 2 && root.actualRows == 2 && root.time == 9 && root.loops == 1)
+        #expect(root.children.map(\.operation) == ["Table scan on c", "Filter: (o.id > 1)"])
+        #expect(root.children[1].time == 8.8, "the time of a loop, for each loop")
+        #expect(root.children[1].children.first?.operation == "Index lookup on o using k (c=c.id)")
+        #expect(root.children[1].hot && !root.children[0].hot && !root.hot)
+    }
+
+    @Test func aJSONPlanBecomesStepsWithTheirFigures() throws {
+        let nodes = ExplainPlan.nodes(from: """
+            {"query_block": {"select_id": 1, "r_loops": 1, "r_total_time_ms": 2.5, "nested_loop": [
+                {"table": {"table_name": "c", "access_type": "ALL", "r_loops": 1, "rows": 10, "r_rows": 8, "r_table_time_ms": 1,
+                           "r_other_time_ms": 0.5, "cost": 0.25, "attached_condition": "c.id > 1"}},
+                {"table": {"table_name": "o", "access_type": "ref", "key": "k", "rows": 1, "cost_info": {"prefix_cost": "1.50"}}}]}}
+            """, json: true)
+        let block = try #require(nodes.first)
+        #expect(block.operation == "Query block #1" && block.time == 2.5)
+        let tables = try #require(block.children.first?.children)
+        #expect(tables.map(\.operation) == ["Table c · ALL · where c.id > 1", "Table o · ref · key k"])
+        #expect(tables[0].rows == 10 && tables[0].actualRows == 8 && tables[0].time == 1.5 && tables[0].cost == 0.25)
+        #expect(tables[1].cost == 1.5)
+        #expect(ExplainPlan.nodes(from: "not json", json: true).isEmpty)
+    }
+
+    @Test func analyzeUsesEachServersForm() {
+        func server(_ flavor: ServerInfo.Flavor, _ number: Int) -> ServerInfo {
+            ServerInfo(flavor: flavor, version: "", versionNumber: number, threadID: 1, tls: nil, certificate: nil)
+        }
+        #expect(ExplainPlan.analyzeSQL("SELECT 1", server: server(.mariadb, 110_404))?.sql == "ANALYZE FORMAT=JSON SELECT 1")
+        #expect(ExplainPlan.analyzeSQL("SELECT 1", server: server(.mysql, 80_018))?.sql == "EXPLAIN ANALYZE SELECT 1")
+        #expect(ExplainPlan.analyzeSQL("SELECT 1", server: server(.mysql, 80_017)) == nil)
+        // Both forms run the statement: never read-only.
+        for sql in ["ANALYZE FORMAT=JSON SELECT 1", "EXPLAIN ANALYZE SELECT 1"] {
+            #expect(StatementCheck.readOnlyRefusal(sql, on: "x", noBackslashEscapes: false) != nil)
+        }
+    }
+}
+
+/// `?` and `:name`, and what runs from the caret.
+@Suite struct QueryParameterTests {
+    func keys(_ sql: String) -> [String] { QueryParameters.places(in: [sql], noBackslashEscapes: false)[0].map(\.key) }
+
+    @Test func parametersAreFoundOnlyInCode() {
+        #expect(keys("SELECT * FROM t WHERE a = ? AND b = :name OR c = :name AND d=:other") == ["?1", ":name", ":name", ":other"])
+        #expect(keys("SELECT '?', ':no', `?` -- ? :x\n/* ? */ # :y\n").isEmpty)
+        #expect(keys("SET @a := 1").isEmpty)
+        #expect(keys("lbl:LOOP LEAVE lbl; END LOOP").isEmpty)
+        #expect(keys("lbl: LOOP").isEmpty)
+        #expect(keys("SELECT (:a)") == [":a"])
+        let two = QueryParameters.places(in: ["SELECT ?", "SELECT ?, :a"], noBackslashEscapes: false)
+        #expect(QueryParameters.keys(two) == ["?1", "?2", ":a"])
+    }
+
+    @Test func aValueCanNeverBecomeCode() {
+        func bound(_ value: String, noBackslashEscapes: Bool = false) -> String {
+            let sql = "SELECT :v, ':v'"
+            let places = QueryParameters.places(in: [sql], noBackslashEscapes: noBackslashEscapes)[0]
+            return QueryParameters.bind(sql, places, values: [":v": value], noBackslashEscapes: noBackslashEscapes)
+        }
+        #expect(bound("7") == "SELECT 7, ':v'")
+        #expect(bound("-1.5") == "SELECT -1.5, ':v'")
+        #expect(bound("007") == "SELECT '007', ':v'")
+        #expect(bound("null") == "SELECT NULL, ':v'")
+        #expect(bound("") == "SELECT '', ':v'")
+        #expect(bound("1 OR 1=1") == "SELECT '1 OR 1=1', ':v'")
+        #expect(bound("x'; DROP TABLE t; -- ") == #"SELECT 'x\'; DROP TABLE t; -- ', ':v'"#)
+        #expect(bound("a'b\\", noBackslashEscapes: true) == #"SELECT 'a''b\', ':v'"#)
+    }
+
+    @Test func runningFromTheCaretTakesTheRest() {
+        let text = "SELECT 1;\nSELECT 2;\nSELECT 3;"
+        #expect(ConsoleScript.statements(from: 12, in: text, noBackslashEscapes: false).map(\.sql) == ["SELECT 2", "SELECT 3"])
+    }
+
+    @Test func theSmallestSubqueryAroundTheCaret() {
+        let text = "SELECT * FROM (SELECT a FROM t WHERE b IN (SELECT c FROM u /* x */)) d WHERE e IN (1, 2)"
+        func at(_ word: String) -> String? {
+            ConsoleScript.subquery(at: (text as NSString).range(of: word).location, in: text, noBackslashEscapes: false)?.sql
+        }
+        #expect(at("c FROM") == "SELECT c FROM u")
+        #expect(at("a FROM") == "SELECT a FROM t WHERE b IN (SELECT c FROM u /* x */)")
+        #expect(at("1, 2") == nil, "brackets that hold no query")
+        #expect(at("d WHERE") == nil)
+        let cte = "SELECT * FROM (WITH x AS (SELECT 1) SELECT * FROM x) y"
+        #expect(ConsoleScript.subquery(at: 40, in: cte, noBackslashEscapes: false)?.sql == "WITH x AS (SELECT 1) SELECT * FROM x")
+    }
+}
+
+/// The saved states of a file, and the history over every connection.
+@Suite struct LocalHistoryTests {
+    @Test func savedStatesComeBackNewestFirstAndTheOldestGo() throws {
+        let history = LocalHistory(directory: URL(fileURLWithPath: try scratch()), limit: 3)
+        let file = URL(fileURLWithPath: "/nowhere/a.sql"), other = URL(fileURLWithPath: "/nowhere/b.sql")
+        for (index, text) in ["one", "two", "two", "three", "four"].enumerated() {
+            history.save(text, of: file, at: Date(timeIntervalSince1970: Double(index + 1)))
+        }
+        let texts = history.versions(of: file).map { try? String(contentsOf: $0.url, encoding: .utf8) }
+        #expect(texts == ["four", "three", "two"], "the same text twice is one state; only the newest are kept")
+        #expect(history.versions(of: other).isEmpty)
+        let path = try #require(history.versions(of: file).first?.url.path)
+        #expect(try FileManager.default.attributesOfItem(atPath: path)[.posixPermissions] as? Int == 0o600)
+    }
+
+    @Test func theHistoryCanBeSearchedOverEveryConnection() async throws {
+        let history = QueryHistory(directory: URL(fileURLWithPath: try scratch()))
+        let a = UUID(), b = UUID()
+        history.add(HistoryEntry(sql: "SELECT 1", date: Date(timeIntervalSince1970: 1), connection: a))
+        history.add(HistoryEntry(sql: "SELECT 2", date: Date(timeIntervalSince1970: 2), connection: b))
+        history.add(HistoryEntry(sql: "DROP TABLE t", date: Date(timeIntervalSince1970: 3), connection: b))
+        history.flush()
+        #expect(await history.allEntries(matching: "select").map(\.sql) == ["SELECT 2", "SELECT 1"])
+    }
+}
+
+@Suite struct FileDecodingTests {
+    @Test func filesOpenByMarkThenUTF8ThenLatin() {
+        #expect(ConsoleScript.decoded(Data("é".utf8)) == ("é", nil))
+        #expect(ConsoleScript.decoded(Data([0xEF, 0xBB, 0xBF, 0x61])) == ("a", nil))
+        #expect(ConsoleScript.decoded(Data([0xFF, 0xFE, 0x61, 0x00])) == ("a", "UTF-16"))
+        #expect(ConsoleScript.decoded(Data([0xE9])) == ("é", "Windows Latin 1"))
+    }
+}

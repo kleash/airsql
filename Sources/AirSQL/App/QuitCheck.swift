@@ -4,12 +4,15 @@ import AppKit
 // Quit asks first about what it would leave unfinished, as its menu item promises (plan §2.10): tables with pending
 // changes, console transactions still open, console results' edits not applied and client tools running, in one sheet.
 extension MainWindowController {
-    /// A line for each thing Quit leaves unfinished: a table's pending changes (kept for the next time it opens), a
-    /// connection's open console transaction (rolled back as AirSQL disconnects) and a console's results' edits not
-    /// applied (discarded). Connections whose Safety settings don't warn on close are left out.
+    /// A line for each thing Quit leaves unfinished: a table's pending changes (kept for the next time it opens), each
+    /// session's open console transaction (rolled back as AirSQL disconnects) and a console's results' edits not applied
+    /// (discarded). Connections whose Safety settings don't warn on close are left out.
     func unfinishedWork() -> [String] {
         var lines: [String] = [], transactions: Set<UUID> = []
         for tab in tabs {
+            if let table = tab.shown as? TableDataController, table.inTransaction, model.data.safety(for: table.context.connection).warnOnClose {
+                lines.append("A transaction in “\(tab.title)” on \(table.context.connection.displayName), not committed: it is rolled back")
+            }
             if let table = tab.shown as? TableDataController, let changes = table.source?.changes, !changes.isEmpty,
                model.data.safety(for: table.context.connection).warnOnClose {
                 let count = changes.rowCount
@@ -17,9 +20,9 @@ extension MainWindowController {
                              + "change\(count == 1 ? "" : "s"), kept for the next time you open the table")
             } else if let console = tab.content as? ConsoleViewController, let saved = console.connection,
                       model.data.safety(for: saved).warnOnClose {
-                if console.session?.inTransaction == true, transactions.insert(saved.id).inserted {
+                if console.session?.inTransaction == true, transactions.insert(console.sessionKey).inserted {
                     let count = console.shared.changes
-                    lines.append("A transaction on \(saved.displayName)"
+                    lines.append("A transaction" + (console.sharesSession ? "" : " in “\(tab.title)”") + " on \(saved.displayName)"
                                  + (count > 0 ? " with \(count.formatted()) change\(count == 1 ? "" : "s")" : "")
                                  + ", not committed: it is rolled back")
                 }

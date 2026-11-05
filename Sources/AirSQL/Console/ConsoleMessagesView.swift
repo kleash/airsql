@@ -13,6 +13,7 @@ struct ConsoleMessage {
     var statement: String
     /// "200 rows · 38 ms", "3 rows affected · 12 ms", or the error and the server's own words.
     var text: String
+    var date = Date()
 }
 
 /// The Messages tab (plan §2.6): each statement of the runs with its rows or rows affected, time, warnings, or the
@@ -40,7 +41,7 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         table.allowsMultipleSelection = true
         table.setAccessibilityIdentifier("console.messages")
         table.setAccessibilityLabel("Messages")
-        for (identifier, width) in [("icon", 22.0), ("line", 64.0), ("statement", 200.0), ("text", 360.0)] {
+        for (identifier, width) in [("icon", 22.0), ("time", 84.0), ("line", 64.0), ("statement", 200.0), ("text", 360.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.width = width
             column.resizingMask = identifier == "text" ? .autoresizingMask : .userResizingMask
@@ -108,6 +109,9 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         field.lineBreakMode = .byTruncatingTail
         field.font = Self.textFont
         switch identifier.rawValue {
+        case "time":
+            field.stringValue = message.date.formatted(date: .omitted, time: .standard)
+            field.textColor = .secondaryLabelColor
         case "line":
             field.stringValue = message.line.map { "Line \($0)" } ?? ""
             field.textColor = .secondaryLabelColor
@@ -156,63 +160,5 @@ final class MessagesTable: ContentTable {
     override func validateProposedFirstResponder(_ responder: NSResponder, for event: NSEvent?) -> Bool {
         guard responder is NSTextField, let event else { return super.validateProposedFirstResponder(responder, for: event) }
         return event.clickCount == 1 && isRowSelected(row(at: convert(event.locationInWindow, from: nil)))
-    }
-}
-
-/// An EXPLAIN's tab (plan §2.6): the plan as the server's table, or as a tree (MySQL's TREE format, MariaDB's JSON
-/// flattened), one or the other by the switch at its top.
-@MainActor
-final class PlanView: NSView {
-    private let choice = NSSegmentedControl(labels: ["Table", "Tree"], trackingMode: .selectOne, target: nil, action: nil)
-    private let holder = NSView()
-    private let table: NSView
-    private let tree: NSView
-
-    init(table: ResultStore?, tree: String, nullText: String, fontSize: CGFloat) {
-        self.table = table.map { ResultGridView(store: $0, nullText: nullText, fontSize: fontSize) }
-            ?? label("The server gave no plan table.", color: .secondaryLabelColor)
-        let scroll = NSTextView.scrollableTextView()
-        let text = scroll.documentView as! NSTextView
-        text.isEditable = false
-        text.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        text.backgroundColor = .content
-        text.string = tree.isEmpty ? "The server gave no plan tree for this statement." : tree
-        text.textContainerInset = NSSize(width: 8, height: 8)
-        text.setAccessibilityIdentifier("console.planTree")
-        self.tree = scroll
-        super.init(frame: .zero)
-        choice.selectedSegment = tree.isEmpty ? 0 : 1
-        choice.selectedSegmentBezelColor = .selectedSegment
-        choice.target = self
-        choice.action = #selector(switched(_:))
-        choice.toolTip = "Show the plan as the server's table, or as a tree of steps"
-        choice.setAccessibilityIdentifier("console.planChoice")
-        choice.translatesAutoresizingMaskIntoConstraints = false
-        holder.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(choice)
-        addSubview(holder)
-        NSLayoutConstraint.activate([
-            choice.topAnchor.constraint(equalTo: topAnchor, constant: Spacing.unit),
-            choice.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.unit),
-            holder.topAnchor.constraint(equalTo: choice.bottomAnchor, constant: Spacing.unit),
-            holder.leadingAnchor.constraint(equalTo: leadingAnchor), holder.trailingAnchor.constraint(equalTo: trailingAnchor),
-            holder.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
-        switched(choice)
-    }
-
-    required init?(coder: NSCoder) { fatalError("not used") }
-
-    @objc private func switched(_ sender: NSSegmentedControl) {
-        holder.subviews.forEach { $0.removeFromSuperview() }
-        let view = sender.selectedSegment == 1 ? tree : table
-        holder.addSubview(view)
-        if view is NSTextField {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([view.topAnchor.constraint(equalTo: holder.topAnchor, constant: Spacing.unit),
-                                         view.leadingAnchor.constraint(equalTo: holder.leadingAnchor, constant: Spacing.double)])
-        } else {
-            view.pin(to: holder)
-        }
     }
 }

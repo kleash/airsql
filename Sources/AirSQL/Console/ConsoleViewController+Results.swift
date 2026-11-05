@@ -32,6 +32,7 @@ extension ConsoleViewController {
     /// Takes away the result tabs that aren't pinned, as a new run starts; those with edits not applied stay, as if pinned
     /// (grid-spec rule 1).
     func dropUnpinnedResults() {
+        guard !keepsResults else { return }
         resultTabs.removeAll { !$0.pinned && $0.pendingRows == 0 }
         if let selected = selectedResult, !selected.pinned, selected !== messagesTab { selectedResult = nil }
     }
@@ -80,11 +81,25 @@ extension ConsoleViewController {
         if selectedResult == nil || selectedResult === messagesTab { selectedResult = tab }
     }
 
+    /// Run Again's rows, the last `count` tabs, in the place of `old`, under its name; none (an error) leaves it as it was.
+    func replace(_ old: ResultTab, withLast count: Int) {
+        guard count > 0, let index = resultTabs.firstIndex(where: { $0 === old }) else { return }
+        let added = Array(resultTabs.suffix(count))
+        resultTabs.removeLast(count)
+        resultTabs.replaceSubrange(index...index, with: added)
+        added[0].title = old.title
+        added[0].pinned = old.pinned
+        if refreshedResult === old { refreshedResult = added[0] }
+        selectedResult = added[0]
+    }
+
     /// An EXPLAIN's tab.
-    func addPlan(table: ResultStore?, tree: String, title: String) {
+    func addPlan(table: ResultStore?, tree: String, nodes: [PlanNode], raw: String, title: String) {
         let tab = ResultTab(title: title, content: .plan(table: table, tree: tree), summary: "")
         let settings = model.data.settings
-        tab.makeView = { PlanView(table: table, tree: tree, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize)) }
+        tab.makeView = {
+            PlanView(table: table, tree: tree, nodes: nodes, raw: raw, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize))
+        }
         resultTabs.append(tab)
         selectedResult = tab
     }
@@ -137,8 +152,8 @@ extension ConsoleViewController {
     /// The result tab's menu (plan §2.12): Pin, Rename, Close, Close Others, Export…, Compare With….
     func resultMenu() -> NSMenu {
         let menu = NSMenu(title: "Result")
-        menu.add([Commands.pinResult, Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, nil,
-                  Commands.exportResult, Commands.compareResult])
+        menu.add([Commands.rerunResult, Commands.copyResultQuery, nil, Commands.pinResult, Commands.renameResult, Commands.closeResult,
+                  Commands.closeOtherResults, nil, Commands.exportResult, Commands.compareResult])
         // The console's own commands go to it wherever the focus is; Export and Compare to whatever handles them.
         for item in menu.items where item.action.map(responds(to:)) == true { item.target = self }
         return menu
@@ -169,6 +184,38 @@ extension ConsoleViewController {
             self.selectedResult = self.resultTabs.isEmpty ? self.messagesTab : self.resultTabs[min(index, self.resultTabs.count - 1)]
             self.showResults()
         }
+    }
+
+    @objc func toggleKeepResults(_ sender: Any?) { keepsResults.toggle() }
+
+    /// View ▸ Refresh Every, on a result: runs it again every so often, for as long as it stays a read and runs cleanly.
+    @objc func setAutoRefresh(_ sender: Any?) {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        refreshSeconds = (sender as? NSMenuItem)?.tag ?? 0
+        refreshedResult = currentResult
+        guard refreshSeconds > 0 else { return }
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(refreshSeconds), repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshResult() }
+        }
+    }
+
+    private func refreshResult() {
+        guard let tab = refreshedResult, let sql = tab.sql, refreshes(sql), isConnected else { return setAutoRefresh(nil) }
+        guard running == nil, shared.runner == nil, tab.pendingRows == 0 else { return }
+        start(ConsoleRun(kind: .run, statements: [SQLStatement(sql: sql)], text: text, replacing: tab))
+    }
+
+    /// Whether only reads may run by themselves: nothing writes without Run.
+    func refreshes(_ sql: String) -> Bool {
+        ReadOnlyClassifier.classify(sql, noBackslashEscapes: editor.noBackslashEscapes) == .readOnly
+    }
+
+    /// The shown result's statement on the clipboard.
+    @objc func copyResultQuery(_ sender: Any?) {
+        guard let sql = currentResult?.sql else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(sql, forType: .string)
     }
 
     @objc func showNextResult(_ sender: Any?) { stepResult(1) }

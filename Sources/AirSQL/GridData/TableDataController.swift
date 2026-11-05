@@ -20,8 +20,8 @@ final class ApplyStop {
 
     /// Called before each statement of the Apply; once stopped only ROLLBACK goes on.
     func starting(_ sql: String) throws {
-        if stopped && sql != "ROLLBACK" { throw AirSQLError.cancelled }
-        running = sql == "COMMIT" || sql == "ROLLBACK" ? nil : sql
+        if stopped && !sql.hasPrefix("ROLLBACK") { throw AirSQLError.cancelled }
+        running = sql == "COMMIT" || sql.hasPrefix("ROLLBACK") ? nil : sql
     }
 
     func stop() {
@@ -61,6 +61,8 @@ final class TableDataController: NSViewController, TabContent {
     let tableName: String
     /// The data session; the tests give their own.
     var openSession: () async throws -> TableSession
+    /// In Manual Commit: the tab's own session, which then is what `openSession` gives.
+    var transactionSession: DBConnection?
     private(set) var source: TableDataSource?
     let viewer = GridViewer(source: nil)
     var grid: DataGridView { viewer.grid }
@@ -544,8 +546,15 @@ final class TableDataController: NSViewController, TabContent {
     }
 
     func shouldClose(_ closes: @escaping (Bool) -> Void) {
+        askAboutTransaction(proceed: { [weak self] in self?.shouldCloseWithoutTransaction(closes) }, stay: { closes(false) })
+    }
+
+    private func shouldCloseWithoutTransaction(_ closes: @escaping (Bool) -> Void) {
         let answer = { [weak self] (close: Bool) in
-            if close { self?.cancelQuery(nil) }  // a read for a tab that's gone only holds up the shared session
+            if close {
+                self?.cancelQuery(nil)  // a read for a tab that's gone only holds up the shared session
+                self?.endTransactionSession()
+            }
             closes(close)
         }
         guard let source, !source.changes.isEmpty, model.data.safety(for: context.connection).warnOnClose,

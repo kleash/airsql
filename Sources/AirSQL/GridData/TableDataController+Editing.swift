@@ -262,7 +262,8 @@ extension TableDataController: DataGridViewDelegate {
             defer { Self.applying.remove(connection) }
             do {
                 var insertIDs: [UInt64] = [], warnings = 0
-                try await PendingChanges.apply(statements) { sql in
+                if let held = transactionSession, !held.inTransaction { _ = try await held.query("START TRANSACTION") }
+                try await PendingChanges.apply(statements, inOpenTransaction: transactionSession != nil) { sql in
                     try stop.starting(sql)
                     let result = try await session.query(sql, rowCap: 1).last
                     warnings += result?.warnings ?? 0

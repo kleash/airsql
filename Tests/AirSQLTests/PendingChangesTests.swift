@@ -178,6 +178,21 @@ struct PendingChangesTests {
         }
         #expect(ran == ["START TRANSACTION", statements[0].sql, "ROLLBACK"])
         #expect(refused?.errorDescription == "Duplicate entry 'x' for key 'name'. Nothing was applied.")
+        // Into an open transaction: nothing is committed, and a failure takes back only this Apply.
+        ran = []
+        try await PendingChanges.apply(statements, inOpenTransaction: true) { sql in
+            ran.append(sql)
+            return 1
+        }
+        #expect(ran == ["SAVEPOINT airsql_apply"] + statements.map(\.sql))
+        ran = []
+        await #expect(throws: ApplyFailure.self) {
+            try await PendingChanges.apply(statements, inOpenTransaction: true) { sql in
+                ran.append(sql)
+                return 0
+            }
+        }
+        #expect(ran == ["SAVEPOINT airsql_apply", statements[0].sql, "ROLLBACK TO SAVEPOINT airsql_apply"])
     }
 
     @Test func aFailureFindsTheColumnTheServerNames() {

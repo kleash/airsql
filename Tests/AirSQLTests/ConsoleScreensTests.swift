@@ -41,7 +41,7 @@ extension AppTests {
             for _ in 0..<2 { console.closeResult(nil) }
             console.selectResult(console.messagesTab)
             await visit("console messages", [window])
-            console.addPlan(table: ConsoleFixtures.customers(rows: 3), tree: "-> Limit: 200 row(s)\n    -> Sort: spent DESC", title: "Plan")
+            console.addPlan(table: ConsoleFixtures.customers(rows: 3), tree: "-> Limit: 200 row(s)\n    -> Sort: spent DESC", nodes: [], raw: "", title: "Plan")
             console.showResults()
             await visit("console plan", [window])
             console.findBar.show(replace: true)

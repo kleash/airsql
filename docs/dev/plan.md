@@ -79,7 +79,7 @@ lessons in `docs/dev/research.md`.
   small patch in the build script adds an expected-host option. Lab test: a CA-signed certificate for the
   database's internal name, reached through the bastion, plus a wrong-name certificate that must fail.
 - **Session model (frozen in P0, R12):** per connected connection:
-  - *main* session: the console tabs share it (one transaction context, shown in the toolbar);
+  - *main* session: the login's own, and what the query tabs share on a connection set to share one; otherwise each query tab has a *query* session of its own, opened by its first run;
   - *data* session: table tabs, grid paging and Apply (Apply runs its own transaction here, so it never commits the
     console's open transaction, R7);
   - *schema* session: introspection;

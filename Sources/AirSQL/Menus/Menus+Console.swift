@@ -15,6 +15,7 @@ extension MainMenu {
         menus.file.insertItem(recent, at: open + 1)
         insert(Commands.save, after: Commands.closeWindow, in: menus.file)
         insert(Commands.saveAs, after: Commands.save, in: menus.file)
+        insert(Commands.localHistory, after: Commands.saveAs, in: menus.file)
 
         menus.data.add([nil, Commands.moveRowsUp, Commands.moveRowsDown])
         menus.edit.add([nil, Commands.toggleComment, Commands.shiftRight, Commands.shiftLeft, Commands.goToLine])
@@ -22,9 +23,14 @@ extension MainMenu {
         menus.view.add([nil, Commands.helpers, Commands.wordWrap, Commands.bigger, Commands.smaller, Commands.actualSize])
 
         insert(Commands.runSelection, after: Commands.runStatement, in: menus.query)
+        insert(Commands.runSelectionWhole, after: Commands.runSelection, in: menus.query)
+        insert(Commands.runSubquery, after: Commands.runSelectionWhole, in: menus.query)
+        insert(Commands.runFromCaret, after: Commands.runSubquery, in: menus.query)
+        insert(Commands.explainAnalyze, after: Commands.explain, in: menus.query)
         let mode = menus.query.items.firstIndex { $0.title == "Transaction Mode" } ?? menus.query.items.count - 1
         menus.query.insertItem(submenu("Isolation Level", isolationItems()), at: mode + 1)
-        menus.query.add([nil, Commands.formatSQL, Commands.history, Commands.profile, Commands.editAsTable, nil, Commands.pinResult,
+        menus.query.add([nil, Commands.formatSQL, Commands.history, Commands.sessions, Commands.profile, Commands.editAsTable, nil, Commands.keepResults, Commands.rerunResult,
+                         Commands.copyResultQuery, Commands.pinResult,
                          Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, Commands.nextResult,
                          Commands.previousResult, Commands.exportResult, Commands.compareResult])
     }

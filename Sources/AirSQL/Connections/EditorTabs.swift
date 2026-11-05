@@ -202,6 +202,15 @@ extension ConnectionEditor {
             timeout.stringValue = value == 0 ? "" : String(value)
         }
         form.row("Query timeout", [timeout, label("seconds", color: .secondaryLabelColor)])
+        form.row("", [toggle("Query tabs share one session", \.sharedQuerySession, id: "editor.sharedSession",
+                             tip: "Run every query tab on one session, with one transaction and database, so they see each "
+                                + "other's temporary tables")],
+                 caption: "Off, each query tab has a session of its own and can run while the others do.")
+        form.row("", [toggle("Start query tabs in Manual Commit", \.startsManual, id: "editor.startsManual",
+                             tip: "Start each new session with Auto-commit off, so changes wait for Commit")])
+        let levels: [(String, IsolationLevel?)] = [("Server's default", nil)] + IsolationLevel.allCases.map { ($0.title, $0) }
+        form.row("Isolation level", [choice(\.startIsolation, levels, id: "editor.startIsolation",
+                                            tip: "Choose the isolation level new query sessions start at")])
         form.row("Databases shown", [text(\.databaseFilter, placeholder: "all", id: "editor.databaseFilter",
                                           tip: "Type the databases to show, separated by commas; * and ? match any text")],
                  caption: "For example: shop, reports_*. The others stay on the server, out of the way.")

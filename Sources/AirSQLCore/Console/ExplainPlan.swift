@@ -1,6 +1,6 @@
 import Foundation
 
-/// EXPLAIN as a table and a tree (plan §2.6, R15: no graphical plan in 1.0). The table is the server's own EXPLAIN; the
+/// EXPLAIN as a table, a tree and steps with their figures (`PlanNode`; plan §2.6, R15: no graphical plan). The table is the server's own EXPLAIN; the
 /// tree is MySQL's EXPLAIN FORMAT=TREE (8.0.16 and later), else EXPLAIN FORMAT=JSON (MariaDB, MySQL 5.7) flattened
 /// into indented lines.
 public enum ExplainPlan {
@@ -25,7 +25,7 @@ public enum ExplainPlan {
 
     /// MariaDB 10.5 and 10.6 repeat the "table" key of a join, and a JSON reader keeps only the last of them: each
     /// repeat becomes "table#002" and so on, in order, which `walk` and `order` read past.
-    private static func numberingRepeats(_ json: String) -> String {
+    static func numberingRepeats(_ json: String) -> String {
         let bytes = Array(json.utf8)
         var out: [UInt8] = [], seen: [[ArraySlice<UInt8>: Int]] = [], index = 0
         while index < bytes.count {
@@ -54,6 +54,12 @@ public enum ExplainPlan {
         }
         return String(decoding: out, as: UTF8.self)
     }
+
+    /// The steps that hold others.
+    static let containers: Set<String> = ["nested_loop", "subqueries", "union_result", "materialized_from_subquery", "query_specifications",
+                                          "duplicates_removal", "filesort", "temporary_table", "grouping_operation", "ordering_operation",
+                                          "read_sorted_file", "having_subqueries", "window_functions_computation", "block-nl-join",
+                                          "expression_cache"]
 
     private static let shown = ["access_type", "key", "used_key_parts", "ref", "rows", "rows_examined_per_scan",
                                 "filtered", "attached_condition", "using_index", "using_filesort", "using_temporary_table"]
@@ -88,9 +94,7 @@ public enum ExplainPlan {
                     if inner == "possible_keys" || inner == "used_key_parts" { continue }
                     walk([inner: child], depth: depth + 1, into: &lines)
                 }
-            case "nested_loop", "subqueries", "union_result", "materialized_from_subquery", "query_specifications",
-                 "duplicates_removal", "filesort", "temporary_table", "grouping_operation", "ordering_operation",
-                 "read_sorted_file", "having_subqueries", "window_functions_computation", "block-nl-join", "expression_cache":
+            case let name where containers.contains(name):
                 lines.append(indent + key.replacingOccurrences(of: "_", with: " ").capitalized)
                 walk(value, depth: depth + 1, into: &lines)
             default:
@@ -100,12 +104,12 @@ public enum ExplainPlan {
     }
 
     /// Query blocks and tables first, then the rest in name order, so the plan reads top down.
-    private static func order(_ key: String) -> String {
+    static func order(_ key: String) -> String {
         (["query_block": "0", "table": "1", "nested_loop": "2"][plain(key)] ?? "3") + key
     }
 
     /// A key without the number `numberingRepeats` gave it.
-    private static func plain(_ key: String) -> String { String(key.prefix { $0 != "#" }) }
+    static func plain(_ key: String) -> String { String(key.prefix { $0 != "#" }) }
 
     private static func text(_ value: Any) -> String {
         if let list = value as? [Any] { return list.map(text).joined(separator: ", ") }

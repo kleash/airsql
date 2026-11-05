@@ -234,8 +234,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     func sidebarSelectionChanged() {
         let selected = sidebar.selectedConnectionIDs
-        // A connection with tabs shows its latest tab; one without shows its summary.
-        if selected.count == 1, let tab = tabs.last(where: { $0.connectionID == selected[0] }) {
+        // A connection with tabs shows its latest tab; one without shows its summary. A query tab with no connection stays:
+        // it takes the one chosen (`refresh`).
+        if selected.count == 1, selectedTab?.connectionID == nil, selectedTab?.content is ConsoleViewController {
+        } else if selected.count == 1, let tab = tabs.last(where: { $0.connectionID == selected[0] }) {
             selectedTab = tab
         } else if !selected.isEmpty {
             selectedTab = nil
@@ -246,6 +248,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     /// Brings every part up to date with the model, the tabs and the selection.
     func refresh() {
+        (selectedTab?.content as? ConsoleViewController)?.takeWindowConnection()
         tabBar.show(tabs, selected: selectedTab) { [weak self] tab in self?.model.connection(tab.connectionID) }
         updateContent()
         updateTint()
@@ -580,6 +583,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.agentResults.action?:
             enabled = activeConnection != nil
             reason = "Select one connection in the sidebar first"
+        case Commands.sessions.action?:
+            enabled = model.openConnection(activeConnection?.id) != nil
+            reason = "Connect first: only a connected connection has sessions"
         default:
             if let check = validateEditorItem(item) ?? validateConnectionItem(item) { (enabled, reason) = check }
         }

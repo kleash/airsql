@@ -9,6 +9,10 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     private let connection: UUID
     private let insert: (String) -> Void
     private let openInTab: (String) -> Void
+    /// A connection's name, for the list of every connection's statements.
+    private let name: (UUID) -> String
+    private lazy var everyConnection = checkbox("All connections", id: "history.all", tip: "Show the statements run on every connection",
+                                                on: false, target: self, action: #selector(scopeChanged(_:)))
     private let preview = NSTextView.scrollableTextView()
     private let search = NSSearchField()
     private let table = ContentTable()
@@ -28,8 +32,9 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         return formatter
     }()
 
-    init(connection: UUID, insert: @escaping (String) -> Void, openInTab: @escaping (String) -> Void) {
+    init(connection: UUID, name: @escaping (UUID) -> String, insert: @escaping (String) -> Void, openInTab: @escaping (String) -> Void) {
         self.connection = connection
+        self.name = name
         self.insert = insert
         self.openInTab = openInTab
         super.init(nibName: nil, bundle: nil)
@@ -48,13 +53,15 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         // The statement and the result share what the time leaves; a long error is shortened, whole in its tooltip.
         for (identifier, title, width, minimum, tip) in [("time", "When", 150.0, 150.0, "Sort by when it ran"),
                                                          ("sql", "Statement", 360.0, 160.0, "Sort by the statement's text"),
-                                                         ("result", "Result", 200.0, 100.0, "Sort by what came of it: rows, or an error")] {
+                                                         ("result", "Result", 200.0, 100.0, "Sort by what came of it: rows, or an error"),
+                                                         ("connection", "Connection", 140.0, 80.0, "Sort by the connection it ran on")] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.headerToolTip = tip
             column.title = title
             column.width = width
             column.minWidth = minimum
             if identifier == "time" { column.resizingMask = .userResizingMask }
+            column.isHidden = identifier == "connection"
             column.sortDescriptorPrototype = NSSortDescriptor(key: identifier, ascending: identifier != "time")
             table.addTableColumn(column)
         }
@@ -92,7 +99,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         insertButton.keyEquivalent = "\r"
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let buttons = NSStackView(views: [helpButton(.console), clear, status, spacer, cancel, insertButton])
+        let buttons = NSStackView(views: [helpButton(.console), clear, everyConnection, status, spacer, cancel, insertButton])
         buttons.spacing = Spacing.unit
         buttons.translatesAutoresizingMaskIntoConstraints = false
         empty.alignment = .center
@@ -140,9 +147,10 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     private func load() {
         loading?.cancel()
         status.stringValue = "Loading…"
-        let words = search.stringValue, connection = connection
+        let words = search.stringValue, connection = connection, all = everyConnection.state == .on
         loading = Task { [weak self] in
-            let found = await QueryHistory.shared.entries(connection, matching: words)
+            let found = all ? await QueryHistory.shared.allEntries(matching: words)
+                : await QueryHistory.shared.entries(connection, matching: words)
             guard let self, !Task.isCancelled else { return }
             self.entries = found
             self.sortEntries()
@@ -159,6 +167,20 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
 
     func controlTextDidChange(_ notification: Notification) { load() }
 
+    @objc private func scopeChanged(_ sender: NSButton) {
+        // The gate (plan §2.8): an agent's reach is one connection at a time, so other connections' statements stay the person's.
+        if sender.state == .on, AgentGuard.refuses("Only the person at the Mac can list every connection's statements.") {
+            sender.state = .off
+            return
+        }
+        let all = sender.state == .on
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("connection"))?.isHidden = !all
+        // Hidden from every agent while it shows other connections (`AgentServer.showsData`).
+        table.setAccessibilityIdentifier(all ? "history.every" : "history.list")
+        (preview.documentView as? NSTextView)?.setAccessibilityIdentifier(all ? "history.every" : "history.preview")
+        load()
+    }
+
     private func sortEntries() {
         guard let sort = table.sortDescriptors.first else { return }
         let result = { (entry: HistoryEntry) in entry.error == nil ? entry.rows ?? -1 : -2 }
@@ -167,6 +189,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
             switch sort.key {
             case "sql": return first.sql.localizedStandardCompare(second.sql) == .orderedAscending
             case "result": return result(first) < result(second)
+            case "connection": return name(first.connection).localizedStandardCompare(name(second.connection)) == .orderedAscending
             default: return first.date < second.date
             }
         }
@@ -213,6 +236,9 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
         case "time":
             field.stringValue = Self.time.string(from: entry.date)
             field.textColor = .secondaryLabelColor
+        case "connection":
+            field.stringValue = name(entry.connection)
+            field.toolTip = field.stringValue
         case "sql":
             field.stringValue = entry.sql.split(whereSeparator: \.isNewline).joined(separator: " ")
             field.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
@@ -277,7 +303,7 @@ final class HistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDe
     @objc private func deleteSelected(_ sender: Any?) {
         // The gate (plan §2.8): the history is the person's record.
         guard !selectedEntries.isEmpty, !AgentGuard.refuses("The history is the person's: only they can change it.") else { return }
-        QueryHistory.shared.remove(selectedEntries, from: connection)
+        for (id, entries) in Dictionary(grouping: selectedEntries, by: \.connection) { QueryHistory.shared.remove(entries, from: id) }
         load()
     }
 
@@ -316,7 +342,7 @@ private final class HistoryPanel: NSPanel {
 extension ConsoleViewController {
     @objc func showHistory(_ sender: Any?) {
         guard let id = connectionID, let window = view.window, window.attachedSheet == nil else { return }
-        let sheet = HistorySheet(connection: id, insert: { [weak self] sql in
+        let sheet = HistorySheet(connection: id, name: { [model] in model.connection($0)?.displayName ?? "A deleted connection" }, insert: { [weak self] sql in
             guard let self else { return }
             self.view.window?.makeFirstResponder(self.editor)
             self.editor.insertText(sql, replacementRange: self.editor.selectedRange())

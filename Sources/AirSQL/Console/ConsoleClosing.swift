@@ -2,12 +2,15 @@ import AirSQLCore
 import AppKit
 
 /// What closing a console asks first (plan §2.6, §2.10): a statement still running (it is cancelled), the open
-/// transaction when this is the connection's last console (Commit or Roll Back), results' edits not applied (Throw
-/// Away), and unsaved text (Save, Don't Save).
+/// transaction when no other console stays on its session (Commit or Roll Back), results' edits not applied (Throw
+/// Away), and unsaved text (Save, Don't Save). Its own session closes with it.
 @MainActor
 enum ConsoleClosing {
     static func ask(_ console: ConsoleViewController, answer: @escaping (Bool) -> Void) {
-        guard let window = console.view.window else { return answer(true) }
+        guard let window = console.view.window else {
+            console.endSession()
+            return answer(true)
+        }
         if console.running != nil {
             return alert(window, "Stop the statement that is running and close “\(console.tab?.title ?? "this tab")”?",
                          "The server stops it; what it changed in an open transaction stays until Commit or Rollback.",
@@ -27,10 +30,10 @@ enum ConsoleClosing {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { whenIdle(console, then) }
     }
 
-    /// The open transaction, when no other console of the connection stays open to show it.
+    /// The open transaction, when no other console on its session stays open to show it.
     private static func transaction(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {
-        let others = console.mainWindow?.tabs.contains { tab in
-            tab.content !== console && (tab.content as? ConsoleViewController)?.connectionID == console.connectionID
+        let others = console.sharesSession && console.mainWindow?.tabs.contains { tab in
+            tab.content !== console && (tab.content as? ConsoleViewController)?.sessionKey == console.sessionKey
         } ?? false
         guard let saved = console.connection, console.model.data.safety(for: saved).warnOnClose, !others,
               let session = console.session, session.inTransaction else { return edits(console, window, answer: answer) }
@@ -72,6 +75,7 @@ enum ConsoleClosing {
     private static func finish(_ console: ConsoleViewController, answer: (Bool) -> Void, _ close: Bool) {
         if close {
             console.closing = true
+            console.endSession()
             ConsoleDocuments.shared.closed(console)
         }
         answer(close)

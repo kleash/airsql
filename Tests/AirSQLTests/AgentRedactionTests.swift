@@ -178,9 +178,19 @@ extension AppTests.AgentGateUITests {
         #expect(await sees(harness).contains("Duplicate entry 'Nordlicht AG'"), "the person sees the message")
         let messages = await sees()
         #expect(messages.contains("console.messages") && !messages.contains("Nordlicht"), "\(messages)")
-        console.addPlan(table: nil, tree: "-> Filter: (customers.name = 'Nordlicht AG')", title: "Plan")
+        let tree = "-> Filter: (customers.name = 'Nordlicht AG')"
+        console.addPlan(table: nil, tree: tree, nodes: [], raw: tree, title: "Plan")
         #expect(await sees(harness).contains("Nordlicht"), "the person sees the plan's tree")
         #expect(await !sees().contains("Nordlicht"), "the agent doesn't")
+        console.addPlan(table: nil, tree: tree, nodes: ExplainPlan.nodes(from: tree, json: false), raw: tree, title: "Plan")
+        #expect(await sees(harness).contains("Nordlicht"), "the person sees the plan's steps")
+        #expect(await !sees().contains("Nordlicht"), "the agent doesn't")
+        for segment in [2, 3] {
+            ((console.currentResult?.view as? PlanView)?.choice)?.selectedSegment = segment
+            (console.currentResult?.view as? PlanView)?.show(page: segment)
+            #expect(await sees(harness).contains("Nordlicht"), "the person sees the plan as text")
+            #expect(await !sees().contains("Nordlicht"), "the agent doesn't")
+        }
         let apply = SQLPreviewRequest(change: ChangeSQL(title: "Apply", statements: ["UPDATE customers SET name = 'Nordlicht AG' WHERE id = 7"],
                                                         connection: Fixtures.production.id),
                                       heading: "Apply 1 change to shop.customers?", caption: "It runs in one transaction.")

@@ -96,10 +96,11 @@ extension ConsoleViewController: NSMenuItemValidation {
         switch item.action {
         case Commands.refresh.action:
             return (isConnected, offline ?? "")
-        case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(explain(_:)), #selector(profileQuery(_:)):
+        case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(runFromCaret(_:)), #selector(runSubquery(_:)), #selector(explain(_:)),
+             #selector(explainAnalyze(_:)), #selector(profileQuery(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (hasText, "Type a statement first")
-        case #selector(runSelection(_:)):
+        case #selector(runSelection(_:)), #selector(runSelectionWhole(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (editor.selectedRange().length > 0, "Select the SQL to run first")
         case #selector(cancelQuery(_:)):
@@ -130,6 +131,13 @@ extension ConsoleViewController: NSMenuItemValidation {
                 return (false, "This is the only result tab")
             }
             return (currentResult != nil, "Run a query first: there is no result tab yet")
+        case #selector(rerunResult(_:)), #selector(copyResultQuery(_:)):
+            guard currentResult?.sql != nil else {
+                return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This tab didn't come from a statement")
+            }
+            if item.action == #selector(copyResultQuery(_:)) { return (true, "") }
+            if let reason = offline ?? busy { return (false, reason) }
+            return (true, "")
         case #selector(showNextResult(_:)), #selector(showPreviousResult(_:)):
             return (!resultTabs.isEmpty, "Run a query first: there is no result tab yet")
         case #selector(exportResult(_:)):
@@ -142,10 +150,22 @@ extension ConsoleViewController: NSMenuItemValidation {
             return (!compareTargets(for: tab).isEmpty, "Run another query first, or connect: there is no other result or table to compare with")
         case #selector(changeConnection(_:)):
             if let reason = busy { return (false, reason) }
+            if !sharesSession, session?.inTransaction == true { return (false, "Commit or roll back first: the transaction is this tab's") }
             return (model.data.connections.count > 1 || connectionID == nil, "There is no other connection to choose")
         case #selector(toggleHelpers(_:)):
             item.state = helpersShown ? .on : .off
             return (true, "")
+        case #selector(toggleKeepResults(_:)):
+            item.state = keepsResults ? .on : .off
+            return (true, "")
+        case #selector(setAutoRefresh(_:)):
+            item.state = item.tag == refreshSeconds ? .on : .off
+            guard item.tag > 0 else { return (true, "") }
+            guard let sql = currentResult?.sql else { return (false, "Show a result with rows first") }
+            if let reason = offline { return (false, reason) }
+            return (refreshes(sql), "Only a statement that just reads runs by itself")
+        case #selector(showLocalHistory(_:)):
+            return (fileURL != nil, "Save the tab in a file first: each save is kept here")
         case #selector(showHistory(_:)):
             return (connectionID != nil, "Choose a connection for this console first")
         default:

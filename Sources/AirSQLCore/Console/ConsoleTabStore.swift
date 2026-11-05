@@ -30,6 +30,8 @@ public struct SavedConsole: Codable, Equatable, Sendable {
     public var text: String?
     /// The cursor's place (UTF-16).
     public var caret: Int
+    /// The database a query tab with a session of its own worked in.
+    public var database: String?
     /// What the tab showed, when it isn't a console.
     public var place: SavedPlace?
     /// It was the window's preview tab.
@@ -38,7 +40,8 @@ public struct SavedConsole: Codable, Equatable, Sendable {
     public var selected: Bool?
 
     public init(id: UUID, title: String, connection: UUID?, path: String?, text: String?, caret: Int, place: SavedPlace? = nil,
-                preview: Bool? = nil, selected: Bool? = nil) {
+                preview: Bool? = nil, selected: Bool? = nil, database: String? = nil) {
+        self.database = database
         self.id = id
         self.title = title
         self.connection = connection
