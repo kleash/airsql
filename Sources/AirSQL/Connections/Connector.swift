@@ -347,7 +347,7 @@ final class Connector {
         guard let minutes = model.connection(id)?.idleDisconnectMinutes, minutes > 0,
               let since = await connected.connection.idleSince(), now.timeIntervalSince(since) >= TimeInterval(minutes * 60),
               open[id] === connected, ToolSheet.running(on: [id]).isEmpty,
-              !NSApp.windows.contains(where: { ($0.windowController as? MainWindowController)?.busyTabs([id]).isEmpty == false })
+              !NSApplication.shared.windows.contains(where: { ($0.windowController as? MainWindowController)?.busyTabs([id]).isEmpty == false })
         else { return }
         SQLLog.shared.note("disconnected after \(minutes) idle minutes", context: connected.connection.options.name)
         disconnect(id)
