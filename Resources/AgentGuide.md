@@ -174,7 +174,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
   `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
   `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
-  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; sheets
+  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; Users and Roles
+  (`users`, `list.usersandroles.table`, `users.grants`) can be read with read access, and every change there is refused
+  to agents: `users.new`, `users.newRole`, `users.edit` and Modify Grants say so; sheets
   `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
   `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
 - **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):

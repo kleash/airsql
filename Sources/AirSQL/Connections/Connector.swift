@@ -284,6 +284,8 @@ final class Connector {
                         stored.tls.pinnedFingerprint = certificate.fingerprint
                         model.save(stored)
                     }
+                case .authFailed where [1820, 1862].contains(error.code):
+                    password = try await changeExpiredPassword(saved, password, routeSocket: routeSocket, on: window, error)
                 case .authFailed:
                     password = try await databasePassword(&saved, on: window, retry: true)
                 default:

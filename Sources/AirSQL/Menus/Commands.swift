@@ -218,6 +218,13 @@ import AppKit
     @objc optional func editDatabase(_ sender: Any?)
     @objc optional func showServerHome(_ sender: Any?)
     @objc optional func editVariable(_ sender: Any?)
+    @objc optional func showUsers(_ sender: Any?)
+    @objc optional func newUser(_ sender: Any?)
+    @objc optional func newRole(_ sender: Any?)
+    @objc optional func editUser(_ sender: Any?)
+    @objc optional func cloneUser(_ sender: Any?)
+    @objc optional func dropUser(_ sender: Any?)
+    @objc optional func modifyGrants(_ sender: Any?)
     @objc optional func goUp(_ sender: Any?)
     @objc optional func compareSelected(_ sender: Any?)
     @objc optional func copyList(_ sender: Any?)
@@ -764,6 +771,20 @@ enum Commands {
                                       tip: HostContent.Pane.commands.tip)
     static let editVariable = Command("Edit Variable…", #selector(AirSQLActions.editVariable(_:)),
                                       tip: "Change the selected variable, for the server or in a new query tab (shows the SQL first)")
+    static let users = Command("Users and Roles", #selector(AirSQLActions.showUsers(_:)),
+                               tip: "Show the server's logins and roles, with what each may do")
+    static let newUser = Command("New User…", #selector(AirSQLActions.newUser(_:)),
+                                 tip: "Make a new login, with its password, limits and privileges (shows the SQL first)")
+    static let newRole = Command("New Role…", #selector(AirSQLActions.newRole(_:)),
+                                 tip: "Make a new role that logins can take on (shows the SQL first)")
+    static let editUser = Command("Edit User…", #selector(AirSQLActions.editUser(_:)),
+                                  tip: "Change the selected login or role: its password, limits, privileges and roles (shows the SQL first)")
+    static let cloneUser = Command("Clone User…", #selector(AirSQLActions.cloneUser(_:)),
+                                   tip: "Make a new login with the selected one's settings and grants, and a password of its own")
+    static let dropUser = Command("Drop User…", #selector(AirSQLActions.dropUser(_:)),
+                                  tip: "Delete the selected logins and roles from the server (asks first and shows the SQL)")
+    static let modifyGrants = Command("Modify Grants…", #selector(AirSQLActions.modifyGrants(_:)),
+                                      tip: "Choose who may do what on the selected database, table or routine (shows the SQL first)")
     static let diskUsage = Command("Disk Usage", #selector(AirSQLActions.showDiskUsage(_:)), "u", [.command, .option],
                                    tip: "Show where the space went, on the server or in the selected database or table")
     static let diskUsageUp = Command("Up One Level", #selector(AirSQLActions.goUp(_:)),
@@ -951,7 +972,7 @@ enum Commands {
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
-        killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
+        killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, users, newUser, newRole, editUser, cloneUser, dropUser, modifyGrants, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder, moveToFolder,
         export, restore, copyToServer, flushHosts, flushLogs, flushPrivileges, flushTables, flushStatus, flushReadLock, compare, compareWith, compareRows, backToServer, includeInSync, nextDifference, previousDifference,

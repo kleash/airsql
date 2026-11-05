@@ -17,6 +17,8 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
 
 - They are kept in your Keychain, never in AirSQL's settings file, in its logs, in the [SQL log](sql-log.md) or in
   what AI agents see.
+- A password you type for a server login under [Users and roles](users.md) goes to the server and isn't kept. It shows as
+  `<secret>` on the SQL preview and in the process list.
 - A PAM or LDAP login sends the password as plain text, so AirSQL uses one only when you turn it on for the connection,
   and only over TLS that proves the server is the right one.
 

@@ -137,6 +137,9 @@ final class OffReasons: NSObject, NSMenuDelegate {
         Commands.diskUsageUp.action: "Open Tools ▸ Disk Usage first", Commands.diskUsageCompare.action: "Open Tools ▸ Disk Usage first",
         Commands.copyList.action: "Open Disk Usage or Server Home first", Commands.exportList.action: "Open Disk Usage or Server Home first",
         Commands.editVariable.action: "Open Database ▸ Server Home ▸ Variables first",
+        Commands.newUser.action: "Open Database ▸ Users and Roles first", Commands.newRole.action: "Open Database ▸ Users and Roles first",
+        Commands.editUser.action: "Open Database ▸ Users and Roles first", Commands.cloneUser.action: "Open Database ▸ Users and Roles first",
+        Commands.dropUser.action: "Open Database ▸ Users and Roles first",
     ]
 
     /// Tells `menu` and its submenus, but not those that make their own items, or the system's.

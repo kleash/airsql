@@ -69,6 +69,8 @@ extension SidebarController: NSMenuItemValidation {
         case .object(_, let object):
             let content = object.kind.isTableLike ? NavigatorHooks.tableData(open, object, nil) : TextContent.definition(open, object)
             main.preview(content, title: object.name, connection: open.id)
+        case .users:
+            main.showUsers(open)
         default:
             break
         }
@@ -105,7 +107,7 @@ extension SidebarController: NSMenuItemValidation {
         case .database:
             menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
                       Commands.export, Commands.restore,
-                      Commands.generateLiquibase, Commands.compareWith, Commands.compareRows, Commands.diskUsage, nil, Commands.editDatabase,
+                      Commands.generateLiquibase, Commands.compareWith, Commands.compareRows, Commands.diskUsage, Commands.modifyGrants, nil, Commands.editDatabase,
                       Commands.refresh, Commands.drop])
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
@@ -115,7 +117,9 @@ extension SidebarController: NSMenuItemValidation {
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
                       Commands.bulkEdit, Commands.compareWith, Commands.compareRows])
             menu.addItem(NavigatorMenus.maintenance())
-            menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.diskUsage, Commands.refresh])
+            menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.diskUsage, Commands.modifyGrants, Commands.refresh])
+        case .users:
+            menu.add([Commands.users])
         case .part:
             menu.add([Commands.openStructure, Commands.openData])
         case .detail(_, _, let part, _):
@@ -123,7 +127,7 @@ extension SidebarController: NSMenuItemValidation {
             if part == .triggers { menu.add([nil, Commands.compareWith, Commands.compareRows]) }
         default:
             menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, nil, Commands.compareWith, Commands.compareRows,
-                      nil, Commands.drop, Commands.refresh])
+                      Commands.modifyGrants, nil, Commands.drop, Commands.refresh])
         }
         return menu
     }
@@ -294,6 +298,27 @@ extension SidebarController: NSMenuItemValidation {
     @objc func showServerHome(_ sender: Any?) {
         guard let open = targetOpen else { return }
         main?.showHost(open, pane: HostContent.Pane(rawValue: (sender as? NSMenuItem)?.tag ?? 0))
+    }
+
+    @objc func showUsers(_ sender: Any?) {
+        if let open = targetOpen { main?.showUsers(open) }
+    }
+
+    /// Who may do what on the selected database, table or routine, from the connection's Users tab.
+    @objc func modifyGrants(_ sender: Any?) {
+        guard let open = targetOpen else { return }
+        let level: GrantLevel
+        if let object = selectedObjects.first {
+            switch object.kind {
+            case .procedure, .function: level = .routine(object.database, object.name, isFunction: object.kind == .function)
+            default: level = .table(object.database, object.name)
+            }
+        } else if let database = selectedDatabases.first {
+            level = .database(database)
+        } else {
+            return
+        }
+        main?.showUsers(open)?.modifyGrants(on: level)
     }
 
     /// Disk Usage of the selected table, database or else the server, in the connection's Disk Usage tab.

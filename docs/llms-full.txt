@@ -31,6 +31,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [The SQL console](https://kleash.github.io/airsql/console.html): write and run SQL, results, transactions, history and the SQL log.
 - [Connections and routes](https://kleash.github.io/airsql/connections.html): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, table commands, find text and the process list.
+- [Users and roles](https://kleash.github.io/airsql/users.html): list, add, change and drop logins and roles, their privileges, limits and passwords.
 - [A table's rows](https://kleash.github.io/airsql/table-data.html): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
@@ -270,6 +271,8 @@ dropping or renaming, restoring a dump, and sync scripts.
   in the sidebar, and sync scripts) saves the statements as a changeset in a changelog once they have run (see
   [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html)). In the query tab, use **Query ▸ Save as Changeset…**.
 - **Copy SQL** copies the statements. **Cancel** changes nothing.
+- **Passwords and keys** show as `<secret>` here and in what Copy SQL copies, as in the [SQL log](https://kleash.github.io/airsql/sql-log.html); only the
+  statements that run have them. Such a change can't be saved as a changeset.
 
 
 ---
@@ -2012,6 +2015,64 @@ added column, DROP INDEX and DROP FOREIGN KEY for added keys, RENAME back. Row c
 
 ---
 
+Source: https://kleash.github.io/airsql/users.html
+
+# Users and roles
+
+**Users and Roles** lists a server's logins and roles and changes them. Open it from **Database ▸ Users and Roles**, from
+a connection's right-click menu, or with a click on the **Users and Roles** row at the end of its tree.
+
+The list shows each account's name, host, kind, login method, whether it has a password (never what it is), whether it's
+locked or expired, its limits and what it must show of TLS. Under the list is what the selected account holds, in the
+server's own words, with any password hash masked. Filter, sorting, **Copy List** and **Export List…** work as on the
+[host page](https://kleash.github.io/airsql/navigator.html).
+
+Reading the list needs SELECT on the `mysql` database; AirSQL says so when your login doesn't have it.
+
+## Add or change an account
+
+**New User…**, **New Role…**, **Edit…** (or a double-click) and **Clone User…** open the same sheet. **Next…** shows the SQL,
+and nothing runs until you press **Run**. Each statement takes effect at once, and the first that fails stops the rest:
+press Refresh to see where it got to.
+
+- **Login**: the name, the host (`%` is anywhere), the login method and the password. Leave the password empty to keep
+  it. **Generate** fills both fields with a random password. **Copy** then copies it, marked so clipboard managers skip it;
+  it can't be shown. To change the login method, type a new password too.
+- **Locked** keeps the account but refuses its logins. **Password expired** makes it choose a new one at its next login.
+- **Limits**: statements, changes and logins an hour, connections at once (0 is no limit), and what it must show of TLS.
+- **Privileges**: the whole server, then each database, table, column and routine it has something on. Each privilege
+  has a tick, marked **reads**, **writes** or **administers**; the list is the server's own. **Add Level…** adds one more;
+  `%` and `_` in a database's name match several, `\_` is a real underscore.
+- **Roles**: the roles it takes on, whether it can pass each one on, and which are on at login. MariaDB has one default
+  role, MySQL several. Roles need MySQL 8 or any MariaDB.
+
+**Clone User…** starts a new login with the selected one's settings, privileges and roles. The password isn't copied.
+
+**Drop User…** asks you to type the name first, and warns when it's the login AirSQL is using.
+
+## Who may do what on one object
+
+Right-click a database, table or routine in the tree and choose **Modify Grants…**. Choose the login or role, and its sheet
+opens at that object's ticks.
+
+## An expired password
+
+When the server says your own password has expired, connecting asks for a new one, changes it and goes on. The new
+password goes to the server only: a password saved in your Keychain stays as it was, so update it in the connection's
+settings. Read-only and Production connections don't offer this: they say the password has expired, and connecting stops.
+
+## What protects these
+
+- Read-only and Production connections refuse every change here, and agents can't make one. The buttons and menu items
+  say why.
+- A password you type is sent to the server and kept nowhere else: not in the [SQL log](https://kleash.github.io/airsql/sql-log.html), history or AirSQL's
+  settings. The [SQL preview](https://kleash.github.io/airsql/sql-preview.html) and Copy SQL show `<secret>`, so a copied statement needs its password put
+  back, and the sheet doesn't offer a Liquibase changeset.
+- When a server's error would quote the statement, AirSQL leaves its words out.
+
+
+---
+
 Source: https://kleash.github.io/airsql/accessibility.html
 
 # Accessibility
@@ -2223,6 +2284,8 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
 
 - They are kept in your Keychain, never in AirSQL's settings file, in its logs, in the [SQL log](https://kleash.github.io/airsql/sql-log.html) or in
   what AI agents see.
+- A password you type for a server login under [Users and roles](https://kleash.github.io/airsql/users.html) goes to the server and isn't kept. It shows as
+  `<secret>` on the SQL preview and in the process list.
 - A PAM or LDAP login sends the password as plain text, so AirSQL uses one only when you turn it on for the connection,
   and only over TLS that proves the server is the right one.
 
@@ -2507,7 +2570,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
   `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
   `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
-  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; sheets
+  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; Users and Roles
+  (`users`, `list.usersandroles.table`, `users.grants`) can be read with read access, and every change there is refused
+  to agents: `users.new`, `users.newRole`, `users.edit` and Modify Grants say so; sheets
   `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
   `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
 - **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
