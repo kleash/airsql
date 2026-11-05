@@ -21,7 +21,9 @@ session of its own, so a long query in one tab leaves the others free.
 - Double-click a query tab's tab (or press F2 while its editor has the focus) to give it a name of your own.
 - When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL. The
   other tabs come back too: see [Getting back to your tabs](navigator.md#getting-back-to-your-tabs).
-- **File ▸ Open Recent** lists the .sql files you had open lately.
+- **File ▸ Open Recent** lists the .sql files you had open lately. A file opens on the connection you last used it with.
+- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Messages says so; Save writes UTF-8.
+- If a file changes on disk, its tab follows, and ⌘Z brings back what it showed; with unsaved edits, Messages warns instead.
 - **Query ▸ Change Connection…** runs the tab's statements on another connection. A tab with no connection, such as a
   file opened with nothing selected, takes the one the toolbar shows.
 
@@ -65,13 +67,15 @@ session of its own, so a long query in one tab leaves the others free.
 |---|---|
 | The statement at the cursor, or the selected text | ⌘↩ (or ⌃F9) |
 | Only the selected text | Query ▸ Run Selection |
+| The selected text as it stands, not split on `;` | Query ▸ Run Selection as One Statement |
 | The smallest query in brackets around the cursor | Query ▸ Run Subquery |
 | The statement at the cursor and every one after it | Query ▸ Run from Cursor |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
-on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another; a run stops at the first error. Each
+on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another. If one fails with others to come, a
+sheet asks whether to **Stop**, **Skip** it, or **Skip All** that fail from there on. Each
 statement that ran then shows a tick, or a cross if it failed, and its time at the end of its line, until you change it
 or run again.
 
@@ -124,11 +128,13 @@ share the current database too.
   A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
   Messages included.
 - **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
-  which keeps its name and pin. **Copy Result's Query** copies the statement.
+  which keeps its name and pin. **Copy Result's Query** copies the statement. **View ▸ Refresh Every** does it every few
+  seconds, for a statement that only reads, until it fails or you choose Off.
+- **Query ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
 - Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
-- **Messages** lists what each statement did: its rows or the rows it changed, how long it took, the server's
+- **Messages** lists when and what each statement did: its rows or the rows it changed, how long it took, the server's
   warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
   names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
   to select its statement.

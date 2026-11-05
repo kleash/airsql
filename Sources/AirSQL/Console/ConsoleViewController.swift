@@ -85,6 +85,14 @@ final class ConsoleViewController: NSViewController, TabContent {
     var sharing: Bool?
     /// The database of a tab with a session of its own, once it has run or been given one.
     var chosenDatabase: String?
+    /// The next run keeps the result tabs (Keep Results).
+    var keepsResults = false
+    /// Run Result Again every so often: the seconds (0: off), the timer and the tab it reruns.
+    var refreshSeconds = 0
+    var refreshTimer: Timer?
+    weak var refreshedResult: ResultTab?
+    /// The file's date on disk as last read or saved.
+    var fileDate: Date?
     /// The values last given to `?` and `:name`, offered at the next run.
     var parameterValues: [String: String] = [:]
     /// It said yes to closing: it isn't kept for the next launch.
@@ -106,6 +114,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         super.init(nibName: nil, bundle: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(sessionChanged(_:)), name: .consoleSessionDidChange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(schemaChanged(_:)), name: .openConnectionDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(checkFile), name: NSApplication.didBecomeActiveNotification, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -209,6 +218,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         placeDivider()
         view.window?.makeFirstResponder(editor)
         showDatabase()
+        checkFile()
         syncToolbar()
     }
 
@@ -342,6 +352,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     func setFile(_ url: URL, savedText: String) {
         fileURL = url
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        Self.rememberConnection(of: url, connectionID)
         self.savedText = savedText
         shownEdited = isEdited
         if let tab { mainWindow?.rename(tab, to: url.lastPathComponent) }
@@ -359,6 +370,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     func setConnection(_ id: UUID) {
         endSession()
         connectionID = id
+        if let fileURL { Self.rememberConnection(of: fileURL, id) }
         tab?.connectionID = id
         ConsoleDocuments.shared.changed(self)
         mainWindow?.refresh()

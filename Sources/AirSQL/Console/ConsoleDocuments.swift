@@ -98,7 +98,7 @@ final class ConsoleDocuments {
                 let window = ConsoleTabStore.load(from: url)
                 return (window.tabs.compactMap { console in
                     if console.place != nil { return (console, "", "") }
-                    let file = console.path.flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
+                    let file = console.path.flatMap { path in (try? Data(contentsOf: URL(fileURLWithPath: path))).map { ConsoleScript.decoded($0).text } }
                     guard let text = console.text ?? file else { return nil }
                     return (console, text, file ?? "")
                 }, window.sidebar)

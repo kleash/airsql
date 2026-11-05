@@ -366,5 +366,56 @@ extension AppTests {
             #expect(rows.contains { $0.job == "The connection" })
             await connection.disconnect()
         }
+
+        /// A script's error asks: Skip goes on; a result refreshes by itself only while it only reads; Keep Results keeps.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aScriptAsksAtAnErrorAndAResultRefreshesItself() async throws {
+            let (main, harness, console, connection) = try await Self.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            console.editor.setText("SELECT nope;\nSELECT RAND() AS r;")
+            console.runAll(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(main.window?.attachedSheet != nil)
+            #expect(await call(harness, "press", ["title": "Skip"]).error == nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.runMarks.marks.map(\.failed) == [true, false])
+            let result = try #require(console.resultTabs.first)
+            console.selectResult(result)
+            let item = NSMenuItem()
+            item.tag = 1
+            console.setAutoRefresh(item)
+            #expect(await eventually(timeout: 5) { console.resultTabs.first !== result })
+            #expect(console.resultTabs.count == 1 && console.refreshedResult === console.resultTabs.first)
+            console.setAutoRefresh(nil)
+            #expect(console.refreshTimer == nil)
+            console.keepsResults = true
+            console.editor.setText("SELECT 5")
+            console.runStatement(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.resultTabs.count == 2)
+            await connection.disconnect()
+        }
+
+        /// A file edited elsewhere: the tab follows, or with unsaved edits warns; the connection is remembered.
+        @Test func aFileChangedOnDiskIsNoticed() async throws {
+            let (_, _, console) = try await ConsoleAppTests.console()
+            let url = URL(fileURLWithPath: try scratch()).appendingPathComponent("b.sql")
+            console.editor.setText("SELECT 1")
+            console.setFile(url, savedText: "")
+            var saved = false
+            console.save(as: false) { saved = $0 }
+            #expect(await eventually(timeout: 5) { saved })
+            #expect(ConsoleViewController.rememberedConnection(of: url) == Fixtures.production.id)
+            try "SELECT 2".write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 60)], ofItemAtPath: url.path)
+            console.checkFile()
+            #expect(await eventually(timeout: 5) { console.text == "SELECT 2" })
+            #expect(!console.isEdited)
+            console.editor.setText("SELECT 3")
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 120)], ofItemAtPath: url.path)
+            console.checkFile()
+            #expect(await eventually(timeout: 5) { console.messagesView.messages.last?.text.contains("changed on disk: saving") == true })
+            #expect(console.text == "SELECT 3")
+        }
     }
 }

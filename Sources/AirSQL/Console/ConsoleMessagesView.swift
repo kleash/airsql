@@ -13,6 +13,7 @@ struct ConsoleMessage {
     var statement: String
     /// "200 rows · 38 ms", "3 rows affected · 12 ms", or the error and the server's own words.
     var text: String
+    var date = Date()
 }
 
 /// The Messages tab (plan §2.6): each statement of the runs with its rows or rows affected, time, warnings, or the
@@ -40,7 +41,7 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         table.allowsMultipleSelection = true
         table.setAccessibilityIdentifier("console.messages")
         table.setAccessibilityLabel("Messages")
-        for (identifier, width) in [("icon", 22.0), ("line", 64.0), ("statement", 200.0), ("text", 360.0)] {
+        for (identifier, width) in [("icon", 22.0), ("time", 84.0), ("line", 64.0), ("statement", 200.0), ("text", 360.0)] {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.width = width
             column.resizingMask = identifier == "text" ? .autoresizingMask : .userResizingMask
@@ -108,6 +109,9 @@ final class ConsoleMessagesView: NSScrollView, NSTableViewDataSource, NSTableVie
         field.lineBreakMode = .byTruncatingTail
         field.font = Self.textFont
         switch identifier.rawValue {
+        case "time":
+            field.stringValue = message.date.formatted(date: .omitted, time: .standard)
+            field.textColor = .secondaryLabelColor
         case "line":
             field.stringValue = message.line.map { "Line \($0)" } ?? ""
             field.textColor = .secondaryLabelColor

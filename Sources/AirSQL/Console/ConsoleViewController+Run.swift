@@ -18,6 +18,8 @@ final class ConsoleRun {
     var timer: Timer?
     /// A statement ended in an error.
     var failed = false
+    /// Skip All, after an error in a script.
+    var skipsErrors = false
     /// Run Again: the result tab its rows take the place of.
     let replacing: ResultTab?
 
@@ -44,6 +46,16 @@ extension ConsoleViewController {
     }
 
     @objc func runAll(_ sender: Any?) { run(all: true) }
+
+    /// The selection as it stands, not split on `;`: a routine's body without a DELIMITER line.
+    @objc func runSelectionWhole(_ sender: Any?) {
+        let selection = editor.selectedRange()
+        guard selection.length > 0, let range = Range(selection) else { return NSSound.beep() }
+        var whole = SQLStatement(sql: (text as NSString).substring(with: selection))
+        whole.range = range
+        whole.end = range.upperBound
+        run([whole])
+    }
 
     /// The statement at the caret and those after it.
     @objc func runFromCaret(_ sender: Any?) {
@@ -276,6 +288,7 @@ extension ConsoleViewController {
                     $0.ranCode = $0.ranCode || code
                 }
             }
+            if outcome.error != nil, !run.cancelled, index + 1 < run.statements.count, await scriptGoesOn(after: outcome, run: run) { continue }
             if outcome.error != nil || run.cancelled {
                 let left = run.statements.count - index - 1
                 if left > 0 { note(.info, "Stopped: the \(left) statement\(left == 1 ? "" : "s") after it didn't run.") }
@@ -286,6 +299,21 @@ extension ConsoleViewController {
             let (rows, text) = await profile.read(on: session)
             if let rows { addResult(rows, title: "Profile", summary: "Where the server spent the time") }
             if let text { note(.info, text) }
+        }
+    }
+
+    /// A script's statement failed with others to come: Skip goes on past it, Skip All past every error from here on, Stop
+    /// ends the run, as it always has where nobody can answer.
+    private func scriptGoesOn(after outcome: ConsoleOutcome, run: ConsoleRun) async -> Bool {
+        if run.skipsErrors { return true }
+        guard let window = view.window, window.attachedSheet == nil else { return false }
+        return await withCheckedContinuation { continuation in
+            ConsoleClosing.alert(window, "A statement failed: go on with the rest?", outcome.error?.localizedDescription ?? "",
+                                 buttons: [("Stop", "End the run here"), ("Skip", "Leave this statement and run the next"),
+                                           ("Skip All", "Run the rest, leaving any that fail")], destructive: nil) { choice in
+                if choice == 2 { run.skipsErrors = true }
+                continuation.resume(returning: choice > 0)
+            }
         }
     }
 
@@ -342,6 +370,7 @@ extension ConsoleViewController {
         run.timer?.invalidate()
         run.activity?.end()
         if running === run { running = nil }
+        if run.failed, run.replacing != nil { setAutoRefresh(nil) }
         if shared.runner == documentID { changeShared { $0.runner = nil } }
         LongQueryNotice.runEnded(after: Date().timeIntervalSince(run.started), failed: run.failed,
                                  place: "“\(tab?.title ?? "Query")” on \(connection?.displayName ?? "the server")")

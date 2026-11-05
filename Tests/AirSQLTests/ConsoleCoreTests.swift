@@ -616,3 +616,12 @@ struct ResultSetSourceTests {
         #expect(await history.allEntries(matching: "select").map(\.sql) == ["SELECT 2", "SELECT 1"])
     }
 }
+
+@Suite struct FileDecodingTests {
+    @Test func filesOpenByMarkThenUTF8ThenLatin() {
+        #expect(ConsoleScript.decoded(Data("é".utf8)) == ("é", nil))
+        #expect(ConsoleScript.decoded(Data([0xEF, 0xBB, 0xBF, 0x61])) == ("a", nil))
+        #expect(ConsoleScript.decoded(Data([0xFF, 0xFE, 0x61, 0x00])) == ("a", "UTF-16"))
+        #expect(ConsoleScript.decoded(Data([0xE9])) == ("é", "Windows Latin 1"))
+    }
+}

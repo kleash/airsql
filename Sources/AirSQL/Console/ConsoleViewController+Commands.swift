@@ -100,7 +100,7 @@ extension ConsoleViewController: NSMenuItemValidation {
              #selector(explainAnalyze(_:)), #selector(profileQuery(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (hasText, "Type a statement first")
-        case #selector(runSelection(_:)):
+        case #selector(runSelection(_:)), #selector(runSelectionWhole(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (editor.selectedRange().length > 0, "Select the SQL to run first")
         case #selector(cancelQuery(_:)):
@@ -155,6 +155,15 @@ extension ConsoleViewController: NSMenuItemValidation {
         case #selector(toggleHelpers(_:)):
             item.state = helpersShown ? .on : .off
             return (true, "")
+        case #selector(toggleKeepResults(_:)):
+            item.state = keepsResults ? .on : .off
+            return (true, "")
+        case #selector(setAutoRefresh(_:)):
+            item.state = item.tag == refreshSeconds ? .on : .off
+            guard item.tag > 0 else { return (true, "") }
+            guard let sql = currentResult?.sql else { return (false, "Show a result with rows first") }
+            if let reason = offline { return (false, reason) }
+            return (refreshes(sql), "Only a statement that just reads runs by itself")
         case #selector(showLocalHistory(_:)):
             return (fileURL != nil, "Save the tab in a file first: each save is kept here")
         case #selector(showHistory(_:)):

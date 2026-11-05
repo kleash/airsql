@@ -31,6 +31,17 @@ public enum ConsoleScript {
         return SQLSplitter.statement(at: caret, in: text, noBackslashEscapes: noBackslashEscapes).map { [$0] } ?? []
     }
 
+    /// A file's text: by its byte-order mark, else as UTF-8, else as Windows Latin. `encoding`: its name when it wasn't UTF-8.
+    public static func decoded(_ data: Data) -> (text: String, encoding: String?) {
+        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]), let text = String(data: data, encoding: .utf16) {
+            return (text, "UTF-16")
+        }
+        let body = data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data
+        if let text = String(data: body, encoding: .utf8) { return (text, nil) }
+        if let text = String(data: data, encoding: .windowsCP1252) { return (text, "Windows Latin 1") }
+        return (String(decoding: data, as: UTF8.self), "damaged UTF-8")
+    }
+
     /// The statement at the caret and all those after it.
     public static func statements(from caret: Int, in text: String, noBackslashEscapes: Bool) -> [SQLStatement] {
         let all = SQLSplitter.statements(in: text, noBackslashEscapes: noBackslashEscapes)

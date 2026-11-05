@@ -43,9 +43,47 @@ extension ConsoleViewController {
                 note(.error, "AirSQL couldn't save “\(url.lastPathComponent)”: \(failure)")
                 return done(false)
             }
+            fileDate = await Self.date(of: url)
             setFile(url, savedText: text)
             done(true)
         }
+    }
+
+    private nonisolated static func date(of url: URL) async -> Date? {
+        await Task.detached { try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date }.value
+    }
+
+    /// The file changed on disk since it was read or saved: the text follows it, or with unsaved edits Messages warns.
+    @objc func checkFile() {
+        guard let url = fileURL, !closing else { return }
+        Task { [weak self] in
+            guard let date = await Self.date(of: url), let self, url == self.fileURL else { return }
+            defer { self.fileDate = date }
+            guard let known = self.fileDate, date != known else { return }
+            if self.isEdited {
+                return self.note(.warning, "“\(url.lastPathComponent)” changed on disk: saving here replaces that version.")
+            }
+            let data = await Task.detached { try? Data(contentsOf: url) }.value
+            guard let data else { return }
+            let text = ConsoleScript.decoded(data).text
+            self.editor.replace(NSRange(location: 0, length: (self.text as NSString).length), with: text)
+            self.savedText = text
+            self.note(.info, "“\(url.lastPathComponent)” changed on disk, so the tab shows the new text. ⌘Z brings back what it showed.")
+        }
+    }
+
+    private static let fileConnections = "ConsoleFileConnections"
+
+    /// The connection a .sql file was last used on, for the next time it opens.
+    static func rememberedConnection(of url: URL) -> UUID? {
+        (UserDefaults.standard.dictionary(forKey: fileConnections)?[url.path] as? String).flatMap(UUID.init(uuidString:))
+    }
+
+    static func rememberConnection(of url: URL, _ id: UUID?) {
+        guard let id else { return }
+        var all = UserDefaults.standard.dictionary(forKey: fileConnections) ?? [:]
+        all[url.path] = id.uuidString
+        UserDefaults.standard.set(all, forKey: fileConnections)
     }
 
     @objc func changeConnection(_ sender: Any?) {

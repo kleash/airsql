@@ -32,6 +32,7 @@ extension ConsoleViewController {
     /// Takes away the result tabs that aren't pinned, as a new run starts; those with edits not applied stay, as if pinned
     /// (grid-spec rule 1).
     func dropUnpinnedResults() {
+        guard !keepsResults else { return }
         resultTabs.removeAll { !$0.pinned && $0.pendingRows == 0 }
         if let selected = selectedResult, !selected.pinned, selected !== messagesTab { selectedResult = nil }
     }
@@ -88,6 +89,7 @@ extension ConsoleViewController {
         resultTabs.replaceSubrange(index...index, with: added)
         added[0].title = old.title
         added[0].pinned = old.pinned
+        if refreshedResult === old { refreshedResult = added[0] }
         selectedResult = added[0]
     }
 
@@ -182,6 +184,31 @@ extension ConsoleViewController {
             self.selectedResult = self.resultTabs.isEmpty ? self.messagesTab : self.resultTabs[min(index, self.resultTabs.count - 1)]
             self.showResults()
         }
+    }
+
+    @objc func toggleKeepResults(_ sender: Any?) { keepsResults.toggle() }
+
+    /// View ▸ Refresh Every, on a result: runs it again every so often, for as long as it stays a read and runs cleanly.
+    @objc func setAutoRefresh(_ sender: Any?) {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        refreshSeconds = (sender as? NSMenuItem)?.tag ?? 0
+        refreshedResult = currentResult
+        guard refreshSeconds > 0 else { return }
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(refreshSeconds), repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshResult() }
+        }
+    }
+
+    private func refreshResult() {
+        guard let tab = refreshedResult, let sql = tab.sql, refreshes(sql), isConnected else { return setAutoRefresh(nil) }
+        guard running == nil, shared.runner == nil, tab.pendingRows == 0 else { return }
+        start(ConsoleRun(kind: .run, statements: [SQLStatement(sql: sql)], text: text, replacing: tab))
+    }
+
+    /// Whether only reads may run by themselves: nothing writes without Run.
+    func refreshes(_ sql: String) -> Bool {
+        ReadOnlyClassifier.classify(sql, noBackslashEscapes: editor.noBackslashEscapes) == .readOnly
     }
 
     /// The shown result's statement on the clipboard.
