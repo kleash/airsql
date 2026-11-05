@@ -339,8 +339,8 @@ final class ERDiagramView: NSView, NSViewToolTipOwner {
         switch key {
         case .rightArrow: candidates = boxes.filter { $0.frame.minX > current.maxX }
         case .leftArrow: candidates = boxes.filter { $0.frame.maxX < current.minX }
-        case .downArrow: candidates = boxes.filter { $0.frame.minX == current.minX && $0.frame.minY > current.maxY }
-        case .upArrow: candidates = boxes.filter { $0.frame.minX == current.minX && $0.frame.maxY < current.minY }
+        case .downArrow: candidates = boxes.filter { $0.frame.minX < current.maxX && $0.frame.maxX > current.minX && $0.frame.minY > current.maxY }
+        case .upArrow: candidates = boxes.filter { $0.frame.minX < current.maxX && $0.frame.maxX > current.minX && $0.frame.maxY < current.minY }
         default: return super.keyDown(with: event)
         }
         let center = NSPoint(x: current.midX, y: current.midY)

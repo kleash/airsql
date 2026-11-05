@@ -13,7 +13,7 @@ final class SQLGeneratorController: NSViewController, TabContent {
     let (textScroll, text) = SQLEditorView.make(fontSize: 12.5)
     let overlay = EditorOverlay()
     let summary = label("", font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, truncates: true)
-    let layouts = popup(["In one folder", "A folder per kind", "A folder per database and kind", "Numbered in order"], selected: 1,
+    let layouts = popup(["One folder", "By kind", "By database and kind", "Numbered"], selected: 1,
                         id: "generator.layout", tip: "Choose how Save to Folder lays its files out", target: nil, action: nil)
     private(set) lazy var copyButton = button("Copy", id: "generator.copy", tip: "Copy the script", target: self, action: #selector(copyScript(_:)))
     private(set) lazy var consoleButton = button("Open in Query Tab", id: "generator.console", tip: "Put the script in a new query tab: nothing runs until you do",
@@ -51,15 +51,20 @@ final class SQLGeneratorController: NSViewController, TabContent {
         text.isEditable = false
         text.setAccessibilityIdentifier("generator.text")
         text.toolTip = "The statements that recreate what you chose, kept up to date with the options"
-        let options = NSStackView(views: boxes.map(\.0))
-        options.spacing = Spacing.double
-        options.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: 0, right: Spacing.double)
+        let rows = [boxes.prefix(4), boxes.suffix(4)].map { row -> NSStackView in
+            let spacer = NSView()
+            spacer.setContentHuggingPriority(.init(1), for: .horizontal)
+            let line = NSStackView(views: row.map(\.0) + [spacer])
+            line.spacing = Spacing.double
+            line.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: 0, right: Spacing.double)
+            return line
+        }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         let actions = NSStackView(views: [summary, spacer, layouts, saveButton, consoleButton, copyButton, helpButton(.editors)])
         actions.spacing = Spacing.unit
         actions.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
-        let bar = NSStackView(views: [options, actions])
+        let bar = NSStackView(views: rows + [actions])
         bar.orientation = .vertical
         bar.spacing = 0
         bar.alignment = .width
@@ -82,7 +87,7 @@ final class SQLGeneratorController: NSViewController, TabContent {
         let reading = Task { () -> DDLScript in
             if context.schema.snapshot.server == nil { try await context.schema.load() }
             guard let server = context.schema.snapshot.server else { throw DesignError("The server didn't say what it is") }
-            // The triggers of the tables chosen, unless they were chosen themselves.
+            // The triggers of the tables chosen, which the Triggers box keeps or leaves out.
             var triggers: [DatabaseObject: String] = [:]
             for object in objects where object.kind == .table {
                 for trigger in context.schema.snapshot.database(object.database)?.triggers ?? [] where trigger.table == object.name {
@@ -90,7 +95,7 @@ final class SQLGeneratorController: NSViewController, TabContent {
                 }
             }
             let all = objects + triggers.keys.filter { !objects.contains($0) }.sorted { $0.name < $1.name }
-            return DDLScript(try await context.read { try await DDLScript.load(all, triggers: triggers.filter { !objects.contains($0.key) }, from: $0) },
+            return DDLScript(try await context.read { try await DDLScript.load(all, triggers: triggers, from: $0) },
                              server: server)
         }
         let work = activity.start("Reading the statements of \(tabTitle)", connection: context.connection.id) { reading.cancel() }

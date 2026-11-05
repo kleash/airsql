@@ -20,12 +20,12 @@ final class ObjectFormView: NSView, NSTextFieldDelegate, NSTableViewDataSource, 
     /// A field is writing to the code: what it wrote may not read back yet (a bracket still open).
     private var writing = false
 
-    let name = AirSQL.textField("", placeholder: "name", id: "objectForm.name", tip: "Type the object's name; changing it renames it when you apply", width: 190)
+    let name = AirSQL.textField("", placeholder: "name", id: "objectForm.name", tip: "Type the object's name; changing it renames it when you apply", width: 150)
     let hint = label("This code doesn't start the usual way, so the fields are off: edit it as text below", font: .systemFont(ofSize: 11.5),
                      color: .secondaryLabelColor, truncates: true)
-    let comment = AirSQL.textField("", placeholder: "none", id: "objectForm.comment", tip: "Type a note to keep with the object", width: 240)
+    let comment = AirSQL.textField("", placeholder: "none", id: "objectForm.comment", tip: "Type a note to keep with the object", width: 200)
     // Routines
-    let returns = AirSQL.textField("", placeholder: "INT", id: "objectForm.returns", tip: "Type the type the function returns", width: 130)
+    let returns = AirSQL.textField("", placeholder: "INT", id: "objectForm.returns", tip: "Type the type the function returns", width: 100)
     let access = popup(RoutineForm.dataAccess, selected: 0, id: "objectForm.access", tip: "Choose what the routine says it does with data", target: nil, action: nil)
     let security = popup(["DEFINER", "INVOKER"], selected: 0, id: "objectForm.security", tip: "Choose whose rights it runs with", target: nil, action: nil)
     let deterministic = checkbox("Deterministic", id: "objectForm.deterministic", tip: "Say that the same input always gives the same result", on: false,
@@ -44,8 +44,8 @@ final class ObjectFormView: NSView, NSTextFieldDelegate, NSTableViewDataSource, 
     let at = AirSQL.textField("", placeholder: "2030-01-31 09:00:00", id: "objectForm.at", tip: "Type when it runs: a date and time, or an expression", width: 180)
     let every = AirSQL.textField("", placeholder: "1", id: "objectForm.every", tip: "Type how many units between runs", width: 60)
     let unit = popup(EventForm.units, selected: 4, id: "objectForm.unit", tip: "Choose the unit of time", target: nil, action: nil)
-    let starts = AirSQL.textField("", placeholder: "now", id: "objectForm.starts", tip: "Type when it starts: a date and time, or an expression; empty for now", width: 170)
-    let ends = AirSQL.textField("", placeholder: "never", id: "objectForm.ends", tip: "Type when it stops: a date and time, or an expression; empty for never", width: 170)
+    let starts = AirSQL.textField("", placeholder: "now", id: "objectForm.starts", tip: "Type when it starts: a date and time, or an expression; empty for now", width: 140)
+    let ends = AirSQL.textField("", placeholder: "never", id: "objectForm.ends", tip: "Type when it stops: a date and time, or an expression; empty for never", width: 140)
     private let startsLabel = label("Starts:"), endsLabel = label("Ends:")
     let state = popup(["Enabled", "Disabled", "Disabled on replicas"], selected: 0, id: "objectForm.state", tip: "Choose whether it runs", target: nil, action: nil)
     let preserve = checkbox("Keep after last run", id: "objectForm.preserve", tip: "Keep the event once it has finished; off drops it", on: false, target: nil, action: nil)
@@ -85,15 +85,17 @@ final class ObjectFormView: NSView, NSTextFieldDelegate, NSTableViewDataSource, 
         case .trigger:
             row([label("Name:"), name, timing, happening, label("on"), table])
         case .event:
-            row([label("Name:"), name, state, preserve, label("Comment:"), comment])
-            row([schedule, at, every, unit, startsLabel, starts, endsLabel, ends])
+            row([label("Name:"), name, state, preserve])
+            row([schedule, at, every, unit])
+            row([startsLabel, starts, endsLabel, ends, label("Comment:"), comment])
         case .view:
-            row([label("Name:"), name, label("Algorithm:"), algorithm, label("Security:"), security, label("Check:"), check])
+            row([label("Name:"), name, label("Algorithm:"), algorithm])
+            row([label("Security:"), security, label("Check:"), check])
         }
         rows.append(hint)
         let stack = NSStackView(views: rows)
         stack.orientation = .vertical
-        stack.alignment = .leading
+        stack.alignment = .width
         stack.spacing = Spacing.half + 2
         stack.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         addSubview(stack)
@@ -104,7 +106,9 @@ final class ObjectFormView: NSView, NSTextFieldDelegate, NSTableViewDataSource, 
     required init?(coder: NSCoder) { fatalError("not used") }
 
     private func line(_ views: [NSView]) -> NSStackView {
-        let line = NSStackView(views: views)
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        let line = NSStackView(views: views + [spacer])
         line.spacing = Spacing.unit
         line.alignment = .centerY
         return line

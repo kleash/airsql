@@ -124,5 +124,5 @@ change its options: IF NOT EXISTS and OR REPLACE where your server takes them, S
 indexes, foreign keys, the AUTO_INCREMENT number and the tables' triggers. Tables come first, then views, routines, triggers and events,
 with foreign key checks off around several tables so that their order doesn't matter, and DELIMITER lines round routines.
 
-**Copy** and **Open in Query Tab** take the whole script. **Save to Folder…** writes a `.sql` file per object: in one folder, a folder
-per kind, a folder per database and kind, or numbered in the order they run. Files of the same name are replaced.
+**Copy** and **Open in Query Tab** take the whole script. **Save to Folder…** writes a `.sql` file per object: all in one folder, in a
+folder per kind, in folders by database and kind, or numbered in the order they run. Files of the same name are replaced.

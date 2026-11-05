@@ -8,6 +8,7 @@ final class PartitionsView: NSView, NSTextViewDelegate, NSTableViewDataSource, N
     weak var editor: TableEditorController?
     let (codeScroll, code) = SQLEditorView.make(fontSize: 12.5)
     let list = ContentTable(frame: .zero)
+    private let empty = label("This table has no partitions", color: .secondaryLabelColor)
     private let columns = [("name", "Name", 140.0, "The partition's name"), ("method", "Method", 90, "How rows are shared out"),
                            ("expression", "Expression", 180, "What the partition is chosen by"),
                            ("values", "Values", 180, "The values this partition holds"),
@@ -39,7 +40,7 @@ final class PartitionsView: NSView, NSTextViewDelegate, NSTableViewDataSource, N
         code.toolTip = "Type the PARTITION BY clause; leave it empty for a table without partitions"
         let caption = label("PARTITION BY clause, such as PARTITION BY HASH (id) PARTITIONS 4. Edit it to add, change or remove partitions; "
                             + "empty it to remove them and keep the rows.", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, wraps: true)
-        for view in [listScroll, caption, codeScroll] as [NSView] {
+        for view in [listScroll, empty, caption, codeScroll] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
@@ -47,6 +48,7 @@ final class PartitionsView: NSView, NSTextViewDelegate, NSTableViewDataSource, N
             listScroll.topAnchor.constraint(equalTo: topAnchor), listScroll.leadingAnchor.constraint(equalTo: leadingAnchor),
             listScroll.trailingAnchor.constraint(equalTo: trailingAnchor),
             listScroll.heightAnchor.constraint(equalTo: heightAnchor, multiplier: 0.45),
+            empty.centerXAnchor.constraint(equalTo: listScroll.centerXAnchor), empty.centerYAnchor.constraint(equalTo: listScroll.centerYAnchor),
             caption.topAnchor.constraint(equalTo: listScroll.bottomAnchor, constant: Spacing.unit),
             caption.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Spacing.double),
             caption.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Spacing.double),
@@ -64,6 +66,7 @@ final class PartitionsView: NSView, NSTextViewDelegate, NSTableViewDataSource, N
         if code.string != clause { code.setText(clause) }
         code.isEditable = !editor.isBusy
         list.reloadData()
+        empty.isHidden = !editor.partitionList.isEmpty
     }
 
     func textDidChange(_ notification: Notification) {

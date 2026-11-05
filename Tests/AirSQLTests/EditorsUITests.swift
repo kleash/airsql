@@ -502,6 +502,18 @@ extension AppTests {
                     let object = try #require(main.selectedTab?.content as? ObjectEditorController)
                     await ready { object.isBusy || !object.overlay.isHidden }
                     check("procedure editor")
+                    for kind in [ObjectKind.function, .trigger, .event, .view] {
+                        main.openObjectEditor(kind, name: nil, database: database, context: context)
+                        let new = try #require(main.selectedTab?.content as? ObjectEditorController)
+                        await ready { new.isBusy || !new.overlay.isHidden }
+                        check("\(kind) editor")
+                        #expect(window.frame.size.width <= max(size.width, MainWindowController.minimumSize.width) + 1, "\(kind) widens the window")
+                    }
+                    let generator = SQLGeneratorController(context: context, objects: [], activity: model.activity)
+                    main.open(generator, title: generator.tabTitle, connection: context.connection.id)
+                    await ready { !generator.copyButton.isEnabled }
+                    check("SQL Generator")
+                    #expect(window.frame.size.width <= max(size.width, MainWindowController.minimumSize.width) + 1, "the generator widens the window")
                     main.openERDiagram(database: database, context: context)
                     let diagram = try #require(main.selectedTab?.content as? ERDiagramController)
                     await ready { diagram.diagram == nil }
