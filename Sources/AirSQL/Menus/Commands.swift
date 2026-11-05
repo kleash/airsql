@@ -94,6 +94,8 @@ import AppKit
     @objc optional func showHistory(_ sender: Any?)
     @objc optional func changeConnection(_ sender: Any?)
     @objc optional func rerunResult(_ sender: Any?)
+    @objc optional func runToFile(_ sender: Any?)
+    @objc optional func openResultInWindow(_ sender: Any?)
     @objc optional func runSelectionWhole(_ sender: Any?)
     @objc optional func toggleKeepResults(_ sender: Any?)
     @objc optional func showSessions(_ sender: Any?)
@@ -482,6 +484,10 @@ enum Commands {
                                            tip: "Send the selected text as it stands, without splitting it on semicolons")
     static let keepResults = Command("Keep Results of Each Run", #selector(AirSQLActions.toggleKeepResults(_:)),
                                      tip: "Open each run's results in new tabs, leaving the earlier ones in place")
+    static let runToFile = Command("Run to File…", #selector(AirSQLActions.runToFile(_:)),
+                                   tip: "Write the rows of the statement at the cursor straight to a file, however many there are")
+    static let resultWindow = Command("Open Result in Window", #selector(AirSQLActions.openResultInWindow(_:)),
+                                      tip: "Move this result to a window of its own, to keep it beside the query")
     static let runFromCaret = Command("Run from Cursor", #selector(AirSQLActions.runFromCaret(_:)),
                                       tip: "Run the statement at the cursor and every statement after it")
     static let runSubquery = Command("Run Subquery", #selector(AirSQLActions.runSubquery(_:)),
@@ -853,7 +859,7 @@ enum Commands {
         toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
-        runStatement, runSelection, runSelectionWhole, keepResults, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
+        runStatement, runSelection, runSelectionWhole, keepResults, runToFile, resultWindow, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,

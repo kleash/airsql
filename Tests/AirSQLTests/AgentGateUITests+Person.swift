@@ -169,6 +169,42 @@ extension AppTests.AgentGateUITests {
         #expect(console.editor.string == "SELECT 1\nSELECT 1")
     }
 
+    /// An agent's reach is one connection at a time: it can't turn on the history of every connection, and if the person
+    /// has it on, it reads none of it.
+    @Test func everyConnectionsHistoryIsThePersons() async throws {
+        let (main, harness, service) = try await Self.agents()
+        defer { service.close() }
+        var production = Fixtures.production
+        production.agentAccess = .schemaRead
+        service.model.save(production)
+        let console = try await Self.console(main, harness, on: Fixtures.production.id)
+        defer { ConsoleViewController.openConnection = { _ in nil } }
+        QueryHistory.shared.add(HistoryEntry(sql: "SELECT 'Elsewhere secret'", connection: Fixtures.staging.id))
+        QueryHistory.shared.flush()
+        console.showHistory(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        let sheet = try #require(main.window?.attachedSheet)
+        let content = try #require(sheet.contentView)
+        let box = try #require(find(NSButton.self, id: "history.all", in: content))
+        let list = try #require(find(NSTableView.self, id: "history.list", in: content))
+
+        let refused = await agentCall(service, "press", ["id": "history.all"])
+        #expect(refused.error?.contains("Only the person at the Mac can list every connection's statements") == true, "\(refused.error ?? "let through")")
+        #expect(box.state == .off && list.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("connection"))?.isHidden == true)
+        let what: [String: Any] = ["include": ["elements", "sheets"]]
+        func agentSees() async -> String { "\((await agentCall(service, "snapshot", what)).json)" }
+        #expect(await !agentSees().contains("Elsewhere secret"))
+
+        // The person turns it on: they read it, and an agent still doesn't, though it may read this connection's rows.
+        #expect(await call(harness, "press", ["id": "history.all"]).error == nil)
+        #expect(box.state == .on)
+        _ = await eventually(timeout: 5) { list.numberOfRows > 0 }
+        #expect("\((await call(harness, "snapshot", what)).json)".contains("Elsewhere secret"))
+        #expect(await !agentSees().contains("Elsewhere secret"))
+        QueryHistory.shared.clear(Fixtures.staging.id)
+        _ = await call(harness, "press", ["id": "history.cancel"])
+    }
+
     @Test func filesAreThePersons() async throws {
         let (main, harness, service) = try await Self.agents()
         defer {

@@ -94,17 +94,17 @@ final class ConsoleDocuments {
         let url = fileURL
         restoring = Task {
             // Each console's text, and the text of its file (what was last saved).
-            let (saved, sidebar) = await Task.detached { () -> ([(SavedConsole, String, String)], [UUID]) in
+            let (saved, sidebar) = await Task.detached { () -> ([(SavedConsole, String, String, ConsoleScript.FileFormat)], [UUID]) in
                 let window = ConsoleTabStore.load(from: url)
                 return (window.tabs.compactMap { console in
-                    if console.place != nil { return (console, "", "") }
-                    let file = console.path.flatMap { path in (try? Data(contentsOf: URL(fileURLWithPath: path))).map { ConsoleScript.decoded($0).text } }
-                    guard let text = console.text ?? file else { return nil }
-                    return (console, text, file ?? "")
+                    if console.place != nil { return (console, "", "", ConsoleScript.FileFormat()) }
+                    let file = console.path.flatMap { path in (try? Data(contentsOf: URL(fileURLWithPath: path))).map(ConsoleScript.decoded) }
+                    guard let text = console.text ?? file?.text else { return nil }
+                    return (console, text, file?.text ?? "", file?.format ?? ConsoleScript.FileFormat())
                 }, window.sidebar)
             }.value
             var selected: Tab?
-            for (console, text, file) in saved {
+            for (console, text, file, format) in saved {
                 let tab: Tab
                 if let place = console.place {
                     guard let id = main.model.connection(console.connection)?.id else { continue }
@@ -116,6 +116,7 @@ final class ConsoleDocuments {
                                                            documentID: console.id)
                     if console.path != nil { controller.savedText = file }
                     controller.chosenDatabase = console.database
+                    controller.fileFormat = format
                     tab = main.open(controller, title: console.title, connection: controller.connectionID)
                     controller.editor.setSelectedRange(NSRange(location: min(console.caret, (text as NSString).length), length: 0))
                     changed(controller)

@@ -187,7 +187,9 @@ says why; so are views. Generated columns can't be edited.
   make it again. Changes kept over a restart are checked the same way.
 - **Manual Commit** (the toolbar's transaction pop-up, or Query ▸ Transaction Mode) moves the table tab to a session of its
   own. Each Apply then writes into a transaction left open, and the rows you read show those changes, until **Commit** or
-  **Roll Back**. Each Apply is still all or nothing. Closing the tab or quitting with the transaction open asks first.
+  **Roll Back**. Each Apply is still all or nothing. Closing the tab or quitting with the transaction open asks first. If the connection
+  drops, the tab says the server rolled the transaction back, with how many rows, and nothing is applied until you press
+  **Open New Session**; the rows are then read again.
 - What Apply can't check: FLOAT, TIMESTAMP, JSON, spatial and vector values, dates with a zero month or day and values
   over 64 KB don't compare exactly, so edits to those go by the key alone and overwrite what is there; the preview
   names them. A change that only differs in case or trailing spaces can pass on a column whose collation ignores

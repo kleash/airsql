@@ -209,6 +209,7 @@ extension TableDataController: DataGridViewDelegate {
     /// it (the person approves it there once, not statement by statement), or when there is a warning (an engine that
     /// can't roll back, cascading deletes); then runs it.
     private func startApply(preview: Bool) {
+        guard !lostTransactionBlocks() else { return }
         // A value being edited is kept first; one its column refuses stays in its editor, which says why.
         viewer.valuePanel?.keepValue(nil)
         guard grid.endEditing(commit: true), viewer.valuePanel?.edited != true else { return }
@@ -291,6 +292,7 @@ extension TableDataController: DataGridViewDelegate {
                 try await PendingChanges.apply(statements, inOpenTransaction: transactionSession != nil) { sql in
                     try stop.starting(sql)
                     let result = try await session.query(sql, rowCap: 1).last
+                    if !sql.hasPrefix("SAVEPOINT") { transactionRows += result?.affectedRows ?? 0 }
                     warnings += result?.warnings ?? 0
                     if sql.hasPrefix("INSERT ") { insertIDs.append(result?.insertID ?? 0) }
                     return result?.affectedRows ?? 0
@@ -336,6 +338,7 @@ extension TableDataController: DataGridViewDelegate {
                 self.activity = nil
                 loading = nil
                 bar.busy = false
+                noticeLostTransaction()
                 if let failure = error as? ApplyFailure { point(at: failure) }
                 showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
                           title: "Nothing was applied to \(tableName)", on: view.window)

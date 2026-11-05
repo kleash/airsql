@@ -25,6 +25,17 @@ extension ConsoleViewController {
     }
 
     private func write(_ text: String, to url: URL, done: @escaping (Bool) -> Void) {
+        guard let data = ConsoleScript.encoded(text, fileFormat) else {
+            guard let window = view.window else { return done(false) }
+            return ConsoleClosing.alert(window, "“\(url.lastPathComponent)” can't hold this text as \(fileFormat.name ?? "it is")",
+                                        "The text has characters that encoding doesn't have. UTF-8 holds them all.",
+                                        buttons: [("Save as UTF-8", "Change the file to UTF-8 and save"), ("Cancel", "Save nothing")],
+                                        destructive: nil) { [weak self] choice in
+                guard choice == 0, let self else { return done(false) }
+                self.fileFormat = ConsoleScript.FileFormat()
+                self.write(text, to: url, done: done)
+            }
+        }
         // The gate (plan §2.8): files on this Mac are the person's to write.
         guard !AgentGuard.refuses("Saving writes a file on this Mac: only the person at the Mac can save (⌘S).") else {
             return done(false)
@@ -32,7 +43,7 @@ extension ConsoleViewController {
         Task {
             let failure = await Task.detached { () -> String? in
                 do {
-                    try text.write(to: url, atomically: true, encoding: .utf8)
+                    try data.write(to: url, options: .atomic)
                     LocalHistory.shared.save(text, of: url)
                     return nil
                 } catch {
@@ -65,7 +76,8 @@ extension ConsoleViewController {
             }
             let data = await Task.detached { try? Data(contentsOf: url) }.value
             guard let data else { return }
-            let text = ConsoleScript.decoded(data).text
+            let (text, format) = ConsoleScript.decoded(data)
+            self.fileFormat = format
             self.editor.replace(NSRange(location: 0, length: (self.text as NSString).length), with: text)
             self.savedText = text
             self.note(.info, "“\(url.lastPathComponent)” changed on disk, so the tab shows the new text. ⌘Z brings back what it showed.")

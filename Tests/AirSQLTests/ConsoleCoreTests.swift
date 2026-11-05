@@ -564,6 +564,8 @@ struct ResultSetSourceTests {
         #expect(keys("lbl:LOOP LEAVE lbl; END LOOP").isEmpty)
         #expect(keys("lbl: LOOP").isEmpty)
         #expect(keys("SELECT (:a)") == [":a"])
+        #expect(keys("SELECT ${a}, :a, ? , '${b}', $x") == [":a", ":a", "?1"], "${name} and :name are one parameter")
+        #expect(QueryParameters.places(in: ["CALL p(? /* p_id int */)"], noBackslashEscapes: false)[0].first?.hint == "p_id int")
         let two = QueryParameters.places(in: ["SELECT ?", "SELECT ?, :a"], noBackslashEscapes: false)
         #expect(QueryParameters.keys(two) == ["?1", "?2", ":a"])
     }
@@ -631,9 +633,12 @@ struct ResultSetSourceTests {
 
 @Suite struct FileDecodingTests {
     @Test func filesOpenByMarkThenUTF8ThenLatin() {
-        #expect(ConsoleScript.decoded(Data("é".utf8)) == ("é", nil))
-        #expect(ConsoleScript.decoded(Data([0xEF, 0xBB, 0xBF, 0x61])) == ("a", nil))
-        #expect(ConsoleScript.decoded(Data([0xFF, 0xFE, 0x61, 0x00])) == ("a", "UTF-16"))
-        #expect(ConsoleScript.decoded(Data([0xE9])) == ("é", "Windows Latin 1"))
+        for (bytes, text, name) in [(Array("é".utf8), "é", nil), ([0xEF, 0xBB, 0xBF, 0x61], "a", "UTF-8 with a byte-order mark"),
+                                    ([0xFF, 0xFE, 0x61, 0x00], "a", "UTF-16"), ([0xE9], "é", "Windows Latin 1")] as [([UInt8], String, String?)] {
+            let read = ConsoleScript.decoded(Data(bytes))
+            #expect(read.text == text && read.format.name == name)
+            #expect(ConsoleScript.encoded(read.text, read.format).map(ConsoleScript.decoded)?.format == read.format, "Save keeps it")
+        }
+        #expect(ConsoleScript.encoded("日本", ConsoleScript.FileFormat(encoding: .windowsCP1252)) == nil)
     }
 }

@@ -33,6 +33,9 @@ extension MainWindowController {
                 }
             }
         }
+        for window in ResultWindowController.open where window.tab.pendingRows > 0 {
+            lines.append("Edits in the window of “\(window.tab.title)”, not applied: they are discarded")
+        }
         return lines + ToolSheet.open.filter(\.running).map { "“\($0.window?.title ?? "")”, still running: it is stopped" }
     }
 }

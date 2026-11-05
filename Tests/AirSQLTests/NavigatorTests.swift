@@ -519,7 +519,7 @@ extension AppTests {
             let console = try #require(main.selectedTab?.content as? ConsoleViewController)
             #expect(console.connectionID == id && console.text == "UPDATE `airsql_fixture`.`orders`\n"
                     + "SET `customer_id` = ?, `region` = ?, `number` = ?, `total` = ?, `parent_id` = ?\nWHERE `id` = ?;\n")
-            #expect(console.messagesView.messages.last?.text.hasPrefix("Put a value in place of each ?") == true)
+            #expect(console.messagesView.messages.last?.text.hasPrefix("Press Run to fill in each value") == true)
             // The database view's table menu does the same.
             let view = DatabaseViewController(open, "airsql_fixture")
             main.open(view, title: "airsql_fixture", connection: id)

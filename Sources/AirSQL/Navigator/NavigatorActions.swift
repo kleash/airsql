@@ -223,7 +223,7 @@ enum NavigatorActions {
             }
             let console = main.openConsole(text: statements.joined(separator: "\n\n") + "\n", title: nil, connection: open.id)
                 .content as? ConsoleViewController
-            if kind != .select { console?.note(.info, "Put a value in place of each ?, then press Run: nothing runs until you do.") }
+            if kind != .select { console?.note(.info, "Press Run to fill in each value: nothing runs until you do.") }
         }
     }
 
@@ -237,7 +237,7 @@ enum NavigatorActions {
                 let console = main.openConsole(text: NavigatorSQL.run(routine, parameters) + "\n", title: nil, connection: open.id)
                     .content as? ConsoleViewController
                 if parameters.contains(where: { $0.mode == "IN" || $0.mode == "INOUT" }) {
-                    console?.note(.info, "Put a value in place of each ?, then press Run: nothing runs until you do.")
+                    console?.note(.info, "Press Run to fill in each value: nothing runs until you do.")
                 }
             } catch {
                 showError(error.localizedDescription,
