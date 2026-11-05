@@ -36,6 +36,13 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        // Five words would be wider than the panel, and widen the window.
+        for (index, (symbol, title)) in [("tablecells", "Columns"), ("function", "Functions"), ("textformat", "Keywords"),
+                                         ("text.quote", "Snippets"), ("clock", "History")].enumerated() {
+            choice.setImage(NSImage(systemSymbolName: symbol, accessibilityDescription: title), forSegment: index)
+            choice.setLabel("", forSegment: index)
+            choice.setToolTip("Show the \(title.lowercased())", forSegment: index)
+        }
         choice.selectedSegment = 0
         choice.selectedSegmentBezelColor = .selectedSegment
         choice.target = self
