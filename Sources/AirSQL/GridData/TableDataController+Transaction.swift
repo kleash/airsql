@@ -14,7 +14,7 @@ extension TableDataController {
         let manual = (sender as? NSMenuItem)?.tag == 1 || (sender as? NSPopUpButton)?.selectedTag() == 1
         guard manual != (transactionSession != nil), !inTransaction, editingOff == nil else { return }
         guard manual else { return endTransactionSession() }
-        let sessions = context.sessions
+        let sessions = sessions
         Task {
             do {
                 useTransactionSession(try await sessions.toolsSession(role: .query))
@@ -63,7 +63,7 @@ extension TableDataController {
                              buttons: [("Open New Session", "Leave what was lost behind and read the rows again"),
                                        ("Cancel", "Open no session and apply nothing")], destructive: nil) { [weak self] choice in
             guard choice == 0, let self, !AgentGuard.refuses("Only the person at the Mac can leave a lost transaction behind.") else { return }
-            let sessions = self.context.sessions
+            let sessions = self.sessions
             Task {
                 do {
                     let session = try await sessions.toolsSession(role: .query)
@@ -90,8 +90,7 @@ extension TableDataController {
             problem = nil
             updateBars()
         }
-        let sessions = context.sessions
-        openSession = { try await sessions.session(.data) }
+        openSession = dataSession
         Task.detached { await session.close() }
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
     }

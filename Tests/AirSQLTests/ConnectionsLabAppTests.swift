@@ -51,6 +51,33 @@ extension AppTests {
         model.connector.disconnect(saved.id)
     }
 
+    /// A table tab outlives its sessions: after Disconnect and Connect, as after a drop that lost the route too, it reads
+    /// through the new ones.
+    @Test(.enabled(if: Lab.enabled)) func aTableTabReadsThroughANewConnect() async throws {
+        var saved = SavedConnection(name: "Again", host: "127.0.0.1", port: Lab.mariadb114.port, user: Lab.airsql.user)
+        saved.tls = TLSOptions(mode: .off)
+        let model = testModel([saved])
+        model.setSavedPassword(saved.id.uuidString, Lab.airsql.password)
+        let (main, _) = appWindow(model)
+        func connect() async {
+            model.connector.connect(saved.id, on: nil)
+            #expect(await eventually(timeout: 30) { model.openConnection(saved.id) != nil })
+        }
+        await connect()
+        let tab = TableDataController(model: model, context: try #require(Editors.context(saved, in: model)), database: "fixture", table: "customers")
+        main.select(main.open(tab, title: "customers", connection: saved.id))
+        func read() async -> Bool {
+            await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return tab.source != nil && tab.loading == nil }
+        }
+        #expect(await read())
+        model.connector.disconnect(saved.id)
+        await connect()
+        tab.problem = nil
+        tab.refresh(nil)
+        #expect(await read() && tab.problem == nil, "\(tab.problem ?? "")")
+        model.connector.disconnect(saved.id)
+    }
+
     @Test(.enabled(if: Lab.enabled)) func trustingASelfSignedCertificatePinsIt() async throws {
         var mysql = SavedConnection(name: "MySQL 8.4", host: "127.0.0.1", port: Lab.mysql84.port, user: Lab.airsql.user)
         mysql.tls = TLSOptions(mode: .verifyIdentity)
