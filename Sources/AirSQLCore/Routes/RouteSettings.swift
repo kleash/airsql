@@ -107,7 +107,7 @@ extension SavedConnection {
         }
         return ConnectOptions(name: displayName, host: host, port: port ?? 3306, endpoint: endpoint, user: user,
                               password: password, database: database.isEmpty ? nil : database, tls: tls,
-                              cleartextLogin: cleartextLogin, compress: compress,
+                              cleartextLogin: cleartextLogin, compress: compress, timeZone: timeZone.isEmpty ? nil : timeZone,
                               startupSQL: SQLSplitter.statements(in: startupSQL).map(\.sql), readOnly: readOnly)
     }
 }

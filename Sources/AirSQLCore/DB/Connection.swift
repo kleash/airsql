@@ -9,7 +9,7 @@ import Foundation
 /// - agent: read-only, opened on first agent use;
 /// - tools: client tools and recon each open their own (`toolsSession`);
 /// - and Cancel's short side connection, which each `DBConnection` opens itself.
-/// The options, password included, stay here in memory until `disconnect`.
+/// The options, password included, stay here in memory until `disconnect`, through a drop too.
 public final class Connection: @unchecked Sendable {
     public var options: ConnectOptions { lock.locked { _options } }
     private var _options: ConnectOptions
@@ -17,6 +17,7 @@ public final class Connection: @unchecked Sendable {
     private let lock = NSLock()
     private var opening: [DBConnection.Role: Task<DBConnection, Error>] = [:]
     private var tools: [DBConnection] = []
+    private var isDropped = false
 
     public init(options: ConnectOptions, log: SQLLog = .shared) {
         _options = options
@@ -35,7 +36,8 @@ public final class Connection: @unchecked Sendable {
     /// one connect; a connect that failed is tried again by the next call.
     public func session(_ role: DBConnection.Role) async throws -> DBConnection {
         precondition(![.tools, .query, .cancel].contains(role), "these sessions come from toolsSession(); Cancel opens its own")
-        let task: Task<DBConnection, Error> = lock.locked {
+        let task: Task<DBConnection, Error> = try lock.locked {
+            if isDropped, role != .main { throw AirSQLError.disconnected }
             if let task = opening[role] { return task }
             var sessionOptions = _options
             if role == .agent { sessionOptions.readOnly = true }
@@ -66,6 +68,7 @@ public final class Connection: @unchecked Sendable {
     /// A new session of its own for a client tool, recon or (`role: .query`) a query tab. Close it when done; `disconnect`
     /// closes it too.
     public func toolsSession(role: DBConnection.Role = .tools) async throws -> DBConnection {
+        if lock.locked({ isDropped }) { throw AirSQLError.disconnected }
         let session = DBConnection(options: options, role: role, log: log)
         do {
             try await session.connect()
@@ -83,6 +86,14 @@ public final class Connection: @unchecked Sendable {
     /// Every session open now.
     public func sessions() async -> [DBConnection] {
         (await openSessions() + lock.locked { tools }).filter(\.isConnected)
+    }
+
+    /// When a statement last ran on any session but the schema's, whose timed reads aren't the person's; nil while one
+    /// runs or a transaction is open: that isn't idle.
+    public func idleSince() async -> Date? {
+        let open = await sessions().filter { $0.role != .schema }
+        guard !open.contains(where: { $0.isBusy || $0.inTransaction }) else { return nil }
+        return open.map(\.lastUsed).max()
     }
 
     /// Whether `used` of the server's `limit` connections leave room for one more, and for other clients.
@@ -105,12 +116,30 @@ public final class Connection: @unchecked Sendable {
         let main = try await session(.main)
         let report = try await main.reconnect()
         let others: [Task<DBConnection, Error>] = lock.locked {
+            isDropped = false
             let tasks = opening.filter { $0.key != .main }.map(\.value)
             opening = opening.filter { $0.key == .main }
             return tasks
         }
         for task in others { if let session = try? await task.value { await session.close() } }
         return report
+    }
+
+    /// The connection dropped: the sessions other than main close, so none outlives the drop with a transaction the tabs
+    /// report as gone. Main and the password stay for `reconnect`, and nothing else opens until then: no silent reconnect.
+    public func dropped() {
+        let (tasks, toolSessions): ([Task<DBConnection, Error>], [DBConnection]) = lock.locked {
+            defer {
+                isDropped = true
+                opening = opening.filter { $0.key == .main }
+                tools = []
+            }
+            return (opening.filter { $0.key != .main }.map(\.value), tools)
+        }
+        Task.detached {
+            for task in tasks { if let session = try? await task.value { await session.close() } }
+            for session in toolSessions { await session.close() }
+        }
     }
 
     /// Pings the open sessions that are idle, so firewalls and wait_timeout don't drop them, except a session whose

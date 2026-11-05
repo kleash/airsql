@@ -45,6 +45,7 @@ of them after.
 - **Lines per row**: how many lines of a value with line breaks each row shows (1 by default).
 - **Date format**: the pattern Display As ▸ Settings' Date Format uses.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
+- **Most rows in a result**: where a console result stops; the statement stops on the server there (100,000 by default).
 - **Open tables newest first**: a table with an AUTO_INCREMENT key shows its newest rows first until you sort it (on by
   default).
 - **Long values**: how many characters of a long value a table's page reads (1,000 by default; 0 reads every value whole).
@@ -59,6 +60,8 @@ of them after.
 
 - **Load details up to … tables**: on a server with more tables than this, a database's columns, indexes and keys load
   when you open it, so connecting stays quick.
+- **Read the schema every … minutes**: reads connected schemas again on a timer, to catch changes others make; 0 (the
+  default) reads them only at connect and on Refresh.
 
 ## Safety
 

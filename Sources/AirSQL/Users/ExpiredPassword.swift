@@ -4,7 +4,8 @@ import AppKit
 extension Connector {
     /// The login's password has expired: asks for a new one and changes it, then the connect goes on with it. Read-only,
     /// Production and agents get `error`, as for any write to accounts. It isn't saved: the Keychain's stays until the
-    /// person changes it, and the next connect asks.
+    /// person changes it, and the next connect asks. A password just typed with Remember would no longer work: the new
+    /// one is remembered in its place.
     func changeExpiredPassword(_ saved: SavedConnection, _ password: String, routeSocket: String?, on window: NSWindow?,
                                _ error: AirSQLError) async throws -> String {
         guard saved.usersRefusal == nil, let window else { throw error }
@@ -27,6 +28,7 @@ extension Connector {
         } catch {
             throw AirSQLError(.authFailed, UserSQL.errorText(error, hiding: new))
         }
+        if remembered[saved.id]?[saved.id.uuidString] != nil { remembered[saved.id]?[saved.id.uuidString] = new }
         return new ?? password
     }
 }

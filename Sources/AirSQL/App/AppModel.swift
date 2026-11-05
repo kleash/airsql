@@ -137,6 +137,20 @@ final class AppModel: ObservableObject {
         return copy
     }
 
+    /// Saves a deleted connection again, outside any folder that has gone since. Its passwords don't come back.
+    func bringBack(_ id: UUID) {
+        guard var saved = data.deletedConnections.first(where: { $0.id == id }) else { return }
+        if !data.folders.contains(where: { $0.id == saved.folderID }) { saved.folderID = nil }
+        var restored = data
+        restored.connections.append(saved)
+        restored.deletedConnections.removeAll { $0.id == id }
+        guard AgentGuard.allows(changing: data, to: restored) else { return }
+        data = restored
+    }
+
+    /// How many deleted connections stay to bring back.
+    static let deletedKept = 20
+
     /// Forgets connections and their saved passwords and table settings.
     func delete(_ ids: Set<UUID>) {
         var remaining = data
@@ -144,6 +158,7 @@ final class AppModel: ObservableObject {
         guard AgentGuard.allows(changing: data, to: remaining) else { return }  // and its passwords stay
         let keys = data.connections.filter { ids.contains($0.id) }.flatMap(\.secretKeys)
         for id in ids { connector.disconnect(id) }
+        remaining.deletedConnections = Array((data.connections.filter { ids.contains($0.id) } + data.deletedConnections).prefix(Self.deletedKept))
         data = remaining
         for id in ids {
             states[id] = nil

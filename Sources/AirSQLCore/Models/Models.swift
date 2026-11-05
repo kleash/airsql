@@ -103,6 +103,14 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var jumpHosts: [SSHHop] = []
     /// Proxy routes: the proxy to the database (Proxy only) or to the first SSH host (SSH + proxy).
     public var proxy = ProxySettings()
+    /// Connects when AirSQL opens (`connectsAtLaunch`).
+    public var reconnectAtLaunch = false
+    /// SET time_zone in each session ("+00:00", "Europe/Paris"); empty: the server's.
+    public var timeZone = ""
+    /// The current database when it last changed: where a connection with no `database` goes back to.
+    public var lastDatabase = ""
+    /// Disconnects after this many minutes with nothing run and no work open; 0: stays connected.
+    public var idleDisconnectMinutes = 0
     /// The objects marked with a star in the tree.
     public var favourites: [DatabaseObject] = []
     /// Its place in its list, once moved by hand; nil: by name.
@@ -158,6 +166,10 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         sshHost = try value(.sshHost, defaults.sshHost)
         jumpHosts = try value(.jumpHosts, defaults.jumpHosts)
         proxy = try value(.proxy, defaults.proxy)
+        reconnectAtLaunch = try value(.reconnectAtLaunch, defaults.reconnectAtLaunch)
+        timeZone = try value(.timeZone, defaults.timeZone)
+        lastDatabase = try value(.lastDatabase, defaults.lastDatabase)
+        idleDisconnectMinutes = try value(.idleDisconnectMinutes, defaults.idleDisconnectMinutes)
     }
 
     /// The name, else user@host:port (or the socket).
@@ -176,6 +188,12 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public func safety(defaults: SafetySettings) -> SafetySettings {
         safety ?? (colour == .production ? .production : defaults)
     }
+
+    /// Marked Production by its colour or its safety settings: such a connection only connects when asked.
+    public var isProduction: Bool { colour == .production || safety == .production }
+
+    /// Whether it connects by itself when AirSQL opens: chosen for this connection, and never for Production.
+    public var connectsAtLaunch: Bool { reconnectAtLaunch && !isProduction }
 
     /// The sidebar's "custom safety" mark: this connection overrides the settings that would apply.
     public var hasCustomSafety: Bool { safety != nil }
@@ -264,6 +282,10 @@ public struct AppSettings: Codable, Equatable {
     public var autoKeywordCase = false
     /// The helpers panel's Snippets: the person's own, besides `SQLSnippet.builtIn`.
     public var snippets: [SQLSnippet] = []
+    /// Settings ▸ Grid: the most rows a console result keeps; the statement stops on the server there.
+    public var resultRowCap = 100_000
+    /// Settings ▸ Connections: connected schemas are read again this often, to catch others' changes; 0: only on Refresh.
+    public var schemaRefreshMinutes = 0
 
     public init() {}
 
@@ -302,6 +324,8 @@ public struct AppSettings: Codable, Equatable {
         completionTableAlias = try value(.completionTableAlias, defaults.completionTableAlias)
         autoKeywordCase = try value(.autoKeywordCase, defaults.autoKeywordCase)
         snippets = try value(.snippets, defaults.snippets)
+        resultRowCap = try value(.resultRowCap, defaults.resultRowCap)
+        schemaRefreshMinutes = try value(.schemaRefreshMinutes, defaults.schemaRefreshMinutes)
     }
 
     /// What completion follows, given what was chosen before.
@@ -323,6 +347,8 @@ public struct AirSQLData: Codable, Equatable {
     public var connections: [SavedConnection] = []
     public var folders: [ConnectionFolder] = []
     public var settings = AppSettings()
+    /// The connections deleted last, newest first, to bring back; their passwords went with them.
+    public var deletedConnections: [SavedConnection] = []
 
     public init(connections: [SavedConnection] = [], folders: [ConnectionFolder] = [], settings: AppSettings = AppSettings()) {
         self.connections = connections
@@ -335,6 +361,7 @@ public struct AirSQLData: Codable, Equatable {
         connections = try container.decodeIfPresent([SavedConnection].self, forKey: .connections) ?? []
         folders = try container.decodeIfPresent([ConnectionFolder].self, forKey: .folders) ?? []
         settings = try container.decodeIfPresent(AppSettings.self, forKey: .settings) ?? AppSettings()
+        deletedConnections = try container.decodeIfPresent([SavedConnection].self, forKey: .deletedConnections) ?? []
     }
 
     public func connection(_ id: UUID?) -> SavedConnection? {

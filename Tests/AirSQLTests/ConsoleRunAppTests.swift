@@ -50,6 +50,24 @@ extension AppTests {
             return (main, harness, console, connection)
         }
 
+        /// A result stops at Settings ▸ Grid's cap, and says so.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aResultStopsAtTheRowCap() async throws {
+            let (_, harness, console, connection) = try await Self.labConsole()
+            ConsoleViewController.rowCap = { 1_500 }
+            defer {
+                ConsoleViewController.openConnection = { _ in nil }
+                ConsoleViewController.rowCap = { 100_000 }
+            }
+            console.editor.setText("SELECT id FROM fixture.big;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            console.runStatement(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let rows = try #require(console.lastOutcome?.results.first?.rows)
+            #expect(rows.rowCount == 1_500 && rows.capped)
+            await connection.disconnect()
+        }
+
         /// Run marks the statements; Run Result Again puts new rows in the tab's place, under its name.
         @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
         func aResultRunsAgainInItsPlace() async throws {

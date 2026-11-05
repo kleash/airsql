@@ -148,6 +148,29 @@ struct ModelsTests {
         #expect(center.isIdle)
     }
 
+    /// Connecting at launch is the person's choice for each connection, and Production never does, however it's marked.
+    @Test func onlyAChosenConnectionOutsideProductionConnectsAtLaunch() throws {
+        var saved = SavedConnection(name: "dev")
+        #expect(!saved.connectsAtLaunch)
+        saved.reconnectAtLaunch = true
+        #expect(saved.connectsAtLaunch)
+        var coloured = saved
+        coloured.colour = .production
+        #expect(!coloured.connectsAtLaunch)
+        var strict = saved
+        strict.safety = .production
+        #expect(!strict.connectsAtLaunch)
+        let older = try JSONDecoder().decode(SavedConnection.self, from: Data(#"{"name":"old"}"#.utf8))
+        #expect(!older.reconnectAtLaunch)
+    }
+
+    @Test func aTimeZoneGoesToTheSessions() {
+        var saved = SavedConnection(name: "dev")
+        #expect(saved.connectOptions(password: "", routeSocket: nil).timeZone == nil)
+        saved.timeZone = "+02:00"
+        #expect(saved.connectOptions(password: "", routeSocket: nil).timeZone == "+02:00")
+    }
+
     @Test func changeSQLEndsEachStatement() {
         let change = ChangeSQL(title: "t", statements: ["DELETE FROM `t` WHERE `id` = 1", " UPDATE `t` SET `a` = 2;\n"], connection: UUID())
         #expect(change.text == "DELETE FROM `t` WHERE `id` = 1;\nUPDATE `t` SET `a` = 2;")

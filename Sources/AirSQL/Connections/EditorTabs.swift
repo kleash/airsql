@@ -190,6 +190,12 @@ extension ConnectionEditor {
         let form = Form()
         form.row("", [toggle("Read-only", \.readOnly, id: "editor.readOnly",
                              tip: "Refuse anything but reads on this connection, from every window and from agents")])
+        let production = draft.isProduction
+        let atLaunch = toggle("Connect when AirSQL opens", \.reconnectAtLaunch, id: "editor.reconnectAtLaunch",
+                              tip: production ? "A Production connection connects only when you ask"
+                                  : "Connect this connection each time AirSQL opens")
+        atLaunch.isEnabled = !production
+        form.row("", [atLaunch], caption: production ? "Not for a Production connection: it connects only when you ask." : nil)
         form.row("", [toggle("Compress traffic", \.compress, id: "editor.compress",
                              tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
         let timeout = textField(draft.queryTimeout == 0 ? "" : String(draft.queryTimeout), placeholder: "none",
@@ -202,6 +208,18 @@ extension ConnectionEditor {
             timeout.stringValue = value == 0 ? "" : String(value)
         }
         form.row("Query timeout", [timeout, label("seconds", color: .secondaryLabelColor)])
+        let idle = textField(draft.idleDisconnectMinutes == 0 ? "" : String(draft.idleDisconnectMinutes), placeholder: "never",
+                             id: "editor.idleDisconnect", tip: "Type after how many idle minutes to disconnect; empty: stay connected", width: 64)
+        idle.alignment = .right
+        bind(idle) { [weak self] in
+            let value = max(0, Int(idle.stringValue) ?? 0)
+            self?.draft.idleDisconnectMinutes = value
+            idle.stringValue = value == 0 ? "" : String(value)
+        }
+        form.row("Disconnect after", [idle, label("idle minutes", color: .secondaryLabelColor)],
+                 caption: "Never with a transaction, edits or a running statement open.")
+        form.row("Time zone", [text(\.timeZone, placeholder: "the server's", id: "editor.timeZone",
+                                    tip: "Type the time zone sessions use, such as +00:00 or Europe/Paris; empty: the server's", width: 180)])
         form.row("", [toggle("Query tabs share one session", \.sharedQuerySession, id: "editor.sharedSession",
                              tip: "Run every query tab on one session, with one transaction and database, so they see each "
                                 + "other's temporary tables")],

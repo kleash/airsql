@@ -10,5 +10,9 @@ final class ConnectionsPane: SettingsPaneController {
                                         label("tables", color: .secondaryLabelColor)],
                  caption: "Names always load at connect. On a server with more tables than this, a database's columns, "
                     + "indexes and keys load when you open it, so connecting stays quick and the server isn't loaded down.")
+        form.row("Read the schema every", [number(\.schemaRefreshMinutes, id: "settings.schemaRefreshMinutes",
+                                                  tip: "Type how many minutes pass between readings of a connected schema, to catch others' changes; 0: only on Refresh",
+                                                  range: 0...1_440, width: 70), label("minutes", color: .secondaryLabelColor)],
+                 caption: "0 reads it only at connect and on Refresh (⌘R).")
     }
 }

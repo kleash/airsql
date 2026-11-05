@@ -62,6 +62,8 @@ final class TableDataController: NSViewController, TabContent {
     let tableName: String
     /// The data session; the tests give their own.
     var openSession: () async throws -> TableSession
+    /// The shared data session, which `openSession` gives outside Manual Commit.
+    let dataSession: () async throws -> TableSession
     /// In Manual Commit: the tab's own session, which then is what `openSession` gives.
     var transactionSession: DBConnection?
     /// Rows the open transaction changed, and what became of them if its session ended unasked.
@@ -155,14 +157,20 @@ final class TableDataController: NSViewController, TabContent {
         self.database = database
         tableName = table
         initialFilter = filter
-        let sessions = context.sessions
-        openSession = { try await sessions.session(.data) }
+        let first = context.sessions, id = context.connection.id
+        dataSession = { [weak model] in
+            try await (model.flatMap { Editors.open($0, id)?.sessions } ?? first).session(.data)
+        }
+        openSession = dataSession
         super.init(nibName: nil, bundle: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
     deinit { autoRefresh?.invalidate() }
+
+    /// The connection's sessions now: a new connect makes new ones, and those the tab opened with are closed for good.
+    var sessions: Connection { Editors.open(model, context.connection.id)?.sessions ?? context.sessions }
 
     var rowsPerPage: Int { max(1, pageSize ?? model.data.settings.rowsPerPage) }
 

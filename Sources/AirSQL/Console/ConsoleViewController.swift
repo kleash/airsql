@@ -19,6 +19,8 @@ final class ConsoleViewController: NSViewController, TabContent {
     static var openConnection: (UUID) -> Connection? = { _ in nil }
     static var schemaCache: (UUID) -> SchemaCache? = { _ in nil }
     static var queryTimeout: (UUID) -> Int = { _ in 0 }
+    /// The most rows a result keeps (Settings ▸ Grid).
+    static var rowCap: () -> Int = { 100_000 }
 
     /// What goes with a session: a tab's own, or the main session its connection's tabs share.
     struct Shared {

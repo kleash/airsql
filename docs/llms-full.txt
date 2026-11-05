@@ -190,6 +190,7 @@ of them after.
 - **Lines per row**: how many lines of a value with line breaks each row shows (1 by default).
 - **Date format**: the pattern Display As ▸ Settings' Date Format uses.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
+- **Most rows in a result**: where a console result stops; the statement stops on the server there (100,000 by default).
 - **Open tables newest first**: a table with an AUTO_INCREMENT key shows its newest rows first until you sort it (on by
   default).
 - **Long values**: how many characters of a long value a table's page reads (1,000 by default; 0 reads every value whole).
@@ -204,6 +205,8 @@ of them after.
 
 - **Load details up to … tables**: on a server with more tables than this, a database's columns, indexes and keys load
   when you open it, so connecting stays quick.
+- **Read the schema every … minutes**: reads connected schemas again on a timer, to catch changes others make; 0 (the
+  default) reads them only at connect and on Refresh.
 
 ## Safety
 
@@ -648,7 +651,7 @@ share the current database too.
   warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
   names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
   to select its statement.
-- A result keeps at most its first 100,000 rows; the tab then says it is cut short.
+- A result keeps at most its first 100,000 rows (**Settings ▸ Grid ▸ Most rows in a result**); the tab then says it is cut short.
 - **Edit ▸ Find** (⌘F) with a result's rows focused finds values in them, as in a [table tab](https://kleash.github.io/airsql/table-data.html): ⌘G and ⇧⌘G
   move between matches, and Options has Match Case, Regular Expression, Whole Words and Filter Rows. Replace is for
   table tabs.
@@ -775,7 +778,9 @@ tabs:
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
-- **Options**: read-only (below), the compressed protocol, a query timeout, how query tabs use sessions and start their transactions (see [Sessions](https://kleash.github.io/airsql/console.html#sessions)), the databases shown (names or patterns
+- **Options**: read-only (below), whether it connects when AirSQL opens, the compressed protocol, a query timeout, how
+  many idle minutes to wait before disconnecting (never with a transaction, edits or a running statement open), the time
+  zone sessions use, how query tabs use sessions and start their transactions (see [Sessions](https://kleash.github.io/airsql/console.html#sessions)), the databases shown (names or patterns
   such as `shop, reports_*`), startup SQL that runs after each login (for example `SET time_zone = '+00:00';`), and the
   connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
   why it can't be used).
@@ -843,8 +848,14 @@ programs chosen, startup SQL and agent access. TLS starts strict, except for a s
 Double-click a connection (once it is connected, a double-click opens or closes its tree), or select it and choose
 **Connection ▸ Connect** (⌘K). The status bar shows each step, hop
 by hop, with Cancel. A connection that drops (the network goes away, the server restarts) is marked in the sidebar;
-AirSQL never reconnects behind your back. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
+AirSQL never reconnects behind your back: Connect sets it up again on the same route and says if an open transaction was rolled
+back. To have a connection connect each time AirSQL opens, tick **Connect when AirSQL opens** in its Options; a
+Production connection can't, and only connects when you ask. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
 transaction or edits that aren't applied.
+
+**File ▸ Connect To** lists every connection. **Connection ▸ Deleted Connections** brings back one of the last 20 you
+deleted, without its passwords. A connection with no default database goes back to the one you last worked in. From a
+script, `open -a AirSQL --args --connect "Staging"` starts AirSQL and connects to that connection by name.
 
 Connected connections are kept alive with a ping every minute, except a session whose transaction has been open longer
 than the safety setting allows.
@@ -2110,7 +2121,7 @@ opens at that object's ticks.
 
 When the server says your own password has expired, connecting asks for a new one, changes it and goes on. The new
 password goes to the server only: a password saved in your Keychain stays as it was, so update it in the connection's
-settings. Read-only and Production connections don't offer this: they say the password has expired, and connecting stops.
+settings. A password you just typed with Remember in Keychain is replaced by the new one. Read-only and Production connections don't offer this: they say the password has expired, and connecting stops.
 
 ## What protects these
 

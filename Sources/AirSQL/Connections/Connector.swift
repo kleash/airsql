@@ -17,6 +17,8 @@ final class Connector {
         /// connect too.
         let route: OpenRoute
         fileprivate var keepAlive: Timer?
+        /// Keep-alive ticks so far: minutes, at `keepAliveInterval`.
+        fileprivate var ticks = 0
 
         fileprivate init(connection: Connection, server: ServerInfo, route: OpenRoute) {
             self.connection = connection
@@ -79,6 +81,18 @@ final class Connector {
             }
         }
         connecting[id] = (task, activity)
+    }
+
+    /// Connects what the person chose to have connected when AirSQL opens, never a Production connection, and the one
+    /// `--connect <name>` asks for by its name (`open -a AirSQL --args --connect Staging`).
+    func connectAtLaunch(on window: NSWindow?, arguments: [String] = CommandLine.arguments) {
+        for saved in model.data.connections where saved.connectsAtLaunch { connect(saved.id, on: window) }
+        guard let flag = arguments.firstIndex(of: "--connect"), arguments.indices.contains(flag + 1) else { return }
+        let name = arguments[flag + 1]
+        guard let asked = model.data.connections.first(where: { $0.displayName == name }) else {
+            return showError("There is no saved connection named “\(name)”.", title: "AirSQL couldn't connect", on: window)
+        }
+        connect(asked.id, on: window)
     }
 
     /// The connection's sessions, for another window (the compare window): connects it first, its prompts on `window`,
@@ -285,6 +299,8 @@ final class Connector {
                         model.save(stored)
                     }
                 case .authFailed where [1820, 1862].contains(error.code):
+                    // Only at Connect: Test Connection's typed password would stay in the editor, to be saved, and no longer work.
+                    guard typed == nil else { throw error }
                     password = try await changeExpiredPassword(saved, password, routeSocket: routeSocket, on: window, error)
                 case .authFailed:
                     password = try await databasePassword(&saved, on: window, retry: true)
@@ -308,22 +324,41 @@ final class Connector {
             MainActor.assumeIsolated {
                 guard let self, let connected, let saved = self.model.connection(id) else { return }
                 let limit = TimeInterval(self.model.data.safety(for: saved).openTransactionMinutes * 60)
+                connected.ticks += 1
+                let refresh = self.model.data.settings.schemaRefreshMinutes
+                if refresh > 0, connected.ticks % refresh == 0, let schema = self.model.openConnection(id), !schema.loading.contains(.schema) {
+                    schema.load()
+                }
                 Task { [weak self] in
                     await connected.connection.keepAlive(transactionLimit: limit)
                     if let main = try? await connected.connection.session(.main), !main.isConnected {
                         self?.dropped(id, connected, AirSQLError.disconnected.message)
                     }
+                    await self?.closeIfIdle(id, connected, now: Date())
                 }
             }
         }
     }
 
+    /// Disconnects a connection idle for its `idleDisconnectMinutes`, never with work open: a statement running, a
+    /// transaction, edits not applied, results waiting or a client tool at work.
+    func closeIfIdle(_ id: UUID, _ connected: Open, now: Date) async {
+        guard let minutes = model.connection(id)?.idleDisconnectMinutes, minutes > 0,
+              let since = await connected.connection.idleSince(), now.timeIntervalSince(since) >= TimeInterval(minutes * 60),
+              open[id] === connected, ToolSheet.running(on: [id]).isEmpty,
+              !NSApplication.shared.windows.contains(where: { ($0.windowController as? MainWindowController)?.busyTabs([id]).isEmpty == false })
+        else { return }
+        SQLLog.shared.note("disconnected after \(minutes) idle minutes", context: connected.connection.options.name)
+        disconnect(id)
+    }
+
     /// `connected` dropped (if it is still the one open): it is reported, and kept so the next Connect can reconnect it
     /// through the same route and clear the thread the server may still have (plan §2.2, R8). Its keep-alive stops.
-    private func dropped(_ id: UUID, _ connected: Open?, _ message: String) {
+    func dropped(_ id: UUID, _ connected: Open?, _ message: String) {
         guard let connected, open[id] === connected else { return }
         open[id] = nil
-        model.detach(id)
+        model.detach(id, closingSessions: false)
+        connected.connection.dropped()
         model.states[id] = .failed(message)
         connected.keepAlive?.invalidate()
         if let previous = droppedOpens.updateValue(connected, forKey: id) { Task { await previous.close() } }

@@ -45,7 +45,7 @@ opens at that object's ticks.
 
 When the server says your own password has expired, connecting asks for a new one, changes it and goes on. The new
 password goes to the server only: a password saved in your Keychain stays as it was, so update it in the connection's
-settings. Read-only and Production connections don't offer this: they say the password has expired, and connecting stops.
+settings. A password you just typed with Remember in Keychain is replaced by the new one. Read-only and Production connections don't offer this: they say the password has expired, and connecting stops.
 
 ## What protects these
 

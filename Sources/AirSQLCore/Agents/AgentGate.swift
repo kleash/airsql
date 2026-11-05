@@ -98,7 +98,7 @@ extension AgentGate {
         return part
     }
 
-    /// A connection without the fields anyone may change (its name, folder, comment, database and how its list looks).
+    /// A connection without the fields anyone may change (its name, folder, comment, databases and how its list looks).
     static func personsPart(_ connection: SavedConnection) -> SavedConnection {
         var part = connection
         part.name = ""
@@ -106,6 +106,7 @@ extension AgentGate {
         part.comment = ""
         part.database = ""
         part.databaseFilter = ""
+        part.lastDatabase = ""
         return part
     }
 }

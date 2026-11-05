@@ -55,6 +55,8 @@ import AppKit
     @objc optional func importConnections(_ sender: Any?)
     @objc optional func exportConnections(_ sender: Any?)
     @objc optional func newConnectionFromURL(_ sender: Any?)
+    @objc optional func connectTo(_ sender: Any?)
+    @objc optional func bringBackConnection(_ sender: Any?)
 
     // Edit
     @objc optional func copyWithHeaders(_ sender: Any?)
@@ -828,6 +830,10 @@ enum Commands {
                                           tip: "Forget the selected connections and their saved passwords (asks first)")
     static let openInTerminal = Command("Open in Terminal", #selector(AirSQLActions.openInTerminal(_:)),
                                         tip: "Open the mysql command line in Terminal on this connection, through its route; read-only if it is")
+    static let connectTo = Command("Connect To", #selector(AirSQLActions.connectTo(_:)),
+                                   tip: "Connect to this connection, or show it if it is connected")
+    static let bringBack = Command("Bring Back", #selector(AirSQLActions.bringBackConnection(_:)),
+                                   tip: "Save this deleted connection again; its passwords must be typed anew")
     static let newFolder = Command("New Folder…", #selector(AirSQLActions.newFolder(_:)),
                                    tip: "Make a sidebar folder for connections; the selected connections move into it")
     static let renameFolder = Command("Rename Folder…", #selector(AirSQLActions.renameFolder(_:)),
@@ -976,7 +982,7 @@ enum Commands {
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
         killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, users, newUser, newRole, editUser, cloneUser, dropUser, modifyGrants, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
-        connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
+        connect, disconnect, connectTo, bringBack, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder, moveToFolder,
         export, restore, copyToServer, flushHosts, flushLogs, flushPrivileges, flushTables, flushStatus, flushReadLock, compare, compareWith, compareRows, backToServer, includeInSync, nextDifference, previousDifference,
         syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
@@ -1002,6 +1008,8 @@ enum Commands {
         "Server Home": "Show what the server holds and does: databases, variables, status, processes",
         "Flush": "Clear the server's caches, logs and counters, or lock its tables",
         "Move to Folder": "Put the selected connections in a folder",
+        "Connect To": "Connect to a saved connection",
+        "Deleted Connections": "Bring back a connection you deleted",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",
         "Surround With": surroundWith.tip,
