@@ -21,6 +21,8 @@ final class ResultTab {
     let id = UUID()
     var title: String
     var pinned = false
+    /// The statement its rows came from.
+    var sql: String?
     let content: Content
     /// A comparison with another connection's result: agents see its rows only if they may read that connection's too.
     var otherConnection: UUID?

@@ -388,7 +388,8 @@ own session, which every query tab of that connection shares.
 - When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL. The
   other tabs come back too: see [Getting back to your tabs](https://kleash.github.io/airsql/navigator.html#getting-back-to-your-tabs).
 - **File ▸ Open Recent** lists the .sql files you had open lately.
-- **Query ▸ Change Connection…** runs the tab's statements on another connection.
+- **Query ▸ Change Connection…** runs the tab's statements on another connection. A tab with no connection, such as a
+  file opened with nothing selected, takes the one the toolbar shows.
 
 ## Write SQL
 
@@ -434,13 +435,18 @@ own session, which every query tab of that connection shares.
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
-on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another; a run stops at the first error.
+on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another; a run stops at the first error. Each
+statement that ran then shows a tick, or a cross if it failed, and its time at the end of its line, until you change it
+or run again.
 
 While a statement runs, the bar above the results shows which one and for how long, with **Cancel**; the status bar
 lists it too. Cancel stops only that statement: AirSQL checks the server is still running it before it stops it. A
 connection can have a query timeout: a statement that runs longer is stopped the same way, and Messages says so.
 The time shown covers the whole run: waiting its turn, the server's work and fetching every row. After an `UPDATE`,
 Messages counts the rows changed; the server's note beside it says how many matched.
+
+If you've gone to another app and a run of 10 seconds or more ends, AirSQL's Dock icon bounces once and a notification
+says which tab finished. It never shows the SQL. Turn the notification off in System Settings ▸ Notifications.
 
 Query tabs of one connection share its session, so while one runs a statement the others wait.
 
@@ -459,7 +465,9 @@ nothing runs.
   tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
   A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
   Messages included.
-- Double-click a result tab to rename it; right-click it to pin, rename or close it, export its rows, or compare it
+- **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
+  which keeps its name and pin. **Copy Result's Query** copies the statement.
+- Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](https://kleash.github.io/airsql/compare.html#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.
 - **Messages** lists what each statement did: its rows or the rows it changed, how long it took, the server's
@@ -1735,6 +1743,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |
+| Run Result Again | ⇧⌘R |
 | Close Result | ⌃⌘W |
 | Show Next Result | ⌥⌘] |
 | Show Previous Result | ⌥⌘[ |

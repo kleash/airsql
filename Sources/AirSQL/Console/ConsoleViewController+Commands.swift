@@ -130,6 +130,13 @@ extension ConsoleViewController: NSMenuItemValidation {
                 return (false, "This is the only result tab")
             }
             return (currentResult != nil, "Run a query first: there is no result tab yet")
+        case #selector(rerunResult(_:)), #selector(copyResultQuery(_:)):
+            guard currentResult?.sql != nil else {
+                return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This tab didn't come from a statement")
+            }
+            if item.action == #selector(copyResultQuery(_:)) { return (true, "") }
+            if let reason = offline ?? busy { return (false, reason) }
+            return (true, "")
         case #selector(showNextResult(_:)), #selector(showPreviousResult(_:)):
             return (!resultTabs.isEmpty, "Run a query first: there is no result tab yet")
         case #selector(exportResult(_:)):

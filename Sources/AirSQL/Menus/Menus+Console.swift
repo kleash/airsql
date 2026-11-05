@@ -24,7 +24,8 @@ extension MainMenu {
         insert(Commands.runSelection, after: Commands.runStatement, in: menus.query)
         let mode = menus.query.items.firstIndex { $0.title == "Transaction Mode" } ?? menus.query.items.count - 1
         menus.query.insertItem(submenu("Isolation Level", isolationItems()), at: mode + 1)
-        menus.query.add([nil, Commands.formatSQL, Commands.history, Commands.profile, Commands.editAsTable, nil, Commands.pinResult,
+        menus.query.add([nil, Commands.formatSQL, Commands.history, Commands.profile, Commands.editAsTable, nil, Commands.rerunResult,
+                         Commands.copyResultQuery, Commands.pinResult,
                          Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, Commands.nextResult,
                          Commands.previousResult, Commands.exportResult, Commands.compareResult])
     }

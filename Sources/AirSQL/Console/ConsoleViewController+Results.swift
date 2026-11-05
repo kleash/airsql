@@ -80,6 +80,17 @@ extension ConsoleViewController {
         if selectedResult == nil || selectedResult === messagesTab { selectedResult = tab }
     }
 
+    /// Run Again's rows, the last `count` tabs, in the place of `old`, under its name; none (an error) leaves it as it was.
+    func replace(_ old: ResultTab, withLast count: Int) {
+        guard count > 0, let index = resultTabs.firstIndex(where: { $0 === old }) else { return }
+        let added = Array(resultTabs.suffix(count))
+        resultTabs.removeLast(count)
+        resultTabs.replaceSubrange(index...index, with: added)
+        added[0].title = old.title
+        added[0].pinned = old.pinned
+        selectedResult = added[0]
+    }
+
     /// An EXPLAIN's tab.
     func addPlan(table: ResultStore?, tree: String, title: String) {
         let tab = ResultTab(title: title, content: .plan(table: table, tree: tree), summary: "")
@@ -137,8 +148,8 @@ extension ConsoleViewController {
     /// The result tab's menu (plan §2.12): Pin, Rename, Close, Close Others, Export…, Compare With….
     func resultMenu() -> NSMenu {
         let menu = NSMenu(title: "Result")
-        menu.add([Commands.pinResult, Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, nil,
-                  Commands.exportResult, Commands.compareResult])
+        menu.add([Commands.rerunResult, Commands.copyResultQuery, nil, Commands.pinResult, Commands.renameResult, Commands.closeResult,
+                  Commands.closeOtherResults, nil, Commands.exportResult, Commands.compareResult])
         // The console's own commands go to it wherever the focus is; Export and Compare to whatever handles them.
         for item in menu.items where item.action.map(responds(to:)) == true { item.target = self }
         return menu
@@ -169,6 +180,13 @@ extension ConsoleViewController {
             self.selectedResult = self.resultTabs.isEmpty ? self.messagesTab : self.resultTabs[min(index, self.resultTabs.count - 1)]
             self.showResults()
         }
+    }
+
+    /// The shown result's statement on the clipboard.
+    @objc func copyResultQuery(_ sender: Any?) {
+        guard let sql = currentResult?.sql else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(sql, forType: .string)
     }
 
     @objc func showNextResult(_ sender: Any?) { stepResult(1) }

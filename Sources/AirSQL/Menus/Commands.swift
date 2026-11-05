@@ -82,6 +82,8 @@ import AppKit
     @objc optional func formatSQL(_ sender: Any?)
     @objc optional func showHistory(_ sender: Any?)
     @objc optional func changeConnection(_ sender: Any?)
+    @objc optional func rerunResult(_ sender: Any?)
+    @objc optional func copyResultQuery(_ sender: Any?)
     @objc optional func profileQuery(_ sender: Any?)
     @objc optional func saveAsChangeset(_ sender: Any?)
     @objc optional func editAsTable(_ sender: Any?)
@@ -467,6 +469,10 @@ enum Commands {
                                          tip: "Save the selected statements as a Liquibase changeset in a changelog")
     static let editAsTable = Command("Edit as Table", #selector(AirSQLActions.editAsTable(_:)),
                                      tip: "Open the selected INSERT statements as a grid to edit")
+    static let rerunResult = Command("Run Result Again", #selector(AirSQLActions.rerunResult(_:)), "r", [.command, .shift],
+                                     tip: "Run the shown result's statement again and show the new rows in its tab")
+    static let copyResultQuery = Command("Copy Result's Query", #selector(AirSQLActions.copyResultQuery(_:)),
+                                         tip: "Copy the statement the shown result came from")
     static let pinResult = Command("Pin Result", #selector(AirSQLActions.pinResult(_:)),
                                    tip: "Keep this result tab: the next run opens a new one")
     static let renameResult = Command("Rename Result…", #selector(AirSQLActions.renameResult(_:)),
@@ -752,7 +758,7 @@ enum Commands {
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
         runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
-        isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, pinResult, renameResult, closeResult,
+        isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,

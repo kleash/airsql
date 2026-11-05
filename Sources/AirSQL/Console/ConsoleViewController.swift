@@ -50,6 +50,8 @@ final class ConsoleViewController: NSViewController, TabContent {
     private(set) var editor: SQLEditorView!
     private(set) var editorScroll: NSScrollView!
     private(set) var findBar: FindBar!
+    /// The tick or cross and the time at the end of each statement run.
+    private(set) var runMarks: RunMarksView!
     let results = ResultsView()
     let messagesView = ConsoleMessagesView()
     lazy var messagesTab: ResultTab = {
@@ -106,6 +108,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         self.editor = editor
         editorScroll = scroll
         editor.setText(initialText)
+        runMarks = RunMarksView(editor: editor)
         editor.onChange = { [weak self] in self?.textChanged() }
         editor.onDropFiles = { [weak self] urls in self?.mainWindow?.openFiles(urls) }
         editor.completions = { [weak self] text, caret in
@@ -329,6 +332,13 @@ final class ConsoleViewController: NSViewController, TabContent {
         if let tab { mainWindow?.rename(tab, to: url.lastPathComponent) }
         ConsoleDocuments.shared.changed(self)
         contentChanged()
+    }
+
+    /// A tab without a connection works on the one the toolbar shows: nothing to choose while the window has one.
+    func takeWindowConnection() {
+        guard connectionID == nil, let id = mainWindow?.activeConnection?.id else { return }
+        setConnection(id)
+        showResults()
     }
 
     func setConnection(_ id: UUID) {

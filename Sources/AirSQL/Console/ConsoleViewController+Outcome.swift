@@ -9,7 +9,11 @@ extension ConsoleViewController {
         let statement = outcome.statement
         let time = milliseconds(outcome.duration)
         if !statement.range.isEmpty { lastOutcome = outcome }
+        if !statement.range.isEmpty, self.text == run.text {
+            runMarks.add(NSRange(statement.range), failed: outcome.error != nil, time: time)
+        }
         if let error = outcome.error {
+            run.failed = true
             let text = run.cancelled && error.kind == .cancelled ? "Cancelled · \(time)" : error.localizedDescription
             note(.error, text, statement: statement, run: run, line: outcome.errorLine)
             if self.text == run.text {
@@ -33,6 +37,7 @@ extension ConsoleViewController {
                 if outcome.error == nil { note(.ok, count + (rows.capped ? ", the first only" : "") + " · " + time, statement: statement, run: run) }
                 addResult(rows, title: title.map { number > 1 ? "\($0) (\(number))" : $0 }, summary: summary,
                           query: number > 1 ? "\(statement.sql) (\(number))" : statement.sql)
+                resultTabs.last?.sql = statement.sql
             } else if outcome.error == nil {
                 let affected = result.changedRows
                 let word = result.info?.contains("Changed:") == true ? "changed" : "affected"
@@ -40,6 +45,7 @@ extension ConsoleViewController {
                 note(.ok, text + " · " + time + (result.info.map { " · " + $0 } ?? ""), statement: statement, run: run)
             }
         }
+        if let old = run.replacing { replace(old, withLast: number) }
         for warning in outcome.warnings { note(.warning, warning, statement: statement, run: run) }
         if StatementCheck.changesCharset(statement.sql, noBackslashEscapes: session.noBackslashEscapes) {
             note(.warning, "AirSQL reads every result as UTF-8, so accents will look wrong after this: SET NAMES utf8mb4 puts it right.",

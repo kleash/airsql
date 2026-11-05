@@ -16,12 +16,20 @@ final class ConsoleRun {
     var session: DBConnection?
     var activity: Activity?
     var timer: Timer?
+    /// A statement ended in an error.
+    var failed = false
+    /// Run Again: the result tab its rows take the place of.
+    let replacing: ResultTab?
 
-    init(kind: Kind, statements: [SQLStatement], text: String) {
+    init(kind: Kind, statements: [SQLStatement], text: String, replacing: ResultTab? = nil) {
         self.kind = kind
         self.statements = statements
         self.text = text
+        self.replacing = replacing
     }
+
+    /// The person's own statements, not a Commit or a change of mode: they run in the tab's database.
+    var isTheirs: Bool { replacing != nil || statements.contains { !$0.range.isEmpty } }
 }
 
 /// Running (plan §2.6): ⌘↩ the statement at the caret (or the selection), ⇧⌘↩ all, each sent alone; the statement
@@ -57,6 +65,20 @@ extension ConsoleViewController {
     }
 
     @objc func explain(_ sender: Any?) { run(all: false, kind: .explain) }
+
+    /// Run Again: the shown result's statement once more, its rows taking the tab's place. It goes through the same
+    /// checks as a Run, as a statement that returns rows can still write (CALL).
+    @objc func rerunResult(_ sender: Any?) {
+        guard let tab = currentResult, let sql = tab.sql else { return }
+        askBeforeClosing([tab]) { [weak self] close in
+            guard close, let self, !ConsoleSafety.refusesOnReadOnly([sql], in: self) else { return }
+            let statement = SQLStatement(sql: sql)
+            ConsoleSafety.check([statement], in: self) { [weak self] approved in
+                guard approved, let self else { return }
+                self.start(ConsoleRun(kind: .run, statements: [statement], text: self.text, replacing: tab))
+            }
+        }
+    }
 
     /// A sync script runs only through its compare.
     private func handedToCompare() -> Bool {
@@ -124,6 +146,7 @@ extension ConsoleViewController {
             dropUnpinnedResults()
             resultsRuler?.errorLine = nil
             editor.runProblem = nil
+            runMarks.clear()
         }
         running = run
         changeShared { $0.runner = documentID }
@@ -154,7 +177,7 @@ extension ConsoleViewController {
     private func perform(_ run: ConsoleRun, on session: DBConnection, connection id: UUID) async {
         // The database made current in the navigator or the toolbar since the session's last USE: used first, so the
         // statements run where the window says (and a run under way is never switched midway). If it fails, nothing runs.
-        if run.statements.contains(where: { !$0.range.isEmpty }), let wanted = model.openConnection(id)?.currentDatabase,
+        if run.isTheirs, let wanted = model.openConnection(id)?.currentDatabase,
            wanted != shared.database ?? session.options.database {
             let use = await ConsoleRunner.run(SQLStatement(sql: "USE " + SQLQuote.identifier(wanted)), in: run.text, on: session)
             show(use, title: nil, run: run, session: session)
@@ -234,6 +257,8 @@ extension ConsoleViewController {
         run.activity?.end()
         if running === run { running = nil }
         if shared.runner == documentID { changeShared { $0.runner = nil } }
+        LongQueryNotice.runEnded(after: Date().timeIntervalSince(run.started), failed: run.failed,
+                                 place: "“\(tab?.title ?? "Query")” on \(connection?.displayName ?? "the server")")
         results.setRunning(nil)
         showResults()
         contentChanged()
