@@ -256,6 +256,14 @@ public struct AppSettings: Codable, Equatable {
     public var disabledInspections: [String] = []
     /// View ▸ Tree: how the sidebar's tree shows things.
     public var tree = TreeSettings()
+    /// Settings ▸ Format: how Format SQL lays SQL out, and the case of what completion inserts.
+    public var formatStyle = SQLFormatStyle()
+    /// Settings ▸ Editor: a table completed after FROM or JOIN brings an alias.
+    public var completionTableAlias = true
+    /// Settings ▸ Editor: reserved words take the case of `formatStyle.keywords` as they're typed.
+    public var autoKeywordCase = false
+    /// The helpers panel's Snippets: the person's own, besides `SQLSnippet.builtIn`.
+    public var snippets: [SQLSnippet] = []
 
     public init() {}
 
@@ -290,6 +298,21 @@ public struct AppSettings: Codable, Equatable {
         transposeSingleRow = try value(.transposeSingleRow, defaults.transposeSingleRow)
         disabledInspections = try value(.disabledInspections, defaults.disabledInspections)
         tree = try value(.tree, defaults.tree)
+        formatStyle = try value(.formatStyle, defaults.formatStyle)
+        completionTableAlias = try value(.completionTableAlias, defaults.completionTableAlias)
+        autoKeywordCase = try value(.autoKeywordCase, defaults.autoKeywordCase)
+        snippets = try value(.snippets, defaults.snippets)
+    }
+
+    /// What completion follows, given what was chosen before.
+    public func completionOptions(recent: [String: Int] = [:]) -> CompletionOptions {
+        var options = CompletionOptions()
+        options.keywordCase = formatStyle.keywords == .keep ? .upper : formatStyle.keywords
+        options.functionCase = formatStyle.functions == .keep ? .upper : formatStyle.functions
+        options.tableAlias = completionTableAlias
+        options.snippets = snippets + SQLSnippet.builtIn
+        options.recent = recent
+        return options
     }
 }
 

@@ -41,6 +41,11 @@ final class OpenConnection {
     private(set) weak var model: AppModel?
     private var running: [Load: Int] = [:]
     private var tasks: [UUID: Task<Void, Never>] = [:]
+    /// How far reading every database's sizes is: 0 of the count, then on; nil when nothing reads.
+    private(set) var sizesProgress: (done: Int, of: Int, database: String)?
+    /// Why the last read of the sizes stopped short.
+    private(set) var sizesError: String?
+    private var sizesTask: Task<Void, Never>?
 
     /// `source`: where the schema is read (the schema session; tests replay a recording).
     init(id: UUID, connection: Connection, model: AppModel, includes: @escaping (String) -> Bool, source: SchemaQuerying? = nil) {
@@ -73,6 +78,48 @@ final class OpenConnection {
     func loadStatistics(_ database: String) {
         start(.statistics(database), "Reading the table sizes of \(database)") { try await $0.loadStatistics(database) }
     }
+
+    /// Reads the sizes of `databases` for Disk Usage and the host page, one database at a time because the query opens
+    /// every table it names, on a session of its own, listed in the status bar with Cancel. What was read stays when it
+    /// stops. Reading already: nothing more is asked.
+    func readSizes(_ databases: [String]) {
+        guard let model, sizesTask == nil, let first = databases.first else { return }
+        sizesError = nil
+        sizesProgress = (0, databases.count, first)
+        changed()
+        let activity = model.activity.start("Reading the sizes on \(name)", connection: id) { [weak self] in self?.stopReadingSizes() }
+        let connection = self.connection, schema = self.schema
+        sizesTask = Task { [weak self] in
+            var session: DBConnection?
+            var failure: String?
+            do {
+                let opened = try await connection.toolsSession()
+                session = opened
+                for (index, database) in databases.enumerated() {
+                    try Task.checkCancellation()
+                    activity.progress = Double(index) / Double(databases.count)
+                    activity.detail = "\(index + 1) of \(databases.count): \(database)"
+                    self?.sizesProgress = (index, databases.count, database)
+                    self?.changed()
+                    let read = Task { try await schema.loadStatistics(database, through: opened) }
+                    try await withTaskCancellationHandler { try await read.value } onCancel: {
+                        Task { _ = try? await opened.cancel() }
+                    }
+                }
+            } catch is CancellationError {
+            } catch {
+                if (error as? AirSQLError)?.kind != .cancelled { failure = error.localizedDescription }
+            }
+            activity.end()
+            if let session { await session.close() }
+            self?.sizesTask = nil
+            self?.sizesProgress = nil
+            self?.sizesError = failure
+            self?.changed()
+        }
+    }
+
+    func stopReadingSizes() { sizesTask?.cancel() }
 
     /// Reads again what DDL changed.
     func refresh(_ objects: [SchemaObject]) {
@@ -137,6 +184,7 @@ final class OpenConnection {
     func close() {
         tasks.values.forEach { $0.cancel() }
         tasks = [:]
+        stopReadingSizes()
         running = [:]
         schema.clear()
         let connection = self.connection

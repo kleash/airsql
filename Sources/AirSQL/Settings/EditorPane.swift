@@ -18,6 +18,10 @@ final class EditorPane: SettingsPaneController {
                                       [2, 3, 4, 8].map { ("\($0) spaces", $0) })])
         form.row("", [toggle("Indent with tabs", id: "settings.editorUsesTabs", tip: "Put in a tab character for Tab and indents instead of spaces",
                              \.editorUsesTabs)])
+        form.row("Completion", [toggle("Add an alias to a table", id: "settings.completionTableAlias",
+                                       tip: "Complete a table after FROM or JOIN with an alias, as orders o", \.completionTableAlias)])
+        form.row("", [toggle("Change keywords' case as you type", id: "settings.autoKeywordCase",
+                             tip: "Give a reserved word the case set in Settings ▸ Format when you finish typing it", \.autoKeywordCase)])
         for (index, inspection) in SQLInspections.all.enumerated() {
             form.row(index == 0 ? "Checks" : "", [inspectionToggle(inspection)])
         }

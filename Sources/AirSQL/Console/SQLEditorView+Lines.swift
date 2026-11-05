@@ -107,17 +107,17 @@ extension SQLEditorView {
         replace(range, with: wrapped, select: NSRange(location: range.location, length: (wrapped as NSString).length))
     }
 
-    /// What Surround With offers: the text before and after the selection.
-    static let surrounds: [(title: String, before: String, after: String)] = [
-        ("Brackets", "(", ")"), ("Subquery", "SELECT * FROM (", ") AS t"), ("CASE", "CASE WHEN ", " THEN  END"),
-        ("COALESCE", "COALESCE(", ", )"), ("Backticks", "`", "`"),
+    /// What Surround With offers besides the snippets written to go around a selection.
+    static let surrounds: [(title: String, body: String)] = [
+        ("Brackets", "($SELECTION$)$END$"), ("Subquery", "SELECT * FROM ($SELECTION$) AS $alias$$END$"),
+        ("CASE", "CASE WHEN $SELECTION$ THEN $value$ END$END$"), ("COALESCE", "COALESCE($SELECTION$, $value$)$END$"), ("Backticks", "`$SELECTION$`$END$"),
     ]
 
-    /// Edit ▸ Surround With ▸ one of `surrounds` (the item's tag), around the selection or the word at the cursor.
+    /// Edit ▸ Surround With ▸ a template (the item's represented body), around the selection or the word at the cursor.
     @objc func surroundWith(_ sender: Any?) {
-        let range = selectionOrWord, pair = Self.surrounds[(sender as? NSMenuItem)?.tag ?? 0]
-        let wrapped = pair.before + (string as NSString).substring(with: range) + pair.after
-        replace(range, with: wrapped, select: NSRange(location: range.location, length: (wrapped as NSString).length))
+        guard let body = (sender as? NSMenuItem)?.representedObject as? String else { return }
+        let range = selectionOrWord
+        insertTemplate(body, replacing: range, selection: (string as NSString).substring(with: range))
     }
 
     /// Edit ▸ Paste from History ▸ one of the editor's last copies (the item's represented text).

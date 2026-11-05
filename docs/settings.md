@@ -22,8 +22,20 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
 
+- **Add an alias to a table**: completing a table after FROM or JOIN adds one, as `orders o`; on at first.
+- **Change keywords' case as you type**: a reserved word takes the case set in [Format](#format) once you finish it; off at first.
 - **Checks**: what the editor underlines while you type (see [Checks while you type](console.md#checks-while-you-type)).
   All are on at first; turn off any you don't want.
+
+## Format
+
+How **Query ▸ Format SQL** lays out SQL, with a preview of a sample below. **Preset** sets all the rules at once; change any
+of them after.
+
+- **Keywords**, **Types**, **Functions**, **Names** and **Aliases**: as written, in capitals or in small letters. Completion
+  puts keywords and functions in the same case. Leave **Names** as written unless your server ignores their case.
+- **Indent**, **Lists** (a line per item, when long, or never; **Comma first**), **Conditions**, **Joins**, **Subqueries**
+  (where brackets go; **Right-align clauses**), **Layout** and **Spaces**.
 
 ## Grid
 

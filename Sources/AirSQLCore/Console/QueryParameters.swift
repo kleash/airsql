@@ -1,6 +1,6 @@
 import Foundation
 
-/// The console's query parameters: `?` and `:name` in a statement's code, never in a string or comment. They are filled
+/// The console's query parameters: `?`, `:name` and `${name}` in a statement's code, never in a string or comment. They are filled
 /// in on this Mac before the statement goes, as quoted values, so the read-only and safety checks see the final SQL.
 public enum QueryParameters {
     /// A parameter in a statement: its place (UTF-16, in the statement) and its key: "?1", "?2"… by order among the
@@ -8,6 +8,8 @@ public enum QueryParameters {
     public struct Place: Equatable, Sendable {
         public var range: Range<Int>
         public var key: String
+        /// The comment right after it, which says what it is (a routine's `? /* p_id int */`).
+        public var hint: String?
     }
 
     /// Each statement's places, in order.
@@ -20,7 +22,12 @@ public enum QueryParameters {
             for (index, token) in tokens.enumerated() where token.kind == .symbol && token.range.count == 1 {
                 if text[token.range.lowerBound] == 0x3F {
                     question += 1
-                    found.append(Place(range: token.range, key: "?\(question)"))
+                    var hint: String?
+                    if index + 1 < tokens.count, tokens[index + 1].kind == .comment {
+                        hint = String(decoding: text[tokens[index + 1].range], as: UTF16.self)
+                            .trimmingCharacters(in: CharacterSet(charactersIn: "/* "))
+                    }
+                    found.append(Place(range: token.range, key: "?\(question)", hint: hint))
                 } else if text[token.range.lowerBound] == 0x3A, index + 1 < tokens.count, tokens[index + 1].kind == .word,
                           tokens[index + 1].range.lowerBound == token.range.upperBound,
                           // lbl:LOOP is a label.
@@ -30,6 +37,17 @@ public enum QueryParameters {
                                        key: ":" + String(decoding: text[word], as: UTF16.self)))
                 }
             }
+            // ${name}: `$` is a name's letter to the lexer.
+            for (index, token) in tokens.enumerated() where index + 3 < tokens.count && token.kind == .word
+                && String(decoding: text[token.range], as: UTF16.self) == "$" {
+                let (open, name, close) = (tokens[index + 1], tokens[index + 2], tokens[index + 3])
+                guard open.kind == .symbol, text[open.range.lowerBound] == 0x7B, name.kind == .word, close.kind == .symbol,
+                      text[close.range.lowerBound] == 0x7D, open.range.lowerBound == token.range.upperBound,
+                      name.range.lowerBound == open.range.upperBound, close.range.lowerBound == name.range.upperBound else { continue }
+                found.append(Place(range: token.range.lowerBound..<close.range.upperBound,
+                                   key: ":" + String(decoding: text[name.range], as: UTF16.self)))
+            }
+            found.sort { $0.range.lowerBound < $1.range.lowerBound }
             return found
         }
     }

@@ -185,7 +185,7 @@ extension AppTests.AgentGateUITests {
         console.addPlan(table: nil, tree: tree, nodes: ExplainPlan.nodes(from: tree, json: false), raw: tree, title: "Plan")
         #expect(await sees(harness).contains("Nordlicht"), "the person sees the plan's steps")
         #expect(await !sees().contains("Nordlicht"), "the agent doesn't")
-        for segment in [2, 3] {
+        for segment in [4, 5] {
             ((console.currentResult?.view as? PlanView)?.choice)?.selectedSegment = segment
             (console.currentResult?.view as? PlanView)?.show(page: segment)
             #expect(await sees(harness).contains("Nordlicht"), "the person sees the plan as text")

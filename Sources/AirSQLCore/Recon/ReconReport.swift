@@ -26,6 +26,7 @@ public enum ReconReport {
 
     /// The summary the compare window shows too.
     public static func summary(_ result: ReconResult) -> [(label: String, value: String)] {
+        if result.isServer { return serverSummary(result) }
         let tables = result.objects.filter { $0.kind == .table }
         let others = result.objects.filter { $0.kind != .table }
         let rows = tables.filter { $0.status == .same || $0.status == .different }.compactMap(\.data).filter(\.differs)
@@ -40,10 +41,27 @@ public enum ReconReport {
                 ("views, routines, triggers and events differ", others.filter { $0.status == .different }.count.formatted())]
     }
 
+    /// The same six figures for two servers: the pairs, then what differs within them.
+    private static func serverSummary(_ result: ReconResult) -> [(label: String, value: String)] {
+        let pairs = result.objects
+        let matching = pairs.filter { $0.status == .same }.count, different = pairs.filter { $0.status == .different }.count
+        let tables = result.databases.values.flatMap(\.objects).filter { $0.kind == .table }.compactMap(\.data).filter(\.differs)
+        let rows = tables.reduce(0) { $0 + $1.differenceCount }
+        let objects = result.databases.values.flatMap(\.objects).filter(\.differs).count
+        return [(matching == 1 ? "database matches" : "databases match", matching.formatted()),
+                (different == 1 ? "database differs" : "databases differ", different.formatted()),
+                ("only in \(result.source.name)", pairs.filter { $0.status == .onlyInSource }.count.formatted()),
+                ("only in \(result.target.name)", pairs.filter { $0.status == .onlyInTarget }.count.formatted()),
+                ("\(rows == 1 ? "row differs" : "rows differ") in \(tables.count) \(tables.count == 1 ? "table" : "tables")",
+                 rows.formatted()),
+                ("objects differ in those databases", objects.formatted())]
+    }
+
     /// How an object compares, in plain words: "different structure and data", "only in Production".
     public static func status(_ object: ReconObject, _ result: ReconResult) -> String {
         switch object.status {
         case .same: return object.data?.differs == true ? "different data" : "same"
+        case .different where object.kind == .database: return "different"
         case .different: return object.data?.differs == true ? "different structure and data" : "different structure"
         case .onlyInSource: return "only in \(result.source.name)"
         case .onlyInTarget: return "only in \(result.target.name)"
@@ -58,6 +76,16 @@ public enum ReconReport {
                  detail: detail)
         }
         var lines = object.parts.map { line("structure", "\($0.kind.rawValue) \($0.name)", $0.detail) }
+        if let pair = result.databases[object.name] {
+            // A pair of databases: its objects' differences, each named within the database.
+            return lines + pair.objects.filter(\.differs).flatMap { inner in
+                Self.lines(inner, pair, limit: limit).map { found in
+                    var found = found
+                    found.object = "\(object.name).\(found.object)"
+                    return found
+                }
+            }
+        }
         guard let data = object.data else { return lines }
         let columns = data.columns
         let width = min(max(data.key.count, columns.isEmpty ? 0 : 1), columns.count)
@@ -91,11 +119,11 @@ public enum ReconReport {
     }
 
     private static func header(_ result: ReconResult) -> [String] {
-        let rules = result.options.ignore
-        let ignored = [rules.autoIncrement ? "AUTO_INCREMENT values" : nil, rules.definer ? "DEFINER" : nil,
-                       rules.collation ? "collations" : nil, rules.whitespace ? "whitespace" : nil].compactMap { $0 }
-        return ["\(result.source.name) · \(result.source.database) (\(result.source.version)) → "
-                    + "\(result.target.name) · \(result.target.database) (\(result.target.version))",
+        let ignored = result.options.ignore.names
+        func side(_ end: ReconEnd) -> String {
+            end.name + (end.database.isEmpty ? "" : " · \(end.database)") + " (\(end.version))"
+        }
+        return ["\(side(result.source)) → \(side(result.target))",
                 "Compared \(result.options.mode == .both ? "structure and data" : result.options.mode.rawValue) on "
                     + ISO8601DateFormatter().string(from: Date()) + String(format: " in %.1f s; ", result.duration)
                     + "\(result.rowsChecked) rows checked, \(result.rowsFetched) fetched",
@@ -119,6 +147,11 @@ public enum ReconReport {
         return rows.joined(separator: "\r\n") + "\r\n"
     }
 
+    /// A line's item, with the object it belongs to where that isn't the section's own (a pair of databases).
+    private static func item(_ line: Line, of object: ReconObject) -> String {
+        line.object == object.name ? line.item : "\(line.object): \(line.item)"
+    }
+
     private static func markdown(_ result: ReconResult) -> String {
         func cell(_ text: String) -> String {
             String(text.prefix(200)).replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "|", with: "\\|")
@@ -129,7 +162,7 @@ public enum ReconReport {
         for object in result.objects where object.differs {
             text += ["", "## \(object.kind.rawValue.capitalized) \(cell(object.name)): \(status(object, result))", "",
                      "| Difference | Item | Detail |", "|---|---|---|"]
-            text += lines(object, result, limit: rowsShown).map { "| \($0.difference) | \(cell($0.item)) | \(cell($0.detail)) |" }
+            text += lines(object, result, limit: rowsShown).map { "| \($0.difference) | \(cell(item($0, of: object))) | \(cell($0.detail)) |" }
         }
         return text.joined(separator: "\n") + "\n"
     }
@@ -146,7 +179,7 @@ public enum ReconReport {
             body.append("<h2>\(escape(object.kind.rawValue.capitalized)) \(escape(object.name)) "
                         + "<small>\(escape(status(object, result)))</small></h2>")
             body.append("<table><tr><th>Difference</th><th>Item</th><th>Detail</th></tr>" + lines(object, result, limit: rowsShown)
-                .map { "<tr><td>\(escape($0.difference))</td><td>\(escape($0.item))</td><td>\(escape($0.detail))</td></tr>" }
+                .map { "<tr><td>\(escape($0.difference))</td><td>\(escape(item($0, of: object)))</td><td>\(escape($0.detail))</td></tr>" }
                 .joined() + "</table>")
         }
         return """
@@ -164,11 +197,17 @@ public enum ReconReport {
     }
 }
 
-/// Two texts side by side, line by line: equal lines on both sides, a line only one side has against a gap (nil), as
-/// the compare window shows two CREATE statements.
+/// Two texts side by side, line by line: equal lines on both sides, changed lines against each other, a line only one
+/// side has against a gap (nil), as the compare window shows two CREATE statements.
 public enum ReconLines {
-    public static func aligned(_ left: String, _ right: String) -> [(left: String?, right: String?)] {
-        let a = left.components(separatedBy: "\n"), b = right.components(separatedBy: "\n")
+    public typealias Row = (left: String?, right: String?)
+
+    private static func squeezed(_ text: String) -> String { text.filter { !$0.isWhitespace } }
+
+    /// `ignoringSpace`: lines that differ only in whitespace count as equal.
+    public static func aligned(_ left: String, _ right: String, ignoringSpace: Bool = false) -> [Row] {
+        let lines = (left.components(separatedBy: "\n"), right.components(separatedBy: "\n"))
+        let a = ignoringSpace ? lines.0.map(squeezed) : lines.0, b = ignoringSpace ? lines.1.map(squeezed) : lines.1
         // The longest common subsequence of lines (definitions are at most a few thousand lines).
         var lengths = [[Int]](repeating: [Int](repeating: 0, count: b.count + 1), count: a.count + 1)
         for i in stride(from: a.count - 1, through: 0, by: -1) {
@@ -176,21 +215,91 @@ public enum ReconLines {
                 lengths[i][j] = a[i] == b[j] ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
             }
         }
-        var rows: [(left: String?, right: String?)] = []
+        var rows: [Row] = []
+        var lefts: [String] = [], rights: [String] = []  // the lines only one side has since the last equal one
+        func flush() {
+            // What stands in each other's place is one changed line, as far as both sides have lines.
+            for index in 0..<max(lefts.count, rights.count) {
+                rows.append((index < lefts.count ? lefts[index] : nil, index < rights.count ? rights[index] : nil))
+            }
+            lefts = []
+            rights = []
+        }
         var i = 0, j = 0
         while i < a.count || j < b.count {
             if i < a.count, j < b.count, a[i] == b[j] {
-                rows.append((a[i], b[j]))
+                flush()
+                rows.append((lines.0[i], lines.1[j]))
                 i += 1
                 j += 1
             } else if j == b.count || i < a.count && lengths[i + 1][j] >= lengths[i][j + 1] {
-                rows.append((a[i], nil))
+                lefts.append(lines.0[i])
                 i += 1
             } else {
-                rows.append((nil, b[j]))
+                rights.append(lines.1[j])
                 j += 1
             }
         }
+        flush()
         return rows
+    }
+
+    /// Whether a row of `aligned` shows a difference.
+    public static func differs(_ row: Row, ignoringSpace: Bool = false) -> Bool {
+        guard let left = row.left, let right = row.right else { return true }
+        return ignoringSpace ? squeezed(left) != squeezed(right) : left != right
+    }
+
+    /// The rows one under the other, as the sync script goes: the target's line (-), then the source's (+) that replaces it.
+    public static func unified(_ rows: [Row], ignoringSpace: Bool = false) -> [(mark: String, line: String)] {
+        rows.flatMap { row -> [(mark: String, line: String)] in
+            guard differs(row, ignoringSpace: ignoringSpace) else { return [(" ", row.left ?? "")] }
+            return (row.right.map { [("-", $0)] } ?? []) + (row.left.map { [("+", $0)] } ?? [])
+        }
+    }
+
+    /// Words a line and its changed counterpart don't share, as ranges of each (`NSString` positions).
+    public static func changedWords(_ left: String, _ right: String, ignoringSpace: Bool = false) -> (left: [NSRange], right: [NSRange]) {
+        func words(_ text: String) -> [(word: Substring, range: NSRange)] {
+            var found: [(word: Substring, range: NSRange)] = []
+            var index = text.startIndex
+            while index < text.endIndex {
+                func wordy(_ character: Character) -> Bool { character.isLetter || character.isNumber || character == "_" }
+                var end = text.index(after: index)
+                if wordy(text[index]) || text[index].isWhitespace {
+                    let same = wordy(text[index]) ? wordy : { $0.isWhitespace }
+                    while end < text.endIndex, same(text[end]) { end = text.index(after: end) }
+                }
+                if !(ignoringSpace && text[index].isWhitespace) { found.append((text[index..<end], NSRange(index..<end, in: text))) }
+                index = end
+            }
+            return found
+        }
+        let a = words(left), b = words(right)
+        // shortcut: a very long line (a view on one line) is marked whole; a real word diff of it costs seconds on the main thread.
+        guard a.count * b.count <= 1_000_000 else {
+            return ([NSRange(location: 0, length: (left as NSString).length)], [NSRange(location: 0, length: (right as NSString).length)])
+        }
+        var lengths = [[Int32]](repeating: [Int32](repeating: 0, count: b.count + 1), count: a.count + 1)
+        for i in stride(from: a.count - 1, through: 0, by: -1) {
+            for j in stride(from: b.count - 1, through: 0, by: -1) {
+                lengths[i][j] = a[i].word == b[j].word ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
+            }
+        }
+        var ours: [NSRange] = [], theirs: [NSRange] = []
+        var i = 0, j = 0
+        while i < a.count || j < b.count {
+            if i < a.count, j < b.count, a[i].word == b[j].word {
+                i += 1
+                j += 1
+            } else if j == b.count || i < a.count && lengths[i + 1][j] >= lengths[i][j + 1] {
+                ours.append(a[i].range)
+                i += 1
+            } else {
+                theirs.append(b[j].range)
+                j += 1
+            }
+        }
+        return (ours, theirs)
     }
 }

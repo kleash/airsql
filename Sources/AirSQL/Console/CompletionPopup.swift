@@ -13,10 +13,17 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
     /// The text the suggestions replace.
     private var range = 0..<0
     static let rowHeight: CGFloat = 22
+    /// How often each suggestion was chosen since AirSQL opened: `CompletionOptions.recent`.
+    static var chosen: [String: Int] = [:]
     static let footerHeight: CGFloat = 24
+    static let docHeight: CGFloat = 46
+    /// What's shown below the list for the selected suggestion.
+    var documentation: ((CompletionItem) -> String?)?
+    private let doc = label("", font: .monospacedSystemFont(ofSize: 10.5, weight: .regular), color: .secondaryLabelColor, wraps: true)
+    private var docHeightConstraint: NSLayoutConstraint?
 
     init(editor: NSTextView, id: String = "completion.list",
-         footer text: String = "↩ inserts · ⎋ closes · from the schema cache: nothing is sent while you type") {
+         footer text: String = "↩ inserts · ⇥ replaces the word · ⎋ closes · nothing is sent while you type") {
         self.editor = editor
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 200), styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: true)
@@ -49,13 +56,23 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         let bar = SurfaceView(.bar)
         bar.translatesAutoresizingMaskIntoConstraints = false
         let box = SurfaceView(.content, radius: Radius.card, border: .separatorColor)
-        for view in [scroll, bar] { box.addSubview(view) }
+        doc.translatesAutoresizingMaskIntoConstraints = false
+        doc.setAccessibilityIdentifier(id + ".doc")
+        doc.lineBreakMode = .byTruncatingTail
+        doc.maximumNumberOfLines = 3
+        doc.toolTip = "Shows more about the selected suggestion"
+        let docHeight = doc.heightAnchor.constraint(equalToConstant: 0)
+        docHeightConstraint = docHeight
+        for view in [scroll, doc, bar] { box.addSubview(view) }
         bar.addSubview(footer)
         NSLayoutConstraint.activate([
             scroll.topAnchor.constraint(equalTo: box.topAnchor, constant: Spacing.half),
             scroll.leadingAnchor.constraint(equalTo: box.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: box.trailingAnchor),
-            bar.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: Spacing.half),
+            doc.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: Spacing.half),
+            doc.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: 10),
+            doc.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -10), docHeight,
+            bar.topAnchor.constraint(equalTo: doc.bottomAnchor),
             bar.leadingAnchor.constraint(equalTo: box.leadingAnchor), bar.trailingAnchor.constraint(equalTo: box.trailingAnchor),
             bar.bottomAnchor.constraint(equalTo: box.bottomAnchor), bar.heightAnchor.constraint(equalToConstant: Self.footerHeight),
             footer.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 10),
@@ -77,7 +94,10 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.selectRowIndexes([0], byExtendingSelection: false)
         table.scrollRowToVisible(0)
         let rows = CGFloat(min(items.count, 8))
-        let size = NSSize(width: 460, height: rows * Self.rowHeight + Self.footerHeight + 2 * Spacing.half)
+        let docs = documentation == nil ? 0 : Self.docHeight
+        docHeightConstraint?.constant = docs
+        showDocumentation()
+        let size = NSSize(width: 460, height: rows * Self.rowHeight + Self.footerHeight + 2 * Spacing.half + docs)
         var caret = editor.firstRect(forCharacterRange: NSRange(location: range.lowerBound, length: 0), actualRange: nil)
         if caret.isEmpty && caret.origin == .zero { caret = window.convertToScreen(editor.convert(editor.visibleRect, to: nil)) }
         var origin = NSPoint(x: caret.minX - 6, y: caret.minY - size.height - 2)
@@ -87,11 +107,16 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         panel.orderFront(nil)
     }
 
+    private func showDocumentation() { doc.stringValue = selected.flatMap { documentation?($0) } ?? "" }
+
+    func tableViewSelectionDidChange(_ notification: Notification) { showDocumentation() }
+
     func close() {
         guard panel.isVisible else { return }
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
         items = []
+        table.reloadData()  // a layout still to come would ask for rows that are gone
     }
 
     /// ↑ or ↓.
@@ -102,13 +127,22 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.scrollRowToVisible(row)
     }
 
-    /// Puts the chosen suggestion in place of the word typed so far.
-    func accept() {
+    /// Puts the chosen suggestion in place of the word typed so far, or of the whole word the cursor is in.
+    func accept(replacingWord: Bool = false) {
         guard let item = selected, let editor else { return close() }
-        let replaced = NSRange(range)
+        var replaced = NSRange(item.replacing ?? range)
+        let text = editor.string as NSString
+        while replacingWord, item.replacing == nil, NSMaxRange(replaced) < text.length, SQLLexer.isNameChar(text.character(at: NSMaxRange(replaced))) {
+            replaced.length += 1
+        }
         close()
         guard NSMaxRange(replaced) <= (editor.string as NSString).length else { return }
-        editor.insertText(item.text, replacementRange: replaced)
+        Self.chosen[item.label.lowercased(), default: 0] += 1
+        if item.kind == .template, let sql = editor as? SQLEditorView {
+            sql.insertTemplate(item.text, replacing: replaced)
+        } else {
+            editor.insertText(item.text, replacementRange: replaced)
+        }
     }
 
     @objc private func doubleClicked(_ sender: Any?) { accept() }
@@ -148,6 +182,9 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
     static func badge(_ kind: CompletionItem.Kind) -> (String, NSColor) {
         switch kind {
         case .join: return ("FK", .hex(0x3A7BD9))
+        case .template: return ("T+", .hex(0xB5651D))
+        case .variable: return ("@", .hex(0x2E7D4F))
+        case .word: return ("W", .hex(0x6B7785))
         case .column: return ("C", .hex(0x6B7785))
         case .table, .alias: return ("T", .hex(0x3A7BD9))
         case .view: return ("V", .hex(0x8A4BAF))

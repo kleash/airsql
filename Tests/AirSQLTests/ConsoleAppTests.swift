@@ -459,19 +459,20 @@ extension AppTests {
         @Test func surroundAndPasteHistory() async throws {
             let (_, _, console) = try await Self.console()
             let editor = try #require(console.editor)
-            func item(_ tag: Int) -> NSMenuItem {
+            func item(_ index: Int) -> NSMenuItem {
                 let item = Commands.surroundWith.item()
-                item.tag = tag
+                item.representedObject = SQLEditorView.surrounds[index].body
                 return item
             }
             editor.setText("SELECT a FROM t")
             editor.setSelectedRange(NSRange(location: 7, length: 1))
             editor.surroundWith(item(0))
-            #expect(editor.string == "SELECT (a) FROM t" && editor.selectedRange() == NSRange(location: 7, length: 3))
+            #expect(editor.string == "SELECT (a) FROM t" && editor.selectedRange() == NSRange(location: 10, length: 0))
             editor.setText("name")
             editor.setSelectedRange(NSRange(location: 2, length: 0))
             editor.surroundWith(item(3))
-            #expect(editor.string == "COALESCE(name, )", "the word at the cursor")
+            #expect(editor.string == "COALESCE(name, value)", "the word at the cursor")
+            #expect((editor.string as NSString).substring(with: editor.selectedRange()) == "value", "its field is chosen")
             editor.undoManager?.undo()
             #expect(editor.string == "name")
 
@@ -845,6 +846,150 @@ extension AppTests {
             // Not inside a string.
             console.editor.insertText(" = 'o", replacementRange: console.editor.selectedRange())
             #expect(!popup.isShown)
+        }
+
+        @Test func templatesExpandAndTabWalksTheirFields() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let (_, _, console) = try await Self.console(testModel([saved]), on: saved.id)
+            let editor = console.editor!
+            func type(_ text: String) { for character in text { editor.insertText(String(character), replacementRange: editor.selectedRange()) } }
+            // The abbreviation is on top of the list: Tab takes it, with its first field selected.
+            type("selw")
+            #expect(editor.completionPopup?.selected?.kind == .template)
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "SELECT * FROM table WHERE condition;")
+            #expect((console.text as NSString).substring(with: editor.selectedRange()) == "table")
+            // What's typed goes in the field, and the next field is still found.
+            type("orders")
+            editor.completionPopup?.close()
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect((console.text as NSString).substring(with: editor.selectedRange()) == "condition")
+            type("1")
+            editor.completionPopup?.close()
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "SELECT * FROM orders WHERE 1;" && editor.selectedRange().location == (console.text as NSString).length)
+            #expect(editor.templateFields.isEmpty)
+            console.editor.setText("")
+            // A field used twice takes a caret in each place; Escape stops.
+            editor.insertTemplate("$a$ = $a$ + $b$", replacing: NSRange(location: 0, length: 0))
+            #expect(editor.extraCarets.count == 1)
+            type("x")
+            #expect(console.text == "x = x + b")
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect((console.text as NSString).substring(with: editor.selectedRange()) == "b" && editor.extraCarets.isEmpty)
+            editor.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+            #expect(editor.templateFields.isEmpty)
+            // A second line starts where the first does.
+            editor.setText("  ")
+            editor.setSelectedRange(NSRange(location: 2, length: 0))
+            editor.insertTemplate("a\nb$END$", replacing: editor.selectedRange())
+            #expect(console.text == "  a\n  b" && editor.selectedRange().location == 7)
+            // A postfix goes the same way, with no list open.
+            editor.setText("log.from")
+            editor.setSelectedRange(NSRange(location: 8, length: 0))
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "SELECT * FROM log")
+            // Plain Tab still indents.
+            editor.setText("xyz")
+            editor.setSelectedRange(NSRange(location: 3, length: 0))
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text != "xyz")
+        }
+
+        @Test func snippetsAndHistoryInTheHelpers() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let model = testModel([saved])
+            model.data.settings.snippets = [SQLSnippet(name: "Wrap", abbreviation: "wr", folder: "Work", body: "($SELECTION$) AS $alias$")]
+            let (_, harness, console) = try await Self.console(model, on: saved.id)
+            #expect(await call(harness, "menu", ["path": "View > Query Helpers"]).error == nil)
+            let panel = console.helpers
+            panel.choice.selectedSegment = 3
+            panel.reload()
+            #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "Work")
+            #expect((panel.table.view(atColumn: 0, row: 1, makeIfNecessary: true) as? NSTextField)?.stringValue == "Wrap (wr)")
+            // Inserted around the selection, with its field chosen.
+            console.editor.setText("SELECT 1")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 8))
+            panel.table.selectRowIndexes([1], byExtendingSelection: false)
+            panel.insertSelected(nil)
+            #expect(console.text == "(SELECT 1) AS alias")
+            #expect((console.text as NSString).substring(with: console.editor.selectedRange()) == "alias")
+            // Its abbreviation works in the editor.
+            console.editor.setText("wr")
+            console.editor.setSelectedRange(NSRange(location: 2, length: 0))
+            console.editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "() AS alias")
+            // Save as Snippet takes the statement, with its dollars kept.
+            console.editor.setText("SELECT '$1'")
+            console.saveAsSnippet(nil)
+            let sheet = try #require(console.presentedViewControllers?.first as? SnippetSheet)
+            let name = try #require(find(NSTextField.self, id: "snippet.name", in: sheet.view))
+            name.stringValue = "Dollar"
+            let save = try #require(find(NSButton.self, id: "snippet.save", in: sheet.view))
+            save.performClick(nil)
+            #expect(model.data.settings.snippets.last?.name == "Dollar" && model.data.settings.snippets.last?.body == "SELECT '$$1'")
+            #expect(SQLTemplate.expand(model.data.settings.snippets.last!.body).text == "SELECT '$1'")
+            // History comes by day, and inserts the statement.
+            let entries = [HistoryEntry(sql: "SELECT 2", connection: saved.id, duration: 2), HistoryEntry(sql: "SELECT 3\nFROM t", connection: saved.id, duration: 1)]
+            panel.history = { entries }
+            panel.choice.selectedSegment = 4
+            panel.reload()
+            #expect(await eventually(timeout: 5) { panel.table.numberOfRows == 3 })
+            panel.table.selectRowIndexes([2], byExtendingSelection: false)
+            console.editor.setText("")
+            panel.insertSelected(nil)
+            #expect(console.text == "SELECT 3\nFROM t")
+            // With no table in the statement the columns of the tree's table would show: with none selected, it says so.
+            panel.choice.selectedSegment = 0
+            console.editor.setText("")
+            panel.reload()
+            #expect(find(NSTextField.self, id: "helpers.empty", in: panel)?.stringValue.contains("in the tree") == true)
+        }
+
+        @Test func keywordsTakeTheirCaseAsTyped() async throws {
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let model = testModel([saved])
+            model.data.settings.autoKeywordCase = true
+            SQLEditorView.settings = { [weak model] in model?.data.settings ?? AppSettings() }
+            defer { SQLEditorView.settings = { AppSettings() } }
+            let (_, _, console) = try await Self.console(model, on: saved.id)
+            let editor = console.editor!
+            func type(_ text: String) { for character in text { editor.insertText(String(character), replacementRange: editor.selectedRange()) } }
+            type("select a.from, 'from ', `from` from t -- from \n")
+            #expect(console.text == "SELECT a.from, 'from ', `from` FROM t -- from \n")
+            model.data.settings.formatStyle.keywords = .lower
+            editor.setText("")
+            type("SELECT 1 ")
+            #expect(console.text == "select 1 ")
+            model.data.settings.autoKeywordCase = false
+            editor.setText("")
+            type("SELECT 1 ")
+            #expect(console.text == "SELECT 1 ")
+        }
+
+        @Test func formatPaneShowsItsRulesAtWork() async throws {
+            let model = testModel([])
+            let pane = FormatPane(model: model)
+            pane.loadView()
+            func preview() -> String { find(NSTextView.self, id: "settings.format.preview", in: pane.view)?.string ?? "" }
+            model.data.settings.formatStyle.keywords = .lower
+            #expect(preview().contains("select c.id") && preview().contains("\nfrom customers c"))
+            let presets = try #require(find(NSPopUpButton.self, id: "settings.format.preset", in: pane.view))
+            let modern = try #require(SQLFormatStyle.presets.firstIndex { $0.name == "River" })
+            presets.selectItem(at: modern + 1)
+            _ = presets.sendAction(presets.action, to: presets.target)
+            #expect(model.data.settings.formatStyle.river && preview().contains("  FROM customers c"))
+            let lists = try #require(find(NSPopUpButton.self, id: "settings.format.lists", in: pane.view))
+            #expect(lists.indexOfSelectedItem == 2, "the controls follow the preset")
         }
 
         @Test func helpersFollowTheStatementAndInsert() async throws {

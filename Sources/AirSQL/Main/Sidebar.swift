@@ -60,6 +60,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     /// Connections whose tree has been opened once since they connected.
     private var treeShown: Set<UUID> = []
     private var observers: [AnyCancellable] = []
+    /// The connections open at the last look, to tell which one just connected.
+    private var knownConnections = Set<UUID>()
     private var reloading = false
     /// A right-click is choosing the row its menu acts on: that shows nothing, so the tab in front stays.
     fileprivate var openingMenu = false
@@ -205,7 +207,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             DispatchQueue.main.async { self?.refreshRows() }
         })
         observers.append(model.$open.sink { [weak self] _ in
-            DispatchQueue.main.async { self?.reload() }
+            DispatchQueue.main.async {
+                self?.reload()
+                self?.showHostOfNewConnection()
+            }
         })
         NotificationCenter.default.addObserver(self, selector: #selector(openConnectionChanged), name: .openConnectionDidChange,
                                                object: nil)
@@ -408,6 +413,15 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         reveal(kind)
     }
 
+    /// Connecting leads to the server's host page, unless a tab of that connection is showing (the one that asked).
+    private func showHostOfNewConnection() {
+        let connected = Set(model.open.keys)
+        defer { knownConnections = connected }
+        guard selectedConnectionIDs.count == 1, selectedNodes.count == 1, let id = selectedConnectionIDs.first,
+              connected.subtracting(knownConnections).contains(id), main?.selectedTab?.connectionID != id else { return }
+        showSelectedObject()
+    }
+
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard !reloading else { return }
         onSelect?()
@@ -532,7 +546,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         let menu = NSMenu(title: "Connection")
         if nodes.allSatisfy({ $0.connectionID != nil }) {
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
-                      Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compare, nil])
+                      Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
+                      Commands.compareRows, Commands.diskUsage, nil])
             menu.addItem(ConnectionMenus.colourMenu())
             menu.addItem(ConnectionMenus.moveMenu())
             menu.add([Commands.moveConnectionUp, Commands.moveConnectionDown, Commands.databasesShown])

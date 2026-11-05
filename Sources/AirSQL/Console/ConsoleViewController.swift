@@ -66,6 +66,10 @@ final class ConsoleViewController: NSViewController, TabContent {
     /// The editor and results, and the helpers panel beside them when shown.
     let outer = NSSplitView()
     lazy var helpers: HelpersPanel = makeHelpers()
+    /// While the helpers show: what tells them the tree's selection moved.
+    var treeObserver: NSObjectProtocol?
+    /// The foreign keys the person defined on this connection, for completion's joins, as last read.
+    var virtualKeys: [String: [String: [SchemaForeignKey]]] = [:]
     private let initialText: String
     /// The run under way, if any.
     var running: ConsoleRun?
@@ -85,12 +89,17 @@ final class ConsoleViewController: NSViewController, TabContent {
     var sharing: Bool?
     /// The database of a tab with a session of its own, once it has run or been given one.
     var chosenDatabase: String?
+    /// A session that ended unasked, until the person answers; then what its replacement takes over from it.
+    var lostSession: LostSession?
+    var carried: LostSession?
     /// The next run keeps the result tabs (Keep Results).
     var keepsResults = false
     /// Run Result Again every so often: the seconds (0: off), the timer and the tab it reruns.
     var refreshSeconds = 0
     var refreshTimer: Timer?
     weak var refreshedResult: ResultTab?
+    /// How the file is stored, which Save keeps.
+    var fileFormat = ConsoleScript.FileFormat()
     /// The file's date on disk as last read or saved.
     var fileDate: Date?
     /// The values last given to `?` and `:name`, offered at the next run.
@@ -126,13 +135,20 @@ final class ConsoleViewController: NSViewController, TabContent {
         editorScroll = scroll
         editor.setText(initialText)
         runMarks = RunMarksView(editor: editor)
+        (scroll.verticalRulerView as? LineNumberRuler)?.onRun = { [weak self] in self?.runStatement(nil) }
         editor.onChange = { [weak self] in self?.textChanged() }
         editor.onDropFiles = { [weak self] urls in self?.mainWindow?.openFiles(urls) }
         editor.completions = { [weak self] text, caret in
             guard let self else { return (caret..<caret, []) }
-            let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }
+            let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }?.adding(self.virtualKeys)
+            self.refreshVirtualKeys()
             return SQLCompletion.suggestions(text: text, caret: caret, snapshot: snapshot, database: self.database,
-                                             noBackslashEscapes: self.editor.noBackslashEscapes)
+                                             noBackslashEscapes: self.editor.noBackslashEscapes,
+                                             options: self.model.data.settings.completionOptions(recent: CompletionPopup.chosen))
+        }
+        editor.completionDocs = { [weak self] item in
+            guard let self else { return nil }
+            return SQLCompletion.documentation(item, snapshot: self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }, database: self.database)
         }
         editor.nameContext = { [weak self] in
             guard let self, let id = self.connectionID, !self.shared.ranCode else { return nil }
@@ -184,7 +200,12 @@ final class ConsoleViewController: NSViewController, TabContent {
         showResults()
         // Connecting or disconnecting, or the first connection saved, changes what the results say; Settings ▸ Editor the
         // text size.
-        observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.showResults() } })
+        observers.append(model.$states.sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.noticeLostSession()
+                self?.showResults()
+            }
+        })
         observers.append(model.$data.map(\.connections.isEmpty).removeDuplicates().dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async { self?.showResults() }
         })
@@ -290,6 +311,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         if session?.inTransaction == true, badgeTimer == nil {
             badgeTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] timer in
                 MainActor.assumeIsolated {
+                    self?.noticeLostSession()
                     guard let self, self.session?.inTransaction == true else {
                         timer.invalidate()
                         self?.badgeTimer = nil
@@ -336,6 +358,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     }
 
     var transactionBadge: String? {
+        if lostSession?.transaction == true { return "Transaction rolled back: the connection ended" }
         guard let session, session.inTransaction else { return nil }
         var badge = "Transaction open"
         let changes = shared.changes

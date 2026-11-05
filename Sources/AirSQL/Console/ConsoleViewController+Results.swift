@@ -153,7 +153,7 @@ extension ConsoleViewController {
     /// The result tab's menu (plan §2.12): Pin, Rename, Close, Close Others, Export…, Compare With….
     func resultMenu() -> NSMenu {
         let menu = NSMenu(title: "Result")
-        menu.add([Commands.rerunResult, Commands.copyResultQuery, nil, Commands.pinResult, Commands.renameResult, Commands.closeResult,
+        menu.add([Commands.rerunResult, Commands.copyResultQuery, Commands.resultWindow, nil, Commands.pinResult, Commands.renameResult, Commands.closeResult,
                   Commands.closeOtherResults, nil, Commands.exportResult, Commands.compareResult])
         // The console's own commands go to it wherever the focus is; Export and Compare to whatever handles them.
         for item in menu.items where item.action.map(responds(to:)) == true { item.target = self }
@@ -188,6 +188,20 @@ extension ConsoleViewController {
     }
 
     @objc func toggleKeepResults(_ sender: Any?) { keepsResults.toggle() }
+
+    @objc func openResultInWindow(_ sender: Any?) {
+        guard let tab = currentResult else { return }
+        moveToWindow(tab).showWindow(nil)
+    }
+
+    /// `tab` leaves the bar for a window of its own.
+    @discardableResult
+    func moveToWindow(_ tab: ResultTab) -> ResultWindowController {
+        resultTabs.removeAll { $0 === tab }
+        if selectedResult === tab { selectedResult = nil }
+        showResults()
+        return ResultWindowController(tab, title: tab.title + " · " + (connection?.displayName ?? "AirSQL"))
+    }
 
     /// View ▸ Refresh Every, on a result: runs it again every so often, for as long as it stays a read and runs cleanly.
     @objc func setAutoRefresh(_ sender: Any?) {

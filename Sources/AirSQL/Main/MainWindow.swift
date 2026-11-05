@@ -566,7 +566,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// to the sidebar (they work on the window's connection), a console's or a table tab's command to the tab shown, as
     /// the toolbar's Run does.
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        if ([Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action] + Commands.treeActions).contains(action) { return sidebar }
+        if ([Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action,
+             Commands.hostDatabases.action] + Commands.treeActions).contains(action) { return sidebar }
+        // Disk Usage from the sidebar's focus goes there; a Disk Usage tab with the focus takes it first, to go into a row.
+        if action == Commands.diskUsage.action, !(selectedTab?.shown is DiskUsageContent), !(selectedTab?.shown is HostContent) {
+            return sidebar
+        }
         // A table tab's Structure page takes what's meant for the page on show.
         if let content = (selectedTab?.shown as? TableDataController)?.shownPage ?? selectedTab?.shown, content.isViewLoaded,
            content.responds(to: action) {
@@ -589,6 +594,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             reason = "Select a connection in the sidebar first"
             let raw = item.representedObject as? String
             item.state = !connections.isEmpty && connections.allSatisfy({ $0.colour.rawValue == raw }) ? .on : .off
+        case Commands.compareWith.action?:
+            reason = sidebar.compareWithBlocked
+            enabled = reason == nil
+        case Commands.compareRows.action?:
+            reason = sidebar.compareRowsBlocked
+            enabled = reason == nil
         case Commands.focusEditor.action?:
             enabled = shownView(SQLEditorView.self) != nil
             reason = "The tab shown has no SQL editor"

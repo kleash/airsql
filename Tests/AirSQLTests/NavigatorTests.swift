@@ -87,7 +87,7 @@ extension AppTests {
             let view = try #require(preview.shown as? DatabaseViewController)
             _ = await eventually(timeout: 10) { open.snapshot.database("airsql_fixture")?.statistics != nil && open.loading.isEmpty }
             view.reload()
-            #expect(view.rows.count == 8)
+            #expect(view.rows.filter(\.kind.isTableLike).count == 8)
             #expect(main.selectedTab?.title == "airsql_fixture")
             // A click on a table shows it in the same tab; a double-click gives it a tab of its own.
             let orders = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders"))))
@@ -519,7 +519,7 @@ extension AppTests {
             let console = try #require(main.selectedTab?.content as? ConsoleViewController)
             #expect(console.connectionID == id && console.text == "UPDATE `airsql_fixture`.`orders`\n"
                     + "SET `customer_id` = ?, `region` = ?, `number` = ?, `total` = ?, `parent_id` = ?\nWHERE `id` = ?;\n")
-            #expect(console.messagesView.messages.last?.text.hasPrefix("Put a value in place of each ?") == true)
+            #expect(console.messagesView.messages.last?.text.hasPrefix("Press Run to fill in each value") == true)
             // The database view's table menu does the same.
             let view = DatabaseViewController(open, "airsql_fixture")
             main.open(view, title: "airsql_fixture", connection: id)

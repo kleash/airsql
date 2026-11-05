@@ -3,12 +3,13 @@ import AppKit
 
 /// The Settings window's panes, in their order (plan §2.4). Each lane keeps its own pane's file.
 enum SettingsPane: String, CaseIterable {
-    case general, editor, grid, connections, safety, agents, clientTools, liquibase
+    case general, editor, format, grid, connections, safety, agents, clientTools, liquibase
 
     var title: String {
         switch self {
         case .general: return "General"
         case .editor: return "Editor"
+        case .format: return "Format"
         case .grid: return "Grid"
         case .connections: return "Connections"
         case .safety: return "Safety"
@@ -22,6 +23,7 @@ enum SettingsPane: String, CaseIterable {
         switch self {
         case .general: return "gearshape"
         case .editor: return "chevron.left.forwardslash.chevron.right"
+        case .format: return "text.alignleft"
         case .grid: return "tablecells"
         case .connections: return "network"
         case .safety: return "shield.lefthalf.filled"
@@ -35,6 +37,7 @@ enum SettingsPane: String, CaseIterable {
         switch self {
         case .general: return "Show the look of AirSQL and where it keeps its settings"
         case .editor: return "Show the SQL editor's settings"
+        case .format: return "Show how Format SQL lays out SQL, with a preview"
         case .grid: return "Show the grid's settings: text size, rows per page, how NULL looks"
         case .connections: return "Show how connections load a server's schema"
         case .safety: return "Show what asks first before it changes data, and the limits agents work within"
@@ -49,6 +52,7 @@ enum SettingsPane: String, CaseIterable {
         switch self {
         case .general: return GeneralPane(model: model)
         case .editor: return EditorPane(model: model)
+        case .format: return FormatPane(model: model)
         case .grid: return GridPane(model: model)
         case .connections: return ConnectionsPane(model: model)
         case .safety: return SafetyPane(model: model)

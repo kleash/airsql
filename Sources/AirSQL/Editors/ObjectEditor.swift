@@ -58,7 +58,12 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         code.completions = { [weak self] text, caret in
             guard let self else { return (caret..<caret, []) }
             return SQLCompletion.suggestions(text: text, caret: caret, snapshot: self.context.schema.snapshot, database: self.database,
-                                             noBackslashEscapes: self.code.noBackslashEscapes)
+                                             noBackslashEscapes: self.code.noBackslashEscapes,
+                                             options: SQLEditorView.settings().completionOptions(recent: CompletionPopup.chosen))
+        }
+        code.completionDocs = { [weak self] item in
+            guard let self else { return nil }
+            return SQLCompletion.documentation(item, snapshot: self.context.schema.snapshot, database: self.database)
         }
         code.setAccessibilityIdentifier("objectEditor.code")
         code.toolTip = "Edit the \(kind.rawValue)'s CREATE statement, then Apply"

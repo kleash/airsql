@@ -38,7 +38,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
   diagram.
 - [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
   to another server; CSV import.
-- [Compare two databases](https://kleash.github.io/airsql/compare.html): structure and data, side by side, and a sync script you review first; or two
+- [Compare](https://kleash.github.io/airsql/compare.html): servers, databases, tables and objects, structure and data, side by side, and a sync script you review first; or two
   results, or a result with a table, row by row.
 - [AI agents](https://kleash.github.io/airsql/agents.html): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
@@ -122,7 +122,7 @@ until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes th
 
 ## The window
 
-- **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
+- **The sidebar** lists your connections. Click one to see its summary (once connected, its [host page](https://kleash.github.io/airsql/navigator.html#the-host-page)), double-click it to connect, right-click it for
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
 - **The tabs** hold your queries and tables. When more are open than fit, the arrow at the end of the strip lists them all. Double-click a tab to rename it; middle-click it to close it; right-click it
   to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as
@@ -166,8 +166,20 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
 
+- **Add an alias to a table**: completing a table after FROM or JOIN adds one, as `orders o`; on at first.
+- **Change keywords' case as you type**: a reserved word takes the case set in [Format](#format) once you finish it; off at first.
 - **Checks**: what the editor underlines while you type (see [Checks while you type](https://kleash.github.io/airsql/console.html#checks-while-you-type)).
   All are on at first; turn off any you don't want.
+
+## Format
+
+How **Query ▸ Format SQL** lays out SQL, with a preview of a sample below. **Preset** sets all the rules at once; change any
+of them after.
+
+- **Keywords**, **Types**, **Functions**, **Names** and **Aliases**: as written, in capitals or in small letters. Completion
+  puts keywords and functions in the same case. Leave **Names** as written unless your server ignores their case.
+- **Indent**, **Lists** (a line per item, when long, or never; **Comma first**), **Conditions**, **Joins**, **Subqueries**
+  (where brackets go; **Right-align clauses**), **Layout** and **Spaces**.
 
 ## Grid
 
@@ -406,7 +418,8 @@ session of its own, so a long query in one tab leaves the others free.
 - When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL. The
   other tabs come back too: see [Getting back to your tabs](https://kleash.github.io/airsql/navigator.html#getting-back-to-your-tabs).
 - **File ▸ Open Recent** lists the .sql files you had open lately. A file opens on the connection you last used it with.
-- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Messages says so; Save writes UTF-8.
+- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Save keeps its encoding. If the text
+  no longer fits that encoding, Save offers UTF-8.
 - If a file changes on disk, its tab follows, and ⌘Z brings back what it showed; with unsaved edits, Messages warns instead.
 - **Query ▸ Change Connection…** runs the tab's statements on another connection. A tab with no connection, such as a
   file opened with nothing selected, takes the one the toolbar shows.
@@ -418,14 +431,39 @@ session of its own, so a long query in one tab leaves the others free.
   what's missing. No server is asked.
 - AirSQL reads what you write a moment after you stop typing, and underlines what it finds: see
   [Checks while you type](#checks-while-you-type).
-- **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
-  keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
-  elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
-  ⌥⎋ opens it anywhere. It comes from what AirSQL already read of the schema: nothing is sent to the server while you
-  type.
-- **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names, the
-  server's functions by kind, and the keywords. Double-click one to put it in at the cursor, or drag it into the editor
-  (a column's name comes quoted where it needs to be, as completion puts it in).
+- **Completion** opens as you type, with what fits there: only `BY` after `ORDER`, only joins after `LEFT`, the
+  statement's columns in its clauses. ↑ and ↓ choose, Return inserts, Tab inserts and replaces the rest of the word too,
+  Escape closes; ⌥⎋ opens it anywhere. Below the list you see more about what's selected: a table's columns, a template's
+  SQL. What you've chosen before comes first. It all comes from what AirSQL already read of the schema: nothing is sent to
+  the server while you type.
+  - A name matches by its start, a word in it (`cust` finds `old_customers`), an abbreviation of its words (`fica` finds
+    `film_category`, `ob` finds `ORDER BY`) or its middle. Keywords of several words come as one, in the case Settings ▸
+    Format sets, and words already in the text come last.
+  - After FROM or JOIN: tables, views and the statement's CTEs. A table comes with an alias (`orders o`) unless you turn
+    that off in Settings ▸ Editor. After JOIN the joins come first: those of foreign keys, real or defined by you, then
+    those names suggest (`customer_id` to `customers.id`). After ON, the condition.
+  - Columns come from tables, CTEs and subqueries alike, with the table's name when two have the same one; `alias.` lists
+    that table's. ORDER BY, GROUP BY and HAVING offer the aliases of the select list too.
+  - `SELECT nam` with no FROM yet offers every table's columns: choosing one adds its FROM.
+  - Just after `*` or `t.*` in a select list, the list offers all the columns in its place.
+  - `INSERT INTO t (` offers the whole column list, then each column left. `VALUES (` offers a field for each column.
+  - After `status = ` or inside `status = '` an ENUM or SET column offers its values. `ENGINE=`, `CHARSET` and `COLLATE`
+    offer theirs, CALL the procedures, `@` the variables of the text, `@@` and SET the common server variables.
+- **Templates.** Type an abbreviation at the start of a statement and press Tab: `sel`, `selw`, `selc`, `lim`, `ins`, `upd`,
+  `del`, `tab`, `view` and `col` turn into the statement, with its first field selected. Type over a field; Tab or Return
+  goes to the next and on to the end, ⇧Tab goes back, Escape stops. A field used twice takes a caret in each place.
+- **Postfix.** Type a table's name and a dot at the start of a statement: `orders.from` turns into `SELECT * FROM orders`,
+  `.cfrom` lists its columns, `.afrom` lists them by an alias, and `.join` adds the table its foreign key points at.
+  `total.cast` puts CAST around a column, anywhere.
+- **Snippets** keep SQL to use again. **Query ▸ Save as Snippet…** saves the selection or the statement, with a name, a
+  folder and an abbreviation of your own. In the SQL, `$name$` is a field, `$END$` is where the cursor ends, `$SELECTION$`
+  the selected text and `$$` a dollar. They're kept in AirSQL's settings on this Mac. A snippet with `$SELECTION$` is also in
+  **Edit ▸ Surround With**.
+- **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names (or of the
+  table selected in the tree, when it names none), the server's functions by kind, the keywords, your **Snippets** and the
+  built-in ones, and the connection's **History** by day, each with a bar as long as it took. Double-click one to put it
+  in at the cursor, or drag it into the editor (a column's name comes quoted where it needs to be, as completion puts it
+  in). Right-click a snippet to edit or delete it; editing a built-in one makes a copy of your own.
 - **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression**, **Match
   Case**, **Whole Words** and **In Selection** (the text selected when you tick it). With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
@@ -469,9 +507,12 @@ session of its own, so a long query in one tab leaves the others free.
 - The cursor's line has a band and, when the text has several statements, the statement it's in has a light shade: that's what ⌘↩
   runs. Other uses of the name at the cursor are marked, and its line and column show in the editor's corner.
 - Settings ▸ Editor sets the font, the text size, the width of a tab and whether Tab puts in a tab character or spaces.
-- **Query ▸ Format SQL** (⌥⇧⌘F) puts each main clause on a line of its own and reserved words in capitals. It changes
-  nothing else: names, values, comments and `/*! … */` code stay exactly as they are, and statements inside a
-  `DELIMITER` block are left alone. If it couldn't do that, it leaves the SQL as it was and says so.
+- **Query ▸ Format SQL** (⌥⇧⌘F) tidies the selection or the whole text: each clause on a line, subqueries indented, AND
+  and OR on lines, CASE, VALUES rows, CREATE TABLE's columns and routine bodies laid out, by the rules of **Settings ▸
+  Format**. It changes only spaces and the case the rules ask for: values, comments and `/*! … */` code stay exactly as
+  they are. If it couldn't prove that, it leaves the SQL as it was and says so. Nothing changes between `-- @formatter:off`
+  and `-- @formatter:on`.
+- Settings ▸ Editor can also give reserved words their case as you type.
 - **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
 
@@ -530,12 +571,15 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
 | The selected text as it stands, not split on `;` | Query ▸ Run Selection as One Statement |
 | The smallest query in brackets around the cursor | Query ▸ Run Subquery |
 | The statement at the cursor and every one after it | Query ▸ Run from Cursor |
+| The rows of a SELECT, straight to a .csv, .tsv or .json file | Query ▸ Run to File… |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
+The ▶ beside the line numbers, at the start of the statement at the cursor, runs it too.
+
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
 on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another. If one fails with others to come, a
-sheet asks whether to **Stop**, **Skip** it, or **Skip All** that fail from there on. Each
+sheet asks whether to **Stop**, **Retry** it, **Skip** it, or **Skip All** that fail from there on. Each
 statement that ran then shows a tick, or a cross if it failed, and its time at the end of its line, until you change it
 or run again.
 
@@ -550,8 +594,8 @@ says which tab finished. It never shows the SQL. Turn the notification off in Sy
 
 ### Parameters
 
-A statement with `?` or `:name` in its code, not in a string or comment, asks for their values before it runs. The same
-`:name` takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
+A statement with `?`, `:name` or `${name}` in its code, not in a string or comment, asks for their values before it runs.
+The same name takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
 become code. The tab remembers the values for the next run. AirSQL fills them in before sending, so Messages, the SQL
 log and the history show the final SQL, and the read-only and safety checks see it too.
 
@@ -568,8 +612,9 @@ others wait.
 If the server is within five connections of its `max_connections`, or refuses another, a tab shares the connection's
 main session instead of opening its own, and Messages says so.
 
-If a tab's session is lost, the next Run says so, and says if an open transaction was rolled back, and runs nothing.
-Run again to open a new session.
+If a tab's session ends without you closing it (the connection drops, or Disconnect takes an open transaction with it),
+the tab says so in Messages and the status bar, with how many rows the server rolled back. Nothing runs in that tab until
+you press **Open New Session** in the sheet Run shows. A tab that was in Manual Commit stays in it.
 
 ### The current database
 
@@ -590,6 +635,8 @@ share the current database too.
 - **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
   which keeps its name and pin. **Copy Result's Query** copies the statement. **View ▸ Refresh Every** does it every few
   seconds, for a statement that only reads, until it fails or you choose Off.
+- **Open Result in Window** moves a result to a window of its own, to keep beside the query. Closing it with edits not
+  applied asks first.
 - **Query ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
 - Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](https://kleash.github.io/airsql/compare.html#compare-two-results-or-a-result-with-a-table)).
@@ -680,13 +727,14 @@ shows in a sheet, with what it will do:
   history. Passwords in statements are masked before they are kept, as in the SQL log. **All connections** searches
   every connection's statements, with a column saying which.
 - **File ▸ Local History…** lists the states a .sql file was saved in (the last 50, kept on this Mac only). Click one to read
-  it; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
+  it, with the lines that differ from the editor tinted; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
 - **Query ▸ Sessions…** lists every session AirSQL has open on the connection: what uses it, its thread on the server, its
   database, and whether it is running or holds a transaction.
 - **View ▸ SQL Log** (⌥⌘L) shows or hides every statement AirSQL sent, as they come, under the tabs. See [the SQL log](https://kleash.github.io/airsql/sql-log.html).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it. **Operations**
   lists the steps as a tree with the server's rows and cost; click a header to sort the steps of each level, and the
-  steps that take a large share are marked in orange. **Table** is the server's EXPLAIN, **Tree** the steps as text and
+  steps that take a large share are marked in orange; select a step to read all the server says about it. **Diagram** draws
+  the steps as boxes, and **Flame** as bars as wide as their time, or their cost before Explain Analyze. **Table** is the server's EXPLAIN, **Tree** the steps as text and
   **Raw** the server's own answer, to copy.
 - **Query ▸ Explain Analyze** (⌥⇧⌘E) runs the statement and adds what really happened: rows read, time and loops. It uses
   `ANALYZE FORMAT=JSON` on MariaDB and `EXPLAIN ANALYZE` on MySQL 8.0.18 or later. As it really runs the statement, a
@@ -818,10 +866,12 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 
 ## Find your way
 
-- **Click** a database to see its tables in the database view: rows, the space their data and indexes take, engine,
-  collation, when they last changed and their comment. Click a column's title to sort by it; AirSQL keeps the order
-  and the widths. **Filter by name** at its top keeps the tables with those letters. Right-click below the rows, or an
-  empty database, for **Create Table…**.
+- **Click** a connected connection to see its [host page](#the-host-page). Connecting shows it too.
+- **Click** a database to see everything in it in the database view: for its tables, rows, a bar and the size of each,
+  engine, collation, when they last changed and their comment. Click a column's title to sort by it; AirSQL keeps the order and the widths.
+  Right-click a title to show or hide columns: **Data**, **Indexes**, **Free**, **Average Row**, **Auto Increment**,
+  **Created**, **Row Format** and **Options** are there too. **Filter by name** at its top keeps the tables with those
+  letters. Right-click below the rows, or an empty database, for **Create Table…**.
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Click the arrow** beside a table or view (or press →) to see what it holds without opening it: **Columns** with
@@ -907,7 +957,8 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
   database view) write a statement with its columns. A `?` marks each value for you to fill in: INSERT leaves out the
   columns the server fills itself (auto-increment and generated ones), and UPDATE finds the row by its primary key (or a
   unique key whose columns can't be NULL; without one, you write the condition).
-- **Run…** on a procedure's menu writes its `CALL`, with a `?` and the name and type of each value it takes; OUT and
+- **Select Top 1000 Rows** on a table's menu writes a `SELECT` of its first 1,000 rows.
+- **Run…** on a procedure's menu writes its `CALL`, with a `?` and the name and type of each value it takes (Run then asks for each by name); OUT and
   INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
 - **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
 
@@ -930,7 +981,8 @@ Upper and lower case match as the column's collation says (most ignore case).
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
 running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
 with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
-idle connections. Double-click a row (or press Return) to read its whole statement; Delete offers to kill it.
+idle connections. The selected process's whole statement shows under the list; double-click a row (or press Return) to
+read it in a window. Delete offers to kill it.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.
@@ -938,6 +990,48 @@ idle connections. Double-click a row (or press Return) to read its whole stateme
 Both ask first. Right before it stops anything, AirSQL checks that the process is still running what the list showed
 (on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so. Both work on a
 read-only connection too: they change no data.
+
+## The host page
+
+Click a connected connection, or choose **Database ▸ Server Home**, for a page on the server. Its top line says what the
+server is, how you reach it and how long it has been up. A click on a row selects it; right-click for its menu.
+
+- **Databases**: each with its size, how many tables, views, routines, triggers and events it has, when it last changed
+  and its collation. Double-click one to open its tables; **Edit Database…** changes the collation new tables take. On a server of up to 3,000 tables (**Settings ▸ Connections**
+  sets this) the sizes are read by themselves; on a bigger one press **Read Sizes**, which reads the databases you've
+  selected, or all of them.
+- **Variables**: each variable's session and global values side by side, with **≠** where they differ. Session shows what
+  a new session starts with. Double-click one, or press **Edit…**, to change it: **Whole server** runs `SET GLOBAL` after
+  showing you the SQL; **In a new query tab** puts `SET SESSION` in a new tab for you to run, as each tab has a session of
+  its own. Type a number, a word, or `DEFAULT`. Read-only and Production connections can't change variables.
+- **Status**: every status counter, with its average per hour and per second since the server started.
+- **Processes**: the [process list](#see-what-the-server-is-running).
+- **Command Statistics**: how many statements of each kind the server has run, with their rates and share.
+
+Every list has a **Filter** that takes a word or a regular expression and says how many rows it kept. Click a column's
+title to sort; right-click a title to show or hide columns. **⌘C** copies the selected rows. **Copy List** and **Export
+List…** take the whole list as CSV. **⌘R** reads it again.
+
+## See where the space went
+
+**Disk Usage** (⌥⌘U, in the **Tools** menu, or right-click a connection, database or table) lists every database with its
+data, indexes, free space, rows and share, largest first, each with a bar: blue for data, teal for indexes, grey for free
+space.
+
+- **Double-click** a database to see its tables, and a table to see its indexes and partitions. **Back** goes up.
+- Select several rows to see what they come to. **Compare Selected** keeps only those, their bars against each other.
+- **Filter**, sorting, **Copy List** and **Export List…** work as on the host page.
+- **Free** is space a table keeps but doesn't use. Select tables and press **Optimize…** to give it back: it shows the SQL
+  first, and locks the tables while it runs. Tables in a shared tablespace all show that tablespace's free space, so a
+  database's total counts it more than once.
+
+Reading a table's size makes the server open that table, so AirSQL reads one database at a time, on a session of its own.
+The status bar shows how far it is, and **Stop** or Cancel there ends it; what was read stays. The sizes then also show in
+the database view and the host page.
+
+InnoDB's sizes and row counts are estimates, and you see only what your login can see, and the databases the connection
+lists. An index's own size comes from `mysql.innodb_index_stats`, which not every login may read; AirSQL says so when it
+can't.
 
 ## Getting back to your tabs
 
@@ -1148,7 +1242,9 @@ says why; so are views. Generated columns can't be edited.
   make it again. Changes kept over a restart are checked the same way.
 - **Manual Commit** (the toolbar's transaction pop-up, or Query ▸ Transaction Mode) moves the table tab to a session of its
   own. Each Apply then writes into a transaction left open, and the rows you read show those changes, until **Commit** or
-  **Roll Back**. Each Apply is still all or nothing. Closing the tab or quitting with the transaction open asks first.
+  **Roll Back**. Each Apply is still all or nothing. Closing the tab or quitting with the transaction open asks first. If the connection
+  drops, the tab says the server rolled the transaction back, with how many rows, and nothing is applied until you press
+  **Open New Session**; the rows are then read again.
 - What Apply can't check: FLOAT, TIMESTAMP, JSON, spatial and vector values, dates with a zero month or day and values
   over 64 KB don't compare exactly, so edits to those go by the key alone and overwrite what is there; the preview
   names them. A change that only differs in case or trailing spaces can pass on a column whose collation ignores
@@ -1539,20 +1635,32 @@ Client tools reach SSH and proxy routes through the connection's private socket 
 
 Source: https://kleash.github.io/airsql/compare.html
 
-# Compare two databases
+# Compare
 
-**Tools ▸ Compare…** (or **Compare…** in a connection's or a database's menu, which starts from it) opens a window
-that compares two databases, on the same server or on two different connections, such as production against staging
-or MySQL 8 against MariaDB. A connection that isn't connected connects when you choose it, asking for a password or
-to trust a certificate on the compare window as the main window would; each side then works through its own route, on
-a session of its own. The compare only reads; nothing changes until you run the sync script yourself.
+**Tools ▸ Compare…** opens a window that compares two servers, two databases, or two tables or other objects, on the
+same server or on two different connections, such as production against staging or MySQL 8 against MariaDB. A
+connection that isn't connected connects when you choose it, asking for a password or to trust a certificate on the
+compare window as the main window would; each side then works through its own route, on a session of its own. The
+compare only reads; nothing changes until you run the sync script yourself.
+
+## Start from the tree
+
+- **Compare With…** in the menu of a connection, database, table, view, routine, trigger or event starts from that row:
+  it is the source, and you choose the target.
+- **Compare**, with two rows selected (⌘-click), compares them; the first is the source. They can be on two connections.
+  Two tables or other objects of one kind compare at once. Two databases or two connections fill the window in and wait
+  for you to press Compare, because they can read a lot: you may want to choose what to compare first.
+
+Both are in the **Tools** menu too.
 
 ## Run a compare
 
-1. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
-   type its name). The sync script makes the target like the source; **Swap** turns them around.
-2. Choose what to compare: **Structure and Data**, **Structure** or **Data**.
-3. Click **Compare** (⌘R). The bar under the setup shows the table and chunk being checked, and **Cancel** (⌘.)
+1. Choose the **level** at the left: **Servers**, **Databases**, or **Objects**.
+2. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
+   type its name), then at the third level an object from the list. The sync script makes the target like the source;
+   **Swap** turns them around.
+3. Choose what to compare: **Structure and Data**, **Structure** or **Data**.
+4. Click **Compare** (⌘R). The bar under the setup shows the table and chunk being checked, and **Cancel** (⌘.)
    stops the compare; the statement running on each server is stopped too. The work is also listed in the main
    window's activity list.
 
@@ -1560,7 +1668,34 @@ The summary says how many tables match, differ in structure, or are only on one 
 much of the data had to come over the network. The list shows what differs first: **only source** and **only target**
 for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
 Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
-they differ. The two definitions scroll together.
+they differ.
+
+The two definitions scroll together. Changed lines stand against each other, with the words that changed marked. **↑**
+and **↓** (⇧F7 and F7) go to the previous and next difference. **Unified** shows one text instead: the target's lines the
+script takes out (`-`), the source's it puts in (`+`). With the **Whitespace in Definitions** rule on, lines that differ
+only in spacing aren't marked.
+
+## Two servers
+
+At the **Servers** level, each side is a connection. Every database is paired by name (without case, where either
+server ignores it), leaving out `information_schema`, `performance_schema`, `mysql` and `sys`, and each pair is compared
+in turn with the same settings. The summary counts the pairs that match, differ and are on one side, and the rows and
+objects that differ across them. A pair that can't be read says why, and the others go on.
+
+Double-click a pair, or press Return, to open it: it shows as a compare of those two databases, with its list, its
+details and its sync script. **Back to All Databases** returns to the pairs, counting what you did there. A script
+belongs to one pair, so **Sync Script…** needs a pair open. **Export Report…** at this level covers every pair.
+
+## Two tables or objects
+
+At the **Objects** level, each side is one object, by any name: `orders` against `orders_old`, in one
+database or in two. Both must be of one kind.
+
+- **Tables** compare in structure and rows, as in a database compare. **Tables…** chooses the columns to leave out and a
+  WHERE. Two tables of one database can't share a foreign key's name, so foreign keys pair up by what they do.
+- **Views, routines, triggers, events and sequences** compare by definition, side by side, their own names aside.
+
+The sync script changes only the target, under the target's name: the source's definition is written for it.
 
 ## What is compared
 
@@ -1585,13 +1720,16 @@ different.
 
 ### Ignore rules
 
-**Ignore Rules** chooses differences the compare doesn't count. All four are on at first:
+**Ignore Rules** chooses differences the compare doesn't count. The first four are on at first:
 
 - **AUTO_INCREMENT Values**: tables' next AUTO_INCREMENT values.
 - **DEFINER**: who views, routines, triggers and events run as. The script then leaves DEFINER out, so they run as
   whoever runs the script.
 - **Collations and Character Sets** of tables and columns (MySQL 8 and MariaDB have different defaults).
 - **Whitespace in Definitions**: spaces and line breaks in bodies, outside quoted text.
+- **Column Order**: the order of a table's columns.
+- **Letter Case in Definitions**: upper and lower case in bodies, outside quoted text.
+- **Definitions**: what views, routines, triggers and events say. Only whether each exists counts.
 
 ### Tables…
 
@@ -1615,6 +1753,9 @@ counts as the same). Both sessions use time zone `+00:00`, so TIMESTAMP values c
 Floats, decimals written with another scale and JSON with other spacing or key order are compared as values.
 
 ## The sync script
+
+Each object that differs has a tick in the list. Untick it, or use **Include in Sync Script** in its menu, and the script,
+**Copy Sync Script** and the changeset leave it out; what it depends on is up to you.
 
 The **Sync script** box shows the statements for the selected object; **Copy Sync Script** copies them. **Sync
 Script…** opens the whole script in a [console](https://kleash.github.io/airsql/console.html) tab of the target named “Sync script”, to read (it can't
@@ -1671,6 +1812,8 @@ line, for a spreadsheet) or **Markdown** (for a ticket). HTML and Markdown list 
 
 - More than 100,000 differing rows in one table are reported as too many to list, without sync statements for that
   table: narrow the compare with a WHERE, or copy the table instead.
+- A server compare keeps every pair's differing rows in memory: on servers that differ a lot, compare **Structure** first.
+- A tick is for a whole object: the changes within a table go or stay together.
 - Column order and row formats are compared and synced. Partitioning is only noticed on one side: a table partitioned
   differently on both reads the same, and no statement adds or removes it. System versioning isn't compared.
 - The data compare reads each side as it goes, not one snapshot: on a busy table it can show rows that changed meanwhile.
@@ -2018,8 +2161,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Create Table… | ⌃⌘N |
 | Open Structure | ⌥⌘O |
 | Process List | ⌥⌘P |
+| Disk Usage | ⌥⌘U |
 | Connect | ⌘K |
 | Disconnect | ⇧⌘K |
+| Next Difference | F7 |
+| Previous Difference | ⇧F7 |
 | Minimize | ⌘M |
 | Show Previous Tab | ⌘{ |
 | Show Next Tab | ⌘} |
@@ -2358,12 +2504,18 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `toolbar.explain`, `toolbar.transactionMode`, `toolbar.commit`, `toolbar.rollback`, `toolbar.cancel`.
 - **Sidebar**: `sidebar.filter`, `sidebar.connections` (select with `select pane=sidebar`), `sidebar.newConnection`,
   `sidebar.processes`. With nothing open: `firstRun.addConnection`, `firstRun.setUpAgents`; a connection's summary:
-  `summary.connect` (`summary.disconnect` once it is connecting or connected), `summary.newQuery`, `summary.edit`.
+  `summary.connect` (`summary.disconnect` while it is connecting), `summary.newQuery`, `summary.edit`; a connected one
+  shows its host page.
 - **Tabs**: `tabs`, `tabs.new`, each `tab` with `tab.close` (select with `select pane=tabs`), `tab.rename`.
 - **Navigator** (a connection's tree in the sidebar; double-click opens): a database `database.tables`; text views
   `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
   processes `processes.list`, `processes.refresh`, `processes.interval`, `processes.killQuery`,
-  `processes.killConnection`; sheets `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
+  `processes.killConnection`, `processes.statement`; the host page `host.panes`, `host.properties`, `host.readSizes`,
+  `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
+  `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
+  `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
+  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; sheets
+  `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
   `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
 - **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
   `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
@@ -2381,7 +2533,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   With… (the result tab's menu) asks with `compare.with` and `compare.key`, and opens the rows that differ in a result
   tab of their own, a grid under the `grid.legend` line (added green, removed red, changed cells amber); find bar
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
-  helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
+  helpers `console.helpers`, `helpers.choice` (Columns, Functions, Keywords, Snippets, History), `helpers.filter`, `helpers.list`; the snippet sheet (Query ▸ Save as Snippet…) `snippet.name`, `snippet.abbreviation`, `snippet.folder`, `snippet.body`, `snippet.save`, `snippet.cancel`; completion `completion.list`;
   history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
 - **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (Return or F2 opens it on the
   focused cell; a value its column refuses keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it
@@ -2437,9 +2589,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
   `objectEditor.definer`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
-- **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
-  `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.filter`, `recon.hideMatching`, `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+- **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,
+  `recon.source.object`, `recon.target.connection`, `recon.target.database`, `recon.target.object`, `recon.swap`,
+  `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`, `recon.filter`, `recon.hideMatching`, `recon.back`,
+  `recon.list` (`recon.tick` in its rows), `recon.tabs`, `recon.diffStyle`, `recon.previousDifference`,
+  `recon.nextDifference`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
   sheet `reconTables.filter`, `reconTables.list`, `reconTables.all`, `reconTables.none`, `reconTables.done`, `reconTables.cancel`.
@@ -2461,7 +2615,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `changeset.cancel`, `changeset.save` (the person's).
 - **Prompts**: `password.field`, `password.remember`, `login.user`, `login.password`, `prompt.answer`,
   `prompt.remember` (remembering is the person's), `trust.fingerprint` (Trust is the person's), `help`.
-- **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`;
+- **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`,
+  `settings.completionTableAlias`, `settings.autoKeywordCase`; Format `settings.format.preset`, `settings.format.preview`, `settings.format.*`;
   Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.loadAllAsksAbove`, `settings.nullText`,
   `settings.transposeSingleRow`; Connections
   `settings.detailsTableThreshold`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,

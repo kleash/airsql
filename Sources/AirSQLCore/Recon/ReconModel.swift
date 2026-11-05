@@ -13,10 +13,25 @@ public struct ReconOptions: Equatable {
     public var ignore = ReconIgnoreRules()
     /// By source table name: tables left out, compared with a renamed target table, columns left out, a WHERE.
     public var tables: [String: ReconTableChoice] = [:]
+    /// Compare just this pair instead of the whole database.
+    public var only: ReconPair?
 
     public init() {}
 
     public func choice(_ table: String) -> ReconTableChoice { tables[table] ?? ReconTableChoice() }
+}
+
+/// Two objects of one kind chosen by name: any names, in any two databases or in the same one.
+public struct ReconPair: Equatable {
+    public var kind: ReconObject.Kind
+    public var source: String
+    public var target: String
+
+    public init(kind: ReconObject.Kind, source: String, target: String) {
+        self.kind = kind
+        self.source = source
+        self.target = target
+    }
 }
 
 /// Differences a compare doesn't count (scope: AUTO_INCREMENT values, DEFINER, default collation, whitespace).
@@ -29,8 +44,21 @@ public struct ReconIgnoreRules: Equatable, Codable {
     public var collation = true
     /// Spaces, tabs and line breaks in view, routine, trigger and event bodies (outside quoted text).
     public var whitespace = true
+    /// The order of a table's columns: only the columns themselves count.
+    public var columnOrder = false
+    /// Upper and lower case in view, routine, trigger and event definitions (outside quoted text).
+    public var letterCase = false
+    /// What views, routines, triggers and events say: only whether each exists counts.
+    public var definitions = false
 
     public init() {}
+
+    /// What is ignored, in plain words, for the window and the report.
+    public var names: [String] {
+        [autoIncrement ? "AUTO_INCREMENT" : nil, definer ? "DEFINER" : nil, collation ? "collations" : nil,
+         whitespace ? "whitespace" : nil, columnOrder ? "column order" : nil, letterCase ? "letter case" : nil,
+         definitions ? "definitions" : nil].compactMap { $0 }
+    }
 }
 
 /// How one source table is compared.
@@ -82,6 +110,8 @@ public struct ReconResult {
     /// Rows the servers checksummed, and rows (or keys with their hashes) that came over the network.
     public var rowsChecked = 0
     public var rowsFetched = 0
+    /// A server compare: each pair's own result by source database name; `objects` lists the pairs as `.database`.
+    public var databases: [String: ReconResult] = [:]
 
     public init(source: ReconEnd, target: ReconEnd, options: ReconOptions, objects: [ReconObject] = []) {
         self.source = source
@@ -93,12 +123,15 @@ public struct ReconResult {
     public func object(_ kind: ReconObject.Kind, _ name: String) -> ReconObject? {
         objects.first { $0.kind == kind && $0.name == name }
     }
+
+    /// Two whole servers: `objects` are database pairs, opened one at a time, and a script belongs to a pair.
+    public var isServer: Bool { source.database.isEmpty }
 }
 
-/// A table, view, routine, trigger, event or sequence, and how it compares.
+/// A table, view, routine, trigger, event or sequence, and how it compares; in a server compare, a pair of databases.
 public struct ReconObject: Equatable {
     public enum Kind: String, CaseIterable {
-        case table, view, sequence, procedure, function, trigger, event
+        case table, view, sequence, procedure, function, trigger, event, database
     }
 
     public enum Status: String {
@@ -124,6 +157,8 @@ public struct ReconObject: Equatable {
     public var references: [String] = []
     /// The target table's engine: MyISAM, Aria and MEMORY can't roll back a failed sync.
     public var targetEngine: String?
+    /// The person unticked it: the sync script skips it.
+    public var leftOut = false
 
     public init(kind: Kind, name: String, targetName: String? = nil, status: Status) {
         self.kind = kind

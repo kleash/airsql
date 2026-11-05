@@ -59,6 +59,9 @@ extension SidebarController: NSMenuItemValidation {
 
     /// A single click shows the row in the preview tab: a database's tables, a table's rows, an object's definition.
     @objc func showSelectedObject() {
+        if let main, selectedConnectionIDs.count == 1, selectedNodes.count == 1, let open = model.openConnection(selectedConnectionIDs[0]) {
+            return main.showHost(open)
+        }
         guard let main, let (open, nodes) = treeSelection, nodes.count == 1 else { return }
         switch nodes[0].kind {
         case .database(_, let name):
@@ -102,24 +105,27 @@ extension SidebarController: NSMenuItemValidation {
         case .database:
             menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
                       Commands.export, Commands.restore,
-                      Commands.generateLiquibase, Commands.compare, nil, Commands.refresh, Commands.drop])
+                      Commands.generateLiquibase, Commands.compareWith, Commands.compareRows, Commands.diskUsage, nil, Commands.editDatabase,
+                      Commands.refresh, Commands.drop])
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
         case .object(_, let object) where object.kind.isTableLike:
-            menu.add([Commands.openData, Commands.openStructure, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, Commands.favourite, Commands.findUsedBy, nil,
-                      Commands.newColumn, Commands.newIndex, Commands.newForeignKey, Commands.editComment, nil,
-                      Commands.generateSelect,
+            menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.copyName, Commands.copyPlainName,
+                      Commands.copyCreate, Commands.favourite, Commands.findUsedBy, nil,
+                      Commands.newColumn, Commands.newIndex, Commands.newForeignKey, Commands.editComment, nil, Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
-                      Commands.bulkEdit])
+                      Commands.bulkEdit, Commands.compareWith, Commands.compareRows])
             menu.addItem(NavigatorMenus.maintenance())
-            menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.refresh])
+            menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.diskUsage, Commands.refresh])
         case .part:
             menu.add([Commands.openStructure, Commands.openData])
-        case .detail:
+        case .detail(_, _, let part, _):
             menu.add([Commands.openStructure, Commands.openData, nil, Commands.copyName, Commands.copyPlainName, Commands.findUsedBy])
             if nodes.allSatisfy(\.isDroppablePart) { menu.add([nil, Commands.drop]) }
+            if part == .triggers { menu.add([nil, Commands.compareWith, Commands.compareRows]) }
         default:
-            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, Commands.favourite, Commands.findUsedBy, Commands.editComment, nil, Commands.drop, Commands.refresh])
+            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, Commands.favourite, Commands.findUsedBy, Commands.editComment, nil,
+                      Commands.compareWith, Commands.compareRows, nil, Commands.drop, Commands.refresh])
         }
         return menu
     }
@@ -139,6 +145,16 @@ extension SidebarController: NSMenuItemValidation {
     @objc func openObject(_ sender: Any?) {
         guard let main, let open = treeSelection?.open else { return }
         for object in selectedObjects where !object.kind.isTableLike { main.openEditor(object, of: open) }
+    }
+
+    @objc func selectTop(_ sender: Any?) {
+        if let open = treeSelection?.open { NavigatorActions.selectTop(selectedObjects, on: open, main: main) }
+    }
+
+    @objc func editDatabase(_ sender: Any?) {
+        if let open = treeSelection?.open, let name = selectedDatabases.first {
+            NavigatorActions.editDatabase(name, on: open, window: view.window)
+        }
     }
 
     @objc func generateSelect(_ sender: Any?) { generate(.select) }
@@ -391,6 +407,28 @@ extension SidebarController: NSMenuItemValidation {
         saved.favourites.removeAll(where: objects.contains)
         if on { saved.favourites += objects }
         model.save(saved)
+    }
+
+    /// A pane of the connection's host page, by the menu item's tag.
+    @objc func showServerHome(_ sender: Any?) {
+        guard let open = targetOpen else { return }
+        main?.showHost(open, pane: HostContent.Pane(rawValue: (sender as? NSMenuItem)?.tag ?? 0))
+    }
+
+    /// Disk Usage of the selected table, database or else the server, in the connection's Disk Usage tab.
+    @objc func showDiskUsage(_ sender: Any?) {
+        guard let main else { return }
+        guard let open = targetOpen else {
+            return showError("Connect to a server first: Disk Usage shows what a connected server holds.",
+                             title: "No connected server", on: view.window)
+        }
+        var level = DiskUsageContent.Level.server
+        if let object = selectedObjects.first(where: { $0.kind == .table }), selectedObjects.count == 1 {
+            level = .table(object.database, object.name)
+        } else if selectedDatabases.count == 1, let database = selectedDatabases.first {
+            level = .database(database)
+        }
+        main.showDiskUsage(open, level: level)
     }
 
     // MARK: Validation

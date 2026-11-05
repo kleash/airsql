@@ -132,7 +132,7 @@ extension AppTests.InteractionTests {
         view.filter.stringValue = "nothing has this"
         view.reload()
         #expect(find(NSTextField.self, id: "database.empty", in: view.view)?.isHidden == false)
-        #expect(view.contextMenu()?.items.map(\.title) == ["Create Table…", "Refresh"])
+        #expect(view.contextMenu()?.items.map(\.title) == ["Create Table…", "Disk Usage", "Refresh"])
     }
 }
 

@@ -111,7 +111,7 @@ public enum ExplainPlan {
     /// A key without the number `numberingRepeats` gave it.
     static func plain(_ key: String) -> String { String(key.prefix { $0 != "#" }) }
 
-    private static func text(_ value: Any) -> String {
+    static func text(_ value: Any) -> String {
         if let list = value as? [Any] { return list.map(text).joined(separator: ", ") }
         return "\(value)"
     }

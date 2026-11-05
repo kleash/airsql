@@ -126,8 +126,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Create Table… | ⌃⌘N |
 | Open Structure | ⌥⌘O |
 | Process List | ⌥⌘P |
+| Disk Usage | ⌥⌘U |
 | Connect | ⌘K |
 | Disconnect | ⇧⌘K |
+| Next Difference | F7 |
+| Previous Difference | ⇧F7 |
 | Minimize | ⌘M |
 | Show Previous Tab | ⌘{ |
 | Show Next Tab | ⌘} |

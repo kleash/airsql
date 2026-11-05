@@ -95,6 +95,8 @@ import AppKit
     @objc optional func showHistory(_ sender: Any?)
     @objc optional func changeConnection(_ sender: Any?)
     @objc optional func rerunResult(_ sender: Any?)
+    @objc optional func runToFile(_ sender: Any?)
+    @objc optional func openResultInWindow(_ sender: Any?)
     @objc optional func runSelectionWhole(_ sender: Any?)
     @objc optional func toggleKeepResults(_ sender: Any?)
     @objc optional func showSessions(_ sender: Any?)
@@ -118,6 +120,7 @@ import AppKit
     @objc optional func indentLines(_ sender: Any?)
     @objc optional func outdentLines(_ sender: Any?)
     @objc optional func toggleHelpers(_ sender: Any?)
+    @objc optional func saveAsSnippet(_ sender: Any?)
 
     // Data (the grid)
     @objc optional func addRow(_ sender: Any?)
@@ -209,6 +212,15 @@ import AppKit
     @objc optional func killConnection(_ sender: Any?)
     @objc optional func showERDiagram(_ sender: Any?)
     @objc optional func bulkEditTables(_ sender: Any?)
+    @objc optional func showDiskUsage(_ sender: Any?)
+    @objc optional func selectTop(_ sender: Any?)
+    @objc optional func editDatabase(_ sender: Any?)
+    @objc optional func showServerHome(_ sender: Any?)
+    @objc optional func editVariable(_ sender: Any?)
+    @objc optional func goUp(_ sender: Any?)
+    @objc optional func compareSelected(_ sender: Any?)
+    @objc optional func copyList(_ sender: Any?)
+    @objc optional func exportList(_ sender: Any?)
 
     // Connection
     @objc optional func connect(_ sender: Any?)
@@ -229,6 +241,12 @@ import AppKit
     @objc optional func restoreDatabase(_ sender: Any?)
     @objc optional func copyToServer(_ sender: Any?)
     @objc optional func compareDatabases(_ sender: Any?)
+    @objc optional func compareWith(_ sender: Any?)
+    @objc optional func compareRows(_ sender: Any?)
+    @objc optional func backToServer(_ sender: Any?)
+    @objc optional func includeInSync(_ sender: Any?)
+    @objc optional func nextDifference(_ sender: Any?)
+    @objc optional func previousDifference(_ sender: Any?)
     @objc optional func showSyncScript(_ sender: Any?)
     @objc optional func exportReport(_ sender: Any?)
     @objc optional func copySyncScript(_ sender: Any?)
@@ -485,6 +503,10 @@ enum Commands {
                                            tip: "Send the selected text as it stands, without splitting it on semicolons")
     static let keepResults = Command("Keep Results of Each Run", #selector(AirSQLActions.toggleKeepResults(_:)),
                                      tip: "Open each run's results in new tabs, leaving the earlier ones in place")
+    static let runToFile = Command("Run to File…", #selector(AirSQLActions.runToFile(_:)),
+                                   tip: "Write the rows of the statement at the cursor straight to a file, however many there are")
+    static let resultWindow = Command("Open Result in Window", #selector(AirSQLActions.openResultInWindow(_:)),
+                                      tip: "Move this result to a window of its own, to keep it beside the query")
     static let runFromCaret = Command("Run from Cursor", #selector(AirSQLActions.runFromCaret(_:)),
                                       tip: "Run the statement at the cursor and every statement after it")
     static let runSubquery = Command("Run Subquery", #selector(AirSQLActions.runSubquery(_:)),
@@ -521,6 +543,8 @@ enum Commands {
                                           tip: "Run this tab's statements on another connection")
     static let profile = Command("Profile", #selector(AirSQLActions.profileQuery(_:)),
                                  tip: "Run the statement and show where the server spent its time")
+    static let saveAsSnippet = Command("Save as Snippet…", #selector(AirSQLActions.saveAsSnippet(_:)),
+                                       tip: "Save the selection or the statement at the cursor as a snippet, to use again from Query Helpers")
     static let saveAsChangeset = Command("Save as Changeset…", #selector(AirSQLActions.saveAsChangeset(_:)),
                                          tip: "Save the selected statements as a Liquibase changeset in a changelog")
     static let editAsTable = Command("Edit as Table", #selector(AirSQLActions.editAsTable(_:)),
@@ -716,6 +740,31 @@ enum Commands {
                                    tip: "Stop the selected process's statement, not its connection; read-only allows it, as no data changes")
     static let killConnection = Command("Kill Connection…", #selector(AirSQLActions.killConnection(_:)),
                                         tip: "End the selected process's connection to the server; read-only allows it, as no data changes")
+    static let selectTop = Command("Select Top 1000 Rows", #selector(AirSQLActions.selectTop(_:)),
+                                   tip: "Write a SELECT of the first 1,000 rows in a new query tab, to run or change")
+    static let editDatabase = Command("Edit Database…", #selector(AirSQLActions.editDatabase(_:)),
+                                      tip: "Change the collation new tables of the selected database take (shows the SQL first)")
+    static let hostDatabases = Command("Databases", #selector(AirSQLActions.showServerHome(_:)), tag: 0,
+                                       tip: HostContent.Pane.databases.tip)
+    static let hostVariables = Command("Variables", #selector(AirSQLActions.showServerHome(_:)), tag: 1,
+                                       tip: HostContent.Pane.variables.tip)
+    static let hostStatus = Command("Status", #selector(AirSQLActions.showServerHome(_:)), tag: 2, tip: HostContent.Pane.status.tip)
+    static let hostProcesses = Command("Processes", #selector(AirSQLActions.showServerHome(_:)), tag: 3,
+                                       tip: HostContent.Pane.processes.tip)
+    static let hostCommands = Command("Command Statistics", #selector(AirSQLActions.showServerHome(_:)), tag: 4,
+                                      tip: HostContent.Pane.commands.tip)
+    static let editVariable = Command("Edit Variable…", #selector(AirSQLActions.editVariable(_:)),
+                                      tip: "Change the selected variable, for the server or in a new query tab (shows the SQL first)")
+    static let diskUsage = Command("Disk Usage", #selector(AirSQLActions.showDiskUsage(_:)), "u", [.command, .option],
+                                   tip: "Show where the space went, on the server or in the selected database or table")
+    static let diskUsageUp = Command("Up One Level", #selector(AirSQLActions.goUp(_:)),
+                                     tip: "Go back from a table to its database, or from a database to the server")
+    static let diskUsageCompare = Command("Compare Selected", #selector(AirSQLActions.compareSelected(_:)),
+                                          tip: "Show only the selected rows, their bars and shares against each other")
+    static let copyList = Command("Copy List", #selector(AirSQLActions.copyList(_:)),
+                                  tip: "Copy the whole list as it shows, as CSV with its headers")
+    static let exportList = Command("Export List…", #selector(AirSQLActions.exportList(_:)),
+                                    tip: "Save the whole list as it shows to a CSV file")
     static let erDiagram = Command("ER Diagram", #selector(AirSQLActions.showERDiagram(_:)),
                                    tip: "Draw the database's tables and their foreign keys")
     static let newView = Command("View…", #selector(AirSQLActions.createObject(_:)), tag: 1,
@@ -763,7 +812,19 @@ enum Commands {
     static let copyToServer = Command("Copy to Another Server…", #selector(AirSQLActions.copyToServer(_:)),
                                       tip: "Copy databases or tables, with their rows, to another connection")
     static let compare = Command("Compare…", #selector(AirSQLActions.compareDatabases(_:)),
-                                 tip: "Compare two databases' structure and data, and make a script that syncs them")
+                                 tip: "Compare two servers, databases or objects, and make a script that syncs them")
+    static let compareWith = Command("Compare With…", #selector(AirSQLActions.compareWith(_:)),
+                                     tip: "Compare the selected connection, database or object with another you choose")
+    static let compareRows = Command("Compare", #selector(AirSQLActions.compareRows(_:)),
+                                     tip: "Compare the two selected connections, databases or objects with each other")
+    static let backToServer = Command("Back to All Databases", #selector(AirSQLActions.backToServer(_:)),
+                                      tip: "Go back to the server compare's list of databases")
+    static let nextDifference = Command("Next Difference", #selector(AirSQLActions.nextDifference(_:)), f7, [],
+                                        tip: "Go to the next place the two definitions differ")
+    static let previousDifference = Command("Previous Difference", #selector(AirSQLActions.previousDifference(_:)), f7, .shift,
+                                            tip: "Go to the previous place the two definitions differ")
+    static let includeInSync = Command("Include in Sync Script", #selector(AirSQLActions.includeInSync(_:)),
+                                       tip: "Tick or untick the selected objects: unticked ones stay out of the sync script")
     static let syncScript = Command("Sync Script…", #selector(AirSQLActions.showSyncScript(_:)),
                                     tip: "Review the script that makes the target match the source, then run it if you want")
     static let exportReport = Command("Export Report…", #selector(AirSQLActions.exportReport(_:)),
@@ -856,8 +917,8 @@ enum Commands {
         toggleSidebar, focusSidebar, focusEditor, focusResults, selectInTree, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
-        runStatement, runSelection, runSelectionWhole, keepResults, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
-        isolation, formatSQL, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
+        runStatement, runSelection, runSelectionWhole, keepResults, runToFile, resultWindow, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
+        isolation, formatSQL, saveAsSnippet, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,
         showContextActions, goToDeclaration, findUsages, renameSymbol, quickDocumentation, parameterInfo, nextProblem, previousProblem, showProblem,
@@ -869,10 +930,11 @@ enum Commands {
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
-        killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
+        killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder, moveToFolder,
-        export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
+        export, restore, copyToServer, compare, compareWith, compareRows, backToServer, includeInSync, nextDifference, previousDifference,
+        syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
@@ -892,6 +954,7 @@ enum Commands {
 
     /// Menu items that only open a submenu, by title.
     static let submenus: [String: String] = [
+        "Server Home": "Show what the server holds and does: databases, variables, status, processes",
         "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",

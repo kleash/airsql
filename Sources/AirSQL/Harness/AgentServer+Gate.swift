@@ -79,13 +79,13 @@ extension AgentServer {
     /// filters a cell's value goes into (a result's conditions, the table tab's WHERE, Filter by Values' list, Type a
     /// Value…'s field), the compare's rows and sync script, the process list (other sessions' statements carry their
     /// values), the console's Messages (a server's error quotes values: Duplicate entry '…') and an EXPLAIN's steps, tree
-    /// and raw answer (conditions quote values; its table is a grid), the SQL preview's statements (an Apply's or a sync's carry the rows' values) and the SQL log
+    /// and raw answer, in any of its views (conditions quote values; its table is a grid), the SQL preview's statements (an Apply's or a sync's carry the rows' values) and the SQL log
     /// (every connection's statements, in a window of its own: hidden from every agent).
     static func showsData(_ view: NSView) -> Bool {
         view is DataGridView || ["valuePanel", "grid.text", "grid.tree", "grid.chart", "columnSummary", "grid.figure", "grid.set",
                                  "grid.lookup", "grid.editor.problem", "result.filter", "tableData.where", "tableData.suggestions", "values.list",
                                  "quickFilter.value", "recon.rows", "recon.script", "processes.list", "console.messages",
-                                 "console.planTree", "console.planOperations", "console.planRaw", "preview.sql", "sqlLog.text", "history.every"]
+                                 "console.planTree", "console.planOperations", "console.planRaw", "console.planDetails", "console.planDiagram", "preview.sql", "sqlLog.text", "history.every"]
             .contains(view.accessibilityIdentifier())
     }
 

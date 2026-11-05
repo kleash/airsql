@@ -164,12 +164,18 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `toolbar.explain`, `toolbar.transactionMode`, `toolbar.commit`, `toolbar.rollback`, `toolbar.cancel`.
 - **Sidebar**: `sidebar.filter`, `sidebar.connections` (select with `select pane=sidebar`), `sidebar.newConnection`,
   `sidebar.processes`. With nothing open: `firstRun.addConnection`, `firstRun.setUpAgents`; a connection's summary:
-  `summary.connect` (`summary.disconnect` once it is connecting or connected), `summary.newQuery`, `summary.edit`.
+  `summary.connect` (`summary.disconnect` while it is connecting), `summary.newQuery`, `summary.edit`; a connected one
+  shows its host page.
 - **Tabs**: `tabs`, `tabs.new`, each `tab` with `tab.close` (select with `select pane=tabs`), `tab.rename`.
 - **Navigator** (a connection's tree in the sidebar; double-click opens): a database `database.tables`; text views
   `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
   processes `processes.list`, `processes.refresh`, `processes.interval`, `processes.killQuery`,
-  `processes.killConnection`; sheets `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
+  `processes.killConnection`, `processes.statement`; the host page `host.panes`, `host.properties`, `host.readSizes`,
+  `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
+  `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
+  `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
+  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; sheets
+  `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
   `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
 - **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
   `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
@@ -187,7 +193,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   With… (the result tab's menu) asks with `compare.with` and `compare.key`, and opens the rows that differ in a result
   tab of their own, a grid under the `grid.legend` line (added green, removed red, changed cells amber); find bar
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
-  helpers `console.helpers`, `helpers.choice`, `helpers.filter`, `helpers.list`; completion `completion.list`;
+  helpers `console.helpers`, `helpers.choice` (Columns, Functions, Keywords, Snippets, History), `helpers.filter`, `helpers.list`; the snippet sheet (Query ▸ Save as Snippet…) `snippet.name`, `snippet.abbreviation`, `snippet.folder`, `snippet.body`, `snippet.save`, `snippet.cancel`; completion `completion.list`;
   history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
 - **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (Return or F2 opens it on the
   focused cell; a value its column refuses keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it
@@ -243,9 +249,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
   `objectEditor.definer`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
-- **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
-  `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.filter`, `recon.hideMatching`, `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+- **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,
+  `recon.source.object`, `recon.target.connection`, `recon.target.database`, `recon.target.object`, `recon.swap`,
+  `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`, `recon.filter`, `recon.hideMatching`, `recon.back`,
+  `recon.list` (`recon.tick` in its rows), `recon.tabs`, `recon.diffStyle`, `recon.previousDifference`,
+  `recon.nextDifference`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
   sheet `reconTables.filter`, `reconTables.list`, `reconTables.all`, `reconTables.none`, `reconTables.done`, `reconTables.cancel`.
@@ -267,7 +275,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `changeset.cancel`, `changeset.save` (the person's).
 - **Prompts**: `password.field`, `password.remember`, `login.user`, `login.password`, `prompt.answer`,
   `prompt.remember` (remembering is the person's), `trust.fingerprint` (Trust is the person's), `help`.
-- **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`;
+- **Settings** (to look at): General `settings.appearance`, `settings.showFolder`; Editor `settings.editorFontSize`,
+  `settings.completionTableAlias`, `settings.autoKeywordCase`; Format `settings.format.preset`, `settings.format.preview`, `settings.format.*`;
   Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.loadAllAsksAbove`, `settings.nullText`,
   `settings.transposeSingleRow`; Connections
   `settings.detailsTableThreshold`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,

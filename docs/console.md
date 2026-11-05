@@ -22,7 +22,8 @@ session of its own, so a long query in one tab leaves the others free.
 - When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL. The
   other tabs come back too: see [Getting back to your tabs](navigator.md#getting-back-to-your-tabs).
 - **File ▸ Open Recent** lists the .sql files you had open lately. A file opens on the connection you last used it with.
-- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Messages says so; Save writes UTF-8.
+- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Save keeps its encoding. If the text
+  no longer fits that encoding, Save offers UTF-8.
 - If a file changes on disk, its tab follows, and ⌘Z brings back what it showed; with unsaved edits, Messages warns instead.
 - **Query ▸ Change Connection…** runs the tab's statements on another connection. A tab with no connection, such as a
   file opened with nothing selected, takes the one the toolbar shows.
@@ -34,14 +35,39 @@ session of its own, so a long query in one tab leaves the others free.
   what's missing. No server is asked.
 - AirSQL reads what you write a moment after you stop typing, and underlines what it finds: see
   [Checks while you type](#checks-while-you-type).
-- **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
-  keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
-  elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
-  ⌥⎋ opens it anywhere. It comes from what AirSQL already read of the schema: nothing is sent to the server while you
-  type.
-- **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names, the
-  server's functions by kind, and the keywords. Double-click one to put it in at the cursor, or drag it into the editor
-  (a column's name comes quoted where it needs to be, as completion puts it in).
+- **Completion** opens as you type, with what fits there: only `BY` after `ORDER`, only joins after `LEFT`, the
+  statement's columns in its clauses. ↑ and ↓ choose, Return inserts, Tab inserts and replaces the rest of the word too,
+  Escape closes; ⌥⎋ opens it anywhere. Below the list you see more about what's selected: a table's columns, a template's
+  SQL. What you've chosen before comes first. It all comes from what AirSQL already read of the schema: nothing is sent to
+  the server while you type.
+  - A name matches by its start, a word in it (`cust` finds `old_customers`), an abbreviation of its words (`fica` finds
+    `film_category`, `ob` finds `ORDER BY`) or its middle. Keywords of several words come as one, in the case Settings ▸
+    Format sets, and words already in the text come last.
+  - After FROM or JOIN: tables, views and the statement's CTEs. A table comes with an alias (`orders o`) unless you turn
+    that off in Settings ▸ Editor. After JOIN the joins come first: those of foreign keys, real or defined by you, then
+    those names suggest (`customer_id` to `customers.id`). After ON, the condition.
+  - Columns come from tables, CTEs and subqueries alike, with the table's name when two have the same one; `alias.` lists
+    that table's. ORDER BY, GROUP BY and HAVING offer the aliases of the select list too.
+  - `SELECT nam` with no FROM yet offers every table's columns: choosing one adds its FROM.
+  - Just after `*` or `t.*` in a select list, the list offers all the columns in its place.
+  - `INSERT INTO t (` offers the whole column list, then each column left. `VALUES (` offers a field for each column.
+  - After `status = ` or inside `status = '` an ENUM or SET column offers its values. `ENGINE=`, `CHARSET` and `COLLATE`
+    offer theirs, CALL the procedures, `@` the variables of the text, `@@` and SET the common server variables.
+- **Templates.** Type an abbreviation at the start of a statement and press Tab: `sel`, `selw`, `selc`, `lim`, `ins`, `upd`,
+  `del`, `tab`, `view` and `col` turn into the statement, with its first field selected. Type over a field; Tab or Return
+  goes to the next and on to the end, ⇧Tab goes back, Escape stops. A field used twice takes a caret in each place.
+- **Postfix.** Type a table's name and a dot at the start of a statement: `orders.from` turns into `SELECT * FROM orders`,
+  `.cfrom` lists its columns, `.afrom` lists them by an alias, and `.join` adds the table its foreign key points at.
+  `total.cast` puts CAST around a column, anywhere.
+- **Snippets** keep SQL to use again. **Query ▸ Save as Snippet…** saves the selection or the statement, with a name, a
+  folder and an abbreviation of your own. In the SQL, `$name$` is a field, `$END$` is where the cursor ends, `$SELECTION$`
+  the selected text and `$$` a dollar. They're kept in AirSQL's settings on this Mac. A snippet with `$SELECTION$` is also in
+  **Edit ▸ Surround With**.
+- **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names (or of the
+  table selected in the tree, when it names none), the server's functions by kind, the keywords, your **Snippets** and the
+  built-in ones, and the connection's **History** by day, each with a bar as long as it took. Double-click one to put it
+  in at the cursor, or drag it into the editor (a column's name comes quoted where it needs to be, as completion puts it
+  in). Right-click a snippet to edit or delete it; editing a built-in one makes a copy of your own.
 - **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression**, **Match
   Case**, **Whole Words** and **In Selection** (the text selected when you tick it). With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
@@ -85,9 +111,12 @@ session of its own, so a long query in one tab leaves the others free.
 - The cursor's line has a band and, when the text has several statements, the statement it's in has a light shade: that's what ⌘↩
   runs. Other uses of the name at the cursor are marked, and its line and column show in the editor's corner.
 - Settings ▸ Editor sets the font, the text size, the width of a tab and whether Tab puts in a tab character or spaces.
-- **Query ▸ Format SQL** (⌥⇧⌘F) puts each main clause on a line of its own and reserved words in capitals. It changes
-  nothing else: names, values, comments and `/*! … */` code stay exactly as they are, and statements inside a
-  `DELIMITER` block are left alone. If it couldn't do that, it leaves the SQL as it was and says so.
+- **Query ▸ Format SQL** (⌥⇧⌘F) tidies the selection or the whole text: each clause on a line, subqueries indented, AND
+  and OR on lines, CASE, VALUES rows, CREATE TABLE's columns and routine bodies laid out, by the rules of **Settings ▸
+  Format**. It changes only spaces and the case the rules ask for: values, comments and `/*! … */` code stay exactly as
+  they are. If it couldn't prove that, it leaves the SQL as it was and says so. Nothing changes between `-- @formatter:off`
+  and `-- @formatter:on`.
+- Settings ▸ Editor can also give reserved words their case as you type.
 - **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
 
@@ -146,12 +175,15 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
 | The selected text as it stands, not split on `;` | Query ▸ Run Selection as One Statement |
 | The smallest query in brackets around the cursor | Query ▸ Run Subquery |
 | The statement at the cursor and every one after it | Query ▸ Run from Cursor |
+| The rows of a SELECT, straight to a .csv, .tsv or .json file | Query ▸ Run to File… |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
+The ▶ beside the line numbers, at the start of the statement at the cursor, runs it too.
+
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
 on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another. If one fails with others to come, a
-sheet asks whether to **Stop**, **Skip** it, or **Skip All** that fail from there on. Each
+sheet asks whether to **Stop**, **Retry** it, **Skip** it, or **Skip All** that fail from there on. Each
 statement that ran then shows a tick, or a cross if it failed, and its time at the end of its line, until you change it
 or run again.
 
@@ -166,8 +198,8 @@ says which tab finished. It never shows the SQL. Turn the notification off in Sy
 
 ### Parameters
 
-A statement with `?` or `:name` in its code, not in a string or comment, asks for their values before it runs. The same
-`:name` takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
+A statement with `?`, `:name` or `${name}` in its code, not in a string or comment, asks for their values before it runs.
+The same name takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
 become code. The tab remembers the values for the next run. AirSQL fills them in before sending, so Messages, the SQL
 log and the history show the final SQL, and the read-only and safety checks see it too.
 
@@ -184,8 +216,9 @@ others wait.
 If the server is within five connections of its `max_connections`, or refuses another, a tab shares the connection's
 main session instead of opening its own, and Messages says so.
 
-If a tab's session is lost, the next Run says so, and says if an open transaction was rolled back, and runs nothing.
-Run again to open a new session.
+If a tab's session ends without you closing it (the connection drops, or Disconnect takes an open transaction with it),
+the tab says so in Messages and the status bar, with how many rows the server rolled back. Nothing runs in that tab until
+you press **Open New Session** in the sheet Run shows. A tab that was in Manual Commit stays in it.
 
 ### The current database
 
@@ -206,6 +239,8 @@ share the current database too.
 - **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
   which keeps its name and pin. **Copy Result's Query** copies the statement. **View ▸ Refresh Every** does it every few
   seconds, for a statement that only reads, until it fails or you choose Off.
+- **Open Result in Window** moves a result to a window of its own, to keep beside the query. Closing it with edits not
+  applied asks first.
 - **Query ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
 - Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
@@ -296,13 +331,14 @@ shows in a sheet, with what it will do:
   history. Passwords in statements are masked before they are kept, as in the SQL log. **All connections** searches
   every connection's statements, with a column saying which.
 - **File ▸ Local History…** lists the states a .sql file was saved in (the last 50, kept on this Mac only). Click one to read
-  it; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
+  it, with the lines that differ from the editor tinted; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
 - **Query ▸ Sessions…** lists every session AirSQL has open on the connection: what uses it, its thread on the server, its
   database, and whether it is running or holds a transaction.
 - **View ▸ SQL Log** (⌥⌘L) shows or hides every statement AirSQL sent, as they come, under the tabs. See [the SQL log](sql-log.md).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it. **Operations**
   lists the steps as a tree with the server's rows and cost; click a header to sort the steps of each level, and the
-  steps that take a large share are marked in orange. **Table** is the server's EXPLAIN, **Tree** the steps as text and
+  steps that take a large share are marked in orange; select a step to read all the server says about it. **Diagram** draws
+  the steps as boxes, and **Flame** as bars as wide as their time, or their cost before Explain Analyze. **Table** is the server's EXPLAIN, **Tree** the steps as text and
   **Raw** the server's own answer, to copy.
 - **Query ▸ Explain Analyze** (⌥⇧⌘E) runs the statement and adds what really happened: rows read, time and loops. It uses
   `ANALYZE FORMAT=JSON` on MariaDB and `EXPLAIN ANALYZE` on MySQL 8.0.18 or later. As it really runs the statement, a

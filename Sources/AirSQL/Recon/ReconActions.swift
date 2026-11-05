@@ -14,12 +14,80 @@ extension MainWindowController {
     }
 }
 
+/// A row of the sidebar a compare starts from: a connection, a database of it, or an object of that database.
+struct ReconStart {
+    var connection: SavedConnection
+    var database: String? = nil
+    var object: (kind: ReconObject.Kind, name: String)? = nil
+
+    var level: ReconLevel { object != nil ? .object : database != nil ? .database : .server }
+}
+
+extension SidebarController {
+    /// The selected rows as starts; empty when one of them can't be compared (a group, a column).
+    var compareStarts: [ReconStart] {
+        let starts = selectedNodes.compactMap { node -> ReconStart? in
+            switch node.kind {
+            case .connection(let id):
+                return model.connection(id).map { ReconStart(connection: $0) }
+            case .database(let id, let name):
+                return model.connection(id).map { ReconStart(connection: $0, database: name) }
+            case .object(let id, let object):
+                return ReconObject.Kind(rawValue: object.kind.rawValue).flatMap { kind in
+                    model.connection(id).map { ReconStart(connection: $0, database: object.database, object: (kind, object.name)) }
+                }
+            case .detail(let id, let table, .triggers, let name):
+                return model.connection(id).map { ReconStart(connection: $0, database: table.database, object: (.trigger, name)) }
+            default:
+                return nil
+            }
+        }
+        return starts.count == selectedNodes.count ? starts : []
+    }
+
+    /// Why Compare With… can't start from the selection, or nil when it can.
+    var compareWithBlocked: String? {
+        compareStarts.count == 1 ? nil : "Select one connection, database or object in the sidebar first"
+    }
+
+    /// Why Compare can't start from the selection, or nil when it can.
+    var compareRowsBlocked: String? {
+        let starts = compareStarts
+        guard starts.count == 2 else { return "Select two connections, two databases or two objects in the sidebar first" }
+        if starts[0].level != starts[1].level { return "Select two of one level: two connections, two databases or two objects" }
+        if starts[0].object?.kind != starts[1].object?.kind { return "Select two objects of one kind, such as two tables" }
+        return nil
+    }
+}
+
+extension MainWindowController {
+    /// Compare With… on a row: it is the source; the target starts on its connection and database, to choose from.
+    @objc func compareWith(_ sender: Any?) {
+        guard sidebar.compareWithBlocked == nil, let start = sidebar.compareStarts.first else { return }
+        let compare = ReconWindowController.show(model: model, source: nil)
+        compare.main = self
+        let right = start.level == .server ? nil : ReconStart(connection: start.connection, database: start.database)
+        compare.start(start.level, left: start, right: right)
+    }
+
+    /// Compare on two rows, the first as the source. Two objects compare at once; whole databases and servers wait for
+    /// Compare, as they can read a lot, so the person can choose what to look at first.
+    @objc func compareRows(_ sender: Any?) {
+        let starts = sidebar.compareStarts
+        guard sidebar.compareRowsBlocked == nil else { return }
+        let compare = ReconWindowController.show(model: model, source: nil)
+        compare.main = self
+        compare.start(starts[0].level, left: starts[0], right: starts[1])
+        if starts[0].level == .object { compare.refresh(nil) }
+    }
+}
+
 /// The compare window's commands: the sync script, the report, the changeset, copying and leaving tables out.
 extension ReconWindowController {
     /// The whole sync script in a console tab of the target marked "sync script" (plan §2.9), to review. It never runs
     /// on its own: Run there brings this window back with the script in the SQL preview.
     @objc func showSyncScript(_ sender: Any?) {
-        guard let result, let window, let saved = target.connection, let main else { return }
+        guard let result, let window, let saved = comparedConnection, let main else { return }
         let destructive = results.detail.includeDestructive
         if let why = nothingToSync(result, destructive: destructive) { return showError(why, title: "Nothing to sync", on: window) }
         let script = result.script(destructive: destructive).map { $0 + ";" }.joined(separator: "\n\n")
@@ -36,7 +104,10 @@ extension ReconWindowController {
     /// Why the sync script is empty; nil when it has steps.
     private func nothingToSync(_ result: ReconResult, destructive: Bool) -> String? {
         guard result.steps(destructive: destructive).isEmpty else { return nil }
-        return !result.objects.contains(where: \.differs) ? "The two databases match."
+        if result.objects.contains(where: { $0.differs && $0.leftOut }) {
+            return "What differs is unticked in the list: tick it to put it in the script."
+        }
+        return !result.objects.contains(where: \.differs) ? "The two match."
             : !destructive && !result.steps(destructive: true).isEmpty
             ? "What differs only goes away with destructive steps (DROP, DELETE): tick “Include destructive steps” to put "
                 + "them in the script."
@@ -162,6 +233,16 @@ extension ReconWindowController {
         put(result.steps(destructive: results.detail.includeDestructive).filter { chosen.contains("\($0.objectKind) \($0.object)") }
             .map { $0.sql + ";" }.joined(separator: "\n\n"))
     }
+
+    /// Include in Sync Script: unticks the selected objects, or ticks them when some are unticked.
+    @objc func includeInSync(_ sender: Any?) {
+        let selected = results.selected
+        set(selected, leftOut: selected.allSatisfy { !$0.leftOut })
+    }
+
+    @objc func nextDifference(_ sender: Any?) { results.detail.goToDifference(by: 1) }
+
+    @objc func previousDifference(_ sender: Any?) { results.detail.goToDifference(by: -1) }
 
     @objc func leaveOutOfCompare(_ sender: Any?) {
         for object in results.selected where object.kind == .table && object.status != .onlyInTarget {

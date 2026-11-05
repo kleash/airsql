@@ -1,3 +1,4 @@
+import AirSQLCore
 import AppKit
 
 /// The editor's line numbers (plan §2.6, mockup's gutter): grey, right-aligned, the caret's line darker and an error's
@@ -6,17 +7,21 @@ final class LineNumberRuler: NSRulerView {
     private weak var editor: SQLEditorView?
     /// The line (from 1) an error points to, marked until the text changes.
     var errorLine: Int? { didSet { needsDisplay = true } }
+    /// The ▶ at the start of the statement at the caret was clicked; nil: no ▶ (an object editor).
+    var onRun: (() -> Void)?
+    private var startKey: [Int] = []
+    private var startCache: Int?
 
     init(editor: SQLEditorView) {
         self.editor = editor
         super.init(scrollView: nil, orientation: .verticalRuler)
         clientView = editor
-        ruleThickness = 32
+        ruleThickness = 44
         // Its edge line stays in its own frame: since macOS 14 views draw outside their bounds unless they clip, and the
         // line crossed the find bar above the editor.
         if #available(macOS 14, *) { clipsToBounds = true }
         setAccessibilityElement(false)
-        toolTip = "Shows line numbers; click a triangle to fold or open what starts on that line"
+        toolTip = "Shows line numbers; click ▶ to run the statement at the cursor, or a triangle to fold or open what starts on that line"
         NotificationCenter.default.addObserver(self, selector: #selector(changed), name: NSView.boundsDidChangeNotification,
                                                object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(changed), name: NSTextView.didChangeSelectionNotification,
@@ -30,7 +35,7 @@ final class LineNumberRuler: NSRulerView {
         guard let editor else { return }
         let font = NSFont.monospacedDigitSystemFont(ofSize: max(9, editor.fontSize - 2), weight: .regular)
         let lines = editor.string.utf16.reduce(1) { $0 + ($1 == 0x0A ? 1 : 0) }
-        let width = max(32, ceil(("\(lines)" as NSString).size(withAttributes: [.font: font]).width) + 18)
+        let width = max(44, ceil(("\(lines)" as NSString).size(withAttributes: [.font: font]).width) + 30)
         if abs(width - ruleThickness) > 0.5 { ruleThickness = width }
         needsDisplay = true
     }
@@ -81,6 +86,10 @@ final class LineNumberRuler: NSRulerView {
             label.draw(at: NSPoint(x: ruleThickness - 10 - size.width, y: y + (fragment.height - size.height) / 2),
                        withAttributes: attributes)
             drawFoldTriangle(lineRange, y: y, height: fragment.height, font: font)
+            if onRun != nil, let start = statementStart, NSLocationInRange(start, lineRange) {
+                let mark = NSAttributedString(string: "▶", attributes: [.font: NSFont.systemFont(ofSize: 9), .foregroundColor: NSColor.statusOK])
+                mark.draw(at: NSPoint(x: 2, y: y + (fragment.height - mark.size().height) / 2))
+            }
             line += 1
             if NSMaxRange(lineRange) <= index || (index == text.length) { break }
             index = NSMaxRange(lineRange)
@@ -104,9 +113,24 @@ final class LineNumberRuler: NSRulerView {
         mark.draw(at: NSPoint(x: ruleThickness - 9, y: y + (height - size.height) / 2), withAttributes: attributes)
     }
 
-    /// A click on the triangles' margin folds or opens that line.
+    /// Where the statement at the caret starts, worked out when the caret or the text has moved. Off for a very long text.
+    private var statementStart: Int? {
+        guard let editor, onRun != nil, (editor.string as NSString).length <= SQLEditorView.longText else { return nil }
+        let key = [editor.selectedRange().location, editor.tokens.count, (editor.string as NSString).length]
+        if key != startKey {
+            startKey = key
+            startCache = SQLSplitter.statement(at: key[0], in: editor.string, noBackslashEscapes: editor.noBackslashEscapes)?.range.lowerBound
+        }
+        return startCache
+    }
+
+    /// A click on ▶ runs the statement at the caret; on the triangles' margin it folds or opens that line.
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if point.x < 14, let onRun, let editor, let start = statementStart {
+            let place = editor.characterIndexForInsertion(at: NSPoint(x: 0, y: editor.convert(event.locationInWindow, from: nil).y))
+            if NSLocationInRange(start, (editor.string as NSString).lineRange(for: NSRange(location: place, length: 0))) { return onRun() }
+        }
         guard let editor, point.x >= ruleThickness - 10 else { return super.mouseDown(with: event) }
         let place = editor.characterIndexForInsertion(at: NSPoint(x: 0, y: editor.convert(event.locationInWindow, from: nil).y))
         editor.toggleFold(lineRange: (editor.string as NSString).lineRange(for: NSRange(location: place, length: 0)))

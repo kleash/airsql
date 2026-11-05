@@ -191,8 +191,12 @@ extension AppTests {
             _ = try await killer.query("KILL \(thread)")
             try? await session.ping()
             #expect(session.wasLost)
-            await run("SELECT 1;")
-            #expect(console.messagesView.messages.last?.text.contains("session was lost") == true)
+            console.editor.setText("SELECT 1;")
+            console.runStatement(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(console.messagesView.messages.last?.text.contains("session with it") == true)
+            #expect(await call(harness, "press", ["title": "Open New Session"]).error == nil)
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             await run("SELECT 2;")
             #expect(console.lastOutcome?.results.first?.rows?.string(0, 0) == "2", "\(console.messagesView.messages.map(\.text))")
             #expect(console.session !== session)
@@ -450,6 +454,250 @@ extension AppTests {
             await connection.disconnect()
             _ = try await root.query("DROP USER lane_run_limit")
             await admin.disconnect()
+        }
+
+        /// A killed session and a whole connection lost, each with a transaction open: the tab says the server rolled it back
+        /// and how many rows, Run runs nothing until the person opens a new session, and that one stays in Manual.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aLostTransactionStopsTheTabUntilThePersonAnswers() async throws {
+            let (main, harness, console, connection) = try await Self.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let admin = try await connection.toolsSession()
+            let database = "lane_run_lost"
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)", "CREATE TABLE \(database).t (id INT PRIMARY KEY)"] {
+                _ = try await admin.query(sql)
+            }
+            func count() async throws -> String? { try await admin.query("SELECT COUNT(*) FROM \(database).t").first?.rows?.string(0, 0) }
+            func write(_ sql: String) async {
+                console.editor.setText(sql)
+                console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+                console.runStatement(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 3])
+                if main.window?.attachedSheet != nil { _ = await call(harness, "press", ["title": "Run"]) }
+                _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            }
+            /// Run is stopped by the sheet and sends nothing; its button lets the next Run through.
+            func runIsStopped() async throws {
+                let before = console.lastOutcome?.statement.sql
+                console.editor.setText("INSERT INTO \(database).t VALUES (99);")
+                console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+                console.runStatement(nil)
+                #expect(await eventually(timeout: 10) { main.window?.attachedSheet != nil })
+                #expect(console.lastOutcome?.statement.sql == before && console.running == nil)
+                #expect(await call(harness, "press", ["title": "Cancel"]).error == nil)
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                #expect(console.lostSession != nil, "Cancel leaves it stopped")
+                console.runStatement(nil)
+                #expect(await eventually(timeout: 10) { main.window?.attachedSheet != nil })
+                #expect(await call(harness, "press", ["title": "Open New Session"]).error == nil)
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                #expect(console.lostSession == nil && console.session == nil)
+            }
+
+            console.setTransactionMode(Self.manualItem())
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            await write("INSERT INTO \(database).t VALUES (1), (2), (3);")
+            #expect(console.transactionBadge?.hasPrefix("Transaction open · 3 changes") == true, "\(console.messagesView.messages.map(\.text))")
+            let thread = try #require(console.session?.server?.threadID)
+
+            // The session alone: killed, then noticed by keep-alive's ping.
+            let session = try #require(console.session)
+            _ = try await admin.query("KILL \(thread)")
+            try? await session.ping()
+            console.noticeLostSession()
+            #expect(console.lostSession?.changes == 3 && console.lostSession?.dropped == true)
+            let said = console.messagesView.messages.last
+            #expect(said?.level == .error && said?.text.contains("rolled back this tab's open transaction") == true
+                    && said?.text.contains("3 row changes are gone") == true, "\(said?.text ?? "")")
+            #expect(console.selectedResult === console.messagesTab)
+            #expect(console.transactionBadge == "Transaction rolled back: the connection ended")
+            try await runIsStopped()
+            #expect(try await count() == "0")
+
+            await write("INSERT INTO \(database).t VALUES (4), (5);")
+            #expect(console.session?.autocommit == false, "still Manual: it would otherwise commit each statement")
+            #expect(try await count() == "0", "held in the new session's transaction")
+
+            // The whole connection: the route goes, every session closes, and a later Connect gives a new Connection.
+            let replacement = Connection(options: DBLab.options(Lab.mariadb114, tls: DBLab.required), log: DBLab.log)
+            try await replacement.connect()
+            await connection.disconnect()
+            console.model.states[Fixtures.production.id] = .failed("The connection was lost.")
+            #expect(await eventually(timeout: 5) { console.lostSession != nil })
+            ConsoleViewController.openConnection = { $0 == Fixtures.production.id ? replacement : nil }
+            console.model.states[Fixtures.production.id] = .connected(server: "MariaDB")
+            #expect(console.lostSession?.changes == 2)
+            #expect(console.messagesView.messages.last?.text.contains("was lost, and the server rolled back") == true)
+            try await runIsStopped()
+            await write("INSERT INTO \(database).t VALUES (6);")
+            #expect(console.session?.autocommit == false && console.session?.inTransaction == true)
+            console.rollback(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let fresh = try await replacement.toolsSession()
+            _ = try await fresh.query("DROP DATABASE \(database)")
+            await replacement.disconnect()
+        }
+
+        /// A table tab's manual transaction, killed: the tab says so, Apply is stopped, and a new session reads the truth.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aTableTabsLostTransactionStopsApply() async throws {
+            let connection = Connection(options: DBLab.options(Lab.mariadb114, tls: DBLab.required), log: DBLab.log)
+            try await connection.connect()
+            defer { Task { await connection.disconnect() } }
+            let database = "lane_run_lost_table"
+            let admin = try await connection.session(.schema)
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)",
+                        "CREATE TABLE \(database).t (id INT PRIMARY KEY, name VARCHAR(20))", "INSERT INTO \(database).t VALUES (1, 'a')"] {
+                _ = try await admin.query(sql)
+            }
+            let schema = SchemaCache(source: admin, includes: { $0 == database })
+            try await schema.load()
+            let saved = SavedConnection(name: "Lab", host: "127.0.0.1", user: "airsql")
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let tab = TableDataController(model: model, context: EditorContext(connection: saved, sessions: connection, schema: schema),
+                                          database: database, table: "t")
+            main.select(main.open(tab, title: "t", connection: saved.id))
+            func ready() async { _ = await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return tab.source != nil && tab.loading == nil } }
+            await ready()
+            tab.setTransactionMode(Self.manualItem())
+            #expect(await eventually(timeout: 10) { tab.transactionSession != nil })
+            await ready()
+            let source = try #require(tab.source)
+            tab.keep(.text("b"), row: 0, column: 1)
+            tab.applyChanges(nil)
+            #expect(await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return source.changes.isEmpty && tab.loading == nil })
+            let session = try #require(tab.transactionSession)
+            _ = try await admin.query("KILL \(try #require(session.server?.threadID))")
+            try? await session.ping()
+            tab.noticeLostTransaction()
+            #expect(tab.lostTransaction?.changes == 1 && tab.problem?.contains("1 row change is gone") == true, "\(tab.problem ?? "")")
+            #expect(tab.transactionBadge == "Transaction rolled back: the connection ended")
+            tab.keep(.text("c"), row: 0, column: 1)
+            tab.applyChanges(nil)
+            #expect(await eventually(timeout: 10) { main.window?.attachedSheet != nil })
+            #expect(tab.source?.changes.isEmpty == false, "nothing applied")
+            #expect(await call(harness, "press", ["title": "Open New Session"]).error == nil)
+            #expect(await eventually(timeout: 10) { tab.lostTransaction == nil && tab.transactionSession?.isConnected == true })
+            await ready()
+            #expect(tab.problem == nil)
+            let name = try await admin.query("SELECT name FROM \(database).t WHERE id = 1").first?.rows?.string(0, 0)
+            #expect(name == "a")
+            _ = try await admin.query("DROP DATABASE \(database)")
+        }
+
+        /// Run to File streams a read to a file, refuses anything else; Retry sends the statement again; a result moves to a
+        /// window; a step shows its details; Save keeps the file's encoding.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func rowsGoToAFileAndResultsToAWindow() async throws {
+            let (main, harness, console, connection) = try await Self.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let folder = URL(fileURLWithPath: try scratch())
+            console.editor.setText("SELECT id FROM fixture.big ORDER BY id LIMIT 25000;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            let csv = folder.appendingPathComponent("rows.csv")
+            console.writeRows(of: SQLStatement(sql: "SELECT id, NULL AS n FROM fixture.big ORDER BY id LIMIT 25000"), to: csv)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 30])
+            let lines = try String(contentsOf: csv, encoding: .utf8).split(separator: "\n")
+            #expect(lines.count == 25_001 && lines[0] == "id,n" && lines[1] == "1,NULL", "\(console.messagesView.messages.map(\.text))")
+            #expect(console.messagesView.messages.last?.text.hasPrefix("25,000 rows written to rows.csv") == true)
+            let json = folder.appendingPathComponent("rows.json")
+            console.writeRows(of: SQLStatement(sql: "SELECT 1 AS a UNION SELECT 2"), to: json)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 30])
+            let parsed = try JSONSerialization.jsonObject(with: Data(contentsOf: json)) as? [[String: Any]]
+            #expect(parsed?.count == 2)
+            console.editor.setText("DELETE FROM nothing;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            console.runToFile(nil)
+            #expect(console.messagesView.messages.last?.text.hasPrefix("Run to File takes a statement that only reads") == true)
+
+            // Retry: the table that was missing is there the second time.
+            let setup = try await connection.toolsSession()
+            _ = try await setup.query("DROP DATABASE IF EXISTS lane_run_retry")
+            _ = try await setup.query("CREATE DATABASE lane_run_retry")
+            console.editor.setText("SELECT * FROM lane_run_retry.t;\nSELECT 2;")
+            console.runAll(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = try await setup.query("CREATE TABLE lane_run_retry.t (a INT)")
+            #expect(await call(harness, "press", ["title": "Retry"]).error == nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.resultTabs.count == 2 && console.runMarks.marks.last?.failed == false, "\(console.messagesView.messages.map(\.text))")
+            _ = try await setup.query("DROP DATABASE lane_run_retry")
+
+            let moved = try #require(console.resultTabs.first)
+            let window = console.moveToWindow(moved)
+            #expect(console.resultTabs.count == 1 && ResultWindowController.open.contains { $0 === window })
+            #expect(window.window?.contentView === moved.view)
+            window.close()
+            #expect(!ResultWindowController.open.contains { $0 === window })
+
+            console.editor.setText("SELECT * FROM fixture.customers WHERE id > 0;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            console.explain(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let plan = try #require(console.resultTabs.last?.view as? PlanView)
+            let outline = try #require(plan.operations?.outline)
+            outline.selectRowIndexes([outline.numberOfRows - 1], byExtendingSelection: false)
+            let details = try #require(find(NSTextView.self, id: "console.planDetails", in: plan))
+            #expect(details.string.contains("table_name: customers"), "\(details.string)")
+            await connection.disconnect()
+            _ = main
+        }
+
+        /// The steps as boxes and bars: a child sits under its parent, a bar's width follows its share.
+        @Test func aPlanDrawsAsBoxesAndBars() {
+            let leaf = { (name: String, time: Double) in PlanNode(operation: name, time: time) }
+            let nodes = [PlanNode(operation: "root", time: 10, children: [leaf("a", 3), leaf("b", 1)])]
+            let diagram = PlanDiagramView(nodes: nodes)
+            let root = diagram.boxes.first { $0.node.operation == "root" }, a = diagram.boxes.first { $0.node.operation == "a" }
+            let b = diagram.boxes.first { $0.node.operation == "b" }
+            #expect(a?.parent == root?.frame && b?.parent == root?.frame && (a?.frame.minY ?? 0) > (root?.frame.maxY ?? 0))
+            #expect(root?.frame.midX == ((a?.frame.midX ?? 0) + (b?.frame.midX ?? 0)) / 2)
+            let flame = PlanFlameView(nodes: nodes)
+            let wide = flame.boxes.first { $0.node.operation == "a" }, thin = flame.boxes.first { $0.node.operation == "b" }
+            #expect(wide?.frame.width == 3 * (thin?.frame.width ?? 0))
+        }
+
+        /// Save keeps a file's encoding, and asks before changing it.
+        @Test func saveKeepsTheFilesEncoding() async throws {
+            let (main, harness, console) = try await ConsoleAppTests.console()
+            let url = URL(fileURLWithPath: try scratch()).appendingPathComponent("latin.sql")
+            console.setFile(url, savedText: "")
+            console.fileFormat = ConsoleScript.FileFormat(encoding: .windowsCP1252)
+            console.editor.setText("SELECT 'é'")
+            var saved = false
+            console.save(as: false) { saved = $0 }
+            #expect(await eventually(timeout: 5) { saved })
+            #expect(try Data(contentsOf: url).last == 0x27 && Data(contentsOf: url).contains(0xE9))
+            console.editor.setText("SELECT '日本'")
+            saved = false
+            console.save(as: false) { saved = $0 }
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(main.window?.attachedSheet != nil)
+            #expect(await call(harness, "press", ["title": "Save as UTF-8"]).error == nil)
+            #expect(await eventually(timeout: 5) { saved })
+            #expect(try String(contentsOf: url, encoding: .utf8) == "SELECT '日本'" && console.fileFormat == ConsoleScript.FileFormat())
+        }
+
+        /// A click on the ▶ beside the statement at the cursor runs it; a click beside another line doesn't.
+        @Test func theGuttersArrowRunsTheStatement() async throws {
+            let (main, harness, console) = try await ConsoleAppTests.console()
+            console.editor.setText("SELECT 1;\n\n\nSELECT 2;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            main.window?.layoutIfNeeded()
+            let ruler = try #require(console.resultsRuler)
+            ruler.display()
+            var runs = 0
+            ruler.onRun = { runs += 1 }
+            func click(line: CGFloat) async {
+                let height = console.editor.layoutManager?.defaultLineHeight(for: console.editor.font!) ?? 16
+                let point = ruler.convert(NSPoint(x: 6, y: 8 + height * (line + 0.5)), to: nil)
+                _ = await call(harness, "click", ["x": point.x, "y": (main.window?.frame.height ?? 0) - point.y])
+            }
+            await click(line: 2)
+            #expect(runs == 0)
+            await click(line: 0)
+            #expect(runs == 1)
         }
     }
 }
