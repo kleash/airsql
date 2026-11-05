@@ -278,5 +278,165 @@ extension AppTests {
             try await Task.sleep(for: .milliseconds(100))
             #expect(main.tabs.count == 1)
         }
+
+        @Test func aPinnedTabGoesLeftAndCloseAllLeavesIt() throws {
+            let (main, _) = appWindow(testModel())
+            _ = main.open(FixtureContent("a"), title: "A", connection: nil)
+            let b = main.open(FixtureContent("b"), title: "B", connection: nil)
+            main.togglePinTab(nil)
+            #expect(main.tabs.first === b && b.pinned)
+            main.closeAllTabs(nil)
+            #expect(main.tabs.count == 1 && main.tabs.first === b)
+            main.setPinned(false, b)
+            main.closeAllTabs(nil)
+            #expect(main.tabs.isEmpty)
+        }
+
+        // MARK: Several windows
+
+        /// One transaction on a shared session, with tabs on it in two windows: Quit lists it once from either window,
+        /// closing one tab doesn't ask about it while the other stays, and it survives the tab's move.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aSharedTransactionIsOneAcrossWindows() async throws {
+            let (main, harness, first, connection) = try await ConsoleRunAppTests.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let setup = try await connection.toolsSession()
+            let database = "lane_workspace_windows"
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)", "CREATE TABLE \(database).t (id INT PRIMARY KEY)"] {
+                _ = try await setup.query(sql)
+            }
+            var saved = try #require(main.model.connection(Fixtures.production.id))
+            saved.sharedQuerySession = true
+            main.model.save(saved)
+            let window = main.anotherWindow()
+            keptWindows.append(window)
+            let tab = window.openConsole(text: "", title: "Other", connection: Fixtures.production.id)
+            let second = try #require(tab.content as? ConsoleViewController)
+            #expect(first.sessionKey == second.sessionKey)
+            first.setTransactionMode(ConsoleRunAppTests.manualItem())
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            first.editor.setText("INSERT INTO \(database).t VALUES (1);")
+            first.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            first.runStatement(nil)
+            if main.window?.attachedSheet != nil { _ = await call(harness, "press", ["title": "Run"]) }
+            #expect(await eventually(timeout: 20) { first.running == nil && first.session?.inTransaction == true })
+            #expect(second.session === first.session)
+
+            let lines = window.unfinishedWork().filter { $0.hasPrefix("A transaction") }
+            #expect(lines.count == 1, "\(lines)")
+            #expect(window.unfinishedWork() == main.unfinishedWork())
+
+            window.moveTabToNewWindow(nil)
+            let third = try #require(main.model.windows.last)
+            keptWindows.append(third)
+            third.window?.orderOut(nil)  // the real display isn't the tests'
+            #expect(third.tabs.first === tab && second.session?.inTransaction == true)
+
+            // The other tab stays open on the session, so closing this one leaves the transaction to it, without asking.
+            var closed = false
+            third.close(tab) { closed = true }
+            #expect(await eventually(timeout: 5) { closed })
+            #expect(first.session?.inTransaction == true)
+            first.rollback(nil)
+            #expect(await eventually(timeout: 10) { first.session?.inTransaction == false })
+            _ = try await setup.query("DROP DATABASE \(database)")
+            await connection.disconnect()
+        }
+
+        @Test func quitAsksAboutEveryWindow() async throws {
+            let (main, _, tab) = try await GridDataAppTests.tab(session: FakeTableSession())
+            let front = main.anotherWindow()
+            keptWindows.append(front)
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            tab.setCellDefault(nil)
+            #expect(front.unfinishedWork() == ["orders on Local: 1 pending change, kept for the next time you open the table"])
+            tab.revertAllChanges(nil)
+        }
+
+        @Test func aFileOpenInOneWindowShowsThereNotInASecondTab() async throws {
+            let folder = try scripts()
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let model = testModel([Fixtures.local])
+            let (first, _) = appWindow(model)
+            let second = first.anotherWindow()
+            keptWindows.append(second)
+            let url = folder.appendingPathComponent("one.sql")
+            await first.openFiles([url]).value
+            await second.openFiles([url]).value
+            #expect(first.tabs.count == 1 && second.tabs.isEmpty)
+        }
+
+        @Test func aTabMovesWithItsContentAndTheFirstWindowFollows() throws {
+            let model = testModel()
+            let (first, _) = appWindow(model)
+            let content = FixtureContent("moves"), stays = FixtureContent("stays")
+            let a = first.open(stays, title: "A", connection: nil), b = first.open(content, title: "B", connection: nil)
+            first.moveTabToNewWindow(nil)
+            let second = try #require(model.windows.last)
+            keptWindows.append(second)
+            second.window?.orderOut(nil)  // the real display isn't the tests'
+            #expect(model.windows.count == 2 && first.tabs.count == 1 && first.selectedTab === a)
+            #expect(second.tabs.first === b && content.view.window === second.window)
+            #expect(second.window?.isExcludedFromWindowsMenu == false)
+            second.moveTabToNextWindow(nil)
+            #expect(first.tabs.count == 2 && second.tabs.isEmpty && first.selectedTab === b)
+        }
+
+        @Test func closingAWindowAsksItsTabsAndTheLastOneStays() throws {
+            let model = testModel()
+            let (first, _) = appWindow(model)
+            let second = first.anotherWindow()
+            keptWindows.append(second)
+            let refuses = FixtureContent("keeps")
+            refuses.closes = false
+            second.open(refuses, title: "A", connection: nil)
+            #expect(second.windowShouldClose(try #require(second.window)) == false)
+            #expect(model.windows.count == 2, "a tab that says no keeps its window")
+            refuses.closes = true
+            _ = second.windowShouldClose(try #require(second.window))
+            #expect(model.windows.count == 1 && model.windows.first === first)
+            #expect(first.windowShouldClose(try #require(first.window)) == true)
+            #expect(model.windows.count == 1, "the last window hides and keeps its tabs")
+        }
+
+        @Test func everyWindowComesBackAfterARelaunch() async throws {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("airsql-windows-\(UUID().uuidString).json")
+            defer {
+                try? FileManager.default.removeItem(at: url)
+                ConsoleDocuments.shared.fileURL = ConsoleTabStore.fileURL
+            }
+            ConsoleDocuments.shared.fileURL = url
+            let model = testModel([Fixtures.local])
+            let (first, _) = appWindow(model)
+            let second = first.anotherWindow()
+            keptWindows.append(second)
+            first.openConsole(text: "SELECT 'first'", title: "One", connection: nil)
+            second.openConsole(text: "SELECT 'second'", title: "Two", connection: nil)
+            ConsoleDocuments.shared.main = first
+            ConsoleDocuments.shared.saveNow()
+
+            let again = testModel([Fixtures.local])
+            let (relaunched, _) = appWindow(again)
+            ConsoleDocuments.shared.restore(into: relaunched)
+            await ConsoleDocuments.shared.restoring?.value
+            keptWindows += again.windows
+            #expect(again.windows.count == 2)
+            #expect(again.windows.map { $0.tabs.map(\.title) } == [["One"], ["Two"]])
+            again.windows.last?.window?.orderOut(nil)
+        }
+
+        @Test func agentsSeeQueryTabsInEveryWindow() throws {
+            var saved = Fixtures.local
+            saved.agentAccess = .schemaRead
+            let model = testModel([saved])
+            let (first, _) = appWindow(model)
+            let second = first.anotherWindow()
+            keptWindows.append(second)
+            let service = AgentService(model: model, main: first)
+            first.openConsole(text: "SELECT 1", title: "One", connection: saved.id)
+            second.openConsole(text: "SELECT 2", title: "Two", connection: saved.id)
+            #expect(service.consoleTabs().count == 2)
+            #expect(second.agents === service)
+        }
     }
 }

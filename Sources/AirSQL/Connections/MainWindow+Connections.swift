@@ -22,7 +22,7 @@ extension MainWindowController {
     /// client tool is working through one of them (disconnecting stops it: a route it uses would go from under it).
     @objc func disconnect(_ sender: Any?) {
         let ids = targetConnections.map(\.id).filter(isConnected)
-        let busy = tabs.filter { tab in
+        let busy = model.allTabs.filter { tab in
             ids.contains(tab.connectionID ?? UUID()) && (tab.tabContent?.isEdited == true || tab.tabContent?.transactionBadge != nil
                 || (tab.content as? ConsoleViewController)?.pendingResultRows ?? 0 > 0)
         }

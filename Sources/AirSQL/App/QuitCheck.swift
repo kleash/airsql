@@ -2,14 +2,15 @@ import AirSQLCore
 import AppKit
 
 // Quit asks first about what it would leave unfinished, as its menu item promises (plan §2.10): tables with pending
-// changes, console transactions still open, console results' edits not applied and client tools running, in one sheet.
+// changes, console transactions still open, console results' edits not applied and client tools running, in one sheet,
+// in every main window.
 extension MainWindowController {
     /// A line for each thing Quit leaves unfinished: a table's pending changes (kept for the next time it opens), each
     /// session's open console transaction (rolled back as AirSQL disconnects) and a console's results' edits not applied
     /// (discarded). Connections whose Safety settings don't warn on close are left out.
     func unfinishedWork() -> [String] {
         var lines: [String] = [], transactions: Set<UUID> = []
-        for tab in tabs {
+        for tab in model.allTabs {
             if let table = tab.shown as? TableDataController, table.inTransaction, model.data.safety(for: table.context.connection).warnOnClose {
                 lines.append("A transaction in “\(tab.title)” on \(table.context.connection.displayName), not committed: it is rolled back")
             }

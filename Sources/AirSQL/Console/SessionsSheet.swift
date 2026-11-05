@@ -55,10 +55,10 @@ extension MainWindowController {
     /// What each session of the connection is for, as the tabs know it.
     func sessionRows(_ sessions: [DBConnection]) -> [SessionsList.Row] {
         sessions.map { session in
-            let console = tabs.lazy.compactMap { tab -> (Tab, ConsoleViewController)? in
+            let console = model.allTabs.lazy.compactMap { tab -> (Tab, ConsoleViewController)? in
                 (tab.content as? ConsoleViewController).flatMap { $0.session === session ? (tab, $0) : nil }
             }
-            let table = tabs.first { ($0.shown as? TableDataController)?.transactionSession === session }
+            let table = model.allTabs.first { ($0.shown as? TableDataController)?.transactionSession === session }
             let job: String
             if let (tab, _) = console.first {
                 job = session.role == .main ? "Query tabs sharing it" : "“\(tab.title)”"

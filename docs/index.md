@@ -37,7 +37,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [AI agents](agents.md): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
 - [Liquibase changelogs](liquibase.md): a database as formatted SQL changesets, and any change saved as one.
-- [Files and your workspace](workspace.md): attached folders, scratch files and a connection's consoles.
+- [Files and your workspace](workspace.md): attached folders, scratch files, a connection's consoles, split tabs, several windows and your own shortcuts.
 - [Keyboard shortcuts](shortcuts.md): every command's shortcut.
 - [Accessibility](accessibility.md): VoiceOver, the keyboard, motion and text size.
 - [Privacy and security](privacy-security.md): what AirSQL connects to, where passwords are kept, what agents may do.

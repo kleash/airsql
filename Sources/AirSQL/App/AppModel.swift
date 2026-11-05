@@ -1,7 +1,7 @@
 // Ported from AirSCP 1.4.0 Sources/AirSCP/AppModel.swift (the saved data shared by the windows, saved on every change).
 import AirSQLCore
+import AppKit
 import Combine
-import Foundation
 import os
 
 let log = Logger(subsystem: "com.kleash.airsql", category: "app")
@@ -40,6 +40,17 @@ final class AppModel: ObservableObject {
     /// What the status bar's agent chip says ("Claude Code · reading schema"); nil hides it. Set by agent access.
     @Published var agentStatus: String?
     let activity: ActivityCenter
+    /// The main windows. Each has its own tabs and sidebar; connections, sessions and the transaction of a shared session
+    /// are the model's and `ConsoleViewController.shared`'s, so anything about all the tabs asks `allTabs`, not a window.
+    var windows: [MainWindowController] = []
+    var allTabs: [Tab] { windows.flatMap(\.tabs) }
+    /// The window in front, which what comes from outside a window (a file from Finder, an agent) goes to.
+    var frontWindow: MainWindowController? {
+        guard windows.count > 1 else { return windows.first }
+        return NSApp.orderedWindows.lazy.compactMap { $0.windowController as? MainWindowController }.first { [windows] front in
+            windows.contains { $0 === front }
+        } ?? windows.first
+    }
     /// Connects and disconnects; the connected connections' sessions are `connector.open[id]?.connection`.
     lazy var connector = Connector(model: self)
     /// Saved passwords by Keychain key (a connection's id): the Keychain, off the main thread; tests replace them.

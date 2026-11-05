@@ -75,6 +75,7 @@ extension AgentService {
         if tool == "double_click" { (name, arguments["count"]) = ("click", 2) }
         if tool == "right_click" { (name, arguments["button"]) = ("click", "right") }
         let server = harness
+        server.main = main
         return await AgentGate.$agent.withValue(client) { await server.handle(name, arguments) }
     }
 

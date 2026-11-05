@@ -50,6 +50,8 @@ final class Tab {
     var title: String
     var connectionID: UUID?
     let content: NSViewController
+    /// It stays at the left of the strip, and Close Others and Close All leave it.
+    var pinned = false
 
     init(title: String, connectionID: UUID?, content: NSViewController) {
         self.title = title
@@ -217,7 +219,7 @@ final class TabBarView: NSView {
         if let tab = button.tab { controller?.select(tab) }
         let menu = NSMenu(title: "Tab")
         menu.add([Commands.closeTab, Commands.closeOtherTabs, Commands.closeAllTabs, Commands.duplicateTab, Commands.renameTab,
-                  nil, Commands.revealInFinder, Commands.changeConnection])
+                  Commands.pinTab, nil, Commands.moveTabToNewWindow, Commands.moveTabToNextWindow, nil, Commands.revealInFinder, Commands.changeConnection])
         if let before, before !== button.tab {
             let beside = Commands.showBeside.item()
             beside.title = "Show Beside “\(before.title)”"
@@ -296,6 +298,9 @@ final class TabButton: NSView {
         let edited = tab.tabContent?.isEdited ?? false
         dot.isHidden = !edited || hovering
         close.isHidden = edited && !hovering
+        close.image = NSImage(systemSymbolName: tab.pinned ? "pin.fill" : "xmark", accessibilityDescription: tab.pinned ? "Unpin Tab" : "Close Tab")?
+            .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
+        close.toolTip = tab.pinned ? "Unpin this tab" : Commands.closeTab.tipWithShortcut
         let place = name.map { " on " + $0 + (connection?.marks.isEmpty == false ? " (\(connection?.marks ?? ""))" : "") } ?? ""
         toolTip = tab.title + place + (edited ? " (unsaved)" : "") + ": click to show it, drag to move it, double-click to rename it, middle-click to close it, right-click for more"
         setAccessibilityLabel(tab.title + place)
@@ -368,7 +373,7 @@ final class TabButton: NSView {
 
     @objc private func closeClicked() {
         guard let tab else { return }
-        bar?.controller?.close(tab)
+        if tab.pinned { bar?.controller?.setPinned(false, tab) } else { bar?.controller?.close(tab) }
     }
 
     // MARK: Renaming in place

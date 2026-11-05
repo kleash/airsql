@@ -20,7 +20,8 @@ struct AgentEvent {
 @MainActor
 final class AgentService {
     let model: AppModel
-    weak var main: MainWindowController?
+    /// The window in front, as what comes from an agent is meant for what the person is looking at.
+    var main: MainWindowController? { model.frontWindow }
     private let directory: URL
     private var listener: AgentListener?
     private(set) var events: [AgentEvent] = []
@@ -33,20 +34,24 @@ final class AgentService {
     private var running: [Activity] = []
     static let eventLimit = 200
 
-    /// Where open_in_console puts SQL: the main window's console tabs.
+    /// Where open_in_console puts SQL: the console tabs of the window in front (`AppModel`).
     var consoles: AgentConsoles?
     /// Carries out the UI tools on the person's windows.
     lazy var harness = AgentServer(main: main, model: model)
 
     init(model: AppModel, main: MainWindowController?, directory: URL = AgentSocket.directory) {
         self.model = model
-        self.main = main
         self.directory = directory
         observers.append(model.$data.map(\.settings.agentsAllowed).removeDuplicates().sink { [weak self] allowed in
             DispatchQueue.main.async { self?.update(allowed: allowed) }
         })
-        main?.statusBar.agent.popover = { [weak self] in self.map { AgentActivityPopover(service: $0) } }
-        main?.agents = self
+        model.windows.forEach(adopt)
+    }
+
+    /// `window`'s status bar and View ▸ Agent Results work with this service.
+    func adopt(_ window: MainWindowController) {
+        window.statusBar.agent.popover = { [weak self] in self.map { AgentActivityPopover(service: $0) } }
+        window.agents = self
     }
 
     /// Opens or closes the socket as the setting says; turning agents off also stops their calls under way.

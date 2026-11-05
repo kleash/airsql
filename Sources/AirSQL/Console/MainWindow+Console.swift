@@ -65,8 +65,9 @@ extension MainWindowController: AgentConsoles {
                 let read = await Task.detached { () -> Result<(text: String, format: ConsoleScript.FileFormat), Error> in
                     Result { ConsoleScript.decoded(try Data(contentsOf: url)) }
                 }.value
-                if let tab = tabs.first(where: { ($0.content as? ConsoleViewController)?.fileURL == url }) {
-                    select(tab)
+                // In any window: two tabs on a file would overwrite each other.
+                if let tab = model.allTabs.first(where: { ($0.content as? ConsoleViewController)?.fileURL == url }) {
+                    show(tab)
                     continue
                 }
                 switch read {
@@ -90,6 +91,11 @@ extension MainWindowController: AgentConsoles {
                                                        + "runs until you press Run.")
         return tab
     }
+}
+
+/// An agent's SQL goes to the window in front.
+extension AppModel: AgentConsoles {
+    func open(sql: String, title: String, connection: UUID?) -> Tab? { frontWindow?.open(sql: sql, title: title, connection: connection) }
 }
 
 /// A console tab as agents' read_console sees it: its text, its database and the person's last statement.

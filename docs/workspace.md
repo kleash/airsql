@@ -41,6 +41,25 @@ again for one tab. Right-click a tab and choose **Show Beside** to pair it with 
 The side with the focus has an accent line along its top, and the status bar and every command follow it. Showing another
 tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the focus across; closing either tab ends the split.
 
+## Pin a tab
+
+**Window ▸ Pin Tab**, also in a tab's right-click menu, keeps the tab at the left of the strip: **Close Other Tabs** and
+**Close All Tabs** leave it, and it stays pinned at the next launch. Click its pin to unpin it.
+
+## Several windows
+
+**File ▸ New Window** (⇧⌘N) opens another main window, for another display or another job. **Window ▸ Move Tab to New
+Window**, also in a tab's right-click menu, takes the tab shown out to a window of its own; **Move Tab to Next Window** moves
+it on, or back. A tab keeps its session, its transaction and its edits as it moves.
+
+Each window has its own tabs and sidebar. Connections belong to AirSQL, not to a window: connect once and every window can
+use the connection, and query tabs sharing one session share it across windows too. A file or a table already open in a
+window shows there rather than opening twice.
+
+Closing a window closes its tabs, asking first about anything unfinished; Cancel keeps it. The last window just hides, as
+it always did, and comes back from the Dock. Quit asks about all the windows at once, and at the next launch they all come
+back in their places. Agents work with the window in front, and read query tabs in every window.
+
 ## Your own shortcuts
 
 **Settings ▸ Keys** lists every command with its shortcut. Filter by name or key, then double-click a row and press the new

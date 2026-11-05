@@ -7,12 +7,12 @@ extension MainWindowController {
     @discardableResult
     func openTableData(_ table: String, database: String, context: EditorContext, condition: String? = nil) -> Tab {
         // A preview with pending changes counts: a second tab on the table would edit the same changes. A plain one doesn't.
-        if condition == nil, let tab = tabs.first(where: { tab in
+        if condition == nil, let tab = model.allTabs.first(where: { tab in
             (tab.shown as? TableDataController).map {
                 $0.shows(context.connection.id, database, table) && ($0 === tab.content || $0.isEdited)
             } == true
         }) {
-            select(tab)
+            show(tab)
             return tab
         }
         let content = TableDataController(model: model, context: context, database: database, table: table, filter: condition)

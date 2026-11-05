@@ -178,9 +178,9 @@ extension MainWindowController {
     }
 
     private func tabItems() -> [QuickOpenSheet.Item] {
-        tabs.map { tab in
+        model.allTabs.map { tab in
             .init(name: tab.title, place: "Tab" + (model.connection(tab.connectionID).map { " on " + $0.displayName } ?? "")) { [weak self] in
-                self?.select(tab)
+                self?.show(tab)
             }
         }
     }
@@ -218,8 +218,10 @@ extension MainWindowController {
         return items
     }
 
+    /// Recent files, then those the Files panel has listed.
     func fileItems() -> [QuickOpenSheet.Item] {
-        NSDocumentController.shared.recentDocumentURLs.map { url in
+        let recent = NSDocumentController.shared.recentDocumentURLs
+        return (recent + sidebar.files.listedFiles.filter { !recent.contains($0) }).map { url in
             .init(name: url.lastPathComponent, place: "File in " + url.deletingLastPathComponent().path) { [weak self] in
                 self?.openFiles([url])
             }

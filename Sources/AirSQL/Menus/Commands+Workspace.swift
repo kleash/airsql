@@ -47,6 +47,16 @@ extension Commands {
     static let askAgentWrite = Command("Write SQL…", #selector(ConsoleViewController.askAgent(_:)), tag: AgentRequest.write.rawValue,
                                        tip: "Say what you want, and copy that as a request for your agent to write the SQL")
 
-    static let workspaceCommands = [askAgent, askAgentFix, askAgentOptimise, askAgentWrite, toggleBookmark, nextBookmark, previousBookmark, splitRight, showBeside, otherPane, filesPanel, attachFolder, detachFolder, newScratch, openFile, runFileOn, copyPath, trashScratch, consoleList,
+    static let newWindow = Command("New Window", #selector(MainWindowController.newWindow(_:)), "N", .command,
+                                   tip: "Open another main window on the same connections, with its own tabs")
+    static let moveTabToNewWindow = Command("Move Tab to New Window", #selector(MainWindowController.moveTabToNewWindow(_:)),
+                                            tip: "Take the tab shown out to a window of its own, session and all")
+    static let moveTabToNextWindow = Command("Move Tab to Next Window", #selector(MainWindowController.moveTabToNextWindow(_:)),
+                                             tip: "Move the tab shown to the next main window, session and all")
+
+    static let pinTab = Command("Pin Tab", #selector(MainWindowController.togglePinTab(_:)),
+                                tip: "Keep this tab at the left of the strip, out of Close Others and Close All")
+
+    static let workspaceCommands = [pinTab, newWindow, moveTabToNewWindow, moveTabToNextWindow, askAgent, askAgentFix, askAgentOptimise, askAgentWrite, toggleBookmark, nextBookmark, previousBookmark, splitRight, showBeside, otherPane, filesPanel, attachFolder, detachFolder, newScratch, openFile, runFileOn, copyPath, trashScratch, consoleList,
                                     defaultConsole]
 }

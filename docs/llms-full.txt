@@ -44,7 +44,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [AI agents](https://kleash.github.io/airsql/agents.html): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
 - [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html): a database as formatted SQL changesets, and any change saved as one.
-- [Files and your workspace](https://kleash.github.io/airsql/workspace.html): attached folders, scratch files and a connection's consoles.
+- [Files and your workspace](https://kleash.github.io/airsql/workspace.html): attached folders, scratch files, a connection's consoles, split tabs, several windows and your own shortcuts.
 - [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): every command's shortcut.
 - [Accessibility](https://kleash.github.io/airsql/accessibility.html): VoiceOver, the keyboard, motion and text size.
 - [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): what AirSQL connects to, where passwords are kept, what agents may do.
@@ -314,7 +314,7 @@ server for.
 
 While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
 or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
-window.
+window. Select some SQL in it and right-click to open it in a new query tab.
 
 ## Where it is
 
@@ -2180,6 +2180,25 @@ again for one tab. Right-click a tab and choose **Show Beside** to pair it with 
 The side with the focus has an accent line along its top, and the status bar and every command follow it. Showing another
 tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the focus across; closing either tab ends the split.
 
+## Pin a tab
+
+**Window ▸ Pin Tab**, also in a tab's right-click menu, keeps the tab at the left of the strip: **Close Other Tabs** and
+**Close All Tabs** leave it, and it stays pinned at the next launch. Click its pin to unpin it.
+
+## Several windows
+
+**File ▸ New Window** (⇧⌘N) opens another main window, for another display or another job. **Window ▸ Move Tab to New
+Window**, also in a tab's right-click menu, takes the tab shown out to a window of its own; **Move Tab to Next Window** moves
+it on, or back. A tab keeps its session, its transaction and its edits as it moves.
+
+Each window has its own tabs and sidebar. Connections belong to AirSQL, not to a window: connect once and every window can
+use the connection, and query tabs sharing one session share it across windows too. A file or a table already open in a
+window shows there rather than opening twice.
+
+Closing a window closes its tabs, asking first about anything unfinished; Cancel keeps it. The last window just hides, as
+it always did, and comes back from the Dock. Quit asks about all the windows at once, and at the next launch they all come
+back in their places. Agents work with the window in front, and read query tabs in every window.
+
 ## Your own shortcuts
 
 **Settings ▸ Keys** lists every command with its shortcut. Filter by name or key, then double-click a row and press the new
@@ -2391,6 +2410,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Forward | ⌃⌘→ |
 | Recent Tabs… | ⌃⌘E |
 | Go to Statement… | ⌃⌘O |
+| New Window | ⇧⌘N |
 | Toggle Bookmark | F3 |
 | Next Bookmark | ⌥F3 |
 | Previous Bookmark | ⌥⇧F3 |
@@ -2607,7 +2627,8 @@ The person sees each statement you ran and the rows you got in the connection's 
   max, average (numbers) and the five most common values, computed on the server.
 - `explain {connection, sql, database?, format?: traditional | json}`.
 - `open_in_console {sql, title?, connection?}`: never runs anything.
-- `read_console {tab?}`: by id or title from `context`; default the active console tab.
+- `read_console {tab?}`: by id or title from `context`, in any main window; default the active console tab. A person's
+  Ask an Agent request names a tab by id, and lines to look at.
 - `guide {topic?}`: this guide.
 
 Long calls send progress notifications when your client asks for them (`_meta.progressToken`).
@@ -2630,7 +2651,7 @@ Each connected connection you may read has its compact schema as a resource, `ai
 
 ## ui
 
-The UI tools act in AirSQL's windows as the person would; replies are JSON as text (`screenshot`: a PNG), `isError` on
+The UI tools act in AirSQL's windows as the person would, on the main window in front when there are several; replies are JSON as text (`screenshot`: a PNG), `isError` on
 failure, and every reply after an action carries the sheet it opened, if any.
 
 - `snapshot {include?, in?}`: windows, sidebar, tabs, status bar, activity and open sheets by default; `menus` lists

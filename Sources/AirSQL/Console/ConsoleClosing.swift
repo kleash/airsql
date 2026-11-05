@@ -32,9 +32,9 @@ enum ConsoleClosing {
 
     /// The open transaction, when no other console on its session stays open to show it.
     private static func transaction(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {
-        let others = console.sharesSession && console.mainWindow?.tabs.contains { tab in
+        let others = console.sharesSession && console.model.allTabs.contains { tab in
             tab.content !== console && (tab.content as? ConsoleViewController)?.sessionKey == console.sessionKey
-        } ?? false
+        }
         guard let saved = console.connection, console.model.data.safety(for: saved).warnOnClose, !others,
               let session = console.session, session.inTransaction else { return edits(console, window, answer: answer) }
         let changes = console.shared.changes

@@ -72,7 +72,8 @@ The person sees each statement you ran and the rows you got in the connection's 
   max, average (numbers) and the five most common values, computed on the server.
 - `explain {connection, sql, database?, format?: traditional | json}`.
 - `open_in_console {sql, title?, connection?}`: never runs anything.
-- `read_console {tab?}`: by id or title from `context`; default the active console tab.
+- `read_console {tab?}`: by id or title from `context`, in any main window; default the active console tab. A person's
+  Ask an Agent request names a tab by id, and lines to look at.
 - `guide {topic?}`: this guide.
 
 Long calls send progress notifications when your client asks for them (`_meta.progressToken`).
@@ -95,7 +96,7 @@ Each connected connection you may read has its compact schema as a resource, `ai
 
 ## ui
 
-The UI tools act in AirSQL's windows as the person would; replies are JSON as text (`screenshot`: a PNG), `isError` on
+The UI tools act in AirSQL's windows as the person would, on the main window in front when there are several; replies are JSON as text (`screenshot`: a PNG), `isError` on
 failure, and every reply after an action carries the sheet it opened, if any.
 
 - `snapshot {include?, in?}`: windows, sidebar, tabs, status bar, activity and open sheets by default; `menus` lists

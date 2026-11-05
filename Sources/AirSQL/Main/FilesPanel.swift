@@ -127,6 +127,9 @@ final class FilesPanelController: NSViewController, NSOutlineViewDataSource, NSO
     /// Top folders opened once: they open by themselves the first time, then stay as the person leaves them.
     private var outlineKnowsExpanded = Set<URL>()
 
+    /// The files read so far, with no disk work: for Quick Open.
+    var listedFiles: [URL] { nodes.values.filter { !$0.isFolder }.map(\.url).sorted { $0.path < $1.path } }
+
     // MARK: The outline
 
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {

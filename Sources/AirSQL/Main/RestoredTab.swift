@@ -31,7 +31,8 @@ final class RestoredTabContent: NSViewController, TabContent {
     let place: SavedPlace
     private let model: AppModel
     private let connectionID: UUID
-    private weak var main: MainWindowController?
+    /// The window it's in now: a tab can move to another.
+    private var main: MainWindowController? { model.windows.first { $0.tabs.contains { $0.shown === self } } }
     /// The person pressed the button: the tab loads once the connect ends. A failed connect keeps it, for the error
     /// sheet's Try Again; a cancelled one ends it.
     private var wanted = false
@@ -50,7 +51,6 @@ final class RestoredTabContent: NSViewController, TabContent {
         self.place = place
         model = main.model
         connectionID = connection
-        self.main = main
         super.init(nibName: nil, bundle: nil)
         self.title = title
     }

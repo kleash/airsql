@@ -4,12 +4,13 @@ import AirSQLCore
 import AppKit
 import Combine
 
-/// The app: the main window, the Settings window and the menu bar. At launch it reads the saved data off the main
+/// The app: the main windows, the Settings window and the menu bar. At launch it reads the saved data off the main
 /// thread, applies the chosen appearance and opens the window.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private(set) var model: AppModel?
-    private(set) var main: MainWindowController?
+    /// The main window in front.
+    var main: MainWindowController? { model?.frontWindow }
     private var settings: SettingsWindowController?
     /// Agents' socket and tools (L7), while Settings ▸ Agents allows agents.
     private(set) var agents: AgentService?
@@ -23,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        NSWindow.allowsAutomaticWindowTabbing = false  // one main window: no tab items in the Window and View menus
+        NSWindow.allowsAutomaticWindowTabbing = false  // AirSQL has its own tabs: no tab items in the Window and View menus
         NSApp.mainMenu = MainMenu.build()
     }
 
@@ -48,9 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         observers.append(model.$data.map(\.settings.appearance).removeDuplicates().sink { NSApp.appearance = appAppearance($0) })
         observers.append(model.$data.map(\.settings.keymap).removeDuplicates().sink { Keymap.apply($0) })
         let main = MainWindowController(model: model)
-        self.main = main
         agents = AgentService(model: model, main: main)
-        agents?.consoles = main
+        agents?.consoles = model
         SQLEditorView.settings = { [weak model] in model?.data.settings ?? AppSettings() }
         // The console's sessions, schema and query timeout: the connected connection's.
         ConsoleViewController.openConnection = { [weak model] in model?.openConnection($0)?.connection }
