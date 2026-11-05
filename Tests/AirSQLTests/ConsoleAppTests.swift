@@ -847,6 +847,96 @@ extension AppTests {
             #expect(!popup.isShown)
         }
 
+        @Test func templatesExpandAndTabWalksTheirFields() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let (_, _, console) = try await Self.console(testModel([saved]), on: saved.id)
+            let editor = console.editor!
+            func type(_ text: String) { for character in text { editor.insertText(String(character), replacementRange: editor.selectedRange()) } }
+            // The abbreviation is on top of the list: Tab takes it, with its first field selected.
+            type("selw")
+            #expect(editor.completionPopup?.selected?.kind == .template)
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "SELECT * FROM table WHERE condition;")
+            #expect((console.text as NSString).substring(with: editor.selectedRange()) == "table")
+            // What's typed goes in the field, and the next field is still found.
+            type("orders")
+            editor.completionPopup?.close()
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect((console.text as NSString).substring(with: editor.selectedRange()) == "condition")
+            type("1")
+            editor.completionPopup?.close()
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "SELECT * FROM orders WHERE 1;" && editor.selectedRange().location == (console.text as NSString).length)
+            #expect(editor.templateFields.isEmpty)
+            console.editor.setText("")
+            // A field used twice takes a caret in each place; Escape stops.
+            editor.insertTemplate("$a$ = $a$ + $b$", replacing: NSRange(location: 0, length: 0))
+            #expect(editor.extraCarets.count == 1)
+            type("x")
+            #expect(console.text == "x = x + b")
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect((console.text as NSString).substring(with: editor.selectedRange()) == "b" && editor.extraCarets.isEmpty)
+            editor.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+            #expect(editor.templateFields.isEmpty)
+            // A second line starts where the first does.
+            editor.setText("  ")
+            editor.setSelectedRange(NSRange(location: 2, length: 0))
+            editor.insertTemplate("a\nb$END$", replacing: editor.selectedRange())
+            #expect(console.text == "  a\n  b" && editor.selectedRange().location == 7)
+            // A postfix goes the same way, with no list open.
+            editor.setText("log.from")
+            editor.setSelectedRange(NSRange(location: 8, length: 0))
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "SELECT * FROM log")
+            // Plain Tab still indents.
+            editor.setText("xyz")
+            editor.setSelectedRange(NSRange(location: 3, length: 0))
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text != "xyz")
+        }
+
+        @Test func keywordsTakeTheirCaseAsTyped() async throws {
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let model = testModel([saved])
+            model.data.settings.autoKeywordCase = true
+            SQLEditorView.settings = { [weak model] in model?.data.settings ?? AppSettings() }
+            defer { SQLEditorView.settings = { AppSettings() } }
+            let (_, _, console) = try await Self.console(model, on: saved.id)
+            let editor = console.editor!
+            func type(_ text: String) { for character in text { editor.insertText(String(character), replacementRange: editor.selectedRange()) } }
+            type("select a.from, 'from ', `from` from t -- from \n")
+            #expect(console.text == "SELECT a.from, 'from ', `from` FROM t -- from \n")
+            model.data.settings.formatStyle.keywords = .lower
+            editor.setText("")
+            type("SELECT 1 ")
+            #expect(console.text == "select 1 ")
+            model.data.settings.autoKeywordCase = false
+            editor.setText("")
+            type("SELECT 1 ")
+            #expect(console.text == "SELECT 1 ")
+        }
+
+        @Test func formatPaneShowsItsRulesAtWork() async throws {
+            let model = testModel([])
+            let pane = FormatPane(model: model)
+            pane.loadView()
+            func preview() -> String { find(NSTextView.self, id: "settings.format.preview", in: pane.view)?.string ?? "" }
+            model.data.settings.formatStyle.keywords = .lower
+            #expect(preview().contains("select c.id") && preview().contains("\nfrom customers c"))
+            let presets = try #require(find(NSPopUpButton.self, id: "settings.format.preset", in: pane.view))
+            let modern = try #require(SQLFormatStyle.presets.firstIndex { $0.name == "River" })
+            presets.selectItem(at: modern + 1)
+            _ = presets.sendAction(presets.action, to: presets.target)
+            #expect(model.data.settings.formatStyle.river && preview().contains("  FROM customers c"))
+            let lists = try #require(find(NSPopUpButton.self, id: "settings.format.lists", in: pane.view))
+            #expect(lists.indexOfSelectedItem == 2, "the controls follow the preset")
+        }
+
         @Test func helpersFollowTheStatementAndInsert() async throws {
             let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
             ConsoleViewController.schemaCache = { _ in cache }

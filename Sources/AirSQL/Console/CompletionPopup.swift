@@ -13,6 +13,8 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
     /// The text the suggestions replace.
     private var range = 0..<0
     static let rowHeight: CGFloat = 22
+    /// How often each suggestion was chosen since AirSQL opened: `CompletionOptions.recent`.
+    static var chosen: [String: Int] = [:]
     static let footerHeight: CGFloat = 24
 
     init(editor: NSTextView, id: String = "completion.list",
@@ -92,6 +94,7 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
         items = []
+        table.reloadData()  // a layout still to come would ask for rows that are gone
     }
 
     /// ↑ or ↓.
@@ -105,10 +108,15 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
     /// Puts the chosen suggestion in place of the word typed so far.
     func accept() {
         guard let item = selected, let editor else { return close() }
-        let replaced = NSRange(range)
+        let replaced = NSRange(item.replacing ?? range)
         close()
         guard NSMaxRange(replaced) <= (editor.string as NSString).length else { return }
-        editor.insertText(item.text, replacementRange: replaced)
+        Self.chosen[item.label.lowercased(), default: 0] += 1
+        if item.kind == .template, let sql = editor as? SQLEditorView {
+            sql.insertTemplate(item.text, replacing: replaced)
+        } else {
+            editor.insertText(item.text, replacementRange: replaced)
+        }
     }
 
     @objc private func doubleClicked(_ sender: Any?) { accept() }
@@ -148,6 +156,9 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
     static func badge(_ kind: CompletionItem.Kind) -> (String, NSColor) {
         switch kind {
         case .join: return ("FK", .hex(0x3A7BD9))
+        case .template: return ("T+", .hex(0xB5651D))
+        case .variable: return ("@", .hex(0x2E7D4F))
+        case .word: return ("W", .hex(0x6B7785))
         case .column: return ("C", .hex(0x6B7785))
         case .table, .alias: return ("T", .hex(0x3A7BD9))
         case .view: return ("V", .hex(0x8A4BAF))

@@ -18,7 +18,7 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
     private var rows: [Row] = []
     private let empty = label("", font: .systemFont(ofSize: 12), color: .secondaryLabelColor, wraps: true)
     /// What the panel shows for the statement at the cursor: its tables' columns, and the server.
-    var source: (() -> (columns: [(table: String, columns: [SchemaColumn])], server: SchemaServer?))?
+    var source: (() -> (columns: [(table: String, columns: [SQLColumnInfo])], server: SchemaServer?))?
     /// Puts text in the editor at the cursor.
     var insert: ((String) -> Void)?
 
@@ -94,7 +94,7 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
                 let kept = columns.filter { keep($0.name) }
                 guard !kept.isEmpty else { continue }
                 rows.append(.heading(table))
-                rows += kept.map { .item(label: $0.name, detail: $0.columnType, insert: SQLCompletion.quote($0.name)) }
+                rows += kept.map { .item(label: $0.name, detail: $0.type ?? "", insert: SQLCompletion.quote($0.name)) }
             }
         case 1:
             let functions = SQLFunction.all.filter { $0.available(on: given.server) && keep($0.name) }

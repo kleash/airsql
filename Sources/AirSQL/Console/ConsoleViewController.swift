@@ -138,7 +138,8 @@ final class ConsoleViewController: NSViewController, TabContent {
             guard let self else { return (caret..<caret, []) }
             let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }
             return SQLCompletion.suggestions(text: text, caret: caret, snapshot: snapshot, database: self.database,
-                                             noBackslashEscapes: self.editor.noBackslashEscapes)
+                                             noBackslashEscapes: self.editor.noBackslashEscapes,
+                                             options: self.model.data.settings.completionOptions(recent: CompletionPopup.chosen))
         }
         editor.nameContext = { [weak self] in
             guard let self, let id = self.connectionID, !self.shared.ranCode else { return nil }

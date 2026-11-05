@@ -10,10 +10,14 @@ extension SQLEditorView {
         if !extraCarets.isEmpty, !applyingCarets {
             return atEveryCaret { self.insertText(typed, replacementRange: self.selectedRange()) }
         }
-        if pairTyped(typed, replacementRange) { return }
+        if pairTyped(typed, replacementRange) {
+            if typed == "'" { updateCompletion(force: false) }  // an ENUM's values
+            return
+        }
         super.insertText(string, replacementRange: replacementRange)
-        // One character typed: a letter, digit, _ or a dot opens or narrows the list; anything else closes it.
-        if typed.count == 1, let unit = typed.utf16.first, unit == 0x2E || SQLLexer.isNameChar(unit) {
+        if typed.count == 1, let unit = typed.utf16.first, !SQLLexer.isNameChar(unit), unit != 0x2E { applyKeywordCase(before: selectedRange().location - 1) }
+        // One character typed: a letter, digit, _, a dot, @ or * opens or narrows the list; anything else closes it.
+        if typed.count == 1, let unit = typed.utf16.first, [0x2E, 0x40, 0x2A].contains(unit) || SQLLexer.isNameChar(unit) || popupOpenInString {
             updateCompletion(force: false)
         } else {
             completionPopup?.close()
@@ -69,7 +73,30 @@ extension SQLEditorView {
 
     override func complete(_ sender: Any?) { updateCompletion(force: true) }
 
+    /// Settings ▸ Editor: the reserved word that ends at `end` takes the keyword case, with nothing else touched: not a
+    /// name after a dot, a variable or anything in a string or a comment.
+    // shortcut: not with several carets, whose text isn't coloured (so not lexed) until all have typed; do it if asked.
+    private func applyKeywordCase(before end: Int) {
+        let settings = Self.settings()
+        guard settings.autoKeywordCase, settings.formatStyle.keywords != .keep, !applyingCarets, extraCarets.isEmpty, end > 0 else { return }
+        let text = self.string as NSString
+        var start = end
+        while start > 0, SQLLexer.isNameChar(text.character(at: start - 1)) { start -= 1 }
+        guard start < end, start == 0 || ![0x2E, 0x40, 0x60].contains(text.character(at: start - 1)), !inTextToken(end) else { return }
+        let range = NSRange(location: start, length: end - start), word = text.substring(with: range)
+        let cased = settings.formatStyle.keywords.apply(word)
+        guard cased != word, SQLWords.reserved.contains(word.uppercased()) else { return }
+        replace(range, with: cased)
+    }
+
+    /// Typing inside a string keeps an ENUM's list up to date, whatever is typed.
+    private var popupOpenInString: Bool { completionPopup?.isShown == true && completionPopup?.items.first?.kind == .value }
+
     override func doCommand(by selector: Selector) {
+        if completionPopup?.isShown != true, !applyingCarets, templateCommand(selector) { return }
+        if selector == #selector(insertNewline(_:)) || selector == #selector(insertTab(_:)), completionPopup?.isShown != true {
+            applyKeywordCase(before: selectedRange().location)
+        }
         if !extraCarets.isEmpty, !applyingCarets {
             if selector == #selector(cancelOperation(_:)) { return dropExtraCarets() }
             return atEveryCaret { super.doCommand(by: selector) }
@@ -101,17 +128,15 @@ extension SQLEditorView {
             return
         }
         let caret = selectedRange().location
-        // Not inside a string or a comment.
-        if tokens.contains(where: { [.string, .comment, .hint].contains($0.kind) && $0.range.lowerBound < caret
-            && (caret < $0.range.upperBound || !$0.isClosed) }) {
-            completionPopup?.close()
-            return
-        }
         let (range, items) = completions(string, caret)
+        // Inside a string only an ENUM's values, and nothing inside a comment.
+        let inText = tokens.contains { [.string, .comment, .hint].contains($0.kind) && $0.range.lowerBound < caret
+            && (caret < $0.range.upperBound || !$0.isClosed) }
         let utf16 = Array(string.utf16)
         let afterDot = range.lowerBound > 0 && utf16[range.lowerBound - 1] == 0x2E
         let typed = String(decoding: utf16[range], as: UTF16.self)
-        guard force || !range.isEmpty || afterDot, !(items.count == 1 && items[0].text == typed) else {
+        let asked = force || !range.isEmpty || afterDot || items.first?.replacing != nil
+        guard asked, !inText || items.first?.kind == .value, !(items.count == 1 && items[0].text == typed) else {
             completionPopup?.close()
             return
         }

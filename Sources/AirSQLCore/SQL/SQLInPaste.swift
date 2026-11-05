@@ -136,9 +136,10 @@ public enum SQLInPaste {
         guard name >= 0, [.word, .quotedName].contains(tokens[code[name]].kind), let column = raw(name).map(SQLQuote.unquoted) else { return false }
         let qualifier = raw(name - 1) == "." ? raw(name - 2).map(SQLQuote.unquoted) : nil
         guard let statement = SQLSplitter.statement(at: caret, in: text, noBackslashEscapes: noBackslashEscapes) else { return false }
-        let refs = SQLCompletion.tableRefs(StatementCheck.codeWords(statement.sql, noBackslashEscapes: noBackslashEscapes))
-            .filter { ref in qualifier.map { $0.caseInsensitiveCompare(ref.name) == .orderedSame } ?? true }
-        let found = refs.compactMap { SQLCompletion.table($0, snapshot, database)?.column(column) }
+        let analysis = SQLAnalysis(statement.sql, snapshot: snapshot, database: database, noBackslashEscapes: noBackslashEscapes)
+        let found = (analysis.scope(at: caret - statement.range.lowerBound)?.visibleSources ?? [])
+            .filter { source in qualifier.map { $0.caseInsensitiveCompare(source.name) == .orderedSame } ?? true }
+            .compactMap { $0.table?.column(column) }
         return !found.isEmpty && found.allSatisfy { ColumnTypes.type($0.dataType)?.numeric ?? false }
     }
 }

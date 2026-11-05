@@ -17,6 +17,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     var completions: ((String, Int) -> (Range<Int>, [CompletionItem]))?
     /// The completion list, once it has been shown.
     var completionPopup: CompletionPopup?
+    /// The settings of every editor, consoles' and object editors' alike.
+    static var settings: () -> AppSettings = { AppSettings() }
     /// .sql files dropped on the editor: the console opens them.
     var onDropFiles: (([URL]) -> Void)?
     /// Where the last Run failed, underlined until the text changes.
@@ -76,6 +78,10 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     /// What's folded away, as ranges of the text.
     var folds: [Range<Int>] = []
     var cachedFoldRegions: [Range<Int>]?
+    /// A template being filled in: the places of each of its fields, the last being where the cursor ends, and which one
+    /// Tab has reached.
+    var templateFields: [[NSRange]] = []
+    var templateField = 0
     /// "Ln 3, Col 14", in the editor's corner.
     let positionLabel = NSTextField(labelWithString: "")
 
