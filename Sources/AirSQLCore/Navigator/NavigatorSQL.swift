@@ -135,6 +135,14 @@ public enum NavigatorSQL {
         return "SELECT \(list)\nFROM \(table.quoted);"
     }
 
+    /// The table's first rows, for a look at them.
+    public static func selectTop(_ table: DatabaseObject) -> String { "SELECT *\nFROM \(table.quoted)\nLIMIT 1000;" }
+
+    /// The collation a database's new tables take.
+    public static func alterCollation(_ database: String, _ collation: String, noBackslashEscapes: Bool) -> String {
+        "ALTER DATABASE \(SQLQuote.identifier(database)) COLLATE " + SQLQuote.string(collation, noBackslashEscapes: noBackslashEscapes)
+    }
+
     /// A row's values: the columns the server doesn't fill itself (generated and auto-increment ones are left out).
     public static func insert(_ table: DatabaseObject, _ columns: [SchemaColumn]) -> String {
         let given = columns.filter { $0.generated == nil && !$0.autoIncrement }

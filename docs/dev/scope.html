@@ -469,8 +469,10 @@ const GROUPS = [
  ]},
  { id: "server", title: "Server, users and data transfer", items: [
   ["Process list with Kill and auto-refresh", "", "H", "1.0", "S"],
-  ["Server variables, session and global, with edit", "", "H", "Skip", "S"],
+  ["Server variables, session and global, with edit", "Refused in read-only and Production", "H", "1.x", "S"],
   ["Status counters and command statistics", "", "H", "1.x", "S"],
+  ["Host page: databases, variables, status, processes, commands", "Shown when a connection is clicked", "H", "1.x", "L"],
+  ["Disk Usage: server, database, table, with bars", "Read one database at a time, with Cancel", "H", "1.x", "M"],
   ["User manager: accounts, hosts, privileges, roles, limits, login plugin", "", "H", "Skip", "L"],
   ["Import CSV with column mapping", "LOAD DATA LOCAL INFILE, or INSERTs when that is disabled", "H", "1.0", "M"],
   ["Built-in SQL export without client tools; copy straight to another server", "", "H", "1.0", "L"],

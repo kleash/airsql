@@ -174,6 +174,15 @@ import AppKit
     @objc optional func killConnection(_ sender: Any?)
     @objc optional func showERDiagram(_ sender: Any?)
     @objc optional func bulkEditTables(_ sender: Any?)
+    @objc optional func showDiskUsage(_ sender: Any?)
+    @objc optional func selectTop(_ sender: Any?)
+    @objc optional func editDatabase(_ sender: Any?)
+    @objc optional func showServerHome(_ sender: Any?)
+    @objc optional func editVariable(_ sender: Any?)
+    @objc optional func goUp(_ sender: Any?)
+    @objc optional func compareSelected(_ sender: Any?)
+    @objc optional func copyList(_ sender: Any?)
+    @objc optional func exportList(_ sender: Any?)
 
     // Connection
     @objc optional func connect(_ sender: Any?)
@@ -635,6 +644,31 @@ enum Commands {
                                    tip: "Stop the selected process's statement, not its connection; read-only allows it, as no data changes")
     static let killConnection = Command("Kill Connection…", #selector(AirSQLActions.killConnection(_:)),
                                         tip: "End the selected process's connection to the server; read-only allows it, as no data changes")
+    static let selectTop = Command("Select Top 1000 Rows", #selector(AirSQLActions.selectTop(_:)),
+                                   tip: "Write a SELECT of the first 1,000 rows in a new query tab, to run or change")
+    static let editDatabase = Command("Edit Database…", #selector(AirSQLActions.editDatabase(_:)),
+                                      tip: "Change the collation new tables of the selected database take (shows the SQL first)")
+    static let hostDatabases = Command("Databases", #selector(AirSQLActions.showServerHome(_:)), tag: 0,
+                                       tip: HostContent.Pane.databases.tip)
+    static let hostVariables = Command("Variables", #selector(AirSQLActions.showServerHome(_:)), tag: 1,
+                                       tip: HostContent.Pane.variables.tip)
+    static let hostStatus = Command("Status", #selector(AirSQLActions.showServerHome(_:)), tag: 2, tip: HostContent.Pane.status.tip)
+    static let hostProcesses = Command("Processes", #selector(AirSQLActions.showServerHome(_:)), tag: 3,
+                                       tip: HostContent.Pane.processes.tip)
+    static let hostCommands = Command("Command Statistics", #selector(AirSQLActions.showServerHome(_:)), tag: 4,
+                                      tip: HostContent.Pane.commands.tip)
+    static let editVariable = Command("Edit Variable…", #selector(AirSQLActions.editVariable(_:)),
+                                      tip: "Change the selected variable, for the server or in a new query tab (shows the SQL first)")
+    static let diskUsage = Command("Disk Usage", #selector(AirSQLActions.showDiskUsage(_:)), "u", [.command, .option],
+                                   tip: "Show where the space went, on the server or in the selected database or table")
+    static let diskUsageUp = Command("Up One Level", #selector(AirSQLActions.goUp(_:)),
+                                     tip: "Go back from a table to its database, or from a database to the server")
+    static let diskUsageCompare = Command("Compare Selected", #selector(AirSQLActions.compareSelected(_:)),
+                                          tip: "Show only the selected rows, their bars and shares against each other")
+    static let copyList = Command("Copy List", #selector(AirSQLActions.copyList(_:)),
+                                  tip: "Copy the whole list as it shows, as CSV with its headers")
+    static let exportList = Command("Export List…", #selector(AirSQLActions.exportList(_:)),
+                                    tip: "Save the whole list as it shows to a CSV file")
     static let erDiagram = Command("ER Diagram", #selector(AirSQLActions.showERDiagram(_:)),
                                    tip: "Draw the database's tables and their foreign keys")
     static let newView = Command("View…", #selector(AirSQLActions.createObject(_:)), tag: 1,
@@ -764,7 +798,7 @@ enum Commands {
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
-        killConnection, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
+        killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder, moveToFolder,
         export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
@@ -787,6 +821,7 @@ enum Commands {
 
     /// Menu items that only open a submenu, by title.
     static let submenus: [String: String] = [
+        "Server Home": "Show what the server holds and does: databases, variables, status, processes",
         "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",

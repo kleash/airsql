@@ -112,6 +112,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Create Table… | ⌃⌘N |
 | Open Structure | ⌥⌘O |
 | Process List | ⌥⌘P |
+| Disk Usage | ⌥⌘U |
 | Connect | ⌘K |
 | Disconnect | ⇧⌘K |
 | Minimize | ⌘M |

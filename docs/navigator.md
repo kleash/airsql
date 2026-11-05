@@ -10,10 +10,12 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 
 ## Find your way
 
-- **Click** a database to see its tables in the database view: rows, the space their data and indexes take, engine,
-  collation, when they last changed and their comment. Click a column's title to sort by it; AirSQL keeps the order
-  and the widths. **Filter by name** at its top keeps the tables with those letters. Right-click below the rows, or an
-  empty database, for **Create Table…**.
+- **Click** a connected connection to see its [host page](#the-host-page). Connecting shows it too.
+- **Click** a database to see everything in it in the database view: for its tables, rows, a bar and the size of each,
+  engine, collation, when they last changed and their comment. Click a column's title to sort by it; AirSQL keeps the order and the widths.
+  Right-click a title to show or hide columns: **Data**, **Indexes**, **Free**, **Average Row**, **Auto Increment**,
+  **Created**, **Row Format** and **Options** are there too. **Filter by name** at its top keeps the tables with those
+  letters. Right-click below the rows, or an empty database, for **Create Table…**.
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Click the arrow** beside a table or view (or press →) to see what it holds without opening it: **Columns** with
@@ -65,6 +67,7 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
   database view) write a statement with its columns. A `?` marks each value for you to fill in: INSERT leaves out the
   columns the server fills itself (auto-increment and generated ones), and UPDATE finds the row by its primary key (or a
   unique key whose columns can't be NULL; without one, you write the condition).
+- **Select Top 1000 Rows** on a table's menu writes a `SELECT` of its first 1,000 rows.
 - **Run…** on a procedure's menu writes its `CALL`, with a `?` and the name and type of each value it takes; OUT and
   INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
 - **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
@@ -82,7 +85,8 @@ Upper and lower case match as the column's collation says (most ignore case).
 **Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
 running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
 with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
-idle connections. Double-click a row (or press Return) to read its whole statement; Delete offers to kill it.
+idle connections. The selected process's whole statement shows under the list; double-click a row (or press Return) to
+read it in a window. Delete offers to kill it.
 
 - **Kill Query…** stops a statement; its connection stays.
 - **Kill Connection…** ends a connection, rolling back its open transaction.
@@ -90,6 +94,48 @@ idle connections. Double-click a row (or press Return) to read its whole stateme
 Both ask first. Right before it stops anything, AirSQL checks that the process is still running what the list showed
 (on MariaDB, that exact statement); if it has moved on, nothing is stopped and AirSQL says so. Both work on a
 read-only connection too: they change no data.
+
+## The host page
+
+Click a connected connection, or choose **Database ▸ Server Home**, for a page on the server. Its top line says what the
+server is, how you reach it and how long it has been up. A click on a row selects it; right-click for its menu.
+
+- **Databases**: each with its size, how many tables, views, routines, triggers and events it has, when it last changed
+  and its collation. Double-click one to open its tables; **Edit Database…** changes the collation new tables take. On a server of up to 3,000 tables (**Settings ▸ Connections**
+  sets this) the sizes are read by themselves; on a bigger one press **Read Sizes**, which reads the databases you've
+  selected, or all of them.
+- **Variables**: each variable's session and global values side by side, with **≠** where they differ. Session shows what
+  a new session starts with. Double-click one, or press **Edit…**, to change it: **Whole server** runs `SET GLOBAL` after
+  showing you the SQL; **In a new query tab** puts `SET SESSION` in a new tab for you to run, as each tab has a session of
+  its own. Type a number, a word, or `DEFAULT`. Read-only and Production connections can't change variables.
+- **Status**: every status counter, with its average per hour and per second since the server started.
+- **Processes**: the [process list](#see-what-the-server-is-running).
+- **Command Statistics**: how many statements of each kind the server has run, with their rates and share.
+
+Every list has a **Filter** that takes a word or a regular expression and says how many rows it kept. Click a column's
+title to sort; right-click a title to show or hide columns. **⌘C** copies the selected rows. **Copy List** and **Export
+List…** take the whole list as CSV. **⌘R** reads it again.
+
+## See where the space went
+
+**Disk Usage** (⌥⌘U, in the **Tools** menu, or right-click a connection, database or table) lists every database with its
+data, indexes, free space, rows and share, largest first, each with a bar: blue for data, teal for indexes, grey for free
+space.
+
+- **Double-click** a database to see its tables, and a table to see its indexes and partitions. **Back** goes up.
+- Select several rows to see what they come to. **Compare Selected** keeps only those, their bars against each other.
+- **Filter**, sorting, **Copy List** and **Export List…** work as on the host page.
+- **Free** is space a table keeps but doesn't use. Select tables and press **Optimize…** to give it back: it shows the SQL
+  first, and locks the tables while it runs. Tables in a shared tablespace all show that tablespace's free space, so a
+  database's total counts it more than once.
+
+Reading a table's size makes the server open that table, so AirSQL reads one database at a time, on a session of its own.
+The status bar shows how far it is, and **Stop** or Cancel there ends it; what was read stays. The sizes then also show in
+the database view and the host page.
+
+InnoDB's sizes and row counts are estimates, and you see only what your login can see, and the databases the connection
+lists. An index's own size comes from `mysql.innodb_index_stats`, which not every login may read; AirSQL says so when it
+can't.
 
 ## Getting back to your tabs
 

@@ -59,6 +59,10 @@ enum NavigatorActions {
         case Commands.runRoutine.action?:
             return objects.count == 1 && [.procedure, .function].contains(objects[0].kind) ? nil
                 : "Select one procedure or function first"
+        case Commands.selectTop.action?:
+            return tableLike.isEmpty ? "Select a table or view first" : nil
+        case Commands.editDatabase.action?:
+            return databases.count == 1 ? writable(open ?? target) : "Select one database first"
         case Commands.copyTable.action?:
             return tables.count == 1 && objects.count == 1 ? writable(open) : "Select one table first (a view can't be copied)"
         case Commands.maintenance.action?:
@@ -74,7 +78,8 @@ enum NavigatorActions {
             return writable(open)
         case Commands.newDatabase.action?:
             return target == nil ? "Connect first: databases are created on a connected server" : writable(target)
-        case Commands.findOnServer.action?, Commands.processList.action?:
+        case Commands.findOnServer.action?, Commands.processList.action?, Commands.diskUsage.action?,
+             Commands.hostDatabases.action?:
             return target == nil ? "Connect first: this works on a connected server" : nil
         default:
             return nil
@@ -200,6 +205,31 @@ enum NavigatorActions {
     }
 
     enum Generated { case select, insert, update }
+
+    /// A new query tab with the first rows of each table: the statement is there to run or change.
+    static func selectTop(_ objects: [DatabaseObject], on open: OpenConnection, main: MainWindowController?) {
+        let tables = objects.filter { $0.kind.isTableLike }
+        guard let main, !tables.isEmpty else { return }
+        _ = main.openConsole(text: tables.map(NavigatorSQL.selectTop).joined(separator: "\n\n") + "\n", title: nil, connection: open.id)
+    }
+
+    /// Asks for a database's new default collation, shows the SQL and runs it. Its tables keep theirs.
+    static func editDatabase(_ name: String, on open: OpenConnection, window: NSWindow?) {
+        guard let window, let found = open.snapshot.database(name) else { return }
+        let field = textField(found.collation, placeholder: "Collation", id: "database.collation",
+                              tip: "Type the collation new tables of this database take", width: 280)
+        ask("Edit \(name)", "Tables it has now keep their own collation.", field: field, action: "Next…", on: window) {
+            let collation = field.stringValue.trimmingCharacters(in: .whitespaces)
+            guard !collation.isEmpty, collation != found.collation else { return }
+            let escapes = open.snapshot.server?.noBackslashEscapes ?? false
+            var request = SQLPreviewRequest(change: ChangeSQL(title: "Edit \(name)", statements: [
+                NavigatorSQL.alterCollation(name, collation, noBackslashEscapes: escapes)], connection: open.id),
+                heading: "Change the collation of \(name)?", caption: "New tables take it; tables it has now keep theirs.")
+            request.actionTitle = "Change"
+            request.noBackslashEscapes = escapes
+            confirmAndRun(request, on: open, window: window, refreshing: [.database(name)])
+        }
+    }
 
     /// Generate SELECT, INSERT or UPDATE: the statement of each table or view, built from the schema cache (their
     /// columns read first where they aren't yet), in a new console tab. Nothing runs until the person presses Run.

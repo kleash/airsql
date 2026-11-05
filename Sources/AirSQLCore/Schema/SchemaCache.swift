@@ -141,6 +141,21 @@ public final class SchemaCache {
         }
     }
 
+    /// Reads a database's statistics through `session` and keeps them: Disk Usage's long reads hold up neither the
+    /// schema session nor what queues here, and a read on a session of its own can be stopped.
+    public func loadStatistics(_ database: String, through session: SchemaQuerying) async throws {
+        guard let server = snapshot.server else { return }
+        let introspection = SchemaIntrospection(server: server)
+        if let setup = introspection.statisticsSetupSQL { _ = try await session.rows(setup) }
+        let found = try await session.rows(introspection.statisticsSQL(database))
+        try await serially { old, publish in
+            guard let index = old.databases.firstIndex(where: { $0.name == database }) else { return }
+            var snapshot = old
+            snapshot.databases[index].statistics = SchemaIntrospection.statistics(found, database: database)
+            publish(snapshot)
+        }
+    }
+
     /// Reads again the objects that DDL changed (created, altered, renamed or dropped; a rename names both), and the
     /// details of tables whose foreign keys point at a refreshed table. A database that isn't cached yet, or
     /// `.database`, is read whole. Views that select from a changed table aren't read again (nothing tells which tables
