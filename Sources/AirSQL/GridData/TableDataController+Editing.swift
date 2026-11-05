@@ -133,6 +133,19 @@ extension TableDataController: DataGridViewDelegate {
     @objc func setCellNull(_ sender: Any?) { setSelected { _ in .null } }
     @objc func setCellDefault(_ sender: Any?) { setSelected { _ in .default } }
 
+    /// Set Expression…: an expression or function for the selected cells, sent to the server as typed at Apply.
+    @objc func setCellExpression(_ sender: Any?) {
+        guard let window = view.window else { return NSSound.beep() }
+        askExpression(on: window) { [weak self] sql in self?.setSelected { _ in .sql(sql) } }
+    }
+
+    /// Reset View: the columns as they come, no sort and no filter.
+    @objc func resetView(_ sender: Any?) {
+        viewer.resetColumns()
+        setSort([])
+        clearFilter(sender)
+    }
+
     /// Cut: copies the selected cells, then clears them (NULL where the column allows it), as pending edits.
     @objc func cut(_ sender: Any?) {
         readWhole(viewer.selectedRows(), columns: viewer.shownColumns) { [weak self] in

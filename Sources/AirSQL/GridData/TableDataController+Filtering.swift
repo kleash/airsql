@@ -294,7 +294,7 @@ extension TableDataController {
     }
 
     /// Sorts on the server; a table of over a million rows asks first when a new column has no index (R17).
-    private func setSort(_ keys: [TableViewSettings.SortKey]) {
+    func setSort(_ keys: [TableViewSettings.SortKey]) {
         guard let source else { return }
         let indexed = Set(source.table.indexes.compactMap { $0.parts.first?.column })
         let unindexed = keys.map(\.column).filter { !indexed.contains($0) && !source.sort.map(\.column).contains($0) }

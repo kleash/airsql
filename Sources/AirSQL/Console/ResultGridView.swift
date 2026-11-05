@@ -197,6 +197,13 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         reorder()
     }
 
+    /// Reset View: the columns as they come, no sort and no filter.
+    @objc func resetView(_ sender: Any?) {
+        viewer.resetColumns()
+        sortRows([])
+        clearFilter(sender)
+    }
+
     /// Export Rows… (and the result tab's Export Result…): the selected rows or every row of the result.
     @objc func exportRows(_ sender: Any?) {
         guard let window else { return }

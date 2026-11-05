@@ -50,7 +50,7 @@ enum GridCopy {
     static func text(_ source: GridSource, rows: [Int], columns: [Int], format: CopyFormat, headers: Bool, nullText: String,
                      database: String? = nil, table: String = "table", noBackslashEscapes: Bool = false,
                      selected: ((Int, Int) -> Bool)? = nil) -> String {
-        var options = CopyOptions(headers: headers, nullText: format == .tsv || format == .csv ? nullText : "NULL")
+        var options = CopyOptions(headers: headers, nullText: format.hasOptionalHeaders || format == .prettyTable || format == .oneRow ? nullText : "NULL")
         options.noBackslashEscapes = noBackslashEscapes
         // UPDATE and DELETE need the whole key, copied or not: part of one addresses more rows than were selected.
         let columns = format == .update || format == .delete
@@ -65,7 +65,7 @@ enum GridCopy {
         var writer = CopyWriter(format, columns: written, database: database, table: table, options: options)
         var text = writer.header()
         // Cells of the block that weren't selected stay empty in a table of text; a statement or object needs its row whole.
-        let holes = format == .tsv || format == .csv ? selected : nil
+        let holes = format.hasOptionalHeaders ? selected : nil
         for row in rows { text += writer.row(columns.map { holes?(row, $0) == false ? "" : source.value(row, $0) }) }
         return text + writer.footer()
     }

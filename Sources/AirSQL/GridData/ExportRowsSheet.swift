@@ -39,7 +39,7 @@ final class ExportRowsSheet: NSWindowController {
     private var copyButton: NSButton!
     private var retainUntilClosed: ExportRowsSheet?
     /// The formats in the pop-up: Excel last.
-    private static let formats: [CopyFormat?] = [.csv, .tsv, .json, .jsonLines, .insert, .insertIgnore, .replace, .markdown, .html, .xml, nil]
+    private static let formats: [CopyFormat?] = [.csv, .tsv, .pipe, .json, .jsonLines, .insert, .insertRows, .insertIgnore, .replace, .markdown, .html, .xml, nil]
 
     static func show(_ request: ExportRowsRequest, activity: ActivityCenter, on window: NSWindow) {
         let sheet = ExportRowsSheet(request, activity: activity)

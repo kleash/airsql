@@ -137,6 +137,11 @@ import AppKit
     @objc optional func showColumnSummary(_ sender: Any?)
     @objc optional func loadMore(_ sender: Any?)
     @objc optional func loadFullCell(_ sender: Any?)
+    @objc optional func hideOtherColumns(_ sender: Any?)
+    @objc optional func resetView(_ sender: Any?)
+    @objc optional func openCellURL(_ sender: Any?)
+    @objc optional func compareCells(_ sender: Any?)
+    @objc optional func setCellExpression(_ sender: Any?)
     @objc optional func showFirstPage(_ sender: Any?)
     @objc optional func showPreviousPage(_ sender: Any?)
     @objc optional func showNextPage(_ sender: Any?)
@@ -596,6 +601,14 @@ enum Commands {
                                         tip: "Copy the SELECT this tab runs, with its filter and sort")
     static let openTableQuery = Command("Open Query in Console", #selector(AirSQLActions.openTableQuery(_:)),
                                         tip: "Open the SELECT this tab runs, with its filter and sort, in a new query tab")
+    static let hideOtherColumns = Command("Hide Other Columns", #selector(AirSQLActions.hideOtherColumns(_:)),
+                                          tip: "Keep only the selected columns on show")
+    static let resetView = Command("Reset View", #selector(AirSQLActions.resetView(_:)),
+                                   tip: "Put the columns, the sort and the filter back as they come")
+    static let openURL = Command("Open URL", #selector(AirSQLActions.openCellURL(_:)), tip: "Open the web address in the selected cell in your browser")
+    static let compareCells = Command("Compare Cells", #selector(AirSQLActions.compareCells(_:)), tip: "Show how two selected cells' values differ, line by line")
+    static let setExpression = Command("Set Expression…", #selector(AirSQLActions.setCellExpression(_:)), f2, .control,
+                                       tip: "Set the selected cells to an SQL expression or function, sent as it is typed")
     static let loadFullCell = Command("Load Full Cell", #selector(AirSQLActions.loadFullCell(_:)),
                                       tip: "Read the rest of a long value that was cut when the rows loaded")
     static let loadMore = Command("Load More", #selector(AirSQLActions.loadMore(_:)), down, [.command, .option],
@@ -778,7 +791,7 @@ enum Commands {
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, firstPage, previousPage, nextPage, lastPage, pageSize, copyTableQuery, openTableQuery, loadFullCell, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
+        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, hideOtherColumns, resetView, openURL, compareCells, setExpression, firstPage, previousPage, nextPage, lastPage, pageSize, copyTableQuery, openTableQuery, loadFullCell, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,

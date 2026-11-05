@@ -144,6 +144,12 @@ extension ResultGridView {
     @objc func setCellNull(_ sender: Any?) { setSelected { _ in .null } }
     @objc func setCellDefault(_ sender: Any?) { setSelected { _ in .default } }
 
+    /// Set Expression…: as in a table tab.
+    @objc func setCellExpression(_ sender: Any?) {
+        guard edits != nil, let window else { return NSSound.beep() }
+        askExpression(on: window) { [weak self] sql in self?.setSelected { _ in .sql(sql) } }
+    }
+
     /// Cut: copies the selected cells, then clears them (NULL where the column allows it), as pending edits.
     @objc func cut(_ sender: Any?) {
         viewer.copy(sender)
@@ -209,7 +215,7 @@ extension ResultGridView {
         case Commands.chooseReferencedRow.action:
             if let off = editingOff { return (false, off) }
             return (viewer.focusedCell.map { foreignKey($0.column) != nil } ?? false, "Select a cell of a foreign key column first")
-        case Commands.cut.action, Commands.setDefault.action, Commands.insertValue.action:
+        case Commands.cut.action, Commands.setDefault.action, Commands.setExpression.action, Commands.insertValue.action:
             if let off = editingOff { return (false, off) }
             return (viewer.selectedCells(limit: 10_000).contains { edits.canEdit(rows.baseRow($0.row), $0.column) }, "Select cells you can edit first")
         case Commands.deleteRows.action:

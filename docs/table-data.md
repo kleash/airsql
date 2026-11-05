@@ -36,7 +36,7 @@ session, a session of their own, so a long query in a query tab never holds them
   on a cut cell asks for Load Full Cell first. Search on the loaded rows and Find look only at what's loaded.
   A table with no key can't find a row to read it back, so its values come whole.
 - A hidden column isn't read at all. Showing it again loads the rows again.
-- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
+- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds or a number you type (**Custom…**),
   until you choose **Off**. Pending changes stay.
 
 **Data ▸ Copy Query** copies the SELECT the tab runs, with its filter and sort, and **Open Query in Console** opens it in
@@ -129,7 +129,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
   **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
-  the selected cells and clears them: NULL where the column allows it, else empty. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set Expression…** (⌃F2) sets them to any SQL expression or function, sent as you typed it when you apply. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
@@ -206,7 +206,7 @@ These work in a query's results too.
 - **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a query tab
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
-- **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
+- **Edit ▸ Copy As** ▸ TSV, CSV, Pipe-Separated, JSON, JSON Lines, Markdown, HTML Table, XML, Pretty Table, One Row, SQL INSERT, INSERT with many rows, INSERT IGNORE, REPLACE,
   UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
   didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their

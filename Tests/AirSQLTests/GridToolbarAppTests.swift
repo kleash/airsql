@@ -246,3 +246,59 @@ extension AppTests {
         }
     }
 }
+
+/// The small commands on a grid's columns and cells.
+extension AppTests {
+    @MainActor @Suite struct GridCommandsAppTests {
+        typealias Tab = GridDataAppTests
+
+        @Test func hideOtherColumnsKeepsTheSelectionAndResetViewBringsThemBack() async throws {
+            let session = FakeTableSession()
+            let (_, _, tab) = try await Tab.tab(session: session)
+            tab.grid.selection.selectColumn(2)
+            tab.viewer.hideOtherColumns(nil)
+            #expect(tab.grid.columnOrder == [2])
+            tab.applyFilter("id > 0")
+            await ready { tab.loading != nil }
+            tab.resetView(nil)
+            await ready { tab.loading != nil }
+            #expect(tab.grid.columnOrder == Array(0..<6))
+            #expect(tab.source?.filter == "" && tab.source?.hiddenColumns.isEmpty == true)
+        }
+
+        @Test func openURLIsOnlyForAWebAddress() async throws {
+            let session = FakeTableSession()
+            session.rows[0][2] = "https://example.com/a?b=1"
+            let (_, _, tab) = try await Tab.tab(session: session)
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            #expect(tab.viewer.validateMenuItem(Commands.openURL.item()))
+            tab.grid.selection.select(GridPosition(row: 1, column: 2))
+            let item = Commands.openURL.item()
+            #expect(!tab.viewer.validateMenuItem(item) && item.toolTip?.contains("web address") == true)
+        }
+
+        @Test func compareCellsWantsTwoCellsAndOpensTheirDifference() async throws {
+            let (main, _, tab) = try await Tab.tab()
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            #expect(!tab.viewer.validateMenuItem(Commands.compareCells.item()))
+            tab.grid.selection.select(GridPosition(row: 1, column: 2), add: true)
+            #expect(tab.viewer.validateMenuItem(Commands.compareCells.item()))
+            tab.viewer.compareCells(nil)
+            #expect(main.selectedTab?.title == "Compare Cells")
+        }
+
+        @Test func anExpressionWaitsAsAPendingValue() async throws {
+            let (_, _, tab) = try await Tab.tab()
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            #expect(tab.validateMenuItem(Commands.setExpression.item()))
+            tab.setSelected { _ in .sql("UPPER('eu')") }
+            #expect(tab.source?.cell(0, 2) == .placeholder("ƒ UPPER('eu')"))
+        }
+
+        @Test func anExpressionIsRefusedOnAReadOnlyConnection() async throws {
+            let (_, _, tab) = try await Tab.tab(readOnly: true)
+            tab.grid.selection.select(GridPosition(row: 0, column: 2))
+            #expect(!tab.validateMenuItem(Commands.setExpression.item()))
+        }
+    }
+}

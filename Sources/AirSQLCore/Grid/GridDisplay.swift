@@ -5,7 +5,7 @@ import Foundation
 /// to some decimal places, dates in the Mac's short, medium or long style. Only the look: copying and editing use the
 /// value itself.
 public enum GridDisplay: String, CaseIterable, Codable {
-    case standard, unixTime, unixMillis, grouped, uuid, hex, text
+    case standard, unixTime, unixMillis, grouped, uuid, hex, text, uuidSwapped, detected
     case decimals0, decimals1, decimals2, decimals3, decimals4
     case dateShort, dateMedium, dateLong
 
@@ -16,6 +16,8 @@ public enum GridDisplay: String, CaseIterable, Codable {
         case .unixMillis: return "Date from Unix Time (milliseconds)"
         case .grouped: return "Number with Grouping"
         case .uuid: return "UUID"
+        case .uuidSwapped: return "UUID, Time First (UUID_TO_BIN(x, 1))"
+        case .detected: return "Detect from the Bytes"
         case .hex: return "Hex"
         case .text: return "Text (UTF-8)"
         case .decimals0: return "No Decimals"
@@ -41,7 +43,7 @@ public enum GridDisplay: String, CaseIterable, Codable {
     public static func choices(for column: GridColumn) -> [GridDisplay] {
         switch column.kind {
         case .number: return [.standard, .grouped, .decimals0, .decimals1, .decimals2, .decimals3, .decimals4, .unixTime, .unixMillis]
-        case .binary: return [.standard, .uuid, .hex, .text]
+        case .binary: return [.standard, .detected, .uuid, .uuidSwapped, .hex, .text]
         case .date where column.hasDate: return [.standard, .dateShort, .dateMedium, .dateLong]
         default: return [.standard]
         }
@@ -74,13 +76,17 @@ public enum GridDisplay: String, CaseIterable, Codable {
             var rounded = Decimal()
             NSDecimalRound(&rounded, &decimal, decimals, .plain)
             return GridAggregate.laidOut("\(rounded)", fraction: decimals, grouping: true, .current)
-        case .uuid:
+        case .uuid: return bytes.flatMap(Self.uuid)
+        case .uuidSwapped:
+            // UUID_TO_BIN(x, 1) stores time-high, time-mid, time-low: put them back in a UUID's order.
             guard let bytes, bytes.count == 16 else { return nil }
-            let hex = bytes.map { String(format: "%02x", $0) }.joined()
-            let parts = [0..<8, 8..<12, 12..<16, 16..<20, 20..<32].map { range in
-                String(hex[hex.index(hex.startIndex, offsetBy: range.lowerBound)..<hex.index(hex.startIndex, offsetBy: range.upperBound)])
-            }
-            return parts.joined(separator: "-")
+            return Self.uuid(Array(bytes[4..<8] + bytes[2..<4] + bytes[0..<2] + bytes[8...]))
+        case .detected:
+            guard let bytes else { return nil }
+            if bytes.count == 16 { return Self.uuid(bytes) }
+            let text = String(decoding: bytes, as: UTF8.self)
+            return !bytes.isEmpty && Array(text.utf8) == bytes && text.unicodeScalars.allSatisfy({ $0.value >= 0x20 || "\t\n\r".unicodeScalars.contains($0) })
+                ? text : nil
         case .hex:
             guard let bytes else { return nil }
             return "0x" + bytes.prefix(512).map { String(format: "%02X", $0) }.joined() + (bytes.count > 512 ? "…" : "")
@@ -90,6 +96,15 @@ public enum GridDisplay: String, CaseIterable, Codable {
         case .dateShort, .dateMedium, .dateLong:
             return value.flatMap { Self.date($0, style: dateStyle, zone: zone) }
         }
+    }
+
+    private static func uuid(_ bytes: [UInt8]) -> String? {
+        guard bytes.count == 16 else { return nil }
+        let hex = bytes.map { String(format: "%02x", $0) }.joined()
+        let parts = [0..<8, 8..<12, 12..<16, 16..<20, 20..<32].map { range in
+            String(hex[hex.index(hex.startIndex, offsetBy: range.lowerBound)..<hex.index(hex.startIndex, offsetBy: range.upperBound)])
+        }
+        return parts.joined(separator: "-")
     }
 
     /// A DATETIME or TIMESTAMP value ("2026-11-03 14:05:09.250") or a DATE in `style` (nil: as stored, fractions kept),

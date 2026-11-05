@@ -38,9 +38,21 @@ extension TableDataController {
     /// Refresh Every ▸ Off, 5, 10, 30 or 60 seconds (the item's tag): reloads the rows loaded so far while nothing else
     /// loads and no cell is being edited.
     @objc func setAutoRefresh(_ sender: Any?) {
+        let seconds = (sender as? NSMenuItem)?.tag ?? 0
+        guard seconds >= 0 else {
+            guard let window = view.window else { return }
+            return askText("Refresh Every", message: "Type how many seconds between refreshes, from 1 to 86,400", placeholder: "120", action: "Refresh",
+                           id: "autoRefresh.seconds", on: window) { [weak self] text in
+                guard let seconds = Int(text), (1...86_400).contains(seconds) else { return NSSound.beep() }
+                self?.startAutoRefresh(seconds)
+            }
+        }
+        startAutoRefresh(seconds)
+    }
+
+    func startAutoRefresh(_ seconds: Int) {
         autoRefresh?.invalidate()
         autoRefresh = nil
-        let seconds = (sender as? NSMenuItem)?.tag ?? 0
         autoRefreshSeconds = seconds
         guard seconds > 0 else { return }
         autoRefresh = Timer.scheduledTimer(withTimeInterval: TimeInterval(seconds), repeats: true) { [weak self] _ in
@@ -80,14 +92,25 @@ extension TableDataController {
         ExportRowsSheet.show(request, activity: model.activity, on: window)
     }
 
-    /// The Refresh Every items, Off first.
+    /// The Refresh Every items, Off first, Custom… last (its tag: -1).
     static func autoRefreshItems() -> [NSMenuItem] {
-        [0, 5, 10, 30, 60].map { seconds in
+        [0, 5, 10, 30, 60, -1].map { seconds in
             let item = Commands.autoRefresh.item()
-            item.title = seconds == 0 ? "Off" : "\(seconds) Seconds"
+            item.title = seconds == 0 ? "Off" : seconds < 0 ? "Custom…" : "\(seconds) Seconds"
             item.tag = seconds
-            item.toolTip = seconds == 0 ? "Stop refreshing the grid by itself" : "Refresh the grid by itself every \(seconds) seconds"
+            item.toolTip = seconds == 0 ? "Stop refreshing the grid by itself" : seconds < 0 ? "Type how many seconds between refreshes"
+                : "Refresh the grid by itself every \(seconds) seconds"
             return item
         }
+    }
+}
+
+/// Asks for an SQL expression for the selected cells (Set Expression…).
+@MainActor
+func askExpression(on window: NSWindow, then keep: @escaping (String) -> Void) {
+    askText("Set Expression", message: "Type an SQL expression or function: it's sent as you type it when you apply", placeholder: "UPPER(name) or NOW()",
+            action: "Set", id: "cell.expression", on: window) { text in
+        let sql = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !sql.isEmpty { keep(sql) }
     }
 }

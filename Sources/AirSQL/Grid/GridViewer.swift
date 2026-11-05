@@ -247,7 +247,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         })
         return MainMenu.submenu("Display As", [item(.standard), .separator(), item(.grouped), decimals, item(.unixTime), item(.unixMillis),
                                                .separator(), item(.dateShort), item(.dateMedium), item(.dateLong), zones, .separator(),
-                                               item(.uuid), item(.hex), item(.text)])
+                                               item(.detected), item(.uuid), item(.uuidSwapped), item(.hex), item(.text)])
     }
 
     /// The host's rows or columns changed (a page arrived): shows them again.
@@ -562,6 +562,56 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         saveColumns()
     }
 
+    /// Hide Other Columns: only the selected columns, or the focused cell's, stay.
+    @objc func hideOtherColumns(_ sender: Any?) {
+        if transposed || record != nil { transposeGrid(nil) }
+        let kept = Set(focusedColumns)
+        setHidden(true, columns: grid.columnOrder.filter { !kept.contains($0) })
+    }
+
+    /// Puts the columns back as they come: every one shown, in order, at its natural width, as stored.
+    func resetColumns() {
+        guard let source else { return }
+        backToGrid(nil)
+        if presentation != .table { present(.table) }
+        displays = [:]
+        zones = [:]
+        heat = [:]
+        updateTint()
+        displayed = display(source)
+        grid.frozenColumns = 0
+        grid.source = displayed
+        saveColumns()
+        status.update()
+        hiddenColumnsDidChange?()
+    }
+
+    /// Open URL: the focused cell's web address in the browser.
+    @objc func openCellURL(_ sender: Any?) {
+        guard let url = focusedURL else { return NSSound.beep() }
+        NSWorkspace.shared.open(url)
+    }
+
+    private var focusedURL: URL? {
+        guard let cell = focusedCell, let text = source?.value(cell.row, cell.column) else { return nil }
+        return GridLink.url(text)
+    }
+
+    /// Compare Cells: two selected cells' values, line by line, in a tab. Cut values read whole first.
+    @objc func compareCells(_ sender: Any?) {
+        let cells = selectedCells(limit: 3)
+        guard cells.count == 2, source != nil, let main = window?.windowController as? MainWindowController else { return NSSound.beep() }
+        let show = { [self] in
+            guard let source else { return }
+            let (first, second) = (source.value(cells[0].row, cells[0].column), source.value(cells[1].row, cells[1].column))
+            let name = { (cell: (row: Int, column: Int)) in "\(source.columns[cell.column].name), row \((cell.row + 1).formatted())" }
+            main.open(TextContent(title: "Compare Cells", caption: "− \(name(cells[0]))   + \(name(cells[1]))",
+                                  text: GridLink.lineDifference(first ?? grid.nullText, second ?? grid.nullText)),
+                      title: "Compare Cells", connection: nil)
+        }
+        if let readWhole { readWhole(cells.map(\.row), cells.map(\.column), show) } else { show() }
+    }
+
     /// Hide Column: the selected columns, or the focused cell's.
     @objc func hideColumn(_ sender: Any?) {
         if transposed || record != nil { transposeGrid(nil) }
@@ -725,6 +775,17 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             item.state = column.map { $0 < grid.frozenColumns } == true ? .on : .off
             item.explain(enabled: enabled, reason: column == nil ? "Select a column first" : "Not while the rows are on their side")
             return enabled
+        case #selector(hideOtherColumns(_:)):
+            let enabled = !focusedColumns.isEmpty && Set(focusedColumns).count < grid.columnCount
+            item.explain(enabled: enabled, reason: focusedColumns.isEmpty ? "Select a column first" : "No other columns are shown")
+            return enabled
+        case #selector(openCellURL(_:)):
+            item.explain(enabled: focusedURL != nil, reason: "Select a cell holding a web address first")
+            return focusedURL != nil
+        case #selector(compareCells(_:)):
+            let enabled = selectedCells(limit: 3).count == 2
+            item.explain(enabled: enabled, reason: "Select two cells first")
+            return enabled
         case #selector(hideColumn(_:)):
             let enabled = grid.columnCount > 1 && grid.selection.cursor != nil
             item.explain(enabled: enabled, reason: grid.columnCount > 1 ? "Select a column first" : "One column stays shown")
@@ -793,9 +854,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
         menu.addItem(.separator())
         switch target {
-        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.transpose, Commands.columnSummary, Commands.chart])
+        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.transpose, Commands.columnSummary, Commands.chart, nil,
+                               Commands.openURL, Commands.compareCells])
         case .row: menu.add([Commands.recordView, Commands.transpose, Commands.valuePanel])
-        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.freeze, Commands.columnList, Commands.heatmap,
+        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.hideOtherColumns, Commands.freeze, Commands.columnList, Commands.heatmap,
                                 Commands.chart])
         }
         if !transposed, record == nil { menu.addItem(Self.displayMenu()) }
