@@ -64,6 +64,13 @@ extension AppTests {
             #expect(await eventually(timeout: 5) { opened?.name == "orders" })
         }
 
+        @Test func aNameTheParserCantPlaceMarksBySpelling() async throws {
+            let editor = try await editor("SELECT nope, NOPE, other FROM nowhere")
+            editor.setSelectedRange(NSRange(location: 7, length: 0))
+            editor.markUsages()
+            #expect(editor.usageMarks.count == 2)
+        }
+
         @Test func usagesAreTinted() async throws {
             let editor = try await editor("SELECT o.id FROM orders o WHERE o.id = 1")
             editor.setSelectedRange(NSRange(location: 7, length: 0))

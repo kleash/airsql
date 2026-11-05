@@ -261,7 +261,7 @@ extension AppTests {
                 editor.layoutManager?.temporaryAttribute(.backgroundColor, atCharacterIndex: place, effectiveRange: nil) != nil
             }
             editor.setText("SELECT orders, `ORDERS`, 'orders', other FROM orders")
-            editor.setSelectedRange(caret(9))
+            editor.setSelectedRange(caret(7, 6))
             #expect(marked(7) && marked(15) && marked(46) && !marked(26) && !marked(35))
             editor.setSelectedRange(caret(2))
             #expect(!marked(7) && !marked(46))

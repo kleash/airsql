@@ -222,8 +222,13 @@ extension SQLEditorView {
               let layout = layoutManager, let token = tokens.first(where: { $0.range.lowerBound <= caret && caret <= $0.range.upperBound
                   && [.word, .quotedName, .variable].contains($0.kind) }) else { return }
         var ranges = usages(at: caret, in: analysis)
-        if ranges.count < 2 { ranges = [] }
-        if token.kind == .word { ranges += SQLBlocks.pair(at: caret, tokens: tokens, text: analysis.text) }
+        let pair = token.kind == .word ? SQLBlocks.pair(at: caret, tokens: tokens, text: analysis.text) : []
+        if ranges.count < 2 {
+            ranges = []
+            // A name the parser can't place still marks by spelling.
+            if pair.isEmpty { markSameNames { range in Range(range).map { ranges.append($0) } } }
+        }
+        ranges += pair
         let color = NSColor.accent.withAlphaComponent(0.14)
         for range in ranges {
             layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: NSRange(range))
