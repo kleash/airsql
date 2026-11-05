@@ -17,3 +17,5 @@ dropping or renaming, restoring a dump, and sync scripts.
   in the sidebar, and sync scripts) saves the statements as a changeset in a changelog once they have run (see
   [Liquibase changelogs](liquibase.md)). In the query tab, use **Query ▸ Save as Changeset…**.
 - **Copy SQL** copies the statements. **Cancel** changes nothing.
+- **Passwords and keys** show as `<secret>` here and in what Copy SQL copies, as in the [SQL log](sql-log.md); only the
+  statements that run have them. Such a change can't be saved as a changeset.

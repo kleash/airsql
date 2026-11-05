@@ -42,6 +42,13 @@ struct NavigatorLabTests {
         }
         let copy = DatabaseObject(.table, other, "copy")
         #expect(try await count(copy) == "2")
+        // Without a column and its indexes, and with the keys the copy's columns still hold.
+        for sql in NavigatorSQL.copyTable(table, to: other, name: "slim", columns: ["id"], where: nil, droppingColumns: ["note"]) {
+            _ = try await session.query(sql)
+        }
+        #expect(try await value(session, "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '\(other)' AND TABLE_NAME = 'slim' "
+                                + "AND COLUMN_NAME = 'note'") == "0")
+        _ = try await session.query("DROP TABLE " + SQLQuote.identifier(other, "slim"))
         #expect(try await value(session, "SELECT twice FROM \(copy.quoted) WHERE id = 2") == "4")
 
         // Find text: %, _ and ! match only themselves.
@@ -53,6 +60,16 @@ struct NavigatorLabTests {
         #expect(try await found("%") == "1")
         #expect(try await found("!") == "1")
         #expect(try await found("PLAIN") == "0")  // the column's collation decides: utf8mb4_bin tells case apart
+        func matched(_ text: String, _ kind: NavigatorSQL.TextMatch.Kind, sensitive: Bool = false) async throws -> String? {
+            try await value(session, NavigatorSQL.countContaining(text, in: table, columns: ["note"], noBackslashEscapes: session.noBackslashEscapes,
+                                                                   match: .init(kind: kind, caseSensitive: sensitive)))
+        }
+        #expect(try await matched("50%_off!", .exact) == "1")
+        #expect(try await matched("50%_off", .exact) == "0")
+        #expect(try await matched("50%", .wildcards) == "1")
+        #expect(try await matched("5_", .wildcards) == "0")
+        #expect(try await matched("^50.*!$", .regex) == "1")
+        #expect(try await matched("PLAIN", .contains, sensitive: true) == "0")
         for text in Hostile.values where !text.isEmpty && !"50%_off!plain".contains(text) {
             #expect(try await found(text) == "0", "\(text.debugDescription)")
         }

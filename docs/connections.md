@@ -37,7 +37,7 @@ tabs:
 A **read-only** connection's sessions are read-only on the server, and AirSQL itself runs on it only statements it can
 prove only read: SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN (as [read-only queries](read-only-queries.md)
 decide), and USE. Anything else is refused before it is sent, with the reason, from the query tab, the navigator, a
-compare's sync script, Restore, Run SQL File and CSV import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
+compare's sync script, Restore, Run SQL File and Import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
 it. A table tab's WHERE filter goes through the same check, within the whole SELECT it runs in, so a condition can't
 call a function such as `SLEEP` or `GET_LOCK` there. Open in Terminal starts `mysql` with a read-only session. The
 grid and the editors don't apply changes to it, and agents can't write to it either. The process list's Kill Query
@@ -102,9 +102,6 @@ transaction or edits that aren't applied.
 **File ▸ Connect To** lists every connection. **Connection ▸ Deleted Connections** brings back one of the last 20 you
 deleted, without its passwords. A connection with no default database goes back to the one you last worked in. From a
 script, `open -a AirSQL --args --connect "Staging"` starts AirSQL and connects to that connection by name.
-
-When the server says the password has expired, Connect asks for a new one and sets it (a saved password is replaced); a
-read-only connection doesn't, so change it there with the server's own tools.
 
 Connected connections are kept alive with a ping every minute, except a session whose transaction has been open longer
 than the safety setting allows.

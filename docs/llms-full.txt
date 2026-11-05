@@ -31,13 +31,14 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [The SQL console](https://kleash.github.io/airsql/console.html): write and run SQL, results, transactions, history and the SQL log.
 - [Connections and routes](https://kleash.github.io/airsql/connections.html): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, table commands, find text and the process list.
+- [Users and roles](https://kleash.github.io/airsql/users.html): list, add, change and drop logins and roles, their privileges, limits and passwords.
 - [A table's rows](https://kleash.github.io/airsql/table-data.html): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
 - [Change tables, views and routines](https://kleash.github.io/airsql/editors.html): the table editor, views and routines as CREATE code, and the ER
   diagram.
 - [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
-  to another server; CSV import.
+  to another server; import from CSV, Excel, JSON and the clipboard, into a new table if you want.
 - [Compare](https://kleash.github.io/airsql/compare.html): servers, databases, tables and objects, structure and data, side by side, and a sync script you review first; or two
   results, or a result with a table, row by row.
 - [AI agents](https://kleash.github.io/airsql/agents.html): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
@@ -273,6 +274,8 @@ dropping or renaming, restoring a dump, and sync scripts.
   in the sidebar, and sync scripts) saves the statements as a changeset in a changelog once they have run (see
   [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html)). In the query tab, use **Query ▸ Save as Changeset…**.
 - **Copy SQL** copies the statements. **Cancel** changes nothing.
+- **Passwords and keys** show as `<secret>` here and in what Copy SQL copies, as in the [SQL log](https://kleash.github.io/airsql/sql-log.html); only the
+  statements that run have them. Such a change can't be saved as a changeset.
 
 
 ---
@@ -308,6 +311,12 @@ Source: https://kleash.github.io/airsql/sql-log.html
 AirSQL writes every statement it sends to a server into one file on your Mac, just before the statement goes out.
 Use it to see exactly what AirSQL did: what a query tab ran, what a table edit applied, what the navigator asked the
 server for.
+
+## Where to read it
+
+While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
+or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
+window.
 
 ## Where it is
 
@@ -727,7 +736,7 @@ shows in a sheet, with what it will do:
   it, with the lines that differ from the editor tinted; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
 - **Query ▸ Sessions…** lists every session AirSQL has open on the connection: what uses it, its thread on the server, its
   database, and whether it is running or holds a transaction.
-- **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](https://kleash.github.io/airsql/sql-log.html).
+- **View ▸ SQL Log** (⌥⌘L) shows or hides every statement AirSQL sent, as they come, under the tabs. See [the SQL log](https://kleash.github.io/airsql/sql-log.html).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it. **Operations**
   lists the steps as a tree with the server's rows and cost; click a header to sort the steps of each level, and the
   steps that take a large share are marked in orange; select a step to read all the server says about it. **Diagram** draws
@@ -782,7 +791,7 @@ tabs:
 A **read-only** connection's sessions are read-only on the server, and AirSQL itself runs on it only statements it can
 prove only read: SELECT, WITH … SELECT, SHOW, DESCRIBE and EXPLAIN (as [read-only queries](https://kleash.github.io/airsql/read-only-queries.html)
 decide), and USE. Anything else is refused before it is sent, with the reason, from the query tab, the navigator, a
-compare's sync script, Restore, Run SQL File and CSV import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
+compare's sync script, Restore, Run SQL File and Import, so not even `SET SESSION TRANSACTION READ WRITE` can lift
 it. A table tab's WHERE filter goes through the same check, within the whole SELECT it runs in, so a condition can't
 call a function such as `SLEEP` or `GET_LOCK` there. Open in Terminal starts `mysql` with a read-only session. The
 grid and the editors don't apply changes to it, and agents can't write to it either. The process list's Kill Query
@@ -848,9 +857,6 @@ transaction or edits that aren't applied.
 deleted, without its passwords. A connection with no default database goes back to the one you last worked in. From a
 script, `open -a AirSQL --args --connect "Staging"` starts AirSQL and connects to that connection by name.
 
-When the server says the password has expired, Connect asks for a new one and sets it (a saved password is replaced); a
-read-only connection doesn't, so change it there with the server's own tools.
-
 Connected connections are kept alive with a ping every minute, except a session whose transaction has been open longer
 than the safety setting allows.
 
@@ -897,13 +903,44 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   the statement that makes it.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
-  filter, a connected connection whose name doesn't match shows the objects that do, opened.
-- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL.
+  filter, a connected connection whose name doesn't match shows the objects that do, opened. Between slashes the filter is
+  a regular expression (`/^wp_/`), and what you opened with Return comes back under its magnifying glass.
+- **Quick Open…** (⌘P) goes to anything by letters of its name, in order: `fica` finds `film_category`. It lists your tabs,
+  connections, databases, tables, routines, triggers and events, recent files and every menu command.
+- **Select in Tree** (⇧⌘L) finds the tab's table or object in the tree; in a query tab, the name at the cursor.
+- **F1** on a tree row shows what the editor's Quick Documentation shows for that name, and a table's first rows, cut
+  short. **Quick Definition** (⌥F1) peeks at its CREATE statement. Both work in a query tab too, for the name at the
+  cursor; there F4 opens the table's rows and ⌥⌘B goes to its DDL. **F4** on a Tables or Views group lists them.
+- **Find Where Used…** lists the views, routines, triggers, events and foreign keys that name the selected object or
+  column, from their definitions on the server, as far as your login can read them.
+- **Back** and **Forward** (⌃⌘← and ⌃⌘→) walk the tabs you've shown; **Recent Tabs…** (⌃⌘E) lists them, the last seen
+  first, with recent files. In a query tab, **Go to Statement…** (⌃⌘O) lists its statements.
+- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL; hold ⇧ as you start to add its
+  database. Drag a table onto a database in the tree to copy it there, through **Copy Table…**'s questions.
+- **Move Up** and **Move Down** in a connection's menu put its list in your own order.
 - F2 renames the selected table or view (or folder), as **Database ▸ Rename…** does.
 - **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
 
 On a server with more than 3,000 tables, AirSQL reads only the names when it connects; a database's columns, indexes and
 keys load when you open it (a spinner shows on its row meanwhile). Change the number in Settings ▸ Connections.
+
+## Choose what the tree shows
+
+The button beside the filter, and **View ▸ Tree**, hold these choices. They last until you change them.
+
+- **Flat List** leaves out the groups: a database's objects come straight under it.
+- Point at an object and click its **star** to make it a favourite (or use **Add to Favourites** in its menu). The star
+  beside the filter, **Favourites Only**, shows only those. Each connection keeps its own.
+- **Sizes** shows each table's size with a bar behind its row, and each database's total, once the sizes are read:
+  click the database to read them. Off, the row shows the estimated rows instead.
+- **Comments** shows tables' and routines' comments beside their names.
+- **Group by Prefix** folds three or more objects that share a first part, such as `wp_`, into a group.
+- **Follow Tab** selects in the tree what the tab you switch to is about.
+- **Database Filter** adds a second box that filters the databases, with the same rules as the first.
+- **Object Kinds** shows or hides tables, views and the rest; **Hide Names…** leaves names or patterns such as `tmp_*` out
+  of every tree.
+- **Databases Shown…** ticks the databases of this server to show; the connection shows "3 of 12" when some are left out.
+  It writes the connection's database filter, so a database left out when you connected returns after you connect again.
 
 ## Change databases and tables
 
@@ -913,9 +950,12 @@ Every change shows its SQL first ([Check SQL before it runs](https://kleash.gith
 - **Drop…** deletes the selected databases or objects. Dropping a database always asks you to type its name; on a
   Production connection, so does dropping or emptying a table.
 - **Truncate…** deletes every row of the selected tables. It can't be rolled back.
+- **Drop…** on an index, foreign key or check under a table takes it off the table; the rows stay.
+- **Edit Comment…** changes a table's or routine's comment. **New Column…**, **New Index…** and **New Foreign Key…** open the
+  table's structure with a new row to fill in; nothing changes until Apply there.
 - **Rename…** gives a table or view a new name. Views and routines that use the old name aren't changed.
 - **Copy Table…** copies a table into the same or another database, with its rows or without, or only the rows where a
-  condition you type holds (for example `created_at >= '2026-01-01'`). Indexes come along; foreign keys don't.
+  condition you type holds (for example `created_at >= '2026-01-01'`). Untick columns to leave them out; the primary key always comes along, the other indexes unless you untick them, and foreign keys if you tick them.
 - **Bulk Table Editor…** moves the selected tables to another database, or changes their engine, or converts them and
   their text columns to another character set and collation.
 - **Maintenance** ▸ Analyze, Check, Optimize, Repair or Checksum runs on the selected tables and shows what the server
@@ -936,13 +976,19 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
   INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
 - **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
 
+## Find text in tabs and files
+
+**Find in Tabs and Files…** (⌃⌥F) searches the text of every query tab and, once you choose a folder, its .sql files.
+Double-click a match to go there. **Replace in Tabs** changes the tabs only, with Undo there, and saves nothing.
+
 ## Find text on the server
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
-tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
-bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
+tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: choose **Stop at 1,000** or **Stop at 100,000** to
+stop counting a table early. The status bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
 matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
-Upper and lower case match as the column's collation says (most ignore case).
+Upper and lower case match as the column's collation says (most ignore case). The menu beside it chooses **Contains**, **Is exactly**, **Wildcards** (`%` and `_`) or a **Regular expression**, and
+**Match case** tells capitals from small letters whatever the column's collation.
 
 ## See what the server is running
 
@@ -1024,6 +1070,12 @@ Source: https://kleash.github.io/airsql/table-data.html
 
 A table tab shows a table's or view's rows in the data grid. They load a page at a time from the connection's data
 session, a session of their own, so a long query in a query tab never holds them up. Edits wait until you apply them.
+
+
+The switch at the top of a table tab shows its **Data**, its **Structure** (the table editor, or a view's code) or its
+**DDL** (the statement that makes it), also in **View ▸ Table Page** (⌃⌥1, ⌃⌥2, ⌃⌥3). The choice stays as you walk the
+tree: the next table opens on the same page, and reads its rows only when you show them. Structure changes wait for Apply
+there, and closing the tab asks about them.
 
 ## Load rows
 
@@ -1239,11 +1291,13 @@ These work in a query's results too.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
-  (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
+  (`NULL`, `\N` or nothing), CSV's separator (any text) and quotes, Windows line endings, the file's encoding (UTF-8, with
+  or without a BOM, UTF-16, Windows-1252 and others; characters it lacks are replaced, and you're told), whether line breaks
+  inside values become spaces and whether the file opens afterwards, then **Export…** to a file or **Copy** to the clipboard.
   In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
   and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.
   Hidden columns aren't exported, and the sheet says how many are left out. SQL formats leave out generated columns.
-  In CSV a real NULL has no quotes and the text NULL has them, so CSV import tells them apart; TSV has no way to.
+  In CSV a real NULL has no quotes and the text NULL has them, so Import tells them apart; TSV has no way to.
   CSV is UTF-8 without a BOM, which scripts read as it is: Excel for Mac needs **Data ▸ From Text**.
   XML and HTML can't hold control characters, nor can a workbook: each shows as �.
 
@@ -1476,10 +1530,10 @@ and in a connection's right-click menu in the sidebar.
 installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
 (MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
 
-A `.csv` dropped on the window or the Dock icon opens Import CSV with the file chosen, and a `.sql.gz` opens Run SQL
+A `.csv`, `.tsv`, `.xlsx` or `.json` dropped on the window (or a `.csv` or `.xlsx` on the Dock icon) opens Import File with the file chosen, and a `.sql.gz` opens Run SQL
 File the same way; nothing runs until you press the sheet's button.
 
-Export, Restore, Run SQL File, Copy to Another Server and Import CSV each open in a window of their own, which you can
+Export, Restore, Run SQL File, Copy to Another Server and Import File each open in a window of their own, which you can
 move aside to keep working. Closing it while it runs asks first; disconnecting the connection it uses, or quitting, says
 it is running and stops it.
 
@@ -1506,7 +1560,11 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
    SQL File take a `mysql` or `mariadb` the same way), where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
 4. The box under the form shows the exact command line of the tool you picked, and **Copy Command** copies it. AirSQL's
    built-in export runs no command, so the box says what it does and the button isn't there.
-5. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
+5. **Output** says where it goes: **One file**, **The clipboard** (small dumps, up to 32 MB) or **A folder, a file per
+   object**. In a folder each table, view, routine, trigger and event gets its own `.sql` that restores on its own, read
+   in the same snapshot. Choose CSV, TSV, JSON, JSON Lines or Excel in the menu beside it for a data file per ticked
+   table instead: column names first, every row, and the SQL options turn off.
+6. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
 
 The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
 or failed export never leaves half a file. When it is done, **Show in Finder** shows you the file.
@@ -1514,6 +1572,20 @@ or failed export never leaves half a file. When it is done, **Show in Finder** s
 **AirSQL (built in)** in the Tool menu writes the SQL itself, through a connection of its own: the tables' `CREATE`
 statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
 consistent snapshot. Its files restore with `mysql` or with Run SQL File.
+
+### What goes in the SQL
+
+- **Rows as** writes `INSERT`, `INSERT IGNORE`, `REPLACE`, or `DELETE` then `INSERT` for each table, and **at most … KB
+  each** caps the size of one statement, for a server with a small `max_allowed_packet`.
+- **Add CREATE DATABASE and USE** makes one database restore under its own name; several always do.
+- **Add DROP DATABASE first** deletes the whole database of that name when the file is restored. It is off while only
+  some tables are ticked, so a file can't take the other tables with it.
+- **Remove DEFINER** leaves the account out of views, routines, triggers and events, so a server without that account
+  takes them; **Remove AUTO_INCREMENT values** leaves out each table's next value; **A transaction per table** speeds up
+  restoring InnoDB tables.
+
+Those last three, `DELETE` before the rows, a folder and the clipboard are AirSQL's own export's: with a dump tool chosen,
+the note says so and **Use AirSQL's Built-in** switches.
 
 ## Restore a dump, or run a .sql file
 
@@ -1543,27 +1615,63 @@ session on each: no file in between.
   it, and the SQL preview asks before it runs. Copies to a production connection always ask.
 - If a statement fails, the copy stops; what was copied before it stays.
 
-## Import a CSV file
+## Import a file
 
-**File ▸ Import CSV…**
+**File ▸ Import File…**, or **Import from Clipboard…** for rows copied from a spreadsheet or a text file.
 
-1. Choose the file. AirSQL guesses the separator (comma, semicolon, tab or bar) and shows each field's first value.
+1. Choose the file, or **Paste** the clipboard. CSV and other delimited text, Excel workbooks (`.xlsx`, the first sheet)
+   and JSON (an array of objects, or one object a line) all work. AirSQL guesses the separator and shows the first
+   rows as they'll be read, at the bottom of the window.
 2. Choose the table. Each column takes a field of the file, matched by name when the first row names the columns, by
    position when it doesn't, or **Leave out** to take its default.
+   Or choose **New Table…** at the end of the menu: AirSQL reads every value and proposes a `CREATE TABLE` you can edit.
+   Only what the server stores unchanged becomes a number or a date: `007`, `+44` and `01/02/2026` stay text. Every
+   column allows NULL, and no key is guessed: add one in the box if you want it.
 3. **Import**. The rows go in one transaction: if one fails (a duplicate key, a value the column refuses), none of the
-   file stays, and the message says which records.
+   file stays, and the message says which records. A new table stays, empty.
+
+For text files, **Format** chooses the separator (or **Other**, any one character), the quotes and the encoding;
+**Automatic** reads UTF-8, UTF-16 with a BOM, and Windows-1252 for what isn't UTF-8. **Skip rows** drops a title above the
+table, **Trim spaces** tidies fields without quotes, and **Backslash escapes** reads MySQL's own `\"` inside quotes.
 
 Empty fields and a `NULL` without quotes become NULL unless you untick it (AirSQL's own CSV writes the text NULL in
-quotes, so the two come back apart), and a whole `0x…` field in a BLOB or BINARY column becomes its bytes. The file should
-be UTF-8: a field that isn't reads as Windows-1252, and the end of the import says so, as it does when the server gave
-warnings. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+quotes, so the two come back apart), and a whole `0x…` field in a BLOB or BINARY column becomes its bytes. **Numbers use a
+decimal comma** reads `1.234,56` as `1234.56` in number columns. In JSON, `null` is always NULL, `true` and `false` are 1
+and 0, and nested values go in as their JSON.
+
+**Rows** says what happens when things go wrong:
+
+- **Stop at a duplicate** undoes the import; **Skip duplicates** keeps the row already there (`INSERT IGNORE`, which also
+  lets the server adjust values that don't fit, so check its warnings); **Replace duplicates** puts the file's row in its
+  place (`REPLACE`).
+- **Delete the table's rows first** deletes them in the same transaction, after a warning, so a failed import brings them
+  back (not on MyISAM and other tables without transactions).
+- **Skip rows the server refuses** keeps the good rows and writes the others, each with the reason, to a CSV in
+  Downloads; **Show Skipped Rows** finds it. A lost connection or a deadlock still stops the import and undoes it.
+
+### Copy a result into a table
+
+Right-click a result ▸ **Copy Result to Table…** (or **Query ▸ Copy Result to Table…**) opens the same window with the
+selected rows, or all of them, into a table of this connection or a new one. NULLs, empty text and bytes stay apart.
+
+AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+
+## Flush
+
+**Tools ▸ Flush** clears the server's host cache, closes and reopens its logs, reloads the grant tables, closes its open
+tables or resets its status counters, each after the SQL preview. They need the `RELOAD` privilege and are off on a
+read-only connection.
+
+**Lock All Tables for Reading…** stops every write on the server (`FLUSH TABLES WITH READ LOCK`), for a consistent copy of
+its files. AirSQL keeps the lock on a connection of its own while a sheet says so; **Unlock** releases it, and so does
+quitting. It is off for agents.
 
 ## Open the mysql command line in Terminal
 
 **Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database. On a
 [read-only connection](https://kleash.github.io/airsql/connections.html#add-or-edit-a-connection) it starts with `SET SESSION TRANSACTION READ ONLY`, as
 AirSQL's own sessions do, so a slip can't change anything there. Exports get it too, where the dump tool knows how
-(MySQL 8.4's and later); restores, Run SQL File, CSV import and copies into a read-only connection are refused.
+(MySQL 8.4's and later); restores, Run SQL File, imports and copies into a read-only connection are refused.
 
 ## Your password stays private
 
@@ -1832,7 +1940,7 @@ no agent can, whatever it asks.
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
 Whatever that would change waits for you:
 
-- Anything that would run on a server (Run in a query tab, Apply, a compare's sync, Restore, Copy, CSV import, Commit)
+- Anything that would run on a server (Run in a query tab, Apply, a compare's sync, Restore, Copy, Import, Commit)
   first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
   can only decline. Statements that AirSQL proves only read run without asking.
 - Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,
@@ -1969,6 +2077,64 @@ added column, DROP INDEX and DROP FOREIGN KEY for added keys, RENAME back. Row c
 
 ---
 
+Source: https://kleash.github.io/airsql/users.html
+
+# Users and roles
+
+**Users and Roles** lists a server's logins and roles and changes them. Open it from **Database ▸ Users and Roles**, from
+a connection's right-click menu, or with a click on the **Users and Roles** row at the end of its tree.
+
+The list shows each account's name, host, kind, login method, whether it has a password (never what it is), whether it's
+locked or expired, its limits and what it must show of TLS. Under the list is what the selected account holds, in the
+server's own words, with any password hash masked. Filter, sorting, **Copy List** and **Export List…** work as on the
+[host page](https://kleash.github.io/airsql/navigator.html).
+
+Reading the list needs SELECT on the `mysql` database; AirSQL says so when your login doesn't have it.
+
+## Add or change an account
+
+**New User…**, **New Role…**, **Edit…** (or a double-click) and **Clone User…** open the same sheet. **Next…** shows the SQL,
+and nothing runs until you press **Run**. Each statement takes effect at once, and the first that fails stops the rest:
+press Refresh to see where it got to.
+
+- **Login**: the name, the host (`%` is anywhere), the login method and the password. Leave the password empty to keep
+  it. **Generate** fills both fields with a random password. **Copy** then copies it, marked so clipboard managers skip it;
+  it can't be shown. To change the login method, type a new password too.
+- **Locked** keeps the account but refuses its logins. **Password expired** makes it choose a new one at its next login.
+- **Limits**: statements, changes and logins an hour, connections at once (0 is no limit), and what it must show of TLS.
+- **Privileges**: the whole server, then each database, table, column and routine it has something on. Each privilege
+  has a tick, marked **reads**, **writes** or **administers**; the list is the server's own. **Add Level…** adds one more;
+  `%` and `_` in a database's name match several, `\_` is a real underscore.
+- **Roles**: the roles it takes on, whether it can pass each one on, and which are on at login. MariaDB has one default
+  role, MySQL several. Roles need MySQL 8 or any MariaDB.
+
+**Clone User…** starts a new login with the selected one's settings, privileges and roles. The password isn't copied.
+
+**Drop User…** asks you to type the name first, and warns when it's the login AirSQL is using.
+
+## Who may do what on one object
+
+Right-click a database, table or routine in the tree and choose **Modify Grants…**. Choose the login or role, and its sheet
+opens at that object's ticks.
+
+## An expired password
+
+When the server says your own password has expired, connecting asks for a new one, changes it and goes on. The new
+password goes to the server only: a password saved in your Keychain stays as it was, so update it in the connection's
+settings. A password you just typed with Remember in Keychain is replaced by the new one. Read-only and Production connections don't offer this: they say the password has expired, and connecting stops.
+
+## What protects these
+
+- Read-only and Production connections refuse every change here, and agents can't make one. The buttons and menu items
+  say why.
+- A password you type is sent to the server and kept nowhere else: not in the [SQL log](https://kleash.github.io/airsql/sql-log.html), history or AirSQL's
+  settings. The [SQL preview](https://kleash.github.io/airsql/sql-preview.html) and Copy SQL show `<secret>`, so a copied statement needs its password put
+  back, and the sheet doesn't offer a Liquibase changeset.
+- When a server's error would quote the statement, AirSQL leaves its words out.
+
+
+---
+
 Source: https://kleash.github.io/airsql/accessibility.html
 
 # Accessibility
@@ -2056,6 +2222,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Go to Sidebar | ⌥⌘1 |
 | Go to Editor | ⌥⌘2 |
 | Go to Results | ⌥⌘3 |
+| Select in Tree | ⇧⌘L |
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
@@ -2156,6 +2323,17 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Toggle Case | ⌃⇧U |
 | Comment Selection | ⌥⌘/ |
 | Complete Statement | ⌃⇧↩ |
+| Find in Tabs and Files… | ⌃⌥F |
+| Data | ⌃⌥1 |
+| Structure | ⌃⌥2 |
+| DDL | ⌃⌥3 |
+| Quick Definition | ⌥F1 |
+| Open Data of Name | F4 |
+| Go to DDL | ⌥⌘B |
+| Back | ⌃⌘← |
+| Forward | ⌃⌘→ |
+| Recent Tabs… | ⌃⌘E |
+| Go to Statement… | ⌃⌘O |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
 HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,
@@ -2180,6 +2358,8 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
 
 - They are kept in your Keychain, never in AirSQL's settings file, in its logs, in the [SQL log](https://kleash.github.io/airsql/sql-log.html) or in
   what AI agents see.
+- A password you type for a server login under [Users and roles](https://kleash.github.io/airsql/users.html) goes to the server and isn't kept. It shows as
+  `<secret>` on the SQL preview and in the process list.
 - A PAM or LDAP login sends the password as plain text, so AirSQL uses one only when you turn it on for the connection,
   and only over TLS that proves the server is the right one.
 
@@ -2411,13 +2591,13 @@ AirSQL's agents' gate fails closed. While it carries out your request, nothing t
 its own:
 
 - **The SQL preview sheet is the person's.** Run in a console, Apply in the grid and the editors, a compare's sync,
-  Restore, Copy and CSV import show what will run in the SQL preview sheet, marked "Asked by <your client>". Only the
+  Restore, Copy and Import show what will run in the SQL preview sheet, marked "Asked by <your client>". Only the
   person can press its Run (or Return, or click it): you get "Only the person at the Mac can approve…". You may press
   Decline (`preview.cancel`), and `wait {until: no_sheet}` for their answer. A console run of statements that are all
   proven read-only (see read-only) runs without asking.
 - **Statements on the person's sessions** that what you did sends, and that aren't proven read-only (a Commit, a
   Roll Back, the transaction mode, a Kill), wait in the same sheet, one by one.
-- **A read-only connection** refuses in the console (and the navigator, a sync, Restore and CSV import) any statement
+- **A read-only connection** refuses in the console (and the navigator, a sync, Restore and Import) any statement
   that isn't proven read-only, a bare USE aside, before anything asks: there is nothing to approve. A table tab's WHERE
   filter must pass the same check inside its SELECT. Open in Terminal starts a read-only session there; the process
   list's Kill (the person's sheet) still works, as it changes no data.
@@ -2464,7 +2644,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
   `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
   `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
-  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; sheets
+  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; Users and Roles
+  (`users`, `list.usersandroles.table`, `users.grants`) can be read with read access, and every change there is refused
+  to agents: `users.new`, `users.newRole`, `users.edit` and Modify Grants say so; sheets
   `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
   `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
 - **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
@@ -2503,7 +2685,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tableData.apply`: Apply opens the SQL preview, whose Run is the person's); the status bar's `tableData.count`,
   `tableData.loadMore`, `tableData.loadAll`; find bar (⌘F) `find.text`, `find.replaceText`, `find.options`,
   `find.previous`, `find.next`, `find.count`, `find.replace`, `find.replaceAll`, `find.done`; Export Rows `export.rows`,
-  `export.format`, `export.headers`, `export.null`, `export.crlf`, `export.copy`, `export.save` (the person's),
+  `export.format`, `export.headers`, `export.null`, `export.separator`, `export.quote`, `export.encoding`, `export.crlf`, `export.joinLines`, `export.open`, `export.copy`, `export.save` (the person's),
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
   `values.cancel`; Data ▸ Quick Filter ▸ Type a Value… `quickFilter.operator`, `quickFilter.value`, `quickFilter.add`
   (then press Filter); Data ▸ Sort by Columns… `sort.column.N`, `sort.direction.N`, `sort.up.N`, `sort.down.N`,
@@ -2522,7 +2704,14 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
-- **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
+- **SQL log** (under the tabs while a server is connected, or its window): `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`,
+  `sqlLog.window`.
+- **Table tab's switch**: `tableData.page` (Data, Structure, DDL); View ▸ Table Page does the same.
+- **Sidebar**: `sidebar.filter` (part of a name, or `/a regular expression/`), `sidebar.databaseFilter`, `sidebar.favourites`, `sidebar.options`,
+  each row's `tree.star`; View ▸ Tree holds the choices (saving them is the person's while Ask before agents change anything is on).
+- **Quick Open** (`quickOpen.field`, `quickOpen.list`, `quickOpen.open`): commands listed there are refused to agents; use the `menu` tool.
+  Quick Documentation on a tree row leaves out the table's rows for an agent.
+- **Find in Tabs and Files**: `findFiles.text`, `findFiles.results`, `findFiles.status`; `findFiles.replace` is the person's.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
@@ -2544,12 +2733,14 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
   `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
-  `export.chooseTool`, `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`,
+  `export.chooseTool`, `export.dataMode`, `export.insertSize`, `export.createDatabase`, `export.dropDatabase`, `export.removeDefiner`,
+  `export.removeAutoIncrement`, `export.wrapInTransactions`, `export.output`, `export.fileFormat`, `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`,
   `export.reveal`; Restore `restore.file`,
   `restore.fileInfo`, `restore.choose`, `restore.database`, `restore.tool`, `restore.chooseTool`, `restore.stopOnError`, `restore.continue`,
   `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
-  `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
-  `csv.emptyIsNull`, `csv.mapping`.
+  `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.newTable`, `csv.separator`, `csv.quote`, `csv.encoding`,
+  `csv.header`, `csv.skip`, `csv.trim`, `csv.emptyIsNull`, `csv.decimalComma`, `csv.duplicates`, `csv.emptyFirst`, `csv.keepGoing` (the person's),
+  `csv.mapping`, `csv.ddl`, `csv.preview`; Paste (`csv.paste`) is the person's.
 - **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.filter`, `liquibase.objects`
   (`liquibase.include.<name>`, `liquibase.rows.<name>`, `liquibase.where.<name>`), `liquibase.author`, `liquibase.ids`,
   `liquibase.rollback`, `liquibase.preconditions`, `liquibase.layout`, `liquibase.saveTo`, `liquibase.choose`,

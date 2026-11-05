@@ -33,13 +33,44 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   the statement that makes it.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
-  filter, a connected connection whose name doesn't match shows the objects that do, opened.
-- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL.
+  filter, a connected connection whose name doesn't match shows the objects that do, opened. Between slashes the filter is
+  a regular expression (`/^wp_/`), and what you opened with Return comes back under its magnifying glass.
+- **Quick Open…** (⌘P) goes to anything by letters of its name, in order: `fica` finds `film_category`. It lists your tabs,
+  connections, databases, tables, routines, triggers and events, recent files and every menu command.
+- **Select in Tree** (⇧⌘L) finds the tab's table or object in the tree; in a query tab, the name at the cursor.
+- **F1** on a tree row shows what the editor's Quick Documentation shows for that name, and a table's first rows, cut
+  short. **Quick Definition** (⌥F1) peeks at its CREATE statement. Both work in a query tab too, for the name at the
+  cursor; there F4 opens the table's rows and ⌥⌘B goes to its DDL. **F4** on a Tables or Views group lists them.
+- **Find Where Used…** lists the views, routines, triggers, events and foreign keys that name the selected object or
+  column, from their definitions on the server, as far as your login can read them.
+- **Back** and **Forward** (⌃⌘← and ⌃⌘→) walk the tabs you've shown; **Recent Tabs…** (⌃⌘E) lists them, the last seen
+  first, with recent files. In a query tab, **Go to Statement…** (⌃⌘O) lists its statements.
+- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL; hold ⇧ as you start to add its
+  database. Drag a table onto a database in the tree to copy it there, through **Copy Table…**'s questions.
+- **Move Up** and **Move Down** in a connection's menu put its list in your own order.
 - F2 renames the selected table or view (or folder), as **Database ▸ Rename…** does.
 - **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
 
 On a server with more than 3,000 tables, AirSQL reads only the names when it connects; a database's columns, indexes and
 keys load when you open it (a spinner shows on its row meanwhile). Change the number in Settings ▸ Connections.
+
+## Choose what the tree shows
+
+The button beside the filter, and **View ▸ Tree**, hold these choices. They last until you change them.
+
+- **Flat List** leaves out the groups: a database's objects come straight under it.
+- Point at an object and click its **star** to make it a favourite (or use **Add to Favourites** in its menu). The star
+  beside the filter, **Favourites Only**, shows only those. Each connection keeps its own.
+- **Sizes** shows each table's size with a bar behind its row, and each database's total, once the sizes are read:
+  click the database to read them. Off, the row shows the estimated rows instead.
+- **Comments** shows tables' and routines' comments beside their names.
+- **Group by Prefix** folds three or more objects that share a first part, such as `wp_`, into a group.
+- **Follow Tab** selects in the tree what the tab you switch to is about.
+- **Database Filter** adds a second box that filters the databases, with the same rules as the first.
+- **Object Kinds** shows or hides tables, views and the rest; **Hide Names…** leaves names or patterns such as `tmp_*` out
+  of every tree.
+- **Databases Shown…** ticks the databases of this server to show; the connection shows "3 of 12" when some are left out.
+  It writes the connection's database filter, so a database left out when you connected returns after you connect again.
 
 ## Change databases and tables
 
@@ -49,9 +80,12 @@ Every change shows its SQL first ([Check SQL before it runs](sql-preview.md)); n
 - **Drop…** deletes the selected databases or objects. Dropping a database always asks you to type its name; on a
   Production connection, so does dropping or emptying a table.
 - **Truncate…** deletes every row of the selected tables. It can't be rolled back.
+- **Drop…** on an index, foreign key or check under a table takes it off the table; the rows stay.
+- **Edit Comment…** changes a table's or routine's comment. **New Column…**, **New Index…** and **New Foreign Key…** open the
+  table's structure with a new row to fill in; nothing changes until Apply there.
 - **Rename…** gives a table or view a new name. Views and routines that use the old name aren't changed.
 - **Copy Table…** copies a table into the same or another database, with its rows or without, or only the rows where a
-  condition you type holds (for example `created_at >= '2026-01-01'`). Indexes come along; foreign keys don't.
+  condition you type holds (for example `created_at >= '2026-01-01'`). Untick columns to leave them out; the primary key always comes along, the other indexes unless you untick them, and foreign keys if you tick them.
 - **Bulk Table Editor…** moves the selected tables to another database, or changes their engine, or converts them and
   their text columns to another character set and collation.
 - **Maintenance** ▸ Analyze, Check, Optimize, Repair or Checksum runs on the selected tables and shows what the server
@@ -72,13 +106,19 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
   INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
 - **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
 
+## Find text in tabs and files
+
+**Find in Tabs and Files…** (⌃⌥F) searches the text of every query tab and, once you choose a folder, its .sql files.
+Double-click a match to go there. **Replace in Tabs** changes the tabs only, with Undo there, and saves nothing.
+
 ## Find text on the server
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
-tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
-bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
+tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: choose **Stop at 1,000** or **Stop at 100,000** to
+stop counting a table early. The status bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
 matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
-Upper and lower case match as the column's collation says (most ignore case).
+Upper and lower case match as the column's collation says (most ignore case). The menu beside it chooses **Contains**, **Is exactly**, **Wildcards** (`%` and `_`) or a **Regular expression**, and
+**Match case** tells capitals from small letters whatever the column's collation.
 
 ## See what the server is running
 

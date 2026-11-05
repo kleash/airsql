@@ -24,6 +24,8 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
     var collations: [Collation] = []
     var engines: [String] = []
     var section = Section.columns
+    /// New Column… and the like: the row to add once the table is read.
+    private var addWhenLoaded: Section?
     var isBusy = false
     /// The list shows no rows while its columns change.
     var emptied = false
@@ -124,6 +126,7 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
                 overlay.hide()
                 showSection(section)
                 designChanged()
+                if let wanted = addWhenLoaded { addOnceLoaded(wanted) }
             } catch {
                 isBusy = false
                 overlay.show(error: error.localizedDescription, retry: (self, #selector(retry(_:))))
@@ -133,6 +136,17 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
     }
 
     @objc private func retry(_ sender: Any?) { load() }
+
+    /// Goes to `wanted` and adds a row there, now or as soon as the table is read.
+    func addOnceLoaded(_ wanted: Section) {
+        guard isViewLoaded, !isBusy, before != nil else {
+            addWhenLoaded = wanted
+            return
+        }
+        addWhenLoaded = nil
+        showSection(wanted)
+        addRow(nil)
+    }
 
     private func read() async throws {
         let context = self.context, database = self.database, table = self.table

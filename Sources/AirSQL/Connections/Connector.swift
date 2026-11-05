@@ -299,10 +299,9 @@ final class Connector {
                         model.save(stored)
                     }
                 case .authFailed where [1820, 1862].contains(error.code):
-                    // Changing it is a write: not on a read-only connection, and only at Connect, where it can be saved.
-                    guard let window, typed == nil, !saved.readOnly else { throw error }
-                    let options = saved.connectOptions(password: password, routeSocket: routeSocket)
-                    password = try await changeExpiredPassword(options, of: saved, on: window)
+                    // Only at Connect: Test Connection's typed password would stay in the editor, to be saved, and no longer work.
+                    guard typed == nil else { throw error }
+                    password = try await changeExpiredPassword(saved, password, routeSocket: routeSocket, on: window, error)
                 case .authFailed:
                     password = try await databasePassword(&saved, on: window, retry: true)
                 default:

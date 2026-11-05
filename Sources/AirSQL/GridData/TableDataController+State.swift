@@ -72,6 +72,7 @@ extension TableDataController: NSMenuItemValidation {
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == Commands.pageData.action { return validatePage(menuItem) }
         if let action = menuItem.action, !Self.instancesRespond(to: action), viewer.responds(to: action) {
             return viewer.validateMenuItem(menuItem)
         }
@@ -97,6 +98,7 @@ extension TableDataController: NSMenuItemValidation {
         // Text being typed undoes itself: ⌘Z goes on past this tab to the window's undo manager.
         // Likewise ⌘⌫: off here, it reaches the text as delete to the line's start.
         if [Commands.undo.action, Commands.redo.action, Commands.deleteRows.action].contains(selector), view.window?.firstResponder is NSTextView { return false }
+        if page != .data, selector != Commands.pageData.action, Self.commandActions.contains(selector) { return false }  // the rows aren't on show
         return super.responds(to: selector) || viewer.responds(to: selector)
     }
     override func forwardingTarget(for selector: Selector!) -> Any? { viewer.responds(to: selector) ? viewer : nil }

@@ -103,9 +103,9 @@ extension AppTests {
                             && main.model.states[Fixtures.production.id] == .connected(server: "MariaDB 11.8.3")
                     },
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
-                           "Compare With…", "Compare", "Disk Usage", "Colour", "Move to Folder", "Delete…"],
+                           "Compare With…", "Compare", "Disk Usage", "Users and Roles", "Colour", "Move to Folder", "Move Up", "Move Down", "Databases Shown…", "Delete…"],
                     enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour",
-                              "Delete…"]),
+                              "Move Up", "Move Down", "Databases Shown…", "Delete…"]),
             Surface(name: "Folder in the sidebar",
                     place: { main, _ in folderRow(main, "Clients") },
                     clicked: { $0.sidebar.selectedFolderNodeID == InteractionTests.folder.id },
@@ -146,8 +146,8 @@ extension AppTests {
                         guard let console = main.selectedTab?.content as? ConsoleViewController else { return false }
                         return console.results.tabButton(for: console.resultTabs[0])?.renameField != nil
                     },
-                    menu: ["Run Result Again", "Copy Result's Query", "Open Result in Window", "Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
-                    enabled: ["Pin Result", "Rename Result…", "Close Result", "Export Result…"]),
+                    menu: ["Run Result Again", "Copy Result's Query", "Open Result in Window", "Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Copy Result to Table…", "Compare With…"],
+                    enabled: ["Pin Result", "Rename Result…", "Close Result", "Export Result…", "Copy Result to Table…"]),
             // region: a plain text cell (a foreign key's double-click opens its drop-down, an ENUM's its list).
             Surface(name: "Table rows: cell",
                     place: { main, _ in
@@ -194,9 +194,9 @@ extension AppTests {
                     },
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultViewer(main)?.valuePanel != nil },
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel",
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Copy Result to Table…", "Value Panel",
                            "Record View", "Transpose", "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Export Rows…", "Value Panel", "Record View",
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Export Rows…", "Copy Result to Table…", "Value Panel", "Record View",
                               "Transpose", "Column Summary…", "Chart"]),
             // A console result of one table with its key: a double-click edits the cell.
             Surface(name: "Editable result cell",
@@ -222,9 +222,9 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultGrid(main).editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Cut", "Paste", "Set NULL", "Set DEFAULT", "Insert Value", "Delete Rows", "Revert",
-                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"],
+                           "Preview SQL…", "Apply Changes", "Export Rows…", "Copy Result to Table…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"],
                     // email is NOT NULL: Set NULL is off, saying so.
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Cut", "Set DEFAULT", "Insert Value", "Delete Rows", "Export Rows…", "Value Panel",
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Cut", "Set DEFAULT", "Insert Value", "Delete Rows", "Export Rows…", "Copy Result to Table…", "Value Panel",
                               "Record View", "Column Summary…", "Chart"]),
             // A console result's header: its rows sort and filter here.
             Surface(name: "Grid column header",
@@ -254,8 +254,8 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.containsRow(1) },
                     doubleClicked: { main, _ in resultViewer(main)?.record == 1 },
                     // In Record View now (the double-click), so without Display As.
-                    menu: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Transpose", "Value Panel"],
-                    enabled: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Record View", "Transpose", "Value Panel"]),
+                    menu: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Copy Result to Table…", "Record View", "Transpose", "Value Panel"],
+                    enabled: ["Copy", "Copy with Headers", "Copy As", "Export Rows…", "Copy Result to Table…", "Record View", "Transpose", "Value Panel"]),
             // View As ▸ Tree: the result's first row, an object (so Copy, of a value, is off).
             Surface(name: "JSON tree",
                     place: { main, _ in
@@ -300,7 +300,7 @@ extension AppTests {
             Surface(name: "Status bar: SQL log",
                     place: { main, _ in windowPoint(main.statusBar.sqlLog.bounds, in: main.statusBar.sqlLog) },
                     clicked: { _ in true },
-                    doubleClicked: { _, received in received.contains("showSQLLog(_:)") },
+                    doubleClicked: { main, _ in !main.logDocked || main.model.data.settings.tree.showsLog == main.logDocked },
                     menu: ["SQL Log", "Clear SQL Log"], enabled: ["SQL Log"]),
             Surface(name: "Status bar: grid",
                     place: { main, _ in

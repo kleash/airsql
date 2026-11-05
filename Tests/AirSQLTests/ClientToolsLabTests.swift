@@ -219,7 +219,7 @@ struct ClientToolsLabTests {
         var options = CSVImport.Options()
         options.separator = UInt8(ascii: ";")
         let columns = ["id", "name", "note", "country"]
-        let rows = try await CSVImport.run(file, options: options, into: session, database: target, table: "people", columns: columns,
+        let rows = try await CSVImport.run(.file(file), options: options, into: session, database: target, table: "people", columns: columns,
                                            mapping: [2, 1, 0, nil], cancellation: Cancellation()) { _ in }
         #expect(rows.rows == 3)
         let result = try await session.query("SELECT id, name, note, country FROM \(SQLQuote.identifier(target, "people")) ORDER BY id")
@@ -230,11 +230,149 @@ struct ClientToolsLabTests {
         // A duplicate key in the last record: nothing of this file stays.
         try "name,id\nGrace,4\nAlan,1\n".write(to: file, atomically: true, encoding: .utf8)
         await #expect(throws: AirSQLError.self) {
-            _ = try await CSVImport.run(file, options: CSVImport.Options(), into: session, database: target, table: "people",
+            _ = try await CSVImport.run(.file(file), options: CSVImport.Options(), into: session, database: target, table: "people",
                                         columns: columns, mapping: [1, 0, nil, nil], cancellation: Cancellation()) { _ in }
         }
         let count = try await session.query("SELECT COUNT(*) FROM \(SQLQuote.identifier(target, "people"))").first?.rows?.string(0, 0)
         #expect(count == "3")
+        _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
+        await session.close()
+    }
+
+    /// The export's choices: rows as REPLACE, no DEFINER or AUTO_INCREMENT value, CREATE and DROP DATABASE, a transaction per
+    /// table; then a file per object that restores, and text for the clipboard.
+    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    func theBuiltInExportWritesWhatIsAsked(_ server: Lab.Server) async throws {
+        let session = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await session.connect()
+        let target = "lane_transfer_export", other = "lane_transfer_export2"
+        for name in [target, other] { _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(name)) }
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+        _ = try await session.query("USE " + SQLQuote.identifier(target))
+        for statement in ["CREATE TABLE t (id INT AUTO_INCREMENT PRIMARY KEY, a VARCHAR(9)) COMMENT 'kept'", "INSERT INTO t (a) VALUES ('x'), ('y')",
+                          "CREATE TABLE T2 (id INT)", "CREATE DEFINER=CURRENT_USER VIEW v AS SELECT id FROM t",
+                          "CREATE DEFINER=CURRENT_USER PROCEDURE p() BEGIN SELECT 1; END"] {
+            _ = try await session.query(statement)
+        }
+        var request = DumpRequest(databases: [target])
+        request.dataMode = .replace
+        request.removeDefiner = true
+        request.removeAutoIncrement = true
+        request.createDatabase = true
+        request.dropDatabase = true
+        request.wrapInTransactions = true
+        let text = try await ToolRun.exportText(request, options: Self.options(server), cancellation: Cancellation()) { _, _ in }
+        #expect(text.contains("DROP DATABASE IF EXISTS `\(target)`;") && text.contains("CREATE DATABASE IF NOT EXISTS `\(target)`"))
+        #expect(text.contains("USE `\(target)`;") && text.contains("REPLACE INTO `t` (`id`, `a`) VALUES (1,'x'),(2,'y');"))
+        #expect(text.contains("START TRANSACTION;") && text.contains("COMMIT;"))
+        #expect(!text.contains("DEFINER=") && !text.contains("AUTO_INCREMENT=") && text.contains("AUTO_INCREMENT,"), "\(text)")
+        // Only some tables: no DROP DATABASE, whatever the request says.
+        var some = DumpRequest(databases: [target], tables: ["t"])
+        some.dropDatabase = true
+        some.dataMode = .deleteInsert
+        some.insertSize = 1
+        let part = try await ToolRun.exportText(some, options: Self.options(server), cancellation: Cancellation()) { _, _ in }
+        #expect(!part.contains("DROP DATABASE") && part.contains("DELETE FROM `t`;"))
+        #expect(part.components(separatedBy: "INSERT INTO `t`").count == 3, "one row an INSERT at this size: \(part)")
+
+        // A file per object, each restoring on its own into another database.
+        let folder = URL(fileURLWithPath: try scratch()).appendingPathComponent("out")
+        _ = try await ToolRun.exportFolder(DumpRequest(databases: [target]), options: Self.options(server), to: folder, cancellation: Cancellation()) { _, _ in }
+        let files = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+        #expect(files == ["T2.sql", "p.sql", "t.sql", "v.sql"], "\(files)")
+        let table = try String(contentsOf: folder.appendingPathComponent("t.sql"), encoding: .utf8)
+        #expect(table.contains("SET NAMES utf8mb4;") && table.contains("CREATE TABLE `t`") && !table.contains("CREATE TABLE `T2`"))
+        // Several databases: each file names only its own, and a folder never drops one.
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(other))
+        _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(other, "o")) (id INT)")
+        var both = DumpRequest(databases: [target, other])
+        both.dropDatabase = true
+        let many = URL(fileURLWithPath: try scratch()).appendingPathComponent("many")
+        _ = try await ToolRun.exportFolder(both, options: Self.options(server), to: many, cancellation: Cancellation()) { _, _ in }
+        let second = try String(contentsOf: many.appendingPathComponent(other + ".o.sql"), encoding: .utf8)
+        #expect(second.contains("USE `\(other)`;") && !second.contains("`\(target)`") && !second.contains("DROP DATABASE"), "\(second)")
+        _ = try await session.query("DROP TABLE " + SQLQuote.identifier(other, "o"))
+        _ = try await session.query("USE " + SQLQuote.identifier(other))
+        let cleanup = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await cleanup.connect()
+        let lines = table.components(separatedBy: "\n").filter { !$0.hasPrefix("--") }.joined(separator: "\n")
+        for statement in lines.components(separatedBy: ";\n") where !statement.isEmpty { _ = try await session.query(statement) }
+        #expect(try await session.rows("SELECT COUNT(*) FROM t") == [["2"]])
+        for name in [target, other] { _ = try await cleanup.query("DROP DATABASE " + SQLQuote.identifier(name)) }
+        await cleanup.close()
+        await session.close()
+    }
+
+    /// A new table from a file, as the sheet makes it; then duplicates skipped or replaced, the table emptied in the same
+    /// transaction, refused rows written to a file while the rest stay, and a result's NULLs and bytes kept apart.
+    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    func importMakesTheTableAndHandlesWhatItIsAskedTo(_ server: Lab.Server) async throws {
+        let session = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await session.connect()
+        let target = "lane_transfer_import"
+        _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target))
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+        let table = SQLQuote.identifier(target, "people")
+        func rows(_ sql: String) async throws -> [[String?]] { try await session.rows(sql) }
+        func run(_ source: ImportSource, _ options: CSVImport.Options, mapping: [Int?] = [0, 1, 2],
+                 columns: [String] = ["id", "name", "joined"], table: String = "people") async throws -> CSVImport.Progress {
+            try await CSVImport.run(source, options: options, into: session, database: target, table: table, columns: columns,
+                                    mapping: mapping, cancellation: Cancellation()) { _ in }
+        }
+        let text = "id,name,joined\n1,Ada,2026-01-02\n2,Émile 👋,\n"
+        let columns = try ImportDetect.columns(.text(text), options: CSVImport.Options(), cancellation: Cancellation())
+        _ = try await session.query(ImportDetect.createTable(database: target, table: "people", columns: columns))
+        #expect(try await run(.text(text), CSVImport.Options()).rows == 2)
+        #expect(try await rows("SELECT id, name, joined FROM \(table) ORDER BY id") == [["1", "Ada", "2026-01-02"], ["2", "Émile 👋", nil]])
+        #expect(try await rows("SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '\(target)' ORDER BY ORDINAL_POSITION")
+            .map { $0[0] } == ["int", "varchar", "date"])
+
+        _ = try await session.query("ALTER TABLE \(table) ADD PRIMARY KEY (id)")
+        var options = CSVImport.Options()
+        options.duplicates = .skip
+        #expect(try await run(.text("id,name,joined\n1,Other,\n3,Grace,\n"), options).warnings > 0)
+        #expect(try await rows("SELECT name FROM \(table) WHERE id = 1") == [["Ada"]])
+        options.duplicates = .replace
+        _ = try await run(.text("id,name,joined\n1,Other,\n"), options)
+        #expect(try await rows("SELECT name FROM \(table) WHERE id = 1") == [["Other"]])
+
+        // A failed import brings the deleted rows back.
+        var empty = CSVImport.Options()
+        empty.emptyFirst = true
+        await #expect(throws: AirSQLError.self) { _ = try await run(.text("id,name,joined\n7,A,\n7,B,\n"), empty) }
+        #expect(try await rows("SELECT COUNT(*) FROM \(table)") == [["3"]])
+        _ = try await run(.text("id,name,joined\n7,A,\n"), empty)
+        #expect(try await rows("SELECT id FROM \(table)") == [["7"]])
+
+        // Refused rows go to the file with the reason; the good ones around them stay, on InnoDB and on a table without transactions.
+        for engine in ["InnoDB", "MyISAM"] {
+            let name = "keep_" + engine
+            _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(target, name)) (id INT PRIMARY KEY, name VARCHAR(3) NOT NULL) ENGINE=\(engine)")
+            var keep = CSVImport.Options()
+            keep.rejects = URL(fileURLWithPath: try scratch() + "/skipped.csv")
+            let done = try await run(.text("id,name\n1,a\n1,dup\n2,toolong\n3,c\n"), keep, mapping: [0, 1], columns: ["id", "name"], table: name)
+            #expect(done.rows == 2 && done.rejected == 2 && done.note.contains("2 rows were refused"), "\(engine)")
+            #expect(try await rows("SELECT id FROM \(SQLQuote.identifier(target, name)) ORDER BY id") == [["1"], ["3"]], "\(engine)")
+            let file = try String(contentsOf: try #require(keep.rejects), encoding: .utf8)
+            #expect(file.hasPrefix("\"1\",\"dup\",") && file.contains("\"2\",\"toolong\","), "\(file)")
+        }
+        // No refused row, no file.
+        var clean = CSVImport.Options()
+        clean.rejects = URL(fileURLWithPath: try scratch() + "/none.csv")
+        _ = try await run(.text("id,name\n9,a\n"), clean, mapping: [0, 1], columns: ["id", "name"], table: "keep_InnoDB")
+        #expect(!FileManager.default.fileExists(atPath: try #require(clean.rejects).path))
+
+        // A result: NULL against empty text and the text NULL, bytes as bytes.
+        var result = CSVImport.Options()
+        result.hexIsBinary = true
+        let source = ImportSource.rows([["a", "b", "c"], [nil, "", "0x00FF"], ["NULL", nil, nil]])
+        let made = try ImportDetect.columns(source, options: result, cancellation: Cancellation())
+        #expect(made.map(\.type) == ["VARCHAR(32)", "VARCHAR(255)", "LONGBLOB"])
+        _ = try await session.query(ImportDetect.createTable(database: target, table: "copied", columns: made))
+        result.binaryColumns = ["c"]
+        result.emptyIsNull = false
+        _ = try await run(source, result, columns: ["a", "b", "c"], table: "copied")
+        #expect(try await rows("SELECT a, b, HEX(c) FROM \(SQLQuote.identifier(target, "copied")) ORDER BY a IS NULL DESC") == [[nil, "", "00FF"], ["NULL", nil, nil]])
         _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
         await session.close()
     }

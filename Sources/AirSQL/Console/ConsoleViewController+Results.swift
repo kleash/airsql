@@ -154,7 +154,7 @@ extension ConsoleViewController {
     func resultMenu() -> NSMenu {
         let menu = NSMenu(title: "Result")
         menu.add([Commands.rerunResult, Commands.copyResultQuery, Commands.resultWindow, nil, Commands.pinResult, Commands.renameResult, Commands.closeResult,
-                  Commands.closeOtherResults, nil, Commands.exportResult, Commands.compareResult])
+                  Commands.closeOtherResults, nil, Commands.exportResult, Commands.copyResultToTable, Commands.compareResult])
         // The console's own commands go to it wherever the focus is; Export and Compare to whatever handles them.
         for item in menu.items where item.action.map(responds(to:)) == true { item.target = self }
         return menu
@@ -247,6 +247,12 @@ extension ConsoleViewController {
     @objc func exportResult(_ sender: Any?) {
         guard let grid = currentResult?.view as? ResultGridView else { return NSSound.beep() }
         grid.exportRows(sender)
+    }
+
+    /// Copy Result to Table…: the shown result's selected rows, or all of them.
+    @objc func copyResultToTable(_ sender: Any?) {
+        guard let grid = currentResult?.view as? ResultGridView else { return NSSound.beep() }
+        grid.copyResultToTable(sender)
     }
 
     @objc func closeOtherResults(_ sender: Any?) {

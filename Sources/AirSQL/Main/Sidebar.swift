@@ -16,7 +16,11 @@ final class SidebarNode: NSObject {
         /// A group under a table or view, and a row of that group, by its name.
         case part(UUID, DatabaseObject, TablePart)
         case detail(UUID, DatabaseObject, TablePart, String)
+        /// Group by Prefix: objects of a database and kind that share a name's first part.
+        case prefix(UUID, String, DatabaseObject.Kind, String)
         case message(UUID, String)
+        /// Users and Roles, the last row of a connected connection's tree.
+        case users(UUID)
     }
 
     let kind: Kind
@@ -44,11 +48,17 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     weak var main: MainWindowController?
     let outline = SidebarOutlineView()
     let filter = NSSearchField()
+    /// The second box (View ▸ Tree ▸ Database Filter): which databases show.
+    let databaseFilter = NSSearchField()
+    /// The favourites-only switch beside the filter.
+    let favouritesButton = NSButton()
     private let header = SidebarNode(.header)
     private var folders: [UUID: SidebarNode] = [:]
     private var connections: [UUID: SidebarNode] = [:]
     /// The tree's rows by kind, kept across reloads so they stay selected and expanded.
     var treeNodes: [SidebarNode.Kind: SidebarNode] = [:]
+    /// What each database's sizes add up to, worked out as rows show; a reload starts again.
+    var treeSizes: [String: (largest: Int, total: Int)] = [:]
     /// Connections whose tree has been opened once since they connected.
     private var treeShown: Set<UUID> = []
     private var observers: [AnyCancellable] = []
@@ -57,6 +67,11 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     private var reloading = false
     /// A right-click is choosing the row its menu acts on: that shows nothing, so the tab in front stays.
     fileprivate var openingMenu = false
+    /// A tab's own row is being selected: the tab stays as it is.
+    private var revealing = false
+    /// Quick Documentation or Definition on show, and what it says.
+    var treeNote: NSPopover?
+    var shownTreeNote = ""
     /// Called when the selected connections change.
     var onSelect: (() -> Void)?
 
@@ -77,7 +92,42 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         filter.sendsSearchStringImmediately = true
         filter.target = self
         filter.action = #selector(filterChanged)
-        filter.translatesAutoresizingMaskIntoConstraints = false
+        // What was searched comes back under the field's magnifying glass.
+        filter.recentsAutosaveName = layoutName("SidebarFilter")
+        filter.searchMenuTemplate = Self.recentsMenu()
+        databaseFilter.placeholderString = "Filter databases"
+        databaseFilter.toolTip = "Type part of a database's name, or /a regular expression/, to show only those databases"
+        databaseFilter.setAccessibilityIdentifier("sidebar.databaseFilter")
+        databaseFilter.delegate = self
+        databaseFilter.sendsSearchStringImmediately = true
+        databaseFilter.target = self
+        databaseFilter.action = #selector(filterChanged)
+        databaseFilter.isHidden = true
+        favouritesButton.bezelStyle = .texturedRounded
+        favouritesButton.isBordered = false
+        favouritesButton.setButtonType(.toggle)
+        favouritesButton.image = NSImage(systemSymbolName: "star", accessibilityDescription: "Favourites only")
+        favouritesButton.alternateImage = NSImage(systemSymbolName: "star.fill", accessibilityDescription: "Favourites only")
+        favouritesButton.toolTip = Commands.treeFavouritesOnly.tip
+        favouritesButton.setAccessibilityIdentifier("sidebar.favourites")
+        favouritesButton.tag = TreeOption.favouritesOnly.rawValue
+        favouritesButton.target = self
+        favouritesButton.action = #selector(toggleTreeOption(_:))
+        let options = NSButton()
+        options.bezelStyle = .texturedRounded
+        options.isBordered = false
+        options.image = NSImage(systemSymbolName: "line.3.horizontal.decrease.circle", accessibilityDescription: "Tree options")
+        options.toolTip = "Choose how the tree shows things: flat, sizes, comments, kinds and more"
+        options.setAccessibilityIdentifier("sidebar.options")
+        options.target = self
+        options.action = #selector(showTreeOptions(_:))
+        let filterRow = NSStackView(views: [filter, favouritesButton, options])
+        filterRow.spacing = Spacing.half
+        let filters = NSStackView(views: [filterRow, databaseFilter])
+        filters.orientation = .vertical
+        filters.spacing = Spacing.half
+        filters.translatesAutoresizingMaskIntoConstraints = false
+        for row in [filterRow, databaseFilter] { row.widthAnchor.constraint(equalTo: filters.widthAnchor).isActive = true }
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         column.resizingMask = .autoresizingMask
@@ -126,12 +176,12 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         processes.translatesAutoresizingMaskIntoConstraints = false
         let footerLine = Hairline()
 
-        [filter, scroll, footerLine, add, processes].forEach(root.addSubview)
+        [filters, scroll, footerLine, add, processes].forEach(root.addSubview)
         NSLayoutConstraint.activate([
-            filter.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.unit),
-            filter.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
-            filter.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
-            scroll.topAnchor.constraint(equalTo: filter.bottomAnchor, constant: Spacing.half),
+            filters.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.unit),
+            filters.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
+            filters.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
+            scroll.topAnchor.constraint(equalTo: filters.bottomAnchor, constant: Spacing.half),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             footerLine.topAnchor.constraint(equalTo: scroll.bottomAnchor),
@@ -152,6 +202,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         observers.append(model.$data.map(\.folders).removeDuplicates().sink { [weak self] _ in
             DispatchQueue.main.async { self?.reload() }
         })
+        observers.append(model.$data.map(\.settings.tree).removeDuplicates().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.reload() }
+        })
         observers.append(model.$states.sink { [weak self] _ in
             DispatchQueue.main.async { self?.refreshRows() }
         })
@@ -164,8 +217,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         NotificationCenter.default.addObserver(self, selector: #selector(openConnectionChanged), name: .openConnectionDidChange,
                                                object: nil)
         outline.setDraggingSourceOperationMask(.copy, forLocal: false)
-        outline.setDraggingSourceOperationMask(.move, forLocal: true)
-        outline.registerForDraggedTypes([.sidebarConnection])
+        outline.setDraggingSourceOperationMask([.move, .copy], forLocal: true)
+        outline.registerForDraggedTypes([.sidebarConnection, .sidebarTable])
         reload()
     }
 
@@ -175,6 +228,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     /// connected connection whose name doesn't match shows the objects that do, expanded.
     func reload() {
         let selected = selectedNodes.map(\.kind)
+        treeSizes = [:]
+        favouritesButton.state = model.data.settings.tree.favouritesOnly ? .on : .off
         let expanded = Set((0..<outline.numberOfRows).compactMap { row -> SidebarNode.Kind? in
             guard let node = outline.item(atRow: row) as? SidebarNode, outline.isItemExpanded(node) else { return nil }
             return node.kind
@@ -227,22 +282,23 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         // a filtered one.
         for row in open {
             guard let id = row.connectionID else { continue }
-            let filtered = !text.isEmpty && !named.contains(id)
+            let filtered = (!text.isEmpty && !named.contains(id)) || model.data.settings.tree.favouritesOnly
             let first = !treeShown.contains(id)
             treeShown.insert(id)
             guard first || filtered || expanded.contains(row.kind) else { continue }
             outline.expandItem(row)
+            // What was open opens again; a filter opens the groups, not the tables.
+            func restore(_ node: SidebarNode) {
+                for child in node.children where (filtered && child.object == nil) || expanded.contains(child.kind) {
+                    outline.expandItem(child)
+                    restore(child)
+                }
+            }
             for database in row.children {
                 let current = first && database.database == model.openConnection(id)?.currentDatabase
                 guard filtered || current || expanded.contains(database.kind) else { continue }
                 outline.expandItem(database)
-                for group in database.children where filtered || expanded.contains(group.kind) {
-                    outline.expandItem(group)
-                    for table in group.children where expanded.contains(table.kind) {
-                        outline.expandItem(table)
-                        for part in table.children where expanded.contains(part.kind) { outline.expandItem(part) }
-                    }
-                }
+                restore(database)
             }
         }
         let rows = IndexSet(selected.compactMap { kind -> Int? in
@@ -290,6 +346,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         outline.selectRowIndexes([row], byExtendingSelection: false)
         outline.scrollRowToVisible(row)
         view.window?.makeFirstResponder(outline)
+        // Return kept what was typed for the field's recent searches.
+        if opens { filter.recentSearches = [text] + filter.recentSearches.filter { $0 != text }.prefix(9) }
         if opens { doubleClicked(nil) }
         return true
     }
@@ -310,7 +368,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             switch node.kind {
             case .header: return nil
             case .folder(let id), .connection(let id), .database(let id, _), .category(let id, _, _), .object(let id, _),
-                 .part(let id, _, _), .detail(let id, _, _, _), .message(let id, _): return id
+                 .part(let id, _, _), .detail(let id, _, _, _), .prefix(let id, _, _, _), .message(let id, _), .users(let id): return id
             }
         }
     }
@@ -320,6 +378,41 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         let rows = IndexSet(ids.compactMap { connections[$0] ?? folders[$0] }.map { outline.row(forItem: $0) }.filter { $0 >= 0 })
         outline.selectRowIndexes(rows, byExtendingSelection: false)
         if let first = rows.first { outline.scrollRowToVisible(first) }
+    }
+
+    /// Selects a row of a connected connection's tree and scrolls to it: the filter goes if it hides the row, and what's
+    /// above the row opens. `showing`: what a click on it shows appears too.
+    func reveal(_ kind: SidebarNode.Kind, showing: Bool = false) {
+        func row() -> SidebarNode? {
+            if case .connection(let id) = kind { return connections[id] }
+            return treeNodes[kind]
+        }
+        if row() == nil {
+            filter.stringValue = ""
+            reload()
+        }
+        guard let node = row(), let id = node.connectionOfTree ?? node.connectionID else { return }
+        var above = [model.connection(id)?.folderID.flatMap { folders[$0] }, connections[id]]
+        if let database = node.database, kind != .database(id, database) {
+            above.append(treeNodes[.database(id, database)])
+            if let object = node.object {
+                above.append(treeNodes[.category(id, database, object.kind)])
+                above.append(TreeGrouping.prefix(of: object.name).flatMap { treeNodes[.prefix(id, database, object.kind, $0)] })
+            }
+        }
+        above.compactMap { $0 }.forEach(outline.expandItem)
+        let index = outline.row(forItem: node)
+        guard index >= 0 else { return }
+        revealing = !showing
+        outline.selectRowIndexes([index], byExtendingSelection: false)
+        revealing = false
+        outline.scrollRowToVisible(index)
+    }
+
+    /// Follow Tab: a row the tree shows now, selected unless it is already; the filter stays.
+    func follow(_ kind: SidebarNode.Kind) {
+        guard treeNodes[kind] != nil, selectedNodes.map(\.kind) != [kind] else { return }
+        reveal(kind)
     }
 
     /// Connecting leads to the server's host page, unless a tab of that connection is showing (the one that asked).
@@ -334,7 +427,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard !reloading else { return }
         onSelect?()
-        guard !openingMenu else { return }
+        guard !openingMenu, !revealing else { return }
         // Arrowing passes over rows: only the one it stops on is read, or the others would queue ahead of it.
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(showSelectedObject), object: nil)
         if NSApp.currentEvent?.type == .keyDown {
@@ -375,8 +468,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         let item = NSPasteboardItem()
         if let id = node.connectionID {
             item.setString(id.uuidString, forType: .sidebarConnection)
-        } else if let text = node.quotedName {
+        } else if let text = NSEvent.modifierFlags.contains(.shift) ? node.object?.quoted ?? node.quotedName : node.quotedName {
+            // ⇧ adds the database to the name; a table dropped on a database row copies there.
             item.setString(text, forType: .string)
+            if let object = node.object, object.kind == .table { item.setString(object.database + "\u{0}" + object.name, forType: .sidebarTable) }
         } else {
             return nil
         }
@@ -397,6 +492,12 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
 
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?,
                      proposedChildIndex index: Int) -> NSDragOperation {
+        if info.draggingSource as AnyObject === outline, info.draggingPasteboard.availableType(from: [.sidebarTable]) != nil {
+            // A table goes to a database of its own connection, by way of Copy Table's questions.
+            guard let row = item as? SidebarNode, case .database = row.kind, row.connectionOfTree == treeSelection?.open.id else { return [] }
+            outlineView.setDropItem(row, dropChildIndex: NSOutlineViewDropOnItemIndex)
+            return .copy
+        }
         guard info.draggingSource as AnyObject === outline, info.draggingPasteboard.availableType(from: [.sidebarConnection]) != nil,
               let row = dropRow(on: item as? SidebarNode) else { return [] }
         outlineView.setDropItem(row, dropChildIndex: NSOutlineViewDropOnItemIndex)
@@ -405,6 +506,13 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
 
     func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
         guard let row = item as? SidebarNode else { return false }
+        if case .database(let id, let database) = row.kind {
+            guard let open = model.openConnection(id), let text = info.draggingPasteboard.string(forType: .sidebarTable) else { return false }
+            let parts = text.split(separator: "\u{0}", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return false }
+            NavigatorActions.copyTable(DatabaseObject(.table, parts[0], parts[1]), on: open, window: view.window, into: database)
+            return true
+        }
         var folder: UUID?
         if case .folder(let id) = row.kind { folder = id }
         let ids = (info.draggingPasteboard.pasteboardItems ?? []).compactMap { $0.string(forType: .sidebarConnection).flatMap(UUID.init) }
@@ -426,10 +534,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
                 return
             }
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
-        case .database, .category, .object, .part, .detail:
+        case .database, .category, .object, .part, .detail, .prefix:
             treeDoubleClicked(node)
-        case .message:
-            break
+        case .message, .users:
+            break  // a click already showed Users and Roles
         }
     }
 
@@ -441,9 +549,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         if nodes.allSatisfy({ $0.connectionID != nil }) {
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
                       Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
-                      Commands.compareRows, Commands.diskUsage, nil])
+                      Commands.compareRows, Commands.diskUsage, Commands.users, nil])
             menu.addItem(ConnectionMenus.colourMenu())
             menu.addItem(ConnectionMenus.moveMenu())
+            menu.add([Commands.moveConnectionUp, Commands.moveConnectionDown, Commands.databasesShown])
             menu.add([nil, Commands.deleteConnection])
         } else if nodes.allSatisfy({ $0.connectionOfTree != nil }) {
             return treeMenu(nodes)
@@ -508,8 +617,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         case .connection(let id):
             if let connection = model.connection(id) {
                 cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true)
+                if let shown = shownDatabases(id) { cell.showDatabases(shown) }
             }
-        case .database, .category, .object, .part, .detail, .message:
+        case .database, .category, .object, .part, .detail, .prefix, .message, .users:
             return treeCell(node, in: outlineView)
         }
         return cell
@@ -519,6 +629,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
 extension NSPasteboard.PasteboardType {
     /// A connection's row dragged inside the sidebar: its id.
     static let sidebarConnection = NSPasteboard.PasteboardType("com.airsql.sidebar-connection")
+    /// A table's row dragged inside the sidebar: its database and name.
+    static let sidebarTable = NSPasteboard.PasteboardType("com.airsql.sidebar-table")
 }
 
 /// The outline: a right-click selects the row under the pointer first (unless it is part of the selection) and opens
@@ -682,6 +794,11 @@ final class SidebarCell: NSTableCellView {
         setAccessibilityLabel([name.stringValue, connection.marks, status].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
+    /// Adds how many of the server's databases the tree shows, when not all ("3 of 12").
+    func showDatabases(_ text: String) {
+        badge.stringValue = text + " · " + badge.stringValue
+    }
+
     func showFolder(_ title: String, count: Int) {
         spinner.isHidden = true
         icon.isHidden = false
@@ -718,5 +835,19 @@ final class SidebarCell: NSTableCellView {
         name.textColor = selected ? .onAccent : nameColour
         badge.textColor = selected ? .onAccent : .quietText
         icon.contentTintColor = selected ? .onAccent : .secondaryLabelColor
+    }
+}
+
+extension SidebarController {
+    /// The menu of a filter's magnifying glass: what was searched lately.
+    static func recentsMenu() -> NSMenu {
+        let menu = NSMenu(title: "Recent")
+        for (title, tag) in [("Recent Filters", NSSearchField.recentsTitleMenuItemTag), ("", NSSearchField.recentsMenuItemTag),
+                             ("No Recent Filters", NSSearchField.noRecentsMenuItemTag), ("Clear Recent Filters", NSSearchField.clearRecentsMenuItemTag)] {
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            item.tag = tag
+            menu.addItem(item)
+        }
+        return menu
     }
 }

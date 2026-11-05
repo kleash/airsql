@@ -121,13 +121,13 @@ AirSQL's agents' gate fails closed. While it carries out your request, nothing t
 its own:
 
 - **The SQL preview sheet is the person's.** Run in a console, Apply in the grid and the editors, a compare's sync,
-  Restore, Copy and CSV import show what will run in the SQL preview sheet, marked "Asked by <your client>". Only the
+  Restore, Copy and Import show what will run in the SQL preview sheet, marked "Asked by <your client>". Only the
   person can press its Run (or Return, or click it): you get "Only the person at the Mac can approve…". You may press
   Decline (`preview.cancel`), and `wait {until: no_sheet}` for their answer. A console run of statements that are all
   proven read-only (see read-only) runs without asking.
 - **Statements on the person's sessions** that what you did sends, and that aren't proven read-only (a Commit, a
   Roll Back, the transaction mode, a Kill), wait in the same sheet, one by one.
-- **A read-only connection** refuses in the console (and the navigator, a sync, Restore and CSV import) any statement
+- **A read-only connection** refuses in the console (and the navigator, a sync, Restore and Import) any statement
   that isn't proven read-only, a bare USE aside, before anything asks: there is nothing to approve. A table tab's WHERE
   filter must pass the same check inside its SELECT. Open in Terminal starts a read-only session there; the process
   list's Kill (the person's sheet) still works, as it changes no data.
@@ -174,7 +174,9 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
   `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
   `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
-  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; sheets
+  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; Users and Roles
+  (`users`, `list.usersandroles.table`, `users.grants`) can be read with read access, and every change there is refused
+  to agents: `users.new`, `users.newRole`, `users.edit` and Modify Grants say so; sheets
   `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
   `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
 - **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
@@ -213,7 +215,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tableData.apply`: Apply opens the SQL preview, whose Run is the person's); the status bar's `tableData.count`,
   `tableData.loadMore`, `tableData.loadAll`; find bar (⌘F) `find.text`, `find.replaceText`, `find.options`,
   `find.previous`, `find.next`, `find.count`, `find.replace`, `find.replaceAll`, `find.done`; Export Rows `export.rows`,
-  `export.format`, `export.headers`, `export.null`, `export.crlf`, `export.copy`, `export.save` (the person's),
+  `export.format`, `export.headers`, `export.null`, `export.separator`, `export.quote`, `export.encoding`, `export.crlf`, `export.joinLines`, `export.open`, `export.copy`, `export.save` (the person's),
   `export.cancel`; Filter by Values `values.search`, `values.list`, `values.all`, `values.none`, `values.ok`,
   `values.cancel`; Data ▸ Quick Filter ▸ Type a Value… `quickFilter.operator`, `quickFilter.value`, `quickFilter.add`
   (then press Filter); Data ▸ Sort by Columns… `sort.column.N`, `sort.direction.N`, `sort.up.N`, `sort.down.N`,
@@ -232,7 +234,14 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
-- **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
+- **SQL log** (under the tabs while a server is connected, or its window): `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`,
+  `sqlLog.window`.
+- **Table tab's switch**: `tableData.page` (Data, Structure, DDL); View ▸ Table Page does the same.
+- **Sidebar**: `sidebar.filter` (part of a name, or `/a regular expression/`), `sidebar.databaseFilter`, `sidebar.favourites`, `sidebar.options`,
+  each row's `tree.star`; View ▸ Tree holds the choices (saving them is the person's while Ask before agents change anything is on).
+- **Quick Open** (`quickOpen.field`, `quickOpen.list`, `quickOpen.open`): commands listed there are refused to agents; use the `menu` tool.
+  Quick Documentation on a tree row leaves out the table's rows for an agent.
+- **Find in Tabs and Files**: `findFiles.text`, `findFiles.results`, `findFiles.status`; `findFiles.replace` is the person's.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
@@ -254,12 +263,14 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tools.timeLeft`, `tools.useBuiltIn`, `tools.unchecked` (running with it ticked: the person's), `tools.cancel`,
   `tools.run` (Export: the person's). Export `export.content`,
   `export.singleTransaction`, `export.hexBlob`, `export.gzip`, `export.dropTable`, `export.objects`, `export.tool`,
-  `export.chooseTool`, `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`,
+  `export.chooseTool`, `export.dataMode`, `export.insertSize`, `export.createDatabase`, `export.dropDatabase`, `export.removeDefiner`,
+  `export.removeAutoIncrement`, `export.wrapInTransactions`, `export.output`, `export.fileFormat`, `export.saveTo`, `export.choose`, `export.extra`, `export.command`, `export.copyCommand`,
   `export.reveal`; Restore `restore.file`,
   `restore.fileInfo`, `restore.choose`, `restore.database`, `restore.tool`, `restore.chooseTool`, `restore.stopOnError`, `restore.continue`,
   `restore.command`, `restore.copyCommand`; Copy `copy.target`, `copy.database`, `copy.content`, `copy.objects`, `copy.replace`,
-  `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.separator`, `csv.header`,
-  `csv.emptyIsNull`, `csv.mapping`.
+  `copy.summary`; CSV import `csv.file`, `csv.choose`, `csv.database`, `csv.table`, `csv.newTable`, `csv.separator`, `csv.quote`, `csv.encoding`,
+  `csv.header`, `csv.skip`, `csv.trim`, `csv.emptyIsNull`, `csv.decimalComma`, `csv.duplicates`, `csv.emptyFirst`, `csv.keepGoing` (the person's),
+  `csv.mapping`, `csv.ddl`, `csv.preview`; Paste (`csv.paste`) is the person's.
 - **Liquibase**: Generate Liquibase Changelog `liquibase.content`, `liquibase.database`, `liquibase.filter`, `liquibase.objects`
   (`liquibase.include.<name>`, `liquibase.rows.<name>`, `liquibase.where.<name>`), `liquibase.author`, `liquibase.ids`,
   `liquibase.rollback`, `liquibase.preconditions`, `liquibase.layout`, `liquibase.saveTo`, `liquibase.choose`,

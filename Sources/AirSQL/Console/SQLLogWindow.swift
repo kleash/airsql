@@ -1,16 +1,16 @@
 import AirSQLCore
 import AppKit
 
-/// The SQL log viewer (plan §2.6, View ▸ SQL Log, ⌥⌘L): the last statements AirSQL sent, as SQL.log has them (time,
-/// connection, session and the statement, credentials masked), newest at the bottom and following new ones as they
-/// come. Typing in the filter keeps the lines with those words. The file is read off the main thread, from where it
-/// was last read.
+/// The SQL log viewer (plan §2.6, View ▸ SQL Log, ⌥⌘L), docked under the main window's tabs or in `SQLLogWindowController`:
+/// the last statements AirSQL sent, as SQL.log has them (time, connection, session and the statement, credentials
+/// masked), newest at the bottom and following new ones as they come. Typing in the filter keeps the lines with those
+/// words. The file is read off the main thread, from where it was last read.
 @MainActor
-final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
-    private static var shown: SQLLogWindowController?
+final class SQLLogViewController: NSViewController, NSSearchFieldDelegate {
     let log: SQLLog
     private let filter = NSSearchField()
     let text: NSTextView
+    private let scroll = NSTextView.scrollableTextView()
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private(set) var lines: [String] = []
     private var offset: UInt64 = 0
@@ -20,37 +20,29 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
     private var timer: Timer?
     /// Lines kept on screen: the newest.
     static let lineLimit = 5_000
+    /// Docked: its bar offers the window.
+    private let docked: Bool
 
-    /// Shows the log's window (one for the app), reading the log again.
-    @discardableResult
-    static func show(_ log: SQLLog = .shared) -> SQLLogWindowController {
-        let controller = shown?.log === log ? shown! : SQLLogWindowController(log: log)
-        shown = controller
-        controller.showWindow(nil)
-        controller.refresh()
-        return controller
+    init(log: SQLLog, docked: Bool) {
+        self.log = log
+        self.docked = docked
+        text = scroll.documentView as! NSTextView
+        super.init(nibName: nil, bundle: nil)
     }
 
-    init(log: SQLLog) {
-        self.log = log
-        let scroll = NSTextView.scrollableTextView()
-        text = scroll.documentView as! NSTextView
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 560),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "SQL Log"
-        window.backgroundColor = .ground
-        window.minSize = NSSize(width: 560, height: 320)
-        window.isReleasedWhenClosed = false
-        super.init(window: window)
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    deinit { timer?.invalidate() }
+
+    override func loadView() {
         text.isEditable = false
         text.backgroundColor = .content
         text.isRichText = false
         text.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
-        text.textContainerInset = NSSize(width: 8, height: 8)
+        text.textContainerInset = NSSize(width: 8, height: docked ? 4 : 8)
         text.setAccessibilityIdentifier("sqlLog.text")
         text.usesFindBar = true
         text.isIncrementalSearchingEnabled = true
-        window.initialFirstResponder = text  // where ⌘F finds; the filter's field has no find bar
         filter.placeholderString = "Filter: words a line contains"
         filter.toolTip = "Type words to show only the lines that contain them"
         filter.setAccessibilityIdentifier("sqlLog.filter")
@@ -60,34 +52,42 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
                             action: #selector(revealLog(_:)))
         let clear = button("Clear Log…", id: "sqlLog.clear", tip: Commands.clearSQLLog.tip, target: self,
                            action: #selector(clearSQLLog(_:)))
-        let bar = NSStackView(views: [filter, status, NSView(), reveal, clear, helpButton(.sqlLog)])
+        var parts: [NSView] = [filter, status, NSView(), reveal, clear, helpButton(.sqlLog)]
+        if docked {
+            let window = button("Open in Window", id: "sqlLog.window", tip: "Show the log in a window of its own", target: self,
+                                action: #selector(openInWindow(_:)))
+            parts.insert(window, at: 3)
+            [reveal, clear, window].forEach { $0.controlSize = .small }
+        }
+        let bar = NSStackView(views: parts)
         bar.spacing = Spacing.unit
-        filter.widthAnchor.constraint(equalToConstant: 280).isActive = true
+        let width = filter.widthAnchor.constraint(equalToConstant: 280)
+        width.priority = .defaultLow
+        width.isActive = true
+        filter.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
         let root = SurfaceView(.ground)
         for view in [bar, scroll] {
             view.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(view)
         }
+        let margin: CGFloat = docked ? 4 : 12
         NSLayoutConstraint.activate([
-            bar.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
-            bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-            bar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
-            scroll.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: 10),
+            bar.topAnchor.constraint(equalTo: root.topAnchor, constant: margin),
+            bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: docked ? Spacing.unit : 16),
+            bar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: docked ? -Spacing.unit : -16),
+            scroll.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: docked ? 4 : 10),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
         ])
-        window.contentView = root
-        window.open(size: NSSize(width: 920, height: 560), autosave: layoutName("SQLLog"))
+        view = root
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.window?.isVisible == true else { return }
+                guard let self, self.view.window?.isVisible == true, !self.view.isHiddenOrHasHiddenAncestor else { return }
                 self.refresh()
             }
         }
     }
-
-    required init?(coder: NSCoder) { fatalError("not used") }
 
     /// Reads what was added to the file since the last read (all of it after it was cleared or started again) and adds
     /// it to the text; nothing new leaves the text and its selection alone. One update at a time, colouring off the main
@@ -132,7 +132,7 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
         let matches = { (line: String) in words.allSatisfy { line.lowercased().contains($0) } }
         let matching = lines.filter(matches).count
         status.stringValue = lines.isEmpty ? "Nothing sent yet: statements show here once you connect"
-            : words.isEmpty ? "\(lines.count.formatted()) lines" : "\(matching.formatted()) of \(lines.count.formatted()) lines"
+            : words.isEmpty ? "\(lines.count.formatted()) line\(lines.count == 1 ? "" : "s")" : "\(matching.formatted()) of \(lines.count.formatted()) lines"
         status.toolTip = status.stringValue  // whole, when a narrow window shortens it
         let added = (new ?? lines).filter(matches)
         guard new == nil || !added.isEmpty || !dropped.isEmpty else { return }
@@ -182,16 +182,56 @@ final class SQLLogWindowController: NSWindowController, NSSearchFieldDelegate {
         NSWorkspace.shared.activateFileViewerSelecting([log.fileURL])
     }
 
+    @objc private func openInWindow(_ sender: Any?) { SQLLogWindowController.show(log) }
+
     /// Clear SQL Log: asks, then removes the log's files (the next statement starts a new one).
     @objc func clearSQLLog(_ sender: Any?) {
-        guard let window else { return }
+        guard let window = view.window else { return }
         ConsoleClosing.alert(window, "Clear the SQL log?", "Every statement listed is removed from SQL.log and SQL.1.log.",
                              buttons: [("Clear", "Remove the logged statements"), ("Cancel", "Keep the log")], destructive: 0) {
             [weak self] choice in
             guard choice == 0, let self else { return }
-            Self.clear(self.log) { self.refresh() }
+            SQLLogWindowController.clear(self.log) { self.refresh() }
         }
     }
+}
+
+/// The log in a window of its own: one for the app.
+@MainActor
+final class SQLLogWindowController: NSWindowController {
+    private static var shown: SQLLogWindowController?
+    let viewer: SQLLogViewController
+    var log: SQLLog { viewer.log }
+    var text: NSTextView { viewer.text }
+    var lines: [String] { viewer.lines }
+
+    /// Shows the log's window, reading the log again.
+    @discardableResult
+    static func show(_ log: SQLLog = .shared) -> SQLLogWindowController {
+        let controller = shown?.log === log ? shown! : SQLLogWindowController(log: log)
+        shown = controller
+        controller.showWindow(nil)
+        controller.viewer.refresh()
+        return controller
+    }
+
+    init(log: SQLLog) {
+        viewer = SQLLogViewController(log: log, docked: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 920, height: 560),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        window.title = "SQL Log"
+        window.backgroundColor = .ground
+        window.minSize = NSSize(width: 560, height: 320)
+        window.isReleasedWhenClosed = false
+        super.init(window: window)
+        window.contentView = viewer.view
+        window.initialFirstResponder = viewer.text  // where ⌘F finds; the filter's field has no find bar
+        window.open(size: NSSize(width: 920, height: 560), autosave: layoutName("SQLLog"))
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    func refresh() { viewer.refresh() }
 
     /// Removes the log's files, off the main thread.
     static func clear(_ log: SQLLog, then done: @escaping () -> Void = {}) {

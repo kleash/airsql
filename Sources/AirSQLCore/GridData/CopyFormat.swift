@@ -47,13 +47,17 @@ public enum CopyFormat: String, CaseIterable, Codable, Sendable {
     public var hasOptionalHeaders: Bool { self == .tsv || self == .csv || self == .pipe }
 }
 
-/// How rows are written: column names first (TSV and CSV), what NULL looks like, CSV's separator, line endings, and the
-/// session's NO_BACKSLASH_ESCAPES for the SQL formats' strings.
+/// How rows are written: column names first (TSV and CSV), what NULL looks like, CSV's separator and quote, line endings,
+/// line breaks inside values, and the session's NO_BACKSLASH_ESCAPES for the SQL formats' strings.
 public struct CopyOptions: Codable, Equatable, Sendable {
     public var headers = false
     public var nullText = "NULL"
     public var separator = ","
+    /// CSV's quote; empty: values are written bare, whatever they hold.
+    public var quote = "\""
     public var lineEnding = "\n"
+    /// Line breaks inside values become spaces: one row, one line.
+    public var joinLines = false
     public var noBackslashEscapes = false
 
     public init(headers: Bool = false, nullText: String = "NULL") {
@@ -118,6 +122,7 @@ public struct CopyWriter {
 
     public mutating func row(_ values: [String?]) -> String {
         defer { rowsWritten += 1 }
+        let values = options.joinLines ? values.map { $0?.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).joined(separator: " ") } : values
         switch format {
         case .tsv: return values.map { tsvField($0 ?? options.nullText) }.joined(separator: "\t") + eol
         case .csv, .pipe:
@@ -302,10 +307,14 @@ public struct CopyWriter {
 
     /// CSV as RFC 4180 writes it: a value with the separator, a quote or a line break in double quotes.
     private func csvField(_ text: String) -> String {
-        text.contains(where: { $0 == "\"" || $0.isNewline }) || text.contains(separator) ? quoted(text) : text
+        guard !options.quote.isEmpty else { return text }
+        return text.contains(where: \.isNewline) || text.contains(options.quote) || text.contains(separator) ? quoted(text) : text
     }
 
-    private func quoted(_ text: String) -> String { "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
+    private func quoted(_ text: String) -> String {
+        let quote = format == .tsv ? "\"" : options.quote
+        return quote + text.replacingOccurrences(of: quote, with: quote + quote) + quote
+    }
 
     private func markdownCell(_ text: String) -> String {
         text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "|", with: "\\|")

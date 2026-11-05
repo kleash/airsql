@@ -13,6 +13,46 @@ struct InsightHooks {
     var openObject: ((SQLSymbol) -> Void)?
 }
 
+/// The small popover of Quick Documentation and the like, at the cursor or a tree's row.
+@MainActor
+enum InsightNote {
+    static func text(_ body: String) -> NSAttributedString {
+        NSAttributedString(string: body, attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular), .foregroundColor: NSColor.labelColor])
+    }
+
+    private static func label(_ body: NSAttributedString) -> NSTextField {
+        let text = NSTextField(labelWithAttributedString: body)
+        text.maximumNumberOfLines = 30
+        text.preferredMaxLayoutWidth = 520
+        return text
+    }
+
+    /// Any key or click away closes it.
+    static func popover(_ title: String, _ body: NSAttributedString) -> NSPopover {
+        let heading = NSTextField(labelWithString: title)
+        heading.font = .boldSystemFont(ofSize: 12)
+        let stack = NSStackView(views: [heading, label(body)])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+        stack.setAccessibilityIdentifier("console.insightNote")
+        let holder = NSViewController()
+        holder.view = stack
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = holder
+        return popover
+    }
+
+    /// Adds what came later (the first rows) to a popover on show.
+    static func append(_ body: String, to popover: NSPopover) {
+        guard let holder = popover.contentViewController, let stack = holder.view as? NSStackView else { return }
+        stack.addArrangedSubview(label(text(body)))
+        holder.preferredContentSize = stack.fittingSize
+    }
+}
+
 /// One background reading of the text: the next one makes it pointless.
 final class InsightTicket {
     private let lock = NSLock()
@@ -342,29 +382,13 @@ extension SQLEditorView {
     }
 
     func showNote(_ title: String, _ body: String) {
-        showNote(title, NSAttributedString(string: body, attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
-                                                                      .foregroundColor: NSColor.labelColor]))
+        showNote(title, InsightNote.text(body))
     }
 
     /// A small popover at the caret; any key or click away closes it.
     private func showNote(_ title: String, _ body: NSAttributedString) {
         notePopover?.close()
-        let heading = NSTextField(labelWithString: title)
-        heading.font = .boldSystemFont(ofSize: 12)
-        let text = NSTextField(labelWithAttributedString: body)
-        text.maximumNumberOfLines = 30
-        text.preferredMaxLayoutWidth = 520
-        let stack = NSStackView(views: [heading, text])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 6
-        stack.edgeInsets = NSEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
-        stack.setAccessibilityIdentifier("console.insightNote")
-        let holder = NSViewController()
-        holder.view = stack
-        let popover = NSPopover()
-        popover.behavior = .transient
-        popover.contentViewController = holder
+        let popover = InsightNote.popover(title, body)
         notePopover = popover
         shownNote = title + "\n" + body.string
         guard window != nil else { return }

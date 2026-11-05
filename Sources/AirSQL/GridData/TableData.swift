@@ -18,7 +18,7 @@ extension MainWindowController {
         let content = TableDataController(model: model, context: context, database: database, table: table, filter: condition)
         let tab = open(content, title: table, connection: context.connection.id)
         // The keyboard goes to the rows: arrows, Return to edit, ⇧↩ for the value panel.
-        window?.makeFirstResponder(content.grid)
+        if content.page == .data { window?.makeFirstResponder(content.grid) }
         return tab
     }
 

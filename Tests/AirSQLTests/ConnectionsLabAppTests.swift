@@ -95,39 +95,33 @@ extension AppTests {
         #expect(model.connector.open[saved.id] == nil && model.states[saved.id] == nil)
     }
 
-    /// An expired password is replaced at Connect, the saved one with it; a read-only connection is left alone. Only the
-    /// throwaway user `lane_expired` is touched.
-    @Test(.enabled(if: Lab.enabled)) func anExpiredPasswordIsReplacedAtConnect() async throws {
-        let admin = Connection(options: DBLab.options(Lab.mariadb114, tls: DBLab.required), log: DBLab.log)
-        let root = try await admin.session(.main)
-        _ = try await root.query("DROP USER IF EXISTS 'lane_expired'@'%'")
-        _ = try await root.query("CREATE USER 'lane_expired'@'%' IDENTIFIED BY 'old\\\\pass' PASSWORD EXPIRE")
+    /// A password typed with Remember, then found expired, must not be what gets saved; Test Connection changes nothing,
+    /// as the editor would go on to save what was typed. Only the throwaway user `lane_expired` is touched.
+    @Test(.enabled(if: Lab.enabled)) func theExpiredPasswordIsNotWhatGetsRemembered() async throws {
+        let admin = DBConnection(options: DBLab.options(Lab.mariadb114), role: .tools, log: DBLab.log)
+        try await admin.connect()
+        _ = try await admin.query("DROP USER IF EXISTS 'lane_expired'@'%'")
+        _ = try await admin.query("CREATE USER 'lane_expired'@'%' IDENTIFIED BY 'old-Pass1' PASSWORD EXPIRE")
         var saved = SavedConnection(name: "Expired", host: "127.0.0.1", port: Lab.mariadb114.port, user: "lane_expired")
         saved.tls = TLSOptions(mode: .off)
-        var locked = saved
-        locked.id = UUID()
-        locked.readOnly = true
-        let model = testModel([saved, locked])
-        model.setSavedPassword(saved.id.uuidString, #"old\pass"#)
+        let model = testModel([saved])
         let (main, harness) = appWindow(model)
+        await #expect(throws: AirSQLError.self) {
+            _ = try await model.connector.test(saved, password: "old-Pass1", proxyPassword: nil, on: main.window) { _ in }
+        }
+        #expect(main.window?.attachedSheet == nil, "it asks for nothing")
 
+        model.setSavedPassword(saved.id.uuidString, "old-Pass1")
+        model.connector.remembered[saved.id] = [saved.id.uuidString: "old-Pass1"]
         model.connector.connect(saved.id, on: main.window)
         #expect(await eventually(timeout: 20) { main.window?.attachedSheet != nil })
-        #expect(await call(harness, "set", ["id": "password.new", "value": "new'pass"]).error == nil)
-        #expect(await call(harness, "set", ["id": "password.again", "value": "new'pass"]).error == nil)
-        #expect(await call(harness, "press", ["title": "Change Password"]).error == nil)
-        #expect(await eventually(timeout: 20) { if case .connected? = model.states[saved.id] { return true } else { return false } },
-                "\(String(describing: model.states[saved.id]))")
-        #expect(await eventually(timeout: 5) { model.savedPassword(saved.id.uuidString) == "new'pass" })
+        #expect(await call(harness, "set", ["id": "password.new", "value": "new-Pass1"]).error == nil)
+        #expect(await call(harness, "set", ["id": "password.repeat", "value": "new-Pass1"]).error == nil)
+        #expect(await call(harness, "press", ["title": "Change"]).error == nil)
+        #expect(await eventually(timeout: 20) { model.savedPassword(saved.id.uuidString) == "new-Pass1" })
         model.connector.disconnect(saved.id)
-        _ = try await root.query("ALTER USER 'lane_expired'@'%' PASSWORD EXPIRE")
-        model.setSavedPassword(locked.id.uuidString, "new'pass")
-
-        model.connector.connect(locked.id, on: main.window)
-        #expect(await eventually(timeout: 20) { if case .failed? = model.states[locked.id] { return true } else { return false } })
-        #expect(await call(harness, "press", ["title": "Close"]).error == nil)
-        _ = try await root.query("DROP USER 'lane_expired'@'%'")
-        await admin.disconnect()
+        _ = try await admin.query("DROP USER 'lane_expired'@'%'")
+        await admin.close()
     }
 
     /// A table tab outlives its sessions: after Disconnect and Connect, as after a drop that lost the route too, it reads

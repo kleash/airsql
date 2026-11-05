@@ -99,6 +99,46 @@ public enum ToolRun {
         }
     }
 
+    /// AirSQL's own export into the new folder `folder`, a file for each object; a failed or cancelled run leaves no folder.
+    /// Never with DROP DATABASE: each file starts the same way, so restoring one would delete the ones restored before.
+    public static func exportFolder(_ request: DumpRequest, options: ConnectOptions, to folder: URL, cancellation: Cancellation,
+                                    progress: @escaping (SQLExport.Progress, Int64) -> Void) async throws -> ToolOutcome {
+        let started = Date()
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let session = DBConnection(options: options, role: .tools)
+        let sink = SQLFolderSink(folder, gzip: request.gzip, cancellation: cancellation)
+        var request = request
+        request.dropDatabase = false
+        do {
+            _ = try await session.connect()
+            try await SQLExport.run(request, from: session, into: sink, cancellation: cancellation) { progress($0, sink.bytes) }
+            try sink.closeCurrent()
+            await session.close()
+            return ToolOutcome(bytes: sink.bytes, duration: Date().timeIntervalSince(started), errors: 0, lastError: nil)
+        } catch {
+            try? sink.closeCurrent()
+            await session.close()
+            try? FileManager.default.removeItem(at: folder)
+            throw cancellation.isCancelled ? AirSQLError.cancelled : error
+        }
+    }
+
+    /// AirSQL's own export as text, for the clipboard.
+    public static func exportText(_ request: DumpRequest, options: ConnectOptions, cancellation: Cancellation,
+                                  progress: @escaping (SQLExport.Progress, Int64) -> Void) async throws -> String {
+        let session = DBConnection(options: options, role: .tools)
+        let sink = SQLTextSink()
+        do {
+            _ = try await session.connect()
+            try await SQLExport.run(request, from: session, into: sink, cancellation: cancellation) { progress($0, Int64(sink.text.utf8.count)) }
+            await session.close()
+            return sink.text
+        } catch {
+            await session.close()
+            throw cancellation.isCancelled ? AirSQLError.cancelled : error
+        }
+    }
+
     /// A hidden file next to `url` that takes its place once complete (a failed or cancelled run leaves nothing).
     final class PartFile {
         let url: URL

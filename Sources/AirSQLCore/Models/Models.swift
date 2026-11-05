@@ -111,6 +111,10 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var lastDatabase = ""
     /// Disconnects after this many minutes with nothing run and no work open; 0: stays connected.
     public var idleDisconnectMinutes = 0
+    /// The objects marked with a star in the tree.
+    public var favourites: [DatabaseObject] = []
+    /// Its place in its list, once moved by hand; nil: by name.
+    public var position: Int?
 
     public init(id: UUID = UUID(), name: String = "", host: String = "", port: Int? = nil, user: String = "",
                 colour: ConnectionColour = .none, route: Route = .direct) {
@@ -153,6 +157,8 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         compress = try value(.compress, defaults.compress)
         startupSQL = try value(.startupSQL, defaults.startupSQL)
         databaseFilter = try value(.databaseFilter, defaults.databaseFilter)
+        favourites = try value(.favourites, defaults.favourites)
+        position = try container.decodeIfPresent(Int.self, forKey: .position)
         queryTimeout = try value(.queryTimeout, defaults.queryTimeout)
         sharedQuerySession = try value(.sharedQuerySession, defaults.sharedQuerySession)
         startsManual = try value(.startsManual, defaults.startsManual)
@@ -266,6 +272,8 @@ public struct AppSettings: Codable, Equatable {
     public var transposeSingleRow = true
     /// Settings ▸ Editor: the checks turned off, by `SQLInspections` code.
     public var disabledInspections: [String] = []
+    /// View ▸ Tree: how the sidebar's tree shows things.
+    public var tree = TreeSettings()
     /// Settings ▸ Format: how Format SQL lays SQL out, and the case of what completion inserts.
     public var formatStyle = SQLFormatStyle()
     /// Settings ▸ Editor: a table completed after FROM or JOIN brings an alias.
@@ -311,6 +319,7 @@ public struct AppSettings: Codable, Equatable {
         loadAllAsksAbove = try value(.loadAllAsksAbove, defaults.loadAllAsksAbove)
         transposeSingleRow = try value(.transposeSingleRow, defaults.transposeSingleRow)
         disabledInspections = try value(.disabledInspections, defaults.disabledInspections)
+        tree = try value(.tree, defaults.tree)
         formatStyle = try value(.formatStyle, defaults.formatStyle)
         completionTableAlias = try value(.completionTableAlias, defaults.completionTableAlias)
         autoKeywordCase = try value(.autoKeywordCase, defaults.autoKeywordCase)

@@ -280,7 +280,7 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
     <li><b>Console.</b> Editor with highlighting and completion from cached schema, run and cancel, result tabs, history, SQL log, auto-commit with Commit and Rollback, safety prompts.</li>
     <li><b>Agents.</b> <code>--mcp</code> server, schema tools, read-only <code>run_query</code>, <code>open_in_console</code>, activity list; then UI driving (snapshot, menu, press) behind the ask-first gate. This comes early because it reuses the schema cache and the console, and it is AirSQL's main difference from HeidiSQL.</li>
     <li><b>Data and structure.</b> Grid editing with pending changes, value viewers, copy and export; table editor with columns, indexes and foreign keys; DDL editing for views and routines.</li>
-    <li><b>Client tools and data transfer.</b> Settings ▸ Client tools, Export and Restore sheets, Open in Terminal; built-in SQL export, copy to another server, CSV import, running a .sql file.</li>
+    <li><b>Client tools and data transfer.</b> Settings ▸ Client tools, Export and Restore sheets, Open in Terminal; built-in SQL export, copy to another server, import from files and the clipboard into new or existing tables, running a .sql file.</li>
     <li><b>Compare and reconcile.</b> Structure diff first (it reuses the schema cache and DDL code), then data diff with server-side chunk checksums, then the sync script.</li>
     <li><b>Liquibase.</b> Changelog from a schema (DDL, DML, both), and Save as Changeset on every change sheet. This reuses the SQL the table editor and grid already show.</li>
     <li><b>Power features.</b> Maintenance, bulk table editor, find text on server, EXPLAIN plan, query profile, reformat, ER diagram.</li>
@@ -383,12 +383,12 @@ const GROUPS = [
   ["Filter the tree by name", "", "H", "1.0", "S"],
   ["Create and drop databases with charset and collation", "", "H", "1.0", "S"],
   ["Rename, empty (truncate) and drop tables", "Each asks first and shows the SQL", "H", "1.0", "S"],
-  ["Favourite objects", "", "H", "Skip", "S"],
+  ["Favourite objects", "Star at a row's edge; Favourites Only", "H", "1.0", "S"],
   ["Copy a table to another database, with an optional WHERE", "", "H", "1.0", "M"],
   ["Bulk table editor: move to another database, change engine or collation", "", "H", "1.0", "M"],
   ["Maintenance: optimize, check, analyze, repair, checksum", "", "H", "1.0", "S"],
   ["Find text in every table of a server", "", "H", "1.0", "M"],
-  ["Quick Open: go to a table, view or connection by part of its name", "", "D", "1.0", "M"]
+  ["Quick Open: go to anything by fuzzy letters of its name, commands too", "", "D", "1.0", "M"]
  ]},
  { id: "editor", title: "Table and object editors", items: [
   ["Columns: type, length, unsigned, null, default, auto increment, comment, collation, generated; reorder", "", "H", "1.0", "L"],
@@ -476,7 +476,7 @@ const GROUPS = [
   ["Status counters and command statistics", "", "H", "1.x", "S"],
   ["Host page: databases, variables, status, processes, commands", "Shown when a connection is clicked", "H", "1.x", "L"],
   ["Disk Usage: server, database, table, with bars", "Read one database at a time, with Cancel", "H", "1.x", "M"],
-  ["User manager: accounts, hosts, privileges, roles, limits, login plugin", "", "H", "Skip", "L"],
+  ["User manager: accounts, hosts, privileges, roles, limits, login plugin", "Refused in read-only, Production and to agents; a typed password is masked and not kept", "H", "1.x", "L"],
   ["Import CSV with column mapping", "LOAD DATA LOCAL INFILE, or INSERTs when that is disabled", "H", "1.0", "M"],
   ["Built-in SQL export without client tools; copy straight to another server", "", "H", "1.0", "L"],
   ["Insert files into BLOB or TEXT columns", "", "H", "Skip", "S"],
