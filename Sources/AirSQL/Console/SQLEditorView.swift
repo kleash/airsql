@@ -33,7 +33,28 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     /// loaded code must not wipe the consoles' steps.
     private let ownUndoManager = UndoManager()
     override var undoManager: UndoManager? { ownUndoManager }
-    static let indentUnit = "    "
+    /// What Tab puts in, and how wide a tab shows, in spaces (Settings ▸ Editor).
+    var indentUnit = "    "
+    var tabWidth = 4 { didSet { if tabWidth != oldValue { setFontSize(fontSize) } } }
+    /// The font's family (Settings ▸ Editor); empty: SF Mono.
+    var fontFamily = "" { didSet { if fontFamily != oldValue { setFontSize(fontSize) } } }
+    /// Tabs set at `tabWidth` spaces of the font, kept on the whole text.
+    private var paragraph = NSParagraphStyle.default
+    /// The text's statements, as of its last change.
+    var statements: [SQLStatement] {
+        if let cachedStatements { return cachedStatements }
+        let found = SQLSplitter.statements(in: string, noBackslashEscapes: noBackslashEscapes)
+        cachedStatements = found
+        return found
+    }
+    private var cachedStatements: [SQLStatement]?
+    /// The steps Extend Selection took, for Shrink Selection.
+    var grownSelections: [(from: NSRange, to: NSRange)] = []
+    /// What's drawn now behind the text, to redraw it when the cursor moves.
+    var shadedStatement: Range<Int>?
+    var shownCaretBand = NSRect.zero
+    /// "Ln 3, Col 14", in the editor's corner.
+    let positionLabel = NSTextField(labelWithString: "")
 
     /// A TextKit 1 editor in a scroll view with a line-number ruler, not wrapping lines.
     static func make(fontSize: CGFloat) -> (NSScrollView, SQLEditorView) {
@@ -57,6 +78,16 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         scroll.verticalRulerView = ruler
         scroll.hasVerticalRuler = true
         scroll.rulersVisible = true
+        let position = editor.positionLabel
+        position.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular)
+        position.textColor = .secondaryLabelColor
+        position.drawsBackground = true
+        position.backgroundColor = .content
+        position.toolTip = "Shows the cursor's line and column, and how many characters are selected"
+        position.setAccessibilityIdentifier("console.position")
+        // By its frame: a scroll view doesn't lay out what's added to it. It keeps to the corner as the view resizes.
+        position.autoresizingMask = scroll.isFlipped ? [.minXMargin, .minYMargin] : [.minXMargin, .maxYMargin]
+        scroll.addSubview(position)
         return (scroll, editor)
     }
 
@@ -92,16 +123,29 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         toolTip = nil
     }
 
-    /// The editor's font: SF Mono at `size` (Settings ▸ Editor, or zoomed for a moment).
+    /// The editor's font: `fontFamily` at `size` (Settings ▸ Editor, or zoomed for a moment).
     func setFontSize(_ size: CGFloat) {
-        font = .monospacedSystemFont(ofSize: size, weight: .regular)
-        typingAttributes = [.font: font!, .foregroundColor: NSColor.labelColor]
+        font = NSFontManager.shared.font(withFamily: fontFamily, traits: [], weight: 5, size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+        let style = NSMutableParagraphStyle()
+        style.tabStops = []
+        style.defaultTabInterval = CGFloat(tabWidth) * (" " as NSString).size(withAttributes: [.font: font!]).width
+        paragraph = style
+        defaultParagraphStyle = style
+        typingAttributes = [.font: font!, .foregroundColor: NSColor.labelColor, .paragraphStyle: style]
         highlightAll()
         underlineProblems()
         (enclosingScrollView?.verticalRulerView as? LineNumberRuler)?.fitWidth()
     }
 
     var fontSize: CGFloat { font?.pointSize ?? 13 }
+
+    /// Settings ▸ Editor's font and indent.
+    func applyStyle(family: String, tabWidth: Int, usesTabs: Bool) {
+        fontFamily = family
+        self.tabWidth = tabWidth
+        indentUnit = usesTabs ? "\t" : String(repeating: " ", count: tabWidth)
+    }
 
     /// Long lines wrap at the editor's edge, or run on and scroll sideways.
     func setWraps(_ wraps: Bool) {
@@ -135,12 +179,14 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     func highlightAll() {
         tokens = []
         highlightedLength = 0
+        cachedStatements = nil
         highlight()
         checkLater()
     }
 
     override func didChangeText() {
         super.didChangeText()
+        cachedStatements = nil
         // A long script is coloured a moment after the typing stops, so keys never wait for it.
         if (string as NSString).length > Self.longText {
             NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(highlightLater), object: nil)
@@ -185,7 +231,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         guard start <= end else { return }
         let range = NSRange(location: start, length: end - start)
         storage.beginEditing()
-        storage.setAttributes([.font: font, .foregroundColor: NSColor.labelColor], range: range)
+        storage.setAttributes([.font: font, .foregroundColor: NSColor.labelColor, .paragraphStyle: paragraph], range: range)
         SQLPreviewSheet.colour(storage, tokens: new, first..<(new.count - suffix), text: Array(text.utf16), font: font)
         storage.endEditing()
     }
@@ -274,8 +320,19 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
         guard !stillSelecting else { return }
         clearMarks()
+        markUsagesAtCaret()
         markMatchingBracket()
+        updateCaretMarks()
         onSelectionChange?()
+    }
+
+    private func markUsagesAtCaret() {
+        guard let layout = layoutManager else { return }
+        let color = NSColor.labelColor.withAlphaComponent(0.1)
+        markUsages { range in
+            layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: range)
+            bracketMarks.append(range)
+        }
     }
 
     /// The bracket next to the caret and its partner, outside strings and comments.

@@ -204,6 +204,10 @@ public struct AppSettings: Codable, Equatable {
     /// Settings ▸ Editor: long lines wrap at the editor's edge instead of scrolling sideways. Not `editorWraps`, which
     /// 1.0.1 saved as false for everyone: the name leaves that behind, so this default reaches them.
     public var editorWordWrap = true
+    /// Settings ▸ Editor: the font's family (empty: SF Mono), how wide a tab is in spaces, and whether Tab puts in a tab.
+    public var editorFontFamily = ""
+    public var editorTabWidth = 4
+    public var editorUsesTabs = false
     /// Settings ▸ Grid: the grid's font size, rows per page, and how NULL is shown.
     public var gridFontSize = 12.0
     public var rowsPerPage = 1_000
@@ -237,6 +241,9 @@ public struct AppSettings: Codable, Equatable {
         safety = try value(.safety, defaults.safety)
         editorFontSize = try value(.editorFontSize, defaults.editorFontSize)
         editorWordWrap = try value(.editorWordWrap, defaults.editorWordWrap)
+        editorFontFamily = try value(.editorFontFamily, defaults.editorFontFamily)
+        editorTabWidth = try value(.editorTabWidth, defaults.editorTabWidth)
+        editorUsesTabs = try value(.editorUsesTabs, defaults.editorUsesTabs)
         gridFontSize = try value(.gridFontSize, defaults.gridFontSize)
         rowsPerPage = try value(.rowsPerPage, defaults.rowsPerPage)
         nullText = try value(.nullText, defaults.nullText)

@@ -59,6 +59,18 @@ own session, which every query tab of that connection shares.
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
   (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
+- **Edit ▸ Lines** works on the selected lines, or the cursor's: **Duplicate Line** (⌃D), **Delete Line** (⌃⇧K), **Move Line Up** and
+  **Down** (⌥⇧↑, ⌥⇧↓), **Join Lines** (⌃⇧J; a line ending in a `--` comment, or a line break inside a string, stays), **Sort Lines** and
+  **Reverse Lines**. ⌘C with nothing selected copies the line.
+- **Edit ▸ Statements** has **Next Statement** and **Previous Statement** (⌃⌥↓, ⌃⌥↑), **Select Statement** (⌃⌘A) and **Move Statement
+  Up** and **Down** (⌃⇧↑, ⌃⇧↓). **Extend Selection** (⌥↑) grows the selection by syntax: the word, the list item or condition, the
+  clause, the brackets, the statement, then everything; **Shrink Selection** (⌥↓) takes those steps back.
+- **Edit ▸ Comment Selection** (⌥⌘/) puts `/* */` around the selection, or takes it away. **Toggle Case** (⌃⇧U) puts the selection or
+  the word at the cursor in capitals, or in small letters. **Complete Statement** (⌃⇧↩) closes its brackets, adds its `;` and starts a
+  new line.
+- The cursor's line has a band and, when the text has several statements, the statement it's in has a light shade: that's what ⌘↩
+  runs. Other uses of the name at the cursor are marked, and its line and column show in the editor's corner.
+- Settings ▸ Editor sets the font, the text size, the width of a tab and whether Tab puts in a tab character or spaces.
 - **Query ▸ Format SQL** (⌥⇧⌘F) puts each main clause on a line of its own and reserved words in capitals. It changes
   nothing else: names, values, comments and `/*! … */` code stay exactly as they are, and statements inside a
   `DELIMITER` block are left alone. If it couldn't do that, it leaves the SQL as it was and says so.

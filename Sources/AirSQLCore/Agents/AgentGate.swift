@@ -83,6 +83,9 @@ extension AgentGate {
         part.appearance = plain.appearance
         part.editorFontSize = plain.editorFontSize
         part.editorWordWrap = plain.editorWordWrap
+        part.editorFontFamily = plain.editorFontFamily
+        part.editorTabWidth = plain.editorTabWidth
+        part.editorUsesTabs = plain.editorUsesTabs
         part.gridFontSize = plain.gridFontSize
         part.rowsPerPage = plain.rowsPerPage
         part.nullText = plain.nullText

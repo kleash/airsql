@@ -199,7 +199,10 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     /// Colours `tokens[indices]` of `text` in `string` as `coloured` does: the console's editor colours what changed.
     nonisolated static func colour(_ string: NSMutableAttributedString, tokens: [SQLToken], _ indices: Range<Int>, text: [UInt16],
                                    font: NSFont) {
-        let semibold = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
+        // The system's monospaced font takes its weight only this way; any other, through its descriptor.
+        let weighted = font.fontDescriptor.addingAttributes([.traits: [NSFontDescriptor.TraitKey.weight: NSFont.Weight.semibold]])
+        let semibold = font.fontName.hasPrefix(".") ? NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .semibold)
+            : NSFont(descriptor: weighted, size: font.pointSize) ?? font
         let italic = NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(.italic), size: font.pointSize) ?? font
         for k in indices {
             let token = tokens[k]

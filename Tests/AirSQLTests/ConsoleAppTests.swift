@@ -148,6 +148,150 @@ extension AppTests {
             #expect(menu.error == nil, "\(menu.error ?? "")")
         }
 
+        /// Edit ▸ Lines and the commands around it: what each does to the text, the cursor, and that Undo takes it back.
+        @Test func lineCommands() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            func on(_ text: String, _ selection: NSRange, _ command: (SQLEditorView) -> Void) -> (String, NSRange) {
+                editor.setText(text)
+                editor.setSelectedRange(selection)
+                command(editor)
+                let result = (editor.string, editor.selectedRange())
+                if result.0 != text {
+                    editor.undoManager?.undo()
+                    #expect(editor.string == text, "Undo takes it back")
+                }
+                return result
+            }
+            func caret(_ place: Int, _ length: Int = 0) -> NSRange { NSRange(location: place, length: length) }
+            let dup = { (e: SQLEditorView) in e.duplicateLine(nil) }
+            #expect(on("a\nb", caret(1), dup) == ("a\na\nb", caret(3)))
+            #expect(on("a\nb", caret(3), dup) == ("a\nb\nb", caret(5)), "the last line has no break")
+            #expect(on("a\nb\nc", caret(0, 3), dup) == ("a\nb\na\nb\nc", caret(4, 3)))
+            let del = { (e: SQLEditorView) in e.deleteLine(nil) }
+            #expect(on("a\nb\nc", caret(2), del) == ("a\nc", caret(2)))
+            #expect(on("a\nb", caret(3), del) == ("a", caret(1)))
+            #expect(on("a", caret(0), del) == ("", caret(0)))
+            let up = { (e: SQLEditorView) in e.moveLineUp(nil) }, down = { (e: SQLEditorView) in e.moveLineDown(nil) }
+            #expect(on("a\nbb\nc", caret(3), up) == ("bb\na\nc", caret(1)))
+            #expect(on("a\nbb", caret(3), up) == ("bb\na", caret(1)), "the last line takes a break")
+            #expect(on("a\nbb\nc", caret(0), up) == ("a\nbb\nc", caret(0)), "nothing above")
+            #expect(on("a\nbb\nc", caret(0), down) == ("bb\na\nc", caret(3)))
+            #expect(on("a\nbb", caret(0), down) == ("bb\na", caret(3)))
+            #expect(on("a\nbb", caret(3), down) == ("a\nbb", caret(3)), "nothing below")
+            #expect(on("a\nb\nc", caret(0, 3), down) == ("c\na\nb", caret(2, 3)))
+            let join = { (e: SQLEditorView) in e.joinLines(nil) }
+            #expect(on("a\n  b\nc", caret(0), join).0 == "a b\nc")
+            #expect(on("a\nb\nc", caret(0, 4), join).0 == "a b\nc")
+            #expect(on("z\nb\na", caret(0, 5), { $0.sortLines(nil) }).0 == "a\nb\nz")
+            #expect(on("1\n2\n3", caret(0, 5), { $0.reverseLines(nil) }).0 == "3\n2\n1")
+            let toggle = { (e: SQLEditorView) in e.toggleCase(nil) }
+            #expect(on("select x", caret(0, 6), toggle) == ("SELECT x", caret(0, 6)))
+            #expect(on("SELECT x", caret(0, 6), toggle) == ("select x", caret(0, 6)))
+            #expect(on("select x", caret(2), toggle).0 == "SELECT x", "the word at the cursor")
+            let block = { (e: SQLEditorView) in e.toggleBlockComment(nil) }
+            #expect(on("a b c", caret(2, 1), block).0 == "a /* b */ c")
+            #expect(on("a /* b */ c", caret(5), block).0 == "a b c")
+            #expect(on("  a b\nc", caret(3), block).0 == "  /* a b */\nc")
+            #expect(on("SELECT (1", caret(9), { $0.completeStatement(nil) }) == ("SELECT (1);\n", caret(12)))
+            // ⌘C with nothing selected takes the line, and has something to do.
+            editor.setText("a\nb")
+            editor.setSelectedRange(caret(0))
+            let pasteboard = NSPasteboard.general, saved = pasteboard.string(forType: .string)
+            defer {
+                pasteboard.clearContents()
+                if let saved { pasteboard.setString(saved, forType: .string) }
+            }
+            editor.copy(nil)
+            #expect(pasteboard.string(forType: .string) == "a\n")
+            #expect(editor.validateUserInterfaceItem(Commands.copy.item()))
+        }
+
+        /// Moving by statement and growing the selection by syntax; the band, shade and marks around the cursor.
+        @Test func statementsAndWhatTheCursorMarks() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            func caret(_ place: Int, _ length: Int = 0) -> NSRange { NSRange(location: place, length: length) }
+            let script = "SELECT 1;\nSELECT 22;\nSELECT 3"
+            editor.setText(script)
+            editor.setSelectedRange(caret(3))
+            editor.nextStatement(nil)
+            #expect(editor.selectedRange() == caret(10))
+            editor.nextStatement(nil)
+            #expect(editor.selectedRange() == caret(21))
+            editor.previousStatement(nil)
+            #expect(editor.selectedRange() == caret(10))
+            editor.setSelectedRange(caret(13))
+            editor.previousStatement(nil)
+            #expect(editor.selectedRange() == caret(10), "first to the start of its own")
+            editor.selectStatement(nil)
+            #expect(editor.selectedRange() == caret(10, 9))
+            editor.setSelectedRange(caret(13))
+            editor.moveStatementDown(nil)
+            #expect(editor.string == "SELECT 1;\nSELECT 3;\nSELECT 22" && editor.selectedRange() == caret(23), "delimiters stay, the cursor goes along")
+            editor.moveStatementUp(nil)
+            #expect(editor.string == script && editor.selectedRange() == caret(13))
+            editor.undoManager?.removeAllActions()
+
+            editor.setSelectedRange(caret(1))
+            editor.extendSelection(nil)
+            #expect(editor.selectedRange() == caret(0, 6))
+            editor.extendSelection(nil)
+            editor.extendSelection(nil)
+            #expect(editor.selectedRange().length > 6)
+            editor.shrinkSelection(nil)
+            editor.shrinkSelection(nil)
+            #expect(editor.selectedRange() == caret(0, 6))
+            editor.shrinkSelection(nil)
+            #expect(editor.selectedRange() == caret(1))
+            #expect(editor.validateUserInterfaceItem(Commands.extendSelection.item()))
+
+            // Band and shade: the statement only when there's another.
+            editor.setSelectedRange(caret(12))
+            #expect(editor.shadedStatement == 10..<19 && editor.caretBand.height > 0)
+            #expect(editor.positionLabel.stringValue == "Ln 2, Col 3")
+            editor.setSelectedRange(caret(10, 6))
+            #expect(editor.positionLabel.stringValue == "Ln 2, Col 1 · 6 selected" && editor.caretBand == .zero)
+            editor.setText("SELECT 1")
+            editor.setSelectedRange(caret(2))
+            #expect(editor.shadedStatement == nil)
+
+            // A name is marked wherever it appears, in any case or quotes; keywords, strings and numbers aren't.
+            func marked(_ place: Int) -> Bool {
+                editor.layoutManager?.temporaryAttribute(.backgroundColor, atCharacterIndex: place, effectiveRange: nil) != nil
+            }
+            editor.setText("SELECT orders, `ORDERS`, 'orders', other FROM orders")
+            editor.setSelectedRange(caret(9))
+            #expect(marked(7) && marked(15) && marked(46) && !marked(26) && !marked(35))
+            editor.setSelectedRange(caret(2))
+            #expect(!marked(7) && !marked(46))
+        }
+
+        /// Settings ▸ Editor reaches open editors: the font, keywords in it too; the indent Tab puts in.
+        @Test func editorSettingsReachTheEditor() async throws {
+            let model = testModel(Fixtures.shop)
+            let (_, _, console) = try await Self.console(model)
+            let editor = try #require(console.editor)
+            #expect(editor.font?.isFixedPitch == true && editor.indentUnit == "    ")
+            editor.setText("SELECT a")
+            model.data.settings.editorFontFamily = "Menlo"
+            model.data.settings.editorTabWidth = 2
+            _ = await eventually(timeout: 5) { editor.font?.familyName == "Menlo" }
+            #expect(editor.indentUnit == "  ")
+            let keyword = editor.textStorage?.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+            #expect(keyword?.familyName == "Menlo", "keywords keep the family")
+            let style = editor.textStorage?.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+            #expect((style?.defaultTabInterval ?? 0) > 0)
+            model.data.settings.editorUsesTabs = true
+            _ = await eventually(timeout: 5) { editor.indentUnit == "\t" }
+            editor.setText("a\nb")
+            editor.setSelectedRange(NSRange(location: 0, length: 3))
+            editor.indentLines(nil)
+            #expect(editor.string == "\ta\n\tb")
+            editor.outdentLines(nil)
+            #expect(editor.string == "a\nb")
+        }
+
         /// Openers bring their partners, outside strings; closers step over them; Delete takes an empty pair; ⌘Z undoes it.
         @Test func bracketsAndQuotesCloseThemselves() async throws {
             let (_, _, console) = try await Self.console()

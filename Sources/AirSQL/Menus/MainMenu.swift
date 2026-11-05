@@ -90,6 +90,7 @@ enum MainMenu {
         addConnectionItems(menus)
         addGridItems(menus)
         addConsoleItems(menus)
+        addSQLEditorItems(menus)
         addNavigatorItems(menus)
         addEditorItems(menus)
         addToolItems(menus)

@@ -358,7 +358,7 @@ enum Commands {
     static let selectAll = Command("Select All", #selector(NSText.selectAll(_:)), "a",
                                    tip: "Select everything in the editor, grid or list that has the focus")
     static let extendSelection = Command("Extend Selection", #selector(AirSQLActions.extendSelection(_:)), up, .option,
-                                         tip: "Grow the grid's selection from the cell to its column, its row, then everything")
+                                         tip: "Grow the selection: in SQL by syntax, in a grid from cell to column, row, then everything")
     static let shrinkSelection = Command("Shrink Selection", #selector(AirSQLActions.shrinkSelection(_:)), down, .option,
                                          tip: "Shrink the grid's selection back: everything, the row, the column, the cell")
     static let copyName = Command("Copy Name", #selector(AirSQLActions.copyName(_:)), "c", [.command, .control], tip: "Copy the selected object's name, quoted for SQL")
@@ -771,7 +771,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ]
+    ] + editorCommands
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {
@@ -790,6 +790,8 @@ enum Commands {
         "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",
+        "Statements": "Move between statements, select one or change their order",
+        "Lines": "Duplicate, delete, move, join, sort or reverse the selected lines of SQL",
         "Copy As": "Copy the selected cells as TSV, CSV, Markdown, JSON, SQL and more",
         "View As": viewAs.tip,
         "Refresh Every": autoRefresh.tip,

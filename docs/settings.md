@@ -17,6 +17,8 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 - **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways; on at first (**View ▸ Word Wrap** too).
 
+- **Font**: the SQL editor's, from the fonts whose letters are all one width (SF Mono at first).
+- **Tab width** and **Indent with tabs**: how wide a tab or an indent is, and whether Tab puts in a tab character or spaces.
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
 

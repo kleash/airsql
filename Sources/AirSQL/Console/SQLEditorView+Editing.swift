@@ -36,7 +36,7 @@ extension SQLEditorView {
     }
 
     /// Changes each selected line with `change` (nil: leaves it), as one edit, selecting the lines after.
-    private func changeLines(_ change: ([String]) -> [String]) {
+    func changeLines(_ change: ([String]) -> [String]) {
         let range = selectedLines
         let block = (string as NSString).substring(with: range)
         let endsWithNewline = block.hasSuffix("\n")
@@ -73,21 +73,21 @@ extension SQLEditorView {
     }
 
     @objc func indentLines(_ sender: Any?) {
-        changeLines { $0.map { $0.isEmpty ? $0 : Self.indentUnit + $0 } }
+        changeLines { $0.map { $0.isEmpty ? $0 : indentUnit + $0 } }
     }
 
     @objc func outdentLines(_ sender: Any?) {
         changeLines { lines in
             lines.map { line in
                 if line.hasPrefix("\t") { return String(line.dropFirst()) }
-                return String(line.dropFirst(min(Self.indentUnit.count, line.prefix { $0 == " " }.count)))
+                return String(line.dropFirst(min(tabWidth, line.prefix { $0 == " " }.count)))
             }
         }
     }
 
     override func insertTab(_ sender: Any?) {
         if (string as NSString).substring(with: selectedRange()).contains("\n") { return indentLines(sender) }
-        insertText(Self.indentUnit, replacementRange: selectedRange())
+        insertText(indentUnit, replacementRange: selectedRange())
     }
 
     override func insertBacktab(_ sender: Any?) { outdentLines(sender) }
@@ -188,8 +188,13 @@ extension SQLEditorView {
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         switch item.action {
-        case #selector(toggleComment(_:)), #selector(indentLines(_:)), #selector(outdentLines(_:)):
+        case #selector(toggleComment(_:)), #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(duplicateLine(_:)),
+             #selector(deleteLine(_:)), #selector(moveLineUp(_:)), #selector(moveLineDown(_:)), #selector(joinLines(_:)),
+             #selector(sortLines(_:)), #selector(reverseLines(_:)), #selector(toggleCase(_:)), #selector(toggleBlockComment(_:)),
+             #selector(completeStatement(_:)), #selector(moveStatementUp(_:)), #selector(moveStatementDown(_:)):
             return isEditable
+        case Commands.copy.action:
+            return !string.isEmpty  // with no selection, it copies the line
         default:
             return super.validateUserInterfaceItem(item)
         }
