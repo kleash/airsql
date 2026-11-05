@@ -203,6 +203,7 @@ extension AppTests {
     @MainActor @Suite struct HostPageTests {
         private func opened(_ change: (inout SavedConnection) -> Void = { _ in }) async throws -> (MainWindowController, OpenConnection, HostContent) {
             var saved = Fixtures.staging
+            saved.safety = nil
             change(&saved)
             let model = testModel([saved])
             let (main, _) = appWindow(model)
@@ -269,7 +270,7 @@ extension AppTests {
             free.show(.variables)
             free.variables.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
             #expect(free.edit.isEnabled)
-            for change in [{ $0.readOnly = true }, { $0.colour = .production }] as [(inout SavedConnection) -> Void] {
+            for change in [{ $0.readOnly = true }, { $0.colour = .production }, { $0.safety = .production }] as [(inout SavedConnection) -> Void] {
                 let (_, _, host) = try await opened(change)
                 host.show(.variables)
                 host.variables.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
