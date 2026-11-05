@@ -393,8 +393,8 @@ extension AppTests {
             #expect(await eventually(timeout: 5) { main.logDockHeight == 0 })
         }
 
-        /// The owner's rule: every expandable row toggles on a double-click, but a table, which opens its tab.
-        @Test func aDoubleClickTogglesEveryExpandableRowButATable() async throws {
+        /// The owner's rule: every expandable row toggles on a double-click, a table too, which also opens its tab.
+        @Test func aDoubleClickTogglesEveryExpandableRow() async throws {
             let folder = ConnectionFolder(name: "Work")
             var connections = Fixtures.shop
             connections[0].folderID = folder.id
@@ -424,7 +424,9 @@ extension AppTests {
                 if let object = node.object, object.kind.isTableLike {
                     press(node)
                     #expect(await eventually(timeout: 5) { main.tabs.contains { $0.title == object.name && $0.content is TableDataController } }, "\(object.name)")
-                    #expect(outline.isItemExpanded(node) == wasOpen, "a table's double-click doesn't open or close it")
+                    #expect(await eventually(timeout: 5) { outline.isItemExpanded(node) != wasOpen }, "\(object.name) opens or closes too")
+                    press(node)
+                    #expect(await eventually(timeout: 5) { outline.isItemExpanded(node) == wasOpen }, "\(object.name) goes back")
                     kinds.insert("table")
                     continue
                 }

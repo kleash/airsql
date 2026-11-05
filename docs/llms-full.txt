@@ -895,7 +895,8 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   Right-click a title to show or hide columns: **Data**, **Indexes**, **Free**, **Average Row**, **Auto Increment**,
   **Created**, **Row Format** and **Options** are there too. **Filter by name** at its top keeps the tables with those
   letters. Right-click below the rows, or an empty database, for **Create Table…**.
-- **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
+- **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own and show
+  its columns, indexes and keys in the tree. Double-click it again to close them.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
 - **Click the arrow** beside a table or view (or press →) to see what it holds without opening it: **Columns** with
   their types (the primary key's are marked **PK**), and for a table **Indexes**, **Foreign Keys**, **Checks** and

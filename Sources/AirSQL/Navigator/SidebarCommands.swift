@@ -77,7 +77,8 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     /// A double-click makes a database current and opens or closes it, opens or closes a group, opens an object in its
-    /// own tab, and a row under a table opens that table's structure (a trigger, its own editor).
+    /// own tab (a table or view opens or closes in the tree too), and a row under a table opens that table's structure (a
+    /// trigger, its own editor).
     func treeDoubleClicked(_ node: SidebarNode) {
         switch node.kind {
         case .database(let id, let name):
@@ -92,6 +93,10 @@ extension SidebarController: NSMenuItemValidation {
             }
             if object.kind.isTableLike { openData(nil) } else { openObject(nil) }
             if let preview { main?.close(preview) }
+            // Its columns and keys open and close with it, as any row with an arrow does.
+            if object.kind.hasParts {
+                if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
+            }
         case .detail(let id, let object, let part, let name):
             guard let open = model.openConnection(id) else { return }
             main?.openEditor(part == .triggers ? DatabaseObject(.trigger, object.database, name) : object, of: open)
