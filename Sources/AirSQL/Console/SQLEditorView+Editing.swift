@@ -100,6 +100,22 @@ extension SQLEditorView {
         insertText("\n" + indent, replacementRange: selectedRange())
     }
 
+    /// Several values pasted between the brackets of an IN become a quoted list, as one undoable step; anything else
+    /// pastes as usual (Paste Without Formatting always does).
+    override func paste(_ sender: Any?) {
+        let selections = selectedRanges
+        guard selections.count == 1, let clipboard = NSPasteboard.general.string(forType: .string),
+              let selection = Range(selectedRange()) else { return super.paste(sender) }
+        let context = nameContext?()
+        guard let edit = SQLInPaste.edit(pasting: clipboard, into: string, selection: selection, snapshot: context?.snapshot,
+                                         database: context?.database, noBackslashEscapes: noBackslashEscapes)
+        else { return super.paste(sender) }
+        breakUndoCoalescing()
+        replace(NSRange(edit.range), with: edit.text,
+                select: NSRange(location: edit.range.lowerBound + (edit.text as NSString).length, length: 0))
+        breakUndoCoalescing()
+    }
+
     // MARK: Drag and drop
 
     /// .sql files dropped on the editor open in console tabs of their own; names and text dropped from elsewhere (the
@@ -159,14 +175,14 @@ extension SQLEditorView {
     }
 
     /// The editor's menu (plan §2.12): Run Statement, Run Selection, Explain, Format SQL, Comment Lines, Edit as Table,
-    /// Cut, Copy, Paste. A right-click outside the selection moves the cursor there first, as a click would.
+    /// Cut, Copy, Paste, Paste Without Formatting. A right-click outside the selection moves the cursor there first, as a click would.
     override func menu(for event: NSEvent) -> NSMenu? {
         let point = convert(event.locationInWindow, from: nil)
         let index = characterIndexForInsertion(at: point)
         if !NSLocationInRange(index, selectedRange()) { setSelectedRange(NSRange(location: index, length: 0)) }
         let menu = NSMenu(title: "SQL Editor")
         menu.add([Commands.runStatement, Commands.runSelection, Commands.explain, Commands.formatSQL, Commands.toggleComment,
-                  Commands.editAsTable, nil, Commands.cut, Commands.copy, Commands.paste])
+                  Commands.editAsTable, nil, Commands.cut, Commands.copy, Commands.paste, Commands.pastePlain])
         return menu
     }
 

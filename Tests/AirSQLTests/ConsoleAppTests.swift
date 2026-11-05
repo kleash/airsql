@@ -112,6 +112,42 @@ extension AppTests {
             #expect(editor.string == "SELECT 1")
         }
 
+        /// Several values pasted inside an IN become a list that one Undo takes back; Paste Without Formatting and any
+        /// other place keep the text as it was copied. Everything goes through the menu, as a person's paste does.
+        @Test func pastingIntoAnInMakesAList() async throws {
+            let (main, harness, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            main.window?.makeFirstResponder(editor)
+            let pasteboard = NSPasteboard.general
+            let saved = pasteboard.string(forType: .string)
+            defer {
+                pasteboard.clearContents()
+                if let saved { pasteboard.setString(saved, forType: .string) }
+            }
+            pasteboard.clearContents()
+            pasteboard.setString("a\nO'Brien\n", forType: .string)
+            let sql = "SELECT 1 FROM t WHERE x IN ()"
+            func place(_ text: String, at caret: Int) {
+                editor.setText(text)
+                editor.setSelectedRange(NSRange(location: caret, length: 0))
+            }
+            place(sql, at: 28)
+            editor.paste(nil)
+            #expect(editor.string == "SELECT 1 FROM t WHERE x IN ('a', 'O\\'Brien')")
+            #expect(editor.selectedRange() == NSRange(location: 43, length: 0))
+            editor.undoManager?.undo()
+            #expect(editor.string == sql, "one Undo takes it all back")
+            place(sql, at: 28)
+            editor.pasteAsPlainText(nil)
+            #expect(editor.string == "SELECT 1 FROM t WHERE x IN (a\nO'Brien\n)")
+            place("SELECT ", at: 7)
+            editor.paste(nil)
+            #expect(editor.string == "SELECT a\nO'Brien\n")
+            #expect(Commands.pastePlain.shortcut == "⌥⇧⌘V")
+            let menu = await call(harness, "menu", ["path": "Edit > Paste Without Formatting"])
+            #expect(menu.error == nil, "\(menu.error ?? "")")
+        }
+
         /// Openers bring their partners, outside strings; closers step over them; Delete takes an empty pair; ⌘Z undoes it.
         @Test func bracketsAndQuotesCloseThemselves() async throws {
             let (_, _, console) = try await Self.console()

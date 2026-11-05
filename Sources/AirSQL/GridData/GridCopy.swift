@@ -65,8 +65,9 @@ enum GridCopy {
         var writer = CopyWriter(format, columns: written, database: database, table: table, options: options)
         var text = writer.header()
         // Cells of the block that weren't selected stay empty in a table of text; a statement or object needs its row whole.
-        let holes = format == .tsv || format == .csv ? selected : nil
-        for row in rows { text += writer.row(columns.map { holes?(row, $0) == false ? "" : source.value(row, $0) }) }
+        let holes = format == .tsv || format == .csv || format == .inList ? selected : nil
+        let hole = format == .inList ? nil : ""  // a list leaves them out
+        for row in rows { text += writer.row(columns.map { holes?(row, $0) == false ? hole : source.value(row, $0) }) }
         return text + writer.footer()
     }
 

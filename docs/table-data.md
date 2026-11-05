@@ -192,7 +192,7 @@ These work in a query's results too.
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
-  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
+  UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
   didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,

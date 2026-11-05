@@ -352,6 +352,8 @@ enum Commands {
     static let copySummary = Command("Copy Selection Summary", #selector(AirSQLActions.copySummary(_:)), "C",
                                      tip: "Copy the selection's count, sum, average, minimum and maximum")
     static let paste = Command("Paste", #selector(NSText.paste(_:)), "v", tip: "Paste text, or cells into the grid as pending edits")
+    static let pastePlain = Command("Paste Without Formatting", #selector(NSTextView.pasteAsPlainText(_:)), "v", [.command, .option, .shift],
+                                    tip: "Paste the text just as it was copied, even between the brackets of an IN")
     static let delete = Command("Delete", #selector(NSText.delete(_:)), tip: "Delete the selection")
     static let selectAll = Command("Select All", #selector(NSText.selectAll(_:)), "a",
                                    tip: "Select everything in the editor, grid or list that has the focus")
@@ -746,7 +748,7 @@ enum Commands {
         newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
         runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
-        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,
+        undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, pastePlain, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,

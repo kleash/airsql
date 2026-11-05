@@ -414,6 +414,13 @@ own session, which every query tab of that connection shares.
   that **Undo** takes back.
 - Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete
   between an empty pair takes both.
+- **Paste into `IN ()`**: with the cursor or a selection between the brackets of an `IN`, several values on the clipboard
+  (a column or row of a grid, cells from Excel, lines of a text file, or a line split by commas) go in as `'a', 'b', 'c'`,
+  with a comma added if the brackets hold values already. Every value is quoted, so a text column compares as text and a number
+  column still uses its index; numbers stay bare when the column on the left is a number in the schema AirSQL has read.
+  Blank lines drop out, spaces around values go, `NULL` stays text, and a list that's already quoted stays as it is. When
+  there are lines or tabs, a comma inside a value is the value's own. One value, or a subquery, pastes as usual, and one
+  **Undo** takes the paste back. **Edit ▸ Paste Without Formatting** (⌥⇧⌘V) always pastes the text just as it was copied.
 - **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
@@ -962,7 +969,7 @@ These work in a query's results too.
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
-  UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
+  UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
   didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,

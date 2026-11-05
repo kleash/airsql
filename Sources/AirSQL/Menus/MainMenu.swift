@@ -47,7 +47,7 @@ enum MainMenu {
                         Commands.closeAllTabs, Commands.reopenClosedTab, Commands.closeWindow, nil, Commands.duplicateTab, Commands.renameTab, Commands.renameF2,
                         Commands.revealInFinder])
 
-        menus.edit.add([Commands.undo, Commands.redo, nil, Commands.cut, Commands.copy, Commands.paste, Commands.delete,
+        menus.edit.add([Commands.undo, Commands.redo, nil, Commands.cut, Commands.copy, Commands.paste, Commands.pastePlain, Commands.delete,
                         Commands.selectAll, nil])
         menus.edit.addItem(submenu("Find", [Commands.find, Commands.findAndReplace, Commands.findNext, Commands.findPrevious,
                                             Commands.useSelectionForFind].map { $0.item() }))

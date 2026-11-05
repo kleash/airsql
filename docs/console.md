@@ -48,6 +48,13 @@ own session, which every query tab of that connection shares.
   that **Undo** takes back.
 - Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete
   between an empty pair takes both.
+- **Paste into `IN ()`**: with the cursor or a selection between the brackets of an `IN`, several values on the clipboard
+  (a column or row of a grid, cells from Excel, lines of a text file, or a line split by commas) go in as `'a', 'b', 'c'`,
+  with a comma added if the brackets hold values already. Every value is quoted, so a text column compares as text and a number
+  column still uses its index; numbers stay bare when the column on the left is a number in the schema AirSQL has read.
+  Blank lines drop out, spaces around values go, `NULL` stays text, and a list that's already quoted stays as it is. When
+  there are lines or tabs, a comma inside a value is the value's own. One value, or a subquery, pastes as usual, and one
+  **Undo** takes the paste back. **Edit ▸ Paste Without Formatting** (⌥⇧⌘V) always pastes the text just as it was copied.
 - **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**

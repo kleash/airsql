@@ -4,7 +4,7 @@ import Foundation
 /// (TSV at first); Export adds Excel (`XLSXWriter`). A `CopyWriter` writes a format a part at a time (header, rows,
 /// footer), so exporting every row of a table streams instead of holding them.
 public enum CopyFormat: String, CaseIterable, Codable, Sendable {
-    case tsv, csv, json, jsonLines, markdown, html, xml, insert, insertIgnore, replace, update, delete, whereClause
+    case tsv, csv, json, jsonLines, markdown, html, xml, insert, insertIgnore, replace, update, delete, whereClause, inList
 
     public var title: String {
         switch self {
@@ -21,6 +21,7 @@ public enum CopyFormat: String, CaseIterable, Codable, Sendable {
         case .update: "SQL UPDATE"
         case .delete: "SQL DELETE"
         case .whereClause: "WHERE Clause"
+        case .inList: "IN List"
         }
     }
 
@@ -33,7 +34,7 @@ public enum CopyFormat: String, CaseIterable, Codable, Sendable {
         case .markdown: "md"
         case .html: "html"
         case .xml: "xml"
-        case .insert, .insertIgnore, .replace, .update, .delete, .whereClause: "sql"
+        case .insert, .insertIgnore, .replace, .update, .delete, .whereClause, .inList: "sql"
         }
     }
 
@@ -66,7 +67,7 @@ public struct CopyWriter {
     public var table: String
     public var options: CopyOptions
     public private(set) var rowsWritten = 0
-    /// WHERE Clause on one column: the values in its IN list so far, and whether a NULL was left out of it.
+    /// WHERE Clause on one column and IN List: the values listed so far, and whether a NULL was left out of the clause.
     private var listed = 0
     private var sawNull = false
 
@@ -104,7 +105,7 @@ public struct CopyWriter {
                 + "<tbody>" + eol
         case .xml: return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + eol + "<table name=\"\(xml(table))\">" + eol
         case .whereClause where columns.count == 1: return SQLQuote.identifier(columns[0].name) + " IN ("
-        case .jsonLines, .insert, .insertIgnore, .replace, .update, .delete, .whereClause: return ""
+        case .jsonLines, .insert, .insertIgnore, .replace, .update, .delete, .whereClause, .inList: return ""
         }
     }
 
@@ -148,6 +149,14 @@ public struct CopyWriter {
                 return (listed == 1 ? "" : ", ") + literal(value, columns[0])
             }
             return (rowsWritten == 0 ? "" : eol + "OR ") + "(" + condition(values, Array(columns.indices)) + ")"
+        case .inList:
+            // Every cell, for the brackets of an IN, which a NULL can never match.
+            var text = ""
+            for (value, column) in zip(values, columns) where value != nil {
+                text += (listed == 0 ? "" : ", ") + literal(value, column)
+                listed += 1
+            }
+            return text
         }
     }
 

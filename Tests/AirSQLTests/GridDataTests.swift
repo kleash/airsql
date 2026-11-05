@@ -86,6 +86,8 @@ struct GridDataTests {
         let id = [Self.columns[0]]
         #expect(CopyWriter.text(.whereClause, columns: id, rows: [["1"], [nil], ["2"]]) == "`id` IN (1, 2) OR `id` IS NULL")
         #expect(CopyWriter.text(.whereClause, columns: id, rows: [[nil]]) == "`id` IN (NULL) OR `id` IS NULL")
+        #expect(CopyWriter.text(.inList, columns: id, rows: [["1"], [nil], ["2"]]) == "1, 2", "a NULL can't match in a list")
+        #expect(CopyWriter.text(.inList, columns: Array(Self.columns[0...1]), rows: [["1", "O'Brien"], ["2", nil]]) == "1, 'O\\'Brien', 2")
         // No key among the columns copied: every column addresses the row. Bits, hex and odd numbers as SQL reads them.
         let plain = [GridColumn(name: "flags", type: "bit"), GridColumn(name: "blob", kind: .binary),
                      GridColumn(name: "n", kind: .number)]
