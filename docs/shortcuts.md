@@ -91,12 +91,12 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Shift Left | ⌘[ |
 | Query Helpers | ⌃⌘H |
 | Go to Line… | ⌃G |
-| Move Up | ⌃⇧⌘↑ |
-| Move Down | ⌃⇧⌘↓ |
+| Move Row Up | ⌃⇧⌘↑ |
+| Move Row Down | ⌃⇧⌘↓ |
 | Fixes and Actions… | ⌥↩ |
 | Go to Declaration | ⌘B |
 | Find Usages… | ⌥F7 |
-| Rename Name… | ⇧F6 |
+| Rename at Cursor… | ⇧F6 |
 | Quick Documentation | F1 |
 | Parameter Info | ⌥⌘I |
 | Next Problem | ⌥F2 |
@@ -165,7 +165,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Structure | ⌃⌥2 |
 | DDL | ⌃⌥3 |
 | Quick Definition | ⌥F1 |
-| Open Data of Name | F4 |
+| Open Table at Cursor | F4 |
 | Go to DDL | ⌥⌘B |
 | Back | ⌃⌘← |
 | Forward | ⌃⌘→ |

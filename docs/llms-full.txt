@@ -165,7 +165,7 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 - **Font**: the SQL editor's, from the fonts whose letters are all one width (SF Mono at first).
 - **Tab width** and **Indent with tabs**: how wide a tab or an indent is, and whether Tab puts in a tab character or spaces.
-- **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
+- **Text size**: the SQL editor's (13 pt at first). **View ▸ Text Size ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
 
 - **Add an alias to a table**: completing a table after FROM or JOIN adds one, as `orders o`; on at first.
@@ -522,7 +522,7 @@ session of its own, so a long query in one tab leaves the others free.
   they are. If it couldn't prove that, it leaves the SQL as it was and says so. Nothing changes between `-- @formatter:off`
   and `-- @formatter:on`.
 - Settings ▸ Editor can also give reserved words their case as you type.
-- **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
+- **View ▸ Text Size ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
 
 ### Bookmarks
@@ -1371,7 +1371,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the query tab, so they open as you left them.
-- **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
+- **View ▸ Text Size ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
   goes back to the size in Settings ▸ Grid.
 
 ## See a whole value
@@ -2397,12 +2397,12 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Shift Left | ⌘[ |
 | Query Helpers | ⌃⌘H |
 | Go to Line… | ⌃G |
-| Move Up | ⌃⇧⌘↑ |
-| Move Down | ⌃⇧⌘↓ |
+| Move Row Up | ⌃⇧⌘↑ |
+| Move Row Down | ⌃⇧⌘↓ |
 | Fixes and Actions… | ⌥↩ |
 | Go to Declaration | ⌘B |
 | Find Usages… | ⌥F7 |
-| Rename Name… | ⇧F6 |
+| Rename at Cursor… | ⇧F6 |
 | Quick Documentation | F1 |
 | Parameter Info | ⌥⌘I |
 | Next Problem | ⌥F2 |
@@ -2471,7 +2471,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Structure | ⌃⌥2 |
 | DDL | ⌃⌥3 |
 | Quick Definition | ⌥F1 |
-| Open Data of Name | F4 |
+| Open Table at Cursor | F4 |
 | Go to DDL | ⌥⌘B |
 | Back | ⌃⌘← |
 | Forward | ⌃⌘→ |

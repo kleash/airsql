@@ -58,7 +58,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the query tab, so they open as you left them.
-- **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
+- **View ▸ Text Size ▸ Bigger** (⌘+) and **Smaller** (⌘−) change the grid's text size while it has the focus; **Actual Size** (⌘0)
   goes back to the size in Settings ▸ Grid.
 
 ## See a whole value

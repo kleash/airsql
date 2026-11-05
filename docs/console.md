@@ -117,7 +117,7 @@ session of its own, so a long query in one tab leaves the others free.
   they are. If it couldn't prove that, it leaves the SQL as it was and says so. Nothing changes between `-- @formatter:off`
   and `-- @formatter:on`.
 - Settings ▸ Editor can also give reserved words their case as you type.
-- **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
+- **View ▸ Text Size ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
 
 ### Bookmarks

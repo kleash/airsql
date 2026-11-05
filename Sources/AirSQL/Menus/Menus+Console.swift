@@ -17,7 +17,8 @@ extension MainMenu {
         insert(Commands.saveAs, after: Commands.save, in: menus.file)
         insert(Commands.localHistory, after: Commands.saveAs, in: menus.file)
 
-        menus.view.add([nil, Commands.helpers, Commands.wordWrap, Commands.bigger, Commands.smaller, Commands.actualSize])
+        menus.view.add([nil, Commands.helpers, Commands.wordWrap])
+        menus.view.addItem(MainMenu.submenu("Text Size", [Commands.bigger, Commands.smaller, Commands.actualSize].map { $0.item() }))
 
         insert(Commands.runSelection, after: Commands.runStatement, in: menus.query)
         let explain = menus.query.items.firstIndex { $0.action == Commands.explain.action } ?? menus.query.items.count - 1
