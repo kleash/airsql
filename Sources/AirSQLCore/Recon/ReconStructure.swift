@@ -257,10 +257,12 @@ struct ReconStructure {
         case (_?, nil): status = .onlyInSource
         case (nil, _?): status = .onlyInTarget
         case let (left?, right?):
-            let named = ReconNormal.renamed(left, kind, to: targetName ?? name)
+            // Both sides spell the name alike: renaming quotes it, and a trigger's own text often doesn't.
+            let wanted = targetName ?? name
             status = !left.isEmpty && !right.isEmpty && (options.ignore.definitions
-                || ReconNormal.definition(named, database: source.name, rules: options.ignore)
-                    == ReconNormal.definition(right, database: target.name, rules: options.ignore)) ? .same : .different
+                || ReconNormal.definition(ReconNormal.renamed(left, kind, to: wanted), database: source.name, rules: options.ignore)
+                    == ReconNormal.definition(ReconNormal.renamed(right, kind, to: wanted), database: target.name, rules: options.ignore))
+                ? .same : .different
         }
         var object = ReconObject(kind: kind, name: name, targetName: targetName, status: status)
         object.sourceDDL = left
