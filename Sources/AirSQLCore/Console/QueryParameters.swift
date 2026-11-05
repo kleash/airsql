@@ -59,11 +59,12 @@ public enum QueryParameters {
     }
 
     /// What a typed value becomes in the SQL: a plain number as it is (not 007, which may be text), NULL as NULL, and
-    /// anything else a quoted string, so a value can never become code.
+    /// anything else a quoted string, so a value can never become code. Quotes are doubled where the text has no backslash:
+    /// that reads the same in either mode, should `noBackslashEscapes` not be the session's yet.
     public static func literal(_ value: String, noBackslashEscapes: Bool) -> String {
         if value.uppercased() == "NULL" { return "NULL" }
         if value.range(of: #"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$"#, options: .regularExpression) != nil { return value }
-        return SQLQuote.string(value, noBackslashEscapes: noBackslashEscapes)
+        return SQLQuote.string(value, noBackslashEscapes: noBackslashEscapes || !value.contains("\\"))
     }
 
     /// `sql` with each of `places` replaced by its value's literal.

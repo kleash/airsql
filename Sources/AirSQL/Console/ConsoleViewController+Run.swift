@@ -105,6 +105,10 @@ extension ConsoleViewController {
     private func withParameters(_ statements: [SQLStatement], then run: @escaping ([SQLStatement]) -> Void) {
         noticeLostSession()
         if let lostSession { return askAboutLostSession(lostSession) }  // before any other question about statements that won't run
+        // A tab's first run has no session yet: the server's sql_mode, for the values and for the checks after them.
+        if let known = session?.noBackslashEscapes ?? model.openConnection(connectionID)?.snapshot.server?.noBackslashEscapes {
+            editor.noBackslashEscapes = known
+        }
         let noBackslashEscapes = editor.noBackslashEscapes
         let places = QueryParameters.places(in: statements.map(\.sql), noBackslashEscapes: noBackslashEscapes)
         let keys = QueryParameters.keys(places)
@@ -294,6 +298,7 @@ extension ConsoleViewController {
     }
 
     private func perform(_ run: ConsoleRun, on session: DBConnection, connection id: UUID) async {
+        guard !run.cancelled else { return }  // Cancel while the session opened had no statement to stop
         // The database chosen in the navigator or the toolbar since the session's last USE: used first, so the statements
         // run where the tab says (and a run under way is never switched midway). If it fails, nothing runs.
         let wanted = (sharesSession ? nil : chosenDatabase) ?? model.openConnection(id)?.currentDatabase
