@@ -99,7 +99,7 @@ final class FindInFilesContent: NSViewController, TabContent, NSTableViewDataSou
     }
 
     private var consoles: [(title: String, console: ConsoleViewController)] {
-        (main?.tabs ?? []).compactMap { tab in (tab.content as? ConsoleViewController).map { (tab.title, $0) } }
+        (main?.model.allTabs ?? []).compactMap { tab in (tab.content as? ConsoleViewController).map { (tab.title, $0) } }
     }
 
     @objc func chooseFolder(_ sender: Any?) {
@@ -160,10 +160,10 @@ final class FindInFilesContent: NSViewController, TabContent, NSTableViewDataSou
             _ = console.view
             console.editor.setSelectedRange(hit.match.range)
             console.editor.scrollRangeToVisible(hit.match.range)
-            main.window?.makeFirstResponder(console.editor)
+            console.view.window?.makeFirstResponder(console.editor)
         }
-        if let console = hit.console, let tab = main.tabs.first(where: { $0.content === console }) {
-            main.select(tab)
+        if let console = hit.console, let tab = main.model.allTabs.first(where: { $0.content === console }) {
+            main.show(tab)
             show(console)
         } else if let file = hit.file {
             Task {

@@ -32,9 +32,9 @@ enum ConsoleClosing {
 
     /// The open transaction, when no other console on its session stays open to show it.
     private static func transaction(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {
-        let others = console.sharesSession && console.mainWindow?.tabs.contains { tab in
+        let others = console.sharesSession && console.model.allTabs.contains { tab in
             tab.content !== console && (tab.content as? ConsoleViewController)?.sessionKey == console.sessionKey
-        } ?? false
+        }
         guard let saved = console.connection, console.model.data.safety(for: saved).warnOnClose, !others,
               let session = console.session, session.inTransaction else { return edits(console, window, answer: answer) }
         let changes = console.shared.changes
@@ -58,6 +58,10 @@ enum ConsoleClosing {
 
     private static func unsaved(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {
         guard console.isEdited else { return finish(console, answer: answer, true) }
+        // A scratch file has nothing to decide: it keeps what it was left with.
+        if let url = console.fileURL, ScriptFiles.isScratch(url) {
+            return console.save(as: false) { saved in finish(console, answer: answer, saved) }
+        }
         let name = console.tab?.title ?? "this tab"
         alert(window, "Save the changes to “\(name)”?",
               console.fileURL == nil ? "The text isn't saved in a file; it's lost if you don't save it."

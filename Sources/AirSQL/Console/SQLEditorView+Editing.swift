@@ -222,6 +222,8 @@ extension SQLEditorView {
             return !string.isEmpty  // with no selection, it copies the line
         case let action? where Self.textCommands.contains(action):
             return isEditable
+        case #selector(nextBookmark(_:))?, #selector(previousBookmark(_:))?:
+            return !bookmarks.isEmpty
         default:
             return super.validateUserInterfaceItem(item)
         }

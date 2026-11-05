@@ -65,9 +65,9 @@ extension AgentService {
         return reply
     }
 
-    /// The console tabs agents may see: those of connections open to agents, and those without a connection.
+    /// The console tabs agents may see, in every window: those of connections open to agents, and those without a connection.
     func consoleTabs() -> [(Tab, AgentConsole, SavedConnection?)] {
-        (main?.tabs ?? []).compactMap { tab in
+        model.allTabs.compactMap { tab in
             guard let console = tab.content as? AgentConsole else { return nil }
             let saved = model.connection(tab.connectionID)
             if tab.connectionID != nil && (saved?.agentAccess ?? .off) == .off { return nil }

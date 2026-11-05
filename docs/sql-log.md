@@ -13,7 +13,7 @@ server for.
 
 While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
 or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
-window.
+window. Select some SQL in it and right-click to open it in a new query tab.
 
 ## Where it is
 

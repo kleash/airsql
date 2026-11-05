@@ -6,7 +6,7 @@ import AppKit
 /// masked), newest at the bottom and following new ones as they come. Typing in the filter keeps the lines with those
 /// words. The file is read off the main thread, from where it was last read.
 @MainActor
-final class SQLLogViewController: NSViewController, NSSearchFieldDelegate {
+final class SQLLogViewController: NSViewController, NSSearchFieldDelegate, NSTextViewDelegate {
     let log: SQLLog
     private let filter = NSSearchField()
     let text: NSTextView
@@ -36,6 +36,7 @@ final class SQLLogViewController: NSViewController, NSSearchFieldDelegate {
 
     override func loadView() {
         text.isEditable = false
+        text.delegate = self
         text.backgroundColor = .content
         text.isRichText = false
         text.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
@@ -87,6 +88,24 @@ final class SQLLogViewController: NSViewController, NSSearchFieldDelegate {
                 self.refresh()
             }
         }
+    }
+
+    /// The text's right-click menu, with the selection in a new query tab.
+    func textView(_ view: NSTextView, menu: NSMenu, for event: NSEvent, at charIndex: Int) -> NSMenu? {
+        let item = NSMenuItem(title: "Open in New Query", action: view.selectedRange().length > 0 ? #selector(openInQuery(_:)) : nil, keyEquivalent: "")
+        item.target = self
+        item.toolTip = view.selectedRange().length > 0 ? "Open the selected text in a new query tab of the window in front"
+            : "Select the SQL in the log first"
+        menu.insertItem(item, at: 0)
+        menu.insertItem(.separator(), at: 1)
+        return menu
+    }
+
+    @objc private func openInQuery(_ sender: Any?) {
+        guard let main = (NSApp.delegate as? AppDelegate)?.main ?? view.window?.windowController as? MainWindowController else { return }
+        let selected = (text.string as NSString).substring(with: text.selectedRange())
+        main.showWindow(nil)
+        main.openConsole(text: selected, title: nil, connection: main.activeConnection?.id)
     }
 
     /// Reads what was added to the file since the last read (all of it after it was cleared or started again) and adds

@@ -44,6 +44,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [AI agents](https://kleash.github.io/airsql/agents.html): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
 - [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html): a database as formatted SQL changesets, and any change saved as one.
+- [Files and your workspace](https://kleash.github.io/airsql/workspace.html): attached folders, scratch files, a connection's consoles, split tabs, several windows and your own shortcuts.
 - [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): every command's shortcut.
 - [Accessibility](https://kleash.github.io/airsql/accessibility.html): VoiceOver, the keyboard, motion and text size.
 - [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): what AirSQL connects to, where passwords are kept, what agents may do.
@@ -316,7 +317,7 @@ server for.
 
 While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
 or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
-window.
+window. Select some SQL in it and right-click to open it in a new query tab.
 
 ## Where it is
 
@@ -521,6 +522,12 @@ session of its own, so a long query in one tab leaves the others free.
 - Settings ▸ Editor can also give reserved words their case as you type.
 - **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
+
+### Bookmarks
+
+**Edit ▸ Bookmarks ▸ Toggle Bookmark** (F3) marks the line at the cursor with a dot beside its number, and the mark stays on
+that line as you edit around it. **Next Bookmark** (⌥F3) and **Previous Bookmark** (⌥⇧F3) go from one to the next. Marks
+last until the tab closes.
 
 ## Checks while you type
 
@@ -2007,6 +2014,15 @@ Whatever that would change waits for you:
 **Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Safety tab) turns the
 asking off; what is yours alone stays yours.
 
+## Ask your agent from the editor
+
+**Query ▸ Ask an Agent** copies a request to paste into your agent: **Explain This**, **Fix the Last Error**, **Make This
+Faster** or **Write SQL…**. AirSQL has no AI of its own, and nothing leaves your Mac from here.
+
+The request names the tab and the selected lines and holds no SQL. The agent reads the tab with its usual tool, at the
+access the connection allows and with passwords masked, and proposes SQL in a new tab for you to run. A request can't give
+an agent any more than that. The items are off while agents are off or can't see the connection.
+
 ## See what agents did
 
 The agents' item in the status bar says what they're doing. Click it (or choose **Tools ▸ Agents ▸ Agent Activity**)
@@ -2183,6 +2199,77 @@ settings. A password you just typed with Remember in Keychain is replaced by the
   settings. The [SQL preview](https://kleash.github.io/airsql/sql-preview.html) and Copy SQL show `<secret>`, so a copied statement needs its password put
   back, and the sheet doesn't offer a Liquibase changeset.
 - When a server's error would quote the statement, AirSQL leaves its words out.
+
+
+---
+
+Source: https://kleash.github.io/airsql/workspace.html
+
+# Files and your workspace
+
+## The Files panel
+
+**View ▸ Files** (⌥⌘4, or the folder button at the foot of the sidebar) shows your scripts in the tree's place. Press it
+again for the tree.
+
+- **Attach Folder…** adds a folder of scripts. AirSQL only reads it: **Detach Folder** takes it out of the list, and it
+  stays on disk.
+- A click selects a file, a double-click or Return opens it in a query tab, and a double-click on a folder opens or
+  closes it. ⌘ and ⇧ select several.
+- Right-click a file or folder and choose **Run On** and a connection: **Run SQL File…** opens with the file chosen, and
+  nothing runs until you press its Run. A folder runs its .sql and .sql.gz files by name, its subfolders first, with a
+  Run for each file.
+- The list follows the disk as AirSQL comes to the front; right-click and choose **Refresh** to read it now.
+
+A file remembers the connection and the database it was last used on, and opens there next time.
+
+## Scratch files
+
+**File ▸ New Scratch File** (⌥⇧⌘N) opens a throwaway .sql file with no name to choose. Scratch files are listed under
+Scratches in the Files panel. Closing one saves it without asking, every save goes into its Local History, and **Move to
+Trash** in its menu removes it.
+
+## A connection's consoles
+
+**File ▸ Consoles…** (⇧⌘J) lists the query tabs of the connection, to jump to one by typing part of its name, and offers a
+new one. **File ▸ Default Console** opens the tab the connection keeps for good: its text is there next time, whatever
+you closed.
+
+## Two tabs side by side
+
+**View ▸ Split Right** (⌥⌘\\) shows the next tab beside the one on show, or a new query if it's the only one; press it
+again for one tab. Right-click a tab and choose **Show Beside** to pair it with the tab you were looking at.
+
+The side with the focus has an accent line along its top, and the status bar and every command follow it. Showing another
+tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the focus across; closing either tab ends the split.
+
+## Pin a tab
+
+**Window ▸ Pin Tab**, also in a tab's right-click menu, keeps the tab at the left of the strip: **Close Other Tabs** and
+**Close All Tabs** leave it, and it stays pinned at the next launch. Click its pin to unpin it.
+
+## Several windows
+
+**File ▸ New Window** (⇧⌘N) opens another main window, for another display or another job. **Window ▸ Move Tab to New
+Window**, also in a tab's right-click menu, takes the tab shown out to a window of its own; **Move Tab to Next Window** moves
+it on, or back. A tab keeps its session, its transaction and its edits as it moves.
+
+Each window has its own tabs and sidebar. Connections belong to AirSQL, not to a window: connect once and every window can
+use the connection, and query tabs sharing one session share it across windows too. A file or a table already open in a
+window shows there rather than opening twice.
+
+Closing a window closes its tabs, asking first about anything unfinished; Cancel keeps it. The last window just hides, as
+it always did, and comes back from the Dock. Quit asks about all the windows at once, and at the next launch they all come
+back in their places. Agents work with the window in front, and read query tabs in every window.
+
+## Your own shortcuts
+
+**Settings ▸ Keys** lists every command with its shortcut. Filter by name or key, then double-click a row and press the new
+keys, or use **Change…**, **Remove** and **Reset**. A shortcut another command has moves to this one, and the note says
+whose it was. Shortcuts macOS keeps for itself, and plain keys that would type in the editor, are refused.
+
+**Start from** replaces your changes with a set of shortcuts like DataGrip's or HeidiSQL's, or AirSQL's own. Menus and
+Help ▸ Keyboard Shortcuts follow at once. Agents can't change shortcuts.
 
 
 ---
@@ -2386,6 +2473,15 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Forward | ⌃⌘→ |
 | Recent Tabs… | ⌃⌘E |
 | Go to Statement… | ⌃⌘O |
+| New Window | ⇧⌘N |
+| Toggle Bookmark | F3 |
+| Next Bookmark | ⌥F3 |
+| Previous Bookmark | ⌥⇧F3 |
+| Split Right | ⌥⌘\ |
+| Go to Other Side | ⌃⌘\ |
+| Files | ⌥⌘4 |
+| New Scratch File | ⌥⇧⌘N |
+| Consoles… | ⇧⌘J |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
 HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,
@@ -2594,7 +2690,8 @@ The person sees each statement you ran and the rows you got in the connection's 
   max, average (numbers) and the five most common values, computed on the server.
 - `explain {connection, sql, database?, format?: traditional | json}`.
 - `open_in_console {sql, title?, connection?}`: never runs anything.
-- `read_console {tab?}`: by id or title from `context`; default the active console tab.
+- `read_console {tab?}`: by id or title from `context`, in any main window; default the active console tab. A person's
+  Ask an Agent request names a tab by id, and lines to look at.
 - `guide {topic?}`: this guide.
 
 Long calls send progress notifications when your client asks for them (`_meta.progressToken`).
@@ -2617,7 +2714,7 @@ Each connected connection you may read has its compact schema as a resource, `ai
 
 ## ui
 
-The UI tools act in AirSQL's windows as the person would; replies are JSON as text (`screenshot`: a PNG), `isError` on
+The UI tools act in AirSQL's windows as the person would, on the main window in front when there are several; replies are JSON as text (`screenshot`: a PNG), `isError` on
 failure, and every reply after an action carries the sheet it opened, if any.
 
 - `snapshot {include?, in?}`: windows, sidebar, tabs, status bar, activity and open sheets by default; `menus` lists

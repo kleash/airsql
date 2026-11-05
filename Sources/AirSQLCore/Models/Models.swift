@@ -274,6 +274,8 @@ public struct AppSettings: Codable, Equatable {
     public var disabledInspections: [String] = []
     /// View ▸ Tree: how the sidebar's tree shows things.
     public var tree = TreeSettings()
+    /// Settings ▸ Keys: the shortcuts changed from the defaults, by command.
+    public var keymap: [String: KeyBinding] = [:]
     /// Settings ▸ Format: how Format SQL lays SQL out, and the case of what completion inserts.
     public var formatStyle = SQLFormatStyle()
     /// Settings ▸ Editor: a table completed after FROM or JOIN brings an alias.
@@ -320,6 +322,7 @@ public struct AppSettings: Codable, Equatable {
         transposeSingleRow = try value(.transposeSingleRow, defaults.transposeSingleRow)
         disabledInspections = try value(.disabledInspections, defaults.disabledInspections)
         tree = try value(.tree, defaults.tree)
+        keymap = try value(.keymap, defaults.keymap)
         formatStyle = try value(.formatStyle, defaults.formatStyle)
         completionTableAlias = try value(.completionTableAlias, defaults.completionTableAlias)
         autoKeywordCase = try value(.autoKeywordCase, defaults.autoKeywordCase)

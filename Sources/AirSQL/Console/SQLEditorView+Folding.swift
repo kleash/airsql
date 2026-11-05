@@ -23,7 +23,9 @@ extension SQLEditorView: NSLayoutManagerDelegate, NSTextStorageDelegate {
 
     /// Keeps the folds on their text through every edit, however it's made; those it touches open.
     func textStorage(_ textStorage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range: NSRange, changeInLength delta: Int) {
-        guard editedMask.contains(.editedCharacters), !folds.isEmpty else { return }
+        guard editedMask.contains(.editedCharacters) else { return }
+        moveBookmarks(replacing: range.location..<(NSMaxRange(range) - delta), by: delta)
+        guard !folds.isEmpty else { return }
         let before = range.location..<(NSMaxRange(range) - delta)
         let count = folds.count
         folds = folds.compactMap { fold in

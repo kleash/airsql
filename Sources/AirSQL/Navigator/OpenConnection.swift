@@ -27,6 +27,8 @@ final class OpenConnection {
     }
 
     let id: UUID
+    /// When it connected: the status bar's popover says for how long.
+    let connectedAt = Date()
     let connection: Connection
     let schema: SchemaCache
     /// The cache's latest snapshot, as the tree shows it.

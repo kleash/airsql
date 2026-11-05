@@ -11,7 +11,8 @@ final class ConsoleDocuments {
 
     /// Where they are kept; tests use their own.
     var fileURL = ConsoleTabStore.fileURL
-    /// The window whose console tabs are kept: the one they were restored into, else the first a console is shown in.
+    /// The first window, whose model says what the others are: the one tabs were restored into, else the first a console
+    /// is shown in.
     weak var main: MainWindowController?
     /// The last session's consoles coming back: files opened meanwhile (from Finder, at launch) wait for them, so a file
     /// among them shows its tab instead of a second one.
@@ -36,7 +37,13 @@ final class ConsoleDocuments {
     /// The window's tabs or the sidebar's selection changed: saved a moment later.
     func tabsChanged(in window: MainWindowController) {
         if main == nil { main = window }
-        if main === window { schedule() }
+        if main?.model === window.model { schedule() }
+    }
+
+    /// A window went: the next first window takes over if it was this.
+    func windowClosed(_ window: MainWindowController) {
+        if main === window { main = window.model.windows.first }
+        schedule()
     }
 
     private func schedule() {
@@ -46,10 +53,23 @@ final class ConsoleDocuments {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
 
-    /// The window now: its tabs in their order (a console being closed, an empty one without a file, a sync script, whose
-    /// compare doesn't outlive the app, and tabs without a `place` left out) and the sidebar's selection.
+    /// The windows now, the first with the others in it.
     var snapshot: SavedWindow {
-        let tabs = (main?.tabs ?? []).compactMap { tab -> SavedConsole? in
+        guard let main else { return SavedWindow() }
+        var saved = snapshot(of: main)
+        let others = main.model.windows.filter { $0 !== main }.map { window -> SavedWindow in
+            var other = snapshot(of: window)
+            other.frame = window.window.map { NSStringFromRect($0.frame) }
+            return other
+        }
+        saved.others = others.isEmpty ? nil : others
+        return saved
+    }
+
+    /// A window now: its tabs in their order (a console being closed, an empty one without a file, a sync script, whose
+    /// compare doesn't outlive the app, and tabs without a `place` left out) and the sidebar's selection.
+    private func snapshot(of main: MainWindowController) -> SavedWindow {
+        let tabs = main.tabs.compactMap { tab -> SavedConsole? in
             var saved: SavedConsole?
             if let console = tab.content as? ConsoleViewController {
                 let text = console.text
@@ -62,10 +82,11 @@ final class ConsoleDocuments {
                 saved = SavedConsole(id: tab.id, title: tab.title, connection: tab.connectionID, path: nil, text: nil, caret: 0,
                                      place: place, preview: tab.content is PreviewContent ? true : nil)
             }
-            if tab === main?.selectedTab { saved?.selected = true }
+            if tab === main.selectedTab { saved?.selected = true }
+            if tab.pinned { saved?.pinned = true }
             return saved
         }
-        return SavedWindow(tabs: tabs, sidebar: main?.sidebar.selectedRowIDs ?? [])
+        return SavedWindow(tabs: tabs, sidebar: main.sidebar.selectedRowIDs)
     }
 
     /// Writes now and waits until it's on disk: quitting, so the last text isn't lost.
@@ -87,44 +108,64 @@ final class ConsoleDocuments {
         if wait { queue.sync(execute: write) } else { queue.async(execute: write) }
     }
 
-    /// Opens the tabs of the last session in `main`, reading them (and their files) off the main thread. A tab whose
-    /// connection is gone is dropped, and the rest are placeholders; none of it contacts a server.
+    /// A kept tab with its text, and the text and format of its file (what was last saved).
+    private typealias Loaded = (console: SavedConsole, text: String, file: String, format: ConsoleScript.FileFormat)
+
+    private nonisolated static func load(_ window: SavedWindow) -> [Loaded] {
+        window.tabs.compactMap { console in
+            if console.place != nil { return (console, "", "", ConsoleScript.FileFormat()) }
+            let file = console.path.flatMap { path in (try? Data(contentsOf: URL(fileURLWithPath: path))).map(ConsoleScript.decoded) }
+            guard let text = console.text ?? file?.text else { return nil }
+            return (console, text, file?.text ?? "", file?.format ?? ConsoleScript.FileFormat())
+        }
+    }
+
+    /// Opens the tabs of the last session in `main` and windows like it for the others, reading them (and their files)
+    /// off the main thread. A tab whose connection is gone is dropped, and the rest are placeholders; none of it contacts a
+    /// server.
     func restore(into main: MainWindowController) {
         self.main = main
         let url = fileURL
         restoring = Task {
-            // Each console's text, and the text of its file (what was last saved).
-            let (saved, sidebar) = await Task.detached { () -> ([(SavedConsole, String, String, ConsoleScript.FileFormat)], [UUID]) in
-                let window = ConsoleTabStore.load(from: url)
-                return (window.tabs.compactMap { console in
-                    if console.place != nil { return (console, "", "", ConsoleScript.FileFormat()) }
-                    let file = console.path.flatMap { path in (try? Data(contentsOf: URL(fileURLWithPath: path))).map(ConsoleScript.decoded) }
-                    guard let text = console.text ?? file?.text else { return nil }
-                    return (console, text, file?.text ?? "", file?.format ?? ConsoleScript.FileFormat())
-                }, window.sidebar)
+            let (windows, loaded) = await Task.detached { () -> ([SavedWindow], [[Loaded]]) in
+                let first = ConsoleTabStore.load(from: url)
+                let windows = [first] + (first.others ?? [])
+                return (windows, windows.map(Self.load))
             }.value
-            var selected: Tab?
-            for (console, text, file, format) in saved {
-                let tab: Tab
-                if let place = console.place {
-                    guard let id = main.model.connection(console.connection)?.id else { continue }
-                    let content = RestoredTabContent(place, title: console.title, connection: id, main: main)
-                    tab = main.open(console.preview == true ? PreviewContent(content) : content, title: console.title, connection: id)
-                } else {
-                    let controller = ConsoleViewController(model: main.model, connection: main.model.connection(console.connection)?.id,
-                                                           text: text, fileURL: console.path.map { URL(fileURLWithPath: $0) },
-                                                           documentID: console.id)
-                    if console.path != nil { controller.savedText = file }
-                    controller.chosenDatabase = console.database
-                    controller.fileFormat = format
-                    tab = main.open(controller, title: console.title, connection: controller.connectionID)
-                    controller.editor.setSelectedRange(NSRange(location: min(console.caret, (text as NSString).length), length: 0))
-                    changed(controller)
+            for (index, (saved, tabs)) in zip(windows, loaded).enumerated() where index == 0 || !tabs.isEmpty {
+                let window = index == 0 ? main : main.anotherWindow()
+                if let frame = saved.frame.map(NSRectFromString), NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
+                    window.window?.setFrame(frame, display: false)
                 }
-                if console.selected == true { selected = tab }
+                fill(window, with: tabs, sidebar: saved.sidebar)
+                if index > 0 { window.showWindow(nil) }
             }
-            main.sidebar.select(sidebar)
-            if let selected { main.select(selected) }
         }
+    }
+
+    private func fill(_ main: MainWindowController, with saved: [Loaded], sidebar: [UUID]) {
+        var selected: Tab?
+        for (console, text, file, format) in saved {
+            let tab: Tab
+            if let place = console.place {
+                guard let id = main.model.connection(console.connection)?.id else { continue }
+                let content = RestoredTabContent(place, title: console.title, connection: id, main: main)
+                tab = main.open(console.preview == true ? PreviewContent(content) : content, title: console.title, connection: id)
+            } else {
+                let controller = ConsoleViewController(model: main.model, connection: main.model.connection(console.connection)?.id,
+                                                       text: text, fileURL: console.path.map { URL(fileURLWithPath: $0) },
+                                                       documentID: console.id)
+                if console.path != nil { controller.savedText = file }
+                controller.chosenDatabase = console.database
+                controller.fileFormat = format
+                tab = main.open(controller, title: console.title, connection: controller.connectionID)
+                controller.editor.setSelectedRange(NSRange(location: min(console.caret, (text as NSString).length), length: 0))
+                changed(controller)
+            }
+            if console.selected == true { selected = tab }
+            if console.pinned == true { main.setPinned(true, tab) }
+        }
+        main.sidebar.select(sidebar)
+        if let selected { main.select(selected) }
     }
 }

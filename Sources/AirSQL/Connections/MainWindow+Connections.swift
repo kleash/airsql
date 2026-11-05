@@ -61,7 +61,7 @@ extension MainWindowController {
 
     /// The tabs of these connections with an open transaction, edits or result edits that a disconnect would lose.
     func busyTabs(_ ids: [UUID]) -> [Tab] {
-        tabs.filter { tab in
+        model.allTabs.filter { tab in
             ids.contains(tab.connectionID ?? UUID()) && (tab.tabContent?.isEdited == true || tab.tabContent?.transactionBadge != nil
                 || (tab.content as? ConsoleViewController)?.pendingResultRows ?? 0 > 0)
         }

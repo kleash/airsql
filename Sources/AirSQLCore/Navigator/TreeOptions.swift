@@ -22,6 +22,10 @@ public struct TreeSettings: Codable, Equatable {
     public var showsLog = true
     /// How tall the log is there, in points.
     public var logHeight = 100.0
+    /// The sidebar shows the Files panel in the tree's place.
+    public var showsFiles = false
+    /// The folders attached to the Files panel, by path.
+    public var attachedFolders: [String] = []
 
     public init() {}
 
@@ -42,6 +46,8 @@ public struct TreeSettings: Codable, Equatable {
         tablePage = try value(.tablePage, defaults.tablePage)
         showsLog = try value(.showsLog, defaults.showsLog)
         logHeight = try value(.logHeight, defaults.logHeight)
+        showsFiles = try value(.showsFiles, defaults.showsFiles)
+        attachedFolders = try value(.attachedFolders, defaults.attachedFolders)
     }
 
     /// Whether `hiddenNames` leaves this object out; patterns compare without case.

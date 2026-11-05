@@ -67,8 +67,8 @@ extension MainWindowController {
     /// Shows the table editor on `table` of `database` (nil: a new table there; a nil database: the editor asks),
     /// in the tab already open on it if there is one.
     func openTableEditor(_ table: String?, database: String?, context: EditorContext) {
-        if let table, let tab = tabs.first(where: { ($0.content as? TableEditorController)?.edits(context.connection.id, database, table) == true }) {
-            select(tab)
+        if let table, let tab = model.allTabs.first(where: { ($0.content as? TableEditorController)?.edits(context.connection.id, database, table) == true }) {
+            show(tab)
             return
         }
         let editor = TableEditorController(context: context, database: database, table: table, activity: model.activity)
@@ -78,10 +78,10 @@ extension MainWindowController {
     /// Shows the object editor on the `kind` named `name` in `database` (nil: a new one, its code from a template; a
     /// new trigger is for `table`).
     func openObjectEditor(_ kind: ObjectKind, name: String?, database: String, table: String? = nil, context: EditorContext) {
-        if let name, let tab = tabs.first(where: {
+        if let name, let tab = model.allTabs.first(where: {
             ($0.content as? ObjectEditorController)?.edits(context.connection.id, kind, database, name) == true
         }) {
-            select(tab)
+            show(tab)
             return
         }
         let editor = ObjectEditorController(context: context, kind: kind, database: database, name: name, table: table,

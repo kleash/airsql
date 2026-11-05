@@ -9,6 +9,8 @@ import ObjectiveC
 final class ToolsResponder: NSResponder, NSMenuItemValidation {
     private weak var main: MainWindowController?
     private static var key = 0
+    /// The connection a file's Run On chose, while the sheet opens.
+    private var chosen: SavedConnection?
 
     /// Puts the commands in `main`'s responder chain (`MainWindowController.init` does), kept as long as the window
     /// controller.
@@ -144,6 +146,7 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
     /// The connection the sheets work on: the window's, or, from the navigator (a database's or table's menu, or while
     /// the tree has the focus), the tree's, starting in the selected rows' database.
     private var connection: SavedConnection? {
+        if let chosen { return chosen }
         guard let main, let (open, database) = main.sidebar.focusedDatabase, var saved = main.model.connection(open.id) else {
             return main?.activeConnection
         }
@@ -164,7 +167,14 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
 
     /// A .csv, .xlsx, .json or .sql.gz dropped or opened from Finder: Import File… or Run SQL File… with the file chosen;
     /// nothing runs until the person presses the sheet's button.
-    func open(file url: URL) {
+    func open(file url: URL) { open(files: [url], on: nil) }
+
+    /// The first of `urls` as `open(file:)` does, on `saved` (nil: the window's connection). The rest follow in the same
+    /// Run SQL File… sheet, one Run each.
+    func open(files urls: [URL], on saved: SavedConnection?) {
+        guard let url = urls.first else { return }
+        chosen = saved
+        defer { chosen = nil }
         let csv = ["csv", "tsv", "xlsx", "json", "jsonl"].contains(url.pathExtension.lowercased())
         let (enabled, reason) = availability(csv ? #selector(importCSV(_:)) : #selector(runSQLFile(_:)))
         guard enabled else {
@@ -174,7 +184,10 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         if csv {
             open({ CSVImportSheet(model: $0, connection: $1, options: $2) }, then: { ($0 as? CSVImportSheet)?.use(url) })
         } else {
-            open({ RestoreSheet(model: $0, connection: $1, options: $2, builtIn: true) }, then: { ($0 as? RestoreSheet)?.use(url) })
+            open({ RestoreSheet(model: $0, connection: $1, options: $2, builtIn: true) }, then: {
+                ($0 as? RestoreSheet)?.use(url)
+                ($0 as? RestoreSheet)?.nextFiles = Array(urls.dropFirst())
+            })
         }
     }
 

@@ -216,7 +216,7 @@ final class Connector {
     /// Tells the person, in the connection's console tabs, that the transaction open when it dropped is now rolled back.
     private func reportRolledBack(_ id: UUID) {
         let text = "The connection dropped and was reconnected, so the transaction that was open is rolled back."
-        for tab in ConsoleDocuments.shared.main?.tabs ?? [] where tab.connectionID == id {
+        for tab in model.allTabs where tab.connectionID == id {
             (tab.content as? ConsoleViewController)?.note(.warning, text)
         }
     }

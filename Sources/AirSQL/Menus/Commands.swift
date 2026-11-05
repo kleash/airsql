@@ -310,8 +310,8 @@ struct Command {
 
     /// A menu item for the menu bar or a context menu (nil target: the responder chain).
     func item() -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        item.keyEquivalentModifierMask = modifiers
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: bound.key)
+        item.keyEquivalentModifierMask = bound.modifiers
         item.toolTip = tip
         item.tag = tag
         if hidden {
@@ -322,7 +322,10 @@ struct Command {
     }
 
     /// The shortcut as menus write it ("⇧⌘↩"), empty without one.
-    var shortcut: String { Command.shortcut(key, modifiers) }
+    var shortcut: String { Command.shortcut(bound.key, bound.modifiers) }
+
+    /// The tooltip with the shortcut after it, for a button that stands for the command.
+    var tipWithShortcut: String { shortcut.isEmpty ? tip : "\(tip) (\(shortcut))" }
 
     static func shortcut(_ key: String, _ modifiers: NSEvent.ModifierFlags) -> String {
         guard !key.isEmpty else { return "" }
@@ -336,8 +339,9 @@ struct Command {
                                        String(UnicodeScalar(NSF9FunctionKey)!): "F9", String(UnicodeScalar(NSF2FunctionKey)!): "F2",
                                        String(UnicodeScalar(NSF1FunctionKey)!): "F1", String(UnicodeScalar(NSF4FunctionKey)!): "F4", String(UnicodeScalar(NSF6FunctionKey)!): "F6",
                                        String(UnicodeScalar(NSF7FunctionKey)!): "F7"]
+        let functionKey = key.unicodeScalars.first.flatMap { (0xF704...0xF726).contains($0.value) ? "F\($0.value - 0xF703)" : nil }
         return (flags.contains(.control) ? "⌃" : "") + (flags.contains(.option) ? "⌥" : "")
-            + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "") + (names[key] ?? key.uppercased())
+            + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "") + (names[key] ?? functionKey ?? key.uppercased())
     }
 }
 
@@ -991,7 +995,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ] + editorCommands + treeCommands + schema
+    ] + editorCommands + treeCommands + schema + workspaceCommands
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {
@@ -1041,6 +1045,9 @@ enum Commands {
         "Table Page": "Switch a table tab between its rows, its structure and its DDL",
         "Tree": "Choose how the sidebar's tree shows a server's objects",
         "Object Kinds": "Choose which kinds of object the tree shows",
+        "Bookmarks": "Mark lines of this editor and move between them",
+        "Ask an Agent": "Copy a request for your agent about this tab: it holds no SQL, and the agent reads the tab through the gate",
+        "Run On": "Run this on a connection: a sheet shows it first, and nothing runs until you press Run",
     ]
 }
 

@@ -90,7 +90,11 @@ final class ConsoleViewController: NSViewController, TabContent {
     /// lose sight of an open transaction. Nil: the connection's setting.
     var sharing: Bool?
     /// The database of a tab with a session of its own, once it has run or been given one.
-    var chosenDatabase: String?
+    var chosenDatabase: String? {
+        didSet {
+            if let chosenDatabase, chosenDatabase != oldValue, let fileURL { Self.rememberDatabase(of: fileURL, chosenDatabase) }
+        }
+    }
     /// A session that ended unasked, until the person answers; then what its replacement takes over from it.
     var lostSession: LostSession?
     var carried: LostSession?
@@ -380,12 +384,13 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     /// The console now shows `url`, saved with `text`.
     func setFile(_ url: URL, savedText: String) {
+        let moved = fileURL != url
         fileURL = url
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
         Self.rememberConnection(of: url, connectionID)
         self.savedText = savedText
         shownEdited = isEdited
-        if let tab { mainWindow?.rename(tab, to: url.lastPathComponent) }
+        if moved, let tab { mainWindow?.rename(tab, to: url.lastPathComponent) }
         ConsoleDocuments.shared.changed(self)
         contentChanged()
     }
@@ -400,7 +405,10 @@ final class ConsoleViewController: NSViewController, TabContent {
     func setConnection(_ id: UUID) {
         endSession()
         connectionID = id
-        if let fileURL { Self.rememberConnection(of: fileURL, id) }
+        if let fileURL {
+            Self.rememberConnection(of: fileURL, id)
+            Self.rememberDatabase(of: fileURL, nil)  // the last one was another server's
+        }
         tab?.connectionID = id
         ConsoleDocuments.shared.changed(self)
         mainWindow?.refresh()

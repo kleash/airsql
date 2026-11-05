@@ -1,0 +1,70 @@
+---
+title: Files and your workspace
+nav_order: 20
+---
+
+# Files and your workspace
+
+## The Files panel
+
+**View ▸ Files** (⌥⌘4, or the folder button at the foot of the sidebar) shows your scripts in the tree's place. Press it
+again for the tree.
+
+- **Attach Folder…** adds a folder of scripts. AirSQL only reads it: **Detach Folder** takes it out of the list, and it
+  stays on disk.
+- A click selects a file, a double-click or Return opens it in a query tab, and a double-click on a folder opens or
+  closes it. ⌘ and ⇧ select several.
+- Right-click a file or folder and choose **Run On** and a connection: **Run SQL File…** opens with the file chosen, and
+  nothing runs until you press its Run. A folder runs its .sql and .sql.gz files by name, its subfolders first, with a
+  Run for each file.
+- The list follows the disk as AirSQL comes to the front; right-click and choose **Refresh** to read it now.
+
+A file remembers the connection and the database it was last used on, and opens there next time.
+
+## Scratch files
+
+**File ▸ New Scratch File** (⌥⇧⌘N) opens a throwaway .sql file with no name to choose. Scratch files are listed under
+Scratches in the Files panel. Closing one saves it without asking, every save goes into its Local History, and **Move to
+Trash** in its menu removes it.
+
+## A connection's consoles
+
+**File ▸ Consoles…** (⇧⌘J) lists the query tabs of the connection, to jump to one by typing part of its name, and offers a
+new one. **File ▸ Default Console** opens the tab the connection keeps for good: its text is there next time, whatever
+you closed.
+
+## Two tabs side by side
+
+**View ▸ Split Right** (⌥⌘\\) shows the next tab beside the one on show, or a new query if it's the only one; press it
+again for one tab. Right-click a tab and choose **Show Beside** to pair it with the tab you were looking at.
+
+The side with the focus has an accent line along its top, and the status bar and every command follow it. Showing another
+tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the focus across; closing either tab ends the split.
+
+## Pin a tab
+
+**Window ▸ Pin Tab**, also in a tab's right-click menu, keeps the tab at the left of the strip: **Close Other Tabs** and
+**Close All Tabs** leave it, and it stays pinned at the next launch. Click its pin to unpin it.
+
+## Several windows
+
+**File ▸ New Window** (⇧⌘N) opens another main window, for another display or another job. **Window ▸ Move Tab to New
+Window**, also in a tab's right-click menu, takes the tab shown out to a window of its own; **Move Tab to Next Window** moves
+it on, or back. A tab keeps its session, its transaction and its edits as it moves.
+
+Each window has its own tabs and sidebar. Connections belong to AirSQL, not to a window: connect once and every window can
+use the connection, and query tabs sharing one session share it across windows too. A file or a table already open in a
+window shows there rather than opening twice.
+
+Closing a window closes its tabs, asking first about anything unfinished; Cancel keeps it. The last window just hides, as
+it always did, and comes back from the Dock. Quit asks about all the windows at once, and at the next launch they all come
+back in their places. Agents work with the window in front, and read query tabs in every window.
+
+## Your own shortcuts
+
+**Settings ▸ Keys** lists every command with its shortcut. Filter by name or key, then double-click a row and press the new
+keys, or use **Change…**, **Remove** and **Reset**. A shortcut another command has moves to this one, and the note says
+whose it was. Shortcuts macOS keeps for itself, and plain keys that would type in the editor, are refused.
+
+**Start from** replaces your changes with a set of shortcuts like DataGrip's or HeidiSQL's, or AirSQL's own. Menus and
+Help ▸ Keyboard Shortcuts follow at once. Agents can't change shortcuts.

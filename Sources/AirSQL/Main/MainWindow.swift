@@ -25,7 +25,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// Holds the split view controller (in the responder chain after its view); the window's content view is its view.
     private var root: NSViewController?
     private(set) var tabs: [Tab] = []
-    private(set) var selectedTab: Tab?
+    private(set) var selectedTab: Tab? { didSet { paneFollows(from: oldValue) } }
+    /// Split Right: the two tabs on show side by side, one of them the selected tab (SplitPanes.swift).
+    var splitPanes: (left: Tab, right: Tab)?
+    var paneViews: PanesView?
+    var focusWatch: NSKeyValueObservation?
     /// The tabs shown, oldest first, and where Back and Forward have got to (`TabHistory`).
     var tabHistory: [Tab] = []
     var historyPlace = 0
@@ -53,7 +57,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         window.autorecalculatesKeyViewLoop = true  // Tab goes on into whichever tab is shown
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified
-        window.isExcludedFromWindowsMenu = true  // Window ▸ AirSQL stands for it
         window.tabbingMode = .disallowed
         super.init(window: window)
         sidebar.main = self
@@ -71,12 +74,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         toolbar.allowsUserCustomization = true
         toolbar.autosavesConfiguration = layoutName("Main") != nil
         window.toolbar = toolbar
-        window.open(size: Self.defaultSize, autosave: layoutName("Main"))
+        // The first window keeps its place between launches; the others open a step down from it.
+        window.open(size: Self.defaultSize, autosave: model.windows.isEmpty ? layoutName("Main") : nil)
+        if let last = model.windows.last?.window { window.setFrameTopLeftPoint(last.cascadeTopLeft(from: .zero)) }
         if split.splitView.autosaveName == nil || UserDefaults.standard.object(forKey: "NSSplitView Subview Frames Sidebar") == nil {
             window.layoutIfNeeded()
             split.splitView.setPosition(236, ofDividerAt: 0)
         }
         sidebar.onSelect = { [weak self] in self?.sidebarSelectionChanged() }
+        model.windows.append(self)
+        windowsChanged()
         observers.append(model.$data.sink { [weak self] _ in DispatchQueue.main.async { self?.refresh() } })
         observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.refresh() } })
         observers.append(model.$open.sink { [weak self] _ in DispatchQueue.main.async { self?.updateLogDock() } })
@@ -89,6 +96,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         updateLogDock()
         ToolsResponder.install(on: self)
         LiquibaseResponder.install(on: self)
+        focusWatch = window.observe(\.firstResponder) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.followFocus() }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -195,7 +205,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return
         }
         model.data.settings.tree.showsLog.toggle()
-        updateLogDock()
+        model.windows.forEach { $0.updateLogDock() }
     }
 
     // MARK: What is active
@@ -245,7 +255,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             preview.show(content)
         } else {
             tabs[index] = Tab(title: tab.title, connectionID: tab.connectionID, content: content)
-            if selectedTab === tab { selectedTab = tabs[index] }
+            if selectedTab === tab {
+                selectedTab = tabs[index]
+            } else if let panes = splitPanes {
+                splitPanes = (panes.left === tab ? tabs[index] : panes.left, panes.right === tab ? tabs[index] : panes.right)
+            }
         }
         refresh()
         if selectedTab === tabs[index], let table = content as? TableDataController, table.page == .data { window?.makeFirstResponder(table.grid) }
@@ -264,9 +278,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 self.closedTabs.append((tab.connectionID, reopen))
                 self.closedTabs = Array(self.closedTabs.suffix(20))
             }
+            // A split ends with either of its tabs, and the other shows.
+            let beside = self.splitPanes.flatMap { $0.left === tab ? $0.right : $0.right === tab ? $0.left : nil }
+            if beside != nil { self.splitPanes = nil }
             self.tabs.remove(at: index)
             if self.selectedTab === tab {
-                self.selectedTab = self.tabs.first { $0 === before } ?? (self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)])
+                self.selectedTab = beside ?? self.tabs.first { $0 === before } ?? (self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)])
             }
             self.refresh()
             ConsoleDocuments.shared.tabsChanged(in: self)
@@ -275,9 +292,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         if let content { content.shouldClose(finish) } else { finish(true) }
     }
 
+    /// The connections' tabs, window by window; a Cancel stops there, and `then` doesn't run.
+    private func closeTabs(of ids: Set<UUID>, in windows: ArraySlice<MainWindowController>, then: @escaping () -> Void) {
+        guard let window = windows.first else { return then() }
+        window.close(window.tabs.filter { ids.contains($0.connectionID ?? UUID()) }) { [weak self] in
+            self?.closeTabs(of: ids, in: windows.dropFirst(), then: then)
+        }
+    }
+
     /// Closes `doomed` one after the other, so each question has the window to itself; a Cancel keeps that tab and the
     /// rest, and `then` doesn't run.
-    private func close(_ doomed: [Tab], then: (() -> Void)? = nil) {
+    func close(_ doomed: [Tab], then: (() -> Void)? = nil) {
         guard let tab = doomed.first else { then?(); return }
         close(tab) { [weak self] in self?.close(Array(doomed.dropFirst()), then: then) }
     }
@@ -326,7 +351,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private func updateContent() {
         let kind: String
         var view: NSView?
-        if let tab = selectedTab {
+        if let panes = splitPanes {
+            kind = "tab:" + panes.left.id.uuidString + panes.right.id.uuidString
+        } else if let tab = selectedTab {
             kind = "tab:" + tab.id.uuidString
             view = tab.content.view
         } else if model.data.connections.isEmpty {
@@ -336,8 +363,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         } else {
             kind = "select"
         }
+        paneViews?.mark(selectedTab)
         guard kind != contentKindKey else { return }
         contentKindKey = kind
+        shownContent?.removeFromSuperview()
+        paneViews = splitPanes.map { PanesView($0.left, $0.right, in: contentHolder.bounds, selected: selectedTab) }
+        view = paneViews ?? view
         contentKind = kind.components(separatedBy: ":").first ?? kind
         if view == nil {
             switch contentKind {
@@ -349,7 +380,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             default: view = selectConnectionView()
             }
         }
-        shownContent?.removeFromSuperview()
         if let view {
             contentHolder.addSubview(view)
             view.pin(to: contentHolder)
@@ -378,7 +408,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         }
         statusBar.server.popover = { [weak self] in
             guard let self, let connection = self.activeConnection else { return nil }
-            return InfoPopover(id: "popover.server", heading: connection.displayName, lines: [stateText(self.model.states[connection.id])])
+            return InfoPopover(id: "popover.server", heading: connection.displayName, lines: [stateText(self.model.states[connection.id])]
+                                + (self.model.openConnection(connection.id).map { ["Connected for " + ActivityPopover.elapsed(Date().timeIntervalSince($0.connectedAt))] } ?? []))
         }
         statusBar.transaction.popover = { [weak self] in
             guard let self, let badge = self.selectedTab?.tabContent?.transactionBadge else { return nil }
@@ -400,7 +431,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return InfoPopover(id: "popover.agent", heading: "Agents", lines: [status], buttons: [off])
         }
         statusBar.agent.menuItems = { [Commands.agentActivity.item(), Commands.turnAgentsOff.item()] }
-        statusBar.sqlLog.toolTip = Commands.sqlLog.tip + " (⌥⌘L)"
+        statusBar.sqlLog.toolTip = Commands.sqlLog.tipWithShortcut
     }
 
     func updateStatus() {
@@ -425,7 +456,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         statusBar.sqlLog.isEnabled = canShowLog
         statusBar.sqlLog.attributedTitle = NSAttributedString(string: "SQL log", attributes: [
             .foregroundColor: canShowLog ? NSColor.accent : NSColor.tertiaryLabelColor, .font: NSFont.systemFont(ofSize: 11.5)])
-        statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tip + " (⌥⌘L)"
+        statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tipWithShortcut
             : "Nothing has been sent yet: the SQL log lists every statement once you connect"
     }
 
@@ -468,7 +499,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }
             let ids = Set(doomed.map(\.id))
-            self.close(self.tabs.filter { ids.contains($0.connectionID ?? UUID()) }) {
+            self.closeTabs(of: ids, in: self.model.windows[...]) {
                 ToolSheet.running(on: Array(ids)).forEach { $0.stop() }
                 self.model.delete(ids)
             }
@@ -482,10 +513,23 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     @objc func closeOtherTabs(_ sender: Any?) {
         guard let keep = selectedTab else { return }
-        close(tabs.filter { $0 !== keep })
+        close(tabs.filter { $0 !== keep && !$0.pinned })
     }
 
-    @objc func closeAllTabs(_ sender: Any?) { close(tabs) }
+    @objc func closeAllTabs(_ sender: Any?) { close(tabs.filter { !$0.pinned }) }
+
+    /// Pin Tab: pinned tabs go first in the strip, in their order.
+    @objc func togglePinTab(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        setPinned(!tab.pinned, tab)
+    }
+
+    func setPinned(_ pinned: Bool, _ tab: Tab) {
+        tab.pinned = pinned
+        tabs = tabs.filter(\.pinned) + tabs.filter { !$0.pinned }
+        refresh()
+        ConsoleDocuments.shared.tabsChanged(in: self)
+    }
 
     @objc func reopenClosedTab(_ sender: Any?) {
         closedTabs.removeAll { $0.connection != nil && model.connection($0.connection) == nil }
@@ -543,6 +587,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return view.subviews.lazy.compactMap(walk).first
         }
         return selectedTab.flatMap { $0.shown.isViewLoaded ? walk($0.shown.view) : nil }
+    }
+
+    /// `tab` leaves this window as it is, session, transaction and edits included, and shows in `other`.
+    func hand(_ tab: Tab, to other: MainWindowController) {
+        guard let index = tabs.firstIndex(where: { $0 === tab }) else { return }
+        // A split ends with either of its tabs, and the other shows.
+        let beside = splitPanes.flatMap { $0.left === tab ? $0.right : $0.right === tab ? $0.left : nil }
+        if beside != nil { splitPanes = nil }
+        tabs.remove(at: index)
+        selectedTab = beside ?? tabs[safe: min(index, tabs.count - 1)]
+        refresh()
+        other.tabs.append(tab)
+        other.select(tab)
+        ConsoleDocuments.shared.tabsChanged(in: self)
     }
 
     /// Moves `tab` to `index` in the strip (a drag).
@@ -647,8 +705,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = closedTabs.contains { $0.connection == nil || model.connection($0.connection) != nil }
             reason = "No closed tab to reopen"
         case Commands.closeOtherTabs.action?:
-            enabled = tabs.count > 1
-            reason = "Only one tab is open"
+            enabled = tabs.contains { $0 !== selectedTab && !$0.pinned }
+            reason = tabs.count > 1 ? "The other tabs are pinned" : "Only one tab is open"
+        case Commands.pinTab.action?:
+            enabled = selectedTab != nil
+            reason = "No tab is open"
+            item.state = selectedTab?.pinned == true ? .on : .off
         case Commands.duplicateTab.action?:
             enabled = selectedTab?.tabContent?.canDuplicate == true
             reason = selectedTab == nil ? "No tab is open" : "This kind of tab can't be duplicated"
@@ -677,7 +739,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = model.openConnection(activeConnection?.id) != nil
             reason = "Connect first: only a connected connection has sessions"
         default:
-            if let check = validateEditorItem(item) ?? validateConnectionItem(item) { (enabled, reason) = check }
+            if let check = validateEditorItem(item) ?? validateConnectionItem(item) ?? validateWorkspaceItem(item) { (enabled, reason) = check }
         }
         item.explain(enabled: enabled, reason: enabled ? nil : reason)
         return enabled
@@ -717,7 +779,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         refresh()
     }
 
-    func windowShouldClose(_ sender: NSWindow) -> Bool { true }
+    /// The last window hides and keeps its tabs, to come back from the Dock. Another goes for good: its tabs close first,
+    /// each asking about unfinished work, and a Cancel keeps the window.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard model.windows.count > 1 else { return true }
+        close(tabs) { [weak self] in self?.windowGone() }
+        return false
+    }
 }
 
 /// The top edge of the docked SQL log: dragging it makes the log taller or shorter.

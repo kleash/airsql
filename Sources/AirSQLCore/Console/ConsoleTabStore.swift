@@ -38,6 +38,8 @@ public struct SavedConsole: Codable, Equatable, Sendable {
     public var preview: Bool?
     /// It was the tab shown.
     public var selected: Bool?
+    /// It was pinned.
+    public var pinned: Bool?
 
     public init(id: UUID, title: String, connection: UUID?, path: String?, text: String?, caret: Int, place: SavedPlace? = nil,
                 preview: Bool? = nil, selected: Bool? = nil, database: String? = nil) {
@@ -59,10 +61,16 @@ public struct SavedWindow: Codable, Equatable, Sendable {
     public var tabs: [SavedConsole]
     /// The connections and folders selected.
     public var sidebar: [UUID]
+    /// The other main windows, on the first one.
+    public var others: [SavedWindow]?
+    /// Where one of those was, as NSStringFromRect writes it.
+    public var frame: String?
 
-    public init(tabs: [SavedConsole] = [], sidebar: [UUID] = []) {
+    public init(tabs: [SavedConsole] = [], sidebar: [UUID] = [], others: [SavedWindow]? = nil, frame: String? = nil) {
         self.tabs = tabs
         self.sidebar = sidebar
+        self.others = others
+        self.frame = frame
     }
 }
 

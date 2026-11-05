@@ -21,7 +21,7 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
     let summary = label("", font: .systemFont(ofSize: 11.5), truncates: true)
     private let spinner = NSProgressIndicator()
     private(set) lazy var back = button("Back", id: "disk.back", tip: Commands.diskUsageUp.tip, target: self, action: #selector(goUp(_:)))
-    private(set) lazy var refreshButton = button("Refresh", id: "disk.refresh", tip: Commands.refresh.tip + " (⌘R)", target: self,
+    private(set) lazy var refreshButton = button("Refresh", id: "disk.refresh", tip: Commands.refresh.tipWithShortcut, target: self,
                                                  action: #selector(refresh(_:)))
     private(set) lazy var stopButton = button("Stop", id: "disk.stop", tip: "Stop reading sizes; what was read stays", target: self,
                                               action: #selector(stop(_:)))

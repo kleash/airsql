@@ -96,6 +96,7 @@ enum MainMenu {
         addToolItems(menus)
         addAgentItems(menus)
         addReconItems(menus)
+        addWorkspaceItems(menus)
 
         // Last in View, as on every Mac.
         menus.view.add([nil, Commands.customizeToolbar, Commands.fullScreen])
