@@ -26,8 +26,8 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     private let empty = label("", font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
     /// The columns share the view's width down to `minimum`, then it scrolls sideways.
     private static let columns: [(id: String, title: String, width: CGFloat, minimum: CGFloat, tip: String)] = [
-        ("name", "Name", 180, 120, "The object's name"), ("type", "Type", 70, 60, "What kind of object it is"), ("rows", "Rows", 80, 60, "About how many rows (InnoDB estimates it)"),
-        ("bar", "Space", 110, 60, "Its data, indexes and free space, against the largest table"),
+        ("name", "Name", 180, 120, "The object's name"), ("type", "Type", 84, 78, "What kind of object it is"), ("rows", "Rows", 70, 60, "About how many rows (InnoDB estimates it)"),
+        ("bar", "Space", 100, 60, "Its data, indexes and free space, against the largest table"),
         ("size", "Size", 72, 60, "Its data plus its indexes"),
         ("data", "Data", 72, 60, "Space its rows take"), ("index", "Indexes", 72, 60, "Space its indexes take"),
         ("engine", "Engine", 70, 60, "Its storage engine"), ("collation", "Collation", 140, 130, "How its text compares and sorts"),
@@ -83,7 +83,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             tableColumn.minWidth = column.minimum
             tableColumn.headerToolTip = column.tip + "; click to sort by it"
             tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.id, ascending: true)
-            if Self.numericColumns.contains(column.id) { tableColumn.headerCell.alignment = .right }
+            if Self.numericColumns.contains(column.id), column.id != "bar" { tableColumn.headerCell.alignment = .right }
             tableColumn.isHidden = Self.hiddenColumns.contains(column.id)
             table.addTableColumn(tableColumn)
         }
@@ -173,7 +173,9 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     }
 
     /// All a table takes, free space included: what its bar is long for.
-    private static func space(_ stats: TableStatistics) -> Int { (stats.dataLength ?? 0) + (stats.indexLength ?? 0) + (stats.dataFree ?? 0) }
+    private static func space(_ stats: TableStatistics) -> Int { size(stats) + (stats.dataFree ?? 0) }
+
+    private static func size(_ stats: TableStatistics) -> Int { (stats.dataLength ?? 0) + (stats.indexLength ?? 0) }
 
     private static func averageRow(_ stats: TableStatistics?) -> Int? {
         guard let stats, let rows = stats.rows, rows > 0, let data = stats.dataLength else { return nil }
@@ -208,7 +210,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             case "free": return stats?.dataFree ?? -1
             case "average": return Self.averageRow(stats) ?? -1
             case "autoIncrement": return stats?.autoIncrement.map { Int(clamping: $0) } ?? -1
-            default: return stats.map { ($0.dataLength ?? 0) + ($0.indexLength ?? 0) } ?? -1  // the bar and Size
+            default: return stats.map(Self.size) ?? -1  // the bar and Size
             }
         }
         let numeric = Self.numericColumns.contains(key)
@@ -226,7 +228,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         case "rows": return table.kind == .view ? "view" : stats?.rows.map { $0.formatted() } ?? ""
         case "data": return DiskUsage.size(stats?.dataLength)
         case "index": return DiskUsage.size(stats?.indexLength)
-        case "size": return DiskUsage.size(stats.map { ($0.dataLength ?? 0) + ($0.indexLength ?? 0) })
+        case "size": return stats?.dataLength == nil && stats?.indexLength == nil ? "" : DiskUsage.size(stats.map(Self.size))
         case "free": return DiskUsage.size(stats?.dataFree)
         case "average": return DiskUsage.size(Self.averageRow(stats))
         case "autoIncrement": return stats?.autoIncrement.map { $0.formatted() } ?? ""

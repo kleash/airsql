@@ -38,7 +38,7 @@ until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes th
 
 ## The window
 
-- **The sidebar** lists your connections. Click one to see its summary, double-click it to connect, right-click it for
+- **The sidebar** lists your connections. Click one to see its summary (once connected, its [host page](navigator.md#the-host-page)), double-click it to connect, right-click it for
   everything else (Duplicate, Colour, Delete…). Hold ⌘ or ⇧ to select several.
 - **The tabs** hold your queries and tables. When more are open than fit, the arrow at the end of the strip lists them all. Double-click a tab to rename it; middle-click it to close it; right-click it
   to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as

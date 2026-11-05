@@ -35,16 +35,16 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
     private(set) lazy var databases = HostList(
         name: "Databases",
         columns: [
-            .init(id: "name", title: "Name", width: 200, tip: "The database"),
-            .init(id: "bar", title: "Space", width: 160, tip: "Its data, indexes and free space, against the largest", bar: true),
-            .init(id: "size", title: "Size", width: 80, numeric: true, tip: "Its data plus its indexes, once read"),
-            .init(id: "tables", title: "Tables", width: 60, numeric: true, tip: "How many tables and sequences"),
-            .init(id: "views", title: "Views", width: 60, numeric: true, tip: "How many views"),
-            .init(id: "routines", title: "Routines", width: 66, numeric: true, tip: "How many procedures and functions"),
-            .init(id: "triggers", title: "Triggers", width: 66, numeric: true, tip: "How many triggers"),
-            .init(id: "events", title: "Events", width: 60, numeric: true, tip: "How many events"),
-            .init(id: "updated", title: "Last Change", width: 140, tip: "When a table's rows last changed, where the engine keeps it"),
-            .init(id: "collation", title: "Collation", width: 150, tip: "How its text compares and sorts by default"),
+            .init(id: "name", title: "Name", width: 170, tip: "The database"),
+            .init(id: "bar", title: "Space", width: 120, tip: "Its data, indexes and free space, against the largest", bar: true),
+            .init(id: "size", title: "Size", width: 72, numeric: true, tip: "Its data plus its indexes, once read"),
+            .init(id: "tables", title: "Tables", width: 54, numeric: true, tip: "How many tables and sequences"),
+            .init(id: "views", title: "Views", width: 54, numeric: true, tip: "How many views"),
+            .init(id: "routines", title: "Routines", width: 60, numeric: true, tip: "How many procedures and functions"),
+            .init(id: "triggers", title: "Triggers", width: 60, numeric: true, tip: "How many triggers"),
+            .init(id: "events", title: "Events", width: 54, numeric: true, tip: "How many events"),
+            .init(id: "updated", title: "Last Change", width: 130, tip: "When a table's rows last changed, where the engine keeps it"),
+            .init(id: "collation", title: "Collation", width: 140, tip: "How its text compares and sorts by default"),
         ],
         sort: NSSortDescriptor(key: "name", ascending: true), accessories: [readSizes, stopSizes, diskUsage])
     private(set) lazy var variables = HostList(

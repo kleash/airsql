@@ -229,6 +229,22 @@ extension AppTests {
             #expect(main.tabs.count == 1 && host.pane == .commands && host.tabs.selectedSegment == HostContent.Pane.commands.rawValue)
         }
 
+        @Test func connectingLeadsToTheHostPageUnlessThatConnectionsTabShows() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            main.sidebar.select([Fixtures.production.id])
+            await openReplayed(model, Fixtures.production.id)
+            #expect(await eventually(timeout: 5) { main.selectedTab?.shown is HostContent })
+
+            let other = testModel(Fixtures.shop)
+            let (second, _) = appWindow(other)
+            second.sidebar.select([Fixtures.production.id])
+            let console = second.openConsole(text: "", title: "Waiting", connection: Fixtures.production.id)
+            await openReplayed(other, Fixtures.production.id)
+            _ = await eventually(timeout: 1) { second.selectedTab?.shown is HostContent }
+            #expect(second.selectedTab === console, "the tab that asked for the connection stays")
+        }
+
         @Test func thePanesShowWhatTheServerSaid() async throws {
             let (_, _, host) = try await opened()
             host.show(.variables)
