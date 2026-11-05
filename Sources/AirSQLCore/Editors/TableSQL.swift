@@ -36,7 +36,7 @@ struct TableSQL {
         lines += table.checks.map(check)
         let options = try self.options(table.options, from: nil)
         return "CREATE TABLE " + SQLQuote.identifier(database, table.name) + " (\n  " + lines.joined(separator: ",\n  ") + "\n)"
-            + (options.isEmpty ? "" : " " + options.joined(separator: " "))
+            + (options.isEmpty ? "" : " " + options.joined(separator: " ")) + (Self.clause(table).map { "\n" + $0 } ?? "")
     }
 
     // MARK: ALTER
@@ -99,7 +99,17 @@ struct TableSQL {
         if !dropKeys.isEmpty { statements.append(table + dropKeys.joined(separator: ",\n  ")) }
         let clauses = drops + changes + adds
         if !clauses.isEmpty { statements.append(table + clauses.joined(separator: ",\n  ")) }
+        // A statement of its own: partition options end an ALTER and take no comma, and by now the table has its new name.
+        if Self.clause(new) != Self.clause(old) {
+            statements.append("ALTER TABLE " + SQLQuote.identifier(database, new.name) + "\n  " + (Self.clause(new) ?? "REMOVE PARTITIONING"))
+        }
         return statements
+    }
+
+    /// The table's partition clause, nil when it has none.
+    static func clause(_ table: TableDesign) -> String? {
+        let clause = table.options.partitioning?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return clause.isEmpty ? nil : clause
     }
 
     /// ADD, CHANGE and MODIFY COLUMN in the new order. The server keeps a changed column in place unless it is told

@@ -53,7 +53,11 @@ enum NavigatorActions {
         case Commands.copyName.action?, Commands.copyPlainName.action?:
             return objects.isEmpty && databases.isEmpty ? "Select a database or object first" : nil
         case Commands.copyCreate.action?:
-            return objects.count == 1 ? nil : "Select one object first"
+            return objects.isEmpty ? "Select an object first" : nil
+        case Commands.createToConsole.action?:
+            return objects.isEmpty ? "Select an object first" : nil
+        case Commands.sqlGenerator.action?:
+            return objects.isEmpty && databases.isEmpty ? "Select a database or objects first" : nil
         case Commands.generateSelect.action?:
             return tableLike.isEmpty || tableLike.count != objects.count ? "Select tables or views first" : nil
         case Commands.generateInsert.action?, Commands.generateUpdate.action?:
@@ -202,10 +206,10 @@ enum NavigatorActions {
         }
     }
 
-    static func copyCreate(_ object: DatabaseObject, on open: OpenConnection, window: NSWindow?) {
+    static func copyCreate(_ objects: [DatabaseObject], on open: OpenConnection, window: NSWindow?) {
         Task {
             do {
-                let text = try await open.createStatement(object) + ";"
+                let text = try await createScript(objects, on: open)
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)
             } catch {
@@ -213,6 +217,26 @@ enum NavigatorActions {
                           on: window)
             }
         }
+    }
+
+    /// A new query tab with the objects' CREATE statements: nothing runs until the person does.
+    static func openCreate(_ objects: [DatabaseObject], on open: OpenConnection, main: MainWindowController?) {
+        guard let main else { return }
+        Task {
+            do {
+                _ = main.openConsole(text: try await createScript(objects, on: open), title: nil, connection: open.id)
+            } catch {
+                showError(error.localizedDescription, title: "Couldn't read the definition", on: main.window)
+            }
+        }
+    }
+
+    /// The objects' CREATE statements as one script, read through the schema session.
+    private static func createScript(_ objects: [DatabaseObject], on open: OpenConnection) async throws -> String {
+        var items: [DDLScript.Item] = []
+        for object in objects { items.append(DDLScript.Item(object, code: try await open.createStatement(object))) }
+        guard let server = open.snapshot.server else { throw AirSQLError.disconnected }
+        return DDLScript(items, server: server).text
     }
 
     enum Generated { case select, insert, update }

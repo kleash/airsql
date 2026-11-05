@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 // The list's cells: text fields, check boxes, pop-ups and combo boxes, each writing its edit back into the design.
-extension TableEditorController: NSComboBoxDataSource {
+extension TableEditorController: NSComboBoxDataSource, NSMenuDelegate {
     static let extras = ["", "AUTO_INCREMENT", "ON UPDATE CURRENT_TIMESTAMP", "VIRTUAL GENERATED", "STORED GENERATED"]
 
     func makeCell(_ id: String, row: Int) -> NSView {
@@ -47,6 +47,12 @@ extension TableEditorController: NSComboBoxDataSource {
             case "name": return text(index.name, placeholder: "name", enabled: index.kind != .primary)
             case "kind": return choice(IndexDesign.Kind.allCases.map(\.title), index.kind.title)
             case "columns": return text(EditorText.parts(index.parts), placeholder: "columns")
+            case "using":
+                let popup = choice(IndexDesign.algorithms, index.algorithm ?? "")
+                popup.isEnabled = popup.isEnabled && index.takesAlgorithm
+                return because(popup, "Full-text, spatial and vector indexes have one way to be stored")
+            case "visible":
+                return because(check(index.visible, enabled: index.kind != .primary), "A primary key is always visible")
             default: return text(index.comment, placeholder: "")
             }
         case .foreignKeys:
@@ -59,7 +65,17 @@ extension TableEditorController: NSComboBoxDataSource {
             case "onUpdate": return choice(ForeignKeyDesign.rules, key.onUpdate)
             default: return choice(ForeignKeyDesign.rules, key.onDelete)
             }
-        case .checks, .options:
+        case .references:
+            let (other, table, key) = incoming[row]
+            switch id {
+            case "table": return label(other == database ? table : other + "." + table, truncates: true)
+            case "key": return label(key.name, truncates: true)
+            case "columns": return label(EditorText.names(key.columns), truncates: true)
+            case "here": return label(EditorText.names(key.referencedColumns), truncates: true)
+            case "onUpdate": return label(key.onUpdate)
+            default: return label(key.onDelete)
+            }
+        case .checks, .options, .partitions:
             if row >= design.checks.count {
                 let column = design.columns[columnCheckRows[row - design.checks.count]]
                 switch id {

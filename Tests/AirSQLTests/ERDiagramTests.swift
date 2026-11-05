@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import AirSQLCore
 
@@ -54,6 +55,47 @@ struct ERDiagramTests {
     @Test func ordersAColumnByTheTablesItPointsAt() {
         let diagram = ERDiagram(database([table("a"), table("b"), table("c"), table("x", pointsAt: ["c"]), table("y", pointsAt: ["a"])]))
         #expect(diagram.columns[1].map(\.name) == ["y", "x"])
+    }
+
+    @Test func drawsOnlyTheTablesChosen() {
+        let shop = database([table("customers"), table("orders", pointsAt: ["customers"]), table("lines", pointsAt: ["orders"]), table("notes")])
+        let diagram = ERDiagram(shop, only: ["orders", "lines"])
+        #expect(diagram.columns.flatMap { $0 }.map(\.name).sorted() == ["lines", "orders"])
+        #expect(diagram.links.map(\.child) == ["lines"], "a key to a table not drawn isn't")
+        #expect(ERDiagram.neighbours(of: ["orders"], in: shop) == ["customers", "orders", "lines"])
+    }
+
+    @Test func listsTheWholeDatabaseFirstAndNamesNewDiagrams() {
+        let saved = [ERLayout(name: "Diagram 1", tables: ["a"])]
+        #expect(ERLayout.list(saved).map(\.name) == [ERLayout.wholeDatabase, "Diagram 1"])
+        #expect(ERLayout.list([ERLayout(name: ERLayout.wholeDatabase)] + saved).count == 2)
+        #expect(ERLayout.newName(in: saved) == "Diagram 2")
+        #expect(ERDiagram.tableName(dragged: "`my``table`") == "my`table")
+    }
+
+    @Test func keepsDiagramsWithTheDatabaseSettings() throws {
+        var settings = TableViewSettings()
+        var layout = ERLayout(name: "Billing", tables: ["a"])
+        layout.positions["a"] = ERLayout.Point(x: 10, y: 20)
+        layout.detail = .keysOnly
+        settings.diagrams = [layout]
+        let back = try JSONDecoder().decode(TableViewSettings.self, from: JSONEncoder().encode(settings))
+        #expect(back == settings)
+        #expect(try JSONDecoder().decode(TableViewSettings.self, from: Data("{}".utf8)).diagrams.isEmpty)
+    }
+
+    @Test func exportsToolsText() throws {
+        var odd = table("a&b", pointsAt: ["orders"])
+        odd.columns[1].name = "x|y"
+        odd.foreignKeys[0].columns = ["x|y"]
+        let diagram = ERDiagram(database([table("orders"), odd]))
+        #expect(diagram.plantUML().hasPrefix("@startuml\n") && diagram.plantUML().contains("orders ||--o{ a_b : \"a&b_orders\""))
+        #expect(diagram.dot().contains("\"a&b\" -> \"orders\"") && diagram.dot().contains("FK x\\|y : int"))
+        for xml in [diagram.graphML(positions: ["orders": ERLayout.Point(x: 5, y: 6)]), diagram.drawIO()] {
+            _ = try XMLDocument(xmlString: xml)  // well formed, whatever the names hold
+            #expect(xml.contains("a&amp;b"))
+        }
+        #expect(diagram.drawIO(positions: ["orders": ERLayout.Point(x: 5, y: 6)]).contains("x=\"5.0\" y=\"6.0\""))
     }
 
     @Test func writesMermaid() {

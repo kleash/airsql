@@ -215,6 +215,8 @@ import AppKit
     @objc optional func killQuery(_ sender: Any?)
     @objc optional func killConnection(_ sender: Any?)
     @objc optional func showERDiagram(_ sender: Any?)
+    @objc optional func showSQLGenerator(_ sender: Any?)
+    @objc optional func openCreateInConsole(_ sender: Any?)
     @objc optional func bulkEditTables(_ sender: Any?)
     @objc optional func showDiskUsage(_ sender: Any?)
     @objc optional func selectTop(_ sender: Any?)
@@ -989,7 +991,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ] + editorCommands + treeCommands
+    ] + editorCommands + treeCommands + schema
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {
@@ -1031,6 +1033,8 @@ enum Commands {
         "Decimal Places": "Round this number column's values to some decimal places, grouped by thousands",
         "Time Zone": displayZone.tip,
         "Maintenance": maintenance.tip,
+        "Add to Index": "Add the columns selected to the end of an index",
+        "Diagram": "Make, arrange, show and export ER diagrams of chosen tables",
         "New Object": "Write a new view, procedure, function, trigger or event as its CREATE statement",
         "Colour": colour.tip,
         "Agents": "Let AI agents use AirSQL, see what they did, or turn them off",

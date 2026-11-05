@@ -35,6 +35,8 @@ public struct TableViewSettings: Codable, Equatable {
     public var virtualKeys: [SchemaForeignKey] = []
     /// The column a row is shown by beside a key that refers to it ("Ada Lovelace" after 12); nil: the first text column.
     public var labelColumn: String?
+    /// The database's saved ER diagrams, on the settings of the table named "" (the database itself).
+    public var diagrams: [ERLayout] = []
 
     public static let recentLimit = 20
 
@@ -63,6 +65,7 @@ public struct TableViewSettings: Codable, Equatable {
         frozenColumns = try container.decodeIfPresent(Int.self, forKey: .frozenColumns) ?? 0
         virtualKeys = try container.decodeIfPresent([SchemaForeignKey].self, forKey: .virtualKeys) ?? []
         labelColumn = try container.decodeIfPresent(String.self, forKey: .labelColumn)
+        diagrams = try container.decodeIfPresent([ERLayout].self, forKey: .diagrams) ?? []
     }
 }
 

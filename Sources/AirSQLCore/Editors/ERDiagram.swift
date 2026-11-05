@@ -23,8 +23,9 @@ public struct ERDiagram: Equatable {
     /// Tables with no keys either way go in columns of at most this many.
     public static let looseColumnHeight = 8
 
-    public init(_ database: SchemaDatabase) {
-        let tables = database.tables.filter { $0.kind == .table }
+    /// `only`: the tables to draw (nil: every table of the database).
+    public init(_ database: SchemaDatabase, only: Set<String>? = nil) {
+        let tables = database.tables.filter { $0.kind == .table && only?.contains($0.name) != false }
         let byName = Dictionary(tables.map { ($0.name, $0) }) { first, _ in first }
         var links: [Link] = []
         for table in tables {
@@ -74,6 +75,23 @@ public struct ERDiagram: Equatable {
             columns.append(Array(loose[start..<min(start + Self.looseColumnHeight, loose.count)]))
         }
         self.columns = columns
+    }
+
+    /// `names` and the tables that point at them or that they point at, in `database`.
+    public static func neighbours(of names: Set<String>, in database: SchemaDatabase) -> Set<String> {
+        var found = names
+        for table in database.tables where table.kind == .table {
+            let parents = table.foreignKeys.filter { $0.referencedDatabase == database.name }.map(\.referencedTable)
+            if names.contains(table.name) { found.formUnion(parents) }
+            if !names.isDisjoint(with: parents) { found.insert(table.name) }
+        }
+        return found.intersection(database.tables.filter { $0.kind == .table }.map(\.name))
+    }
+
+    /// A table's name from text dragged out of the tree, where it is quoted.
+    public static func tableName(dragged text: String) -> String {
+        var scanner = HeaderScanner(text)
+        return scanner.name() ?? text
     }
 
     /// The diagram as Mermaid's erDiagram: each table with its columns (base type, name, PK, FK and UK marks), then a

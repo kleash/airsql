@@ -13,7 +13,7 @@ extension TableEditorController {
         sections.target = self
         sections.action = #selector(sectionChosen(_:))
         sections.setAccessibilityIdentifier("tableEditor.sections")
-        sections.toolTip = "Show the table's columns, indexes, foreign keys, checks or options"
+        sections.toolTip = "Show the table's columns, indexes, foreign keys, what points at it, checks, partitions or options"
         sections.translatesAutoresizingMaskIntoConstraints = false
         // Squeezed (a long count, the spinner while applying) rather than widening the window past its minimum.
         sections.setContentCompressionResistancePriority(.init(490), for: .horizontal)
@@ -76,6 +76,9 @@ extension TableEditorController {
         options.editor = self
         listHolder.addSubview(options)
         options.pin(to: listHolder)
+        partitionsView.editor = self
+        listHolder.addSubview(partitionsView)
+        partitionsView.pin(to: listHolder)
 
         sqlText.isEditable = false
         sqlText.isSelectable = true
@@ -133,16 +136,20 @@ extension TableEditorController {
         endEditing()
         section = new
         sections.selectedSegment = new.rawValue
-        let isOptions = new == .options
-        options.isHidden = !isOptions
-        listColumn.isHidden = isOptions
-        if isOptions { options.show(self) } else { configureList() }
+        options.isHidden = new != .options
+        partitionsView.isHidden = new != .partitions
+        listColumn.isHidden = new == .options || new == .partitions
+        // The hidden list holds no rows of a section with none.
+        configureList()
+        if new == .options { options.show(self) }
+        if new == .partitions { partitionsView.show(self) }
         updateButtons()
     }
 
     func updateSectionTitles() {
-        let counts = [design.columns.count, design.indexes.count, design.foreignKeys.count, design.checks.count + columnCheckRows.count]
-        let names = ["Columns", "Indexes", "Foreign keys", "Checks", "Options"]
+        let counts = [design.columns.count, design.indexes.count, design.foreignKeys.count, incoming.count,
+                      design.checks.count + columnCheckRows.count, partitionList.count]
+        let names = ["Columns", "Indexes", "Foreign keys", "Used by", "Checks", "Partitions", "Options"]
         for (index, name) in names.enumerated() {
             let count = index < counts.count && counts[index] > 0 ? " · \(counts[index])" : ""
             sections.setLabel(name + count, forSegment: index)
@@ -173,16 +180,18 @@ extension TableEditorController {
 
     func updateButtons() {
         let kinds: [Section: String] = [.indexes: "indexes", .foreignKeys: "foreign keys", .checks: "checks"]
-        listHint.isHidden = list.numberOfRows > 0 || kinds[section] == nil
-        listHint.stringValue = "No \(kinds[section] ?? "rows") yet: press + below to add one"
+        listHint.isHidden = list.numberOfRows > 0 || (kinds[section] == nil && section != .references)
+        listHint.stringValue = section == .references ? "No foreign key points at this table"
+            : "No \(kinds[section] ?? "rows") yet: press + below to add one"
         let reason = applyReason
         applyButton.isEnabled = reason == nil
         applyButton.toolTip = reason ?? "Show the SQL in the preview sheet, then run it on the server (⌘S)"
         discardButton.isEnabled = !isBusy && isEdited && before != nil
         discardButton.toolTip = discardButton.isEnabled ? "Discard your changes and show the table as the server has it"
             : (isBusy ? "Wait until the server has answered" : "Nothing to discard")
-        addButton.isEnabled = !isBusy && section != .options
-        removeButton.isEnabled = !isBusy && section != .options && !list.selectedRowIndexes.isEmpty
+        addButton.isEnabled = !isBusy && editsRows
+        addButton.toolTip = editsRows ? Commands.addRow.tip : "Add a foreign key in the other table: this list shows what is there"
+        removeButton.isEnabled = !isBusy && editsRows && !list.selectedRowIndexes.isEmpty
         removeButton.toolTip = removeButton.isEnabled ? "Remove the selected rows from the design; they go when you apply"
             : "Select a row first"
         if isBusy { status.startAnimation(nil) } else { status.stopAnimation(nil) }
@@ -238,8 +247,8 @@ extension TableEditorController {
             item.title = isUndo ? (enabled ? "Undo Change" : "Undo") : (enabled ? "Redo Change" : "Redo")
             reason = isUndo ? "Nothing to undo" : "Nothing to redo"
         case Commands.addRow.action?, Commands.duplicateRow.action?, Commands.deleteRows.action?:
-            enabled = !isBusy && section != .options && (item.action == Commands.addRow.action || !list.selectedRowIndexes.isEmpty)
-            reason = section == .options ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"
+            enabled = !isBusy && editsRows && (item.action == Commands.addRow.action || !list.selectedRowIndexes.isEmpty)
+            reason = !editsRows ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"
             // Off while typing: ⌘⌫ reaches the text as delete to the line's start.
             if item.action == Commands.deleteRows.action, sections.window?.firstResponder is NSText {
                 enabled = false
@@ -250,10 +259,13 @@ extension TableEditorController {
             reason = section == .columns ? "Select a column first" : "Show the columns first"
         case Commands.copy.action?:
             enabled = canCopyRows
-            reason = section == .options ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"
+            reason = !editsRows ? "Show a list first: columns, indexes, keys or checks" : "Select a row first"
         case Commands.paste.action?:
             enabled = canPasteRows
             reason = "Copy rows of this list first, here or in another table"
+        case Commands.indexFromColumns.action?, Commands.uniqueFromColumns.action?:
+            enabled = !isBusy && section == .columns && !list.selectedRowIndexes.isEmpty
+            reason = "Select columns in the Columns list first"
         default:
             break
         }

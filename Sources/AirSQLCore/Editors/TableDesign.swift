@@ -27,7 +27,13 @@ public struct TableDesign: Hashable {
             ? Dictionary(table.checks.filter { columnChecks.contains($0.name) }.map { ($0.name, $0.clause) }) { first, _ in first }
             : [:]
         columns = table.columns.map { ColumnDesign($0, check: ownChecks[$0.name], server: server) }
-        indexes = table.indexes.map(IndexDesign.init)
+        // On MEMORY a BTREE index is a choice (HASH is its default); elsewhere it's what an index is.
+        let memory = ["MEMORY", "HEAP"].contains(options.engine?.uppercased() ?? "")
+        indexes = table.indexes.map { index in
+            var design = IndexDesign(index)
+            if memory, index.type.uppercased() == "BTREE" { design.algorithm = "BTREE" }
+            return design
+        }
         foreignKeys = table.foreignKeys.map(ForeignKeyDesign.init)
         checks = table.checks.filter { ownChecks[$0.name] == nil }.map(CheckDesign.init)
     }
@@ -176,6 +182,8 @@ public struct IndexDesign: Hashable {
     public var comment = ""
     /// False for MySQL's INVISIBLE and MariaDB's IGNORED indexes.
     public var visible = true
+    /// USING BTREE or HASH; nil leaves it to the engine.
+    public var algorithm: String?
 
     public init(name: String, kind: Kind, parts: [Part]) {
         self.name = name
@@ -197,7 +205,14 @@ public struct IndexDesign: Hashable {
                                        descending: $0.descending) }
         comment = index.comment
         visible = index.visible
+        if index.type.uppercased() == "HASH" { algorithm = "HASH" }
     }
+
+    /// Only these kinds of index can say how they are stored.
+    public var takesAlgorithm: Bool { [.primary, .unique, .index].contains(kind) }
+
+    /// The choices of USING, with what stands for none first.
+    public static let algorithms = ["", "BTREE", "HASH"]
 }
 
 public struct ForeignKeyDesign: Hashable {
@@ -262,6 +277,8 @@ public struct TableOptions: Hashable {
     /// The next AUTO_INCREMENT value.
     public var autoIncrement: UInt64?
     public var rowFormat: String?
+    /// The PARTITION BY clause as SQL; nil for a table without partitions.
+    public var partitioning: String?
 
     public init(engine: String? = nil, collation: String? = nil, comment: String = "", autoIncrement: UInt64? = nil,
                 rowFormat: String? = nil) {

@@ -107,16 +107,16 @@ extension SidebarController: NSMenuItemValidation {
         case .database:
             menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
                       Commands.export, Commands.restore,
-                      Commands.generateLiquibase, Commands.compareWith, Commands.compareRows, Commands.diskUsage, Commands.modifyGrants, nil, Commands.editDatabase,
+                      Commands.generateLiquibase, Commands.sqlGenerator, Commands.compareWith, Commands.compareRows, Commands.diskUsage, Commands.modifyGrants, nil, Commands.editDatabase,
                       Commands.refresh, Commands.drop])
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
         case .object(_, let object) where object.kind.isTableLike:
             menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.copyName, Commands.copyPlainName,
-                      Commands.copyCreate, Commands.favourite, Commands.findUsedBy, nil,
+                      Commands.copyCreate, Commands.createToConsole, Commands.sqlGenerator, Commands.favourite, Commands.findUsedBy, nil,
                       Commands.newColumn, Commands.newIndex, Commands.newForeignKey, Commands.editComment, nil, Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
-                      Commands.bulkEdit, Commands.compareWith, Commands.compareRows])
+                      Commands.bulkEdit, Commands.compareWith, Commands.compareRows, Commands.diagramOfSelection, Commands.diagramOfNeighbours])
             menu.addItem(NavigatorMenus.maintenance())
             menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.diskUsage, Commands.modifyGrants, Commands.refresh])
         case .users:
@@ -128,8 +128,9 @@ extension SidebarController: NSMenuItemValidation {
             if nodes.allSatisfy(\.isDroppablePart) { menu.add([nil, Commands.drop]) }
             if part == .triggers { menu.add([nil, Commands.compareWith, Commands.compareRows]) }
         default:
-            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, Commands.favourite, Commands.findUsedBy, Commands.editComment, nil,
-                      Commands.compareWith, Commands.compareRows, Commands.modifyGrants, nil, Commands.drop, Commands.refresh])
+            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, Commands.createToConsole, Commands.sqlGenerator, Commands.favourite,
+                      Commands.findUsedBy, Commands.editComment, nil, Commands.compareWith, Commands.compareRows, Commands.modifyGrants, nil, Commands.drop,
+                      Commands.refresh])
         }
         return menu
     }
@@ -192,8 +193,19 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     @objc func copyCreateStatement(_ sender: Any?) {
-        guard let open = treeSelection?.open, let object = selectedObjects.first else { return }
-        NavigatorActions.copyCreate(object, on: open, window: view.window)
+        guard let open = treeSelection?.open, !selectedObjects.isEmpty else { return }
+        NavigatorActions.copyCreate(selectedObjects, on: open, window: view.window)
+    }
+
+    @objc func openCreateInConsole(_ sender: Any?) {
+        guard let open = treeSelection?.open, !selectedObjects.isEmpty else { return }
+        NavigatorActions.openCreate(selectedObjects, on: open, main: main)
+    }
+
+    /// The SQL Generator on the objects selected, or everything in the databases selected.
+    @objc func showSQLGenerator(_ sender: Any?) {
+        guard let open = treeSelection?.open, let context = Editors.context(model.connection(open.id), in: model) else { return }
+        main?.openSQLGenerator(selectedObjects, databases: selectedDatabases, context: context)
     }
 
     @objc func refresh(_ sender: Any?) {

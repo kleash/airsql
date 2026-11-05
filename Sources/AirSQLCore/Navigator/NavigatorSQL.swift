@@ -22,6 +22,15 @@ public struct DatabaseObject: Hashable, Codable {
         self.name = name
     }
 
+    /// Everything `database` holds, by kind.
+    public static func all(in database: SchemaDatabase) -> [DatabaseObject] {
+        let name = database.name
+        return database.tables.map { table in
+            DatabaseObject(Kind(rawValue: table.kind.rawValue) ?? .table, name, table.name)
+        } + database.routines.map { DatabaseObject($0.kind == .function ? .function : .procedure, name, $0.name) }
+            + database.triggers.map { DatabaseObject(.trigger, name, $0.name) } + database.events.map { DatabaseObject(.event, name, $0.name) }
+    }
+
     /// `shop`.`orders`.
     public var quoted: String { SQLQuote.identifier(database, name) }
 

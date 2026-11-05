@@ -1,15 +1,22 @@
 import AirSQLCore
 import AppKit
 
-/// The table editor (mockups screen 10): columns, indexes, foreign keys, checks and options in one tab that never
+/// The table editor (mockups screen 10): columns, indexes, foreign keys, what points here, checks, partitions and options in one tab that never
 /// blocks the window, with the SQL that Apply will run always shown under them. Apply shows that SQL in the preview
 /// sheet and runs it on a tools session; nothing changes on the server before. Reading and applying run off the main
 /// thread, each as an Activity with Cancel.
 @MainActor
 final class TableEditorController: NSViewController, TabContent, NSMenuItemValidation {
     enum Section: Int, CaseIterable {
-        case columns, indexes, foreignKeys, checks, options
+        case columns, indexes, foreignKeys, references, checks, partitions, options
     }
+
+    /// The foreign keys that point at this table, of the databases read so far.
+    var incoming: [(database: String, table: String, key: SchemaForeignKey)] = []
+    /// The table's partitions as the server last said.
+    var partitionList: [TablePartition] = []
+    /// The section is a list of rows the person edits.
+    var editsRows: Bool { ![.references, .partitions, .options].contains(section) }
 
     let context: EditorContext
     let activity: ActivityCenter
@@ -39,6 +46,7 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
     let listColumn = NSView()
     let addButton = NSButton(), removeButton = NSButton()
     let options = TableOptionsView()
+    let partitionsView = PartitionsView()
     let sqlText = NSTextView()
     let applyButton = button("Apply", id: "tableEditor.apply", tip: "", target: nil, action: #selector(AirSQLActions.applyChanges(_:)),
                              primary: true)
@@ -107,6 +115,7 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
         updateSQL()
         updateSectionTitles()
         options.show(self)
+        partitionsView.show(self)
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
     }
 
@@ -163,6 +172,12 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
             try await context.schema.refresh([.table(database: database, name: table)])
             before = try await readTable(database, table)
             design = before!
+            incoming = context.schema.snapshot.databases.flatMap { other in
+                other.tables.flatMap { child in
+                    child.foreignKeys.filter { $0.referencedDatabase == database && $0.referencedTable == table }
+                        .map { (other.name, child.name, $0) }
+                }
+            }
         } else {
             if self.database == nil { self.database = context.firstDatabase() }
             var id = ColumnDesign(name: "id", type: TypeSpec(name: "int", unsigned: true))

@@ -1448,18 +1448,24 @@ first.
 
 ## The table editor
 
-Open it from a table's **Open Structure**, or make a new table with **Database ▸ Create Table…**. A table editor has five
+Open it from a table's **Open Structure**, or make a new table with **Database ▸ Create Table…**. A table editor has seven
 parts, chosen at the top:
 
 - **Columns**: name, type (the types your server has), length or ENUM values, unsigned, NULL, default, extra (counts up
   by itself, follows updates, or is generated from an expression), collation and comment. Drag rows to reorder the
   columns.
 - **Indexes**: primary key, unique, plain, full-text and spatial indexes. Write their columns separated by commas:
-  `email(10)` indexes the first 10 characters, `created_at DESC` sorts down.
+  `email(10)` indexes the first 10 characters, `created_at DESC` sorts down. **Using** chooses BTREE or HASH, and **Visible** off
+  keeps an index up to date while queries leave it alone (INVISIBLE on MySQL, IGNORED on MariaDB). In the Columns list, right-click
+  selected columns for **New Index from Columns**, **New Unique Index from Columns** and **Add to Index**.
 - **Foreign keys**: this table's columns, the table they point at and its columns, and what happens on update and on
   delete.
+- **Used by**: the foreign keys of other tables that point at this one, from the databases read so far. Double-click one to open
+  that table.
 - **Checks**: conditions every row must satisfy. On MariaDB, a check written with a column belongs to that column and
   stays with it when the column changes.
+- **Partitions**: the partitions the server has, with their rows and sizes, and the PARTITION BY clause. Edit the clause to add or change
+  partitions; empty it to remove them and keep the rows. Changing them copies the table, and rows that fit no partition stop the change.
 - **Options**: the table's name, engine, default collation, row format, next AUTO_INCREMENT number and comment.
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
@@ -1472,7 +1478,8 @@ length, two columns of one name, an emoji in a name, which the server would keep
 
 ## Apply
 
-**Apply** (⌘S) shows the statements in the [SQL preview](https://kleash.github.io/airsql/sql-preview.html) first. Then they run one at a time on a
+**Apply** (⌘S) shows the statements in the [SQL preview](https://kleash.github.io/airsql/sql-preview.html) first; **Open in Query Tab** there puts them in a query tab
+instead of running them. Then they run one at a time on a
 connection of their own, and the editor reads the table back from the server.
 
 - MySQL and MariaDB can't roll table changes back: each statement takes effect as it runs. When there are several, the
@@ -1485,7 +1492,18 @@ connection of their own, and the editor reads the table back from the server.
 ## Views, procedures, functions, triggers and events
 
 Open one from the tree, or start a new one from **Database ▸ New Object**. The editor shows its CREATE statement, as the
-server keeps it, to edit as text.
+server keeps it, to edit as text, with its head as fields above it:
+
+- **Procedures and functions**: name, return type, data access, security, deterministic, comment, and the parameters, which **+**, **−**
+  and the arrows add, remove and reorder.
+- **Triggers**: name, before or after, insert, update or delete, and the table.
+- **Events**: name, enabled or disabled, whether it stays after its last run, comment, and the schedule: every so often, with when it
+  starts and ends, or once. A bare date and time gets its quotes; anything else is an expression.
+- **Views**: name, algorithm, security and check option.
+
+The fields and the code stay in step, and ⌘Z in the code takes a field's change back. The fields rewrite only the head, so the
+body stays as you typed it, though a comment between the head's clauses goes. When the head isn't one the form can read (it is still being typed, say),
+the fields turn off until it is.
 
 - **Runs as** chooses its DEFINER: the account it was created with, or you. Keeping another account's DEFINER needs the
   SET_USER_ID privilege on MySQL, or SET USER on MariaDB.
@@ -1494,6 +1512,7 @@ server keeps it, to edit as text.
 - MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
   function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
   apply again, and **Revert** puts the old code back.
+- **Run…** on a procedure or function opens a CALL or SELECT of it in a query tab, for the code the server has: apply your changes first.
 - The code has the tab's editor: line numbers, completion, Comment Lines (⌘/), Format SQL and the matching bracket.
 - When the server refuses the code, the place it points to is underlined in red, with the message on hover, until you
   change the text.
@@ -1506,11 +1525,44 @@ and each table sits right of the tables its foreign keys point at; lines go from
 at, virtual foreign keys you added in a table's rows included ([Virtual foreign keys](https://kleash.github.io/airsql/table-data.html#foreign-key-labels-and-virtual-foreign-keys)).
 Tables with no keys come last.
 
-Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure**, **Open Data** and **Copy Name** (⌘C copies the selected table's name too), or the empty space to export. Pinch,
-⌘+ and ⌘− zoom, ⌘0 goes back to actual size and **Fit** shows the whole diagram; ⌘F goes to the find field, where typing
-part of a name selects that table and Return goes to the next. ⌘R reads the schema again. **Export Image…** saves the diagram as a PNG, and **Export
-Mermaid…** as Mermaid text, which many docs sites and wikis draw.
+Click a table to select it (⌘ or ⇧ click adds more; the arrow keys move between tables), double-click it to open it in the
+table editor, and right-click it for **Open Structure**, **Open Data**, **Copy Name** and the diagram's own commands (⌘C copies
+the selected table's name too), or the empty space to export. Pinch, ⌘+ and ⌘− zoom, ⌘0 goes back to actual size and **Fit** shows
+the whole diagram; ⌘F goes to the find field, where typing part of a name selects that table and Return goes to the next. ⌘R
+reads the schema again.
+
+### Boxes and saved diagrams
+
+Drag a box to move it, with any others selected; ⌥ and the arrow keys do the same from the keyboard. ⌘Z takes a move back. A
+diagram remembers where its boxes are: it is kept on this Mac, never on the server.
+
+A database can have several diagrams, chosen in **Diagram**. The first always shows every table.
+
+- **Diagram of Selected Tables** in a table's right-click menu in the tree makes a diagram of only those tables, and **Diagram
+  of Neighbours** adds every table that touches them by a foreign key.
+- **Add Table** adds one more, or drag tables onto the diagram from the tree. **Add Neighbours** adds what touches the selected
+  boxes (on the whole database's diagram it makes a new diagram of them), and **Remove from Diagram** takes boxes off; the tables
+  themselves aren't touched.
+- **New Diagram from Selection…** keeps the selected boxes, or all of them, under a name. **Database ▸ Diagram** also has Rename and
+  Delete, which asks first: a deleted diagram's layout can't be got back.
+- **Arrange** lays the boxes out again, **Left to Right**, **Top to Bottom** or as a **Grid**, and forgets where you moved them.
+- **Show** chooses **All Columns**, **Keys Only** or **Names Only**, and turns **Comments** and **Virtual Keys** on or off.
+
+**Export** saves the diagram as a PNG, or as text for other tools: Mermaid, which many docs sites and wikis draw, PlantUML, Graphviz
+DOT, GraphML and draw.io (the last two keep where your boxes are). **Print Diagram…** fits it on one page.
+
+## CREATE statements of several objects
+
+**Copy CREATE** works on several selected objects, as one script. **Open CREATE in Query Tab** puts that script in a new query tab;
+nothing runs until you run it.
+
+**SQL Generator…**, on a database or on selected objects, shows the statements that recreate them and keeps them up to date as you
+change its options: IF NOT EXISTS and OR REPLACE where your server takes them, Skip DEFINER, database names, and whether to keep
+indexes, foreign keys, the AUTO_INCREMENT number and the tables' triggers. Tables come first, then views, routines, triggers and events,
+with foreign key checks off around several tables so that their order doesn't matter, and DELIMITER lines round routines.
+
+**Copy** and **Open in Query Tab** take the whole script. **Save to Folder…** writes a `.sql` file per object: all in one folder, in a
+folder per kind, in folders by database and kind, or numbered in the order they run. Files of the same name are replaced.
 
 
 ---
@@ -2715,12 +2767,13 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
-  `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.cancel`, `preview.run` (the person's).
+  `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.console`, `preview.cancel`, `preview.run` (the person's).
 - **Table editor**: `tableEditor.sections`, `tableEditor.list`, `tableEditor.options` (`.name`, `.database`, `.engine`,
   `.collation`, `.rowFormat`, `.autoIncrement`, `.comment`), `tableEditor.sql`, `tableEditor.apply`,
-  `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
-  `objectEditor.definer`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
-  `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
+  `tableEditor.partitions`, `tableEditor.partitionClause`, `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
+  `objectEditor.definer`, `objectEditor.run`, `objectEditor.apply`, `objectEditor.revert`, and its fields, `objectForm.name` and the like. **ER diagram**: `erDiagram.database`,
+  `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`. **SQL Generator**: `generator.text`,
+  `generator.copy`, `generator.console`, `generator.save`, `generator.layout`, and a box per option (`generator.indexes` and so on).
 - **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,
   `recon.source.object`, `recon.target.connection`, `recon.target.database`, `recon.target.object`, `recon.swap`,
   `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`, `recon.filter`, `recon.hideMatching`, `recon.back`,

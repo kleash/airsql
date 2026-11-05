@@ -282,6 +282,22 @@ extension AppTests {
             // The menus reach the page on show, not the rows behind it.
             #expect(!first.responds(to: Commands.addRow.action) && first.responds(to: Commands.pageData.action))
             #expect(main.supplementalTarget(forAction: Commands.apply.action, sender: nil) as AnyObject? === first.shownPage)
+            // The editor's sections work on the page, and it comes back on the one left.
+            let page = try #require(first.shownPage as? TableEditorController)
+            // A replayed connection has no tools session to read the table with: the sections work all the same.
+            #expect(await eventually(timeout: 5) { !page.isBusy })
+            #expect(page.before == nil && !page.overlay.isHidden)
+            for section in TableEditorController.Section.allCases {
+                page.sections.selectedSegment = section.rawValue
+                page.sectionChosen(page.sections)
+                #expect(page.section == section)
+            }
+            page.showSection(.partitions)
+            #expect(!page.partitionsView.isHidden && page.listColumn.isHidden)
+            first.show(.data)
+            first.show(.structure)
+            #expect(first.shownPage === page && page.section == .partitions)
+            page.showSection(.columns)
             // The next table opens on that page and leaves its rows unread.
             main.sidebar.reveal(.object(id, DatabaseObject(.table, "airsql_fixture", "customers")), showing: true)
             let second = try #require((main.selectedTab?.content as? PreviewContent)?.shown as? TableDataController)

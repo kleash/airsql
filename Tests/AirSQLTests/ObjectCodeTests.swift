@@ -115,3 +115,246 @@ struct ObjectCodeTests {
         #expect(old.columnChecks == nil)
     }
 }
+
+struct DDLScriptTests {
+    let server = SchemaServer(version: "11.8.2-MariaDB")
+    let mysql = SchemaServer(version: "8.4.0")
+    let table = """
+        CREATE TABLE `orders` (
+          `id` int NOT NULL AUTO_INCREMENT,
+          `customer` int NOT NULL,
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `one` (`customer`),
+          KEY `two` (`id`),
+          CONSTRAINT `fk` FOREIGN KEY (`customer`) REFERENCES `customers` (`id`)
+        ) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4
+        """
+
+    func item(_ kind: DatabaseObject.Kind, _ name: String, _ code: String, table: String? = nil) -> DDLScript.Item {
+        DDLScript.Item(DatabaseObject(kind, "shop", name), code: code, table: table)
+    }
+
+    @Test func leavesOutWhatTheOptionsSay() {
+        var options = DDLScript.Options()
+        options.indexes = false
+        options.foreignKeys = false
+        options.autoIncrement = false
+        options.ifNotExists = true
+        options.databaseNames = true
+        #expect(DDLScript([item(.table, "orders", table)], options: options, server: server).text == """
+            CREATE TABLE IF NOT EXISTS `shop`.`orders` (
+              `id` int NOT NULL AUTO_INCREMENT,
+              `customer` int NOT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+            """)
+    }
+
+    @Test func rewritesObjectsAsEachServerTakes() {
+        let view = item(.view, "v", "CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`%` SQL SECURITY DEFINER VIEW `shop`.`v` AS select 1")
+        let routine = item(.procedure, "p", "CREATE DEFINER=`root`@`%` PROCEDURE `p`()\nBEGIN\n  SELECT 1;\nEND")
+        var options = DDLScript.Options()
+        options.skipDefiner = true
+        options.orReplace = true
+        #expect(DDLScript([view], options: options, server: mysql).text
+                == "CREATE OR REPLACE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `v` AS select 1;\n")
+        #expect(DDLScript([routine], options: options, server: mysql).text
+                == "DELIMITER ;;\nCREATE PROCEDURE `p`()\nBEGIN\n  SELECT 1;\nEND;;\nDELIMITER ;\n", "MySQL can't replace a routine")
+        #expect(DDLScript([routine], options: options, server: server).text.contains("CREATE OR REPLACE PROCEDURE `p`()"))
+        options.orReplace = false
+        options.ifNotExists = true
+        let event = item(.event, "e", "CREATE EVENT `e` ON SCHEDULE EVERY 1 DAY DO SELECT 1")
+        #expect(DDLScript([event], options: options, server: mysql).text == "CREATE EVENT IF NOT EXISTS `e` ON SCHEDULE EVERY 1 DAY DO SELECT 1;\n")
+    }
+
+    @Test func ordersTheScriptAndTurnsKeyChecksOffForTables() {
+        let items = [item(.trigger, "t", "CREATE TRIGGER `t` BEFORE INSERT ON `orders` FOR EACH ROW SET @a = 1", table: "orders"),
+                     item(.view, "v", "CREATE VIEW `v` AS select 1"), item(.table, "orders", table),
+                     item(.table, "b", "CREATE TABLE `b` (\n  `id` int\n)")]
+        let text = DDLScript(items, server: server).text
+        #expect(text.hasPrefix("SET FOREIGN_KEY_CHECKS = 0;\n\nCREATE TABLE `orders`") && text.hasSuffix("SET FOREIGN_KEY_CHECKS = 1;\n"))
+        #expect(text.range(of: "VIEW `v`")!.lowerBound < text.range(of: "TRIGGER `t`")!.lowerBound)
+        var options = DDLScript.Options()
+        options.triggers = false
+        #expect(!DDLScript(items, options: options, server: server).text.contains("TRIGGER"), "only a table's own triggers are optional")
+    }
+
+    @Test func filesStayInTheFolderAndDifferByMoreThanCase() {
+        let items = [item(.table, "../../etc/passwd", "CREATE TABLE `x` (\n  `a` int\n)"), item(.table, "Foo", "CREATE TABLE `Foo` (\n  `a` int\n)"),
+                     item(.table, "foo", "CREATE TABLE `foo` (\n  `a` int\n)"), item(.procedure, "p", "CREATE PROCEDURE `p`() SELECT 1")]
+        let script = DDLScript(items, server: server)
+        #expect(script.files(.flat).map(\.path) == ["_._.._etc_passwd.sql", "Foo.sql", "foo-2.sql", "p.sql"])
+        #expect(script.files(.byKind).last?.path == "procedures/p.sql")
+        #expect(script.files(.byDatabase).last?.path == "shop/procedures/p.sql")
+        #expect(script.files(.numbered).map(\.path).last == "004_p.sql")
+        #expect(script.files(.flat).first?.text.hasSuffix(");\n") == true)
+    }
+
+    @Test func readsEachKindsColumn() async throws {
+        let source = CannedSource(["SHOW CREATE TABLE": [["t", "CREATE TABLE `t` (\n)"]],
+                                   "SHOW CREATE EVENT": [["e", "", "UTC", "CREATE EVENT `e`", "", "", ""]]])
+        let items = try await DDLScript.load([DatabaseObject(.table, "shop", "t"), DatabaseObject(.event, "shop", "e")], from: source)
+        #expect(items.map(\.code) == ["CREATE TABLE `t` (\n)", "CREATE EVENT `e`"])
+    }
+}
+
+struct TableOptionsSQLTests {
+    let server = SchemaServer(version: "11.8.2-MariaDB")
+
+    func table() -> TableDesign {
+        var table = TableDesign(name: "t")
+        var id = ColumnDesign(name: "id", type: TypeSpec(name: "int"))
+        id.original = "id"
+        table.columns = [id]
+        return table
+    }
+
+    @Test func readsThePartitionClauseOfEitherServer() {
+        let mysql = "CREATE TABLE `t` (\n  `id` int\n) ENGINE=InnoDB COMMENT='PARTITION BY nothing'\n/*!50100 PARTITION BY HASH (`id`)\nPARTITIONS 4 */"
+        #expect(EditorQueries.partitionClause(mysql, noBackslashEscapes: false) == "PARTITION BY HASH (`id`)\nPARTITIONS 4")
+        let mariadb = "CREATE TABLE `t` (\n  `id` int\n) ENGINE=InnoDB\n PARTITION BY RANGE (`id`)\n(PARTITION `p0` VALUES LESS THAN (10) ENGINE = InnoDB)"
+        #expect(EditorQueries.partitionClause(mariadb, noBackslashEscapes: false)
+                == "PARTITION BY RANGE (`id`)\n(PARTITION `p0` VALUES LESS THAN (10) ENGINE = InnoDB)")
+        #expect(EditorQueries.partitionClause("CREATE TABLE `t` (\n  `id` int\n) COMMENT='PARTITION BY x'", noBackslashEscapes: false) == nil)
+    }
+
+    @Test func writesPartitionsInCreateAndAStatementOfTheirOwn() throws {
+        var new = table()
+        new.options.partitioning = "  PARTITION BY HASH (id) PARTITIONS 2\n"
+        #expect(try new.statements(database: "d", from: nil, server: server).first?.hasSuffix("\n)\nPARTITION BY HASH (id) PARTITIONS 2") == true)
+        var renamed = new
+        renamed.name = "u"
+        renamed.options.comment = "x"
+        let statements = try renamed.statements(database: "d", from: table(), server: server)
+        #expect(statements.count == 2 && statements[1] == "ALTER TABLE `d`.`u`\n  PARTITION BY HASH (id) PARTITIONS 2")
+        #expect(try table().statements(database: "d", from: new, server: server) == ["ALTER TABLE `d`.`t`\n  REMOVE PARTITIONING"])
+        var same = new
+        same.options.partitioning = "PARTITION BY HASH (id) PARTITIONS 2"
+        #expect(try same.statements(database: "d", from: new, server: server).isEmpty)
+    }
+
+    @Test func writesHowAnIndexIsStored() throws {
+        var hash = IndexDesign(name: "h", kind: .index, parts: [.init(column: "id")])
+        hash.algorithm = "HASH"
+        var old = table()
+        hash.original = "h"
+        old.indexes = [hash]
+        var new = old
+        new.indexes[0].algorithm = "BTREE"
+        #expect(try new.statements(database: "d", from: old, server: server)
+                == ["ALTER TABLE `d`.`t`\n  DROP INDEX `h`,\n  ADD INDEX `h` (`id`) USING BTREE"])
+        new.indexes[0].kind = .fulltext
+        #expect(try new.statements(database: "d", from: old, server: server).first?.contains("USING") == false)
+        new.indexes[0].kind = .index
+        new.indexes[0].algorithm = "NOPE; DROP TABLE t"
+        #expect(throws: DesignError.self) { try new.statements(database: "d", from: old, server: server) }
+    }
+
+    @Test func keepsBTREEOnMemoryTablesOnly() {
+        var table = SchemaTable(name: "t", kind: .table, engine: "MEMORY")
+        table.indexes = [SchemaIndex(name: "a", unique: false, type: "BTREE",
+                                     parts: [.init(column: "id", expression: nil, prefixLength: nil, descending: false)], visible: true, comment: "")]
+        #expect(TableDesign(table, options: TableOptions(engine: "MEMORY"), server: server).indexes[0].algorithm == "BTREE")
+        #expect(TableDesign(table, options: TableOptions(engine: "InnoDB"), server: server).indexes[0].algorithm == nil)
+    }
+}
+
+struct ObjectFormTests {
+    @Test func readsAProcedureAndWritesItsHeadLeavingTheBody() throws {
+        let code = """
+            CREATE DEFINER=`root`@`%` PROCEDURE `add it`(IN p_name VARCHAR(100), OUT `the id` DECIMAL(10,2), INOUT p_set ENUM('a,b','c'))
+                READS SQL DATA
+                DETERMINISTIC
+                SQL SECURITY INVOKER
+                COMMENT 'it''s'
+            BEGIN
+              SELECT 1; -- a note
+            END
+            """
+        var form = try #require(RoutineForm(code, noBackslashEscapes: false))
+        #expect(form.name == "add it" && form.deterministic && form.security == "INVOKER" && form.dataAccess == "READS SQL DATA" && form.comment == "it's")
+        #expect(form.parameters == [.init(mode: "IN", name: "p_name", type: "VARCHAR(100)"), .init(mode: "OUT", name: "the id", type: "DECIMAL(10,2)"),
+                                    .init(mode: "INOUT", name: "p_set", type: "ENUM('a,b','c')")])
+        form.parameters.swapAt(0, 1)
+        form.parameters.removeLast()
+        form.deterministic = false
+        form.comment = "new"
+        #expect(form.code(noBackslashEscapes: false) == """
+            CREATE DEFINER=`root`@`%` PROCEDURE `add it`(OUT `the id` DECIMAL(10,2), IN `p_name` VARCHAR(100))
+            READS SQL DATA
+            SQL SECURITY INVOKER
+            COMMENT 'new'
+            BEGIN
+              SELECT 1; -- a note
+            END
+            """)
+    }
+
+    @Test func readsAFunctionsReturnsUpToItsBody() throws {
+        for (text, returns) in [("RETURNS INT\nRETURN 1", "INT"), ("RETURNS varchar(20) CHARSET utf8mb4 COLLATE utf8mb4_bin\nDETERMINISTIC\nRETURN 'x'",
+                                                                   "varchar(20) CHARSET utf8mb4 COLLATE utf8mb4_bin"),
+                                ("RETURNS DECIMAL(10,2) UNSIGNED NO SQL BEGIN RETURN 1; END", "DECIMAL(10,2) UNSIGNED"),
+                                ("RETURNS DOUBLE PRECISION RETURN 1", "DOUBLE PRECISION")] {
+            var form = try #require(RoutineForm("CREATE FUNCTION f(a INT, b CHAR(3)) " + text, noBackslashEscapes: false), "\(text)")
+            #expect(form.returns == returns && form.parameters.count == 2 && form.parameters[0].mode.isEmpty)
+            form.returns = "BIGINT"
+            #expect(form.code(noBackslashEscapes: false).hasPrefix("CREATE FUNCTION `f`(`a` INT, `b` CHAR(3)) RETURNS BIGINT"))
+            #expect(form.code(noBackslashEscapes: false).hasSuffix(text.hasSuffix("END") ? "BEGIN RETURN 1; END" : text.hasSuffix("'x'") ? "RETURN 'x'" : "RETURN 1"))
+        }
+    }
+
+    @Test func refusesCodeItCantRead() {
+        for code in ["CREATE PROCEDURE p", "CREATE PROCEDURE p(IN", "SELECT 1", "CREATE PROCEDURE p(IN a) BEGIN END", "CREATE FUNCTION f() RETURNS"] {
+            #expect(RoutineForm(code, noBackslashEscapes: false) == nil, "\(code)")
+        }
+        #expect(TriggerForm("CREATE TRIGGER t BEFORE INSERT ON x", noBackslashEscapes: false) == nil)
+        #expect(EventForm("CREATE EVENT e ON SCHEDULE EVERY 1 DAY", noBackslashEscapes: false) == nil)
+    }
+
+    @Test func readsATriggerAndChangesWhenItFires() throws {
+        var form = try #require(TriggerForm("CREATE DEFINER=`a`@`b` TRIGGER `t` AFTER UPDATE ON `shop`.`orders` FOR EACH ROW FOLLOWS other\nSET @a = 1",
+                                            noBackslashEscapes: false))
+        #expect(form.timing == "AFTER" && form.event == "UPDATE" && form.table == "orders")
+        form.timing = "BEFORE"
+        form.event = "DELETE"
+        form.table = "lines"
+        #expect(form.code() == "CREATE DEFINER=`a`@`b` TRIGGER `t` BEFORE DELETE ON `shop`.`lines` FOR EACH ROW\nFOLLOWS other\nSET @a = 1")
+    }
+
+    @Test func readsAnEventsScheduleAndWritesAnother() throws {
+        let code = "CREATE DEFINER=`a`@`b` EVENT `e` ON SCHEDULE EVERY 2 HOUR STARTS '2030-01-01 00:00:00' ENDS CURRENT_TIMESTAMP + INTERVAL 1 DAY "
+            + "ON COMPLETION PRESERVE DISABLE ON SLAVE COMMENT 'x' DO BEGIN SELECT 1; END"
+        var form = try #require(EventForm(code, noBackslashEscapes: false))
+        #expect(!form.once && form.every == "2" && form.unit == "HOUR" && form.starts == "'2030-01-01 00:00:00'")
+        #expect(form.ends == "CURRENT_TIMESTAMP + INTERVAL 1 DAY" && form.preserve && form.state == "DISABLE ON SLAVE" && form.comment == "x")
+        form.once = true
+        form.at = "2031-06-01 12:30"
+        form.preserve = false
+        form.state = "ENABLE"
+        form.comment = ""
+        #expect(form.code(noBackslashEscapes: false) == "CREATE DEFINER=`a`@`b` EVENT `e` ON SCHEDULE AT '2031-06-01 12:30' ON COMPLETION NOT PRESERVE ENABLE\nDO BEGIN SELECT 1; END")
+        let once = try #require(EventForm("CREATE EVENT e ON SCHEDULE AT NOW() + INTERVAL 1 HOUR DO SELECT 1", noBackslashEscapes: false))
+        #expect(once.once && once.at == "NOW() + INTERVAL 1 HOUR")
+    }
+
+    @Test func readsAViewAndItsCheckOption() throws {
+        let code = "CREATE ALGORITHM=MERGE DEFINER=`a`@`b` SQL SECURITY INVOKER VIEW `v` (x) AS select 1 AS `x` from t WITH LOCAL CHECK OPTION"
+        var form = try #require(ViewForm(code, noBackslashEscapes: false))
+        #expect(form.algorithm == "MERGE" && form.security == "INVOKER" && form.checkOption == "LOCAL")
+        #expect(form.code() == code)
+        form.checkOption = ""
+        form.algorithm = "TEMPTABLE"
+        #expect(form.code() == "CREATE ALGORITHM=TEMPTABLE DEFINER=`a`@`b` SQL SECURITY INVOKER VIEW `v` (x) AS select 1 AS `x` from t")
+        let plain = try #require(ViewForm("CREATE OR REPLACE VIEW s.v AS SELECT 1 WITH CHECK OPTION;", noBackslashEscapes: false))
+        #expect(plain.checkOption == "CASCADED" && plain.code().hasPrefix("CREATE OR REPLACE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `s`.`v` AS SELECT 1"))
+    }
+
+    @Test func everyTemplateHasAForm() {
+        #expect(RoutineForm(ObjectCode.template(.procedure, name: "p"), noBackslashEscapes: false) != nil)
+        #expect(RoutineForm(ObjectCode.template(.function, name: "f"), noBackslashEscapes: false) != nil)
+        #expect(TriggerForm(ObjectCode.template(.trigger, name: "t"), noBackslashEscapes: false) != nil)
+        #expect(EventForm(ObjectCode.template(.event, name: "e"), noBackslashEscapes: false) != nil)
+        #expect(ViewForm(ObjectCode.template(.view, name: "v"), noBackslashEscapes: false) != nil)
+    }
+}

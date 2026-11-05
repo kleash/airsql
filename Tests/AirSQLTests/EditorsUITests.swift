@@ -105,7 +105,8 @@ extension AppTests {
             let other = middle(4, 1)
             let menu = await call(harness, "click", ["x": other.0, "y": other.1, "button": "right"])
             #expect(list.selectedRow == 4, "a right-click selects the row it is on: \(menu.error ?? "")")
-            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Move Up", "Move Down", "Delete Rows"])
+            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Move Up", "Move Down", "Delete Rows", "New Index from Columns",
+                                             "New Unique Index from Columns", "Add to Index"])
             // Paste waits for rows copied.
             #expect((menu["menu"] as? [[String: Any]])?.filter { $0["enabled"] as? Bool != true }.map { $0["title"] as? String } == ["Paste"])
             _ = await call(harness, "menu", ["path": "context > Delete Rows"])
@@ -135,7 +136,7 @@ extension AppTests {
             let fixtures = ERDiagramTests()
             let long = String(repeating: "customer_loyalty_points_", count: 3).prefix(64)
             let view = ERDiagramView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
-            view.show(ERDiagram(fixtures.database([fixtures.table(String(long)), fixtures.table("orders", pointsAt: [String(long)])])))
+            view.show(ERDiagram(fixtures.database([fixtures.table(String(long)), fixtures.table("orders", pointsAt: [String(long)])])), layout: ERLayout(name: ""))
             let box = try #require(view.boxes.first { $0.table.name == long })
             let tip = view.view(view, stringForToolTip: 0, point: NSPoint(x: box.frame.midX, y: box.frame.midY), userData: nil)
             #expect(tip.hasPrefix(long + "\n"))
@@ -160,10 +161,10 @@ extension AppTests {
             #expect(editor.sqlText.string.contains("COMMENT='Paid or not'"))
             editor.revertChanges(nil)
             #expect(!editor.isEdited)
-            for section in TableEditorController.Section.allCases.dropLast() {
+            for (section, rows) in [(TableEditorController.Section.columns, 6), (.indexes, 4), (.foreignKeys, 2), (.checks, 2)] {
                 editor.sections.selectedSegment = section.rawValue
                 editor.sectionChosen(editor.sections)
-                #expect(editor.list.numberOfRows == [6, 4, 2, 2][section.rawValue], "\(section)")
+                #expect(editor.list.numberOfRows == rows, "\(section)")
             }
         }
 
@@ -262,14 +263,15 @@ extension AppTests {
             let boxes = diagram.canvas.boxes
             let x = { (name: String) in boxes.first { $0.table.name == name }?.frame.minX ?? -1 }
             #expect(x("customers") >= 0 && x("customers") < x("orders") && x("orders") < x("order_lines"))
-            #expect(main.selectedTab?.title == "airsql_fixture · diagram" && diagram.exportMermaid.isEnabled)
+            #expect(main.selectedTab?.title == "airsql_fixture · diagram" && diagram.export.isEnabled)
             let box = try #require(boxes.first { $0.table.name == "orders" })
             let point = windowPoint(box.frame.insetBy(dx: 10, dy: 10), in: diagram.canvas)
 
             let reply = await call(harness, "click", ["x": point.0, "y": point.1])
             #expect(diagram.canvas.selected == "orders", "\(reply.error ?? "") at \(point); canvas \(diagram.canvas.convert(diagram.canvas.bounds, to: nil))")
             let menu = await call(harness, "click", ["x": point.0, "y": point.1, "button": "right"])
-            #expect(titles(menu["menu"]) == ["Open Structure", "Open Data", "Copy Name"])
+            #expect(titles(menu["menu"]) == ["Open Structure", "Open Data", "Copy Name", "Add Neighbours", "Remove from Diagram",
+                                             "New Diagram from Selection…"])
             diagram.copy(nil)
             #expect(NSPasteboard.general.string(forType: .string) == "`orders`")
             diagram.find.stringValue = "CUSTOM"
@@ -286,6 +288,215 @@ extension AppTests {
             _ = await call(harness, "click", ["x": point.0, "y": point.1, "count": 2])
             #expect(main.selectedTab?.title == "orders · structure")
             #expect(diagram.canvas.png().map { NSBitmapImageRep(data: $0)?.pixelsWide ?? 0 } == Int(diagram.canvas.bounds.width * 2))
+        }
+
+        @Test func aDiagramOfChosenTablesKeepsItsBoxesAndComesBack() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, harness) = appWindow(model)
+            let context = try await recordedEditorContext()
+            main.openERDiagram(database: database, tables: ["orders"], neighbours: true, context: context)
+            let diagram = try #require(main.selectedTab?.content as? ERDiagramController)
+            await ready { diagram.diagram == nil }
+            main.window?.layoutIfNeeded()
+            let name = diagram.layout.name
+            #expect(diagram.layouts.first?.tables == nil && diagram.layout.tables?.contains("orders") == true)
+            #expect(diagram.layout.tables?.contains("customers") == true && !(diagram.layout.tables?.contains("tags") ?? true))
+            #expect(diagram.canvas.boxes.count == diagram.layout.tables?.count)
+            #expect(diagram.addTable.numberOfItems > 1, "the tables not drawn are offered")
+
+            // Dragged with the mouse, the box stays where it was left; Undo takes it back.
+            let box = try #require(diagram.canvas.boxes.first { $0.table.name == "orders" })
+            let start = diagram.canvas.convert(NSPoint(x: box.frame.midX, y: box.frame.midY), to: nil)
+            func event(_ type: NSEvent.EventType, _ point: NSPoint) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0, windowNumber: main.window?.windowNumber ?? 0,
+                                   context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            diagram.canvas.mouseDown(with: event(.leftMouseDown, start))
+            diagram.canvas.mouseDragged(with: event(.leftMouseDragged, NSPoint(x: start.x + 30, y: start.y - 40)))
+            diagram.canvas.mouseUp(with: event(.leftMouseUp, NSPoint(x: start.x + 30, y: start.y - 40)))
+            let moved = try #require(diagram.layout.positions["orders"])
+            #expect(moved.x == box.frame.minX + 30 && moved.y == box.frame.minY + 40)
+            diagram.undo(nil)
+            #expect(diagram.layout.positions.isEmpty)
+            diagram.redo(nil)
+            #expect(diagram.canvas.boxes.first { $0.table.name == "orders" }?.frame.minY == CGFloat(moved.y))
+
+            // Taken off, added back by a drop, and what shows in a box.
+            diagram.canvas.selected = "customers"
+            diagram.removeFromDiagram(nil)
+            #expect(!diagram.canvas.boxes.contains { $0.table.name == "customers" })
+            diagram.add(["customers", "not_a_table"])
+            #expect(diagram.canvas.boxes.contains { $0.table.name == "customers" } && diagram.layout.tables?.contains("not_a_table") == false)
+            let item = Commands.detailNames.item()
+            diagram.showDetail(item)
+            #expect(diagram.canvas.boxes.allSatisfy { $0.shown.isEmpty && $0.more == 0 })
+            diagram.arrangeBoxes(Commands.arrangeGrid.item())
+            #expect(diagram.layout.positions.isEmpty && diagram.layout.arrangement == .grid)
+            for format in DiagramExport.allCases { #expect(diagram.exported(format)?.isEmpty == false) }
+
+            // Saved: a new tab on the database has it.
+            TableViewSettingsStore.shared.flush()
+            main.openERDiagram(database: database, context: context)
+            let again = try #require(main.selectedTab?.content as? ERDiagramController)
+            await ready { again.diagram == nil }
+            #expect(again.diagrams.itemTitles == [ERLayout.wholeDatabase, name] && again.diagrams.indexOfSelectedItem == 0)
+            again.diagrams.selectItem(at: 1)
+            again.diagramChosen(again.diagrams)
+            #expect(again.layout.arrangement == .grid && again.canvas.boxes.count == diagram.canvas.boxes.count)
+            // Delete asks: Cancel keeps it.
+            again.deleteDiagram(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Cancel"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(again.layouts.count == 2)
+            again.deleteDiagram(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Delete"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(again.layouts.count == 1 && again.layout.tables == nil)
+        }
+
+        @Test func theTableEditorMakesIndexesFromColumnsAndShowsWhatPointsAtIt() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            let context = try await recordedEditorContext()
+            main.openTableEditor("customers", database: database, context: context)
+            let editor = try #require(main.selectedTab?.content as? TableEditorController)
+            await ready { editor.before == nil }
+            #expect(editor.incoming.contains { $0.table == "orders" })
+            editor.showSection(.references)
+            #expect(editor.list.numberOfRows == editor.incoming.count && !editor.addButton.isEnabled)
+            #expect(editor.sections.label(forSegment: TableEditorController.Section.references.rawValue)?.hasPrefix("Used by · ") == true)
+            editor.list.selectRowIndexes([0], byExtendingSelection: false)
+            editor.deleteRows(nil)
+            #expect(!editor.isEdited, "this list isn't the table's own to change")
+
+            editor.showSection(.columns)
+            editor.list.selectRowIndexes([1, 0], byExtendingSelection: false)
+            editor.uniqueFromColumns(nil)
+            #expect(editor.section == .indexes)
+            let made = try #require(editor.design.indexes.last)
+            #expect(made.kind == .unique && made.parts.compactMap(\.column) == Array(editor.design.columns.prefix(2).map(\.name)))
+
+            // A column added to it, then the SQL of how it is stored and that it is unused.
+            editor.showSection(.columns)
+            editor.list.selectRowIndexes([2], byExtendingSelection: false)
+            let item = NSMenuItem(title: made.name, action: nil, keyEquivalent: "")
+            item.tag = editor.design.indexes.count - 1
+            editor.addColumnsToIndex(item)
+            #expect(editor.design.indexes.last?.parts.count == 3)
+            editor.update { $0.indexes[$0.indexes.count - 1].visible = false }
+            #expect(editor.sqlText.string.contains("ADD UNIQUE INDEX") && editor.sqlText.string.contains("IGNORED"))
+
+            // The clause shows as SQL as it is typed, and Revert takes it back.
+            editor.showSection(.partitions)
+            editor.partitionsView.code.setText("PARTITION BY HASH (id) PARTITIONS 2")
+            editor.partitionsView.textDidChange(Notification(name: NSText.didChangeNotification))
+            #expect(editor.sqlText.string.contains("PARTITION BY HASH (id) PARTITIONS 2"))
+            editor.revertChanges(nil)
+            #expect(editor.partitionsView.code.string.isEmpty && !editor.isEdited)
+        }
+
+        @Test func newRowCommandsLandOnTheirSections() async throws {
+            for (command, section) in [(Commands.newColumn, TableEditorController.Section.columns), (Commands.newIndex, .indexes),
+                                       (Commands.newForeignKey, .foreignKeys)] {
+                #expect(TableEditorController.Section(rawValue: command.tag) == section, "\(command.title)")
+                let (_, _, editor) = try await tableEditor("orders")
+                let rows = editor.design.columns.count + editor.design.indexes.count + editor.design.foreignKeys.count
+                editor.addOnceLoaded(section)
+                #expect(editor.section == section && editor.sections.selectedSegment == section.rawValue && !editor.listColumn.isHidden)
+                #expect(editor.design.columns.count + editor.design.indexes.count + editor.design.foreignKeys.count == rows + 1)
+            }
+            // Asked for before the table is read, it waits for it.
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.openTableEditor("orders", database: database, context: try await recordedEditorContext())
+            let early = try #require(main.selectedTab?.content as? TableEditorController)
+            early.addOnceLoaded(.indexes)
+            await ready { early.section != .indexes }
+            #expect(early.design.indexes.count == (early.before?.indexes.count ?? 0) + 1)
+        }
+
+        @Test func aChangeCanGoToAQueryTabInsteadOfRunning() async throws {
+            let (main, harness, editor) = try await tableEditor("orders")
+            editor.update { $0.options.comment = "x" }
+            editor.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Open in Query Tab"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(console.editor.string.hasPrefix("ALTER TABLE `airsql_fixture`.`orders`") && editor.isEdited)
+        }
+
+        @Test func aFormWritesToTheCodeAndFollowsIt() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.openObjectEditor(.procedure, name: "add_customer", database: database, context: try await recordedEditorContext())
+            let editor = try #require(main.selectedTab?.content as? ObjectEditorController)
+            await ready { editor.isBusy }
+            let form = editor.form
+            #expect(form.name.stringValue == "add_customer" && form.parameters.numberOfRows == 1)
+            form.add(nil)
+            #expect(editor.code.string.contains("(IN `p_name` VARCHAR(100), IN `p_2` INT)") && editor.applyButton.isEnabled)
+            form.moveParameterUp(nil)
+            #expect(editor.code.string.contains("(IN `p_2` INT, IN `p_name` VARCHAR(100))"))
+            form.deterministic.state = .on
+            form.edited(form.deterministic)
+            #expect(editor.code.string.contains(")\nDETERMINISTIC\nBEGIN\n"))
+            editor.code.undoManager?.undo()
+            #expect(!editor.code.string.contains("DETERMINISTIC"), "one undo takes a field's change back")
+
+            // What is typed in the code shows in the fields; code they can't read turns them off and says so.
+            editor.code.replace(NSRange(location: 0, length: editor.code.string.utf16.count), with: "CREATE PROCEDURE `other`()\nNO SQL\nBEGIN\nEND")
+            #expect(form.name.stringValue == "other" && form.parameters.numberOfRows == 0 && form.access.titleOfSelectedItem == "NO SQL")
+            editor.code.replace(NSRange(location: 0, length: editor.code.string.utf16.count), with: "CREATE PROCEDURE `other`(IN")
+            #expect(!form.name.isEnabled && !form.hint.isHidden)
+
+            // A new event starts readable, and Once at swaps the fields.
+            main.openObjectEditor(.event, name: nil, database: database, context: try await recordedEditorContext())
+            let event = try #require(main.selectedTab?.content as? ObjectEditorController)
+            await ready { event.isBusy }
+            #expect(event.form.every.stringValue == "1" && event.form.state.titleOfSelectedItem == "Disabled" && event.form.at.isHidden)
+            event.form.schedule.selectItem(at: 1)
+            event.form.at.stringValue = "2031-01-01 00:00:00"
+            event.form.edited(event.form.schedule)
+            #expect(event.code.string.contains("ON SCHEDULE AT '2031-01-01 00:00:00'") && !event.form.at.isHidden && event.form.every.isHidden)
+        }
+
+        @Test func aRoutineRunsOnlyAsTheServerHasIt() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.openObjectEditor(.procedure, name: "add_customer", database: database, context: try await recordedEditorContext())
+            let editor = try #require(main.selectedTab?.content as? ObjectEditorController)
+            await ready { editor.isBusy }
+            #expect(!editor.runButton.isHidden && editor.runButton.isEnabled)
+            editor.code.setText(editor.code.string + " ")
+            editor.updateControls()
+            #expect(!editor.runButton.isEnabled && editor.runButton.toolTip?.hasPrefix("Apply your changes first") == true)
+        }
+
+        @Test func theGeneratorShowsLiveDDLAndWritesAFilePerObject() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            var context = try await recordedEditorContext()
+            context.reads = CannedSource([
+                "SHOW CREATE TABLE": [["orders", "CREATE TABLE `orders` (\n  `id` int NOT NULL,\n  KEY `x` (`id`)\n) ENGINE=InnoDB"]],
+                "SHOW CREATE TRIGGER": [["t", "", "CREATE TRIGGER `t` BEFORE INSERT ON `orders` FOR EACH ROW SET @a = 1"]],
+            ])
+            let generator = SQLGeneratorController(context: context, objects: [DatabaseObject(.table, database, "orders")], activity: model.activity)
+            main.open(generator, title: generator.tabTitle, connection: context.connection.id)
+            await ready { generator.text.string.isEmpty }
+            #expect(generator.text.string.hasPrefix("CREATE TABLE `orders` (") && generator.text.string.contains("KEY `x`"))
+            #expect(generator.text.string.contains("CREATE TRIGGER `t`"), "the table's triggers come with it")
+            for option in [\DDLScript.Options.indexes, \.triggers] {
+                let box = try #require(generator.boxes.first { $0.1 == option }?.0)
+                box.state = .off
+                generator.optionChanged(box)
+            }
+            #expect(generator.text.string == "CREATE TABLE `orders` (\n  `id` int NOT NULL\n) ENGINE=InnoDB;\n")
+            generator.openInConsole(nil)
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(console.editor.string.hasPrefix("CREATE TABLE `orders`"))
         }
 
         @Test func everyEditorIsTidyAndSaysWhatItsControlsDo() async throws {
@@ -320,6 +531,18 @@ extension AppTests {
                     let object = try #require(main.selectedTab?.content as? ObjectEditorController)
                     await ready { object.isBusy || !object.overlay.isHidden }
                     check("procedure editor")
+                    for kind in [ObjectKind.function, .trigger, .event, .view] {
+                        main.openObjectEditor(kind, name: nil, database: database, context: context)
+                        let new = try #require(main.selectedTab?.content as? ObjectEditorController)
+                        await ready { new.isBusy || !new.overlay.isHidden }
+                        check("\(kind) editor")
+                        #expect(window.frame.size.width <= max(size.width, MainWindowController.minimumSize.width) + 1, "\(kind) widens the window")
+                    }
+                    let generator = SQLGeneratorController(context: context, objects: [], activity: model.activity)
+                    main.open(generator, title: generator.tabTitle, connection: context.connection.id)
+                    await ready { !generator.copyButton.isEnabled }
+                    check("SQL Generator")
+                    #expect(window.frame.size.width <= max(size.width, MainWindowController.minimumSize.width) + 1, "the generator widens the window")
                     main.openERDiagram(database: database, context: context)
                     let diagram = try #require(main.selectedTab?.content as? ERDiagramController)
                     await ready { diagram.diagram == nil }
