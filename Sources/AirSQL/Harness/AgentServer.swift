@@ -301,11 +301,11 @@ final class AgentServer {
             if match == nil, let id, let button = Self.views(NSButton.self, in: window.contentView?.superview ?? window.contentView)
                 .first(where: { $0.accessibilityIdentifier() == id && !$0.isHiddenOrHasHiddenAncestor }) {
                 guard button.isEnabled else { throw Failure("“\(id)” is disabled now" + (button.toolTip.map { ": " + $0 } ?? ".")) }
-                try checkAgentMayAct(in: window)
+                try checkAgentMayAct(in: window, pressing: button.title)
                 return await perform { self.pressButton(button) }
             }
             guard let node = match else { continue }
-            try checkAgentMayAct(in: window)
+            try checkAgentMayAct(in: window, pressing: node.title)
             guard node.enabled else {
                 throw Failure("“\(id ?? title ?? "")” is disabled now" + (node.help.map { ": " + $0 } ?? "."))
             }

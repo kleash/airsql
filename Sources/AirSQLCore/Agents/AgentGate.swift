@@ -61,6 +61,7 @@ extension AgentGate {
             return "the client tools AirSQL runs"
         }
         if personsPart(old.settings) != personsPart(new.settings) { return "these settings" }
+        if old.connections.contains(where: { new.connection($0.id) == nil }) { return "which connections there are" }
         for connection in new.connections {
             let before = old.connection(connection.id) ?? SavedConnection(id: connection.id)
             if before.agentAccess != connection.agentAccess || before.agentSampleRows != connection.agentSampleRows {

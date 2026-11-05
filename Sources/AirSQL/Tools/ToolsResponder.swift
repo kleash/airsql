@@ -67,13 +67,17 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         request.actionTitle = "Lock"
         request.destructive = true
         request.warnings = ["Nothing can write to this server until you unlock it, on any connection."]
-        let options = open.connection.options
         SQLPreviewSheet.show(request, connection: saved, on: window) { result in
             guard result.approved else { return }
             Task {
-                let session = DBConnection(options: options, role: .tools)
+                // One of the connection's own, so keep-alive pings it through a long backup, and a drop or Disconnect ends it.
+                let session: DBConnection
                 do {
-                    _ = try await session.connect()
+                    session = try await open.connection.toolsSession()
+                } catch {
+                    return showError(error.localizedDescription, title: "Couldn't lock the tables", on: window)
+                }
+                do {
                     _ = try await session.query("FLUSH TABLES WITH READ LOCK")
                 } catch {
                     await session.close()
@@ -85,15 +89,21 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
                 alert.informativeText = "Nothing can write to this server until you unlock it."
                 alert.addButton(withTitle: "Unlock").toolTip = "Release the lock, so the server takes writes again"
                 _ = await alert.beginSheetModal(for: window)
-                _ = try? await session.query("UNLOCK TABLES")
+                let held = (try? await session.query("UNLOCK TABLES")) != nil
                 await session.close()
                 work.end()
+                if !held {
+                    showError("Its session ended while the sheet was up, so the server may have taken writes since then: don't count on "
+                              + "a copy made under this lock.", title: "The lock had already gone", on: window)
+                }
             }
         }
     }
 
     @objc func openInTerminal(_ sender: Any?) {
         guard let main, let window = main.window, let saved = main.activeConnection else { return }
+        // The gate (plan §2.8): it writes the login to a file and hands over a client no gate stands in front of.
+        guard !AgentGuard.refuses("Only the person at the Mac can open a client in Terminal.") else { return }
         Task {
             guard let options = await Self.options(for: saved, model: main.model, on: window) else { return }
             let work = main.model.activity.start("Opening Terminal on \(saved.displayName)", connection: saved.id)
