@@ -59,6 +59,8 @@ struct TreeLabTests {
         for (part, name) in [(TablePart.foreignKeys, "to_parent"), (.checks, "positive"), (.indexes, "by_n"), (.indexes, "PRIMARY")] {
             _ = try await session.query(try #require(NavigatorSQL.dropPart(part, name, of: child)))
         }
-        #expect(try await session.rows("SHOW CREATE TABLE \(child.quoted)").first?[1]?.contains("KEY") == false)
+        // The index a foreign key made for itself stays when the key goes, as the server has it.
+        let left = try #require(try await session.rows("SHOW CREATE TABLE \(child.quoted)").first?[1])
+        for gone in ["FOREIGN KEY", "PRIMARY KEY", "by_n", "CONSTRAINT"] { #expect(!left.contains(gone), "\(left)") }
     }
 }

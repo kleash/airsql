@@ -326,7 +326,7 @@ extension AppTests {
             sidebar.treeDoubleClicked(kept)
             #expect(await eventually(timeout: 5) { main.selectedTab?.title.contains("orders") == true })
             #expect(sidebar.treeMenu([kept]).items.compactMap { $0.isSeparatorItem ? nil : $0.title }
-                    == ["Open Structure", "Open Data", "Copy Name", "Copy Name Without Quotes"])
+                    == ["Open Structure", "Open Data", "Copy Name", "Copy Name Without Quotes", "Find Where Used…"])
 
             // A group's Expand All stops at the tables: it doesn't open them, or the tree would drown in columns.
             let tables = try #require(sidebar.treeNodes[.category(id, "airsql_fixture", .table)])

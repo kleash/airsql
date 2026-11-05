@@ -294,6 +294,12 @@ AirSQL writes every statement it sends to a server into one file on your Mac, ju
 Use it to see exactly what AirSQL did: what a query tab ran, what a table edit applied, what the navigator asked the
 server for.
 
+## Where to read it
+
+While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
+or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
+window.
+
 ## Where it is
 
 `~/Library/Logs/AirSQL/SQL.log`. Only you can read it (file mode 0600). At 10 MB it becomes `SQL.1.log`, replacing the
@@ -677,7 +683,7 @@ shows in a sheet, with what it will do:
   it; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
 - **Query ▸ Sessions…** lists every session AirSQL has open on the connection: what uses it, its thread on the server, its
   database, and whether it is running or holds a transaction.
-- **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](https://kleash.github.io/airsql/sql-log.html).
+- **View ▸ SQL Log** (⌥⌘L) shows or hides every statement AirSQL sent, as they come, under the tabs. See [the SQL log](https://kleash.github.io/airsql/sql-log.html).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it. **Operations**
   lists the steps as a tree with the server's rows and cost; click a header to sort the steps of each level, and the
   steps that take a large share are marked in orange. **Table** is the server's EXPLAIN, **Tree** the steps as text and
@@ -833,13 +839,44 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   the statement that makes it.
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
-  filter, a connected connection whose name doesn't match shows the objects that do, opened.
-- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL.
+  filter, a connected connection whose name doesn't match shows the objects that do, opened. Between slashes the filter is
+  a regular expression (`/^wp_/`), and what you opened with Return comes back under its magnifying glass.
+- **Quick Open…** (⌘P) goes to anything by letters of its name, in order: `fica` finds `film_category`. It lists your tabs,
+  connections, databases, tables, routines, triggers and events, recent files and every menu command.
+- **Select in Tree** (⇧⌘L) finds the tab's table or object in the tree; in a query tab, the name at the cursor.
+- **F1** on a tree row shows what the editor's Quick Documentation shows for that name, and a table's first rows, cut
+  short. **Quick Definition** (⌥F1) peeks at its CREATE statement. Both work in a query tab too, for the name at the
+  cursor; there F4 opens the table's rows and ⌥⌘B goes to its DDL. **F4** on a Tables or Views group lists them.
+- **Find Where Used…** lists the views, routines, triggers, events and foreign keys that name the selected object or
+  column, from their definitions on the server, as far as your login can read them.
+- **Back** and **Forward** (⌃⌘← and ⌃⌘→) walk the tabs you've shown; **Recent Tabs…** (⌃⌘E) lists them, the last seen
+  first, with recent files. In a query tab, **Go to Statement…** (⌃⌘O) lists its statements.
+- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL; hold ⇧ as you start to add its
+  database. Drag a table onto a database in the tree to copy it there, through **Copy Table…**'s questions.
+- **Move Up** and **Move Down** in a connection's menu put its list in your own order.
 - F2 renames the selected table or view (or folder), as **Database ▸ Rename…** does.
 - **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
 
 On a server with more than 3,000 tables, AirSQL reads only the names when it connects; a database's columns, indexes and
 keys load when you open it (a spinner shows on its row meanwhile). Change the number in Settings ▸ Connections.
+
+## Choose what the tree shows
+
+The button beside the filter, and **View ▸ Tree**, hold these choices. They last until you change them.
+
+- **Flat List** leaves out the groups: a database's objects come straight under it.
+- Point at an object and click its **star** to make it a favourite (or use **Add to Favourites** in its menu). The star
+  beside the filter, **Favourites Only**, shows only those. Each connection keeps its own.
+- **Sizes** shows each table's size with a bar behind its row, and each database's total, once the sizes are read:
+  click the database to read them. Off, the row shows the estimated rows instead.
+- **Comments** shows tables' and routines' comments beside their names.
+- **Group by Prefix** folds three or more objects that share a first part, such as `wp_`, into a group.
+- **Follow Tab** selects in the tree what the tab you switch to is about.
+- **Database Filter** adds a second box that filters the databases, with the same rules as the first.
+- **Object Kinds** shows or hides tables, views and the rest; **Hide Names…** leaves names or patterns such as `tmp_*` out
+  of every tree.
+- **Databases Shown…** ticks the databases of this server to show; the connection shows "3 of 12" when some are left out.
+  It writes the connection's database filter, so a database left out when you connected returns after you connect again.
 
 ## Change databases and tables
 
@@ -849,6 +886,9 @@ Every change shows its SQL first ([Check SQL before it runs](https://kleash.gith
 - **Drop…** deletes the selected databases or objects. Dropping a database always asks you to type its name; on a
   Production connection, so does dropping or emptying a table.
 - **Truncate…** deletes every row of the selected tables. It can't be rolled back.
+- **Drop…** on an index, foreign key or check under a table takes it off the table; the rows stay.
+- **Edit Comment…** changes a table's or routine's comment. **New Column…**, **New Index…** and **New Foreign Key…** open the
+  table's structure with a new row to fill in; nothing changes until Apply there.
 - **Rename…** gives a table or view a new name. Views and routines that use the old name aren't changed.
 - **Copy Table…** copies a table into the same or another database, with its rows or without, or only the rows where a
   condition you type holds (for example `created_at >= '2026-01-01'`). Indexes come along; foreign keys don't.
@@ -871,11 +911,17 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
   INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
 - **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
 
+## Find text in tabs and files
+
+**Find in Tabs and Files…** (⌃⌥F) searches the text of every query tab and, once you choose a folder, its .sql files.
+Double-click a match to go there. **Replace in Tabs** changes the tabs only, with Undo there, and saves nothing.
+
 ## Find text on the server
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
-tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
-bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
+tables that hold it with how many rows. A value can contain the text, be exactly it, or match it as a regular expression.
+It reads each table in full, so it can take a while on a big server: choose **Stop at 1,000** or **Stop at 100,000** to
+stop counting a table early. The status bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
 matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
 Upper and lower case match as the column's collation says (most ignore case).
 
@@ -916,6 +962,12 @@ Source: https://kleash.github.io/airsql/table-data.html
 
 A table tab shows a table's or view's rows in the data grid. They load a page at a time from the connection's data
 session, a session of their own, so a long query in a query tab never holds them up. Edits wait until you apply them.
+
+
+The switch at the top of a table tab shows its **Data**, its **Structure** (the table editor, or a view's code) or its
+**DDL** (the statement that makes it), also in **View ▸ Table Page** (⌃⌥1, ⌃⌥2, ⌃⌥3). The choice stays as you walk the
+tree: the next table opens on the same page, and reads its rows only when you show them. Structure changes wait for Apply
+there, and closing the tab asks about them.
 
 ## Load rows
 
@@ -1899,6 +1951,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Go to Sidebar | ⌥⌘1 |
 | Go to Editor | ⌥⌘2 |
 | Go to Results | ⌥⌘3 |
+| Select in Tree | ⇧⌘L |
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
@@ -1996,6 +2049,17 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Toggle Case | ⌃⇧U |
 | Comment Selection | ⌥⌘/ |
 | Complete Statement | ⌃⇧↩ |
+| Find in Tabs and Files… | ⌃⌥F |
+| Data | ⌃⌥1 |
+| Structure | ⌃⌥2 |
+| DDL | ⌃⌥3 |
+| Quick Definition | ⌥F1 |
+| Open Data of Name | F4 |
+| Go to DDL | ⌥⌘B |
+| Back | ⌃⌘← |
+| Forward | ⌃⌘→ |
+| Recent Tabs… | ⌃⌘E |
+| Go to Statement… | ⌃⌘O |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
 HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,
@@ -2356,7 +2420,14 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
-- **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
+- **SQL log** (under the tabs while a server is connected, or its window): `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`,
+  `sqlLog.window`.
+- **Table tab's switch**: `tableData.page` (Data, Structure, DDL); View ▸ Table Page does the same.
+- **Sidebar**: `sidebar.filter` (part of a name, or `/a regular expression/`), `sidebar.databaseFilter`, `sidebar.favourites`, `sidebar.options`,
+  each row's `tree.star`; View ▸ Tree holds the choices (saving them is the person's while Ask before agents change anything is on).
+- **Quick Open** (`quickOpen.field`, `quickOpen.list`, `quickOpen.open`): commands listed there are refused to agents; use the `menu` tool.
+  Quick Documentation on a tree row leaves out the table's rows for an agent.
+- **Find in Tabs and Files**: `findFiles.text`, `findFiles.results`, `findFiles.status`; `findFiles.replace` is the person's.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
