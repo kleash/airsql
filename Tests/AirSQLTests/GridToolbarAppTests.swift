@@ -142,3 +142,107 @@ extension AppTests {
         }
     }
 }
+
+/// The pager, Page Down at the end, and the tab's query.
+extension AppTests {
+    @MainActor @Suite struct GridPagerAppTests {
+        typealias Tab = GridDataAppTests
+
+        static func tab(rows: Int = 2_500) async throws -> (MainWindowController, AgentServer, TableDataController, FakeTableSession) {
+            let session = FakeTableSession()
+            session.rows = (1...1_000).map { [String($0), "7", "EU", "100", "1.00", nil] }
+            let (main, harness, tab) = try await Tab.tab(session: session)
+            await ready { tab.loading != nil }
+            return (main, harness, tab, session)
+        }
+
+        var lastPage: (FakeTableSession) -> String? { { $0.statements.last { $0.contains(" LIMIT ") } } }
+
+        @Test func thePagerReplacesTheRowsAndSaysWhereItIs() async throws {
+            let (_, _, tab, session) = try await Self.tab()
+            let source = try #require(tab.source)
+            #expect(tab.pageLabel.stringValue.hasPrefix("1–1,000"))
+            let previous = Commands.previousPage.item()
+            #expect(!tab.validateMenuItem(previous) && previous.toolTip == "These are the first rows")
+            tab.showNextPage(nil)
+            await ready { tab.loading != nil }
+            #expect(lastPage(session)?.hasSuffix("LIMIT 1000 OFFSET 1000") == true)
+            #expect(source.firstRow == 1_000 && source.loadedRows == 1_000)
+            #expect(tab.pageLabel.stringValue.hasPrefix("1,001–2,000"))
+            #expect(tab.viewer.status.rows.stringValue.hasPrefix("Rows 1,001–2,000"))
+            tab.loadRows(more: true)
+            await ready { tab.loading != nil }
+            #expect(lastPage(session)?.hasSuffix("LIMIT 1001 OFFSET 1999") == true)
+            tab.refresh(nil)
+            await ready { tab.loading != nil }
+            #expect(source.firstRow == 1_000)  // Refresh stays on the page
+            tab.showFirstPage(nil)
+            await ready { tab.loading != nil }
+            #expect(source.firstRow == 0)
+        }
+
+        @Test func aTableOpensNewestFirstWhenTheSettingIsOn() async throws {
+            let connection = SavedConnection(name: "Local", host: "127.0.0.1", user: "app")
+            let model = testModel([connection])
+            model.data.settings.newestFirst = true
+            let (main, _) = appWindow(model)
+            let session = FakeTableSession()
+            let tab = try await Tab.open(in: main, connection: connection, session: session)
+            await ready { tab.loading != nil }
+            #expect(lastPage(session)?.hasSuffix("ORDER BY `id` DESC LIMIT 1000") == true)
+        }
+
+        @Test func aNewFilterGoesBackToTheStart() async throws {
+            let (_, _, tab, _) = try await Self.tab()
+            tab.showNextPage(nil)
+            await ready { tab.loading != nil }
+            tab.applyFilter("id > 1")
+            await ready { tab.loading != nil }
+            #expect(tab.source?.firstRow == 0)
+        }
+
+        @Test func lastPageCountsFirst() async throws {
+            let (_, _, tab, session) = try await Self.tab()
+            tab.showLastPage(nil)
+            await ready { tab.loading != nil || tab.total?.exact != true }
+            await ready { tab.loading != nil }
+            #expect(session.statements.contains { $0.hasPrefix("SELECT COUNT(*)") })
+            #expect(tab.source?.firstRow == 0)  // the fake's 1,000 rows are one page
+        }
+
+        @Test func rowsPerPageIsTheTabsOwn() async throws {
+            let (_, _, tab, session) = try await Self.tab()
+            let item = NSMenuItem()
+            item.tag = 500
+            tab.setPageSize(item)
+            await ready { tab.loading != nil }
+            #expect(tab.rowsPerPage == 500)
+            #expect(lastPage(session)?.hasSuffix("LIMIT 500") == true)
+            let choice = Commands.pageSize.item()
+            choice.tag = 500
+            #expect(tab.validateMenuItem(choice) && choice.state == .on)
+        }
+
+        @Test func pageDownOnTheLastRowLoadsMore() async throws {
+            let (_, _, tab, session) = try await Self.tab()
+            tab.grid.selection.select(GridPosition(row: 998, column: 0))
+            let reads = session.statements.count
+            tab.grid.moveDown(nil)
+            #expect(tab.loading != nil)
+            await ready { tab.loading != nil }
+            #expect(session.statements.count > reads)
+            #expect(lastPage(session)?.contains("OFFSET 999") == true)
+        }
+
+        @Test func theQueryCarriesTheFilterAndTheSort() async throws {
+            let (main, _, tab, _) = try await Self.tab()
+            tab.applyFilter("region = 'EU'")
+            await ready { tab.loading != nil }
+            tab.copyTableQuery(nil)
+            let text = NSPasteboard.general.string(forType: .string) ?? ""
+            #expect(text.contains("WHERE (region = 'EU'") && text.hasSuffix("LIMIT 1000;"))
+            tab.openTableQuery(nil)
+            #expect((main.selectedTab?.content as? ConsoleViewController)?.text == text)
+        }
+    }
+}

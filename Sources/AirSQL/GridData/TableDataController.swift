@@ -71,8 +71,17 @@ final class TableDataController: NSViewController, TabContent {
     private(set) lazy var toolbar = GridToolbar(grid: grid, groups: [
         [.init(Commands.refresh, "arrow.clockwise"), .init(Commands.autoRefresh, "timer", menu: { Self.autoRefreshItems() })],
         [.init(Commands.addRow, "plus"), .init(Commands.duplicateRow, "plus.square.on.square")] + GridToolbar.Item.changeItems,
-        GridToolbar.Item.findItems, GridToolbar.Item.viewItems, [.init(Commands.exportRows, "square.and.arrow.up")],
+        GridToolbar.Item.findItems, GridToolbar.Item.viewItems,
+        [.init(Commands.copyTableQuery, "text.quote", menu: { [Commands.copyTableQuery.item(), Commands.openTableQuery.item()] }),
+         .init(Commands.exportRows, "square.and.arrow.up")],
+    ], label: pageLabel, trailing: [
+        .init(Commands.firstPage, "backward.end"), .init(Commands.previousPage, "chevron.left"), .init(Commands.nextPage, "chevron.right"),
+        .init(Commands.lastPage, "forward.end"), .init(Commands.pageSize, "list.number", menu: { Self.pageSizeItems() }),
     ])
+    /// The pager's rows on show: "1,001–2,000 of about 52,000".
+    let pageLabel = AirSQL.label("", font: .monospacedDigitSystemFont(ofSize: 11.5, weight: .regular), color: .secondaryLabelColor)
+    /// Rows per Page in this tab; nil: Settings ▸ Grid's.
+    var pageSize: Int?
     /// The status bar's links, after the rows' count (`viewer.status.rows`).
     lazy var countLink = link("Count Exactly", Commands.countRows, id: "tableData.count")
     lazy var moreLink = link("Load More", Commands.loadMore, id: "tableData.loadMore")
@@ -138,7 +147,7 @@ final class TableDataController: NSViewController, TabContent {
 
     deinit { autoRefresh?.invalidate() }
 
-    var rowsPerPage: Int { max(1, model.data.settings.rowsPerPage) }
+    var rowsPerPage: Int { max(1, pageSize ?? model.data.settings.rowsPerPage) }
 
     override func loadView() {
         let view = NSView()
@@ -232,6 +241,7 @@ final class TableDataController: NSViewController, TabContent {
         settings = saved
         let names = Set(source.columns.map(\.name))
         source.sort = saved.sort.filter { names.contains($0.column) }
+        source.newestFirst = model.data.settings.newestFirst
         source.hiddenColumns = Set(source.columns.indices.filter { saved.hiddenColumns.contains(source.columns[$0].name) })
         bar.filterText = initialFilter ?? saved.filter
         source.filter = GridFilter.condition(bar.filterText)
@@ -249,13 +259,17 @@ final class TableDataController: NSViewController, TabContent {
 
     // MARK: Loading
 
-    /// Loads the first page again (a new filter or sort, Refresh), or the next one (Load More). `keepingSaved`: the new
-    /// rows read back after Apply stay after the loaded ones (unless the pages bring them).
-    func loadRows(more: Bool, through rows: Int? = nil, keepingSaved: Bool = false) {
+    /// Loads the first page again (a new filter or sort), the rows loaded so far (Refresh, `through`), the page from row
+    /// `first` (the pager), or the next one (Load More). `keepingSaved`: the new rows read back after Apply stay after the
+    /// loaded ones (unless the pages bring them).
+    func loadRows(more: Bool, through rows: Int? = nil, keepingSaved: Bool = false, from first: Int? = nil) {
         guard let source, loading == nil else { return }
         let limit = more ? rowsPerPage : max(rowsPerPage, rows ?? 0)
-        if !more { source.cutLength = max(0, model.data.settings.longValueLimit) }
-        let sql = more ? source.nextPageSQL(limit: limit) : source.pageSQL(offset: 0, limit: limit, trimmed: true)
+        if !more {
+            source.cutLength = max(0, model.data.settings.longValueLimit)
+            source.firstRow = first ?? (rows == nil ? 0 : source.firstRow)
+        }
+        let sql = more ? source.nextPageSQL(limit: limit) : source.pageSQL(offset: source.firstRow, limit: limit, trimmed: true)
         // Load More's first row repeats the last one loaded (`nextPageSQL`).
         let requested = more && source.loadedRows > 0 ? limit + 1 : limit
         let filter = source.filter
@@ -385,7 +399,7 @@ final class TableDataController: NSViewController, TabContent {
     /// when the estimate is below what has loaded: InnoDB's can say 0 of a million rows.
     var knownTotal: (rows: Int, exact: Bool)? {
         guard let source else { return nil }
-        if !source.hasMore { return (source.keptRows, true) }
+        if !source.hasMore { return (source.firstRow + source.keptRows, true) }
         guard let total, total.filter == source.filter, total.exact || total.rows >= source.loadedRows else { return nil }
         return (total.rows, total.exact)
     }
@@ -401,7 +415,9 @@ final class TableDataController: NSViewController, TabContent {
     }
 
     /// Count Rows Exactly: COUNT(*) with the filter.
-    @objc func countRows(_ sender: Any?) {
+    @objc func countRows(_ sender: Any?) { count() }
+
+    private func count(then: ((Int) -> Void)? = nil) {
         guard let source, loading == nil else { return }
         let sql = source.countSQL, filter = source.filter
         beginRead("Counting the rows of \(tableName)")
@@ -418,7 +434,62 @@ final class TableDataController: NSViewController, TabContent {
             }
             endRead()
             updateBars()
+            if let total, total.exact, total.filter == filter { then?(total.rows) }
         }
+    }
+
+    // MARK: Pager: a page replaces the rows shown; Load More adds to them.
+
+    @objc func showFirstPage(_ sender: Any?) { loadRows(more: false, from: 0) }
+    @objc func showPreviousPage(_ sender: Any?) { loadRows(more: false, from: max(0, (source?.firstRow ?? 0) - rowsPerPage)) }
+    @objc func showNextPage(_ sender: Any?) { loadRows(more: false, from: (source?.firstRow ?? 0) + (source?.loadedRows ?? 0)) }
+
+    /// Last Page needs the count, which it reads first unless it's known.
+    @objc func showLastPage(_ sender: Any?) {
+        let show = { [weak self] (rows: Int) -> Void in
+            guard let self else { return }
+            loadRows(more: false, from: max(0, rows - 1) / rowsPerPage * rowsPerPage)
+        }
+        if let total, total.exact, total.filter == source?.filter { show(total.rows) } else { count(then: show) }
+    }
+
+    /// Rows per Page (the item's tag): this tab's, from the rows on show.
+    @objc func setPageSize(_ sender: Any?) {
+        guard let size = (sender as? NSMenuItem)?.tag, size > 0, let source else { return }
+        pageSize = size
+        loadRows(more: false, from: source.firstRow)
+    }
+
+    static func pageSizeItems() -> [NSMenuItem] {
+        [100, 500, 1_000, 5_000, 10_000].map { size in
+            let item = Commands.pageSize.item()
+            item.title = size.formatted()
+            item.tag = size
+            item.toolTip = "Load \(size.formatted()) rows at a time in this tab"
+            return item
+        }
+    }
+
+    /// What the rows are out of, as far as anyone can tell: "1,001–2,000 of about 52,000".
+    var pageRange: String {
+        guard let source else { return "" }
+        let kept = source.keptRows + source.saved.count, end = source.firstRow + kept
+        let range = kept == 0 ? "No rows" : "\((source.firstRow + 1).formatted())–\(end.formatted())"
+        return range + (knownTotal.map { " of \($0.exact ? "" : "about ")\($0.rows.formatted())" } ?? "")
+    }
+
+    /// The SELECT the tab runs, whole values and all.
+    private var tableQuery: String? { source?.pageSQL(offset: 0, limit: rowsPerPage) }
+
+    @objc func copyTableQuery(_ sender: Any?) {
+        guard let tableQuery else { return NSSound.beep() }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(tableQuery + ";", forType: .string)
+    }
+
+    @objc func openTableQuery(_ sender: Any?) {
+        guard let tableQuery, let main = view.window?.windowController as? MainWindowController else { return NSSound.beep() }
+        main.openConsole(text: tableQuery + ";", title: nil, connection: context.connection.id)
     }
 
     @objc func loadMore(_ sender: Any?) { loadRows(more: true) }
@@ -574,6 +645,8 @@ final class TableDataController: NSViewController, TabContent {
         fresh.filter = old.filter
         fresh.sort = old.sort.filter { names.contains($0.column) }
         fresh.cutLength = old.cutLength
+        fresh.newestFirst = old.newestFirst
+        fresh.firstRow = old.firstRow
         fresh.hiddenColumns = Set(old.hiddenColumns.compactMap { old.columns[$0].name }.compactMap { name in fresh.columns.firstIndex { $0.name == name } })
         fresh.changes = old.changes
         source = fresh

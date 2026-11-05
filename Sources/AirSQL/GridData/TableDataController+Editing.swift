@@ -30,6 +30,11 @@ extension TableDataController: DataGridViewDelegate {
         }
     }
 
+    /// A Page Down or ↓ past the rows loaded brings the next page.
+    func dataGridReachedLastRow(_ grid: DataGridView) {
+        if source?.hasMore == true, loading == nil { loadRows(more: true) }
+    }
+
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {
         sort(by: column, adding: adding)
     }

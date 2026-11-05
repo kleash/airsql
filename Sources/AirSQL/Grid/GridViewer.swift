@@ -735,6 +735,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     // MARK: DataGridViewDelegate
 
+    func dataGridReachedLastRow(_ grid: DataGridView) {
+        if !(grid.source is TransposedSource) { host?.dataGridReachedLastRow(grid) }
+    }
+
     func dataGridSelectionDidChange(_ grid: DataGridView) {
         status.update()
         updateValuePanel()

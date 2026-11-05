@@ -28,6 +28,10 @@ public final class TableDataSource: GridSource {
     public static let shownLimit = 1_000
     /// The characters (bytes for binary) a long value's page reads; 0: every value whole. Settings ▸ Grid.
     public var cutLength = 0
+    /// The first row loaded, past the table's start (the pager).
+    public var firstRow = 0
+    /// With no sort, an AUTO_INCREMENT key's newest rows come first. Settings ▸ Grid.
+    public var newestFirst = false
     /// Columns hidden in the grid, which pages don't read.
     public var hiddenColumns: Set<Int> = []
 
@@ -94,7 +98,8 @@ public final class TableDataSource: GridSource {
     public func pageSQL(offset: Int, limit: Int?, trimmed: Bool = false) -> String {
         var sql = "SELECT " + columns.indices.map { trimmed ? selected($0) : SQLQuote.identifier(columns[$0].name) }.joined(separator: ", ") + from
         let ties = (key ?? []).map { columns[$0].name }.filter { name in !sort.contains { $0.column == name } }
-        let order = sort + ties.map { TableViewSettings.SortKey(column: $0, ascending: sort.last?.ascending ?? true) }
+        let counting = key?.count == 1 && key.map { table.columns[$0[0]].autoIncrement } == true
+        let order = sort + ties.map { TableViewSettings.SortKey(column: $0, ascending: sort.last?.ascending ?? !(newestFirst && counting)) }
         if !order.isEmpty { sql += " ORDER BY " + GridSorting.orderBy(order) }
         if let limit { sql += " LIMIT \(limit)" }
         if offset > 0 { sql += (limit == nil ? " LIMIT 18446744073709551615" : "") + " OFFSET \(offset)" }
@@ -105,7 +110,8 @@ public final class TableDataSource: GridSource {
     /// others add or delete meanwhile. It starts one row early, so `append` can tell.
     public func nextPageSQL(limit: Int?) -> String {
         overlapping = loadedRows > 0
-        return overlapping ? pageSQL(offset: loadedRows - 1, limit: limit.map { $0 + 1 }, trimmed: true) : pageSQL(offset: 0, limit: limit, trimmed: true)
+        return overlapping ? pageSQL(offset: firstRow + loadedRows - 1, limit: limit.map { $0 + 1 }, trimmed: true)
+            : pageSQL(offset: firstRow, limit: limit, trimmed: true)
     }
 
     /// Whether a page may hold less than the column's value. Reading a row whole needs its key.

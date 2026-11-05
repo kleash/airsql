@@ -11,7 +11,9 @@ import Testing
 func testModel(_ connections: [SavedConnection] = [], folders: [ConnectionFolder] = []) -> AppModel {
     _ = TestEnvironment.isolated
     var passwords: [String: String] = [:]
-    let model = AppModel(data: AirSQLData(connections: connections, folders: folders), activity: ActivityCenter(), store: { _ in })
+    var data = AirSQLData(connections: connections, folders: folders)
+    data.settings.newestFirst = false  // the tests read rows from the first; one turns it on
+    let model = AppModel(data: data, activity: ActivityCenter(), store: { _ in })
     model.savedPassword = { passwords[$0] }
     model.setSavedPassword = { passwords[$0] = $1 }
     return model

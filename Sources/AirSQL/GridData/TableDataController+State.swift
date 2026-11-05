@@ -51,6 +51,8 @@ extension TableDataController: NSMenuItemValidation {
         } else {
             rows.stringValue = "\(loaded) rows loaded"
         }
+        if source.firstRow > 0 { rows.stringValue = "Rows " + pageRange }
+        pageLabel.stringValue = pageRange
         rows.stringValue += readAt.map { " · read " + GridStatusView.time($0) } ?? ""
         rows.toolTip = known?.exact == false && source.hasMore ? "The server's estimate: Count Exactly counts the rows" : nil
         countLink.isHidden = total?.exact == true && total?.filter == source.filter || !source.hasMore
@@ -83,6 +85,7 @@ extension TableDataController: NSMenuItemValidation {
         }
         menuItem.explain(enabled: enabled, reason: reason)
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
+        if menuItem.action == Commands.pageSize.action { menuItem.state = menuItem.tag == rowsPerPage ? .on : .off }
         if menuItem.action == Commands.useAsLabel.action { menuItem.state = isLabel(viewer.focusedColumn) ? .on : .off }
         return enabled
     }
@@ -139,6 +142,11 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.redo.action: return (source.changes.canRedo, "Nothing to redo")
         case Commands.loadMore.action, Commands.loadAll.action:
             return (source.hasMore && loading == nil, source.hasMore ? "Wait until the rows have loaded" : "Every row is loaded")
+        case Commands.firstPage.action, Commands.previousPage.action:
+            return (source.firstRow > 0 && loading == nil, source.firstRow > 0 ? "Wait until the rows have loaded" : "These are the first rows")
+        case Commands.nextPage.action, Commands.lastPage.action:
+            return (source.hasMore && loading == nil, source.hasMore ? "Wait until the rows have loaded" : "These are the last rows")
+        case Commands.pageSize.action: return (loading == nil, "Wait until the rows have loaded")
         case Commands.loadFullCell.action:
             if loading != nil { return (false, "Wait until the rows have loaded") }
             return (viewer.focusedCell.map { source.isCut($0.row, $0.column) } ?? false, "This cell holds its whole value")

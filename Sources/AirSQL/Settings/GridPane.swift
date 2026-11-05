@@ -19,6 +19,9 @@ final class GridPane: SettingsPaneController {
                                         tip: "Type how many characters of a long value a table's page reads; 0 reads every value whole",
                                         range: 0...100_000_000, width: 110), label("characters")],
                  caption: "Load Full Cell reads the rest, as do editing, copying and exporting.")
+        form.row("", [toggle("Open tables newest first", id: "settings.newestFirst",
+                             tip: "Show a table with an AUTO_INCREMENT key from its newest row, until you sort it", \.newestFirst)],
+                 caption: "A table's own sort, once you've set one, comes first.")
         form.row("NULL shown as", [text(\.nullText, id: "settings.nullText",
                                         tip: "Type how empty (NULL) values look in the grid; they are drawn in grey italics",
                                         placeholder: "NULL", width: 120)],

@@ -32,6 +32,8 @@ protocol DataGridViewDelegate: AnyObject {
     /// `rect` of the header.
     func dataGridFiltersColumns(_ grid: DataGridView) -> Bool
     func dataGrid(_ grid: DataGridView, filterValuesOf column: Int, at rect: NSRect)
+    /// Moving down reached the last row: the host may load more.
+    func dataGridReachedLastRow(_ grid: DataGridView)
     /// A double click on a row's number: Record View.
     func dataGrid(_ grid: DataGridView, openRecord row: Int)
     /// A double click on a cell that can't be edited: show its whole value (default: a beep).
@@ -42,6 +44,7 @@ protocol DataGridViewDelegate: AnyObject {
 
 extension DataGridViewDelegate {
     func dataGridSelectionDidChange(_ grid: DataGridView) {}
+    func dataGridReachedLastRow(_ grid: DataGridView) {}
     func dataGrid(_ grid: DataGridView, canEditRow row: Int, column: Int) -> Bool { false }
     func dataGrid(_ grid: DataGridView, didEditRow row: Int, column: Int, text: String) {}
     func dataGrid(_ grid: DataGridView, edit row: Int, column: Int, typed: String?) -> Bool { false }

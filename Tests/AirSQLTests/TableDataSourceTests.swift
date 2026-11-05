@@ -189,3 +189,13 @@ struct TableDataSourceTrimTests {
         #expect(source.changes.state.originals[["1"]] == nil)
     }
 }
+
+struct TableDataSourceOrderTests {
+    @Test func anAutoIncrementKeyOpensNewestFirstUntilSorted() {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table())
+        source.newestFirst = true
+        #expect(source.pageSQL(offset: 0, limit: 5).hasSuffix("ORDER BY `id` DESC LIMIT 5"))
+        source.sort = [.init(column: "name", ascending: true)]
+        #expect(source.pageSQL(offset: 0, limit: 5).hasSuffix("ORDER BY `name` ASC, `id` ASC LIMIT 5"))
+    }
+}

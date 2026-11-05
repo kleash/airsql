@@ -26,8 +26,8 @@ final class GridToolbar: NSView {
     /// Commands the host leaves out for now (a result that can't be edited has no Delete Rows).
     var left: Set<Selector> = [] { didSet { if left != oldValue { validate() } } }
 
-    /// `trailing`: what the host keeps at the bar's right end.
-    init(grid: DataGridView, groups: [[Item]], trailing: [NSView] = []) {
+    /// `label` and `trailing`: what the host keeps at the bar's right end.
+    init(grid: DataGridView, groups: [[Item]], label: NSView? = nil, trailing: [Item] = []) {
         self.grid = grid
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
@@ -45,7 +45,12 @@ final class GridToolbar: NSView {
             }
             if let last = row.views(in: .leading).last { row.setCustomSpacing(Spacing.double, after: last) }
         }
-        trailing.forEach { row.addView($0, in: .trailing) }
+        if let label { row.addView(label, in: .trailing) }
+        for item in trailing {
+            let button = makeButton(item)
+            row.addView(button, in: .trailing)
+            buttons.append((item, button, item.command.item()))
+        }
         row.spacing = 2
         row.edgeInsets = NSEdgeInsets(top: 2, left: Spacing.unit, bottom: 2, right: Spacing.unit)
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest

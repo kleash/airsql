@@ -11,7 +11,8 @@ session, a session of their own, so a long query in a query tab never holds them
 ## Load rows
 
 - The first page loads when the tab opens: **Settings ▸ Grid ▸ Rows per page** rows (1,000 at first), in the table's
-  key order, so pages follow one another.
+  key order, so pages follow one another. A table with an AUTO_INCREMENT key opens newest first, until you sort it
+  (**Settings ▸ Grid ▸ Open tables newest first**).
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
   An estimate below what has already loaded is left out (InnoDB's can say 0 of a million rows), and with no figure to go
@@ -24,6 +25,10 @@ session, a session of their own, so a long query in a query tab never holds them
   toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
 - Pages are read by offset. If someone adds or deletes rows between pages, a row can repeat or be missing: a notice says
   so when it happens, and Refresh reads the rows again.
+- **↓** or **Page Down** on the last row loaded loads the next page too.
+- The pager at the right of the toolbar shows which rows are on show and steps through them: **First Page**, **Previous
+  Page**, **Next Page** and **Last Page** (which counts the rows first) replace the rows, where Load More adds to them.
+  **Rows per Page** changes the page size for this tab.
 - A long value (TEXT, BLOB, JSON, a very long VARCHAR) comes cut at the server, to its first 1,000 characters
   (**Settings ▸ Grid ▸ Long values**; 0 reads every value whole), so a table of large blobs opens at once. Such a cell ends
   in `…`. **Data ▸ Load Full Cell**, or the button in the value panel, reads the rest. Editing the cell, copying it,
@@ -33,6 +38,9 @@ session, a session of their own, so a long query in a query tab never holds them
 - A hidden column isn't read at all. Showing it again loads the rows again.
 - **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
   until you choose **Off**. Pending changes stay.
+
+**Data ▸ Copy Query** copies the SELECT the tab runs, with its filter and sort, and **Open Query in Console** opens it in
+a new query tab.
 
 ## Filter, search and sort
 
