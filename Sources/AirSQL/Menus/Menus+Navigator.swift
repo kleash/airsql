@@ -20,7 +20,8 @@ extension MainMenu {
         menus.database.add([nil])
         menus.database.addItem(MainMenu.submenu("Server Home", [Commands.hostDatabases, Commands.hostVariables, Commands.hostStatus,
                                                                 Commands.hostProcesses, Commands.hostCommands].map { $0.item() }))
-        menus.database.add([Commands.editVariable, Commands.editDatabase])
+        menus.database.add([Commands.editVariable, Commands.editDatabase, nil, Commands.users, Commands.newUser, Commands.newRole, Commands.editUser,
+                            Commands.cloneUser, Commands.dropUser, Commands.modifyGrants])
         menus.tools.add([Commands.generateLiquibase, nil, Commands.diskUsage, Commands.diskUsageUp, Commands.diskUsageCompare,
                          Commands.copyList, Commands.exportList])
         menus.view.addItem(submenu("Tree", Commands.treeMenuItems()))

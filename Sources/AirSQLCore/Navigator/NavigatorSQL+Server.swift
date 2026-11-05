@@ -14,6 +14,8 @@ public struct ServerProcess: Hashable {
     public var info: String?
     /// MariaDB's id of the running statement, for KILL QUERY ID: it can't stop the next statement by mistake.
     public var queryID: UInt64?
+    /// `info` to show: another session's CREATE USER has its password masked. Kill checks against `info` itself.
+    public var shownInfo: String? { info.map { SQLLog.mask($0) } }
 
     public init(id: UInt64, user: String, host: String, database: String?, command: String, time: Int, state: String?,
                 info: String?, queryID: UInt64?) {
@@ -44,27 +46,6 @@ extension NavigatorSQL {
             pattern.append(character)
         }
         return pattern + "%"
-    }
-
-    /// How Find Text compares a column with the text.
-    public enum FindMode: String, CaseIterable {
-        case contains = "Contains", exact = "Exactly", regexp = "Regular expression"
-    }
-
-    /// The rows of a table where any of `columns` matches `text` in that way.
-    public static func matches(_ text: String, mode: FindMode, columns: [String], noBackslashEscapes: Bool) -> String {
-        let value = SQLQuote.string(text, noBackslashEscapes: noBackslashEscapes)
-        switch mode {
-        case .contains: return contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes)
-        case .exact: return columns.map { "\(SQLQuote.identifier($0)) = \(value)" }.joined(separator: " OR ")
-        case .regexp: return columns.map { "\(SQLQuote.identifier($0)) REGEXP \(value)" }.joined(separator: " OR ")
-        }
-    }
-
-    /// How many rows of `table` match, counting no further than `limit` (nil: all of them), so a huge table stops early.
-    public static func countMatching(_ condition: String, in table: DatabaseObject, limit: Int?) -> String {
-        guard let limit else { return "SELECT COUNT(*) FROM \(table.quoted) WHERE " + condition }
-        return "SELECT COUNT(*) FROM (SELECT 1 FROM \(table.quoted) WHERE \(condition) LIMIT \(limit)) AS matched"
     }
 
     /// Definitions that may name `name` (kind, database, object, definition), wherever the login can read them. The LIKE
@@ -110,16 +91,52 @@ extension NavigatorSQL {
         return object.kind == .table ? "ALTER TABLE \(object.quoted) COMMENT = \(text)" : "ALTER \(object.kind.keyword) \(object.quoted) COMMENT \(text)"
     }
 
-    /// `col1` LIKE '%text%' ESCAPE '!' OR `col2` LIKE …: the rows of a table where any of `columns` contains `text`.
-    public static func contains(_ text: String, columns: [String], noBackslashEscapes: Bool) -> String {
-        let pattern = SQLQuote.string(containsPattern(text), noBackslashEscapes: noBackslashEscapes)
-        return columns.map { "\(SQLQuote.identifier($0)) LIKE \(pattern) ESCAPE '!'" }.joined(separator: " OR ")
+    /// How Find Text compares: a column's own collation decides case unless `caseSensitive`.
+    public struct TextMatch: Equatable, Sendable {
+        public enum Kind: Int, CaseIterable, Sendable {
+            case contains, exact, wildcards, regex
+
+            public var title: String {
+                switch self {
+                case .contains: return "Contains"
+                case .exact: return "Is exactly"
+                case .wildcards: return "Wildcards (% and _)"
+                case .regex: return "Regular expression"
+                }
+            }
+        }
+
+        public var kind = Kind.contains
+        public var caseSensitive = false
+
+        public init(kind: Kind = .contains, caseSensitive: Bool = false) {
+            self.kind = kind
+            self.caseSensitive = caseSensitive
+        }
+    }
+
+    /// `col1` LIKE '%text%' ESCAPE '!' OR `col2` LIKE …: the rows of a table where any of `columns` matches `text`. Exact
+    /// case compares as utf8mb4_bin, whatever the column's character set.
+    public static func contains(_ text: String, columns: [String], noBackslashEscapes: Bool, match: TextMatch = TextMatch()) -> String {
+        let quote = { SQLQuote.string($0, noBackslashEscapes: noBackslashEscapes) }
+        let test: String
+        switch match.kind {
+        case .contains: test = "LIKE \(quote(containsPattern(text))) ESCAPE '!'"
+        case .exact: test = "= " + quote(text)
+        case .wildcards: test = "LIKE \(quote(text.replacingOccurrences(of: "!", with: "!!"))) ESCAPE '!'"
+        case .regex: test = "REGEXP " + quote(text)
+        }
+        return columns.map {
+            (match.caseSensitive ? "CONVERT(\(SQLQuote.identifier($0)) USING utf8mb4) COLLATE utf8mb4_bin" : SQLQuote.identifier($0)) + " " + test
+        }.joined(separator: " OR ")
     }
 
     /// How many rows of `table` hold `text` in one of `columns`.
     public static func countContaining(_ text: String, in table: DatabaseObject, columns: [String],
-                                       noBackslashEscapes: Bool) -> String {
-        countMatching(contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes), in: table, limit: nil)
+                                       noBackslashEscapes: Bool, match: TextMatch = TextMatch(), limit: Int? = nil) -> String {
+        let condition = contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes, match: match)
+        guard let limit else { return "SELECT COUNT(*) FROM \(table.quoted) WHERE " + condition }
+        return "SELECT COUNT(*) FROM (SELECT 1 FROM \(table.quoted) WHERE \(condition) LIMIT \(limit)) AS matched"
     }
 
     /// Every connection to the server and what it runs (MariaDB adds the statement's id).

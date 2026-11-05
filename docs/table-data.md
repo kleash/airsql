@@ -228,10 +228,12 @@ These work in a query's results too.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
-  (`NULL`, `\N` or nothing) and Windows line endings, then **Export…** to a file or **Copy** to the clipboard.
+  (`NULL`, `\N` or nothing), CSV's separator (any text) and quotes, Windows line endings, the file's encoding (UTF-8, with
+  or without a BOM, UTF-16, Windows-1252 and others; characters it lacks are replaced, and you're told), whether line breaks
+  inside values become spaces and whether the file opens afterwards, then **Export…** to a file or **Copy** to the clipboard.
   In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
   and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.
   Hidden columns aren't exported, and the sheet says how many are left out. SQL formats leave out generated columns.
-  In CSV a real NULL has no quotes and the text NULL has them, so CSV import tells them apart; TSV has no way to.
+  In CSV a real NULL has no quotes and the text NULL has them, so Import tells them apart; TSV has no way to.
   CSV is UTF-8 without a BOM, which scripts read as it is: Excel for Mac needs **Data ▸ From Text**.
   XML and HTML can't hold control characters, nor can a workbook: each shows as �.

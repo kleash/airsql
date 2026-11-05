@@ -34,13 +34,12 @@ struct TreeLabTests {
         #expect(rows.allSatisfy { $0.count == 4 && DatabaseObject.Kind(rawValue: $0[0] ?? "") != nil })
 
         // Find modes and limits.
-        func count(_ mode: NavigatorSQL.FindMode, _ text: String, limit: Int? = nil) async throws -> String? {
-            let condition = NavigatorSQL.matches(text, mode: mode, columns: ["note"], noBackslashEscapes: flag)
-            return try await session.rows(NavigatorSQL.countMatching(condition, in: parent, limit: limit)).first?.first ?? nil
+        func count(_ kind: NavigatorSQL.TextMatch.Kind, _ text: String, limit: Int? = nil) async throws -> String? {
+            try await session.rows(NavigatorSQL.countContaining(text, in: parent, columns: ["note"], noBackslashEscapes: flag, match: .init(kind: kind), limit: limit)).first?.first ?? nil
         }
         #expect(try await count(.contains, "alpha") == "2")
         #expect(try await count(.exact, "alpha") == "1")
-        #expect(try await count(.regexp, "^(alpha|beta)$") == "2")
+        #expect(try await count(.regex, "^(alpha|beta)$") == "2")
         #expect(try await count(.contains, "a", limit: 2) == "2")
 
         // Quick Documentation's rows.

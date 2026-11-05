@@ -510,11 +510,12 @@ struct TreeSearchTests {
     }
 
     @Test func findModesAndLimits() {
-        #expect(NavigatorSQL.matches("a'b", mode: .exact, columns: ["c"], noBackslashEscapes: true) == "`c` = 'a''b'")
-        #expect(NavigatorSQL.matches("^a", mode: .regexp, columns: ["c", "d"], noBackslashEscapes: true) == "`c` REGEXP '^a' OR `d` REGEXP '^a'")
+        #expect(NavigatorSQL.contains("a'b", columns: ["c"], noBackslashEscapes: true, match: .init(kind: .exact)) == "`c` = 'a''b'")
+        #expect(NavigatorSQL.contains("^a", columns: ["c", "d"], noBackslashEscapes: true, match: .init(kind: .regex)) == "`c` REGEXP '^a' OR `d` REGEXP '^a'")
         let table = DatabaseObject(.table, "d", "t")
-        #expect(NavigatorSQL.countMatching("x", in: table, limit: nil) == "SELECT COUNT(*) FROM `d`.`t` WHERE x")
-        #expect(NavigatorSQL.countMatching("x", in: table, limit: 10) == "SELECT COUNT(*) FROM (SELECT 1 FROM `d`.`t` WHERE x LIMIT 10) AS matched")
+        #expect(NavigatorSQL.countContaining("x", in: table, columns: ["c"], noBackslashEscapes: true, match: .init(kind: .exact)) == "SELECT COUNT(*) FROM `d`.`t` WHERE `c` = 'x'")
+        #expect(NavigatorSQL.countContaining("x", in: table, columns: ["c"], noBackslashEscapes: true, match: .init(kind: .exact), limit: 10)
+                == "SELECT COUNT(*) FROM (SELECT 1 FROM `d`.`t` WHERE `c` = 'x' LIMIT 10) AS matched")
     }
 
     @Test func partsDropByTheirOwnSQL() {

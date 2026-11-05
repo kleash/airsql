@@ -149,10 +149,10 @@ extension SQLEditorView {
         return (urls ?? []).filter { ["sql", "txt"].contains($0.pathExtension.lowercased()) || opensInSheet($0) }
     }
 
-    /// A file for Import CSV… or Run SQL File…, not a console.
+    /// A file for Import File… or Run SQL File…, not a console.
     static func opensInSheet(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
-        return name.hasSuffix(".csv") || name.hasSuffix(".sql.gz")
+        return [".csv", ".tsv", ".xlsx", ".json", ".jsonl", ".sql.gz"].contains { name.hasSuffix($0) }
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

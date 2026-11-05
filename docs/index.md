@@ -24,13 +24,14 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [The SQL console](console.md): write and run SQL, results, transactions, history and the SQL log.
 - [Connections and routes](connections.md): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
 - [Browse a server](navigator.md): the tree, the database view, table commands, find text and the process list.
+- [Users and roles](users.md): list, add, change and drop logins and roles, their privileges, limits and passwords.
 - [A table's rows](table-data.md): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](data-grid.md): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
 - [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, and the ER
   diagram.
 - [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy
-  to another server; CSV import.
+  to another server; import from CSV, Excel, JSON and the clipboard, into a new table if you want.
 - [Compare](compare.md): servers, databases, tables and objects, structure and data, side by side, and a sync script you review first; or two
   results, or a result with a table, row by row.
 - [AI agents](agents.md): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at

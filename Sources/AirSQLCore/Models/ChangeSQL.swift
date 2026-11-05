@@ -2,7 +2,7 @@ import Foundation
 
 /// A change shown in the SQL preview sheet before it runs (grid Apply, table editor, drop and rename, restore, recon
 /// sync), and what "Save as Liquibase changeset" saves: the statements, a title, and the connection they run on.
-public struct ChangeSQL: Equatable {
+public struct ChangeSQL: Equatable, CustomStringConvertible, CustomDebugStringConvertible {
     public var title: String
     public var statements: [String]
     public var connection: UUID
@@ -20,6 +20,10 @@ public struct ChangeSQL: Equatable {
             return trimmed.hasSuffix(";") ? trimmed : trimmed + ";"
         }.joined(separator: "\n")
     }
+
+    /// Without the statements, wherever a change gets printed: a user's can hold a password.
+    public var description: String { title }
+    public var debugDescription: String { title }
 }
 
 /// Where a saved connection is now, for the sidebar, the status bar and the summary. Set by whatever connects (the

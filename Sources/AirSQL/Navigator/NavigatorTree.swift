@@ -142,9 +142,9 @@ extension SidebarController {
             return row
         }
         if rows.isEmpty, text.isEmpty, options.favouritesOnly {
-            return [node(.message(id, "No favourites here: point at an object and click its star"))]
+            return [node(.message(id, "No favourites here: point at an object and click its star")), node(.users(id))]
         }
-        return rows
+        return text.isEmpty ? rows + [node(.users(id))] : rows
     }
 
     /// "3 of 12" when the connection's database filter leaves databases out of the tree.
@@ -252,6 +252,9 @@ extension SidebarController {
             cell.show(node.detail?.isKey == true ? TreeIcon.primaryKey : TreeIcon.of(part), name, count: node.detail?.note ?? "", countGivesWay: true, busy: false,
                       tip: (node.detail?.about ?? name) + "\nDouble-click to open " + (part == .triggers ? "it" : "the table's structure")
                         + ", right-click for more")
+        case .users:
+            cell.show(TreeIcon.image("US", 0x6B7785), "Users and Roles", count: "", busy: false,
+                      tip: "The server's logins and roles: click to see them, right-click for more")
         default:
             break
         }
@@ -276,7 +279,7 @@ extension SidebarNode {
     var connectionOfTree: UUID? {
         switch kind {
         case .database(let id, _), .category(let id, _, _), .object(let id, _), .part(let id, _, _), .detail(let id, _, _, _),
-             .prefix(let id, _, _, _), .message(let id, _): return id
+             .prefix(let id, _, _, _), .message(let id, _), .users(let id): return id
         default: return nil
         }
     }
@@ -316,6 +319,7 @@ extension SidebarNode {
         case .object(_, let object): return object.name
         case .part(_, _, let part): return part.rawValue
         case .detail(_, _, _, let name): return name
+        case .users: return "Users and Roles"
         default: return nil
         }
     }

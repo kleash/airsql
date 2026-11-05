@@ -149,7 +149,7 @@ extension ConsoleViewController: NSMenuItemValidation {
             return (true, "")
         case #selector(showNextResult(_:)), #selector(showPreviousResult(_:)):
             return (!resultTabs.isEmpty, "Run a query first: there is no result tab yet")
-        case #selector(exportResult(_:)):
+        case #selector(exportResult(_:)), #selector(copyResultToTable(_:)):
             if currentResult?.view is ResultGridView { return (true, "") }
             return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This result has no rows to export")
         case #selector(compareResult(_:)):

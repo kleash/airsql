@@ -134,7 +134,7 @@ struct AccuracyLabTests {
                 try data.write(to: file)
                 var options = CSVImport.Options()
                 options.binaryColumns = binary
-                return try await CSVImport.run(file, options: options, into: session, database: Self.database, table: "c",
+                return try await CSVImport.run(.file(file), options: options, into: session, database: Self.database, table: "c",
                                                columns: ["id", "t", "b"], mapping: [0, 1, 2], cancellation: Cancellation()) { _ in }
             }
             #expect(try await run(Data(text.utf8)).note.isEmpty)

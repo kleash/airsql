@@ -23,6 +23,8 @@ public struct ConnectOptions: Equatable, Sendable, CustomStringConvertible, Cust
     public var user: String
     /// Never logged, never in SQL; held in memory while the connection is open.
     public var password: String
+    /// Set for one login with an expired password: what the login changes it to, before anything else.
+    public var newPassword: String?
     /// The default database, if any.
     public var database: String?
     public var tls: TLSOptions
@@ -362,6 +364,10 @@ public final class DBConnection: @unchecked Sendable {
                                 tls: cipher.map { c in version.map { String(cString: $0) + ", " + c } ?? c },
                                 certificate: check?.certificate)
 
+        // Until an expired password changes the server allows nothing else, not even SET NAMES.
+        if let new = options.newPassword {
+            _ = try run(mysql, UserSQL(mariaDB: server.flavor == .mariadb, noBackslashEscapes: noBackslashEscapes).ownPassword(new), flavor: server.flavor)
+        }
         // The session's setup, every time it connects.
         var set = "SET NAMES utf8mb4"
         if let zone = options.timeZone { set += ", time_zone = " + SQLQuote.string(zone) }

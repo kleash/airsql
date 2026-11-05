@@ -151,10 +151,10 @@ final class ResultGridView: NSView, DataGridViewDelegate {
                 menu.add([nil] + (edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil,
                          Commands.previewChanges, Commands.apply, nil])
             }
-            menu.add([Commands.exportRows])
+            menu.add([Commands.exportRows, Commands.copyResultToTable])
         case .row:
             if editable { menu.add((edits?.canDelete == true ? [Commands.deleteRows] : []) + [Commands.revert, nil]) }
-            menu.add([Commands.exportRows])
+            menu.add([Commands.exportRows, Commands.copyResultToTable])
         }
         for item in menu.items + menu.items.compactMap(\.submenu).flatMap(\.items) where item.target == nil { item.target = self }
         return menu
@@ -216,6 +216,17 @@ final class ResultGridView: NSView, DataGridViewDelegate {
             selectedCount: selected.count, selected: { selected.map(values) },
             loadedCount: rows.rowCount, loaded: { (0..<rows.rowCount).map(values) }, all: nil)
         ExportRowsSheet.show(request, activity: ActivityCenter.shared, on: window)
+    }
+
+    /// Copy Result to Table…: the selected rows when there are several, else every row, as Import File… takes them.
+    @objc func copyResultToTable(_ sender: Any?) {
+        let rows = rows, order = viewer.shownColumns, selected = viewer.selectedRows()
+        let chosen = selected.count > 1 ? selected : Array(0..<rows.rowCount)
+        let table = [order.map { source.columns[$0].name as String? }] + chosen.map { row in order.map { rows.value(row, $0) } }
+        let tools = (window?.windowController).flatMap { first in
+            sequence(first: first as NSResponder, next: \.nextResponder).lazy.compactMap { $0 as? ToolsResponder }.first
+        }
+        tools?.copyToTable(rows: table, title: "The result (\(ObjectPicker.count(chosen.count, "row")))")
     }
 }
 
