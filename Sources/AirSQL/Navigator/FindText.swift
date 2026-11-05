@@ -26,6 +26,12 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
     private var go: NSButton?
     private var stopButton: NSButton?
     private var noBackslashEscapes = false
+    private let matchMenu = popup(NavigatorSQL.TextMatch.Kind.allCases.map(\.title), selected: 0, id: "find.match",
+                                  tip: "Choose how the text is compared", target: nil, action: nil)
+    private let caseBox = checkbox("Match case", id: "find.case", tip: "Tell capitals from small letters, whatever the column's collation",
+                                   on: false, target: nil, action: nil)
+    /// The comparison of the search shown.
+    private var searchedMatch = NavigatorSQL.TextMatch()
 
     init(_ open: OpenConnection, database: String?) {
         self.open = open
@@ -63,7 +69,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         self.go = go
         stopButton = stop
         updateButtons()
-        let bar = NSStackView(views: [field, scope, go, stop, spinner, helpButton(.navigator)])
+        let bar = NSStackView(views: [field, scope, matchMenu, caseBox, go, stop, spinner, helpButton(.navigator)])
         bar.spacing = Spacing.unit
         bar.translatesAutoresizingMaskIntoConstraints = false
         for (id, title, width, tip) in [("table", "Table", 260.0, "Sort by the table that holds the text"),
@@ -123,6 +129,8 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
         let databases = scope.indexOfSelectedItem == 0 ? open.snapshot.databases.map(\.name) : [scope.titleOfSelectedItem ?? ""]
         matches = []
         searched = text
+        searchedMatch = NavigatorSQL.TextMatch(kind: NavigatorSQL.TextMatch.Kind(rawValue: matchMenu.indexOfSelectedItem) ?? .contains,
+                                               caseSensitive: caseBox.state == .on)
         table.reloadData()
         spinner.isHidden = false
         spinner.startAnimation(nil)
@@ -166,7 +174,8 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
                 activity.progress = Double(index) / Double(max(tables.count, 1))
                 activity.detail = "\(index + 1) of \(tables.count): \(object.database).\(object.name)"
                 status.stringValue = "Searching \(object.database).\(object.name) (\(index + 1) of \(tables.count))…"
-                let sql = NavigatorSQL.countContaining(text, in: object, columns: columns, noBackslashEscapes: noBackslashEscapes)
+                let sql = NavigatorSQL.countContaining(text, in: object, columns: columns, noBackslashEscapes: noBackslashEscapes,
+                                                       match: searchedMatch)
                 let running = Task { try await opened.query(sql) }
                 let results = try await withTaskCancellationHandler { try await running.value } onCancel: {
                     Task { _ = try? await opened.cancel() }
@@ -193,7 +202,7 @@ final class FindTextContent: NSViewController, TabContent, NSTableViewDataSource
 
     @objc func openMatch(_ sender: Any?) {
         guard let match = chosen, let main = view.window?.windowController as? MainWindowController else { return }
-        let condition = NavigatorSQL.contains(searched, columns: match.columns, noBackslashEscapes: noBackslashEscapes)
+        let condition = NavigatorSQL.contains(searched, columns: match.columns, noBackslashEscapes: noBackslashEscapes, match: searchedMatch)
         main.openTableData(match.table, of: open, condition: condition)
     }
 

@@ -48,6 +48,8 @@ import AppKit
     @objc optional func revealInFinder(_ sender: Any?)
     @objc optional func runSQLFile(_ sender: Any?)
     @objc optional func importCSV(_ sender: Any?)
+    @objc optional func importClipboard(_ sender: Any?)
+    @objc optional func copyResultToTable(_ sender: Any?)
     @objc optional func importSSHConfig(_ sender: Any?)
     @objc optional func importConnections(_ sender: Any?)
     @objc optional func exportConnections(_ sender: Any?)
@@ -237,6 +239,12 @@ import AppKit
 
     // Tools
     @objc optional func exportDatabase(_ sender: Any?)
+    @objc optional func flushHosts(_ sender: Any?)
+    @objc optional func flushLogs(_ sender: Any?)
+    @objc optional func flushPrivileges(_ sender: Any?)
+    @objc optional func flushTables(_ sender: Any?)
+    @objc optional func flushStatus(_ sender: Any?)
+    @objc optional func flushReadLock(_ sender: Any?)
     @objc optional func restoreDatabase(_ sender: Any?)
     @objc optional func copyToServer(_ sender: Any?)
     @objc optional func compareDatabases(_ sender: Any?)
@@ -386,8 +394,12 @@ enum Commands {
                                         tip: "Show the tab's .sql file in Finder")
     static let runSQLFile = Command("Run SQL File…", #selector(AirSQLActions.runSQLFile(_:)),
                                     tip: "Run the statements of a .sql or .sql.gz file on this connection, with progress")
-    static let importCSV = Command("Import CSV…", #selector(AirSQLActions.importCSV(_:)),
-                                   tip: "Load rows from a CSV file into a table, choosing which column goes where")
+    static let importCSV = Command("Import File…", #selector(AirSQLActions.importCSV(_:)),
+                                   tip: "Load rows from a CSV, Excel or JSON file into a table or a new one, choosing which column goes where")
+    static let importClipboard = Command("Import from Clipboard…", #selector(AirSQLActions.importClipboard(_:)),
+                                         tip: "Load the rows on the clipboard into a table or a new one")
+    static let copyResultToTable = Command("Copy Result to Table…", #selector(AirSQLActions.copyResultToTable(_:)),
+                                           tip: "Copy this result's rows into a table or a new one")
     static let importSSHConfig = Command("Import from ~/.ssh/config…", #selector(AirSQLActions.importSSHConfig(_:)),
                                          tip: "Make connections that tunnel through the SSH hosts in your ~/.ssh/config")
     static let importConnections = Command("Import Connections…", #selector(AirSQLActions.importConnections(_:)),
@@ -808,6 +820,18 @@ enum Commands {
                                  tip: "Run a dump file into a database with your mysql or mariadb client")
     static let copyToServer = Command("Copy to Another Server…", #selector(AirSQLActions.copyToServer(_:)),
                                       tip: "Copy databases or tables, with their rows, to another connection")
+    static let flushHosts = Command("Flush Hosts…", #selector(AirSQLActions.flushHosts(_:)),
+                                    tip: "Clear the server's host cache, which unblocks hosts it refused after failed connections")
+    static let flushLogs = Command("Flush Logs…", #selector(AirSQLActions.flushLogs(_:)),
+                                   tip: "Close and reopen the server's log files")
+    static let flushPrivileges = Command("Flush Privileges…", #selector(AirSQLActions.flushPrivileges(_:)),
+                                         tip: "Reload the grant tables, after changing them by hand")
+    static let flushTables = Command("Flush Tables…", #selector(AirSQLActions.flushTables(_:)),
+                                     tip: "Close the server's open tables and write their changes to disk")
+    static let flushStatus = Command("Flush Status…", #selector(AirSQLActions.flushStatus(_:)),
+                                     tip: "Reset the server's status counters")
+    static let flushReadLock = Command("Lock All Tables for Reading…", #selector(AirSQLActions.flushReadLock(_:)),
+                                       tip: "Stop every write on the server until you unlock it, for a consistent copy of its files")
     static let compare = Command("Compare…", #selector(AirSQLActions.compareDatabases(_:)),
                                  tip: "Compare two servers, databases or objects, and make a script that syncs them")
     static let compareWith = Command("Compare With…", #selector(AirSQLActions.compareWith(_:)),
@@ -908,7 +932,7 @@ enum Commands {
         about, settings, hide, hideOthers, showAll, quit,
         newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
-        runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
+        runSQLFile, importCSV, importClipboard, copyResultToTable, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, pastePlain, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
         toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
@@ -930,7 +954,7 @@ enum Commands {
         killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder, moveToFolder,
-        export, restore, copyToServer, compare, compareWith, compareRows, backToServer, includeInSync, nextDifference, previousDifference,
+        export, restore, copyToServer, flushHosts, flushLogs, flushPrivileges, flushTables, flushStatus, flushReadLock, compare, compareWith, compareRows, backToServer, includeInSync, nextDifference, previousDifference,
         syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
@@ -952,6 +976,7 @@ enum Commands {
     /// Menu items that only open a submenu, by title.
     static let submenus: [String: String] = [
         "Server Home": "Show what the server holds and does: databases, variables, status, processes",
+        "Flush": "Clear the server's caches, logs and counters, or lock its tables",
         "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",

@@ -16,10 +16,10 @@ and in a connection's right-click menu in the sidebar.
 installer), MAMP and your `PATH`. Leave the fields empty and AirSQL picks, for each server, the tools of its family
 (MariaDB's for MariaDB, MySQL's for MySQL) closest to its version. Choose a program to always use that one.
 
-A `.csv` dropped on the window or the Dock icon opens Import CSV with the file chosen, and a `.sql.gz` opens Run SQL
+A `.csv`, `.tsv`, `.xlsx` or `.json` dropped on the window (or a `.csv` or `.xlsx` on the Dock icon) opens Import File with the file chosen, and a `.sql.gz` opens Run SQL
 File the same way; nothing runs until you press the sheet's button.
 
-Export, Restore, Run SQL File, Copy to Another Server and Import CSV each open in a window of their own, which you can
+Export, Restore, Run SQL File, Copy to Another Server and Import File each open in a window of their own, which you can
 move aside to keep working. Closing it while it runs asks first; disconnecting the connection it uses, or quitting, says
 it is running and stops it.
 
@@ -46,7 +46,11 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
    SQL File take a `mysql` or `mariadb` the same way), where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
 4. The box under the form shows the exact command line of the tool you picked, and **Copy Command** copies it. AirSQL's
    built-in export runs no command, so the box says what it does and the button isn't there.
-5. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
+5. **Output** says where it goes: **One file**, **The clipboard** (small dumps, up to 32 MB) or **A folder, a file per
+   object**. In a folder each table, view, routine, trigger and event gets its own `.sql` that restores on its own, read
+   in the same snapshot. Choose CSV, TSV, JSON, JSON Lines or Excel in the menu beside it for a data file per ticked
+   table instead: column names first, every row, and the SQL options turn off.
+6. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
 
 The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
 or failed export never leaves half a file. When it is done, **Show in Finder** shows you the file.
@@ -54,6 +58,20 @@ or failed export never leaves half a file. When it is done, **Show in Finder** s
 **AirSQL (built in)** in the Tool menu writes the SQL itself, through a connection of its own: the tables' `CREATE`
 statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
 consistent snapshot. Its files restore with `mysql` or with Run SQL File.
+
+### What goes in the SQL
+
+- **Rows as** writes `INSERT`, `INSERT IGNORE`, `REPLACE`, or `DELETE` then `INSERT` for each table, and **at most … KB
+  each** caps the size of one statement, for a server with a small `max_allowed_packet`.
+- **Add CREATE DATABASE and USE** makes one database restore under its own name; several always do.
+- **Add DROP DATABASE first** deletes the whole database of that name when the file is restored. It is off while only
+  some tables are ticked, so a file can't take the other tables with it.
+- **Remove DEFINER** leaves the account out of views, routines, triggers and events, so a server without that account
+  takes them; **Remove AUTO_INCREMENT values** leaves out each table's next value; **A transaction per table** speeds up
+  restoring InnoDB tables.
+
+Those last three, `DELETE` before the rows, a folder and the clipboard are AirSQL's own export's: with a dump tool chosen,
+the note says so and **Use AirSQL's Built-in** switches.
 
 ## Restore a dump, or run a .sql file
 
@@ -83,27 +101,63 @@ session on each: no file in between.
   it, and the SQL preview asks before it runs. Copies to a production connection always ask.
 - If a statement fails, the copy stops; what was copied before it stays.
 
-## Import a CSV file
+## Import a file
 
-**File ▸ Import CSV…**
+**File ▸ Import File…**, or **Import from Clipboard…** for rows copied from a spreadsheet or a text file.
 
-1. Choose the file. AirSQL guesses the separator (comma, semicolon, tab or bar) and shows each field's first value.
+1. Choose the file, or **Paste** the clipboard. CSV and other delimited text, Excel workbooks (`.xlsx`, the first sheet)
+   and JSON (an array of objects, or one object a line) all work. AirSQL guesses the separator and shows the first
+   rows as they'll be read, at the bottom of the window.
 2. Choose the table. Each column takes a field of the file, matched by name when the first row names the columns, by
    position when it doesn't, or **Leave out** to take its default.
+   Or choose **New Table…** at the end of the menu: AirSQL reads every value and proposes a `CREATE TABLE` you can edit.
+   Only what the server stores unchanged becomes a number or a date: `007`, `+44` and `01/02/2026` stay text. Every
+   column allows NULL, and no key is guessed: add one in the box if you want it.
 3. **Import**. The rows go in one transaction: if one fails (a duplicate key, a value the column refuses), none of the
-   file stays, and the message says which records.
+   file stays, and the message says which records. A new table stays, empty.
+
+For text files, **Format** chooses the separator (or **Other**, any one character), the quotes and the encoding;
+**Automatic** reads UTF-8, UTF-16 with a BOM, and Windows-1252 for what isn't UTF-8. **Skip rows** drops a title above the
+table, **Trim spaces** tidies fields without quotes, and **Backslash escapes** reads MySQL's own `\"` inside quotes.
 
 Empty fields and a `NULL` without quotes become NULL unless you untick it (AirSQL's own CSV writes the text NULL in
-quotes, so the two come back apart), and a whole `0x…` field in a BLOB or BINARY column becomes its bytes. The file should
-be UTF-8: a field that isn't reads as Windows-1252, and the end of the import says so, as it does when the server gave
-warnings. AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+quotes, so the two come back apart), and a whole `0x…` field in a BLOB or BINARY column becomes its bytes. **Numbers use a
+decimal comma** reads `1.234,56` as `1234.56` in number columns. In JSON, `null` is always NULL, `true` and `false` are 1
+and 0, and nested values go in as their JSON.
+
+**Rows** says what happens when things go wrong:
+
+- **Stop at a duplicate** undoes the import; **Skip duplicates** keeps the row already there (`INSERT IGNORE`, which also
+  lets the server adjust values that don't fit, so check its warnings); **Replace duplicates** puts the file's row in its
+  place (`REPLACE`).
+- **Delete the table's rows first** deletes them in the same transaction, after a warning, so a failed import brings them
+  back (not on MyISAM and other tables without transactions).
+- **Skip rows the server refuses** keeps the good rows and writes the others, each with the reason, to a CSV in
+  Downloads; **Show Skipped Rows** finds it. A lost connection or a deadlock still stops the import and undoes it.
+
+### Copy a result into a table
+
+Right-click a result ▸ **Copy Result to Table…** (or **Query ▸ Copy Result to Table…**) opens the same window with the
+selected rows, or all of them, into a table of this connection or a new one. NULLs, empty text and bytes stay apart.
+
+AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
+
+## Flush
+
+**Tools ▸ Flush** clears the server's host cache, closes and reopens its logs, reloads the grant tables, closes its open
+tables or resets its status counters, each after the SQL preview. They need the `RELOAD` privilege and are off on a
+read-only connection.
+
+**Lock All Tables for Reading…** stops every write on the server (`FLUSH TABLES WITH READ LOCK`), for a consistent copy of
+its files. AirSQL keeps the lock on a connection of its own while a sheet says so; **Unlock** releases it, and so does
+quitting. It is off for agents.
 
 ## Open the mysql command line in Terminal
 
 **Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database. On a
 [read-only connection](connections.md#add-or-edit-a-connection) it starts with `SET SESSION TRANSACTION READ ONLY`, as
 AirSQL's own sessions do, so a slip can't change anything there. Exports get it too, where the dump tool knows how
-(MySQL 8.4's and later); restores, Run SQL File, CSV import and copies into a read-only connection are refused.
+(MySQL 8.4's and later); restores, Run SQL File, imports and copies into a read-only connection are refused.
 
 ## Your password stays private
 

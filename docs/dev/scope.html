@@ -280,7 +280,7 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
     <li><b>Console.</b> Editor with highlighting and completion from cached schema, run and cancel, result tabs, history, SQL log, auto-commit with Commit and Rollback, safety prompts.</li>
     <li><b>Agents.</b> <code>--mcp</code> server, schema tools, read-only <code>run_query</code>, <code>open_in_console</code>, activity list; then UI driving (snapshot, menu, press) behind the ask-first gate. This comes early because it reuses the schema cache and the console, and it is AirSQL's main difference from HeidiSQL.</li>
     <li><b>Data and structure.</b> Grid editing with pending changes, value viewers, copy and export; table editor with columns, indexes and foreign keys; DDL editing for views and routines.</li>
-    <li><b>Client tools and data transfer.</b> Settings ▸ Client tools, Export and Restore sheets, Open in Terminal; built-in SQL export, copy to another server, CSV import, running a .sql file.</li>
+    <li><b>Client tools and data transfer.</b> Settings ▸ Client tools, Export and Restore sheets, Open in Terminal; built-in SQL export, copy to another server, import from files and the clipboard into new or existing tables, running a .sql file.</li>
     <li><b>Compare and reconcile.</b> Structure diff first (it reuses the schema cache and DDL code), then data diff with server-side chunk checksums, then the sync script.</li>
     <li><b>Liquibase.</b> Changelog from a schema (DDL, DML, both), and Save as Changeset on every change sheet. This reuses the SQL the table editor and grid already show.</li>
     <li><b>Power features.</b> Maintenance, bulk table editor, find text on server, EXPLAIN plan, query profile, reformat, ER diagram.</li>

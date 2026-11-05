@@ -27,7 +27,7 @@ struct ExportRowsRequest {
 /// Export Rows…: which rows, the format (each copy format, and Excel), the options, then a file or the clipboard. The
 /// rows are written off the main thread, with the activity's progress and Cancel.
 @MainActor
-final class ExportRowsSheet: NSWindowController {
+final class ExportRowsSheet: NSWindowController, NSTextFieldDelegate {
     private let request: ExportRowsRequest
     private let activity: ActivityCenter
     private let scope: NSPopUpButton
@@ -38,8 +38,22 @@ final class ExportRowsSheet: NSWindowController {
                                  tip: "Choose how NULL values are written in CSV, TSV, Markdown and HTML", target: nil, action: nil)
     private let crlf = checkbox("Windows line endings", id: "export.crlf", tip: "End lines with CR LF, as Windows apps expect",
                                 on: false, target: nil, action: nil)
-    private let separator = popup(["Comma", "Semicolon", "Tab", "Pipe"], selected: 0, id: "export.separator",
+    private let separator = popup(["Comma", "Semicolon", "Tab", "Pipe", "Other"], selected: 0, id: "export.separator",
                                   tip: "Choose what separates the values in CSV", target: nil, action: nil)
+    private let otherSeparator = AirSQL.textField("", placeholder: "Separator", id: "export.otherSeparator",
+                                                  tip: "Type what separates the values", width: 80)
+    private let quote = popup(["Double quotes", "Single quotes", "No quotes"], selected: 0, id: "export.quote",
+                              tip: "Choose what encloses values that hold separators or line breaks in CSV", target: nil, action: nil)
+    private let encoding = popup(ExportRowsSheet.encodings.map(\.title), selected: 0, id: "export.encoding",
+                                 tip: "Choose the file's text encoding; a BOM helps Excel read UTF-8", target: nil, action: nil)
+    private let joinLines = checkbox("Remove line breaks in values", id: "export.joinLines", tip: "Replace line breaks inside values with spaces",
+                                     on: false, target: nil, action: nil)
+    private let openAfter = checkbox("Open the file afterwards", id: "export.open", tip: "Open the file in its app when it is written",
+                                     on: false, target: nil, action: nil)
+    private static let encodings: [(title: String, encoding: String.Encoding, bom: [UInt8])] = [
+        ("UTF-8", .utf8, []), ("UTF-8 with BOM", .utf8, [0xEF, 0xBB, 0xBF]), ("UTF-16 with BOM", .utf16LittleEndian, [0xFF, 0xFE]),
+        ("Windows-1252", .windowsCP1252, []), ("ISO Latin 1", .isoLatin1, []), ("Mac Roman", .macOSRoman, []),
+    ]
     private let preview = label("", font: .monospacedSystemFont(ofSize: 11, weight: .regular), color: .secondaryLabelColor, truncates: false)
     static let previewRows = 8
     private var copyButton: NSButton!
@@ -68,10 +82,12 @@ final class ExportRowsSheet: NSWindowController {
         window.title = "Export Rows of \(request.title)"
         window.backgroundColor = .ground
         super.init(window: window)
-        for control in [format, scope, headers, nullText, crlf, separator] as [NSControl] {
+        for control in [format, scope, headers, nullText, crlf, separator, quote, joinLines] as [NSControl] {
             control.target = self
             control.action = #selector(formatChanged(_:))
         }
+        otherSeparator.delegate = self
+        otherSeparator.isHidden = true
         window.contentView = makeContent()
         window.setContentSize(window.contentView!.fittingSize)
         formatChanged(nil)
@@ -86,8 +102,11 @@ final class ExportRowsSheet: NSWindowController {
         form.row("Format", [format])
         form.row("Options", [headers])
         form.row("NULL as", [nullText])
-        form.row("Separator", [separator])
+        form.row("Separator", [separator, otherSeparator, quote])
+        form.row("Encoding", [encoding])
         form.row("", [crlf])
+        form.row("", [joinLines])
+        form.row("", [openAfter])
         if request.hiddenColumns > 0 {
             let count = request.hiddenColumns
             form.row("", [label("\(count) hidden column\(count == 1 ? " is" : "s are") left out: show them first to export them",
@@ -128,6 +147,11 @@ final class ExportRowsSheet: NSWindowController {
             : "Put the rows on the clipboard in this format"
         separator.isEnabled = chosen == .csv
         separator.toolTip = chosen == .csv ? "Choose what separates the values in CSV" : "Only CSV has a choice of separator"
+        otherSeparator.isHidden = chosen != .csv || separator.indexOfSelectedItem < 4
+        quote.isEnabled = chosen == .csv || chosen == .pipe
+        quote.toolTip = quote.isEnabled ? "Choose what encloses values that hold separators or line breaks in CSV" : "Only CSV has a choice of quotes"
+        encoding.isEnabled = chosen != nil
+        encoding.toolTip = chosen != nil ? "Choose the file's text encoding; a BOM helps Excel read UTF-8" : "Excel files have their own encoding"
         preview.stringValue = chosen.map { format in
             // Long values are cut here only: the preview is for the shape of the file.
             let rows = request.preview(scope.indexOfSelectedItem == 0).map { $0.map { $0.map { String($0.prefix(60)) } } }
@@ -139,9 +163,14 @@ final class ExportRowsSheet: NSWindowController {
         var options = CopyOptions(headers: headers.state == .on, nullText: ["NULL", "\\N", ""][max(0, nullText.indexOfSelectedItem)])
         options.lineEnding = crlf.state == .on ? "\r\n" : "\n"
         options.noBackslashEscapes = request.noBackslashEscapes
-        options.separator = [",", ";", "\t", "|"][max(0, separator.indexOfSelectedItem)]
+        let typed = otherSeparator.stringValue
+        options.separator = [",", ";", "\t", "|", typed.isEmpty ? "," : typed][max(0, separator.indexOfSelectedItem)]
+        options.quote = ["\"", "'", ""][max(0, quote.indexOfSelectedItem)]
+        options.joinLines = joinLines.state == .on
         return options
     }
+
+    func controlTextDidChange(_ notification: Notification) { formatChanged(nil) }
 
     @objc private func cancel(_ sender: Any?) { dismiss() }
 
@@ -170,6 +199,7 @@ final class ExportRowsSheet: NSWindowController {
         guard let parent = window?.sheetParent else { return }
         let format = chosenFormat, options = options, request = request, activity = activity
         let which = scope.indexOfSelectedItem
+        let text = Self.encodings[max(0, encoding.indexOfSelectedItem)], open = openAfter.state == .on
         dismiss()
         let panel = NSSavePanel()
         panel.nameFieldStringValue = request.title + "." + (format?.fileExtension ?? "xlsx")
@@ -177,23 +207,26 @@ final class ExportRowsSheet: NSWindowController {
         panel.message = "Export the rows of \(request.title)"
         panel.beginSheetModal(for: parent) { response in
             guard response == .OK, let url = panel.url else { return }
-            guard which < 2 else { return Self.write(nil, to: url, format: format, options: options, request: request, activity: activity, parent: parent) }
+            guard which < 2 else {
+                return Self.write(nil, to: url, format: format, options: options, text: text, open: open, request: request, activity: activity, parent: parent)
+            }
             request.readWhole(which == 1) {
                 // The rows at hand are taken now, on the main thread; every row streams from the server instead.
-                Self.write(which == 0 ? request.selected() : request.loaded(), to: url, format: format, options: options, request: request,
-                           activity: activity, parent: parent)
+                Self.write(which == 0 ? request.selected() : request.loaded(), to: url, format: format, options: options, text: text, open: open,
+                           request: request, activity: activity, parent: parent)
             }
         }
     }
 
-    private static func write(_ rows: [[String?]]?, to url: URL, format: CopyFormat?, options: CopyOptions, request: ExportRowsRequest, activity: ActivityCenter,
-                              parent: NSWindow) {
+    private static func write(_ rows: [[String?]]?, to url: URL, format: CopyFormat?, options: CopyOptions,
+                              text: (title: String, encoding: String.Encoding, bom: [UInt8]), open: Bool, request: ExportRowsRequest,
+                              activity: ActivityCenter, parent: NSWindow) {
         let stop = StopFlag()
         let work = activity.start("Exporting the rows of \(request.title)") { stop.set() }
         Task.detached {
             do {
                 let output = try ExportOutput(url: url, format: format, columns: request.columns, database: request.database,
-                                              table: request.table, options: options)
+                                              table: request.table, options: options, encoding: text.encoding, bom: text.bom)
                 if let rows {
                     try output.write(rows)
                 } else if let all = request.all {
@@ -203,9 +236,14 @@ final class ExportRowsSheet: NSWindowController {
                     }
                 }
                 try output.finish()
-                let cut = output.cutCells
+                let cut = output.cutCells, lost = output.lostText
                 await MainActor.run {
                     work.end()
+                    if open { NSWorkspace.shared.open(url) }
+                    if lost {
+                        showError("Some characters don't exist in \(text.title), and were replaced. Export as UTF-8 to keep them.",
+                                  title: "\(url.lastPathComponent) was saved with characters replaced", on: parent)
+                    }
                     guard cut > 0 else { return }
                     showError("\(cut.formatted()) \(cut == 1 ? "cell was" : "cells were") longer than the 32,767 characters a cell of Excel "
                               + "holds, and the file has only the start of them. Export as CSV to keep every value whole.",
@@ -229,14 +267,20 @@ final class ExportOutput: @unchecked Sendable {
     private var writer: CopyWriter?
     private let workbook: XLSXWriter?
     private let file: FileHandle?
+    private let encoding: String.Encoding
+    /// Text the encoding has no characters for was replaced.
+    private(set) var lostText = false
 
-    init(url: URL, format: CopyFormat?, columns: [GridColumn], database: String?, table: String, options: CopyOptions) throws {
+    init(url: URL, format: CopyFormat?, columns: [GridColumn], database: String?, table: String, options: CopyOptions,
+         encoding: String.Encoding = .utf8, bom: [UInt8] = []) throws {
+        self.encoding = encoding
         if let format {
             guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw CocoaError(.fileWriteNoPermission) }
             file = try FileHandle(forWritingTo: url)
             writer = CopyWriter(format, columns: columns, database: database, table: table, options: options)
             workbook = nil
-            try file?.write(contentsOf: Data((writer?.header() ?? "").utf8))
+            try file?.write(contentsOf: Data(bom))
+            try put(writer?.header() ?? "")
         } else {
             workbook = try XLSXWriter(url: url, columns: columns, headers: options.headers)
             file = nil
@@ -253,12 +297,18 @@ final class ExportOutput: @unchecked Sendable {
         }
         var text = ""
         for row in rows { text += writer?.row(row) ?? "" }
-        try file?.write(contentsOf: Data(text.utf8))
+        try put(text)
+    }
+
+    private func put(_ text: String) throws {
+        if let exact = text.data(using: encoding) { return try file?.write(contentsOf: exact) ?? () }
+        lostText = true
+        try file?.write(contentsOf: text.data(using: encoding, allowLossyConversion: true) ?? Data())
     }
 
     func finish() throws {
         if let workbook { return try workbook.finish() }
-        try file?.write(contentsOf: Data((writer?.footer() ?? "").utf8))
+        try put(writer?.footer() ?? "")
         try file?.close()
     }
 }
