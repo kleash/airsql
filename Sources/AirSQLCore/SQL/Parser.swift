@@ -1,3 +1,5 @@
+import Foundation
+
 /// A hand-written recursive-descent parser for MySQL and MariaDB statements over `SQLLexer`. It takes any text, as the
 /// editor has it mid-word: `parse` always returns a tree for each statement of `SQLSplitter`, with what it could read.
 /// SELECT, INSERT, REPLACE, UPDATE, DELETE and the heads of CREATE, ALTER and DROP are read in full; the rest as far as
@@ -6,11 +8,33 @@
 public struct SQLParser {
     /// Every statement of `text`, in order.
     public static func parse(_ text: String, noBackslashEscapes: Bool = false) -> [SQLParsedStatement] {
-        SQLSplitter.statements(in: text, noBackslashEscapes: noBackslashEscapes).map { parse($0, noBackslashEscapes: noBackslashEscapes) }
+        withDeepStack {
+            SQLSplitter.statements(in: text, noBackslashEscapes: noBackslashEscapes).map { read($0, noBackslashEscapes: noBackslashEscapes) }
+        }
     }
 
     /// One statement of `SQLSplitter`.
     public static func parse(_ statement: SQLStatement, noBackslashEscapes: Bool = false) -> SQLParsedStatement {
+        withDeepStack { read(statement, noBackslashEscapes: noBackslashEscapes) }
+    }
+
+    /// Runs `body`, which recurses over a tree, on a stack of its own: a dispatch queue's 512 KB holds only some 40
+    /// brackets in a debug build.
+    public static func withDeepStack<T>(_ body: @escaping () -> T) -> T {
+        let box = Box<T>(), done = DispatchSemaphore(value: 0)
+        let thread = Thread {
+            box.value = body()
+            done.signal()
+        }
+        thread.stackSize = 16 << 20
+        thread.start()
+        done.wait()
+        return box.value!
+    }
+
+    private final class Box<T> { var value: T? }
+
+    private static func read(_ statement: SQLStatement, noBackslashEscapes: Bool) -> SQLParsedStatement {
         var lexer = SQLLexer(statement.sql, noBackslashEscapes: noBackslashEscapes)
         let offset = statement.range.lowerBound
         var tokens: [Token] = [], hasCode = false, open = false
@@ -50,7 +74,7 @@ public struct SQLParser {
     /// Brackets and prefixes open now; past `depthLimit` the statement is left unread, as the stack is finite.
     var depth = 0
     var gaveUp = false
-    static let depthLimit = 96
+    static let depthLimit = 200
 
     private init(tokens: [Token], end: Int) {
         self.tokens = tokens

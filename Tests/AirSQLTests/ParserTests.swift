@@ -262,14 +262,24 @@ import Testing
     }
 
     @Test func deepNestingEndsQuietly() {
+        // Plain values to expect: a failure would otherwise reflect the whole tree.
+        func shallow(_ sql: String) -> Bool { one(sql).shallow }
         let deep = String(repeating: "(", count: 50_000) + "1" + String(repeating: ")", count: 50_000)
-        #expect(one("SELECT " + deep).shallow)
-        #expect(one("SELECT " + String(repeating: "NOT ", count: 50_000) + "1").shallow)
-        #expect(one("SELECT " + String(repeating: "(SELECT ", count: 50_000)).errors.isEmpty)
-        #expect(one("SELECT 1" + String(repeating: " + 1", count: 50_000)).shallow)
-        #expect(one("SELECT * FROM " + String(repeating: "(", count: 50_000) + "t").shallow)
-        let wide = "SELECT 1 WHERE a" + String(repeating: " OR a", count: 50_000)
-        #expect(!one(wide).shallow && one(wide).query?.blocks[0].whereClause?.children.count == 50_001)
+        let brackets = shallow("SELECT " + deep)
+        #expect(brackets)
+        let nots = shallow("SELECT " + String(repeating: "NOT ", count: 50_000) + "1")
+        #expect(nots)
+        let queries = shallow("SELECT " + String(repeating: "(SELECT ", count: 50_000))
+        #expect(queries)
+        let sums = shallow("SELECT 1" + String(repeating: " + 1", count: 50_000))
+        #expect(sums)
+        let joins = shallow("SELECT * FROM " + String(repeating: "(", count: 50_000) + "t")
+        #expect(joins)
+        let wide = one("SELECT 1 WHERE a" + String(repeating: " OR a", count: 50_000))
+        let count = wide.query?.blocks[0].whereClause?.children.count
+        let read = !wide.shallow
+        #expect(read)
+        #expect(count == 50_001)
     }
 
     @Test func anyTextParses() {

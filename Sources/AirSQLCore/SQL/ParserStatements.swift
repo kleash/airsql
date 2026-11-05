@@ -1,3 +1,4 @@
+import Foundation
 extension SQLParser {
     /// Reads the one statement in `tokens`.
     mutating func statement() -> SQLParsedStatement {
