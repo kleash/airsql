@@ -179,7 +179,7 @@ extension SQLParser {
         var write = SQLWrite()
         while at(["LOW_PRIORITY", "IGNORE"]) { index += 1 }
         write.clauses.append((.from, lastEnd))
-        write.tables = tableList(&write.clauses)
+        tables(&write)
         if at("SET") {
             write.clauses.append((.set, current.range.upperBound))
             index += 1
@@ -213,19 +213,23 @@ extension SQLParser {
             if isUsingForm() {
                 write.deleteTargets = starless(&self)
                 expect("USING")
-                write.tables = tableList(&write.clauses)
-            } else {
-                write.tables = tableList(&write.clauses)
             }
+            tables(&write)
         } else {
             write.deleteTargets = starless(&self)
             if expect("FROM", "Expected FROM\(foundText)") {
                 write.clauses.append((.from, lastEnd))
-                write.tables = tableList(&write.clauses)
+                tables(&write)
             }
         }
         tail(&write)
         result.write = write
+    }
+
+    private mutating func tables(_ write: inout SQLWrite) {
+        let start = current.range.lowerBound
+        write.tables = tableList(&write.clauses)
+        write.tablesRange = start..<max(start, lastEnd)
     }
 
     /// DELETE FROM a, b USING …: a USING at this level before any WHERE.

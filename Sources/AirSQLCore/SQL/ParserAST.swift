@@ -203,6 +203,8 @@ public struct SQLInsertRow: Sendable {
 public struct SQLWrite: Sendable {
     /// INSERT's table, UPDATE's tables, DELETE's FROM.
     public var tables: [SQLTableRef] = []
+    /// UPDATE's or DELETE's tables with their joins' conditions.
+    public var tablesRange: Range<Int>?
     /// DELETE a, b FROM …: the tables rows go from.
     public var deleteTargets: [SQLName] = []
     public var columns: [SQLIdentifier] = []

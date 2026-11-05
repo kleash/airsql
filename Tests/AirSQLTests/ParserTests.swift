@@ -600,3 +600,147 @@ import Testing
         #expect(SQLInspections.problems(analysis, disabled: ["noWhere"]).isEmpty)
     }
 }
+
+@Suite struct IntentionTests {
+    func analysis(_ sql: String) -> SQLAnalysis { SQLAnalysis(sql, snapshot: InspectionTests.snapshot(), database: "shop") }
+
+    func apply(_ edits: [SQLEdit], to sql: String) -> String {
+        let text = NSMutableString(string: sql)
+        for edit in edits.sorted(by: { $0.range.lowerBound > $1.range.lowerBound }) { text.replaceCharacters(in: NSRange(edit.range), with: edit.text) }
+        return text as String
+    }
+
+    /// The text after the action `title` with the caret at the `|` in `marked`.
+    func after(_ marked: String, _ title: String) -> String? {
+        let caret = (marked as NSString).range(of: "|").location, sql = marked.replacingOccurrences(of: "|", with: "")
+        guard let fix = SQLIntentions.actions(at: caret, in: analysis(sql)).first(where: { $0.title == title }), case .edit(let edits) = fix.action else { return nil }
+        return apply(edits, to: sql)
+    }
+
+    @Test func quotesAndUnquotes() {
+        #expect(after("SELECT i|d FROM orders", "Quote Name") == "SELECT `id` FROM orders")
+        #expect(after("SELECT `i|d` FROM orders", "Remove Quotes") == "SELECT id FROM orders")
+        #expect(after("SELECT `i|d` FROM orders", "Quote Name") == nil)
+    }
+
+    @Test func qualifiesAndUnqualifies() {
+        #expect(after("SELECT tot|al FROM orders o", "Qualify with o") == "SELECT o.total FROM orders o")
+        #expect(after("SELECT o.tot|al FROM orders o", "Remove Table Name") == "SELECT total FROM orders o")
+        #expect(after("SELECT o.i|d FROM orders o JOIN customers c ON 1", "Remove Table Name") == nil)
+        #expect(after("SELECT 1 FROM ord|ers", "Qualify with shop") == "SELECT 1 FROM shop.orders")
+        #expect(after("SELECT 1 FROM shop.ord|ers", "Remove Database Name") == "SELECT 1 FROM orders")
+    }
+
+    @Test func introducesAnAlias() {
+        #expect(after("SELECT orders.id FROM ord|ers WHERE orders.id = 1", "Add Table Alias “o”") == "SELECT o.id FROM orders o WHERE o.id = 1")
+        #expect(after("SELECT 1 FROM cust|omers, orders c", "Add Table Alias “c2”") == "SELECT 1 FROM customers c2, orders c")
+        #expect(after("SELECT 1 FROM ord|ers o", "Add Table Alias “o”") == nil)
+    }
+
+    @Test func expandsAStar() {
+        #expect(after("SELECT *| FROM customers", "Expand * to Its Columns") == "SELECT id, name FROM customers")
+        #expect(after("SELECT c.*| FROM customers c JOIN orders o ON 1", "Expand * to Its Columns") == "SELECT c.id, c.name FROM customers c JOIN orders o ON 1")
+        #expect(after("SELECT *| FROM customers c, customers d", "Expand * to Its Columns") == "SELECT c.id, c.name, d.id, d.name FROM customers c, customers d")
+        #expect(after("SELECT *| FROM nosuch", "Expand * to Its Columns") == nil)
+    }
+
+    @Test func movesASubqueryToWith() {
+        #expect(after("SELECT * FROM (SELECT i|d FROM orders) d", "Move Subquery to WITH") == "WITH d AS (SELECT id FROM orders)\nSELECT * FROM d")
+        #expect(after("SELECT (SELECT MAX(i|d) FROM orders) FROM customers", "Move Subquery to WITH")
+                == "WITH extracted AS (SELECT MAX(id) FROM orders)\nSELECT (SELECT * FROM extracted) FROM customers")
+        #expect(after("WITH a AS (SELECT 1) SELECT * FROM a, (SELECT 2| AS b) d", "Move Subquery to WITH") == "WITH a AS (SELECT 1), d AS (SELECT 2 AS b) SELECT * FROM a, d")
+        #expect(after("SELECT * FROM orders o WHERE EXISTS (SELECT 1| FROM customers c WHERE c.id = o.id)", "Move Subquery to WITH") == nil)
+    }
+
+    @Test func splitsAndMergesInserts() {
+        #expect(after("INSERT INTO t (a) VALUES (1|), (2)", "Split into One INSERT per Row") == "INSERT INTO t (a) VALUES (1);\nINSERT INTO t (a) VALUES (2)")
+        #expect(after("INSERT INTO t (a) VALUES (1|); INSERT INTO t (a) VALUES (2), (3); SELECT 1", "Merge with the Next INSERT") == "INSERT INTO t (a) VALUES (1), (2), (3); SELECT 1")
+        #expect(after("INSERT INTO t (a) VALUES (1|); INSERT INTO u (a) VALUES (2)", "Merge with the Next INSERT") == nil)
+    }
+
+    @Test func dropsAnInsertColumn() {
+        #expect(after("INSERT INTO t (a, b|, c) VALUES (1, 2, 3), (4, 5, 6)", "Remove Column “b” and Its Values") == "INSERT INTO t (a, c) VALUES (1, 3), (4, 6)")
+        #expect(after("INSERT INTO t (a, b|) VALUES (1, 2)", "Remove Column “b” and Its Values") == "INSERT INTO t (a) VALUES (1)")
+    }
+
+    @Test func previewsWhatAWriteWouldTouch() {
+        func preview(_ sql: String) -> String? { let found = analysis(sql); return SQLIntentions.preview(of: found.statements[0], in: found) }
+        #expect(preview("DELETE FROM orders WHERE id = 1") == "SELECT orders.* FROM orders WHERE id = 1 LIMIT 1000")
+        #expect(preview("DELETE o FROM orders o JOIN customers c ON c.id = o.id WHERE c.id = 2 ") == "SELECT o.* FROM orders o JOIN customers c ON c.id = o.id WHERE c.id = 2 LIMIT 1000")
+        #expect(preview("DELETE FROM orders ORDER BY id DESC LIMIT 5") == "SELECT orders.* FROM orders ORDER BY id DESC LIMIT 5")
+        #expect(preview("UPDATE orders SET total = total + 1, customer_id = 2 WHERE id = 1")
+                == "SELECT total + 1 AS `new total`, 2 AS `new customer_id`, orders.* FROM orders WHERE id = 1 LIMIT 1000")
+        #expect(preview("WITH c AS (SELECT 1 AS id) DELETE FROM orders WHERE id IN (SELECT id FROM c)")
+                == "WITH c AS (SELECT 1 AS id) SELECT orders.* FROM orders WHERE id IN (SELECT id FROM c) LIMIT 1000")
+        #expect(preview("SELECT 1") == nil && preview("DELETE FROM") == nil)
+        let previewSQL = preview("UPDATE orders SET total = 1") ?? ""
+        #expect(ReadOnlyClassifier.classify(previewSQL, noBackslashEscapes: false) == .readOnly)
+    }
+
+    @Test func renames() throws {
+        func renamed(_ marked: String, to name: String) throws -> String {
+            let caret = (marked as NSString).range(of: "|").location, sql = marked.replacingOccurrences(of: "|", with: "")
+            let found = analysis(sql), symbol = try #require(found.reference(at: caret)?.symbol)
+            return apply(try SQLIntentions.rename(symbol, to: name, at: caret, in: found).get(), to: sql)
+        }
+        #expect(try renamed("SELECT o.id FROM orders o| WHERE o.total > 1", to: "ord") == "SELECT ord.id FROM orders ord WHERE ord.total > 1")
+        #expect(try renamed("WITH c| AS (SELECT 1 AS x) SELECT c.x FROM c", to: "d e") == "WITH `d e` AS (SELECT 1 AS x) SELECT `d e`.x FROM `d e`")
+        #expect(try renamed("SELECT id AS n|, 1 FROM orders ORDER BY n", to: "m") == "SELECT id AS m, 1 FROM orders ORDER BY m")
+        #expect(try renamed("SELECT * FROM orders|; DELETE FROM orders", to: "sales") == "RENAME TABLE shop.orders TO shop.sales;\nSELECT * FROM sales; DELETE FROM sales")
+        #expect(try renamed("SELECT total| FROM orders", to: "sum") == "ALTER TABLE shop.orders RENAME COLUMN total TO sum;\nSELECT sum FROM orders")
+    }
+
+    @Test func aRenameThatClashesIsRefused() throws {
+        let sql = "SELECT 1 FROM orders o, customers c", found = analysis(sql)
+        let caret = 21, symbol = try #require(found.reference(at: caret)?.symbol)
+        #expect(SQLIntentions.rename(symbol, to: "c", at: caret, in: found) == .failure(SQLRenameError(message: "“c” is already a table in this query")))
+        #expect(SQLIntentions.rename(symbol, to: " ", at: caret, in: found) == .failure(SQLRenameError(message: "Type a name")))
+    }
+
+    @Test func renamesVariables() throws {
+        let sql = "SET @total = 1; SELECT @Total + @other"
+        let edits = try #require(SQLIntentions.renameVariable(at: 6, to: "sum", in: analysis(sql)))
+        #expect(apply(edits, to: sql) == "SET @sum = 1; SELECT @sum + @other")
+    }
+
+    @Test func documentsTablesColumnsAndFunctions() throws {
+        func doc(_ marked: String) -> (title: String, body: String)? {
+            let caret = (marked as NSString).range(of: "|").location
+            return SQLIntentions.documentation(at: caret, in: analysis(marked.replacingOccurrences(of: "|", with: "")))
+        }
+        let table = try #require(doc("SELECT 1 FROM ord|ers"))
+        #expect(table.title == "orders" && table.body.contains("customer_id") && table.body.contains("PK"))
+        let column = try #require(doc("SELECT i|d FROM orders"))
+        #expect(column.title == "id" && column.body.contains("NOT NULL") && column.body.contains("In orders"))
+        #expect(doc("SELECT CONC|AT('a') FROM orders")?.body.hasPrefix("CONCAT(text, …)") == true)
+        #expect(doc("SELECT 1 FROM orders o|")?.body.hasPrefix("Alias of orders") == true)
+        #expect(doc("WITH c| AS (SELECT 1 AS x) SELECT * FROM c")?.body.contains("x") == true)
+        #expect(doc("SELECT 1| FROM orders") == nil)
+    }
+
+    @Test func parameterInfoFollowsTheCaret() throws {
+        func info(_ marked: String) -> (String, [String], Int)? {
+            let caret = (marked as NSString).range(of: "|").location
+            return SQLIntentions.parameters(at: caret, in: analysis(marked.replacingOccurrences(of: "|", with: ""))).map { ($0.title, $0.items, $0.active) }
+        }
+        let call = try #require(info("SELECT IF(a, b|, c)"))
+        #expect(call.0 == "IF" && call.1 == ["condition", "then", "else"] && call.2 == 1)
+        #expect(info("SELECT IF(a, LEFT(|x, 1), c)")?.0 == "LEFT")
+        let value = try #require(info("INSERT INTO orders (id, total) VALUES (1, |2)"))
+        #expect(value.1 == ["id", "total"] && value.2 == 1)
+        #expect(info("INSERT INTO orders VALUES (1, |2)")?.1.first == "id")
+        #expect(info("SELECT 1|") == nil)
+    }
+
+    @Test func hintsNameEachValue() {
+        let found = analysis("INSERT INTO orders (id, total) VALUES (1, 2)")
+        #expect(SQLIntentions.valueHints(in: found, range: 0..<100).map(\.column) == ["id", "total"])
+    }
+
+    @Test func offersRenameOnNames() {
+        let titles = SQLIntentions.actions(at: 7, in: analysis("SELECT id FROM orders")).map(\.title)
+        #expect(titles.contains("Rename…"))
+        let preview = SQLIntentions.actions(at: 2, in: analysis("DELETE FROM orders WHERE id = 1")).map(\.title)
+        #expect(preview.contains("Preview the Rows This Would Touch"))
+    }
+}
