@@ -357,11 +357,14 @@ extension AppTests {
             #expect(model.data.settings.tree.tablePage == 0)  // a look at it isn't a choice
         }
 
-        @Test func theSQLLogDocksOnceAServerIsConnected() async throws {
+        @Test func theSQLLogIsOneClickFromTheStatusBarOnceAServerIsConnected() async throws {
             let model = testModel(Fixtures.shop)
             let (main, _) = appWindow(model)
             #expect(!main.logDocked)
             _ = await openReplayed(model, id)
+            #expect(!model.data.settings.tree.showsLog && main.logDockHeight == 0, "closed until asked for: it would cost the results rows")
+            #expect(main.statusBar.sqlLog.action == Commands.sqlLog.action)
+            main.showSQLLog(nil)
             #expect(await eventually(timeout: 5) { main.logPanel.isViewLoaded && main.logDockHeight == 100 })
             main.window?.layoutIfNeeded()
             #expect(main.logPanel.view.frame.height == 100 && main.logPanel.view.window === main.window)

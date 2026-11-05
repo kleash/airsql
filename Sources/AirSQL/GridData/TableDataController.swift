@@ -80,12 +80,12 @@ final class TableDataController: NSViewController, TabContent {
     let emptyNote = TableEmptyNote()
     private(set) lazy var toolbar = GridToolbar(grid: grid, groups: [
         [.init(Commands.refresh, "arrow.clockwise"), .init(Commands.autoRefresh, "timer", menu: { Self.autoRefreshItems() })],
-        [.init(Commands.addRow, "plus"), .init(Commands.duplicateRow, "plus.square.on.square")] + GridToolbar.Item.changeItems,
+        [.init(Commands.addRow, "plus", stays: true), .init(Commands.duplicateRow, "plus.square.on.square")] + GridToolbar.Item.changeItems,
         GridToolbar.Item.findItems, GridToolbar.Item.viewItems,
         [.init(Commands.copyTableQuery, "text.quote", menu: { [Commands.copyTableQuery.item(), Commands.openTableQuery.item()] }),
          .init(Commands.exportRows, "square.and.arrow.up")],
     ], label: pageLabel, trailing: [
-        .init(Commands.firstPage, "backward.end"), .init(Commands.previousPage, "chevron.left"), .init(Commands.nextPage, "chevron.right"),
+        .init(Commands.firstPage, "backward.end"), .init(Commands.previousPage, "chevron.left", stays: true), .init(Commands.nextPage, "chevron.right", stays: true),
         .init(Commands.lastPage, "forward.end"), .init(Commands.pageSize, "list.number", menu: { Self.pageSizeItems() }),
     ])
     /// The pager's rows on show: "1,001–2,000 of about 52,000".

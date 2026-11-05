@@ -43,6 +43,29 @@ extension AppTests {
             #expect(console.resultTabs[0].pinned)
         }
 
+        @Test func aConsolesRowsGrowWithTheWindowAndAlwaysShow() async throws {
+            let (main, _, console) = try await ConsoleAppTests.console()
+            console.addResult(ConsoleFixtures.customers(rows: 50), title: "One", summary: "")
+            console.selectResult(console.resultTabs[0])
+            let view = try #require(console.resultTabs[0].view as? ResultGridView)
+            func height(_ size: NSSize) -> CGFloat {
+                main.window?.setFrame(NSRect(origin: NSPoint(x: -20000, y: -20000), size: size), display: false)
+                main.window?.layoutIfNeeded()
+                return view.grid.scrollView.frame.height
+            }
+            let start = height(MainWindowController.defaultSize)
+            let grown = height(NSSize(width: 1500, height: 950))
+            #expect(grown >= start + 90, "\(start) to \(grown): the results take their share")
+            _ = height(MainWindowController.minimumSize)
+            view.searchAllColumns(nil)
+            view.filterBar.searchField.stringValue = "a"
+            view.reorder()
+            view.performTextFinderAction(nil)
+            console.split.setPosition(console.split.bounds.height, ofDividerAt: 0)  // the divider dragged right down
+            main.window?.layoutIfNeeded()
+            #expect(view.grid.scrollView.frame.height >= 3 * view.grid.rowHeight - 1, "\(view.grid.scrollView.frame.height)")
+        }
+
         @Test func theFindButtonOpensTheFindBarFromAnywhere() async throws {
             let (main, _, tab) = try await GridDataAppTests.tab()
             main.window?.makeFirstResponder(main.sidebar.outline)
@@ -88,6 +111,35 @@ extension AppTests {
             #expect((main.window?.frame.width ?? 0) <= MainWindowController.minimumSize.width, "\(main.window?.frame.width ?? 0) \(tab.toolbar.frame)")
             let shown = tab.toolbar.subviews.flatMap(\.subviews).filter { !$0.isHidden }.count
             #expect(shown > 3, "\(shown)")
+        }
+
+        @Test func whatDoesntFitGoesBehindMoreTheSameHoweverTheWidthCame() async throws {
+            let (main, _, tab) = try await GridDataAppTests.tab()
+            func width(_ value: Double) {
+                main.window?.setFrame(NSRect(origin: NSPoint(x: -20000, y: -20000), size: NSSize(width: value, height: 720)), display: false)
+                main.window?.layoutIfNeeded()
+                tab.toolbar.validate()
+            }
+            func shown() -> [String] { Commands.all.filter { tab.toolbar.button($0)?.isHidden == false }.map(\.title) }
+            width(1180)
+            #expect(tab.toolbar.overflow.isEmpty)
+            let wide = shown()
+            width(1000)
+            width(900)
+            let narrow = shown()
+            let held = [Commands.addRow, Commands.deleteRows, Commands.apply, Commands.find, Commands.sortColumns]
+            #expect(held.allSatisfy { tab.toolbar.button($0)?.isHidden == false })
+            let behind = tab.toolbar.overflowItems().map(\.title)
+            #expect(!behind.isEmpty && Set(narrow + behind).isSuperset(of: wide), "every button is shown or in the menu")
+            #expect(tab.toolbar.overflowItems().allSatisfy { $0.target != nil })
+            tab.toolbar.validate()
+            #expect(shown() == narrow, "validating again changes nothing")
+            width(1180)
+            #expect(shown() == wide && tab.toolbar.overflow.isEmpty)
+            let (small, _, opened) = try await GridDataAppTests.tab(size: MainWindowController.minimumSize)
+            small.window?.layoutIfNeeded()
+            opened.toolbar.validate()
+            #expect(Commands.all.filter { opened.toolbar.button($0)?.isHidden == false }.map(\.title) == narrow, "opened at this width")
         }
 
         /// customers with a `note` cut at the server, and what reading its row back finds.

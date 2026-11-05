@@ -19,7 +19,7 @@ public struct TreeSettings: Codable, Equatable {
     /// The page a table tab opens on (0 Data, 1 Structure, 2 DDL): what was chosen last, as you walk the tree.
     public var tablePage = 0
     /// View ▸ SQL Log: the log shows under the tabs while a server is connected.
-    public var showsLog = true
+    public var showsLog = false
     /// How tall the log is there, in points.
     public var logHeight = 100.0
 
