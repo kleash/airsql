@@ -76,8 +76,8 @@ public enum ErrorMapping {
         case 1130:
             return error(.authFailed, "This user may not log in from this computer's address. An administrator can allow "
                 + "it (the user's host part).")
-        case 1862:
-            return error(.authFailed, "The password has expired. Change it with the server's own tools, then connect again.")
+        case 1820, 1862:
+            return error(.authFailed, "The password has expired. Connect from AirSQL to set a new one, or change it with the server's own tools.")
         case 1251, 2059:
             return error(.loginMethodNotAllowed, "The server asked for a login method AirSQL doesn't have.")
         case Int(CR_PLUGIN_NOT_ALLOWED):

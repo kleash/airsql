@@ -298,6 +298,11 @@ final class Connector {
                         stored.tls.pinnedFingerprint = certificate.fingerprint
                         model.save(stored)
                     }
+                case .authFailed where [1820, 1862].contains(error.code):
+                    // Changing it is a write: not on a read-only connection, and only at Connect, where it can be saved.
+                    guard let window, typed == nil, !saved.readOnly else { throw error }
+                    let options = saved.connectOptions(password: password, routeSocket: routeSocket)
+                    password = try await changeExpiredPassword(options, of: saved, on: window)
                 case .authFailed:
                     password = try await databasePassword(&saved, on: window, retry: true)
                 default:

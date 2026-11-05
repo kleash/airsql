@@ -103,6 +103,9 @@ transaction or edits that aren't applied.
 deleted, without its passwords. A connection with no default database goes back to the one you last worked in. From a
 script, `open -a AirSQL --args --connect "Staging"` starts AirSQL and connects to that connection by name.
 
+When the server says the password has expired, Connect asks for a new one and sets it (a saved password is replaced); a
+read-only connection doesn't, so change it there with the server's own tools.
+
 Connected connections are kept alive with a ping every minute, except a session whose transaction has been open longer
 than the safety setting allows.
 

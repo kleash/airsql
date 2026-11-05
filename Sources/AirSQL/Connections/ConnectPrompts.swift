@@ -28,6 +28,20 @@ extension Connector {
         return password
     }
 
+    /// Asks for a new password in place of an expired one and sets it. A saved password is replaced once the connect works.
+    func changeExpiredPassword(_ options: ConnectOptions, of saved: SavedConnection, on window: NSWindow) async throws -> String {
+        let id = saved.id
+        let plain = saved.tls.mode == .off && saved.route == .direct && saved.socket.isEmpty && !saved.isOnThisMac
+        let new: String? = await withCheckedContinuation { done in
+            track(id, showNewPasswordPrompt(for: saved.displayName, plainText: plain, on: window) { done.resume(returning: $0) })
+        }
+        guard let new else { throw AirSQLError(.cancelled, "Cancelled.") }
+        guard !AgentGuard.refuses("Only the person at the Mac can change a password.") else { throw AirSQLError(.cancelled, "Cancelled.") }
+        try await DBConnection.changeExpiredPassword(options, to: new)
+        if await secret(id.uuidString) != nil { remembered[id, default: [:]][id.uuidString] = new }
+        return new
+    }
+
     /// The proxy's password: none without a user, else the Keychain's or the person's.
     func proxyPassword(_ saved: SavedConnection, typed: String?, on window: NSWindow?) async throws -> String {
         guard !saved.proxy.user.isEmpty else { return "" }

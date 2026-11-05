@@ -39,6 +39,8 @@ public struct ConnectOptions: Equatable, Sendable, CustomStringConvertible, Cust
     public var readOnly: Bool
     /// Seconds to wait for the server while connecting.
     public var connectTimeout: Int
+    /// Set: the connect only replaces an expired password with this, then closes. Never logged.
+    public var newPassword: String?
 
     public init(name: String = "", host: String, port: Int = 3306, endpoint: Endpoint = .tcp, user: String,
                 password: String = "", database: String? = nil, tls: TLSOptions = TLSOptions(), cleartextLogin: Bool = false,
@@ -191,6 +193,15 @@ public final class DBConnection: @unchecked Sendable {
     @discardableResult
     public func connect() async throws -> ServerInfo {
         try await worker.perform { [self] in try connectHere() }
+    }
+
+    /// Logs in with `options` and replaces their expired password with `new`, on a session that closes at once.
+    public static func changeExpiredPassword(_ options: ConnectOptions, to new: String, log: SQLLog = .shared) async throws {
+        var changing = options
+        changing.newPassword = new
+        let session = DBConnection(options: changing, role: .tools, log: log)
+        defer { Task { await session.close() } }
+        try await session.connect()
     }
 
     /// Runs one statement and reads all of its results. A result set stops at `rowCap` rows: then the statement is
@@ -365,6 +376,15 @@ public final class DBConnection: @unchecked Sendable {
                                 tls: cipher.map { c in version.map { String(cString: $0) + ", " + c } ?? c },
                                 certificate: check?.certificate)
 
+        if let new = options.newPassword {
+            let quoted = SQLQuote.string(new, noBackslashEscapes: mysql.pointee.server_status & UInt32(SERVER_STATUS_NO_BACKSLASH_ESCAPES) != 0)
+            // MariaDB's expired sessions take only SET PASSWORD; MySQL 8.4 has no PASSWORD().
+            let change = server.flavor == .mariadb ? "SET PASSWORD = PASSWORD(\(quoted))" : "ALTER USER CURRENT_USER() IDENTIFIED BY \(quoted)"
+            _ = try run(mysql, change, flavor: server.flavor, logged: false)
+            log.note("the expired password was changed", context: context)
+            return server
+        }
+
         // The session's setup, every time it connects.
         var set = "SET NAMES utf8mb4"
         if let zone = options.timeZone { set += ", time_zone = " + SQLQuote.string(zone) }
@@ -421,6 +441,7 @@ public final class DBConnection: @unchecked Sendable {
         var protocolType = (options.endpoint == .tcp ? MYSQL_PROTOCOL_TCP : MYSQL_PROTOCOL_SOCKET).rawValue
         try set(MYSQL_SET_CHARSET_NAME, text: "utf8mb4")
         try set(MYSQL_OPT_LOCAL_INFILE, &zero)  // and the library is built without it (R5)
+        if options.newPassword != nil { try set(MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS, &on) }
         try set(MYSQL_OPT_PROTOCOL, &protocolType)
         try set(MYSQL_OPT_CONNECT_TIMEOUT, &timeout)
         let methods = try loginMethods()

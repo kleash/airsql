@@ -65,6 +65,40 @@ func showPasswordPrompt(for connection: String, user: String, retry: Bool, canRe
     return alert
 }
 
+/// The sheet for a password the server says has expired: `reply` gets the new one, typed twice alike; nil: cancelled.
+/// `plainText`: the statement that sets it crosses the network unencrypted, and the sheet says so.
+@MainActor @discardableResult
+func showNewPasswordPrompt(for connection: String, plainText: Bool, on window: NSWindow, reply: @escaping (String?) -> Void) -> NSAlert {
+    let alert = NSAlert()
+    alert.messageText = "The password for “\(connection)” has expired"
+    alert.informativeText = "The server wants a new one before anything else. It goes to the server only, never into a log."
+        + (plainText ? " This connection has no TLS, so it crosses the network unencrypted." : "")
+    func field(_ id: String, _ placeholder: String, y: CGFloat) -> NSSecureTextField {
+        let field = NSSecureTextField(frame: NSRect(x: 0, y: y, width: 300, height: 22))
+        field.placeholderString = placeholder
+        field.toolTip = "Type the new password"
+        field.setAccessibilityIdentifier(id)
+        return field
+    }
+    let new = field("password.new", "New password", y: 28), again = field("password.again", "New password again", y: 0)
+    let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 50))
+    accessory.addSubview(new)
+    accessory.addSubview(again)
+    alert.accessoryView = accessory
+    alert.addButton(withTitle: "Change Password").toolTip = "Set the new password on the server and log in with it"
+    alert.addButton(withTitle: "Cancel").toolTip = "Don't connect: the password stays expired"
+    alert.window.initialFirstResponder = new
+    alert.beginSheetModal(for: window) { response in
+        guard response == .alertFirstButtonReturn else { return reply(nil) }
+        guard !new.stringValue.isEmpty, new.stringValue == again.stringValue else {
+            reply(nil)
+            return showError("The two passwords aren't the same, or are empty: nothing was changed.", title: "Password not changed", on: window)
+        }
+        reply(new.stringValue)
+    }
+    return alert
+}
+
 /// A SHA-256 fingerprint ("AB:CD:…") as the Trust sheets show it: monospaced and selectable, in two lines of 16 pairs
 /// that the field's width breaks, so the text copied is the fingerprint as it is, nothing put in. Another shape (ssh's
 /// SHA256:base64) stays on one line. Its width is its `preferredMaxLayoutWidth`.
