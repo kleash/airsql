@@ -583,6 +583,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.agentResults.action?:
             enabled = activeConnection != nil
             reason = "Select one connection in the sidebar first"
+        case Commands.sessions.action?:
+            enabled = model.openConnection(activeConnection?.id) != nil
+            reason = "Connect first: only a connected connection has sessions"
         default:
             if let check = validateEditorItem(item) ?? validateConnectionItem(item) { (enabled, reason) = check }
         }

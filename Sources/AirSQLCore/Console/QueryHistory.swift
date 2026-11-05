@@ -79,6 +79,16 @@ public final class QueryHistory: @unchecked Sendable {
         }
     }
 
+    /// Every connection's statements, newest first, those containing every word of `search` (any case).
+    public func allEntries(matching search: String = "") async -> [HistoryEntry] {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        var found: [HistoryEntry] = []
+        for id in names.compactMap({ UUID(uuidString: $0.replacingOccurrences(of: ".jsonl", with: "")) }) {
+            found += await entries(id, matching: search)
+        }
+        return found.sorted { $0.date > $1.date }
+    }
+
     /// Forgets the connection's history.
     public func clear(_ connection: UUID) {
         queue.async { [self] in try? FileManager.default.removeItem(at: file(connection)) }

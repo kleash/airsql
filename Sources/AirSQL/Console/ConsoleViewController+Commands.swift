@@ -155,6 +155,8 @@ extension ConsoleViewController: NSMenuItemValidation {
         case #selector(toggleHelpers(_:)):
             item.state = helpersShown ? .on : .off
             return (true, "")
+        case #selector(showLocalHistory(_:)):
+            return (fileURL != nil, "Save the tab in a file first: each save is kept here")
         case #selector(showHistory(_:)):
             return (connectionID != nil, "Choose a connection for this console first")
         default:

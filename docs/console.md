@@ -211,7 +211,12 @@ shows in a sheet, with what it will do:
 - **Query ▸ Query History** (⌘Y) lists the statements run on the tab's connection, newest first. Type to search;
   Return or a double-click puts one in the editor at the cursor, and a click shows it whole below the list. Click a
   header to sort, ⌘-click to select several; a right-click also opens them in a new tab or deletes them from the
-  history. Passwords in statements are masked before they are kept, as in the SQL log.
+  history. Passwords in statements are masked before they are kept, as in the SQL log. **All connections** searches
+  every connection's statements, with a column saying which.
+- **File ▸ Local History…** lists the states a .sql file was saved in (the last 50, kept on this Mac only). Click one to read
+  it; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
+- **Query ▸ Sessions…** lists every session AirSQL has open on the connection: what uses it, its thread on the server, its
+  database, and whether it is running or holds a transaction.
 - **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](sql-log.md).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it. **Operations**
   lists the steps as a tree with the server's rows and cost; click a header to sort the steps of each level, and the

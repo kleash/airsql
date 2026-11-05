@@ -33,6 +33,7 @@ extension ConsoleViewController {
             let failure = await Task.detached { () -> String? in
                 do {
                     try text.write(to: url, atomically: true, encoding: .utf8)
+                    LocalHistory.shared.save(text, of: url)
                     return nil
                 } catch {
                     return error.localizedDescription

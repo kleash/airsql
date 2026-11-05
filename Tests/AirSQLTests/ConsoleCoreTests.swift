@@ -590,3 +590,29 @@ struct ResultSetSourceTests {
         #expect(ConsoleScript.subquery(at: 40, in: cte, noBackslashEscapes: false)?.sql == "WITH x AS (SELECT 1) SELECT * FROM x")
     }
 }
+
+/// The saved states of a file, and the history over every connection.
+@Suite struct LocalHistoryTests {
+    @Test func savedStatesComeBackNewestFirstAndTheOldestGo() throws {
+        let history = LocalHistory(directory: URL(fileURLWithPath: try scratch()), limit: 3)
+        let file = URL(fileURLWithPath: "/nowhere/a.sql"), other = URL(fileURLWithPath: "/nowhere/b.sql")
+        for (index, text) in ["one", "two", "two", "three", "four"].enumerated() {
+            history.save(text, of: file, at: Date(timeIntervalSince1970: Double(index + 1)))
+        }
+        let texts = history.versions(of: file).map { try? String(contentsOf: $0.url, encoding: .utf8) }
+        #expect(texts == ["four", "three", "two"], "the same text twice is one state; only the newest are kept")
+        #expect(history.versions(of: other).isEmpty)
+        let path = try #require(history.versions(of: file).first?.url.path)
+        #expect(try FileManager.default.attributesOfItem(atPath: path)[.posixPermissions] as? Int == 0o600)
+    }
+
+    @Test func theHistoryCanBeSearchedOverEveryConnection() async throws {
+        let history = QueryHistory(directory: URL(fileURLWithPath: try scratch()))
+        let a = UUID(), b = UUID()
+        history.add(HistoryEntry(sql: "SELECT 1", date: Date(timeIntervalSince1970: 1), connection: a))
+        history.add(HistoryEntry(sql: "SELECT 2", date: Date(timeIntervalSince1970: 2), connection: b))
+        history.add(HistoryEntry(sql: "DROP TABLE t", date: Date(timeIntervalSince1970: 3), connection: b))
+        history.flush()
+        #expect(await history.allEntries(matching: "select").map(\.sql) == ["SELECT 2", "SELECT 1"])
+    }
+}

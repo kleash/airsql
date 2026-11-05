@@ -75,7 +75,7 @@ extension AgentServer {
         view is DataGridView || ["valuePanel", "grid.text", "grid.tree", "grid.chart", "columnSummary", "grid.figure", "grid.set",
                                  "grid.lookup", "grid.editor.problem", "result.filter", "tableData.where", "tableData.suggestions", "values.list",
                                  "quickFilter.value", "recon.rows", "recon.script", "processes.list", "console.messages",
-                                 "console.planTree", "console.planOperations", "console.planRaw", "preview.sql", "sqlLog.text"]
+                                 "console.planTree", "console.planOperations", "console.planRaw", "preview.sql", "sqlLog.text", "history.every"]
             .contains(view.accessibilityIdentifier())
     }
 
@@ -84,6 +84,7 @@ extension AgentServer {
     /// comparison's other connection's); a compare's, both sides'.
     func hidesData(_ view: NSView) -> Bool {
         guard AgentGate.agent != nil, Self.showsData(view) else { return false }
+        if view.accessibilityIdentifier() == "history.every" { return true }  // every connection's statements
         var window = view.window
         while let parent = window?.sheetParent ?? (window?.className.contains("Popover") == true ? window?.parent : nil) {
             window = parent

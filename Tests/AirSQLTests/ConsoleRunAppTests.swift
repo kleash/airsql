@@ -331,5 +331,40 @@ extension AppTests {
             #expect(try await outside() == "c")
             _ = try await admin.query("DROP DATABASE \(database)")
         }
+
+        /// Local History brings a saved state back into the editor, as an edit.
+        @Test func aFilesSavedStateComesBack() async throws {
+            let (main, harness, console) = try await ConsoleAppTests.console()
+            let url = URL(fileURLWithPath: try scratch()).appendingPathComponent("a.sql")
+            console.editor.setText("SELECT 1")
+            console.setFile(url, savedText: "")
+            var saved = false
+            console.save(as: false) { saved = $0 }
+            #expect(await eventually(timeout: 5) { saved })
+            console.editor.setText("SELECT 2")
+            console.save(as: false) { _ in }
+            #expect(await eventually(timeout: 5) { console.savedText == "SELECT 2" })
+            console.showLocalHistory(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            let sheet = try #require(main.window?.attachedSheet?.contentViewController as? LocalHistorySheet)
+            sheet.select(row: 1)
+            #expect(await call(harness, "press", ["id": "localHistory.restore"]).error == nil)
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(console.text == "SELECT 1" && console.isEdited)
+        }
+
+        /// Sessions… names what uses each session.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func theSessionsListNamesEachTab() async throws {
+            let (main, harness, console, connection) = try await Self.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            console.editor.setText("SELECT 1")
+            console.runStatement(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let rows = main.sessionRows(await connection.sessions())
+            #expect(rows.contains { $0.job == "“\(main.selectedTab?.title ?? "")”" && $0.state == "Idle" })
+            #expect(rows.contains { $0.job == "The connection" })
+            await connection.disconnect()
+        }
     }
 }

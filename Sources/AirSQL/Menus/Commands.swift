@@ -83,6 +83,8 @@ import AppKit
     @objc optional func showHistory(_ sender: Any?)
     @objc optional func changeConnection(_ sender: Any?)
     @objc optional func rerunResult(_ sender: Any?)
+    @objc optional func showSessions(_ sender: Any?)
+    @objc optional func showLocalHistory(_ sender: Any?)
     @objc optional func runFromCaret(_ sender: Any?)
     @objc optional func runSubquery(_ sender: Any?)
     @objc optional func explainAnalyze(_ sender: Any?)
@@ -470,6 +472,10 @@ enum Commands {
                                    tip: "Tidy the SQL's spacing and keyword case; values and comments stay as they are")
     static let history = Command("Query History", #selector(AirSQLActions.showHistory(_:)), "y",
                                  tip: "Search the statements run on this connection and insert one again")
+    static let sessions = Command("Sessions…", #selector(AirSQLActions.showSessions(_:)),
+                                  tip: "List the sessions open on this connection and what each is doing")
+    static let localHistory = Command("Local History…", #selector(AirSQLActions.showLocalHistory(_:)),
+                                      tip: "See the states this file was saved in and bring one back")
     static let changeConnection = Command("Change Connection…", #selector(AirSQLActions.changeConnection(_:)),
                                           tip: "Run this tab's statements on another connection")
     static let profile = Command("Profile", #selector(AirSQLActions.profileQuery(_:)),
@@ -767,7 +773,7 @@ enum Commands {
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
         runStatement, runSelection, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
-        isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
+        isolation, formatSQL, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
