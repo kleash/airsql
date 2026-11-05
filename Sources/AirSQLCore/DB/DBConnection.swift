@@ -155,6 +155,7 @@ public final class DBConnection: @unchecked Sendable {
     private let state = NSCondition()
     private var mysql: UnsafeMutablePointer<MYSQL>?
     private var _server: ServerInfo?
+    private var _lastUsed = Date()
     private var serverStatus: UInt32 = 0
     private var _transactionStarted: Date?
     /// The tag of the statement on the wire, and its text.
@@ -271,6 +272,8 @@ public final class DBConnection: @unchecked Sendable {
     public var isConnected: Bool { state.locked { mysql != nil } }
     /// The connection dropped, and nothing has reconnected or closed it.
     public var wasLost: Bool { state.locked { lost != nil } }
+    /// When a statement last started here (or the session opened).
+    public var lastUsed: Date { state.locked { _lastUsed } }
     /// A statement is running.
     public var isBusy: Bool { state.locked { running != nil } }
     /// A transaction is open on the server (SERVER_STATUS_IN_TRANS).
@@ -506,6 +509,7 @@ public final class DBConnection: @unchecked Sendable {
             while cancels > 0 { state.wait() }
             running = tag
             runningSQL = sql
+            _lastUsed = Date()
             return serverStatus & UInt32(SERVER_STATUS_NO_BACKSLASH_ESCAPES) != 0
         }
         defer { state.locked { (running, runningSQL) = (nil, nil) } }

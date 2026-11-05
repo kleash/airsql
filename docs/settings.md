@@ -60,6 +60,8 @@ of them after.
 
 - **Load details up to … tables**: on a server with more tables than this, a database's columns, indexes and keys load
   when you open it, so connecting stays quick.
+- **Read the schema every … minutes**: reads connected schemas again on a timer, to catch changes others make; 0 (the
+  default) reads them only at connect and on Refresh.
 
 ## Safety
 

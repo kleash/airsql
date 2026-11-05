@@ -51,6 +51,50 @@ extension AppTests {
         model.connector.disconnect(saved.id)
     }
 
+    /// What a connect sets up from the saved connection: its time zone in each session, the database last worked in
+    /// while it's there, and a disconnect once idle, never with a transaction open.
+    @Test(.enabled(if: Lab.enabled)) func aConnectionComesBackWhereItWasAndClosesWhenIdle() async throws {
+        var saved = SavedConnection(name: "Back", host: "127.0.0.1", port: Lab.mariadb114.port, user: Lab.airsql.user)
+        saved.tls = TLSOptions(mode: .off)
+        saved.timeZone = "+03:00"
+        saved.idleDisconnectMinutes = 5
+        let model = testModel([saved])
+        model.setSavedPassword(saved.id.uuidString, Lab.airsql.password)
+        func connect() async throws -> OpenConnection {
+            model.connector.connect(saved.id, on: nil)
+            #expect(await eventually(timeout: 30) { model.openConnection(saved.id)?.snapshot.server != nil })
+            return try #require(model.openConnection(saved.id))
+        }
+        var open = try await connect()
+        #expect(open.currentDatabase == nil)
+        open.currentDatabase = "fixture"
+        #expect(model.connection(saved.id)?.lastDatabase == "fixture")
+        let main = try await open.connection.session(.main)
+        #expect(try await main.query("SELECT @@time_zone").first?.rows?.string(0, 0) == "+03:00")
+        model.connector.disconnect(saved.id)
+        open = try await connect()
+        #expect(open.currentDatabase == "fixture")
+        model.connector.disconnect(saved.id)
+
+        var gone = try #require(model.connection(saved.id))
+        gone.lastDatabase = "no_such_database"
+        model.save(gone)
+        open = try await connect()
+        #expect(open.currentDatabase == nil)
+
+        let connected = try #require(model.connector.open[saved.id])
+        let later = Date().addingTimeInterval(600)
+        await model.connector.closeIfIdle(saved.id, connected, now: Date())
+        #expect(model.connector.open[saved.id] != nil, "not idle long enough")
+        let session = try await open.connection.session(.main)
+        _ = try await session.query("START TRANSACTION")
+        await model.connector.closeIfIdle(saved.id, connected, now: later)
+        #expect(model.connector.open[saved.id] != nil, "a transaction is open")
+        _ = try await session.query("ROLLBACK")
+        await model.connector.closeIfIdle(saved.id, connected, now: later)
+        #expect(model.connector.open[saved.id] == nil && model.states[saved.id] == nil)
+    }
+
     /// A table tab outlives its sessions: after Disconnect and Connect, as after a drop that lost the route too, it reads
     /// through the new ones.
     @Test(.enabled(if: Lab.enabled)) func aTableTabReadsThroughANewConnect() async throws {

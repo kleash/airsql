@@ -293,6 +293,41 @@ extension AppTests {
 
 /// The outline row of folder `id`.
 extension AppTests {
+    /// A deleted connection comes back from the menu without its password, out of a folder that has gone; the list keeps
+    /// the last few.
+    @Test func aDeletedConnectionComesBack() async throws {
+        var saved = SavedConnection(name: "Gone", host: "127.0.0.1", user: "u")
+        saved.folderID = UUID()
+        let model = testModel([saved])
+        model.setSavedPassword(saved.id.uuidString, "secret")
+        let (_, harness) = appWindow(model)
+        model.delete([saved.id])
+        #expect(model.data.connections.isEmpty && model.data.deletedConnections.map(\.id) == [saved.id])
+        #expect(await eventually(timeout: 5) { model.savedPassword(saved.id.uuidString) == nil })
+        #expect(await call(harness, "menu", ["path": "Connection > Deleted Connections > Gone"]).error == nil)
+        #expect(model.connection(saved.id)?.folderID == nil && model.data.deletedConnections.isEmpty)
+        #expect(model.savedPassword(saved.id.uuidString) == nil)
+
+        let many = (0..<25).map { SavedConnection(name: "c\($0)") }
+        model.data.connections = many
+        model.delete(Set(many.map(\.id)))
+        #expect(model.data.deletedConnections.count == AppModel.deletedKept)
+    }
+
+    /// File ▸ Connect To connects the one chosen, as `--connect` does at launch.
+    @Test func connectToAndTheLaunchSwitchConnectByName() async throws {
+        let one = SavedConnection(name: "One", host: "127.0.0.1", port: 1, user: "u")
+        let two = SavedConnection(name: "Two", host: "127.0.0.1", port: 1, user: "u")
+        let model = testModel([one, two])
+        let (main, harness) = appWindow(model)
+        #expect(await call(harness, "menu", ["path": "File > Connect To > One"]).error == nil)
+        #expect(model.states[one.id] != nil && model.states[two.id] == nil)
+        model.connector.cancel(one.id)
+        model.connector.connectAtLaunch(on: main.window, arguments: ["AirSQL", "--connect", "Two"])
+        #expect(model.states[two.id] != nil)
+        model.connector.cancel(two.id)
+    }
+
     /// At launch only what was chosen connects, never Production; the editor says why Production can't.
     @Test func connectingAtLaunchLeavesOutProduction() async throws {
         var chosen = SavedConnection(name: "Chosen", host: "127.0.0.1", port: 1, user: "u")

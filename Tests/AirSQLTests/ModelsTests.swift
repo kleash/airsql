@@ -164,6 +164,13 @@ struct ModelsTests {
         #expect(!older.reconnectAtLaunch)
     }
 
+    @Test func aTimeZoneGoesToTheSessions() {
+        var saved = SavedConnection(name: "dev")
+        #expect(saved.connectOptions(password: "", routeSocket: nil).timeZone == nil)
+        saved.timeZone = "+02:00"
+        #expect(saved.connectOptions(password: "", routeSocket: nil).timeZone == "+02:00")
+    }
+
     @Test func changeSQLEndsEachStatement() {
         let change = ChangeSQL(title: "t", statements: ["DELETE FROM `t` WHERE `id` = 1", " UPDATE `t` SET `a` = 2;\n"], connection: UUID())
         #expect(change.text == "DELETE FROM `t` WHERE `id` = 1;\nUPDATE `t` SET `a` = 2;")

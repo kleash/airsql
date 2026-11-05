@@ -24,7 +24,9 @@ tabs:
   private certificate authority, and a client certificate and key for a server that asks for one. **PAM or LDAP
   login** allows the plain-text login such accounts need, only over TLS that proves the server.
 - **SSH and Proxy**: the route (below).
-- **Options**: read-only (below), the compressed protocol, a query timeout, how query tabs use sessions and start their transactions (see [Sessions](console.md#sessions)), the databases shown (names or patterns
+- **Options**: read-only (below), whether it connects when AirSQL opens, the compressed protocol, a query timeout, how
+  many idle minutes to wait before disconnecting (never with a transaction, edits or a running statement open), the time
+  zone sessions use, how query tabs use sessions and start their transactions (see [Sessions](console.md#sessions)), the databases shown (names or patterns
   such as `shop, reports_*`), startup SQL that runs after each login (for example `SET time_zone = '+00:00';`), and the
   connection's own client tools (empty: Settings ▸ Client Tools' choice; each says which program and version it is, or
   why it can't be used).
@@ -96,6 +98,10 @@ AirSQL never reconnects behind your back: Connect sets it up again on the same r
 back. To have a connection connect each time AirSQL opens, tick **Connect when AirSQL opens** in its Options; a
 Production connection can't, and only connects when you ask. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
 transaction or edits that aren't applied.
+
+**File ▸ Connect To** lists every connection. **Connection ▸ Deleted Connections** brings back one of the last 20 you
+deleted, without its passwords. A connection with no default database goes back to the one you last worked in. From a
+script, `open -a AirSQL --args --connect "Staging"` starts AirSQL and connects to that connection by name.
 
 Connected connections are kept alive with a ping every minute, except a session whose transaction has been open longer
 than the safety setting allows.

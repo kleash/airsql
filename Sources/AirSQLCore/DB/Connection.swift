@@ -88,6 +88,14 @@ public final class Connection: @unchecked Sendable {
         (await openSessions() + lock.locked { tools }).filter(\.isConnected)
     }
 
+    /// When a statement last ran on any session but the schema's, whose timed reads aren't the person's; nil while one
+    /// runs or a transaction is open: that isn't idle.
+    public func idleSince() async -> Date? {
+        let open = await sessions().filter { $0.role != .schema }
+        guard !open.contains(where: { $0.isBusy || $0.inTransaction }) else { return nil }
+        return open.map(\.lastUsed).max()
+    }
+
     /// Whether `used` of the server's `limit` connections leave room for one more, and for other clients.
     static func hasRoom(used: Int, limit: Int) -> Bool { used + 5 < limit }
 

@@ -10,6 +10,23 @@ extension MainWindowController {
         }
     }
 
+    /// File ▸ Connect To: selects the chosen connection and connects it.
+    @objc func connectTo(_ sender: Any?) {
+        guard let id = (sender as? NSMenuItem)?.representedObject as? UUID else { return }
+        sidebar.select([id])
+        sidebarSelectionChanged()
+        if !isConnected(id) { model.connector.connect(id, on: window) }
+    }
+
+    /// Connection ▸ Bring Back: the chosen deleted connection returns, selected.
+    @objc func bringBackConnection(_ sender: Any?) {
+        guard let id = (sender as? NSMenuItem)?.representedObject as? UUID else { return }
+        model.bringBack(id)
+        sidebar.reload()
+        sidebar.select([id])
+        sidebarSelectionChanged()
+    }
+
     /// Connected or connecting, as the sidebar shows it.
     func isConnected(_ id: UUID) -> Bool {
         switch model.states[id] {
@@ -22,10 +39,7 @@ extension MainWindowController {
     /// client tool is working through one of them (disconnecting stops it: a route it uses would go from under it).
     @objc func disconnect(_ sender: Any?) {
         let ids = targetConnections.map(\.id).filter(isConnected)
-        let busy = tabs.filter { tab in
-            ids.contains(tab.connectionID ?? UUID()) && (tab.tabContent?.isEdited == true || tab.tabContent?.transactionBadge != nil
-                || (tab.content as? ConsoleViewController)?.pendingResultRows ?? 0 > 0)
-        }
+        let busy = busyTabs(ids)
         let tools = ToolSheet.running(on: ids)
         guard !busy.isEmpty || !tools.isEmpty, let window else { return ids.forEach(model.connector.disconnect) }
         let alert = NSAlert()
@@ -42,6 +56,14 @@ extension MainWindowController {
             guard response == .alertFirstButtonReturn else { return }
             ToolSheet.running(on: ids).forEach { $0.stop() }
             ids.forEach { self?.model.connector.disconnect($0) }
+        }
+    }
+
+    /// The tabs of these connections with an open transaction, edits or result edits that a disconnect would lose.
+    func busyTabs(_ ids: [UUID]) -> [Tab] {
+        tabs.filter { tab in
+            ids.contains(tab.connectionID ?? UUID()) && (tab.tabContent?.isEdited == true || tab.tabContent?.transactionBadge != nil
+                || (tab.content as? ConsoleViewController)?.pendingResultRows ?? 0 > 0)
         }
     }
 

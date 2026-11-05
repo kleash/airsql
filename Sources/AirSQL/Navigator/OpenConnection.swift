@@ -36,8 +36,16 @@ final class OpenConnection {
     private(set) var loadError: String?
     /// The database the console works in: the connection's own at first, then the one double-clicked in the tree.
     var currentDatabase: String? {
-        didSet { changed() }
+        didSet {
+            if let currentDatabase, var saved = model?.connection(id), saved.lastDatabase != currentDatabase {
+                saved.lastDatabase = currentDatabase
+                model?.save(saved)
+            }
+            changed()
+        }
     }
+    /// Where the person left off, gone back to once the schema shows it is still there.
+    private var databaseToRestore: String?
     private(set) weak var model: AppModel?
     private var running: [Load: Int] = [:]
     private var tasks: [UUID: Task<Void, Never>] = [:]
@@ -55,9 +63,15 @@ final class OpenConnection {
         schema = SchemaCache(source: source ?? SchemaSession(connection: connection),
                              tableThreshold: model.data.settings.detailsTableThreshold, includes: includes)
         currentDatabase = connection.options.database
+        if currentDatabase == nil { databaseToRestore = model.connection(id)?.lastDatabase }
         schema.onChange = { [weak self] snapshot in
-            self?.snapshot = snapshot
-            self?.changed()
+            guard let self else { return }
+            self.snapshot = snapshot
+            if snapshot.server != nil, let name = self.databaseToRestore {
+                self.databaseToRestore = nil
+                if self.currentDatabase == nil, snapshot.database(name) != nil { self.currentDatabase = name }
+            }
+            self.changed()
         }
     }
 

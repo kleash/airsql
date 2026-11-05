@@ -180,7 +180,13 @@ final class AgentServer {
     /// Fills a menu as it would be as it opens; the Window menu's tabs from this harness's main window (a test process
     /// has several open).
     func update(_ menu: NSMenu) {
-        if menu.delegate === WindowMenu.shared, let main { main.updateWindowMenu(menu) } else { menu.delegate?.menuNeedsUpdate?(menu) }
+        if menu.delegate === WindowMenu.shared, let main {
+            main.updateWindowMenu(menu)
+        } else if let connections = menu.delegate as? ConnectToMenu {
+            connections.fill(menu, from: main)
+        } else {
+            menu.delegate?.menuNeedsUpdate?(menu)
+        }
     }
 
     /// Whether the item is enabled now (its target's own validation, as AppKit checks before showing a menu), the

@@ -105,6 +105,12 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var proxy = ProxySettings()
     /// Connects when AirSQL opens (`connectsAtLaunch`).
     public var reconnectAtLaunch = false
+    /// SET time_zone in each session ("+00:00", "Europe/Paris"); empty: the server's.
+    public var timeZone = ""
+    /// The current database when it last changed: where a connection with no `database` goes back to.
+    public var lastDatabase = ""
+    /// Disconnects after this many minutes with nothing run and no work open; 0: stays connected.
+    public var idleDisconnectMinutes = 0
 
     public init(id: UUID = UUID(), name: String = "", host: String = "", port: Int? = nil, user: String = "",
                 colour: ConnectionColour = .none, route: Route = .direct) {
@@ -155,6 +161,9 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         jumpHosts = try value(.jumpHosts, defaults.jumpHosts)
         proxy = try value(.proxy, defaults.proxy)
         reconnectAtLaunch = try value(.reconnectAtLaunch, defaults.reconnectAtLaunch)
+        timeZone = try value(.timeZone, defaults.timeZone)
+        lastDatabase = try value(.lastDatabase, defaults.lastDatabase)
+        idleDisconnectMinutes = try value(.idleDisconnectMinutes, defaults.idleDisconnectMinutes)
     }
 
     /// The name, else user@host:port (or the socket).
@@ -267,6 +276,8 @@ public struct AppSettings: Codable, Equatable {
     public var snippets: [SQLSnippet] = []
     /// Settings ▸ Grid: the most rows a console result keeps; the statement stops on the server there.
     public var resultRowCap = 100_000
+    /// Settings ▸ Connections: connected schemas are read again this often, to catch others' changes; 0: only on Refresh.
+    public var schemaRefreshMinutes = 0
 
     public init() {}
 
@@ -305,6 +316,7 @@ public struct AppSettings: Codable, Equatable {
         autoKeywordCase = try value(.autoKeywordCase, defaults.autoKeywordCase)
         snippets = try value(.snippets, defaults.snippets)
         resultRowCap = try value(.resultRowCap, defaults.resultRowCap)
+        schemaRefreshMinutes = try value(.schemaRefreshMinutes, defaults.schemaRefreshMinutes)
     }
 
     /// What completion follows, given what was chosen before.
@@ -326,6 +338,8 @@ public struct AirSQLData: Codable, Equatable {
     public var connections: [SavedConnection] = []
     public var folders: [ConnectionFolder] = []
     public var settings = AppSettings()
+    /// The connections deleted last, newest first, to bring back; their passwords went with them.
+    public var deletedConnections: [SavedConnection] = []
 
     public init(connections: [SavedConnection] = [], folders: [ConnectionFolder] = [], settings: AppSettings = AppSettings()) {
         self.connections = connections
@@ -338,6 +352,7 @@ public struct AirSQLData: Codable, Equatable {
         connections = try container.decodeIfPresent([SavedConnection].self, forKey: .connections) ?? []
         folders = try container.decodeIfPresent([ConnectionFolder].self, forKey: .folders) ?? []
         settings = try container.decodeIfPresent(AppSettings.self, forKey: .settings) ?? AppSettings()
+        deletedConnections = try container.decodeIfPresent([SavedConnection].self, forKey: .deletedConnections) ?? []
     }
 
     public func connection(_ id: UUID?) -> SavedConnection? {
