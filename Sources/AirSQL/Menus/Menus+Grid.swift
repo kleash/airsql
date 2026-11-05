@@ -17,27 +17,36 @@ extension MainMenu {
         menus.edit.insertItem(Commands.shrinkSelection.item(), at: selectAll + 2)
         menus.data.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.pasteAsNewRows,
                         Commands.pasteWithFormat, Commands.deleteRows, nil,
-                        Commands.setNull, Commands.setDefault])
+                        Commands.setNull, Commands.setDefault, Commands.setExpression])
         menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
         menus.data.add([Commands.chooseReferencedRow, Commands.useAsLabel, Commands.addVirtualKey, Commands.removeVirtualKey])
         menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
         menus.data.addItem(submenu("Quick Filter", QuickFilter.commands.map { $0.item() } + [.separator(), Commands.filterPrompt.item()]))
         menus.data.add([Commands.filterByValues, Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending,
-                        Commands.addToSort, Commands.sortColumns, Commands.clearSort, nil,
-                        Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn, Commands.freeze])
+                        Commands.addToSort, Commands.sortColumns, Commands.orderBy, Commands.clearSort, nil,
+                        Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn, Commands.hideOtherColumns, Commands.freeze,
+                        Commands.openURL, Commands.compareCells])
         menus.data.addItem(GridViewer.displayMenu())
-        menus.data.add([nil, Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.exportRows])
+        menus.data.add([nil, Commands.loadFullCell, Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.firstPage,
+                        Commands.previousPage, Commands.nextPage, Commands.lastPage])
+        menus.data.addItem(submenu("Rows per Page", TableDataController.pageSizeItems()))
+        menus.data.add([nil, Commands.copyTableQuery, Commands.openTableQuery, Commands.exportRows])
         let refresh = menus.view.items.firstIndex { $0.action == Commands.refresh.action } ?? menus.view.items.count - 1
         menus.view.insertItem(submenu("Refresh Every", TableDataController.autoRefreshItems()), at: refresh + 1)
-        menus.view.add([nil, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,
+        menus.view.add([nil, Commands.resetView, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,
                         Commands.transpose, Commands.columnList, nil, Commands.heatmap, Commands.highlightEqual])
-        menus.view.addItem(submenu("View As", ["Table", "Text", "Tree"].enumerated().map { index, title in
+        menus.view.addItem(submenu("View As", viewAsItems()))
+        menus.view.add([Commands.chart])
+    }
+
+    /// View As's choices.
+    static func viewAsItems() -> [NSMenuItem] {
+        ["Table", "Text", "Tree"].enumerated().map { index, title in
             let item = Commands.viewAs.item()
             item.title = title
             item.tag = index
             return item
-        }))
-        menus.view.add([Commands.chart])
+        }
     }
 }
 

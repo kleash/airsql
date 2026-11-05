@@ -513,9 +513,11 @@ extension AppTests {
             }
             let transpose = Commands.transpose.item()
             #expect(tab.validateMenuItem(transpose))
-            tab.bar.transposeButton.performClick(nil)
+            tab.toolbar.validate()
+            let button = try #require(tab.toolbar.button(Commands.transpose))
+            button.performClick(nil)
             #expect(tab.viewer.transposed)
-            #expect(tab.bar.transposeButton.image != nil)
+            #expect(button.image != nil)
             let menu = tab.viewer.dataGrid(tab.grid, menuFor: .row(0))
             #expect(menu?.items.contains { $0.action == Commands.transpose.action } == true)
         }
@@ -855,7 +857,7 @@ extension AppTests {
             let menu = try #require(view.viewer.dataGrid(view.grid, menuFor: .cells))
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title)
                     == ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel", "Record View", "Transpose",
-                        "Column Summary…", "Chart", "Display As"])
+                        "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"])
         }
 
         @Test func readOnlyConnectionsRefuseEditsAndLongValuesOpenInTheValuePanel() async throws {

@@ -31,6 +31,12 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     var filterByValue: ((_ column: Int, _ value: String?) -> Void)?
     /// Keeps a value edited in the value panel as the host's cell's pending value (nil: the panel only shows values).
     var keepValue: ((_ row: Int, _ column: Int, _ text: String) -> Void)?
+    /// Whether the host's cell holds only the start of its value, and reads the host's `rows` whole in `columns` before
+    /// what must have them (nil: a host's cells are always whole).
+    var isCut: ((_ row: Int, _ column: Int) -> Bool)?
+    var readWhole: ((_ rows: [Int], _ columns: [Int], _ then: @escaping () -> Void) -> Void)?
+    /// Columns were hidden or shown.
+    var hiddenColumnsDidChange: (() -> Void)?
     /// Why the host's cell can't be edited, said when it is double-clicked; nil: nothing to say.
     var whyReadOnly: ((_ row: Int, _ column: Int) -> String?)?
     /// Where the columns are kept; nil: nowhere.
@@ -85,6 +91,14 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         status.update()
         NotificationCenter.default.addObserver(self, selector: #selector(gridSettingsChanged(_:)), name: .gridSettingsDidChange,
                                                object: nil)
+        if let settings = (NSApp.delegate as? AppDelegate)?.model?.data.settings { applyLook(settings) }
+    }
+
+    /// Settings ▸ Grid's font, lines per row and date format.
+    private func applyLook(_ settings: AppSettings) {
+        if grid.fontFamily != settings.gridFontFamily { grid.fontFamily = settings.gridFontFamily }
+        if grid.rowLines != settings.gridRowLines { grid.rowLines = settings.gridRowLines }
+        GridDisplay.pattern = settings.gridDatePattern.isEmpty ? AppSettings().gridDatePattern : settings.gridDatePattern
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -101,6 +115,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         guard let settings = (notification.object as? AppModel)?.data.settings,
               let old = notification.userInfo?["old"] as? AppSettings else { return }
         grid.nullText = settings.nullText
+        applyLook(settings)
         if grid.fontSize == CGFloat(old.gridFontSize) { grid.fontSize = CGFloat(settings.gridFontSize) }
     }
 
@@ -125,6 +140,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private(set) weak var summaryShown: GridSummaryView?
     /// View As or Chart (`GridViewer+Views`): what the body shows, and the view shown in place of the grid.
     var presentation = Presentation.table
+    /// The host's row of actions, kept up to date with the status bar.
+    weak var toolbar: GridToolbar?
     /// The host's find bar, for Esc.
     weak var findBar: TableFindBar?
     /// Called when View As changes what the body shows.
@@ -238,8 +255,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             return item
         })
         return MainMenu.submenu("Display As", [item(.standard), .separator(), item(.grouped), decimals, item(.unixTime), item(.unixMillis),
-                                               .separator(), item(.dateShort), item(.dateMedium), item(.dateLong), zones, .separator(),
-                                               item(.uuid), item(.hex), item(.text)])
+                                               .separator(), item(.dateShort), item(.dateMedium), item(.dateLong), item(.datePattern), zones, .separator(),
+                                               item(.detected), item(.uuid), item(.uuidSwapped), item(.hex), item(.text), item(.wkt)])
     }
 
     /// The host's rows or columns changed (a page arrived): shows them again.
@@ -365,6 +382,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             valuePanel = panel
             updateValuePanel()
         }
+        status.update()
     }
 
     /// The panel shows the focused cell, editable where the host lets it be edited (`keepValue`); text being edited
@@ -376,7 +394,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             valuePanel.keep = nil
             return valuePanel.show(column: nil, value: nil, bytes: nil)
         }
-        if let keepValue, host?.dataGrid(grid, canEditRow: row, column: column) == true {
+        let cut = isCut?(row, column) == true
+        if !cut, let keepValue, host?.dataGrid(grid, canEditRow: row, column: column) == true {
             valuePanel.keep = { [weak self] text in
                 guard let self else { return nil }
                 if let refusal = host?.dataGrid(grid, check: text, row: row, column: column) { return refusal }
@@ -389,7 +408,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         var placeholder: String?
         if case .placeholder(let words) = source.cell(row, column) { placeholder = words }
         valuePanel.show(column: source.columns[column], value: placeholder == nil ? source.value(row, column) : nil,
-                        bytes: (source as? GridBytes)?.bytes(row, column), placeholder: placeholder)
+                        bytes: (source as? GridBytes)?.bytes(row, column), placeholder: placeholder,
+                        loadFull: cut ? { [weak self] in self?.readWhole?([row], [column]) {} } : nil)
     }
 
     /// Edits the focused cell's value in the value panel, opening it first (a long or multi-line value).
@@ -463,6 +483,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         grid.columnOrder = order
         saveColumns()
         status.update()
+        hiddenColumnsDidChange?()
     }
 
     // MARK: Commands (they reach the viewer while its grid has the focus)
@@ -550,6 +571,56 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         saveColumns()
     }
 
+    /// Hide Other Columns: only the selected columns, or the focused cell's, stay.
+    @objc func hideOtherColumns(_ sender: Any?) {
+        if transposed || record != nil { transposeGrid(nil) }
+        let kept = Set(focusedColumns)
+        setHidden(true, columns: grid.columnOrder.filter { !kept.contains($0) })
+    }
+
+    /// Puts the columns back as they come: every one shown, in order, at its natural width, as stored.
+    func resetColumns() {
+        guard let source else { return }
+        backToGrid(nil)
+        if presentation != .table { present(.table) }
+        displays = [:]
+        zones = [:]
+        heat = [:]
+        updateTint()
+        displayed = display(source)
+        grid.frozenColumns = 0
+        grid.source = displayed
+        saveColumns()
+        status.update()
+        hiddenColumnsDidChange?()
+    }
+
+    /// Open URL: the focused cell's web address in the browser.
+    @objc func openCellURL(_ sender: Any?) {
+        guard let url = focusedURL else { return NSSound.beep() }
+        NSWorkspace.shared.open(url)
+    }
+
+    private var focusedURL: URL? {
+        guard let cell = focusedCell, let text = source?.value(cell.row, cell.column) else { return nil }
+        return GridLink.url(text)
+    }
+
+    /// Compare Cells: two selected cells' values, line by line, in a tab. Cut values read whole first.
+    @objc func compareCells(_ sender: Any?) {
+        let cells = selectedCells(limit: 3)
+        guard cells.count == 2, source != nil, let main = window?.windowController as? MainWindowController else { return NSSound.beep() }
+        let show = { [self] in
+            guard let source else { return }
+            let (first, second) = (source.value(cells[0].row, cells[0].column), source.value(cells[1].row, cells[1].column))
+            let name = { (cell: (row: Int, column: Int)) in "\(source.columns[cell.column].name), row \((cell.row + 1).formatted())" }
+            main.open(TextContent(title: "Compare Cells", caption: "− \(name(cells[0]))   + \(name(cells[1]))",
+                                  text: GridLink.lineDifference(first ?? grid.nullText, second ?? grid.nullText)),
+                      title: "Compare Cells", connection: nil)
+        }
+        if let readWhole { readWhole(cells.map(\.row), cells.map(\.column), show) } else { show() }
+    }
+
     /// Hide Column: the selected columns, or the focused cell's.
     @objc func hideColumn(_ sender: Any?) {
         if transposed || record != nil { transposeGrid(nil) }
@@ -580,9 +651,13 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     private func copySelection(_ format: CopyFormat, headers: Bool) {
         if copiesEverything, grid.selection.isEmpty, grid.selection.cursor == nil { grid.selectAll(nil) }
-        guard let copied else { return NSSound.beep() }
-        GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name,
-                     noBackslashEscapes: noBackslashEscapes)
+        guard copied != nil else { return NSSound.beep() }
+        let copy = { [self] in
+            guard let copied else { return }
+            GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name,
+                          noBackslashEscapes: noBackslashEscapes)
+        }
+        if let readWhole { readWhole(selectedRows(), shownColumns, copy) } else { copy() }
     }
 
     // MARK: The host's cells
@@ -709,6 +784,17 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             item.state = column.map { $0 < grid.frozenColumns } == true ? .on : .off
             item.explain(enabled: enabled, reason: column == nil ? "Select a column first" : "Not while the rows are on their side")
             return enabled
+        case #selector(hideOtherColumns(_:)):
+            let enabled = !focusedColumns.isEmpty && Set(focusedColumns).count < grid.columnCount
+            item.explain(enabled: enabled, reason: focusedColumns.isEmpty ? "Select a column first" : "No other columns are shown")
+            return enabled
+        case #selector(openCellURL(_:)):
+            item.explain(enabled: focusedURL != nil, reason: "Select a cell holding a web address first")
+            return focusedURL != nil
+        case #selector(compareCells(_:)):
+            let enabled = selectedCells(limit: 3).count == 2
+            item.explain(enabled: enabled, reason: "Select two cells first")
+            return enabled
         case #selector(hideColumn(_:)):
             let enabled = grid.columnCount > 1 && grid.selection.cursor != nil
             item.explain(enabled: enabled, reason: grid.columnCount > 1 ? "Select a column first" : "One column stays shown")
@@ -718,6 +804,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     }
 
     // MARK: DataGridViewDelegate
+
+    func dataGridReachedLastRow(_ grid: DataGridView) {
+        if !(grid.source is TransposedSource) { host?.dataGridReachedLastRow(grid) }
+    }
 
     func dataGridSelectionDidChange(_ grid: DataGridView) {
         status.update()
@@ -773,9 +863,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         }
         menu.addItem(.separator())
         switch target {
-        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.transpose, Commands.columnSummary, Commands.chart])
+        case .cells: menu.add([Commands.valuePanel, Commands.recordView, Commands.transpose, Commands.columnSummary, Commands.chart, nil,
+                               Commands.openURL, Commands.compareCells])
         case .row: menu.add([Commands.recordView, Commands.transpose, Commands.valuePanel])
-        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.freeze, Commands.columnList, Commands.heatmap,
+        case .column: menu.add([Commands.columnSummary, Commands.hideColumn, Commands.hideOtherColumns, Commands.freeze, Commands.columnList, Commands.heatmap,
                                 Commands.chart])
         }
         if !transposed, record == nil { menu.addItem(Self.displayMenu()) }

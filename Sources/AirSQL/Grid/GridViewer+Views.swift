@@ -25,7 +25,10 @@ extension GridViewer {
     /// Shows the rows as `next`, in place of what the body shows now.
     func present(_ next: Presentation) {
         guard source != nil else { return }
-        defer { didPresent?() }
+        defer {
+            didPresent?()
+            status.update()
+        }
         if next != .table, transposed || record != nil { transposeGrid(nil) }
         presented?.removeFromSuperview()
         presented = nil

@@ -111,6 +111,16 @@ extension DataGridView {
                 let deleted = mark == .deleted
                 // NULL and what the server fills in at Apply (auto, default, ƒ NOW()) look alike: grey and slanted.
                 let (attributes, ellipsis) = look(transposed == nil ? sourceColumn : row * columnCount + sourceColumn, info, isNull: cell == .null || cell.isPlaceholder, deleted: deleted)
+                // Rows of several lines: the lines after the first, under it. The first goes on below as ever.
+                if styles.lines > 1, case .text(let whole) = cell, whole.contains(where: \.isNewline) {
+                    let parts = whole.split(whereSeparator: \.isNewline).prefix(styles.lines).map { GridStyles.display(String($0)) }
+                    text = parts[0]
+                    for (index, part) in parts.enumerated().dropFirst() {
+                        let line = CTLineCreateWithAttributedString(NSAttributedString(string: part, attributes: attributes))
+                        context.textPosition = CGPoint(x: rect.minX + GridStyles.padding, y: y + styles.baseline + CGFloat(index) * styles.lineHeight)
+                        CTLineDraw(CTLineCreateTruncatedLine(line, Double(available), .end, ellipsis) ?? line, context)
+                    }
+                }
                 var line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
                 var width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
                 if width > available {

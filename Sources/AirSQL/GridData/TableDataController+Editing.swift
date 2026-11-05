@@ -30,6 +30,11 @@ extension TableDataController: DataGridViewDelegate {
         }
     }
 
+    /// A Page Down or ↓ past the rows loaded brings the next page.
+    func dataGridReachedLastRow(_ grid: DataGridView) {
+        if source?.hasMore == true, loading == nil { loadRows(more: true) }
+    }
+
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool) {
         sort(by: column, adding: adding)
     }
@@ -95,9 +100,13 @@ extension TableDataController: DataGridViewDelegate {
     /// and generated ones are always left to the server; without keys, the key columns are too.
     private func duplicate(keepingKeys: Bool) {
         guard let source, editingOff == nil else { return NSSound.beep() }
+        let rows = viewer.selectedRows()
+        guard !rows.contains(where: { row in source.columns.indices.contains { source.isCut(row, $0) } }) else {
+            return readWhole(rows) { [weak self] in self?.duplicate(keepingKeys: keepingKeys) }
+        }
         var last: UUID?
         let depth = source.changes.undoDepth
-        for row in viewer.selectedRows() {
+        for row in rows {
             var values: [String: PendingChanges.Value] = [:]
             for (index, column) in source.table.columns.enumerated() where column.generated == nil {
                 if column.autoIncrement || !keepingKeys && source.columns[index].isKey { continue }
@@ -124,10 +133,26 @@ extension TableDataController: DataGridViewDelegate {
     @objc func setCellNull(_ sender: Any?) { setSelected { _ in .null } }
     @objc func setCellDefault(_ sender: Any?) { setSelected { _ in .default } }
 
+    /// Set Expression…: an expression or function for the selected cells, sent to the server as typed at Apply.
+    @objc func setCellExpression(_ sender: Any?) {
+        guard let window = view.window else { return NSSound.beep() }
+        askExpression(on: window) { [weak self] sql in self?.setSelected { _ in .sql(sql) } }
+    }
+
+    /// Reset View: the columns as they come, no sort and no filter.
+    @objc func resetView(_ sender: Any?) {
+        viewer.resetColumns()
+        setSort([])
+        clearFilter(sender)
+    }
+
     /// Cut: copies the selected cells, then clears them (NULL where the column allows it), as pending edits.
     @objc func cut(_ sender: Any?) {
-        viewer.copy(sender)
-        setSelected { [source] in source?.table.columns[$0].nullable == true ? .null : .text("") }
+        readWhole(viewer.selectedRows(), columns: viewer.shownColumns) { [weak self] in
+            guard let self else { return }
+            viewer.copy(sender)
+            setSelected { [source] in source?.table.columns[$0].nullable == true ? .null : .text("") }
+        }
     }
 
     /// Revert (⌥⌘Z): the selected rows' changes.

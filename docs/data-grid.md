@@ -10,6 +10,15 @@ status bar's figures, the value panel, Record View, Transpose, other ways to sho
 a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
 [A table's rows](table-data.md).
 
+## The toolbar
+
+A table tab and a console result each have a row of buttons over the rows: the actions that are also in the menu bar, kept
+beside the work. The buttons act on the grid under them, wherever the focus is. Hold the pointer over one to see what it
+does, or why it's dimmed. A table's has Refresh, Refresh Every, Add Row, Duplicate Row, Delete Rows, Revert, Preview SQL
+and Apply; every grid has Find, the Column List, Sort by Columns, the Value Panel, Record View, Transpose, View As and
+Chart. A console result adds Pin, Compare With and Export, and shows its editing buttons only when it can be edited. When
+the tab is narrow, the buttons at the end step out; the menu bar still has them.
+
 ## The header
 
 Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:
@@ -60,7 +69,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
   (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
   query result shows the grid again, as does an Apply that deletes the row.
-- **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the button at the end of a table's grid bar) turns rows
+- **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the toolbar) turns rows
   into columns, with the column names down the left: handy for comparing a few wide rows. A query result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.
 
@@ -79,6 +88,19 @@ copying and editing use the stored value.
   zone, so choose the first one when that is UTC. The header says so (`datetime as medium date, UTC → this Mac's`).
 - Bytes: **UUID** (for `binary(16)`), **Hex**, or **Text (UTF-8)**.
 - **As Stored** shows the value as the server sent it again. AirSQL remembers each column's choice for each table.
+
+**Detect from the Bytes** shows a 16-byte value as a UUID and readable bytes as text, and leaves the rest as stored. **UUID,
+Time First** reads a value stored with MySQL's `UUID_TO_BIN(x, 1)`.
+
+A spatial column can show as **Well-Known Text** (`POINT(1 2)`). Dates can also use **Settings' Date Format**, a pattern
+you set in **Settings ▸ Grid ▸ Date format**, such as `dd/MM/yyyy HH:mm`.
+
+## Other commands on cells and columns
+
+- **Data ▸ Hide Other Columns** keeps only the selected columns on show; **View ▸ Reset View** puts the columns, the sort
+  and the filter back as they come.
+- **Data ▸ Open URL** opens a cell holding a web address in your browser.
+- **Data ▸ Compare Cells** opens a tab showing how two selected cells differ, line by line.
 
 ## Colours
 

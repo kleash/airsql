@@ -4,12 +4,16 @@ import Foundation
 /// (TSV at first); Export adds Excel (`XLSXWriter`). A `CopyWriter` writes a format a part at a time (header, rows,
 /// footer), so exporting every row of a table streams instead of holding them.
 public enum CopyFormat: String, CaseIterable, Codable, Sendable {
-    case tsv, csv, json, jsonLines, markdown, html, xml, insert, insertIgnore, replace, update, delete, whereClause, inList
+    case tsv, csv, pipe, json, jsonLines, markdown, html, xml, prettyTable, oneRow, insert, insertRows, insertIgnore, replace, update, delete, whereClause, inList
 
     public var title: String {
         switch self {
         case .tsv: "TSV"
         case .csv: "CSV"
+        case .pipe: "Pipe-Separated"
+        case .prettyTable: "Pretty Table"
+        case .oneRow: "One Row"
+        case .insertRows: "SQL INSERT, Many Rows"
         case .json: "JSON"
         case .jsonLines: "JSON Lines"
         case .markdown: "Markdown"
@@ -29,17 +33,18 @@ public enum CopyFormat: String, CaseIterable, Codable, Sendable {
         switch self {
         case .tsv: "tsv"
         case .csv: "csv"
+        case .pipe, .prettyTable, .oneRow: "txt"
         case .json: "json"
         case .jsonLines: "jsonl"
         case .markdown: "md"
         case .html: "html"
         case .xml: "xml"
-        case .insert, .insertIgnore, .replace, .update, .delete, .whereClause, .inList: "sql"
+        case .insert, .insertRows, .insertIgnore, .replace, .update, .delete, .whereClause, .inList: "sql"
         }
     }
 
     /// Formats whose first line can be the column names (the others name them anyway).
-    public var hasOptionalHeaders: Bool { self == .tsv || self == .csv }
+    public var hasOptionalHeaders: Bool { self == .tsv || self == .csv || self == .pipe }
 }
 
 /// How rows are written: column names first (TSV and CSV), what NULL looks like, CSV's separator, line endings, and the
@@ -70,6 +75,8 @@ public struct CopyWriter {
     /// WHERE Clause on one column and IN List: the values listed so far, and whether a NULL was left out of the clause.
     private var listed = 0
     private var sawNull = false
+    /// Pretty Table's rows: its columns' widths need them all.
+    private var pretty: [[String]] = []
 
     public init(_ format: CopyFormat, columns: [GridColumn], database: String? = nil, table: String = "table",
                 options: CopyOptions = CopyOptions()) {
@@ -95,7 +102,7 @@ public struct CopyWriter {
         let names = columns.map(\.name)
         switch format {
         case .tsv: return options.headers ? names.map(tsvField).joined(separator: "\t") + eol : ""
-        case .csv: return options.headers ? names.map(csvField).joined(separator: options.separator) + eol : ""
+        case .csv, .pipe: return options.headers ? names.map(csvField).joined(separator: separator) + eol : ""
         case .json: return "["
         case .markdown:
             return "| " + names.map(markdownCell).joined(separator: " | ") + " |" + eol
@@ -105,7 +112,7 @@ public struct CopyWriter {
                 + "<tbody>" + eol
         case .xml: return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + eol + "<table name=\"\(xml(table))\">" + eol
         case .whereClause where columns.count == 1: return SQLQuote.identifier(columns[0].name) + " IN ("
-        case .jsonLines, .insert, .insertIgnore, .replace, .update, .delete, .whereClause, .inList: return ""
+        case .jsonLines, .prettyTable, .oneRow, .insert, .insertRows, .insertIgnore, .replace, .update, .delete, .whereClause, .inList: return ""
         }
     }
 
@@ -113,10 +120,19 @@ public struct CopyWriter {
         defer { rowsWritten += 1 }
         switch format {
         case .tsv: return values.map { tsvField($0 ?? options.nullText) }.joined(separator: "\t") + eol
-        case .csv:
+        case .csv, .pipe:
             // Text that reads as NULL is quoted: a bare NULL is the real one, which CSV import reads back.
             return values.map { value in value.map { $0 == options.nullText ? quoted($0) : csvField($0) } ?? csvField(options.nullText) }
-                .joined(separator: options.separator) + eol
+                .joined(separator: separator) + eol
+        case .prettyTable:
+            pretty.append(values.map { ($0 ?? options.nullText).split(whereSeparator: \.isNewline).joined(separator: " ") })
+            return ""
+        case .oneRow: return (rowsWritten == 0 ? "" : ", ") + values.map { $0 ?? options.nullText }.joined(separator: ", ")
+        case .insertRows:
+            let written = columns.indices.filter { !columns[$0].marks.contains(.generated) }
+            let start = rowsWritten > 0 ? "," + eol : "INSERT INTO " + qualifiedTable + " (" + written.map { SQLQuote.identifier(columns[$0].name) }.joined(separator: ", ")
+                + ") VALUES" + eol
+            return start + "  (" + written.map { literal(values[$0], columns[$0]) }.joined(separator: ", ") + ")"
         case .json: return (rowsWritten == 0 ? eol : "," + eol) + "  " + jsonObject(values)
         case .jsonLines: return jsonObject(values) + eol
         case .markdown: return "| " + values.map { markdownCell($0 ?? options.nullText) }.joined(separator: " | ") + " |" + eol
@@ -163,6 +179,9 @@ public struct CopyWriter {
     public func footer() -> String {
         switch format {
         case .json: return (rowsWritten == 0 ? "" : eol) + "]" + eol
+        case .insertRows: return rowsWritten == 0 ? "" : ";" + eol
+        case .oneRow: return rowsWritten == 0 ? "" : eol
+        case .prettyTable: return prettyTable
         case .html: return "</tbody>" + eol + "</table>" + eol
         case .xml: return "</table>" + eol
         case .whereClause where columns.count == 1:
@@ -170,6 +189,22 @@ public struct CopyWriter {
             return (listed == 0 ? "NULL)" : ")") + (sawNull ? " OR " + SQLQuote.identifier(columns[0].name) + " IS NULL" : "")
         default: return ""
         }
+    }
+
+    private var separator: String { format == .pipe ? "|" : options.separator }
+
+    /// The rows in lines and columns of plain text, numbers to the right.
+    private var prettyTable: String {
+        let names = columns.map(\.name)
+        let widths = names.indices.map { index in pretty.reduce(names[index].count) { max($0, $1[index].count) } }
+        func line(_ cells: [String], right: Bool) -> String {
+            "| " + cells.indices.map { index in
+                let room = String(repeating: " ", count: widths[index] - cells[index].count)
+                return right && columns[index].kind == .number ? room + cells[index] : cells[index] + room
+            }.joined(separator: " | ") + " |" + eol
+        }
+        let rule = "+" + widths.map { String(repeating: "-", count: $0 + 2) }.joined(separator: "+") + "+" + eol
+        return rule + line(names, right: false) + rule + pretty.map { line($0, right: true) }.joined() + rule
     }
 
     private var qualifiedTable: String {
@@ -267,7 +302,7 @@ public struct CopyWriter {
 
     /// CSV as RFC 4180 writes it: a value with the separator, a quote or a line break in double quotes.
     private func csvField(_ text: String) -> String {
-        text.contains(where: { $0 == "\"" || $0.isNewline }) || text.contains(options.separator) ? quoted(text) : text
+        text.contains(where: { $0 == "\"" || $0.isNewline }) || text.contains(separator) ? quoted(text) : text
     }
 
     private func quoted(_ text: String) -> String { "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" }

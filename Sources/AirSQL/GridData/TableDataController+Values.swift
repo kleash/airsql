@@ -86,6 +86,10 @@ extension TableDataController {
             return true
         }
         guard typed == nil else { return false }
+        if source.isCut(row, column) {
+            readWhole([row], columns: [column]) { [weak self] in self?.viewer.editInValuePanel() }
+            return true
+        }
         if foreignKey(column) != nil {
             showLookup(row: row, column: column)
             return true
@@ -188,6 +192,10 @@ extension TableDataController {
     /// Related Rows (⌃⌘↓): the row the focused cell's foreign key points to, and the rows of other tables that point at
     /// this row, as a menu; each opens in a table tab filtered to them.
     @objc func showRelatedRows(_ sender: Any?) {
+        // Keys may be hidden, so not read: the row whole first.
+        if let source, let row = viewer.focusedCell?.row, source.columns.indices.contains(where: { source.isCut(row, $0) }) {
+            return readWhole([row]) { [weak self] in self?.showRelatedRows(sender) }
+        }
         guard let source, let cell = viewer.focusedCell, case .loaded = source.row(cell.row) else { return NSSound.beep() }
         let row = Dictionary(source.columns.indices.map { column in
             (source.columns[column].name, source.bytes(cell.row, column) ?? source.value(cell.row, column).map { Array($0.utf8) })

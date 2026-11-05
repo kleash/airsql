@@ -160,7 +160,7 @@ extension AppTests {
                     doubleClicked: { main, _ in (main.selectedTab?.content as? TableDataController)?.grid.editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Cut", "Paste", "Quick Filter", "Clear Filter", "Set NULL", "Set DEFAULT", "Insert Value",
                            "Related Rows", "Add Row", "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Revert", "Preview SQL…", "Apply Changes", "Export Rows…",
-                           "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Display As"],
+                           "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Cut", "Quick Filter", "Set DEFAULT", "Insert Value", "Related Rows", "Add Row",
                               "Duplicate Row", "Duplicate Row Without Keys", "Delete Rows", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart"]),
             // Near a header's left (its sort control is at the right): a double-click sorts by the column.
@@ -182,9 +182,9 @@ extension AppTests {
                     // region: not a key (Use as Label) nor a foreign key (Add Virtual Foreign Key…).
                     menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Add to Sort", "Sort by Columns…", "Clear Sort", "Filter by Values…",
                            "Clear Filter", "Use as Label", "Add Virtual Foreign Key…", "Remove Virtual Foreign Key", "Column Summary…",
-                           "Hide Column", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
+                           "Hide Column", "Hide Other Columns", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
-                              "Use as Label", "Add Virtual Foreign Key…", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Chart"]),
+                              "Use as Label", "Add Virtual Foreign Key…", "Column Summary…", "Hide Column", "Hide Other Columns", "Freeze", "Column List…", "Chart"]),
             Surface(name: "Grid cell",
                     place: { main, _ in
                         let grid = resultGrid(main)
@@ -195,7 +195,7 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultViewer(main)?.valuePanel != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Value Panel",
-                           "Record View", "Transpose", "Column Summary…", "Chart", "Display As"],
+                           "Record View", "Transpose", "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"],
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Export Rows…", "Value Panel", "Record View",
                               "Transpose", "Column Summary…", "Chart"]),
             // A console result of one table with its key: a double-click edits the cell.
@@ -222,7 +222,7 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.cursor == GridPosition(row: 1, column: 1) },
                     doubleClicked: { main, _ in resultGrid(main).editor != nil },
                     menu: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Cut", "Paste", "Set NULL", "Set DEFAULT", "Insert Value", "Delete Rows", "Revert",
-                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Display As"],
+                           "Preview SQL…", "Apply Changes", "Export Rows…", "Value Panel", "Record View", "Transpose", "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"],
                     // email is NOT NULL: Set NULL is off, saying so.
                     enabled: ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Cut", "Set DEFAULT", "Insert Value", "Delete Rows", "Export Rows…", "Value Panel",
                               "Record View", "Column Summary…", "Chart"]),
@@ -240,9 +240,9 @@ extension AppTests {
                     clicked: { main in resultGrid(main).selection.containsColumn(1) },
                     doubleClicked: { main, _ in !resultGrid(main).sortOrder.isEmpty },
                     menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Add to Sort", "Sort by Columns…", "Clear Sort", "Filter by Values…",
-                           "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
+                           "Clear Filter", "Column Summary…", "Hide Column", "Hide Other Columns", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
-                              "Column Summary…", "Hide Column", "Freeze", "Column List…", "Chart"]),
+                              "Column Summary…", "Hide Column", "Hide Other Columns", "Freeze", "Column List…", "Chart"]),
             Surface(name: "Grid row number",
                     place: { main, _ in
                         let grid = resultGrid(main)

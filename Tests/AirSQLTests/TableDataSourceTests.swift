@@ -122,3 +122,161 @@ struct TableDataSourceTests {
         #expect(source.value(0, 1) == long)
     }
 }
+
+/// Long values cut at the server and hidden columns not read.
+struct TableDataSourceTrimTests {
+    static func source() -> TableDataSource {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table())
+        source.cutLength = 3
+        return source
+    }
+
+    static func page(photo: [UInt8]) -> ResultStore {
+        let store = TableDataSourceTests.page([])
+        _ = store.append([Array("1".utf8), Array("Ann".utf8), photo, Array("1.50".utf8)])
+        return store
+    }
+
+    @Test func aPageCutsLongColumnsLeavesOutHiddenOnesAndKeepsTheKeyWhole() {
+        let source = Self.source()
+        source.hiddenColumns = [0, 3]
+        // photo is a BLOB; name is varchar(20), past the cut; hidden price is left out; the hidden key stays.
+        #expect(source.pageSQL(offset: 0, limit: 5, trimmed: true)
+            == "SELECT `id`, LEFT(`name`, 4), LEFT(`photo`, 4), NULL FROM `shop`.`items` ORDER BY `id` ASC LIMIT 5")
+        // Exports and statements that want the values stay whole.
+        #expect(source.pageSQL(offset: 0, limit: 5).hasPrefix("SELECT `id`, `name`, `photo`, `price` FROM"))
+        source.cutLength = 0
+        source.hiddenColumns = []
+        #expect(source.pageSQL(offset: 0, limit: 5, trimmed: true) == source.pageSQL(offset: 0, limit: 5))
+    }
+
+    @Test func aTableWithoutAKeyReadsWhole() {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table(key: false))
+        source.cutLength = 3
+        source.hiddenColumns = [3]
+        #expect(source.pageSQL(offset: 0, limit: 5, trimmed: true) == source.pageSQL(offset: 0, limit: 5))
+    }
+
+    @Test func aValueOnePastTheLimitIsCutAndAllOfItIsReadBack() {
+        let source = Self.source()
+        source.append(Self.page(photo: [1, 2, 3, 4]), requested: 5)
+        #expect(source.isCut(0, 2))
+        #expect(!source.isCut(0, 1))  // three characters: whole
+        #expect(!source.isCut(0, 0))
+        #expect(source.note(0, 2)?.contains("Load Full Cell") == true)
+        #expect(source.patch([Self.page(photo: [1, 2, 3, 4, 5, 6])], deleted: []))
+        #expect(!source.isCut(0, 2))
+    }
+
+    @Test func charactersCountNotBytes() {
+        let source = Self.source()
+        let store = TableDataSourceTests.page([])
+        _ = store.append([Array("1".utf8), Array("äöü".utf8), [1], Array("1.50".utf8)])  // six bytes, three characters
+        _ = store.append([Array("2".utf8), Array("äöüß".utf8), [1], Array("1.50".utf8)])
+        source.append(store, requested: 5)
+        #expect(!source.isCut(0, 1))
+        #expect(source.isCut(1, 1))
+        #expect(source.cell(1, 1) == .text("äöüß…"))
+    }
+
+    /// The start of a value can't stand for it: Apply mustn't compare it, nor may typing it back drop the edit.
+    @Test func anEditOverACutValueComparesNothing() {
+        let source = Self.source()
+        source.append(Self.page(photo: [1, 2, 3, 4]), requested: 5)
+        let start = source.value(0, 2)
+        source.set(.text(start ?? ""), row: 0, column: 2)
+        #expect(source.changes.state.edits[["1"]]?["photo"] != nil)
+        #expect(source.changes.state.originals[["1"]] == nil)
+    }
+}
+
+struct TableDataSourceOrderTests {
+    @Test func anAutoIncrementKeyOpensNewestFirstUntilSorted() {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table())
+        source.newestFirst = true
+        #expect(source.pageSQL(offset: 0, limit: 5).hasSuffix("ORDER BY `id` DESC LIMIT 5"))
+        source.sort = [.init(column: "name", ascending: true)]
+        #expect(source.pageSQL(offset: 0, limit: 5).hasSuffix("ORDER BY `name` ASC, `id` ASC LIMIT 5"))
+    }
+}
+
+struct GridLinkTests {
+    @Test func onlyWholeWebAddressesOpen() {
+        #expect(GridLink.url(" https://example.com/x ")?.host == "example.com")
+        for text in ["file:///etc/passwd", "javascript:alert(1)", "example.com", "see https://example.com", "https://"] {
+            #expect(GridLink.url(text) == nil, "\(text)")
+        }
+    }
+
+    @Test func aLineDifferenceMarksEachSide() {
+        #expect(GridLink.lineDifference("a\nb\nc", "a\nx\nc") == "  a\n− b\n+ x\n  c")
+        #expect(GridLink.lineDifference("same", "same") == "  same")
+    }
+}
+
+struct CopyFormatAdditionsTests {
+    let columns = [GridColumn(name: "id", kind: .number), GridColumn(name: "name", kind: .text)]
+
+    @Test func manyRowsMakeOneInsert() {
+        #expect(CopyWriter.text(.insertRows, columns: columns, rows: [["1", "a"], ["2", nil]], table: "t")
+            == "INSERT INTO `t` (`id`, `name`) VALUES\n  (1, 'a'),\n  (2, NULL);\n")
+        #expect(CopyWriter.text(.insertRows, columns: columns, rows: [], table: "t") == "")
+    }
+
+    @Test func oneRowAndPipes() {
+        #expect(CopyWriter.text(.oneRow, columns: columns, rows: [["1", "a"], ["2", "b"]]) == "1, a, 2, b\n")
+        #expect(CopyWriter.text(.pipe, columns: columns, rows: [["1", "a|b"]]) == "1|\"a|b\"\n")
+    }
+
+    @Test func aPrettyTableLinesUp() {
+        #expect(CopyWriter.text(.prettyTable, columns: columns, rows: [["1", "ab\ncd"], ["100", nil]])
+            == "+-----+-------+\n| id  | name  |\n+-----+-------+\n|   1 | ab cd |\n| 100 | NULL  |\n+-----+-------+\n")
+    }
+}
+
+struct GridDisplayBytesTests {
+    static let bytes: [UInt8] = [0x11, 0xEB, 0x6C, 0xCD, 0x78, 0x0C, 0xBA, 0xBA, 0x95, 0x64, 0x5B, 0x8C, 0x65, 0x60, 0x24, 0xDB]
+
+    @Test func aSwappedUUIDReadsInItsOwnOrder() {
+        #expect(GridDisplay.uuidSwapped.format("x", bytes: Self.bytes) == "780cbaba-6ccd-11eb-9564-5b8c656024db")
+    }
+
+    @Test func detectingBytesFindsAUUIDOrText() {
+        #expect(GridDisplay.detected.format("x", bytes: Self.bytes)?.count == 36)
+        #expect(GridDisplay.detected.format("x", bytes: Array("plain".utf8)) == "plain")
+        #expect(GridDisplay.detected.format("x", bytes: [0xFF, 0x00]) == nil)
+    }
+}
+
+struct WellKnownTextTests {
+    func double(_ value: Double) -> [UInt8] { withUnsafeBytes(of: value.bitPattern.littleEndian, Array.init) }
+    func uint(_ value: UInt32) -> [UInt8] { withUnsafeBytes(of: value.littleEndian, Array.init) }
+    var srid: [UInt8] { [0, 0, 0, 0] }
+
+    func point(_ x: Double, _ y: Double) -> [UInt8] { [1] + uint(1) + double(x) + double(y) }
+
+    @Test func shapesReadAsText() throws {
+        #expect(WellKnownText(srid + point(1, 2.5))?.text == "POINT(1 2.5)")
+        let line = [1] + uint(2) + uint(2) + double(0) + double(0) + double(3) + double(4)
+        #expect(WellKnownText(srid + line)?.text == "LINESTRING(0 0, 3 4)")
+        let square = [1] + uint(3) + uint(1) + uint(2) + double(0) + double(0) + double(1) + double(1)
+        #expect(WellKnownText(srid + square)?.text == "POLYGON((0 0, 1 1))")
+        #expect(WellKnownText(srid + [1] + uint(4) + uint(2) + point(1, 2) + point(3, 4))?.text == "MULTIPOINT((1 2), (3 4))")
+        #expect(WellKnownText(srid + [1] + uint(7) + uint(1) + point(1, 2))?.text == "GEOMETRYCOLLECTION(POINT(1 2))")
+    }
+
+    @Test func bytesThatArentAShapeAreRefused() {
+        #expect(WellKnownText([1, 2]) == nil)
+        #expect(WellKnownText(srid + point(1, 2) + [9]) == nil)
+        #expect(WellKnownText(srid + [1] + uint(2) + uint(.max)) == nil)  // a count past the bytes
+        #expect(WellKnownText(srid + [1] + uint(99)) == nil)
+    }
+}
+
+struct OrderTextTests {
+    @Test func aTypedOrderByComesFirstAndCantSwallowTheRest() {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table())
+        source.orderText = "LENGTH(name) DESC -- longest"
+        #expect(source.pageSQL(offset: 0, limit: 5).hasSuffix("ORDER BY LENGTH(name) DESC -- longest\n, `id` ASC LIMIT 5"))
+    }
+}

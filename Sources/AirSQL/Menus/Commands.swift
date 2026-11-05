@@ -156,6 +156,20 @@ import AppKit
     @objc optional func showRelatedRows(_ sender: Any?)
     @objc optional func showColumnSummary(_ sender: Any?)
     @objc optional func loadMore(_ sender: Any?)
+    @objc optional func loadFullCell(_ sender: Any?)
+    @objc optional func hideOtherColumns(_ sender: Any?)
+    @objc optional func typeOrderBy(_ sender: Any?)
+    @objc optional func resetView(_ sender: Any?)
+    @objc optional func openCellURL(_ sender: Any?)
+    @objc optional func compareCells(_ sender: Any?)
+    @objc optional func setCellExpression(_ sender: Any?)
+    @objc optional func showFirstPage(_ sender: Any?)
+    @objc optional func showPreviousPage(_ sender: Any?)
+    @objc optional func showNextPage(_ sender: Any?)
+    @objc optional func showLastPage(_ sender: Any?)
+    @objc optional func setPageSize(_ sender: Any?)
+    @objc optional func copyTableQuery(_ sender: Any?)
+    @objc optional func openTableQuery(_ sender: Any?)
     @objc optional func loadAll(_ sender: Any?)
     @objc optional func countRows(_ sender: Any?)
     @objc optional func hideColumn(_ sender: Any?)
@@ -623,6 +637,27 @@ enum Commands {
                                      tip: "Show the rows this value refers to, or the rows that refer to it")
     static let columnSummary = Command("Column Summary…", #selector(AirSQLActions.showColumnSummary(_:)),
                                        tip: "Count the column's distinct values, NULLs, minimum and maximum on the server")
+    static let firstPage = Command("First Page", #selector(AirSQLActions.showFirstPage(_:)), tip: "Show the table's first page of rows")
+    static let previousPage = Command("Previous Page", #selector(AirSQLActions.showPreviousPage(_:)), tip: "Show the page of rows before these")
+    static let nextPage = Command("Next Page", #selector(AirSQLActions.showNextPage(_:)), tip: "Show the page of rows after these, in their place")
+    static let lastPage = Command("Last Page", #selector(AirSQLActions.showLastPage(_:)),
+                                  tip: "Count the rows, then show the table's last page")
+    static let pageSize = Command("Rows per Page", #selector(AirSQLActions.setPageSize(_:)), tip: "Choose how many rows this tab loads at a time")
+    static let copyTableQuery = Command("Copy Query", #selector(AirSQLActions.copyTableQuery(_:)),
+                                        tip: "Copy the SELECT this tab runs, with its filter and sort")
+    static let openTableQuery = Command("Open Query in Console", #selector(AirSQLActions.openTableQuery(_:)),
+                                        tip: "Open the SELECT this tab runs, with its filter and sort, in a new query tab")
+    static let orderBy = Command("Order By…", #selector(AirSQLActions.typeOrderBy(_:)), tip: "Type any ORDER BY for the table, expressions included")
+    static let hideOtherColumns = Command("Hide Other Columns", #selector(AirSQLActions.hideOtherColumns(_:)),
+                                          tip: "Keep only the selected columns on show")
+    static let resetView = Command("Reset View", #selector(AirSQLActions.resetView(_:)),
+                                   tip: "Put the columns, the sort and the filter back as they come")
+    static let openURL = Command("Open URL", #selector(AirSQLActions.openCellURL(_:)), tip: "Open the web address in the selected cell in your browser")
+    static let compareCells = Command("Compare Cells", #selector(AirSQLActions.compareCells(_:)), tip: "Show how two selected cells' values differ, line by line")
+    static let setExpression = Command("Set Expression…", #selector(AirSQLActions.setCellExpression(_:)), f2, .control,
+                                       tip: "Set the selected cells to an SQL expression or function, sent as it is typed")
+    static let loadFullCell = Command("Load Full Cell", #selector(AirSQLActions.loadFullCell(_:)),
+                                      tip: "Read the rest of a long value that was cut when the rows loaded")
     static let loadMore = Command("Load More", #selector(AirSQLActions.loadMore(_:)), down, [.command, .option],
                                   tip: "Load the next page of rows")
     static let loadAll = Command("Load All", #selector(AirSQLActions.loadAll(_:)), down, [.command, .option, .shift],
@@ -827,7 +862,7 @@ enum Commands {
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
+        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, orderBy, hideOtherColumns, resetView, openURL, compareCells, setExpression, firstPage, previousPage, nextPage, lastPage, pageSize, copyTableQuery, openTableQuery, loadFullCell, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
@@ -866,6 +901,7 @@ enum Commands {
         "Copy As": "Copy the selected cells as TSV, CSV, Markdown, JSON, SQL and more",
         "View As": viewAs.tip,
         "Refresh Every": autoRefresh.tip,
+        "Rows per Page": pageSize.tip,
         "Transaction Mode": autoCommit.tip,
         "Isolation Level": isolation.tip,
         "Insert Value": insertValue.tip,

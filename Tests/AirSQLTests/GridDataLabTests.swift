@@ -67,6 +67,15 @@ struct GridDataLabTests {
         return source
     }
 
+    /// A long value comes cut and the type it reads as stays: text as text, in characters; bytes as hex; JSON as text.
+    func trimmedPage(_ table: String, _ snapshot: SchemaSnapshot, on session: DBConnection, cut: Int) async throws -> TableDataSource {
+        let source = TableDataSource(database: Self.database, table: try #require(snapshot.table(Self.database, table)))
+        source.cutLength = cut
+        let page = try #require(try await session.query(source.pageSQL(offset: 0, limit: 100, trimmed: true)).first?.rows)
+        source.append(page, requested: 100)
+        return source
+    }
+
     /// As the table tab applies them, on the data session (UPDATE counts the rows it matched: CLIENT_FOUND_ROWS).
     func apply(_ source: TableDataSource, on session: DBConnection) async throws {
         try await PendingChanges.apply(try source.changes.statements(database: Self.database, table: source.table.name,
@@ -350,6 +359,44 @@ struct GridDataLabTests {
             #expect(try await rows("SELECT shop, HEX(tag), note FROM \(Self.database).pairs", on: session)
                     == [["1", "00112233445566778899AABBCCDDEEFF", "edited"]])
         }
+    }
+
+    @Test(arguments: servers)
+    func longValuesComeCutAndReadBackWhole(_ server: Lab.Server) async throws {
+        let session = try await connected(server)
+        let database = SQLQuote.identifier(Self.database)
+        do {
+            for statement in [
+                "DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database) CHARACTER SET utf8mb4",
+                "CREATE TABLE \(database).longs (id INT PRIMARY KEY, body LONGTEXT NULL, picture LONGBLOB NULL, doc JSON NULL) ENGINE=InnoDB",
+                "INSERT INTO \(database).longs VALUES (1, REPEAT('ä', 30), UNHEX(REPEAT('00FF', 30)), JSON_OBJECT('key', REPEAT('x', 30))), "
+                    + "(2, 'short', X'01', '[]'), (3, NULL, NULL, NULL)",
+            ] { _ = try await session.query(statement) }
+            let cache = SchemaCache(source: session, includes: { $0 == Self.database })
+            try await cache.load()
+            let source = try await trimmedPage("longs", cache.snapshot, on: session, cut: 10)
+            #expect(source.isCut(0, 1) && source.isCut(0, 2) && source.isCut(0, 3))
+            #expect(source.value(0, 1) == String(repeating: "ä", count: 11))
+            #expect(source.value(0, 2) == "0x" + String(repeating: "00FF", count: 5) + "00")
+            #expect(source.columns[2].kind == .binary)
+            for column in 1...3 { #expect(!source.isCut(1, column) && !source.isCut(2, column)) }
+            #expect(source.value(2, 1) == nil)
+            // Sorted by a cut column, the server still sorts on the whole value.
+            source.sort = [.init(column: "body", ascending: true)]
+            #expect(try await session.query(source.pageSQL(offset: 0, limit: 3, trimmed: true)).first?.rows?.rowCount == 3)
+            // Read back by key, the row is whole.
+            var stores: [ResultStore] = []
+            for sql in source.readBackSQL([["1"]], noBackslashEscapes: session.noBackslashEscapes) {
+                stores.append(try #require(try await session.query(sql).first?.rows))
+            }
+            #expect(source.patch(stores, deleted: []))
+            #expect(source.value(0, 1) == String(repeating: "ä", count: 30) && !source.isCut(0, 1))
+            #expect(source.value(0, 2) == "0x" + String(repeating: "00FF", count: 30))
+        } catch {
+            await tearDown(session)
+            throw error
+        }
+        await tearDown(session)
     }
 
     @Test(arguments: servers)

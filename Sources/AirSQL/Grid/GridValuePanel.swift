@@ -25,6 +25,10 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     private let wrap = checkbox("Wrap", id: "valuePanel.wrap", tip: "Wrap long lines to the panel's width", on: true, target: nil,
                                 action: nil)
     let actions = NSPopUpButton(frame: .zero, pullsDown: true)
+    /// Reads the rest of a cell the rows hold only the start of (nil: the value is whole).
+    private var loadFull: (() -> Void)?
+    lazy var loadFullButton = button(Commands.loadFullCell.title, id: "valuePanel.loadFull", tip: Commands.loadFullCell.tip, target: self,
+                                     action: #selector(loadFullPressed(_:)))
     private(set) var mode = Mode.text
     /// The mode the person picked, kept while the values fit it.
     private var picked: Mode?
@@ -90,7 +94,9 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         actions.toolTip = "Keep, put back, format, compact, load or save the value"
         actions.setAccessibilityIdentifier("valuePanel.actions")
         let bottom = NSStackView()
-        bottom.setViews([footer], in: .leading)
+        loadFullButton.controlSize = .small
+        loadFullButton.isHidden = true
+        bottom.setViews([footer, loadFullButton], in: .leading)
         bottom.setViews([wrap, actions], in: .trailing)
         bottom.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 6, right: 8)
         for bar in [top, bottom] { bar.setHuggingPriority(.defaultHigh, for: .vertical) }
@@ -118,8 +124,11 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
 
     /// Shows a cell: `value` nil for NULL (or no cell when `column` is nil); `bytes` as the server sent them;
     /// `placeholder` what the server will put there at Apply.
-    func show(column: GridColumn?, value: String?, bytes: [UInt8]?, placeholder: String? = nil) {
+    /// `loadFull`: the value is only its start, and this reads the rest.
+    func show(column: GridColumn?, value: String?, bytes: [UInt8]?, placeholder: String? = nil, loadFull: (() -> Void)? = nil) {
         edited = false
+        self.loadFull = loadFull
+        loadFullButton.isHidden = loadFull == nil
         self.column = column
         self.value = value
         self.placeholder = placeholder
@@ -151,6 +160,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     /// The footer's words for the cell shown.
     private var summary: String {
         if let placeholder { return placeholder + " · the server sets it when you apply" }
+        if loadFull != nil { return "Only the start of the value" }
         return value == nil ? "NULL" : describe()
     }
 
@@ -204,6 +214,8 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         text.autoresizingMask = on ? .width : []
         if on { text.frame.size.width = textScroll.contentSize.width }
     }
+
+    @objc private func loadFullPressed(_ sender: Any?) { loadFull?() }
 
     @objc private func pick(_ sender: NSSegmentedControl) {
         guard let chosen = Mode(rawValue: sender.selectedSegment) else { return }
@@ -366,7 +378,7 @@ extension GridValuePanel: NSMenuItemValidation {
         case #selector(formatJSON(_:)), #selector(compactJSON(_:)):
             keep == nil ? (false, "This cell can't be edited") : (json, "The value isn't JSON")
         case #selector(loadFile(_:)): (keep != nil, "This cell can't be edited")
-        default: (value != nil, "NULL has nothing to save")
+        default: loadFull != nil ? (false, "Load Full Cell first: only the start of the value is here") : (value != nil, "NULL has nothing to save")
         }
         item.toolTip = enabled ? tip : reason
         return enabled

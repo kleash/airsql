@@ -12,6 +12,10 @@ struct ExportRowsRequest {
     var noBackslashEscapes = false
     /// The columns hidden in the grid, which aren't written.
     var hiddenColumns = 0
+    /// Reads the selected or loaded rows' long values whole (a table's rows load them cut), then runs what's given.
+    var readWhole: (_ loaded: Bool, _ then: @escaping () -> Void) -> Void = { $1() }
+    /// Up to `previewRows` of the selected or loaded rows, for the sheet's preview.
+    var preview: (_ selected: Bool) -> [[String?]] = { _ in [] }
     var selectedCount: Int
     var selected: () -> [[String?]]
     var loadedCount: Int
@@ -34,10 +38,14 @@ final class ExportRowsSheet: NSWindowController {
                                  tip: "Choose how NULL values are written in CSV, TSV, Markdown and HTML", target: nil, action: nil)
     private let crlf = checkbox("Windows line endings", id: "export.crlf", tip: "End lines with CR LF, as Windows apps expect",
                                 on: false, target: nil, action: nil)
+    private let separator = popup(["Comma", "Semicolon", "Tab", "Pipe"], selected: 0, id: "export.separator",
+                                  tip: "Choose what separates the values in CSV", target: nil, action: nil)
+    private let preview = label("", font: .monospacedSystemFont(ofSize: 11, weight: .regular), color: .secondaryLabelColor, truncates: false)
+    static let previewRows = 8
     private var copyButton: NSButton!
     private var retainUntilClosed: ExportRowsSheet?
     /// The formats in the pop-up: Excel last.
-    private static let formats: [CopyFormat?] = [.csv, .tsv, .json, .jsonLines, .insert, .insertIgnore, .replace, .markdown, .html, .xml, nil]
+    private static let formats: [CopyFormat?] = [.csv, .tsv, .pipe, .json, .jsonLines, .insert, .insertRows, .insertIgnore, .replace, .markdown, .html, .xml, nil]
 
     static func show(_ request: ExportRowsRequest, activity: ActivityCenter, on window: NSWindow) {
         let sheet = ExportRowsSheet(request, activity: activity)
@@ -60,8 +68,10 @@ final class ExportRowsSheet: NSWindowController {
         window.title = "Export Rows of \(request.title)"
         window.backgroundColor = .ground
         super.init(window: window)
-        format.target = self
-        format.action = #selector(formatChanged(_:))
+        for control in [format, scope, headers, nullText, crlf, separator] as [NSControl] {
+            control.target = self
+            control.action = #selector(formatChanged(_:))
+        }
         window.contentView = makeContent()
         window.setContentSize(window.contentView!.fittingSize)
         formatChanged(nil)
@@ -76,6 +86,7 @@ final class ExportRowsSheet: NSWindowController {
         form.row("Format", [format])
         form.row("Options", [headers])
         form.row("NULL as", [nullText])
+        form.row("Separator", [separator])
         form.row("", [crlf])
         if request.hiddenColumns > 0 {
             let count = request.hiddenColumns
@@ -91,7 +102,13 @@ final class ExportRowsSheet: NSWindowController {
         save.keyEquivalent = "\r"
         let buttons = NSStackView(views: [helpButton(.tableData), NSView(), cancel, copyButton, save])
         buttons.spacing = Spacing.unit
-        let stack = NSStackView(views: [heading, form.finish(), buttons])
+        preview.setAccessibilityIdentifier("export.preview")
+        preview.lineBreakMode = .byClipping
+        preview.maximumNumberOfLines = Self.previewRows + 4
+        preview.toolTip = "The first rows, as they'll be written"
+        preview.widthAnchor.constraint(equalToConstant: 440).isActive = true
+        preview.heightAnchor.constraint(equalToConstant: 130).isActive = true
+        let stack = NSStackView(views: [heading, form.finish(), preview, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = Spacing.double
@@ -109,12 +126,20 @@ final class ExportRowsSheet: NSWindowController {
         copyButton.isEnabled = chosen != nil
         copyButton.toolTip = chosen == nil ? "Excel files can't go on the clipboard: export to a file instead"
             : "Put the rows on the clipboard in this format"
+        separator.isEnabled = chosen == .csv
+        separator.toolTip = chosen == .csv ? "Choose what separates the values in CSV" : "Only CSV has a choice of separator"
+        preview.stringValue = chosen.map { format in
+            // Long values are cut here only: the preview is for the shape of the file.
+            let rows = request.preview(scope.indexOfSelectedItem == 0).map { $0.map { $0.map { String($0.prefix(60)) } } }
+            return CopyWriter.text(format, columns: request.columns, rows: rows, database: request.database, table: request.table, options: options)
+        } ?? "Excel files have no text preview."
     }
 
     private var options: CopyOptions {
         var options = CopyOptions(headers: headers.state == .on, nullText: ["NULL", "\\N", ""][max(0, nullText.indexOfSelectedItem)])
         options.lineEnding = crlf.state == .on ? "\r\n" : "\n"
         options.noBackslashEscapes = request.noBackslashEscapes
+        options.separator = [",", ";", "\t", "|"][max(0, separator.indexOfSelectedItem)]
         return options
     }
 
@@ -128,12 +153,14 @@ final class ExportRowsSheet: NSWindowController {
 
     @objc private func copyRows(_ sender: Any?) {
         guard let format = chosenFormat else { return }
-        let rows = scope.indexOfSelectedItem == 0 ? request.selected() : request.loaded()
-        let text = CopyWriter.text(format, columns: request.columns, rows: rows, database: request.database, table: request.table,
-                                   options: options)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        let request = request, options = options, selected = scope.indexOfSelectedItem == 0
         dismiss()
+        request.readWhole(!selected) {
+            let text = CopyWriter.text(format, columns: request.columns, rows: selected ? request.selected() : request.loaded(), database: request.database,
+                                       table: request.table, options: options)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
     }
 
     @objc private func saveRows(_ sender: Any?) {
@@ -150,39 +177,47 @@ final class ExportRowsSheet: NSWindowController {
         panel.message = "Export the rows of \(request.title)"
         panel.beginSheetModal(for: parent) { response in
             guard response == .OK, let url = panel.url else { return }
-            // The rows at hand are taken now, on the main thread; every row streams from the server instead.
-            let rows: [[String?]]? = which == 0 ? request.selected() : which == 1 ? request.loaded() : nil
-            let stop = StopFlag()
-            let work = activity.start("Exporting the rows of \(request.title)") { stop.set() }
-            Task.detached {
-                do {
-                    let output = try ExportOutput(url: url, format: format, columns: request.columns, database: request.database,
-                                                  table: request.table, options: options)
-                    if let rows {
-                        try output.write(rows)
-                    } else if let all = request.all {
-                        try await all { batch in
-                            if stop.isSet { throw CancellationError() }
-                            try output.write(batch)
-                        }
+            guard which < 2 else { return Self.write(nil, to: url, format: format, options: options, request: request, activity: activity, parent: parent) }
+            request.readWhole(which == 1) {
+                // The rows at hand are taken now, on the main thread; every row streams from the server instead.
+                Self.write(which == 0 ? request.selected() : request.loaded(), to: url, format: format, options: options, request: request,
+                           activity: activity, parent: parent)
+            }
+        }
+    }
+
+    private static func write(_ rows: [[String?]]?, to url: URL, format: CopyFormat?, options: CopyOptions, request: ExportRowsRequest, activity: ActivityCenter,
+                              parent: NSWindow) {
+        let stop = StopFlag()
+        let work = activity.start("Exporting the rows of \(request.title)") { stop.set() }
+        Task.detached {
+            do {
+                let output = try ExportOutput(url: url, format: format, columns: request.columns, database: request.database,
+                                              table: request.table, options: options)
+                if let rows {
+                    try output.write(rows)
+                } else if let all = request.all {
+                    try await all { batch in
+                        if stop.isSet { throw CancellationError() }
+                        try output.write(batch)
                     }
-                    try output.finish()
-                    let cut = output.cutCells
-                    await MainActor.run {
-                        work.end()
-                        guard cut > 0 else { return }
-                        showError("\(cut.formatted()) \(cut == 1 ? "cell was" : "cells were") longer than the 32,767 characters a cell of Excel "
-                                  + "holds, and the file has only the start of them. Export as CSV to keep every value whole.",
-                                  title: "\(url.lastPathComponent) was saved with values cut", on: parent)
-                    }
-                } catch {
-                    try? FileManager.default.removeItem(at: url)
-                    await MainActor.run {
-                        work.end()
-                        guard !(error is CancellationError) else { return }
-                        showError(error.localizedDescription,
-                                  title: "The rows of \(request.title) weren't exported", on: parent)
-                    }
+                }
+                try output.finish()
+                let cut = output.cutCells
+                await MainActor.run {
+                    work.end()
+                    guard cut > 0 else { return }
+                    showError("\(cut.formatted()) \(cut == 1 ? "cell was" : "cells were") longer than the 32,767 characters a cell of Excel "
+                              + "holds, and the file has only the start of them. Export as CSV to keep every value whole.",
+                              title: "\(url.lastPathComponent) was saved with values cut", on: parent)
+                }
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                await MainActor.run {
+                    work.end()
+                    guard !(error is CancellationError) else { return }
+                    showError(error.localizedDescription,
+                              title: "The rows of \(request.title) weren't exported", on: parent)
                 }
             }
         }

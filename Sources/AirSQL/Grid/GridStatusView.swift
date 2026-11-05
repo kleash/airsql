@@ -57,6 +57,7 @@ final class GridStatusView: NSStackView {
 
     /// Shows the selection as it is now.
     func update() {
+        viewer?.toolbar?.setNeedsValidation()
         rows.isHidden = rows.stringValue.isEmpty
         guard let grid = viewer?.grid, grid.source != nil, let cursor = grid.selection.cursor else {
             hasPosition = false

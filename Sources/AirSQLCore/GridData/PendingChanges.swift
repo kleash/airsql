@@ -83,16 +83,17 @@ public struct PendingChanges: Equatable {
     static let originalLimit = 65_536
 
     /// Sets a loaded row's cell; back to its loaded value (`original`, nil for NULL), the edit goes away. The first
-    /// edit's `original` stays: it is what the person saw, as a reload doesn't show through a pending edit.
-    public mutating func set(_ value: Value, column: String, key: Key, original: String?) {
+    /// edit's `original` stays: it is what the person saw, as a reload doesn't show through a pending edit. `whole` false:
+    /// `original` is only the start of the value, which can't be matched or checked at Apply.
+    public mutating func set(_ value: Value, column: String, key: Key, original: String?, whole: Bool = true) {
         change { state in
             var row = state.edits[key] ?? [:], originals = state.originals[key] ?? [:]
             let loaded = original.map(Value.text) ?? .null
-            if value == loaded {
+            if whole, value == loaded {
                 row[column] = nil
                 originals[column] = nil
             } else {
-                if row[column] == nil, (original?.utf8.count ?? 0) <= Self.originalLimit { originals[column] = loaded }
+                if whole, row[column] == nil, (original?.utf8.count ?? 0) <= Self.originalLimit { originals[column] = loaded }
                 row[column] = value
             }
             state.edits[key] = row.isEmpty ? nil : row

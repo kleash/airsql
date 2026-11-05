@@ -88,6 +88,11 @@ extension AgentGate {
         part.editorUsesTabs = plain.editorUsesTabs
         part.gridFontSize = plain.gridFontSize
         part.rowsPerPage = plain.rowsPerPage
+        part.longValueLimit = plain.longValueLimit
+        part.newestFirst = plain.newestFirst
+        part.gridFontFamily = plain.gridFontFamily
+        part.gridRowLines = plain.gridRowLines
+        part.gridDatePattern = plain.gridDatePattern
         part.nullText = plain.nullText
         part.detailsTableThreshold = plain.detailsTableThreshold
         return part

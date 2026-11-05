@@ -138,8 +138,17 @@ extension ResultGridView {
     /// Filter by Values…: the focused column's values in the rows shown, with their counts.
     @objc func filterByValues(_ sender: Any?) {
         guard let column = viewer.focusedColumn, let window else { return NSSound.beep() }
+        FilterByValuesSheet.show(column: source.columns[column], table: "the result", onServer: false, on: window, read: valueCounts(column),
+                                 completion: { [weak self] condition in
+            guard let condition else { return }
+            self?.filter(column, by: condition, adding: true)
+        })
+    }
+
+    /// The column's values in the rows shown, the most frequent first, with their counts.
+    private func valueCounts(_ column: Int) -> () async throws -> [[String?]] {
         let rows = rows
-        FilterByValuesSheet.show(column: source.columns[column], table: "the result", onServer: false, on: window, read: {
+        return {
             var counts: [String?: Int] = [:], order: [String?] = []
             for row in 0..<rows.rowCount {
                 let value = rows.value(row, column)
@@ -148,7 +157,15 @@ extension ResultGridView {
             }
             let sorted = order.sorted { counts[$0]! > counts[$1]! }.prefix(FilterByValuesSheet.limit)
             return sorted.map { [$0, String(counts[$0]!)] }
-        }, completion: { [weak self] condition in
+        }
+    }
+
+    func dataGridFiltersColumns(_ grid: DataGridView) -> Bool { true }
+
+    /// A header's funnel: the same list, in a popover; the rows here, no query.
+    func dataGrid(_ grid: DataGridView, filterValuesOf column: Int, at rect: NSRect) {
+        FilterByValuesSheet.pop(column: source.columns[column], table: "the result", chosen: nil, at: rect, of: grid.header, read: valueCounts(column),
+                                completion: { [weak self] condition in
             guard let condition else { return }
             self?.filter(column, by: condition, adding: true)
         })

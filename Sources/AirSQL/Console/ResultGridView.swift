@@ -19,6 +19,12 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     /// The bar over the rows, and its conditions on the source's columns (ANDed).
     let filterBar = ResultFilterBar()
     let findBar = TableFindBar()
+    /// The result's actions; a console's result shows it (`showToolbar`).
+    private(set) lazy var toolbar = GridToolbar(grid: grid, groups: [
+        GridToolbar.Item.changeItems, GridToolbar.Item.findItems, GridToolbar.Item.viewItems,
+        [.init(Commands.pinResult, "pin"), .init(Commands.compareResult, "arrow.left.arrow.right"), .init(Commands.exportResult, "square.and.arrow.up")],
+    ])
+    private let bars = NSStackView()
     /// Over the grid when there are no rows to show.
     let emptyNote = TableEmptyNote()
     /// Whether the find bar's Filter Rows was hiding rows at the last change.
@@ -79,7 +85,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         // changes wait; hidden, they take no room.
         findBar.owner = self
         viewer.findBar = findBar
-        let bars = NSStackView(views: [filterBar, findBar, notice])
+        bars.setViews([filterBar, findBar, notice], in: .top)
         bars.orientation = .vertical
         bars.spacing = 0
         bars.translatesAutoresizingMaskIntoConstraints = false
@@ -118,6 +124,14 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// The toolbar over the rows: for a console's result, not a grid inside another screen.
+    func showToolbar() {
+        bars.insertView(toolbar, at: 0, in: .top)
+        toolbar.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true
+        viewer.toolbar = toolbar
+        updateToolbarEditing()
+    }
 
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
         let menu = NSMenu(title: "Result")
@@ -183,6 +197,13 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         reorder()
     }
 
+    /// Reset View: the columns as they come, no sort and no filter.
+    @objc func resetView(_ sender: Any?) {
+        viewer.resetColumns()
+        sortRows([])
+        clearFilter(sender)
+    }
+
     /// Export Rows… (and the result tab's Export Result…): the selected rows or every row of the result.
     @objc func exportRows(_ sender: Any?) {
         guard let window else { return }
@@ -190,7 +211,9 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         func values(_ row: Int) -> [String?] { order.map { rows.value(row, $0) } }
         let request = ExportRowsRequest(
             title: table.name == "table" ? "result" : table.name, columns: order.map { source.columns[$0] }, database: table.database,
-            table: table.name, noBackslashEscapes: viewer.noBackslashEscapes, hiddenColumns: source.columns.count - order.count, selectedCount: selected.count, selected: { selected.map(values) },
+            table: table.name, noBackslashEscapes: viewer.noBackslashEscapes, hiddenColumns: source.columns.count - order.count,
+            preview: { chosen in (chosen ? Array(selected.prefix(ExportRowsSheet.previewRows)) : Array(0..<min(ExportRowsSheet.previewRows, rows.rowCount))).map(values) },
+            selectedCount: selected.count, selected: { selected.map(values) },
             loadedCount: rows.rowCount, loaded: { (0..<rows.rowCount).map(values) }, all: nil)
         ExportRowsSheet.show(request, activity: ActivityCenter.shared, on: window)
     }

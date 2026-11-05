@@ -4,7 +4,8 @@ import Foundation
 /// A table's rows in the grid (`GridSource`'s table tab): pages of `SELECT … LIMIT … OFFSET …` with the WHERE filter
 /// and ORDER BY on the server, which the tab runs on the data session and hands over (`append`); the loaded rows
 /// searched locally (`localFilter`); and the pending changes drawn over them, new rows after the loaded ones. Key
-/// columns are fetched and kept whole, so an edit addresses its exact row. It writes every statement the tab sends
+/// columns are fetched and kept whole, so an edit addresses its exact row; long values come cut at the server and hidden
+/// columns not at all (`isCut`), until `readBackSQL` reads a row whole. It writes every statement the tab sends
 /// about the table (pages, counts, Column Summary, Filter by Values), so they share one filter. Main thread.
 public final class TableDataSource: GridSource {
     public let database: String
@@ -25,6 +26,16 @@ public final class TableDataSource: GridSource {
     public var timeZoneNote: String?
     /// The most characters a cell shows (key columns: all of them).
     public static let shownLimit = 1_000
+    /// The characters (bytes for binary) a long value's page reads; 0: every value whole. Settings ▸ Grid.
+    public var cutLength = 0
+    /// An ORDER BY typed by hand, expressions and all, ahead of `sort` (empty: none).
+    public var orderText = ""
+    /// The first row loaded, past the table's start (the pager).
+    public var firstRow = 0
+    /// With no sort, an AUTO_INCREMENT key's newest rows come first. Settings ▸ Grid.
+    public var newestFirst = false
+    /// Columns hidden in the grid, which pages don't read.
+    public var hiddenColumns: Set<Int> = []
 
     private var pages: [ResultStore] = []
     /// Each page's first row.
@@ -66,8 +77,7 @@ public final class TableDataSource: GridSource {
         if ["tinyint", "smallint", "mediumint", "int", "integer", "bigint", "decimal", "numeric", "float", "double", "real"]
             .contains(type) { return .number }
         if ["date", "datetime", "timestamp", "time", "year"].contains(type) { return .date }
-        if type.hasSuffix("binary") || type.hasSuffix("blob") || ["geometry", "point", "linestring", "polygon", "multipoint",
-           "multilinestring", "multipolygon", "geometrycollection", "geomcollection", "vector"].contains(type) { return .binary }
+        if type.hasSuffix("binary") || type.hasSuffix("blob") || type == "vector" || GridColumn.spatialTypes.contains(type) { return .binary }
         return .text
     }
 
@@ -85,11 +95,16 @@ public final class TableDataSource: GridSource {
     /// The SELECT of `limit` rows from `offset` (no limit: nil): every column by name (invisible ones too), the filter,
     /// and the sort, then the key for rows the sort leaves equal, so pages follow one another without repeating or
     /// missing a row. The key goes the way of the sort's last column: an index on that column still serves both.
-    public func pageSQL(offset: Int, limit: Int?) -> String {
-        var sql = "SELECT " + columns.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") + from
+    /// `trimmed`: for the grid, with long values cut and hidden columns left out, which keeps their places in the rows.
+    public func pageSQL(offset: Int, limit: Int?, trimmed: Bool = false) -> String {
+        var sql = "SELECT " + columns.indices.map { trimmed ? selected($0) : SQLQuote.identifier(columns[$0].name) }.joined(separator: ", ") + from
         let ties = (key ?? []).map { columns[$0].name }.filter { name in !sort.contains { $0.column == name } }
-        let order = sort + ties.map { TableViewSettings.SortKey(column: $0, ascending: sort.last?.ascending ?? true) }
-        if !order.isEmpty { sql += " ORDER BY " + GridSorting.orderBy(order) }
+        let counting = key?.count == 1 && key.map { table.columns[$0[0]].autoIncrement } == true
+        let order = sort + ties.map { TableViewSettings.SortKey(column: $0, ascending: sort.last?.ascending ?? !(newestFirst && counting)) }
+        // A newline after typed SQL, so a -- comment can't swallow what follows.
+        let typed = orderText.isEmpty ? [] : [orderText + "\n"]
+        let clauses = typed + (order.isEmpty ? [] : [GridSorting.orderBy(order)])
+        if !clauses.isEmpty { sql += " ORDER BY " + clauses.joined(separator: ", ") }
         if let limit { sql += " LIMIT \(limit)" }
         if offset > 0 { sql += (limit == nil ? " LIMIT 18446744073709551615" : "") + " OFFSET \(offset)" }
         return sql
@@ -99,7 +114,29 @@ public final class TableDataSource: GridSource {
     /// others add or delete meanwhile. It starts one row early, so `append` can tell.
     public func nextPageSQL(limit: Int?) -> String {
         overlapping = loadedRows > 0
-        return overlapping ? pageSQL(offset: loadedRows - 1, limit: limit.map { $0 + 1 }) : pageSQL(offset: 0, limit: limit)
+        return overlapping ? pageSQL(offset: firstRow + loadedRows - 1, limit: limit.map { $0 + 1 }, trimmed: true)
+            : pageSQL(offset: firstRow, limit: limit, trimmed: true)
+    }
+
+    /// Whether a page may hold less than the column's value. Reading a row whole needs its key.
+    /// shortcut: a table without a key (a view too) reads whole values, as it always did; to cut them, read back by offset.
+    public func trims(_ column: Int) -> Bool {
+        key != nil && !columns[column].isKey && (hiddenColumns.contains(column) || isLong(column))
+    }
+
+    private func isLong(_ column: Int) -> Bool {
+        guard cutLength > 0 else { return false }
+        let info = table.columns[column], type = info.dataType.lowercased()
+        if ["varchar", "varbinary"].contains(type) { return Int(info.columnType.filter(\.isNumber)) ?? 0 > cutLength }
+        return info.isJSON || ["text", "mediumtext", "longtext", "blob", "mediumblob", "longblob", "json"].contains(type)
+    }
+
+    /// A column in a trimmed page, unnamed: an alias would take over the ORDER BY of a cut column. One past `cutLength`
+    /// tells a cut value from one that just fits.
+    private func selected(_ column: Int) -> String {
+        let name = SQLQuote.identifier(columns[column].name)
+        guard trims(column) else { return name }
+        return hiddenColumns.contains(column) ? "NULL" : "LEFT(\(name), \(cutLength + 1))"
     }
 
     /// `SELECT COUNT(*)` with the filter: Count Rows Exactly.
@@ -307,13 +344,25 @@ public final class TableDataSource: GridSource {
         return store.bytes(local, column)
     }
 
+    /// Whether a grid row's cell holds less than its value on the server: cut, or not read as its column is hidden.
+    public func isCut(_ index: Int, _ column: Int) -> Bool {
+        guard trims(column), case .loaded(let row) = self.row(index), row < loadedRows, replaced[row] == nil else { return false }
+        if hiddenColumns.contains(column) { return true }
+        let (store, local) = page(row)
+        return store.withBytes(local, column) { bytes in
+            // LEFT counts characters of text, which arrives as UTF-8: bytes that don't continue one.
+            bytes.count > cutLength && (store.columns[column].isBinary || bytes.lazy.filter { $0 & 0xC0 != 0x80 }.count > cutLength)
+        } ?? false
+    }
+
     /// A stored value as the grid's sources give it whole (export streams them this way too): binary as all its hex.
     public static func text(_ store: ResultStore, _ row: Int, _ column: Int) -> String? {
         store.display(row, column, binaryBytes: .max)
     }
 
     public func note(_ row: Int, _ column: Int) -> String? {
-        columns[column].type.lowercased().hasPrefix("timestamp") ? timeZoneNote : nil
+        if isCut(row, column) { return "The start of a longer value: Load Full Cell reads the rest" }
+        return columns[column].type.lowercased().hasPrefix("timestamp") ? timeZoneNote : nil
     }
 
     /// A cell's value with its pending change, whole (for editing, copying and exporting): nil for NULL.
@@ -378,8 +427,9 @@ public final class TableDataSource: GridSource {
         guard row < rowCount else { return .loading }
         if let shown = placeholder(row, column) { return .placeholder(shown) }
         guard let text = value(row, column) else { return .null }
-        guard !columns[column].isKey, text.count > Self.shownLimit else { return .text(text) }
-        return .text(String(text.prefix(Self.shownLimit)) + "…")
+        guard !columns[column].isKey else { return .text(text) }
+        if text.count > Self.shownLimit { return .text(String(text.prefix(Self.shownLimit)) + "…") }
+        return .text(mark(row, column) == .none && isCut(row, column) ? text + "…" : text)
     }
 
     public func mark(_ row: Int, _ column: Int) -> GridMark {
@@ -409,7 +459,7 @@ public final class TableDataSource: GridSource {
         switch row(index) {
         case .loaded(let row):
             guard let key = rowKey(index) else { return }
-            changes.set(value, column: columns[column].name, key: key, original: self.value(loaded: row, column))
+            changes.set(value, column: columns[column].name, key: key, original: self.value(loaded: row, column), whole: !isCut(index, column))
         case .inserted(let id): changes.set(value, column: columns[column].name, insert: id)
         case nil: break
         }

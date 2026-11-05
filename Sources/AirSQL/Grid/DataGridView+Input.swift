@@ -126,7 +126,9 @@ extension DataGridView {
     /// Moves the cursor (and with ⇧ the selection) and scrolls to it.
     func move(_ move: GridSelection.Move, extend: Bool = false) {
         selection.move(move, extend: extend, rows: rowCount, columns: columnCount, page: rowsPerPage)
-        if let cursor = selection.cursor { reveal(cellRect(cursor)) }
+        guard let cursor = selection.cursor else { return }
+        reveal(cellRect(cursor))
+        if move == .down || move == .pageDown, cursor.row == rowCount - 1 { delegate?.dataGridReachedLastRow(self) }
     }
 
     override func moveUp(_ sender: Any?) { move(.up) }

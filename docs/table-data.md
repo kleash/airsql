@@ -11,7 +11,8 @@ session, a session of their own, so a long query in a query tab never holds them
 ## Load rows
 
 - The first page loads when the tab opens: **Settings ▸ Grid ▸ Rows per page** rows (1,000 at first), in the table's
-  key order, so pages follow one another.
+  key order, so pages follow one another. A table with an AUTO_INCREMENT key opens newest first, until you sort it
+  (**Settings ▸ Grid ▸ Open tables newest first**).
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
   An estimate below what has already loaded is left out (InnoDB's can say 0 of a million rows), and with no figure to go
@@ -24,8 +25,25 @@ session, a session of their own, so a long query in a query tab never holds them
   toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
 - Pages are read by offset. If someone adds or deletes rows between pages, a row can repeat or be missing: a notice says
   so when it happens, and Refresh reads the rows again.
-- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
+- **↓** or **Page Down** on the last row loaded loads the next page too.
+- The pager at the right of the toolbar shows which rows are on show and steps through them: **First Page**, **Previous
+  Page**, **Next Page** and **Last Page** (which counts the rows first) replace the rows, where Load More adds to them.
+  **Rows per Page** changes the page size for this tab.
+- A long value (TEXT, BLOB, JSON, a very long VARCHAR) comes cut at the server, to its first 1,000 characters
+  (**Settings ▸ Grid ▸ Long values**; 0 reads every value whole), so a table of large blobs opens at once. Such a cell ends
+  in `…`. **Data ▸ Load Full Cell**, or the button in the value panel, reads the rest. Editing the cell, copying it,
+  Duplicate Row and exporting read the whole value first, so nothing written or copied is ever the cut text; a quick filter
+  on a cut cell asks for Load Full Cell first. Search on the loaded rows and Find look only at what's loaded.
+  A table with no key can't find a row to read it back, so its values come whole.
+- A hidden column isn't read at all. Showing it again loads the rows again.
+- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds or a number you type (**Custom…**),
   until you choose **Off**. Pending changes stay.
+
+**Data ▸ Order By…** takes any ORDER BY, expressions included; a click on a header's sort control replaces it. On a
+read-only connection it's checked like a typed filter.
+
+**Data ▸ Copy Query** copies the SELECT the tab runs, with its filter and sort, and **Open Query in Console** opens it in
+a new query tab.
 
 ## Filter, search and sort
 
@@ -114,7 +132,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
   **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
-  the selected cells and clears them: NULL where the column allows it, else empty. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set Expression…** (⌃F2) sets them to any SQL expression or function, sent as you typed it when you apply. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
@@ -194,9 +212,11 @@ These work in a query's results too.
 - **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a query tab
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
-- **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
-  UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
+- **Edit ▸ Copy As** ▸ TSV, CSV, Pipe-Separated, JSON, JSON Lines, Markdown, HTML Table, XML, Pretty Table, One Row, SQL INSERT, INSERT with many rows, INSERT IGNORE, REPLACE,
+  UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are
+  left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
   didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
+- The export sheet previews the first rows in the format chosen; CSV can use a comma, semicolon, tab or pipe.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written

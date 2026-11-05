@@ -173,7 +173,14 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 - **Text size**: the grid's (12 pt at first), open grids' too. ⌘+, ⌘− and ⌘0 change it the same way for the grid with
   the focus; a grid made bigger or smaller keeps its size until ⌘0.
+- **Font**: the grid's font, or the system's.
+- **Lines per row**: how many lines of a value with line breaks each row shows (1 by default).
+- **Date format**: the pattern Display As ▸ Settings' Date Format uses.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
+- **Open tables newest first**: a table with an AUTO_INCREMENT key shows its newest rows first until you sort it (on by
+  default).
+- **Long values**: how many characters of a long value a table's page reads (1,000 by default; 0 reads every value whole).
+  Load Full Cell reads the rest.
 - **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
   row is then held in memory.
 - **NULL shown as**: how empty values look in the grid, open grids' too.
@@ -913,7 +920,8 @@ session, a session of their own, so a long query in a query tab never holds them
 ## Load rows
 
 - The first page loads when the tab opens: **Settings ▸ Grid ▸ Rows per page** rows (1,000 at first), in the table's
-  key order, so pages follow one another.
+  key order, so pages follow one another. A table with an AUTO_INCREMENT key opens newest first, until you sort it
+  (**Settings ▸ Grid ▸ Open tables newest first**).
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
   estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
   An estimate below what has already loaded is left out (InnoDB's can say 0 of a million rows), and with no figure to go
@@ -926,8 +934,25 @@ session, a session of their own, so a long query in a query tab never holds them
   toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
 - Pages are read by offset. If someone adds or deletes rows between pages, a row can repeat or be missing: a notice says
   so when it happens, and Refresh reads the rows again.
-- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
+- **↓** or **Page Down** on the last row loaded loads the next page too.
+- The pager at the right of the toolbar shows which rows are on show and steps through them: **First Page**, **Previous
+  Page**, **Next Page** and **Last Page** (which counts the rows first) replace the rows, where Load More adds to them.
+  **Rows per Page** changes the page size for this tab.
+- A long value (TEXT, BLOB, JSON, a very long VARCHAR) comes cut at the server, to its first 1,000 characters
+  (**Settings ▸ Grid ▸ Long values**; 0 reads every value whole), so a table of large blobs opens at once. Such a cell ends
+  in `…`. **Data ▸ Load Full Cell**, or the button in the value panel, reads the rest. Editing the cell, copying it,
+  Duplicate Row and exporting read the whole value first, so nothing written or copied is ever the cut text; a quick filter
+  on a cut cell asks for Load Full Cell first. Search on the loaded rows and Find look only at what's loaded.
+  A table with no key can't find a row to read it back, so its values come whole.
+- A hidden column isn't read at all. Showing it again loads the rows again.
+- **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds or a number you type (**Custom…**),
   until you choose **Off**. Pending changes stay.
+
+**Data ▸ Order By…** takes any ORDER BY, expressions included; a click on a header's sort control replaces it. On a
+read-only connection it's checked like a typed filter.
+
+**Data ▸ Copy Query** copies the SELECT the tab runs, with its filter and sort, and **Open Query in Console** opens it in
+a new query tab.
 
 ## Filter, search and sort
 
@@ -1016,7 +1041,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
   **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
-  the selected cells and clears them: NULL where the column allows it, else empty. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set Expression…** (⌃F2) sets them to any SQL expression or function, sent as you typed it when you apply. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
@@ -1096,9 +1121,11 @@ These work in a query's results too.
 - **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a query tab
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
   whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
-- **Edit ▸ Copy As** ▸ TSV, CSV, JSON, JSON Lines, Markdown, HTML Table, XML, SQL INSERT, INSERT IGNORE, REPLACE,
-  UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
+- **Edit ▸ Copy As** ▸ TSV, CSV, Pipe-Separated, JSON, JSON Lines, Markdown, HTML Table, XML, Pretty Table, One Row, SQL INSERT, INSERT with many rows, INSERT IGNORE, REPLACE,
+  UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are
+  left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
   didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
+- The export sheet previews the first rows in the format chosen; CSV can use a comma, semicolon, tab or pipe.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written
@@ -1121,6 +1148,15 @@ A table's rows and a query's results show in the same grid. These parts of it he
 status bar's figures, the value panel, Record View, Transpose, other ways to show a column, colours, text, charts, and
 a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
 [A table's rows](https://kleash.github.io/airsql/table-data.html).
+
+## The toolbar
+
+A table tab and a console result each have a row of buttons over the rows: the actions that are also in the menu bar, kept
+beside the work. The buttons act on the grid under them, wherever the focus is. Hold the pointer over one to see what it
+does, or why it's dimmed. A table's has Refresh, Refresh Every, Add Row, Duplicate Row, Delete Rows, Revert, Preview SQL
+and Apply; every grid has Find, the Column List, Sort by Columns, the Value Panel, Record View, Transpose, View As and
+Chart. A console result adds Pin, Compare With and Export, and shows its editing buttons only when it can be edited. When
+the tab is narrow, the buttons at the end step out; the menu bar still has them.
 
 ## The header
 
@@ -1172,7 +1208,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
   (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
   query result shows the grid again, as does an Apply that deletes the row.
-- **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the button at the end of a table's grid bar) turns rows
+- **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the toolbar) turns rows
   into columns, with the column names down the left: handy for comparing a few wide rows. A query result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.
 
@@ -1191,6 +1227,19 @@ copying and editing use the stored value.
   zone, so choose the first one when that is UTC. The header says so (`datetime as medium date, UTC → this Mac's`).
 - Bytes: **UUID** (for `binary(16)`), **Hex**, or **Text (UTF-8)**.
 - **As Stored** shows the value as the server sent it again. AirSQL remembers each column's choice for each table.
+
+**Detect from the Bytes** shows a 16-byte value as a UUID and readable bytes as text, and leaves the rest as stored. **UUID,
+Time First** reads a value stored with MySQL's `UUID_TO_BIN(x, 1)`.
+
+A spatial column can show as **Well-Known Text** (`POINT(1 2)`). Dates can also use **Settings' Date Format**, a pattern
+you set in **Settings ▸ Grid ▸ Date format**, such as `dd/MM/yyyy HH:mm`.
+
+## Other commands on cells and columns
+
+- **Data ▸ Hide Other Columns** keeps only the selected columns on show; **View ▸ Reset View** puts the columns, the sort
+  and the filter back as they come.
+- **Data ▸ Open URL** opens a cell holding a web address in your browser.
+- **Data ▸ Compare Cells** opens a tab showing how two selected cells differ, line by line.
 
 ## Colours
 
@@ -1910,6 +1959,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Sort Descending | ⌃⌥⌘↓ |
 | Go to Row… | ⌘L |
 | Related Rows | ⌃⌘↓ |
+| Set Expression… | ⌃F2 |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
 | Create Table… | ⌃⌘N |

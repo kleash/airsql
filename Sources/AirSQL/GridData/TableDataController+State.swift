@@ -21,7 +21,7 @@ extension TableDataController: NSMenuItemValidation {
                 + "\(source.shownLoadedRows.formatted()) of \(source.keptRows.formatted()) loaded rows"
         } else {
             bar.scope.style = .accent
-            let filtered = !source.filter.isEmpty, sorted = !source.sort.isEmpty
+            let filtered = !source.filter.isEmpty, sorted = !source.sort.isEmpty || !source.orderText.isEmpty
             bar.scope.text = "On server · " + (filtered && sorted ? "filtered, sorted" : filtered ? "filtered" : sorted ? "sorted" : "all rows")
         }
         bar.scope.toolTip = local ? "The search runs on the rows loaded so far; untick Loaded rows only to search every row"
@@ -51,6 +51,8 @@ extension TableDataController: NSMenuItemValidation {
         } else {
             rows.stringValue = "\(loaded) rows loaded"
         }
+        if source.firstRow > 0 { rows.stringValue = "Rows " + pageRange }
+        pageLabel.stringValue = pageRange
         rows.stringValue += readAt.map { " · read " + GridStatusView.time($0) } ?? ""
         rows.toolTip = known?.exact == false && source.hasMore ? "The server's estimate: Count Exactly counts the rows" : nil
         countLink.isHidden = total?.exact == true && total?.filter == source.filter || !source.hasMore
@@ -78,9 +80,13 @@ extension TableDataController: NSMenuItemValidation {
             reason = QuickFilter.reason(GridCondition.Operator.allCases[menuItem.tag], focusedValues())
             enabled = reason == nil
         }
+        if Self.exactValueActions.contains(menuItem.action), let cell = viewer.focusedCell, source?.isCut(cell.row, cell.column) == true {
+            (enabled, reason) = (false, "Only the start of this value is loaded: Load Full Cell first")
+        }
         menuItem.explain(enabled: enabled, reason: reason)
         if menuItem.action == Commands.manualCommit.action { menuItem.state = (menuItem.tag == 1) == (transactionSession != nil) ? .on : .off }
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
+        if menuItem.action == Commands.pageSize.action { menuItem.state = menuItem.tag == rowsPerPage ? .on : .off }
         if menuItem.action == Commands.useAsLabel.action { menuItem.state = isLabel(viewer.focusedColumn) ? .on : .off }
         return enabled
     }
@@ -95,6 +101,9 @@ extension TableDataController: NSMenuItemValidation {
     }
     override func forwardingTarget(for selector: Selector!) -> Any? { viewer.responds(to: selector) ? viewer : nil }
 
+    /// The commands that take the focused cell's value for a condition.
+    private static let exactValueActions: Set<Selector?> = [Commands.quickFilter.action, Commands.filterEquals.action, Commands.filterNotEquals.action]
+
     /// Whether a command can run now, and why not.
     private func state(of action: Selector?) -> (Bool, String?) {
         guard let source else { return (false, "The table is still loading") }
@@ -107,7 +116,7 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.addRow.action: return (editable, readOnly)
         case Commands.duplicateRow.action, Commands.duplicateRowWithoutKeys.action, Commands.deleteRows.action:
             return !editable ? (false, readOnly) : (hasSelection, "Select the rows first")
-        case Commands.setNull.action, Commands.setDefault.action, Commands.insertValue.action, Commands.cut.action:
+        case Commands.setNull.action, Commands.setDefault.action, Commands.setExpression.action, Commands.insertValue.action, Commands.cut.action:
             if !editable { return (false, readOnly) }
             // The first cells tell (listing a big selection would take a while).
             let cells = viewer.selectedCells(limit: 10_000).filter { source.canEdit($0.row, $0.column) }
@@ -135,6 +144,14 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.redo.action: return (source.changes.canRedo, "Nothing to redo")
         case Commands.loadMore.action, Commands.loadAll.action:
             return (source.hasMore && loading == nil, source.hasMore ? "Wait until the rows have loaded" : "Every row is loaded")
+        case Commands.firstPage.action, Commands.previousPage.action:
+            return (source.firstRow > 0 && loading == nil, source.firstRow > 0 ? "Wait until the rows have loaded" : "These are the first rows")
+        case Commands.nextPage.action, Commands.lastPage.action:
+            return (source.hasMore && loading == nil, source.hasMore ? "Wait until the rows have loaded" : "These are the last rows")
+        case Commands.pageSize.action: return (loading == nil, "Wait until the rows have loaded")
+        case Commands.loadFullCell.action:
+            if loading != nil { return (false, "Wait until the rows have loaded") }
+            return (viewer.focusedCell.map { source.isCut($0.row, $0.column) } ?? false, "This cell holds its whole value")
         case Commands.cancelQuery.action: return (canCancel, "Nothing is running in this tab")
         case Commands.countRows.action: return (loading == nil, "Wait until the rows have loaded")
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.sortAscending.action,
@@ -145,7 +162,8 @@ extension TableDataController: NSMenuItemValidation {
             guard let column = viewer.focusedColumn else { return (false, "Select a cell or a column first") }
             let sorted = source.localSort.contains { $0.column == column } || source.sort.contains { $0.column == source.columns[column].name }
             return (!sorted, "This column is already in the sort")
-        case Commands.clearSort.action: return (!source.sort.isEmpty || !source.localSort.isEmpty, "The rows aren't sorted")
+        case Commands.clearSort.action:
+            return (!source.sort.isEmpty || !source.localSort.isEmpty || !source.orderText.isEmpty, "The rows aren't sorted")
         case Commands.sortColumns.action: return (!(grid.source is TransposedSource), "Leave Transpose or Record View first")
         case Commands.filterByValues.action: return (viewer.focusedColumn != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:

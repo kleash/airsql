@@ -26,3 +26,41 @@ public struct GridGoTo: Equatable {
         return names.firstIndex(of: column) ?? names.firstIndex { $0.caseInsensitiveCompare(column) == .orderedSame }
     }
 }
+
+/// What a cell's text can open or show beside another.
+public enum GridLink {
+    /// The web address a whole cell holds; other schemes (file, a custom app's) aren't for a click on data.
+    public static func url(_ text: String) -> URL? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased()), url.host?.isEmpty == false else { return nil }
+        return url
+    }
+
+    /// `second` against `first` line by line: "  " for a line in both, "− " for one only in the first, "+ " only in the second.
+    public static func lineDifference(_ first: String, _ second: String) -> String {
+        let old = first.components(separatedBy: .newlines), new = second.components(separatedBy: .newlines)
+        let difference = new.difference(from: old)
+        var removed = Set<Int>(), inserted = Set<Int>()
+        for change in difference {
+            switch change {
+            case .remove(let offset, _, _): removed.insert(offset)
+            case .insert(let offset, _, _): inserted.insert(offset)
+            }
+        }
+        var lines: [String] = [], left = 0, right = 0
+        while left < old.count || right < new.count {
+            if left < old.count, removed.contains(left) {
+                lines.append("− " + old[left])
+                left += 1
+            } else if right < new.count, inserted.contains(right) {
+                lines.append("+ " + new[right])
+                right += 1
+            } else {
+                lines.append("  " + new[right])
+                left += 1
+                right += 1
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+}
