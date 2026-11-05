@@ -79,7 +79,7 @@ extension TableDataController {
         }
         toolbar.leadingView = nil
         pageBar.subviews.forEach { $0.removeFromSuperview() }
-        let row = actionBar([pageSwitch, NSView()] + ((pages[page] as? TableEditorController)?.barActions ?? []))
+        let row = actionBar([pageSwitch, NSView()] + ((pages[page] as? TableEditorController)?.barActions ?? []), spacing: Spacing.unit)
         pageBar.addSubview(row)
         row.pin(to: pageBar)
     }

@@ -283,11 +283,11 @@ extension NSButton {
 
 /// A row of `views` in a grid toolbar's look: the bar's colour, a line under it. For the screens with no grid.
 @MainActor
-func actionBar(_ views: [NSView]) -> NSView {
+func actionBar(_ views: [NSView], spacing: CGFloat = 2) -> NSView {
     let bar = SurfaceView(.bar)
     bar.translatesAutoresizingMaskIntoConstraints = false
     let row = NSStackView(views: views)
-    row.spacing = 2
+    row.spacing = spacing
     row.edgeInsets = NSEdgeInsets(top: 2, left: Spacing.unit, bottom: 2, right: Spacing.unit)
     let hairline = Hairline(.softSeparator)
     for view in [row, hairline] {

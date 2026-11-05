@@ -72,13 +72,18 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         find.target = self
         find.action = #selector(findTable(_:))
         find.controlSize = .small
-        find.widthAnchor.constraint(equalToConstant: 140).isActive = true
+        find.widthAnchor.constraint(equalToConstant: 110).isActive = true
         fitButton.target = self
         fitButton.action = #selector(fitAll(_:))
-        for picker in [databases, diagrams] { picker.controlSize = .small }
+        for picker in [databases, diagrams] {
+            picker.controlSize = .small
+            picker.setContentCompressionResistancePriority(.defaultLow - 1, for: .horizontal)
+            picker.widthAnchor.constraint(greaterThanOrEqualToConstant: 90).isActive = true
+        }
         summary.setContentHuggingPriority(.init(1), for: .horizontal)
         summary.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let bar = actionBar([databases, diagrams, fitButton, addTable, arrange, show, export, summary, find, helpButton(.editors)])
+        summary.widthAnchor.constraint(greaterThanOrEqualToConstant: 100).isActive = true
+        let bar = actionBar([databases, diagrams, fitButton, addTable, arrange, show, export, summary, find, helpButton(.editors)], spacing: 6)
         scroll.documentView = canvas
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
@@ -524,7 +529,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         (control.cell as? NSPopUpButtonCell)?.imagePosition = .imageOnly
         control.setAccessibilityLabel(title)
         control.translatesAutoresizingMaskIntoConstraints = false
-        control.widthAnchor.constraint(equalToConstant: 38).isActive = true
+        control.widthAnchor.constraint(equalToConstant: 36).isActive = true
         control.setAccessibilityIdentifier(id)
         for command in commands {
             let item = command?.item() ?? .separator()

@@ -362,7 +362,7 @@ private final class BarHeaderCell: NSTableHeaderCell {
         NSColor.softSeparator.setFill()
         NSRect(x: frame.maxX - 1, y: frame.minY + 4, width: 1, height: frame.height - 8).fill()
         NSRect(x: frame.minX, y: frame.maxY - 1, width: frame.width, height: 1).fill()
-        drawInterior(withFrame: frame, in: view)
+        drawInterior(withFrame: frame.insetBy(dx: 0, dy: max(0, (frame.height - 18) / 2)), in: view)
     }
 }
 

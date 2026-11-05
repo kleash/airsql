@@ -54,10 +54,6 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         let scroll = NSScrollView()
         scroll.documentView = list
         scroll.hasVerticalScroller = true
-        emptyNote.translatesAutoresizingMaskIntoConstraints = false
-        scroll.addSubview(emptyNote)
-        NSLayoutConstraint.activate([emptyNote.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
-                                     emptyNote.centerYAnchor.constraint(equalTo: scroll.centerYAnchor)])
         split.isVertical = true
         split.dividerStyle = .thin
         split.autosaveName = layoutName("Compare split")
@@ -72,6 +68,10 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         side.distribution = .fill
         side.spacing = 0
         for view in side.arrangedSubviews { view.widthAnchor.constraint(equalTo: side.widthAnchor).isActive = true }
+        emptyNote.translatesAutoresizingMaskIntoConstraints = false
+        side.addSubview(emptyNote)
+        NSLayoutConstraint.activate([emptyNote.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+                                     emptyNote.centerYAnchor.constraint(equalTo: scroll.centerYAnchor)])
         split.addArrangedSubview(side)
         split.addArrangedSubview(detail.view)
         scroll.widthAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
