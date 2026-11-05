@@ -94,3 +94,16 @@ A database can have several diagrams, chosen in **Diagram**. The first always sh
 
 **Export** saves the diagram as a PNG, or as text for other tools: Mermaid, which many docs sites and wikis draw, PlantUML, Graphviz
 DOT, GraphML and draw.io (the last two keep where your boxes are). **Print Diagram…** fits it on one page.
+
+## CREATE statements of several objects
+
+**Copy CREATE** works on several selected objects, as one script. **Open CREATE in Query Tab** puts that script in a new query tab;
+nothing runs until you run it.
+
+**SQL Generator…**, on a database or on selected objects, shows the statements that recreate them and keeps them up to date as you
+change its options: IF NOT EXISTS and OR REPLACE where your server takes them, Skip DEFINER, database names, and whether to keep
+indexes, foreign keys, the AUTO_INCREMENT number and the tables' triggers. Tables come first, then views, routines, triggers and events,
+with foreign key checks off around several tables so that their order doesn't matter, and DELIMITER lines round routines.
+
+**Copy** and **Open in Query Tab** take the whole script. **Save to Folder…** writes a `.sql` file per object: in one folder, a folder
+per kind, a folder per database and kind, or numbered in the order they run. Files of the same name are replaced.

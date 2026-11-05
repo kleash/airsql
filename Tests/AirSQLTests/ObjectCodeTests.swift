@@ -115,3 +115,86 @@ struct ObjectCodeTests {
         #expect(old.columnChecks == nil)
     }
 }
+
+struct DDLScriptTests {
+    let server = SchemaServer(version: "11.8.2-MariaDB")
+    let mysql = SchemaServer(version: "8.4.0")
+    let table = """
+        CREATE TABLE `orders` (
+          `id` int NOT NULL AUTO_INCREMENT,
+          `customer` int NOT NULL,
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `one` (`customer`),
+          KEY `two` (`id`),
+          CONSTRAINT `fk` FOREIGN KEY (`customer`) REFERENCES `customers` (`id`)
+        ) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4
+        """
+
+    func item(_ kind: DatabaseObject.Kind, _ name: String, _ code: String, table: String? = nil) -> DDLScript.Item {
+        DDLScript.Item(DatabaseObject(kind, "shop", name), code: code, table: table)
+    }
+
+    @Test func leavesOutWhatTheOptionsSay() {
+        var options = DDLScript.Options()
+        options.indexes = false
+        options.foreignKeys = false
+        options.autoIncrement = false
+        options.ifNotExists = true
+        options.databaseNames = true
+        #expect(DDLScript([item(.table, "orders", table)], options: options, server: server).text == """
+            CREATE TABLE IF NOT EXISTS `shop`.`orders` (
+              `id` int NOT NULL AUTO_INCREMENT,
+              `customer` int NOT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+            """)
+    }
+
+    @Test func rewritesObjectsAsEachServerTakes() {
+        let view = item(.view, "v", "CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`%` SQL SECURITY DEFINER VIEW `shop`.`v` AS select 1")
+        let routine = item(.procedure, "p", "CREATE DEFINER=`root`@`%` PROCEDURE `p`()\nBEGIN\n  SELECT 1;\nEND")
+        var options = DDLScript.Options()
+        options.skipDefiner = true
+        options.orReplace = true
+        #expect(DDLScript([view], options: options, server: mysql).text
+                == "CREATE OR REPLACE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `v` AS select 1;\n")
+        #expect(DDLScript([routine], options: options, server: mysql).text
+                == "DELIMITER ;;\nCREATE PROCEDURE `p`()\nBEGIN\n  SELECT 1;\nEND;;\nDELIMITER ;\n", "MySQL can't replace a routine")
+        #expect(DDLScript([routine], options: options, server: server).text.contains("CREATE OR REPLACE PROCEDURE `p`()"))
+        options.orReplace = false
+        options.ifNotExists = true
+        let event = item(.event, "e", "CREATE EVENT `e` ON SCHEDULE EVERY 1 DAY DO SELECT 1")
+        #expect(DDLScript([event], options: options, server: mysql).text == "CREATE EVENT IF NOT EXISTS `e` ON SCHEDULE EVERY 1 DAY DO SELECT 1;\n")
+    }
+
+    @Test func ordersTheScriptAndTurnsKeyChecksOffForTables() {
+        let items = [item(.trigger, "t", "CREATE TRIGGER `t` BEFORE INSERT ON `orders` FOR EACH ROW SET @a = 1", table: "orders"),
+                     item(.view, "v", "CREATE VIEW `v` AS select 1"), item(.table, "orders", table),
+                     item(.table, "b", "CREATE TABLE `b` (\n  `id` int\n)")]
+        let text = DDLScript(items, server: server).text
+        #expect(text.hasPrefix("SET FOREIGN_KEY_CHECKS = 0;\n\nCREATE TABLE `orders`") && text.hasSuffix("SET FOREIGN_KEY_CHECKS = 1;\n"))
+        #expect(text.range(of: "VIEW `v`")!.lowerBound < text.range(of: "TRIGGER `t`")!.lowerBound)
+        var options = DDLScript.Options()
+        options.triggers = false
+        #expect(!DDLScript(items, options: options, server: server).text.contains("TRIGGER"), "only a table's own triggers are optional")
+    }
+
+    @Test func filesStayInTheFolderAndDifferByMoreThanCase() {
+        let items = [item(.table, "../../etc/passwd", "CREATE TABLE `x` (\n  `a` int\n)"), item(.table, "Foo", "CREATE TABLE `Foo` (\n  `a` int\n)"),
+                     item(.table, "foo", "CREATE TABLE `foo` (\n  `a` int\n)"), item(.procedure, "p", "CREATE PROCEDURE `p`() SELECT 1")]
+        let script = DDLScript(items, server: server)
+        #expect(script.files(.flat).map(\.path) == ["_._.._etc_passwd.sql", "Foo.sql", "foo-2.sql", "p.sql"])
+        #expect(script.files(.byKind).last?.path == "procedures/p.sql")
+        #expect(script.files(.byDatabase).last?.path == "shop/procedures/p.sql")
+        #expect(script.files(.numbered).map(\.path).last == "004_p.sql")
+        #expect(script.files(.flat).first?.text.hasSuffix(");\n") == true)
+    }
+
+    @Test func readsEachKindsColumn() async throws {
+        let source = CannedSource(["SHOW CREATE TABLE": [["t", "CREATE TABLE `t` (\n)"]],
+                                   "SHOW CREATE EVENT": [["e", "", "UTC", "CREATE EVENT `e`", "", "", ""]]])
+        let items = try await DDLScript.load([DatabaseObject(.table, "shop", "t"), DatabaseObject(.event, "shop", "e")], from: source)
+        #expect(items.map(\.code) == ["CREATE TABLE `t` (\n)", "CREATE EVENT `e`"])
+    }
+}

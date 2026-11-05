@@ -67,6 +67,9 @@ public struct CreateHeader {
     /// After CREATE, where OR REPLACE goes; where a DEFINER clause goes when there is none.
     let afterCreate: String.Index
     let definerSlot: String.Index
+    /// Where the name starts, after any IF NOT EXISTS, and where it (with its database) ends; after the kind's word.
+    let nameRange: Range<String.Index>
+    let afterKind: String.Index
 
     public init?(_ code: String) {
         var scanner = HeaderScanner(code)
@@ -112,10 +115,13 @@ public struct CreateHeader {
         self.definer = definer
         definerAccount = account
         definerSlot = slot
+        afterKind = scanner.index
         if scanner.peekWord() == "IF" {
             _ = scanner.word()
             guard scanner.word() == "NOT", scanner.word() == "EXISTS" else { return nil }
         }
+        scanner.skipSpace()
+        let nameStart = scanner.index
         guard let first = scanner.name() else { return nil }
         if scanner.symbol(".") {
             guard let second = scanner.name() else { return nil }
@@ -125,6 +131,7 @@ public struct CreateHeader {
             database = nil
             name = first
         }
+        nameRange = nameStart..<scanner.index
     }
 }
 

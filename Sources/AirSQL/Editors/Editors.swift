@@ -108,6 +108,20 @@ extension MainWindowController {
         open(diagram, title: diagram.tabTitle, connection: context.connection.id)
     }
 
+    /// Shows the SQL Generator on `objects` and all that `databases` hold, their details read first.
+    func openSQLGenerator(_ objects: [DatabaseObject], databases: [String], context: EditorContext) {
+        Task {
+            do {
+                try await context.schema.loadDetails(Array(Set(objects.map(\.database) + databases)))
+                let held = databases.flatMap { name in context.schema.snapshot.database(name).map(DatabaseObject.all(in:)) ?? [] }
+                let generator = SQLGeneratorController(context: context, objects: objects + held, activity: model.activity)
+                open(generator, title: generator.tabTitle, connection: context.connection.id)
+            } catch {
+                showError(error.localizedDescription, title: "Couldn't read the schema", on: window)
+            }
+        }
+    }
+
     // MARK: Menu commands
 
     /// The connection the editor commands act on: the tree's (its right-click menus), else the window's.

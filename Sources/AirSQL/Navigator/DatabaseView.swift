@@ -350,7 +350,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     }
 
     @objc func copyCreateStatement(_ sender: Any?) {
-        if let first = selectedObjects.first { NavigatorActions.copyCreate(first, on: open, window: view.window) }
+        if !selectedObjects.isEmpty { NavigatorActions.copyCreate(selectedObjects, on: open, window: view.window) }
     }
 
     /// ⌘C: the selected tables' names.

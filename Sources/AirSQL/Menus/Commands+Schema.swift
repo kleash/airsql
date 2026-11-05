@@ -52,11 +52,16 @@ extension Commands {
     static let exportDrawIO = export("draw.io…", .drawIO, tip: "Save the diagram as a file draw.io opens and can edit")
     static let printDiagram = Command("Print Diagram…", #selector(ERDiagramController.printDiagram(_:)), tip: "Print the diagram on one page")
 
+    static let sqlGenerator = Command("SQL Generator…", #selector(AirSQLActions.showSQLGenerator(_:)),
+                                      tip: "Show the statements that recreate what is selected, with options, to copy, open or save")
+    static let createToConsole = Command("Open CREATE in Query Tab", #selector(AirSQLActions.openCreateInConsole(_:)),
+                                         tip: "Put the CREATE statements of what is selected in a new query tab")
+
     static let diagramArrange = [arrangeLeftToRight, arrangeTopToBottom, arrangeGrid]
     static let diagramDetail = [detailAll, detailKeys, detailNames]
     static let diagramExports = [exportPNG, exportMermaid, exportPlantUML, exportDOT, exportGraphML, exportDrawIO]
 
     static let schema: [Command] = [diagramOfSelection, diagramOfNeighbours, diagramNew, diagramRename, diagramDelete, diagramNeighbours,
-                                    diagramRemove, diagramComments, diagramVirtualKeys, printDiagram]
+                                    diagramRemove, diagramComments, diagramVirtualKeys, printDiagram, sqlGenerator, createToConsole]
         + diagramArrange + diagramDetail + diagramExports
 }

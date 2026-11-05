@@ -346,6 +346,30 @@ extension AppTests {
             #expect(again.layouts.count == 1 && again.layout.tables == nil)
         }
 
+        @Test func theGeneratorShowsLiveDDLAndWritesAFilePerObject() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            var context = try await recordedEditorContext()
+            context.reads = CannedSource([
+                "SHOW CREATE TABLE": [["orders", "CREATE TABLE `orders` (\n  `id` int NOT NULL,\n  KEY `x` (`id`)\n) ENGINE=InnoDB"]],
+                "SHOW CREATE TRIGGER": [["t", "", "CREATE TRIGGER `t` BEFORE INSERT ON `orders` FOR EACH ROW SET @a = 1"]],
+            ])
+            let generator = SQLGeneratorController(context: context, objects: [DatabaseObject(.table, database, "orders")], activity: model.activity)
+            main.open(generator, title: generator.tabTitle, connection: context.connection.id)
+            await ready { generator.text.string.isEmpty }
+            #expect(generator.text.string.hasPrefix("CREATE TABLE `orders` (") && generator.text.string.contains("KEY `x`"))
+            #expect(generator.text.string.contains("CREATE TRIGGER `t`"), "the table's triggers come with it")
+            for option in [\DDLScript.Options.indexes, \.triggers] {
+                let box = try #require(generator.boxes.first { $0.1 == option }?.0)
+                box.state = .off
+                generator.optionChanged(box)
+            }
+            #expect(generator.text.string == "CREATE TABLE `orders` (\n  `id` int NOT NULL\n) ENGINE=InnoDB;\n")
+            generator.openInConsole(nil)
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(console.editor.string.hasPrefix("CREATE TABLE `orders`"))
+        }
+
         @Test func everyEditorIsTidyAndSaysWhatItsControlsDo() async throws {
             var problems: [String] = [], missing: [String] = []
             for appearance in [NSAppearance.Name.aqua, .darkAqua] {

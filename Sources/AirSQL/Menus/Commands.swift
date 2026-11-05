@@ -210,6 +210,8 @@ import AppKit
     @objc optional func killQuery(_ sender: Any?)
     @objc optional func killConnection(_ sender: Any?)
     @objc optional func showERDiagram(_ sender: Any?)
+    @objc optional func showSQLGenerator(_ sender: Any?)
+    @objc optional func openCreateInConsole(_ sender: Any?)
     @objc optional func bulkEditTables(_ sender: Any?)
     @objc optional func showDiskUsage(_ sender: Any?)
     @objc optional func selectTop(_ sender: Any?)

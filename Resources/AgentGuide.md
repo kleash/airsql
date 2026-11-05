@@ -241,7 +241,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `.collation`, `.rowFormat`, `.autoIncrement`, `.comment`), `tableEditor.sql`, `tableEditor.apply`,
   `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
   `objectEditor.definer`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
-  `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`.
+  `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`. **SQL Generator**: `generator.text`,
+  `generator.copy`, `generator.console`, `generator.save`, `generator.layout`, and a box per option (`generator.indexes` and so on).
 - **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,
   `recon.source.object`, `recon.target.connection`, `recon.target.database`, `recon.target.object`, `recon.swap`,
   `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`, `recon.filter`, `recon.hideMatching`, `recon.back`,
