@@ -2,8 +2,8 @@ import Foundation
 
 /// An object in the navigator's tree that its commands act on: a table, view or sequence, a routine, a trigger or an
 /// event, in its database.
-public struct DatabaseObject: Hashable {
-    public enum Kind: String, CaseIterable {
+public struct DatabaseObject: Hashable, Codable {
+    public enum Kind: String, CaseIterable, Codable {
         case table, view, sequence, procedure, function, trigger, event
 
         /// The word SQL uses for it (DROP VIEW, SHOW CREATE PROCEDURE).
@@ -97,9 +97,13 @@ public enum NavigatorSQL {
     /// options but not foreign keys), then, given `columns` (the ones that aren't generated), its rows where `condition`
     /// holds.
     public static func copyTable(_ table: DatabaseObject, to database: String, name: String, columns: [String]?,
-                                 where condition: String?) -> [String] {
+                                 where condition: String?, droppingColumns: [String] = [], droppingIndexes: [String] = [],
+                                 foreignKeys: [SchemaForeignKey] = []) -> [String] {
         let target = SQLQuote.identifier(database, name)
         var statements = ["CREATE TABLE \(target) LIKE \(table.quoted)"]
+        // Indexes first: one on a dropped column would otherwise shrink or go, and be missing here.
+        let drops = droppingIndexes.map { "DROP INDEX " + SQLQuote.identifier($0) } + droppingColumns.map { "DROP COLUMN " + SQLQuote.identifier($0) }
+        if !drops.isEmpty { statements.append("ALTER TABLE \(target) " + drops.joined(separator: ", ")) }
         if let columns, !columns.isEmpty {
             let list = columns.map { SQLQuote.identifier($0) }.joined(separator: ", ")
             var insert = "INSERT INTO \(target) (\(list)) SELECT \(list) FROM \(table.quoted)"
@@ -107,6 +111,13 @@ public enum NavigatorSQL {
                 insert += " WHERE " + condition
             }
             statements.append(insert)
+        }
+        // After the rows, without the original's name: constraint names are unique in a database.
+        for key in foreignKeys {
+            statements.append("ALTER TABLE \(target) ADD FOREIGN KEY (" + key.columns.map { SQLQuote.identifier($0) }.joined(separator: ", ")
+                + ") REFERENCES " + SQLQuote.identifier(key.referencedDatabase, key.referencedTable) + " ("
+                + key.referencedColumns.map { SQLQuote.identifier($0) }.joined(separator: ", ") + ") ON DELETE " + key.onDelete
+                + " ON UPDATE " + key.onUpdate)
         }
         return statements
     }
@@ -209,6 +220,26 @@ public enum NavigatorSQL {
 
     /// Text that can't end the comment it is put in.
     private static func comment(_ text: String) -> String { text.replacingOccurrences(of: "*/", with: "* /") }
+
+    /// Quick Documentation's rows: what can be read as text, cut at the server so a page of long values costs nothing.
+    public static func firstRows(_ table: DatabaseObject, _ columns: [SchemaColumn], limit: Int = 5) -> (sql: String, names: [String])? {
+        let shown = columns.filter { textTypes.contains($0.dataType.lowercased()) || numberLike.contains($0.dataType.lowercased()) }.prefix(6)
+        guard !shown.isEmpty else { return nil }
+        let list = shown.map { "LEFT(\(SQLQuote.identifier($0.name)), 40)" }.joined(separator: ", ")
+        return ("SELECT \(list) FROM \(table.quoted) LIMIT \(limit)", shown.map(\.name))
+    }
+
+    private static let numberLike: Set<String> = ["tinyint", "smallint", "mediumint", "int", "bigint", "decimal", "float", "double", "bit", "year",
+                                                  "date", "time", "datetime", "timestamp"]
+
+    /// Rows as lines of padded columns, for a note in a fixed-width font.
+    public static func rowsText(_ names: [String], _ rows: [[String?]]) -> String {
+        let table = [names] + rows.map { $0.map { $0.map { String($0.prefix(24)) } ?? "NULL" } }
+        let widths = names.indices.map { column in table.map { column < $0.count ? $0[column].count : 0 }.max() ?? 0 }
+        return table.map { row in
+            zip(row, widths).map { $0.padding(toLength: $1 + 2, withPad: " ", startingAt: 0) }.joined().trimmingCharacters(in: .whitespaces)
+        }.joined(separator: "\n")
+    }
 
     /// What New Database and the bulk editor offer: the server's character sets (name, description, default collation),
     /// collations (name, character set), its own character set and collation, and its storage engines (name, support).

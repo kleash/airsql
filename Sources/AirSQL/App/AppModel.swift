@@ -77,7 +77,11 @@ final class AppModel: ObservableObject {
             text.isEmpty || connection.displayName.localizedCaseInsensitiveContains(text)
                 || connection.host.localizedCaseInsensitiveContains(text) || (folder?.name.localizedCaseInsensitiveContains(text) ?? false)
         }
-        let sorted = data.connections.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+        // Connections moved by hand keep their places, ahead of the rest by name.
+        let sorted = data.connections.sorted {
+            if $0.position != $1.position { return ($0.position ?? .max) < ($1.position ?? .max) }
+            return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
         let folders = data.folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         let known = Set(folders.map(\.id))
         var result: [(folder: ConnectionFolder?, connections: [SavedConnection])] = []
@@ -88,6 +92,19 @@ final class AppModel: ObservableObject {
             if !inside.isEmpty || text.isEmpty { result.append((folder, inside)) }
         }
         return result
+    }
+
+    /// Move Up, Move Down: swaps a connection with its neighbour in its list; the whole list then keeps its order by hand.
+    func moveConnection(_ id: UUID, by step: Int) {
+        guard let list = sections(filter: "").first(where: { $0.connections.contains { $0.id == id } })?.connections,
+              let from = list.firstIndex(where: { $0.id == id }), list.indices.contains(from + step) else { return }
+        var order = list
+        order.swapAt(from, from + step)
+        for (place, connection) in order.enumerated() {
+            guard var saved = self.connection(connection.id) else { continue }
+            saved.position = place
+            save(saved)
+        }
     }
 
     /// Puts these connections in a folder (nil: outside any).

@@ -83,7 +83,7 @@ extension AppTests {
             // The menu bar has the lane's items, each saying what it does.
             let bar = try #require(NSApp.mainMenu)
             let file = try #require(bar.item(withTitle: "File")?.submenu), toolsMenu = try #require(bar.item(withTitle: "Tools")?.submenu)
-            #expect(file.item(withTitle: "Run SQL File…") != nil && file.item(withTitle: "Import CSV…") != nil)
+            #expect(file.item(withTitle: "Run SQL File…") != nil && file.item(withTitle: "Import File…") != nil)
             #expect(toolsMenu.items.map(\.title).starts(with: ["Open in Terminal", "Export…", "Restore…", "Copy to Another Server…"]))
         }
 
@@ -313,7 +313,7 @@ extension AppTests {
             sheet.show(databases: ToolFixtures.databases())
             sheet.show(columns: ToolFixtures.customerColumns)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
-            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the CSV file first")
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose a file first, or Paste the rows")
             let file = URL(fileURLWithPath: try scratch() + "/people.csv")
             try "Email;NAME;phone\nada@example.com;Ada Lovelace;\n".write(to: file, atomically: true, encoding: .utf8)
             sheet.use(file)
@@ -328,6 +328,141 @@ extension AppTests {
             _ = await call(harness, "set", ["id": "csv.map.name", "value": "Leave out (its default)"])
             _ = await call(harness, "set", ["id": "csv.map.email", "value": "Leave out (its default)"])
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the field at least one column takes")
+        }
+
+        /// A folder of data files: one for each table, an empty table's with only its names, NULL as the format writes it.
+        @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests"))
+        func tablesExportToAFileEach() async throws {
+            let options = ClientToolsLabTests.options(Lab.mariadb114)
+            let session = DBConnection(options: options, role: .tools)
+            _ = try await session.connect()
+            let target = "lane_transfer_files"
+            _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target))
+            _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+            _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(target, "a")) (id INT, note VARCHAR(9))")
+            _ = try await session.query("INSERT INTO \(SQLQuote.identifier(target, "a")) VALUES (1, 'x,y'), (2, NULL)")
+            _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(target, "empty")) (id INT)")
+            let tables = [(database: target, name: "a"), (database: target, name: "empty")]
+            let folder = URL(fileURLWithPath: try scratch()).appendingPathComponent("csv")
+            let bytes = try await TableFiles.export(tables, format: .csv, options: options, snapshot: true, to: folder, cancellation: Cancellation()) { _, _ in }
+            #expect(bytes > 0)
+            #expect(try String(contentsOf: folder.appendingPathComponent("a.csv"), encoding: .utf8) == "id,note\n1,\"x,y\"\n2,NULL\n")
+            #expect(try String(contentsOf: folder.appendingPathComponent("empty.csv"), encoding: .utf8) == "id\n")
+            let book = URL(fileURLWithPath: try scratch()).appendingPathComponent("xlsx")
+            _ = try await TableFiles.export(tables, format: nil, options: options, snapshot: false, to: book, cancellation: Cancellation()) { _, _ in }
+            #expect(try XLSXReader.rows(Data(contentsOf: book.appendingPathComponent("a.xlsx"))).first == ["id", "note"])
+            // A failure leaves no folder.
+            let gone = URL(fileURLWithPath: try scratch()).appendingPathComponent("gone")
+            await #expect(throws: AirSQLError.self) {
+                _ = try await TableFiles.export([(database: target, name: "missing")], format: .csv, options: options, snapshot: false, to: gone,
+                                                cancellation: Cancellation()) { _, _ in }
+            }
+            #expect(!FileManager.default.fileExists(atPath: gone.path))
+            // The lab's login may flush.
+            _ = try await session.query("FLUSH TABLES")
+            _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
+            await session.close()
+        }
+
+        /// Flush sits in the Tools menu: off until connected, and off on a read-only connection, saying why.
+        @Test func flushIsOffUntilItCanRun() async throws {
+            let (main, _) = Self.window()
+            let tools = try #require(sequence(first: main as NSResponder, next: \.nextResponder).lazy.compactMap { $0 as? ToolsResponder }.first)
+            #expect(tools.availability(#selector(ToolsResponder.flushTables(_:))).1 == "Connect to \(ToolFixtures.local.displayName) first")
+            #expect(NSApp.mainMenu?.item(withTitle: "Tools")?.submenu?.item(withTitle: "Flush")?.submenu?.item(withTitle: "Flush Tables…") != nil)
+        }
+
+        /// What only AirSQL's own export does says so, offers the way out, and the data formats turn SQL's options off.
+        @Test func theExportSheetFitsItsOptionsToTheChoice() async throws {
+            let (main, harness) = Self.window()
+            let sheet = Self.exportSheet(on: main)
+            defer { sheet.close() }
+            let content = try #require(sheet.window?.contentView)
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            _ = await call(harness, "press", ["id": "export.removeDefiner"])
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("Removing DEFINER") == true)
+            #expect(!sheet.useBuiltIn.isHidden)
+            _ = await call(harness, "set", ["id": "export.tool", "value": "AirSQL (built in)"])
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            let format = try #require(find(NSPopUpButton.self, id: "export.fileFormat", in: content))
+            #expect(!format.isEnabled)
+            _ = await call(harness, "set", ["id": "export.output", "value": "A folder, a file per object"])
+            #expect(format.isEnabled)
+            _ = await call(harness, "set", ["id": "export.fileFormat", "value": "CSV"])
+            let mode = try #require(find(NSPopUpButton.self, id: "export.dataMode", in: content))
+            #expect(!mode.isEnabled && mode.toolTip == "Only SQL files have this option")
+            _ = await call(harness, "set", ["id": "export.fileFormat", "value": "SQL"])
+            #expect(mode.isEnabled)
+            _ = await call(harness, "set", ["id": "export.output", "value": "The clipboard"])
+            #expect(sheet.runButton.toolTip == "Put the export on the clipboard")
+        }
+
+        /// New Table… proposes the CREATE TABLE from every value; the text can be edited, and only a CREATE TABLE is taken.
+        @Test func theImportSheetProposesANewTableAndShowsTheRows() async throws {
+            let (main, harness) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            let content = try #require(sheet.window?.contentView)
+            let file = URL(fileURLWithPath: try scratch() + "/new orders.csv")
+            try "id;total\n1;2,50\n2;3,75\n".write(to: file, atomically: true, encoding: .utf8)
+            sheet.use(file)
+            _ = await call(harness, "set", ["id": "csv.table", "value": "New Table…"])
+            let ddl = try #require(find(NSTextView.self, id: "csv.ddl", in: content))
+            _ = await eventually(timeout: 5) { ddl.string.contains("`total`") }
+            #expect(ddl.string.contains("`new_orders`") && ddl.string.contains("`total` VARCHAR(32)"), "\(ddl.string)")
+            _ = await eventually(timeout: 5) { sheet.runButton.isEnabled }
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            let preview = try #require(find(NSTableView.self, id: "csv.preview", in: content))
+            #expect(preview.numberOfRows == 2 && preview.numberOfColumns == 2)
+            // The decimal comma turns the column into a number, and a new table has no rows to delete.
+            _ = await call(harness, "press", ["id": "csv.decimalComma"])
+            _ = await eventually(timeout: 5) { ddl.string.contains("DECIMAL(3,2)") }
+            #expect(ddl.string.contains("`total` DECIMAL(3,2)"), "\(ddl.string)")
+            #expect(try #require(find(NSButton.self, id: "csv.emptyFirst", in: content)).isEnabled == false)
+            ddl.string = "DROP TABLE orders"
+            ddl.delegate?.textDidChange?(Notification(name: NSText.didChangeNotification, object: ddl))
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("CREATE TABLE") == true)
+        }
+
+        /// A result comes with its names, NULLs apart from empty text, and a clipboard's text is guessed as a file's is.
+        @Test func theImportSheetTakesAResultAndText() async throws {
+            let (main, _) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            sheet.show(columns: ToolFixtures.customerColumns)
+            let content = try #require(sheet.window?.contentView)
+            let preview = try #require(find(NSTableView.self, id: "csv.preview", in: content))
+            sheet.use(rows: [["name", "email"], ["Ada", nil]], title: "The result (1 row)")
+            _ = await eventually(timeout: 5) { preview.numberOfRows == 1 }
+            #expect(preview.dataSource?.tableView?(preview, objectValueFor: preview.tableColumns[1], row: 0) as? String == "NULL")
+            #expect(try #require(find(NSButton.self, id: "csv.header", in: content)).isEnabled == false)
+            sheet.use(text: "name\temail\nAda\ta@example.com\nGrace\tg@example.com\n")
+            _ = await eventually(timeout: 5) { preview.numberOfRows == 2 }
+            #expect(preview.numberOfColumns == 2 && sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            #expect(try #require(find(NSPopUpButton.self, id: "csv.separator", in: content)).titleOfSelectedItem == "Tab")
+        }
+
+        /// JSON brings its own names; a file with no text format turns the text controls off.
+        @Test func theImportSheetTakesJSONAndOffersOnlyWhatFits() async throws {
+            let (main, _) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            sheet.show(columns: ToolFixtures.customerColumns)
+            let content = try #require(sheet.window?.contentView)
+            let file = URL(fileURLWithPath: try scratch() + "/people.json")
+            try #"[{"name": "Ada", "email": null}]"#.write(to: file, atomically: true, encoding: .utf8)
+            sheet.use(file)
+            _ = await eventually(timeout: 5) { sheet.runButton.isEnabled }
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            #expect(try #require(find(NSPopUpButton.self, id: "csv.separator", in: content)).isEnabled == false)
+            #expect(try #require(find(NSButton.self, id: "csv.header", in: content)).isEnabled == false)
+            #expect(try #require(find(NSTableView.self, id: "csv.preview", in: content)).numberOfRows == 1)
         }
 
         @Test func theCSVFormSaysWhyItIsOffWhileItRuns() async throws {

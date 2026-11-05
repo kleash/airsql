@@ -30,6 +30,8 @@ struct SQLPreviewRequest {
     /// The session's NO_BACKSLASH_ESCAPES (`DBConnection.noBackslashEscapes`), as `SQLQuote.string` wrote the SQL: it
     /// decides where the strings end, so the colours match what the server will read.
     var noBackslashEscapes = false
+    /// A new password the statements carry, kept out of what a failure says (`UserSQL.errorText`).
+    var password: String?
 
     init(change: ChangeSQL, heading: String, caption: String) {
         self.change = change
@@ -57,6 +59,8 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     private let runButton: NSButton
     private let confirmField = NSTextField()
     private var saveBox: NSButton?
+    /// What the sheet shows and Copy SQL copies: credentials masked, as in the SQL log. Only the run has them.
+    private var shownSQL: String { SQLLog.mask(request.text ?? request.change.text, noBackslashEscapes: request.noBackslashEscapes) }
 
     /// Shows the sheet on `window` for a change on `connection`.
     @discardableResult
@@ -165,7 +169,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         text.isSelectable = true
         text.drawsBackground = false
         let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
-        text.textStorage?.setAttributedString(Self.coloured(request.text ?? request.change.text, font: font,
+        text.textStorage?.setAttributedString(Self.coloured(shownSQL, font: font,
                                                             noBackslashEscapes: request.noBackslashEscapes))
         text.textContainerInset = NSSize(width: 6, height: 6)
         text.setAccessibilityIdentifier("preview.sql")
@@ -285,7 +289,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
 
     @objc private func copySQL(_ sender: Any?) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(request.change.text, forType: .string)
+        NSPasteboard.general.setString(shownSQL, forType: .string)
     }
 
     @objc private func openInConsole(_ sender: Any?) {

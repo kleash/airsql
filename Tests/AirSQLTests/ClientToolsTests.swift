@@ -347,6 +347,53 @@ struct ClientToolsTests {
         #expect(SQLPiece.statement("SET NAMES utf8mb4").fileText == "SET NAMES utf8mb4;\n")
     }
 
+    @Test func theDumpToolIsToldTheExportsChoicesItKnows() {
+        let command = ToolCommand(tool: Self.tool("mysqldump", .mysql, [8, 4, 3]), options: ConnectOptions(name: "Shop", host: "db.example.com", user: "app"), server: nil)
+        var request = DumpRequest(databases: ["shop"])
+        request.dataMode = .replace
+        request.createDatabase = true
+        request.dropDatabase = true
+        request.insertSize = 64 << 10
+        let argv = command.dump(request, optionFile: "/f")
+        #expect(argv.contains("--replace") && argv.contains("--add-drop-database") && argv.contains("--net-buffer-length=65536"))
+        #expect(argv.suffix(2) == ["--databases", "shop"])
+        #expect(request.builtInOnly == nil)
+        // Some tables stay a table list: no DROP DATABASE, which would take the rest with it.
+        var some = DumpRequest(databases: ["shop"], tables: ["orders"])
+        some.dropDatabase = true
+        let few = command.dump(some, optionFile: "/f")
+        #expect(!few.contains("--add-drop-database") && few.suffix(2) == ["shop", "orders"])
+        some.createDatabase = true
+        #expect(some.builtInOnly != nil)
+        some = DumpRequest(databases: ["shop"])
+        some.removeDefiner = true
+        #expect(some.builtInOnly?.contains("DEFINER") == true)
+    }
+
+    @Test func csvTakesAnyQuoteAndSeparatorAndJoinsLines() {
+        let columns = [GridColumn(name: "a"), GridColumn(name: "b")]
+        var options = CopyOptions()
+        options.separator = "||"
+        options.quote = "'"
+        #expect(CopyWriter.text(.csv, columns: columns, rows: [["it's", "x||y"], [#"say "hi""#, nil]], table: "t", options: options)
+            == "'it''s'||'x||y'\n" + #"say "hi""# + "||NULL\n")
+        options.quote = ""
+        #expect(CopyWriter.text(.csv, columns: columns, rows: [["a'b", "x||y"]], table: "t", options: options) == "a'b||x||y\n")
+        options = CopyOptions()
+        options.joinLines = true
+        #expect(CopyWriter.text(.csv, columns: columns, rows: [["a\nb\r\nc", nil]], table: "t", options: options) == "a b c,NULL\n")
+    }
+
+    @Test func theExportRemovesDefinersAndTheNextAutoIncrementOnly() {
+        #expect(SQLExport.withoutDefiner("CREATE ALGORITHM=UNDEFINED DEFINER=`a`@`%` SQL SECURITY DEFINER VIEW `v` AS select 1")
+            == "CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `v` AS select 1")
+        #expect(SQLExport.withoutDefiner("CREATE DEFINER=`a``b`@`h` PROCEDURE `p`() SELECT 'DEFINER=`x`'") == "CREATE PROCEDURE `p`() SELECT 'DEFINER=`x`'")
+        #expect(SQLExport.withoutDefiner("CREATE TABLE t (a INT)") == "CREATE TABLE t (a INT)")
+        let create = "CREATE TABLE `t` (\n  `id` int NOT NULL AUTO_INCREMENT COMMENT 'AUTO_INCREMENT=9'\n) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4"
+        #expect(SQLExport.withoutAutoIncrement(create)
+            == "CREATE TABLE `t` (\n  `id` int NOT NULL AUTO_INCREMENT COMMENT 'AUTO_INCREMENT=9'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")
+    }
+
     @Test func csvIsReadAsSpreadsheetsWriteItInAnyPieces() throws {
         let text = "\u{FEFF}id,name,note\r\n1,Ada,\"says \"\"hi\"\", then, leaves\"\r\n2,,\"two\nlines\"\n3,Émile,\n4,\"\",last"
         let expected = [["id", "name", "note"], ["1", "Ada", #"says "hi", then, leaves"#], ["2", "", "two\nlines"], ["3", "Émile", ""],

@@ -292,7 +292,7 @@ extension AppTests {
 
         @Test func aDiagramOfChosenTablesKeepsItsBoxesAndComesBack() async throws {
             let model = testModel([Fixtures.local])
-            let (main, _) = appWindow(model)
+            let (main, harness) = appWindow(model)
             let context = try await recordedEditorContext()
             main.openERDiagram(database: database, tables: ["orders"], neighbours: true, context: context)
             let diagram = try #require(main.selectedTab?.content as? ERDiagramController)
@@ -343,7 +343,16 @@ extension AppTests {
             again.diagrams.selectItem(at: 1)
             again.diagramChosen(again.diagrams)
             #expect(again.layout.arrangement == .grid && again.canvas.boxes.count == diagram.canvas.boxes.count)
+            // Delete asks: Cancel keeps it.
             again.deleteDiagram(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Cancel"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            #expect(again.layouts.count == 2)
+            again.deleteDiagram(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Delete"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             #expect(again.layouts.count == 1 && again.layout.tables == nil)
         }
 
@@ -386,6 +395,26 @@ extension AppTests {
             #expect(editor.sqlText.string.contains("PARTITION BY HASH (id) PARTITIONS 2"))
             editor.revertChanges(nil)
             #expect(editor.partitionsView.code.string.isEmpty && !editor.isEdited)
+        }
+
+        @Test func newRowCommandsLandOnTheirSections() async throws {
+            for (command, section) in [(Commands.newColumn, TableEditorController.Section.columns), (Commands.newIndex, .indexes),
+                                       (Commands.newForeignKey, .foreignKeys)] {
+                #expect(TableEditorController.Section(rawValue: command.tag) == section, "\(command.title)")
+                let (_, _, editor) = try await tableEditor("orders")
+                let rows = editor.design.columns.count + editor.design.indexes.count + editor.design.foreignKeys.count
+                editor.addOnceLoaded(section)
+                #expect(editor.section == section && editor.sections.selectedSegment == section.rawValue && !editor.listColumn.isHidden)
+                #expect(editor.design.columns.count + editor.design.indexes.count + editor.design.foreignKeys.count == rows + 1)
+            }
+            // Asked for before the table is read, it waits for it.
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.openTableEditor("orders", database: database, context: try await recordedEditorContext())
+            let early = try #require(main.selectedTab?.content as? TableEditorController)
+            early.addOnceLoaded(.indexes)
+            await ready { early.section != .indexes }
+            #expect(early.design.indexes.count == (early.before?.indexes.count ?? 0) + 1)
         }
 
         @Test func aChangeCanGoToAQueryTabInsteadOfRunning() async throws {

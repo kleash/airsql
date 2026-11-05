@@ -31,15 +31,18 @@ enum NavigatorMenus {
 /// SQL before anything changes (plan §1, Data safety), runs it on a session of its own and reads the changes back.
 @MainActor
 enum NavigatorActions {
+    /// Why nothing may change on this connection; nil: it's writable.
+    static func readOnlyReason(_ open: OpenConnection?, _ model: AppModel?) -> String? {
+        guard let connection = model?.connection(open?.id), connection.readOnly else { return nil }
+        return "“\(connection.displayName)” is read-only: turn that off in its connection settings to change anything"
+    }
+
     /// Why a command can't act on these objects or databases now; nil: it can.
     static func reason(for action: Selector?, objects: [DatabaseObject], databases: [String], open: OpenConnection?,
                        target: OpenConnection?, model: AppModel?) -> String? {
         let tables = objects.filter { $0.kind == .table }
         let tableLike = objects.filter { $0.kind.isTableLike }
-        func writable(_ open: OpenConnection?) -> String? {
-            guard let connection = model?.connection(open?.id), connection.readOnly else { return nil }
-            return "“\(connection.displayName)” is read-only: turn that off in its connection settings to change anything"
-        }
+        func writable(_ open: OpenConnection?) -> String? { readOnlyReason(open, model) }
         let onlyTables = tables.isEmpty || tables.count != objects.count ? "Select tables first (not views or other objects)"
             : writable(open)
         switch action {
@@ -83,8 +86,14 @@ enum NavigatorActions {
         case Commands.newDatabase.action?:
             return target == nil ? "Connect first: databases are created on a connected server" : writable(target)
         case Commands.findOnServer.action?, Commands.processList.action?, Commands.diskUsage.action?,
-             Commands.hostDatabases.action?:
+             Commands.hostDatabases.action?, Commands.users.action?:
             return target == nil ? "Connect first: this works on a connected server" : nil
+        case Commands.modifyGrants.action?:
+            if databases.count + objects.count != 1 { return "Select one database, table or routine first" }
+            if let object = objects.first, object.kind.isTableLike == false, ![.procedure, .function].contains(object.kind) {
+                return "Select one database, table or routine first"
+            }
+            return open?.usersRefusal
         default:
             return nil
         }
@@ -108,7 +117,8 @@ enum NavigatorActions {
                     if changeset { SQLPreviewSheet.changesetWriter?(request.change, request.noBackslashEscapes) }
                     done?(results)
                 } catch {
-                    showError(error.localizedDescription, title: "Couldn't \(request.actionTitle.lowercased())", on: window)
+                    showError(UserSQL.errorText(error, hiding: request.password), title: "Couldn't \(request.actionTitle.lowercased())",
+                              on: window)
                 }
             }
         }
@@ -117,7 +127,8 @@ enum NavigatorActions {
         guard ask || agent else { return run(false) }
         guard let window else { return }
         var shown = request
-        shown.offersChangeset = true
+        // A changelog is a file: what carries a credential stays out of it.
+        shown.offersChangeset = SQLLog.mask(request.change.text, noBackslashEscapes: request.noBackslashEscapes) == request.change.text
         SQLPreviewSheet.show(shown, connection: saved, on: window) { result in
             if result.approved { run(result.saveAsChangeset) }
         }

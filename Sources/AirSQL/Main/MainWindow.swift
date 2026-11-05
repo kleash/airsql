@@ -17,11 +17,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private let tint = SurfaceView(.clear)
     private var tintHeight: NSLayoutConstraint!
     private let contentHolder = NSView()
+    /// The docked SQL log, under the content, and how tall it is (0 while it doesn't show).
+    private(set) lazy var logPanel = SQLLogViewController(log: .shared, docked: true)
+    private let logHolder = NSView()
+    private var logHeight: NSLayoutConstraint!
     private let split = MainSplitViewController()
     /// Holds the split view controller (in the responder chain after its view); the window's content view is its view.
     private var root: NSViewController?
     private(set) var tabs: [Tab] = []
     private(set) var selectedTab: Tab?
+    /// The tabs shown, oldest first, and where Back and Forward have got to (`TabHistory`).
+    var tabHistory: [Tab] = []
+    var historyPlace = 0
+    var walkingHistory = false
     /// The agents' service (it sets itself), for View ▸ Agent Results.
     weak var agents: AgentService?
     /// What the content area shows now: "firstRun", "summary", "select" or "tab" (tests and the snapshot read it).
@@ -71,12 +79,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         sidebar.onSelect = { [weak self] in self?.sidebarSelectionChanged() }
         observers.append(model.$data.sink { [weak self] _ in DispatchQueue.main.async { self?.refresh() } })
         observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.refresh() } })
+        observers.append(model.$open.sink { [weak self] _ in DispatchQueue.main.async { self?.updateLogDock() } })
         observers.append(model.$agentStatus.sink { [weak self] _ in DispatchQueue.main.async { self?.updateStatus() } })
         observers.append(model.activity.$running.sink { [weak self] _ in DispatchQueue.main.async { self?.updateStatus() } })
         NotificationCenter.default.addObserver(self, selector: #selector(tabContentChanged(_:)), name: .tabContentDidChange,
                                                object: nil)
         configureStatusItems()
         refresh()
+        updateLogDock()
         ToolsResponder.install(on: self)
         LiquibaseResponder.install(on: self)
     }
@@ -92,7 +102,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         let column = NSViewController()
         let columnView = NSView()
         contentHolder.translatesAutoresizingMaskIntoConstraints = false
-        [tabBar, contentHolder, statusBar].forEach(columnView.addSubview)
+        logHolder.translatesAutoresizingMaskIntoConstraints = false
+        logHolder.clipsToBounds = true
+        logHeight = logHolder.heightAnchor.constraint(equalToConstant: 0)
+        [tabBar, contentHolder, logHolder, statusBar].forEach(columnView.addSubview)
         NSLayoutConstraint.activate([
             tabBar.topAnchor.constraint(equalTo: columnView.topAnchor),
             tabBar.leadingAnchor.constraint(equalTo: columnView.leadingAnchor),
@@ -100,7 +113,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             contentHolder.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
             contentHolder.leadingAnchor.constraint(equalTo: columnView.leadingAnchor),
             contentHolder.trailingAnchor.constraint(equalTo: columnView.trailingAnchor),
-            statusBar.topAnchor.constraint(equalTo: contentHolder.bottomAnchor),
+            logHolder.topAnchor.constraint(equalTo: contentHolder.bottomAnchor),
+            logHolder.leadingAnchor.constraint(equalTo: columnView.leadingAnchor),
+            logHolder.trailingAnchor.constraint(equalTo: columnView.trailingAnchor),
+            logHeight,
+            statusBar.topAnchor.constraint(equalTo: logHolder.bottomAnchor),
             statusBar.leadingAnchor.constraint(equalTo: columnView.leadingAnchor),
             statusBar.trailingAnchor.constraint(equalTo: columnView.trailingAnchor),
             statusBar.bottomAnchor.constraint(equalTo: columnView.bottomAnchor),
@@ -137,6 +154,50 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         return root
     }
 
+    // MARK: The SQL log
+
+    /// The log shows under the tabs while it's on and a server is connected: before that it has nothing to say.
+    var logDocked: Bool { model.data.settings.tree.showsLog && !model.open.isEmpty }
+    var logDockHeight: CGFloat { logHeight.constant }
+
+    func updateLogDock() {
+        let height = logDocked ? CGFloat(model.data.settings.tree.logHeight) : 0
+        guard logHeight.constant != height else { return }
+        if logDocked, logPanel.view.superview == nil {
+            let edge = LogDockEdge()
+            edge.drag = { [weak self] by in self?.resizeLog(by: by) }
+            edge.finished = { [weak self] in
+                guard let self else { return }
+                self.model.data.settings.tree.logHeight = Double(self.logHeight.constant)
+            }
+            logHolder.addSubview(logPanel.view)
+            logHolder.addSubview(edge)
+            logPanel.view.pin(to: logHolder)
+            NSLayoutConstraint.activate([
+                edge.topAnchor.constraint(equalTo: logHolder.topAnchor), edge.heightAnchor.constraint(equalToConstant: 5),
+                edge.leadingAnchor.constraint(equalTo: logHolder.leadingAnchor), edge.trailingAnchor.constraint(equalTo: logHolder.trailingAnchor),
+            ])
+        }
+        logHeight.constant = height
+        logHolder.isHidden = !logDocked
+        if logDocked { logPanel.refresh() }
+    }
+
+    /// Between a line or two of the log and half the window.
+    private func resizeLog(by delta: CGFloat) {
+        logHeight.constant = min(max(logHeight.constant + delta, 70), max((window?.frame.height ?? 0) / 2, 70))
+    }
+
+    /// View ▸ SQL Log: shows or hides the docked log; with nothing connected, its window.
+    @objc func showSQLLog(_ sender: Any?) {
+        guard !model.open.isEmpty else {
+            SQLLogWindowController.show()
+            return
+        }
+        model.data.settings.tree.showsLog.toggle()
+        updateLogDock()
+    }
+
     // MARK: What is active
 
     /// The connection the window is about: the selected tab's, else the one selected in the sidebar.
@@ -170,8 +231,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     func select(_ tab: Tab) {
         guard tabs.contains(where: { $0 === tab }) else { return }
         selectedTab = tab
+        noteVisit(tab)
         refresh()
         ConsoleDocuments.shared.tabsChanged(in: self)
+        if model.data.settings.tree.followsTab, let open = model.openConnection(tab.connectionID) { sidebar.follow(tab.treeRow(in: open)) }
     }
 
     /// Puts `content` in the place of a tab that came back after a relaunch: same title, same order, shown if it was.
@@ -185,7 +248,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             if selectedTab === tab { selectedTab = tabs[index] }
         }
         refresh()
-        if selectedTab === tabs[index], let table = content as? TableDataController { window?.makeFirstResponder(table.grid) }
+        if selectedTab === tabs[index], let table = content as? TableDataController, table.page == .data { window?.makeFirstResponder(table.grid) }
     }
 
     /// Closes `tab` once its content agrees (it may ask about unsaved work first), then runs `then`. It is shown first:
@@ -503,13 +566,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// to the sidebar (they work on the window's connection), a console's or a table tab's command to the tab shown, as
     /// the toolbar's Run does.
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
-        if [Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action, Commands.sqlGenerator.action,
-            Commands.hostDatabases.action].contains(action) { return sidebar }
+        if ([Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action, Commands.sqlGenerator.action,
+             Commands.hostDatabases.action, Commands.users.action, Commands.modifyGrants.action] + Commands.treeActions).contains(action) { return sidebar }
         // Disk Usage from the sidebar's focus goes there; a Disk Usage tab with the focus takes it first, to go into a row.
         if action == Commands.diskUsage.action, !(selectedTab?.shown is DiskUsageContent), !(selectedTab?.shown is HostContent) {
             return sidebar
         }
-        if let content = selectedTab?.shown, content.isViewLoaded, content.responds(to: action) {
+        // A table tab's Structure page takes what's meant for the page on show.
+        if let content = (selectedTab?.shown as? TableDataController)?.shownPage ?? selectedTab?.shown, content.isViewLoaded,
+           content.responds(to: action) {
             return content
         }
         return super.supplementalTarget(forAction: action, sender: sender)
@@ -564,6 +629,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.quickOpen.action?:
             enabled = window?.attachedSheet == nil
             reason = "A sheet is open: answer it first"
+        case Commands.sqlLog.action?:
+            item.state = logDocked ? .on : .off
+        case Commands.goBack.action?:
+            enabled = canGoBack
+            reason = "No tab shown before this one is still open"
+        case Commands.goForward.action?:
+            enabled = canGoForward
+            reason = "Go Back first: nothing is ahead of this tab"
+        case Commands.recentTabs.action?:
+            enabled = window?.attachedSheet == nil
+            reason = "A sheet is open: answer it first"
+        case Commands.selectInTree.action?:
+            enabled = model.openConnection(selectedTab?.connectionID) != nil
+            reason = "The tab shown has no connected server, so nothing of it is in the tree"
         case Commands.reopenClosedTab.action?:
             enabled = closedTabs.contains { $0.connection == nil || model.connection($0.connection) != nil }
             reason = "No closed tab to reopen"
@@ -639,6 +718,29 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool { true }
+}
+
+/// The top edge of the docked SQL log: dragging it makes the log taller or shorter.
+final class LogDockEdge: NSView {
+    var drag: ((CGFloat) -> Void)?
+    var finished: (() -> Void)?
+
+    init() {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        toolTip = "Drag to make the SQL log taller or shorter"
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeUpDown) }
+    override func mouseDragged(with event: NSEvent) { drag?(event.deltaY) }
+    override func mouseUp(with event: NSEvent) { finished?() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.separatorColor.setFill()
+        NSRect(x: 0, y: bounds.maxY - 1, width: bounds.width, height: 1).intersection(bounds).fill()
+    }
 }
 
 /// The window's root view: .sql files dropped anywhere on the window (the sidebar, a tab, the empty window; the

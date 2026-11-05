@@ -15,6 +15,28 @@ public struct DumpRequest: Equatable, Sendable {
         }
     }
 
+    /// How rows are written.
+    public enum DataMode: Int, CaseIterable, Sendable {
+        case insert, insertIgnore, replace, deleteInsert
+
+        public var title: String {
+            switch self {
+            case .insert: return "INSERT"
+            case .insertIgnore: return "INSERT IGNORE"
+            case .replace: return "REPLACE"
+            case .deleteInsert: return "DELETE, then INSERT"
+            }
+        }
+
+        var verb: String {
+            switch self {
+            case .insert, .deleteInsert: return "INSERT INTO"
+            case .insertIgnore: return "INSERT IGNORE INTO"
+            case .replace: return "REPLACE INTO"
+            }
+        }
+    }
+
     /// One database: its tables (`tables`, empty for all) and no CREATE DATABASE, so it restores into any database.
     /// Several: each whole, with CREATE DATABASE and USE.
     public var databases: [String]
@@ -28,12 +50,33 @@ public struct DumpRequest: Equatable, Sendable {
     public var hexBlob = true
     public var addDropTable = false
     public var gzip = false
+    public var dataMode = DataMode.insert
+    /// One database: CREATE DATABASE and USE all the same, so it restores under its own name.
+    public var createDatabase = false
+    /// DROP DATABASE first, for whole databases only: a file of some tables mustn't drop the others.
+    public var dropDatabase = false
+    public var removeDefiner = false
+    public var removeAutoIncrement = false
+    /// Each table's rows between START TRANSACTION and COMMIT.
+    public var wrapInTransactions = false
+    /// The largest INSERT, in bytes of SQL.
+    public var insertSize = SQLExport.statementSize
     /// The person's own options, already split into words (`ToolCommand.words`).
     public var extra: [String] = []
 
     public init(databases: [String], tables: [String] = []) {
         self.databases = databases
         self.tables = tables
+    }
+
+    /// What only AirSQL's own export can do, in words, nil when a dump tool can write this.
+    public var builtInOnly: String? {
+        if removeDefiner { return "Removing DEFINER" }
+        if removeAutoIncrement { return "Removing AUTO_INCREMENT values" }
+        if dataMode == .deleteInsert { return "DELETE before the rows" }
+        if wrapInTransactions { return "A transaction per table" }
+        if createDatabase && !tables.isEmpty { return "CREATE DATABASE with only some tables" }
+        return nil
     }
 }
 
@@ -156,13 +199,17 @@ public struct ToolCommand: Sendable {
         }
         args += request.objects && request.content != .data ? ["--routines", "--events", "--triggers"] : ["--skip-triggers"]
         args.append(request.addDropTable ? "--add-drop-table" : "--skip-add-drop-table")
+        if request.dataMode == .insertIgnore { args.append("--insert-ignore") }
+        if request.dataMode == .replace { args.append("--replace") }
+        if request.insertSize != SQLExport.statementSize { args.append("--net-buffer-length=\(request.insertSize)") }
+        if request.dropDatabase && request.tables.isEmpty { args.append("--add-drop-database") }
         // MySQL 8's tools read column statistics only MySQL 8 has (written loose-: only MySQL's tools know it).
         if family == .mysql, (tool.version?.majorMinor ?? 0) >= 800,
            let server, server.flavor == .mariadb || !server.atLeast(8) {
             args.append("--loose-column-statistics=0")
         }
         args += request.extra
-        if request.databases.count == 1 {
+        if request.databases.count == 1, !(request.tables.isEmpty && (request.createDatabase || request.dropDatabase)) {
             args += request.databases + request.tables
         } else {
             args += ["--databases"] + request.databases

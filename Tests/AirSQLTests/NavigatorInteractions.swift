@@ -11,9 +11,15 @@ extension AppTests.InteractionTests {
         let orders = DatabaseObject(.table, "airsql_fixture", "orders")
         let procedure = DatabaseObject(.procedure, "airsql_fixture", "add_customer")
         let views = SidebarNode.Kind.category(id, "airsql_fixture", .view)
-        let tableMenu = ["Open Data", "Open Structure", "Select Top 1000 Rows", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Generate SELECT",
-                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare", "Diagram of Selected Tables", "Diagram of Neighbours", "Maintenance", "Truncate…", "Rename…", "Drop…", "Disk Usage", "Refresh"]
-        let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Generate SELECT", "Generate INSERT",
+        let tableMenu = ["Open Data", "Open Structure", "Select Top 1000 Rows", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…",
+                         "Add to Favourites", "Find Where Used…", "New Column…", "New Index…", "New Foreign Key…", "Edit Comment…", "Generate SELECT",
+                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare", "Diagram of Selected Tables", "Diagram of Neighbours",
+                         "Maintenance", "Truncate…", "Rename…", "Drop…", "Disk Usage", "Modify Grants…", "Refresh"]
+        let treeOnly: Set<String> = ["Add to Favourites", "Find Where Used…", "New Column…", "New Index…", "New Foreign Key…", "Edit Comment…", "Open CREATE in Query Tab",
+                                     "SQL Generator…", "Diagram of Selected Tables", "Diagram of Neighbours"]
+        let viewMenu = tableMenu.filter { !treeOnly.contains($0) && !$0.hasPrefix("Compare") && $0 != "Modify Grants…" }
+        let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Add to Favourites", "Find Where Used…", "New Column…", "New Index…",
+                                          "New Foreign Key…", "Edit Comment…", "Generate SELECT", "Generate INSERT",
                                           "Generate UPDATE", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Maintenance", "Truncate…",
                                           "Rename…", "Drop…", "Refresh"]
         @MainActor func preview(_ main: MainWindowController) -> NSViewController? {
@@ -30,7 +36,7 @@ extension AppTests.InteractionTests {
                         main.model.openConnection(id)?.currentDatabase == "airsql_fixture" && expanded(main, .database(id, "airsql_fixture"))
                     },
                     menu: ["New Query", "New Database…", "Create Table…", "Copy Name", "Copy Name Without Quotes", "Export…", "Restore…", "Generate Liquibase Changelog…", "SQL Generator…",
-                           "Compare With…", "Compare", "Disk Usage", "Edit Database…", "Refresh", "Drop…"],
+                           "Compare With…", "Compare", "Disk Usage", "Modify Grants…", "Edit Database…", "Refresh", "Drop…"],
                     enabled: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Compare With…", "Refresh", "Drop…"]),
             Surface(name: "Table or view in the tree",
                     place: { main, _ in treeRow(main, .object(id, orders))?.point },
@@ -41,8 +47,8 @@ extension AppTests.InteractionTests {
                     place: { main, _ in treeRow(main, .object(id, procedure))?.point },
                     clicked: { preview($0) is TextContent && $0.selectedTab?.title == "add_customer" },
                     doubleClicked: { main, _ in main.selectedTab?.content is ObjectEditorController },
-                    menu: ["Open", "Run…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Compare With…", "Compare", "Drop…", "Refresh"],
-                    enabled: ["Open", "Run…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Compare With…", "Drop…", "Refresh"]),
+                    menu: ["Open", "Run…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Add to Favourites", "Find Where Used…", "Edit Comment…", "Compare With…", "Compare", "Modify Grants…", "Drop…", "Refresh"],
+                    enabled: ["Open", "Run…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Add to Favourites", "Find Where Used…", "Edit Comment…", "Compare With…", "Drop…", "Refresh"]),
             Surface(name: "Folder or category in the tree",
                     place: { main, _ in treeRow(main, views)?.point },
                     clicked: { $0.sidebar.selectedNodes.map(\.kind) == [views] },
@@ -65,7 +71,7 @@ extension AppTests.InteractionTests {
                         if let tab = main.tabs.first(where: { $0.content is DatabaseViewController }) { main.select(tab) }
                         return opened
                     },
-                    menu: tableMenu.filter { !$0.hasPrefix("Compare") && !$0.hasPrefix("Diagram") && $0 != "SQL Generator…" && $0 != "Open CREATE in Query Tab" }, enabled: tableCommands.subtracting(["Compare With…"])),
+                    menu: viewMenu, enabled: tableCommands.subtracting(treeOnly).subtracting(["Compare With…"])),
             Surface(name: "Process list row",
                     place: { main, _ in
                         guard let open = main.model.openConnection(id) else { return nil }

@@ -341,7 +341,22 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         }
     }
 
+    /// Asks first: a diagram's layout can't be got back.
     @objc func deleteDiagram(_ sender: Any?) {
+        guard let window = view.window, layout.tables != nil else { return }
+        let alert = NSAlert()
+        alert.messageText = "Delete the diagram “\(layout.name)”?"
+        alert.informativeText = "Where its boxes are can't be got back. The tables themselves aren't touched."
+        let delete = alert.addButton(withTitle: "Delete")
+        delete.hasDestructiveAction = true
+        delete.toolTip = "Forget this diagram for good"
+        alert.addButton(withTitle: "Cancel").toolTip = "Keep the diagram"
+        alert.beginSheetModal(for: window) { [weak self] in
+            if $0 == .alertFirstButtonReturn { self?.forgetDiagram() }
+        }
+    }
+
+    private func forgetDiagram() {
         guard layout.tables != nil else { return }
         layouts.remove(at: current)
         current = 0

@@ -107,7 +107,7 @@ A database can have several diagrams, chosen in **Diagram**. The first always sh
   boxes (on the whole database's diagram it makes a new diagram of them), and **Remove from Diagram** takes boxes off; the tables
   themselves aren't touched.
 - **New Diagram from Selection…** keeps the selected boxes, or all of them, under a name. **Database ▸ Diagram** also has Rename and
-  Delete.
+  Delete, which asks first: a deleted diagram's layout can't be got back.
 - **Arrange** lays the boxes out again, **Left to Right**, **Top to Bottom** or as a **Grid**, and forgets where you moved them.
 - **Show** chooses **All Columns**, **Keys Only** or **Names Only**, and turns **Comments** and **Virtual Keys** on or off.
 

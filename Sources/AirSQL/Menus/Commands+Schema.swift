@@ -30,7 +30,7 @@ extension Commands {
                                     tip: "Keep the selected boxes, or all of them, as a diagram of their own")
     static let diagramRename = Command("Rename Diagram…", #selector(ERDiagramController.renameDiagram(_:)), tip: "Give this diagram another name")
     static let diagramDelete = Command("Delete Diagram", #selector(ERDiagramController.deleteDiagram(_:)),
-                                       tip: "Forget this diagram; the tables themselves aren't touched")
+                                       tip: "Forget this diagram, after asking; the tables themselves aren't touched")
     static let diagramNeighbours = Command("Add Neighbours", #selector(ERDiagramController.addNeighbours(_:)),
                                            tip: "Add every table that touches the selected boxes by a foreign key")
     static let diagramRemove = Command("Remove from Diagram", #selector(ERDiagramController.removeFromDiagram(_:)),

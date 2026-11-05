@@ -80,6 +80,11 @@ extension ConsoleViewController: NSMenuItemValidation {
     @objc func refresh(_ sender: Any?) { model.openConnection(connectionID)?.load() }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if [Commands.quickDefinition.action, Commands.openNameData.action, Commands.goToDDL.action].contains(item.action) {
+            let connected = model.openConnection(connectionID) != nil
+            item.explain(enabled: connected, reason: "Connect first: names are looked up on a connected server")
+            return connected
+        }
         let (enabled, reason) = verdict(for: item)
         item.explain(enabled: enabled, reason: enabled ? nil : reason)
         return enabled
@@ -144,7 +149,7 @@ extension ConsoleViewController: NSMenuItemValidation {
             return (true, "")
         case #selector(showNextResult(_:)), #selector(showPreviousResult(_:)):
             return (!resultTabs.isEmpty, "Run a query first: there is no result tab yet")
-        case #selector(exportResult(_:)):
+        case #selector(exportResult(_:)), #selector(copyResultToTable(_:)):
             if currentResult?.view is ResultGridView { return (true, "") }
             return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This result has no rows to export")
         case #selector(compareResult(_:)):
