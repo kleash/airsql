@@ -10,14 +10,26 @@ extension MainMenu {
         menus.edit.addItem(submenu("Carets", [Commands.selectNextOccurrence, Commands.selectAllOccurrences, Commands.caretPerLine,
                                               Commands.addCaretAbove, Commands.addCaretBelow, Commands.columnSelection].map { $0.item() }))
         menus.edit.addItem(submenu("Folding", [Commands.foldHere, Commands.unfoldHere, Commands.foldAll, Commands.unfoldAll].map { $0.item() }))
-        menus.edit.addItem(submenu("Surround With", SQLEditorView.surrounds.enumerated().map { index, surround in
-            let item = Commands.surroundWith.item()
-            item.title = surround.title
-            item.tag = index
-            return item
-        }))
+        menus.edit.addItem(submenu("Surround With", [], delegate: SurroundMenu.shared))
         menus.edit.addItem(submenu("Paste from History", [], delegate: PasteHistoryMenu.shared))
         menus.edit.add([Commands.blockComment, Commands.toggleCase, Commands.completeStatement])
+    }
+}
+
+/// Edit ▸ Surround With: the templates, and the person's snippets that hold `$SELECTION$`, made as the menu opens.
+@MainActor
+final class SurroundMenu: NSObject, NSMenuDelegate {
+    static let shared = SurroundMenu()
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let own = SQLEditorView.settings().snippets.filter { $0.body.contains("$SELECTION$") }.map { (title: $0.name, body: $0.body) }
+        for surround in SQLEditorView.surrounds + own {
+            let item = Commands.surroundWith.item()
+            item.title = surround.title
+            item.representedObject = surround.body
+            menu.addItem(item)
+        }
     }
 }
 

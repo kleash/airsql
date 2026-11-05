@@ -172,8 +172,10 @@ extension AgentServer {
                 .filter { !["group", "splitgroup", "scrollarea", "unknown"].contains($0.role) || !$0.id.isEmpty }
                 .map { $0.json(relativeTo: window) }
         }
-        if include.contains("settings"),
-           let data = try? JSONEncoder().encode(model.data.settings), let settings = try? JSONSerialization.jsonObject(with: data) {
+        // Without the snippets: the person's own SQL, which isn't masked as the history is.
+        var saved = model.data.settings
+        saved.snippets = []
+        if include.contains("settings"), let data = try? JSONEncoder().encode(saved), let settings = try? JSONSerialization.jsonObject(with: data) {
             result["settings"] = settings
         }
         return result

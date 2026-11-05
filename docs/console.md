@@ -35,14 +35,39 @@ session of its own, so a long query in one tab leaves the others free.
   what's missing. No server is asked.
 - AirSQL reads what you write a moment after you stop typing, and underlines what it finds: see
   [Checks while you type](#checks-while-you-type).
-- **Completion** opens as you type: after FROM or JOIN the tables and views, after JOIN first the joins that foreign
-  keys give (`orders o ON o.customer_id = c.id`), after `alias.` that table's columns, after USE the databases, and
-  elsewhere the statement's columns, functions and keywords. ↑ and ↓ choose, Return or Tab inserts, Escape closes;
-  ⌥⎋ opens it anywhere. It comes from what AirSQL already read of the schema: nothing is sent to the server while you
-  type.
-- **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names, the
-  server's functions by kind, and the keywords. Double-click one to put it in at the cursor, or drag it into the editor
-  (a column's name comes quoted where it needs to be, as completion puts it in).
+- **Completion** opens as you type, with what fits there: only `BY` after `ORDER`, only joins after `LEFT`, the
+  statement's columns in its clauses. ↑ and ↓ choose, Return inserts, Tab inserts and replaces the rest of the word too,
+  Escape closes; ⌥⎋ opens it anywhere. Below the list you see more about what's selected: a table's columns, a template's
+  SQL. What you've chosen before comes first. It all comes from what AirSQL already read of the schema: nothing is sent to
+  the server while you type.
+  - A name matches by its start, a word in it (`cust` finds `old_customers`), an abbreviation of its words (`fica` finds
+    `film_category`, `ob` finds `ORDER BY`) or its middle. Keywords of several words come as one, in the case Settings ▸
+    Format sets, and words already in the text come last.
+  - After FROM or JOIN: tables, views and the statement's CTEs. A table comes with an alias (`orders o`) unless you turn
+    that off in Settings ▸ Editor. After JOIN the joins come first: those of foreign keys, real or defined by you, then
+    those names suggest (`customer_id` to `customers.id`). After ON, the condition.
+  - Columns come from tables, CTEs and subqueries alike, with the table's name when two have the same one; `alias.` lists
+    that table's. ORDER BY, GROUP BY and HAVING offer the aliases of the select list too.
+  - `SELECT nam` with no FROM yet offers every table's columns: choosing one adds its FROM.
+  - Just after `*` or `t.*` in a select list, the list offers all the columns in its place.
+  - `INSERT INTO t (` offers the whole column list, then each column left. `VALUES (` offers a field for each column.
+  - After `status = ` or inside `status = '` an ENUM or SET column offers its values. `ENGINE=`, `CHARSET` and `COLLATE`
+    offer theirs, CALL the procedures, `@` the variables of the text, `@@` and SET the common server variables.
+- **Templates.** Type an abbreviation at the start of a statement and press Tab: `sel`, `selw`, `selc`, `lim`, `ins`, `upd`,
+  `del`, `tab`, `view` and `col` turn into the statement, with its first field selected. Type over a field; Tab or Return
+  goes to the next and on to the end, ⇧Tab goes back, Escape stops. A field used twice takes a caret in each place.
+- **Postfix.** Type a table's name and a dot at the start of a statement: `orders.from` turns into `SELECT * FROM orders`,
+  `.cfrom` lists its columns, `.afrom` lists them by an alias, and `.join` adds the table its foreign key points at.
+  `total.cast` puts CAST around a column, anywhere.
+- **Snippets** keep SQL to use again. **Query ▸ Save as Snippet…** saves the selection or the statement, with a name, a
+  folder and an abbreviation of your own. In the SQL, `$name$` is a field, `$END$` is where the cursor ends, `$SELECTION$`
+  the selected text and `$$` a dollar. They're kept in AirSQL's settings on this Mac. A snippet with `$SELECTION$` is also in
+  **Edit ▸ Surround With**.
+- **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names (or of the
+  table selected in the tree, when it names none), the server's functions by kind, the keywords, your **Snippets** and the
+  built-in ones, and the connection's **History** by day, each with a bar as long as it took. Double-click one to put it
+  in at the cursor, or drag it into the editor (a column's name comes quoted where it needs to be, as completion puts it
+  in). Right-click a snippet to edit or delete it; editing a built-in one makes a copy of your own.
 - **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression**, **Match
   Case**, **Whole Words** and **In Selection** (the text selected when you tick it). With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
@@ -86,9 +111,12 @@ session of its own, so a long query in one tab leaves the others free.
 - The cursor's line has a band and, when the text has several statements, the statement it's in has a light shade: that's what ⌘↩
   runs. Other uses of the name at the cursor are marked, and its line and column show in the editor's corner.
 - Settings ▸ Editor sets the font, the text size, the width of a tab and whether Tab puts in a tab character or spaces.
-- **Query ▸ Format SQL** (⌥⇧⌘F) puts each main clause on a line of its own and reserved words in capitals. It changes
-  nothing else: names, values, comments and `/*! … */` code stay exactly as they are, and statements inside a
-  `DELIMITER` block are left alone. If it couldn't do that, it leaves the SQL as it was and says so.
+- **Query ▸ Format SQL** (⌥⇧⌘F) tidies the selection or the whole text: each clause on a line, subqueries indented, AND
+  and OR on lines, CASE, VALUES rows, CREATE TABLE's columns and routine bodies laid out, by the rules of **Settings ▸
+  Format**. It changes only spaces and the case the rules ask for: values, comments and `/*! … */` code stay exactly as
+  they are. If it couldn't prove that, it leaves the SQL as it was and says so. Nothing changes between `-- @formatter:off`
+  and `-- @formatter:on`.
+- Settings ▸ Editor can also give reserved words their case as you type.
 - **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
 

@@ -326,6 +326,8 @@ struct SQLFormatPrinter {
         switch raw {
         case ",", ";", ".": break
         case ")": if style.spaceInsideBrackets, frame.kind == .group, symbol(index - 1) != "(" { space() }
+        // COUNT (*) is an error by default: only IGNORE_SPACE lets a built-in stand apart from its bracket.
+        case "(" where word(index - 1).map { Self.functions.contains($0) && !SQLWords.reserved.contains($0) } == true && !wasSpaced: break
         default:
             if isBinaryOperator(index) {
                 space()
@@ -590,6 +592,8 @@ struct SQLFormatPrinter {
                 pending = frame.clauseColumn
             } else if frame.kind == .query, frame.perLine {
                 out.append(0x20)
+            } else if frames.count == 1, word(frame.verb) == "ALTER" {
+                pending = frame.base + style.indent
             }
         case ";":
             if routine, frames.count == 1 {

@@ -23,7 +23,7 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
     private var docHeightConstraint: NSLayoutConstraint?
 
     init(editor: NSTextView, id: String = "completion.list",
-         footer text: String = "↩ inserts · ⎋ closes · from the schema cache: nothing is sent while you type") {
+         footer text: String = "↩ inserts · ⇥ replaces the word · ⎋ closes · nothing is sent while you type") {
         self.editor = editor
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 460, height: 200), styleMask: [.borderless, .nonactivatingPanel],
                         backing: .buffered, defer: true)
@@ -127,10 +127,14 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.scrollRowToVisible(row)
     }
 
-    /// Puts the chosen suggestion in place of the word typed so far.
-    func accept() {
+    /// Puts the chosen suggestion in place of the word typed so far, or of the whole word the cursor is in.
+    func accept(replacingWord: Bool = false) {
         guard let item = selected, let editor else { return close() }
-        let replaced = NSRange(item.replacing ?? range)
+        var replaced = NSRange(item.replacing ?? range)
+        let text = editor.string as NSString
+        while replacingWord, item.replacing == nil, NSMaxRange(replaced) < text.length, SQLLexer.isNameChar(text.character(at: NSMaxRange(replaced))) {
+            replaced.length += 1
+        }
         close()
         guard NSMaxRange(replaced) <= (editor.string as NSString).length else { return }
         Self.chosen[item.label.lowercased(), default: 0] += 1

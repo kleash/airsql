@@ -3,7 +3,7 @@ import AppKit
 
 /// Completion while typing (plan §2.6): after a letter or a dot the list opens under the cursor with what the schema
 /// cache offers there (not inside strings or comments); ⌥⎋ opens it anywhere. While it is open, ↑ and ↓ choose,
-/// Return or Tab inserts and Escape closes; typing on narrows it.
+/// Return inserts, Tab replaces the rest of the word too and Escape closes; typing on narrows it.
 extension SQLEditorView {
     override func insertText(_ string: Any, replacementRange: NSRange) {
         let typed = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
@@ -107,7 +107,8 @@ extension SQLEditorView {
         switch selector {
         case #selector(moveUp(_:)): popup.move(-1)
         case #selector(moveDown(_:)): popup.move(1)
-        case #selector(insertNewline(_:)), #selector(insertTab(_:)): popup.accept()
+        case #selector(insertNewline(_:)): popup.accept()
+        case #selector(insertTab(_:)): popup.accept(replacingWord: true)
         case #selector(cancelOperation(_:)): popup.close()
         default:
             popup.close()

@@ -459,19 +459,20 @@ extension AppTests {
         @Test func surroundAndPasteHistory() async throws {
             let (_, _, console) = try await Self.console()
             let editor = try #require(console.editor)
-            func item(_ tag: Int) -> NSMenuItem {
+            func item(_ index: Int) -> NSMenuItem {
                 let item = Commands.surroundWith.item()
-                item.tag = tag
+                item.representedObject = SQLEditorView.surrounds[index].body
                 return item
             }
             editor.setText("SELECT a FROM t")
             editor.setSelectedRange(NSRange(location: 7, length: 1))
             editor.surroundWith(item(0))
-            #expect(editor.string == "SELECT (a) FROM t" && editor.selectedRange() == NSRange(location: 7, length: 3))
+            #expect(editor.string == "SELECT (a) FROM t" && editor.selectedRange() == NSRange(location: 10, length: 0))
             editor.setText("name")
             editor.setSelectedRange(NSRange(location: 2, length: 0))
             editor.surroundWith(item(3))
-            #expect(editor.string == "COALESCE(name, )", "the word at the cursor")
+            #expect(editor.string == "COALESCE(name, value)", "the word at the cursor")
+            #expect((editor.string as NSString).substring(with: editor.selectedRange()) == "value", "its field is chosen")
             editor.undoManager?.undo()
             #expect(editor.string == "name")
 

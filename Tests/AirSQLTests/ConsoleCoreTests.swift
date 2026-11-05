@@ -247,6 +247,8 @@ struct SQLFormatterTests {
         #expect(format("select a,\n  -- the b column\n  b from t") == "SELECT a,\n       -- the b column\n       b\nFROM t")
         #expect(format("/*!40101 set   names utf8 */;") == "/*!40101 set   names utf8 */;")
         #expect(format("select count(*)  from t") == "SELECT count(*)\nFROM t")  // COUNT isn't reserved
+        #expect(format("select count (*) from t") == "SELECT count(*)\nFROM t")
+        #expect(format("alter table t add a int, add b int") == "ALTER TABLE t ADD a INT,\n    ADD b INT")
         #expect(format("select 1 - -1, a*b, -c, t.*, @x:=1 from t") == "SELECT 1 - -1, a * b, -c, t.*, @x := 1\nFROM t")
         #expect(format("-- @formatter:off\nselect  1;\n-- @formatter:on\nselect  2;") == "-- @formatter:off\nselect  1;\n-- @formatter:on\nSELECT 2;")
     }
@@ -291,6 +293,8 @@ struct SQLFormatterTests {
         let formatted = SQLFormatter.format(sql)
         #expect(formatted != nil, "\(sql)")
         if let formatted { #expect(SQLLexer.sameTokens(sql, formatted)) }
+        // Formatting what's formatted changes nothing.
+        if let formatted { #expect(SQLFormatter.format(formatted) == formatted, "\(sql)") }
         // Every preset holds to it too.
         for preset in SQLFormatStyle.presets { #expect(SQLFormatter.format(sql, style: preset.style) != nil, "\(preset.name): \(sql)") }
     }
