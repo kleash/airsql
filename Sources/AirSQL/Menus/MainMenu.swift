@@ -130,7 +130,9 @@ final class OffReasons: NSObject, NSMenuDelegate {
         "Tools": "Select a connection in the sidebar first",
     ]
     private static let inCompare: Set<Selector> = [Commands.syncScript.action, Commands.exportReport.action,
-                                                   Commands.copySyncScript.action, Commands.leaveOutOfCompare.action]
+                                                   Commands.copySyncScript.action, Commands.leaveOutOfCompare.action,
+                                                   Commands.includeInSync.action, Commands.backToServer.action,
+                                                   Commands.nextDifference.action, Commands.previousDifference.action]
 
     /// Tells `menu` and its submenus, but not those that make their own items, or the system's.
     static func watch(_ menu: NSMenu) {

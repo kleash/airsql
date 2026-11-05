@@ -539,6 +539,31 @@ struct ReconTests {
         let rows = ReconLines.aligned("a\nb\nc\nd", "a\nc\nx\nd")
         #expect(rows.map { "\($0.left ?? "-")\($0.right ?? "-")" } == ["aa", "b-", "cc", "-x", "dd"])
         #expect(ReconLines.aligned("", "").count == 1)
+        // Lines in each other's place are one changed line, as far as both sides have lines.
+        #expect(ReconLines.aligned("a\nb\nc\nz", "a\nx\nz").map { "\($0.left ?? "-")\($0.right ?? "-")" } == ["aa", "bx", "c-", "zz"])
+    }
+
+    @Test func spaceCanBeLeftOutOfTheLines() {
+        let rows = ReconLines.aligned("  a  b\nc", "a b\nd", ignoringSpace: true)
+        #expect(rows.map(\.left) == ["  a  b", "c"] && rows.map(\.right) == ["a b", "d"])
+        #expect(!ReconLines.differs(rows[0], ignoringSpace: true) && ReconLines.differs(rows[0]) && ReconLines.differs(rows[1], ignoringSpace: true))
+    }
+
+    @Test func unifiedLinesGoAsTheScriptDoes() {
+        let lines = ReconLines.unified(ReconLines.aligned("a\nnew\nz", "a\nold\nz\ngone"))
+        #expect(lines.map { $0.mark + $0.line } == [" a", "-old", "+new", " z", "-gone"])
+    }
+
+    @Test func changedWordsAreTheOnesNotShared() {
+        func marked(_ text: String, _ ranges: [NSRange]) -> [String] { ranges.map { (text as NSString).substring(with: $0) } }
+        let left = "`status` = 'paid', é😀 x", right = "`state` = 'paid', é😀 yy"
+        let changes = ReconLines.changedWords(left, right)
+        #expect(marked(left, changes.left) == ["status", "x"] && marked(right, changes.right) == ["state", "yy"])
+        #expect(ReconLines.changedWords("a  b", "a b", ignoringSpace: true).left.isEmpty)
+        #expect(marked("a  b", ReconLines.changedWords("a  b", "a b").left) == ["  "])
+        // Too long to diff word by word: the whole line.
+        let long = (1...3000).map(String.init).joined(separator: " ")
+        #expect(ReconLines.changedWords(long, long + " x").left == [NSRange(location: 0, length: (long as NSString).length)])
     }
 }
 

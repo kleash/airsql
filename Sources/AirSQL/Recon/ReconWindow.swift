@@ -1,9 +1,9 @@
 import AirSQLCore
 import AppKit
 
-/// The compare window (plan §2.9, mockups screen 8): two databases, on the same or different connections, compared in
-/// structure and data; the differences listed with what makes them; a sync script reviewed in a console tab and the SQL
-/// preview, and run only when the person says so, on a session of its own.
+/// The compare window (plan §2.9, mockups screen 8): two servers, databases or objects, on the same or different
+/// connections, compared in structure and data; the differences listed with what makes them; a sync script reviewed in a
+/// console tab and the SQL preview, and run only when the person says so, on a session of its own.
 @MainActor
 final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
     /// Reaches a saved connection's sessions, connecting it first when it isn't, its prompts on the window given
@@ -22,6 +22,10 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
     weak var main: MainWindowController?
     var options = ReconOptions()
     private(set) var result: ReconResult?
+    /// The server compare a database pair was opened from, for Back to All Databases.
+    private(set) var serverResult: ReconResult?
+    /// The connection the shown result's target is on: the sync script runs there, whatever the picker says by then.
+    private var comparedTarget: SavedConnection?
     private var task: Task<Void, Never>?
     private var activity: Activity?
 
@@ -67,7 +71,10 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
             picker.connections = model.data.connections.sorted {
                 $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
             }
-            picker.changed = { [weak self] in self?.update() }
+            picker.changed = { [weak self] in
+                self?.serverResult = nil
+                self?.update()
+            }
         }
         toolbarItems.window = self
         results.window = self
@@ -139,6 +146,25 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
 
     var isRunning: Bool { task != nil }
 
+    var level: ReconLevel { ReconLevel(rawValue: toolbarItems.level.indexOfSelectedItem) ?? .database }
+
+    /// Compares servers, databases or objects from now on.
+    func choose(level: ReconLevel) {
+        toolbarItems.level.selectItem(at: level.rawValue)
+        source.level = level
+        target.level = level
+        serverResult = nil
+        update()
+    }
+
+    /// Fills both sides in (a start from the tree); without a `right`, the target is left to choose.
+    func start(_ level: ReconLevel, left: ReconStart, right: ReconStart?) {
+        choose(level: level)
+        source.choose(left.connection, database: left.database, object: left.object)
+        if let right { target.choose(right.connection, database: right.database, object: right.object) }
+        window?.makeFirstResponder(level == .object ? target.objects : target.popup)
+    }
+
     /// Brings the controls up to date with the choices, the run and the result.
     func update() {
         toolbarItems.update()
@@ -151,15 +177,32 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         if isRunning { return "A compare is running: wait for it, or Cancel it" }
         if Self.connect == nil { return "This build of AirSQL can't open connections yet" }
         if source.connection == nil || target.connection == nil { return "Choose a connection on each side first" }
+        let sameConnection = source.connection?.id == target.connection?.id
+        if level == .server { return sameConnection ? "Choose two different connections: these are the same one" : nil }
         if source.database.isEmpty || target.database.isEmpty { return "Choose a database on each side first" }
-        if source.connection?.id == target.connection?.id && source.database == target.database {
-            return "Choose two different databases: these are the same one"
-        }
-        return nil
+        let sameDatabase = sameConnection && source.database == target.database
+        if level == .database { return sameDatabase ? "Choose two different databases: these are the same one" : nil }
+        guard let left = source.object, let right = target.object else { return "Choose an object on each side first" }
+        if left.kind != right.kind { return "Choose two of one kind: a \(left.kind.rawValue) and a \(right.kind.rawValue) can't be compared" }
+        return sameDatabase && left.name == right.name ? "Choose two different objects: these are the same one" : nil
+    }
+
+    /// The connection the sync script of the shown result belongs to.
+    var comparedConnection: SavedConnection? { comparedTarget ?? target.connection }
+
+    /// Why the result has no sync script to show, or nil when it has.
+    var scriptBlocked: String? {
+        guard let result else { return "Compare first: then there is something to show" }
+        return result.isServer ? "A script belongs to one pair of databases: open one first" : nil
     }
 
     /// Why Tables… can't open now, or nil when it can: it needs a compare's list or a source to read one from.
     var tablesBlocked: String? {
+        if level == .server { return "Tables… chooses within one database: open a pair of databases first" }
+        if level == .object {
+            guard let object = source.object else { return "Choose an object for the source first" }
+            return object.kind == .table ? nil : "Only tables have columns and rows to choose"
+        }
         if result != nil { return nil }
         if isRunning || Self.connect == nil { return compareBlocked }
         return source.connection == nil || source.database.isEmpty ? "Choose a connection and a database for the source first" : nil
@@ -170,6 +213,9 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
     /// Tables…: the last compare's tables or, before one, the source's, so that a long first run can be limited.
     @objc func showTables(_ sender: Any?) {
         guard let window, tablesBlocked == nil else { return }
+        if level == .object, let object = source.object {
+            return ReconTablesSheet.show(for: self, tables: [object.name], on: window)
+        }
         if let result {
             let tables = result.objects.filter { $0.kind == .table && $0.status != .onlyInTarget }.map(\.name)
             return ReconTablesSheet.show(for: self, tables: tables, on: window)
@@ -213,7 +259,13 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
     @objc func refresh(_ sender: Any?) {
         guard compareBlocked == nil, let connect = Self.connect, let left = source.connection, let right = target.connection
         else { return }
-        let (leftDatabase, rightDatabase, options) = (source.database, target.database, self.options)
+        var options = self.options
+        options.only = nil
+        if level == .object, let first = source.object, let second = target.object {
+            options.only = ReconPair(kind: first.kind, source: first.name, target: second.name)
+        }
+        let (leftDatabase, rightDatabase, level) = (self.level == .server ? "" : source.database,
+                                                    self.level == .server ? "" : target.database, self.level)
         activity = model.activity.start("Comparing \(source.summary) with \(target.summary)", connection: right.id) { [weak self] in
             self?.task?.cancel()
         }
@@ -229,15 +281,17 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
                 sessions.append(a)
                 let b = try await connect(right, window).toolsSession()
                 sessions.append(b)
-                outcome = .success(try await Recon.run(
-                    source: ReconSide(name: left.displayName, database: leftDatabase, session: a),
-                    target: ReconSide(name: right.displayName, database: rightDatabase, session: b), options: options) { step in
-                        DispatchQueue.main.async { self?.show(step) }
-                    })
+                let sides = (ReconSide(name: left.displayName, database: leftDatabase, session: a),
+                             ReconSide(name: right.displayName, database: rightDatabase, session: b))
+                let progress: (ReconProgress) -> Void = { step in DispatchQueue.main.async { self?.show(step) } }
+                outcome = .success(level == .server
+                    ? try await Recon.runServer(source: sides.0, target: sides.1, options: options, progress: progress)
+                    : try await Recon.run(source: sides.0, target: sides.1, options: options, progress: progress))
             } catch {
                 outcome = .failure(error)
             }
             for session in sessions { await session.close() }
+            if case .success = outcome { self?.comparedTarget = right }
             self?.finished(outcome)
         }
         update()
@@ -269,7 +323,9 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         activity = nil
         progressStrip.isHidden = true
         switch outcome {
-        case .success(let result): show(result)
+        case .success(let result):
+            serverResult?.update(pair: result.source.database, with: result)
+            show(result)
         case .failure(let error) where error is CancellationError || (error as? AirSQLError)?.kind == .cancelled:
             break
         case .failure(let error):
@@ -285,10 +341,42 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         update()
     }
 
+    /// Opens a pair of a server compare: its own result, list and sync script, as a database compare.
+    func openPair(_ object: ReconObject) {
+        guard let result, let pair = result.databases[object.name], !isRunning else { return }
+        let (left, right) = (source.connection, target.connection)
+        choose(level: .database)
+        source.choose(left, database: object.name)
+        target.choose(right, database: object.targetName)
+        serverResult = result  // after the pickers, as choosing starts anew
+        show(pair)
+    }
+
+    /// Back to the pairs of the server compare, with what was done in the open pair.
+    @objc func backToServer(_ sender: Any?) {
+        guard var server = serverResult, let result else { return }
+        server.update(pair: result.source.database, with: result)
+        choose(level: .server)
+        show(server)
+    }
+
+    /// The objects leave the sync script, or come back to it.
+    func set(_ objects: [ReconObject], leftOut: Bool) {
+        guard var changed = result else { return }
+        for object in objects {
+            if let index = changed.objects.firstIndex(where: { $0.kind == object.kind && $0.name == object.name }) {
+                changed.objects[index].leftOut = leftOut
+            }
+        }
+        result = changed
+        results.refresh(changed)
+        update()
+    }
+
     @objc func swapSides(_ sender: Any?) {
-        let (connection, database) = (source.connection, source.database)
-        source.choose(target.connection, database: target.database)
-        target.choose(connection, database: database)
+        let (connection, database, object) = (source.connection, source.database, source.object)
+        source.choose(target.connection, database: target.database, object: target.object)
+        target.choose(connection, database: database, object: object)
         update()
     }
 
@@ -302,9 +390,23 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         switch menuItem.action {
         case #selector(refresh(_:)): reason = compareBlocked
         case #selector(cancelQuery(_:)): reason = isRunning ? nil : "No compare is running"
-        case #selector(showSyncScript(_:)), #selector(exportReport(_:)):
+        case #selector(showSyncScript(_:)):
+            reason = scriptBlocked
+        case #selector(exportReport(_:)):
             reason = result == nil ? "Compare first: then there is something to show" : nil
-        case #selector(copySyncScript(_:)), #selector(leaveOutOfCompare(_:)), #selector(NSText.copy(_:)):
+        case #selector(backToServer(_:)):
+            reason = serverResult == nil ? "No server compare is open behind this one" : nil
+        case #selector(copySyncScript(_:)), #selector(includeInSync(_:)):
+            reason = scriptBlocked ?? (results.selected.isEmpty ? "Select objects in the list first" : nil)
+            if menuItem.action == #selector(includeInSync(_:)) {
+                menuItem.state = !results.selected.isEmpty && results.selected.allSatisfy { !$0.leftOut } ? .on : .off
+            }
+        case #selector(nextDifference(_:)), #selector(previousDifference(_:)):
+            reason = results.detail.differenceBlocked
+        case #selector(leaveOutOfCompare(_:)):
+            reason = level != .database ? "Only a compare of two databases has tables to leave out"
+                : results.selected.isEmpty ? "Select objects in the list first" : nil
+        case #selector(NSText.copy(_:)):
             reason = results.selected.isEmpty ? "Select objects in the list first" : nil
         default: return true
         }

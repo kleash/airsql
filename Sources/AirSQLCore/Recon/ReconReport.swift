@@ -197,11 +197,17 @@ public enum ReconReport {
     }
 }
 
-/// Two texts side by side, line by line: equal lines on both sides, a line only one side has against a gap (nil), as
-/// the compare window shows two CREATE statements.
+/// Two texts side by side, line by line: equal lines on both sides, changed lines against each other, a line only one
+/// side has against a gap (nil), as the compare window shows two CREATE statements.
 public enum ReconLines {
-    public static func aligned(_ left: String, _ right: String) -> [(left: String?, right: String?)] {
-        let a = left.components(separatedBy: "\n"), b = right.components(separatedBy: "\n")
+    public typealias Row = (left: String?, right: String?)
+
+    private static func squeezed(_ text: String) -> String { text.filter { !$0.isWhitespace } }
+
+    /// `ignoringSpace`: lines that differ only in whitespace count as equal.
+    public static func aligned(_ left: String, _ right: String, ignoringSpace: Bool = false) -> [Row] {
+        let lines = (left.components(separatedBy: "\n"), right.components(separatedBy: "\n"))
+        let a = ignoringSpace ? lines.0.map(squeezed) : lines.0, b = ignoringSpace ? lines.1.map(squeezed) : lines.1
         // The longest common subsequence of lines (definitions are at most a few thousand lines).
         var lengths = [[Int]](repeating: [Int](repeating: 0, count: b.count + 1), count: a.count + 1)
         for i in stride(from: a.count - 1, through: 0, by: -1) {
@@ -209,21 +215,91 @@ public enum ReconLines {
                 lengths[i][j] = a[i] == b[j] ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
             }
         }
-        var rows: [(left: String?, right: String?)] = []
+        var rows: [Row] = []
+        var lefts: [String] = [], rights: [String] = []  // the lines only one side has since the last equal one
+        func flush() {
+            // What stands in each other's place is one changed line, as far as both sides have lines.
+            for index in 0..<max(lefts.count, rights.count) {
+                rows.append((index < lefts.count ? lefts[index] : nil, index < rights.count ? rights[index] : nil))
+            }
+            lefts = []
+            rights = []
+        }
         var i = 0, j = 0
         while i < a.count || j < b.count {
             if i < a.count, j < b.count, a[i] == b[j] {
-                rows.append((a[i], b[j]))
+                flush()
+                rows.append((lines.0[i], lines.1[j]))
                 i += 1
                 j += 1
             } else if j == b.count || i < a.count && lengths[i + 1][j] >= lengths[i][j + 1] {
-                rows.append((a[i], nil))
+                lefts.append(lines.0[i])
                 i += 1
             } else {
-                rows.append((nil, b[j]))
+                rights.append(lines.1[j])
                 j += 1
             }
         }
+        flush()
         return rows
+    }
+
+    /// Whether a row of `aligned` shows a difference.
+    public static func differs(_ row: Row, ignoringSpace: Bool = false) -> Bool {
+        guard let left = row.left, let right = row.right else { return true }
+        return ignoringSpace ? squeezed(left) != squeezed(right) : left != right
+    }
+
+    /// The rows one under the other, as the sync script goes: the target's line (-), then the source's (+) that replaces it.
+    public static func unified(_ rows: [Row], ignoringSpace: Bool = false) -> [(mark: String, line: String)] {
+        rows.flatMap { row -> [(mark: String, line: String)] in
+            guard differs(row, ignoringSpace: ignoringSpace) else { return [(" ", row.left ?? "")] }
+            return (row.right.map { [("-", $0)] } ?? []) + (row.left.map { [("+", $0)] } ?? [])
+        }
+    }
+
+    /// Words a line and its changed counterpart don't share, as ranges of each (`NSString` positions).
+    public static func changedWords(_ left: String, _ right: String, ignoringSpace: Bool = false) -> (left: [NSRange], right: [NSRange]) {
+        func words(_ text: String) -> [(word: Substring, range: NSRange)] {
+            var found: [(word: Substring, range: NSRange)] = []
+            var index = text.startIndex
+            while index < text.endIndex {
+                func wordy(_ character: Character) -> Bool { character.isLetter || character.isNumber || character == "_" }
+                var end = text.index(after: index)
+                if wordy(text[index]) || text[index].isWhitespace {
+                    let same = wordy(text[index]) ? wordy : { $0.isWhitespace }
+                    while end < text.endIndex, same(text[end]) { end = text.index(after: end) }
+                }
+                if !(ignoringSpace && text[index].isWhitespace) { found.append((text[index..<end], NSRange(index..<end, in: text))) }
+                index = end
+            }
+            return found
+        }
+        let a = words(left), b = words(right)
+        // shortcut: a very long line (a view on one line) is marked whole; a real word diff of it costs seconds on the main thread.
+        guard a.count * b.count <= 4_000_000 else {
+            return ([NSRange(location: 0, length: (left as NSString).length)], [NSRange(location: 0, length: (right as NSString).length)])
+        }
+        var lengths = [[Int32]](repeating: [Int32](repeating: 0, count: b.count + 1), count: a.count + 1)
+        for i in stride(from: a.count - 1, through: 0, by: -1) {
+            for j in stride(from: b.count - 1, through: 0, by: -1) {
+                lengths[i][j] = a[i].word == b[j].word ? lengths[i + 1][j + 1] + 1 : max(lengths[i + 1][j], lengths[i][j + 1])
+            }
+        }
+        var ours: [NSRange] = [], theirs: [NSRange] = []
+        var i = 0, j = 0
+        while i < a.count || j < b.count {
+            if i < a.count, j < b.count, a[i].word == b[j].word {
+                i += 1
+                j += 1
+            } else if j == b.count || i < a.count && lengths[i + 1][j] >= lengths[i][j + 1] {
+                ours.append(a[i].range)
+                i += 1
+            } else {
+                theirs.append(b[j].range)
+                j += 1
+            }
+        }
+        return (ours, theirs)
     }
 }

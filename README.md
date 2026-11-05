@@ -38,7 +38,7 @@ AI agents that never change anything without you. Free and open source.</b></p>
 - **Client tools** ([Export, restore, copy and import](docs/client-tools.md)): your own `mysqldump` and `mysql`, with
   passwords kept off the command line, or AirSQL's own export and runner; Terminal over any route; copies to another
   server; CSV import.
-- **Compare and reconcile** two databases ([Compare two databases](docs/compare.md)), structure and data, with a sync
+- **Compare and reconcile** two servers, databases, tables or objects ([Compare](docs/compare.md)), structure and data, with a sync
   script you review first and a report as HTML, CSV or Markdown; **Liquibase changesets**
   ([Liquibase changelogs](docs/liquibase.md)) of a schema or of any change.
 - **AI agents over MCP** ([AI agents](docs/agents.md)), at the level you set for each connection: their queries must

@@ -95,6 +95,209 @@ extension AppTests {
             return controller
         }
 
+        /// A server compare like the window shows: a pair that differs, one that matches, one on each side, one unread.
+        static func serverResult() -> ReconResult {
+            var result = ReconResult(source: ReconEnd(name: "Production", database: "", version: "8.4.13"),
+                                     target: ReconEnd(name: "Staging", database: "", version: "11.8.9-MariaDB"), options: ReconOptions())
+            var unread = ReconObject(kind: .database, name: "locked", status: .different)
+            unread.parts = [ReconPart(kind: .options, name: "error", change: .changed, detail: "access denied")]
+            result.objects = [ReconObject(kind: .database, name: "shop", status: .different),
+                              ReconObject(kind: .database, name: "same", status: .same),
+                              ReconObject(kind: .database, name: "new", status: .onlyInSource),
+                              ReconObject(kind: .database, name: "old", status: .onlyInTarget), unread]
+            result.databases["shop"] = Self.result()
+            var same = Self.result()
+            same.objects = []
+            result.databases["same"] = same
+            return result
+        }
+
+        private func text(_ view: NSScrollView) -> String { (view.documentView as? NSTextView)?.string ?? "" }
+
+        @Test func eachLevelSaysWhatItNeeds() {
+            ReconWindowController.connect = { _, _ in throw CancellationError() }
+            defer { ReconWindowController.connect = nil }
+            let controller = Self.window(nil)
+            #expect(controller.level == .database && controller.compareBlocked == nil)
+            #expect(controller.source.objects.isHidden && !controller.source.databases.isHidden)
+            controller.choose(level: .server)
+            #expect(controller.source.databases.isHidden && controller.target.databases.isHidden)
+            #expect(controller.compareBlocked == nil && controller.tablesBlocked?.hasPrefix("Tables… chooses") == true)
+            #expect(controller.source.summary == "Production · shop", "the connection's own name")
+            controller.target.choose(Fixtures.production)
+            #expect(controller.compareBlocked == "Choose two different connections: these are the same one")
+            controller.choose(level: .object)
+            #expect(!controller.source.objects.isHidden && !controller.target.objects.isHidden)
+            controller.source.choose(Fixtures.production, database: "shop", object: (.table, "orders"))
+            controller.target.choose(Fixtures.production, database: "shop")
+            #expect(controller.compareBlocked == "Choose an object on each side first")
+            controller.target.choose(Fixtures.production, database: "shop", object: (.table, "orders"))
+            #expect(controller.compareBlocked == "Choose two different objects: these are the same one")
+            controller.target.choose(Fixtures.production, database: "shop", object: (.view, "orders_view"))
+            #expect(controller.compareBlocked == "Choose two of one kind: a table and a view can't be compared")
+            #expect(controller.source.summary == "Production · shop · shop.orders" && controller.target.objects.stringValue == "orders_view (view)")
+            controller.target.choose(Fixtures.production, database: "shop", object: (.table, "orders_old"))
+            #expect(controller.compareBlocked == nil, "two tables of one database")
+            #expect(controller.tablesBlocked == nil, "its columns and WHERE can be chosen")
+            controller.swapSides(nil)
+            #expect(controller.source.object?.name == "orders_old" && controller.target.object?.name == "orders")
+            controller.source.choose(Fixtures.production, database: "shop", object: (.procedure, "tidy"))
+            #expect(controller.tablesBlocked == "Only tables have columns and rows to choose")
+        }
+
+        /// The tree's selection decides what can start, and fills the window in; two connections wait for Compare.
+        @Test func theTreesRowsStartACompare() async throws {
+            let (main, _, _, work) = await AppTests.InteractionTests.window()
+            ReconWindowController.connect = { _, _ in throw CancellationError() }
+            defer {
+                work.end()
+                ReconWindowController.connect = nil
+            }
+            let id = Fixtures.production.id, sidebar = main.sidebar, outline = main.sidebar.outline
+            func select(_ kinds: [SidebarNode.Kind]) throws {
+                let rows = try kinds.map { try #require(treeRow(main, $0)?.row) }
+                outline.selectRowIndexes(IndexSet(rows), byExtendingSelection: false)
+            }
+            let orders = SidebarNode.Kind.object(id, DatabaseObject(.table, "airsql_fixture", "orders"))
+            let customers = SidebarNode.Kind.object(id, DatabaseObject(.table, "airsql_fixture", "customers"))
+            let routine = SidebarNode.Kind.object(id, DatabaseObject(.procedure, "airsql_fixture", "add_customer"))
+            let database = SidebarNode.Kind.database(id, "airsql_fixture")
+            try select([orders])
+            #expect(sidebar.compareWithBlocked == nil && sidebar.compareRowsBlocked?.hasPrefix("Select two connections") == true)
+            try select([orders, customers])
+            #expect(sidebar.compareRowsBlocked == nil && sidebar.compareWithBlocked != nil)
+            let starts = sidebar.compareStarts
+            #expect(starts.map(\.object?.name) == ["customers", "orders"] || starts.map(\.object?.name) == ["orders", "customers"])
+            try select([orders, routine])
+            #expect(sidebar.compareRowsBlocked == "Select two objects of one kind, such as two tables")
+            try select([orders, database])
+            #expect(sidebar.compareRowsBlocked == "Select two of one level: two connections, two databases or two objects")
+            try select([.category(id, "airsql_fixture", .view)])
+            #expect(sidebar.compareStarts.isEmpty && sidebar.compareWithBlocked != nil)
+
+            let controller = Self.window(nil)
+            controller.start(.object, left: starts[0], right: starts[1])
+            #expect(controller.level == .object)
+            #expect(controller.compareBlocked == nil, "\(controller.compareBlocked ?? "")")
+            #expect(controller.target.object?.kind == .table && controller.target.database == "airsql_fixture")
+            let servers = Self.window(nil)
+            servers.start(.server, left: ReconStart(connection: Fixtures.production), right: ReconStart(connection: Fixtures.staging))
+            #expect(servers.level == .server && servers.result == nil)
+        }
+
+        @Test func aServerCompareListsPairsAndOpensThem() throws {
+            let controller = Self.window(nil)
+            controller.choose(level: .server)
+            controller.show(Self.serverResult())
+            let results = controller.results, detail = results.detail
+            #expect(results.objects.map(\.name).prefix(2) == ["new", "old"], "what is on one side comes first")
+            #expect(controller.scriptBlocked == "A script belongs to one pair of databases: open one first")
+            #expect(!controller.toolbarItems.sync.isEnabled && controller.toolbarItems.export.isEnabled)
+            let content = try #require(controller.window?.contentView)
+            let back = try #require(find(NSButton.self, id: "recon.back", in: content))
+            #expect(back.isHidden)
+            let shop = try #require(results.objects.firstIndex { $0.name == "shop" })
+            results.list.selectRowIndexes(IndexSet(integer: shop), byExtendingSelection: false)
+            #expect(detail.message.stringValue.contains("objects differ") && !detail.message.isHidden)
+            let cell = try #require(results.list.view(atColumn: 0, row: shop, makeIfNecessary: true) as? ReconObjectCell)
+            #expect(cell.chip.text == "differs" && cell.name.stringValue == "shop" && cell.what.stringValue.hasSuffix("rows"))
+            #expect(cell.tick.isHidden, "a pair has no script of its own to tick")
+            let locked = try #require(results.objects.firstIndex { $0.name == "locked" })
+            results.list.selectRowIndexes(IndexSet(integer: locked), byExtendingSelection: false)
+            #expect(detail.message.stringValue == "locked couldn't be compared: access denied")
+            // Double click (or Return): the pair as a database compare, its script there; Back returns with what changed.
+            results.list.selectRowIndexes(IndexSet(integer: shop), byExtendingSelection: false)
+            let doubleAction = try #require(results.list.doubleAction)
+            NSApp.sendAction(doubleAction, to: results.list.target, from: results.list)
+            #expect(controller.level == .database && controller.source.database == "shop" && controller.result?.isServer == false)
+            #expect(controller.scriptBlocked == nil && !back.isHidden)
+            let opened = try #require(controller.result)
+            var cleaned = opened
+            cleaned.objects = []
+            controller.show(cleaned)
+            controller.backToServer(nil)
+            #expect(controller.level == .server && controller.result?.isServer == true && back.isHidden)
+            #expect(controller.result?.object(.database, "shop")?.status == .same)
+            // Pairs on one side, or unread, have nothing to open.
+            let old = try #require(results.objects.firstIndex { $0.name == "old" })
+            results.list.selectRowIndexes(IndexSet(integer: old), byExtendingSelection: false)
+            NSApp.sendAction(doubleAction, to: results.list.target, from: results.list)
+            #expect(controller.level == .server)
+            // Touching a side starts anew: there is no way back to a compare of other sides.
+            results.list.selectRowIndexes(IndexSet(integer: results.objects.firstIndex { $0.name == "same" } ?? 0), byExtendingSelection: false)
+            NSApp.sendAction(doubleAction, to: results.list.target, from: results.list)
+            #expect(controller.serverResult != nil)
+            controller.target.choose(Fixtures.staging, database: "other")
+            #expect(controller.serverResult == nil)
+        }
+
+        @Test func untickingAnObjectLeavesTheScript() throws {
+            let controller = Self.window(Self.result())
+            let results = controller.results
+            let row = try #require(results.objects.firstIndex { $0.name == "orders" })
+            results.list.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            #expect(text(results.detail.script).contains("ADD COLUMN `currency`"))
+            let cell = try #require(results.list.view(atColumn: 0, row: row, makeIfNecessary: true) as? ReconObjectCell)
+            #expect(!cell.tick.isHidden && cell.tick.state == .on)
+            cell.tick.state = .off
+            cell.tick.sendAction(cell.tick.action, to: cell.tick.target)
+            #expect(results.selected.map(\.name) == ["orders"], "the selection stays")
+            #expect(text(results.detail.script) == "-- Nothing to sync for orders: it is unticked in the list")
+            #expect(controller.result?.steps().contains { $0.object == "orders" } == false)
+            let item = Commands.includeInSync.item()
+            #expect(controller.validateMenuItem(item) && item.state == .off)
+            controller.includeInSync(nil)
+            #expect(controller.result?.steps().contains { $0.object == "orders" } == true)
+            #expect(controller.validateMenuItem(item) && item.state == .on)
+            let matching = try #require(results.objects.firstIndex { !$0.differs })
+            let plain = try #require(results.list.view(atColumn: 0, row: matching, makeIfNecessary: true) as? ReconObjectCell)
+            #expect(plain.tick.isHidden, "nothing of it would be in the script")
+        }
+
+        /// F7 walks the runs of differing lines; Unified shows one text; a word's change is marked within its line.
+        @Test func theDefinitionsHaveDiffControls() throws {
+            let controller = Self.window(Self.result())
+            let results = controller.results, detail = results.detail
+            let row = try #require(results.objects.firstIndex { $0.name == "paid_orders" })
+            results.list.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            #expect(detail.differences.count == 1 && detail.next.isEnabled && detail.differenceBlocked == nil)
+            let view = try #require(detail.left.documentView as? NSTextView), other = try #require(detail.right.documentView as? NSTextView)
+            let storage = try #require(view.textStorage)
+            let position = (view.string as NSString).range(of: "`status` = 'paid'").location
+            func tint(_ place: Int) -> NSColor? { storage.attribute(.backgroundColor, at: place, effectiveRange: nil) as? NSColor }
+            #expect(tint(0) != tint(position + 9), "the word that changed stands out from its line")
+            detail.style.selectedSegment = 1
+            detail.update()
+            #expect(view.string.contains("- CREATE VIEW `paid_orders` AS select `id` from `orders` where `status` in ('paid','shipped')"))
+            #expect(view.string.contains("+ CREATE VIEW `paid_orders` AS select `id` from `orders` where `status` = 'paid'"))
+            #expect(detail.leftTitle.stringValue.contains(" → "))
+            detail.style.selectedSegment = 0
+            detail.update()
+            #expect(!other.string.isEmpty && !detail.leftTitle.stringValue.contains(" → "))
+            let orders = try #require(results.objects.firstIndex { $0.name == "orders" })
+            results.list.selectRowIndexes(IndexSet(integer: orders), byExtendingSelection: false)
+            #expect(detail.differences.count > 1)
+            controller.nextDifference(nil)
+            let first = view.selectedRange().location
+            controller.nextDifference(nil)
+            #expect(view.selectedRange().location > first)
+            controller.previousDifference(nil)
+            #expect(view.selectedRange().location == first)
+            controller.previousDifference(nil)
+            #expect(view.selectedRange().location > first, "it goes round")
+            let match = try #require(results.objects.firstIndex { !$0.differs })
+            results.list.selectRowIndexes(IndexSet(integer: match), byExtendingSelection: false)
+            #expect(detail.differenceBlocked != nil && !detail.next.isEnabled)
+            let item = Commands.nextDifference.item()
+            #expect(!controller.validateMenuItem(item) && item.toolTip == detail.differenceBlocked)
+        }
+
+        /// The script runs where the result was compared, not where the picker has moved to since.
+        @Test func theScriptStaysOnTheComparedTarget() {
+            let controller = Self.window(Self.result())
+            #expect(controller.comparedConnection?.id == Fixtures.staging.id)
+        }
+
         @Test func theWindowStaysAtItsMinimumSize() {
             let controller = Self.window(Self.result(), size: ReconWindowController.minimumSize)
             #expect(controller.window?.frame.width == ReconWindowController.minimumSize.width)
@@ -257,6 +460,12 @@ extension AppTests {
                     #expect((before.window?.frame.height ?? 0) >= room - 1, "\(place): \(before.window?.frame.height ?? 0)")
                     let window = Self.window(Self.result(), size: size, appearance: appearance)
                     check(window, "structure")
+                    let levels = Self.window(nil, size: size, appearance: appearance)
+                    levels.choose(level: .object)
+                    check(levels, "objects")
+                    levels.choose(level: .server)
+                    levels.show(Self.serverResult())
+                    check(levels, "server")
                     for (row, object) in window.results.objects.enumerated() where ["products", "gift_cards", "paid_orders"].contains(object.name) {
                         window.results.list.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
                         window.results.detail.tabs.selectedSegment = object.data == nil ? 0 : 1
@@ -334,7 +543,7 @@ extension AppTests {
                     "\(copied)")
             let menu = try #require(list.menu)
             menu.delegate?.menuNeedsUpdate?(menu)
-            #expect(menu.items.map(\.title) == ["Copy", "Copy Sync Script", "Leave Out of Next Compare"])
+            #expect(menu.items.map(\.title) == ["Copy", "Copy Sync Script", "Include in Sync Script", "Leave Out of Next Compare"])
             let menuBar = MainMenu.build()
             for item in menu.items {
                 #expect(menuBar.items.contains { $0.submenu?.items.contains { $0.action == item.action } == true }, "\(item.title)")

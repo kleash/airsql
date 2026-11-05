@@ -1,22 +1,34 @@
 ---
-title: Compare two databases
+title: Compare
 nav_order: 16
 ---
 
-# Compare two databases
+# Compare
 
-**Tools ▸ Compare…** (or **Compare…** in a connection's or a database's menu, which starts from it) opens a window
-that compares two databases, on the same server or on two different connections, such as production against staging
-or MySQL 8 against MariaDB. A connection that isn't connected connects when you choose it, asking for a password or
-to trust a certificate on the compare window as the main window would; each side then works through its own route, on
-a session of its own. The compare only reads; nothing changes until you run the sync script yourself.
+**Tools ▸ Compare…** opens a window that compares two servers, two databases, or two tables or other objects, on the
+same server or on two different connections, such as production against staging or MySQL 8 against MariaDB. A
+connection that isn't connected connects when you choose it, asking for a password or to trust a certificate on the
+compare window as the main window would; each side then works through its own route, on a session of its own. The
+compare only reads; nothing changes until you run the sync script yourself.
+
+## Start from the tree
+
+- **Compare With…** in the menu of a connection, database, table, view, routine, trigger or event starts from that row:
+  it is the source, and you choose the target.
+- **Compare**, with two rows selected (⌘-click), compares them; the first is the source. They can be on two connections.
+  Two tables or other objects of one kind compare at once. Two databases or two connections fill the window in and wait
+  for you to press Compare, because they can read a lot: you may want to choose what to compare first.
+
+Both are in the **Tools** menu too.
 
 ## Run a compare
 
-1. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
-   type its name). The sync script makes the target like the source; **Swap** turns them around.
-2. Choose what to compare: **Structure and Data**, **Structure** or **Data**.
-3. Click **Compare** (⌘R). The bar under the setup shows the table and chunk being checked, and **Cancel** (⌘.)
+1. Choose the **level** in the toolbar: **Servers**, **Databases**, or **Tables and Objects**.
+2. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
+   type its name), then at the third level an object from the list. The sync script makes the target like the source;
+   **Swap** turns them around.
+3. Choose what to compare: **Structure and Data**, **Structure** or **Data**.
+4. Click **Compare** (⌘R). The bar under the setup shows the table and chunk being checked, and **Cancel** (⌘.)
    stops the compare; the statement running on each server is stopped too. The work is also listed in the main
    window's activity list.
 
@@ -24,7 +36,34 @@ The summary says how many tables match, differ in structure, or are only on one 
 much of the data had to come over the network. The list shows what differs first: **only source** and **only target**
 for objects on one side, **structure**, **data**, then **match**. The filter above it narrows it by name, and **Hide
 Matching** leaves only what differs. Click an object to see it; double-click it, or press Return, to see its rows when
-they differ. The two definitions scroll together.
+they differ.
+
+The two definitions scroll together. Changed lines stand against each other, with the words that changed marked. **↑**
+and **↓** (⇧F7 and F7) go to the previous and next difference. **Unified** shows one text instead: the target's lines the
+script takes out (`-`), the source's it puts in (`+`). With the **Whitespace in Definitions** rule on, lines that differ
+only in spacing aren't marked.
+
+## Two servers
+
+At the **Servers** level, each side is a connection. Every database is paired by name (without case, where either
+server ignores it), leaving out `information_schema`, `performance_schema`, `mysql` and `sys`, and each pair is compared
+in turn with the same settings. The summary counts the pairs that match, differ and are on one side, and the rows and
+objects that differ across them. A pair that can't be read says why, and the others go on.
+
+Double-click a pair, or press Return, to open it: it shows as a compare of those two databases, with its list, its
+details and its sync script. **Back to All Databases** returns to the pairs, counting what you did there. A script
+belongs to one pair, so **Sync Script…** needs a pair open. **Export Report…** at this level covers every pair.
+
+## Two tables or objects
+
+At the **Tables and Objects** level, each side is one object, by any name: `orders` against `orders_old`, in one
+database or in two. Both must be of one kind.
+
+- **Tables** compare in structure and rows, as in a database compare. **Tables…** chooses the columns to leave out and a
+  WHERE. Two tables of one database can't share a foreign key's name, so foreign keys pair up by what they do.
+- **Views, routines, triggers, events and sequences** compare by definition, side by side, their own names aside.
+
+The sync script changes only the target, under the target's name: the source's definition is written for it.
 
 ## What is compared
 
@@ -49,13 +88,16 @@ different.
 
 ### Ignore rules
 
-**Ignore Rules** chooses differences the compare doesn't count. All four are on at first:
+**Ignore Rules** chooses differences the compare doesn't count. The first four are on at first:
 
 - **AUTO_INCREMENT Values**: tables' next AUTO_INCREMENT values.
 - **DEFINER**: who views, routines, triggers and events run as. The script then leaves DEFINER out, so they run as
   whoever runs the script.
 - **Collations and Character Sets** of tables and columns (MySQL 8 and MariaDB have different defaults).
 - **Whitespace in Definitions**: spaces and line breaks in bodies, outside quoted text.
+- **Column Order**: the order of a table's columns.
+- **Letter Case in Definitions**: upper and lower case in bodies, outside quoted text.
+- **Definitions**: what views, routines, triggers and events say. Only whether each exists counts.
 
 ### Tables…
 
@@ -79,6 +121,9 @@ counts as the same). Both sessions use time zone `+00:00`, so TIMESTAMP values c
 Floats, decimals written with another scale and JSON with other spacing or key order are compared as values.
 
 ## The sync script
+
+Each object that differs has a tick in the list. Untick it, or use **Include in Sync Script** in its menu, and the script,
+**Copy Sync Script** and the changeset leave it out; what it depends on is up to you.
 
 The **Sync script** box shows the statements for the selected object; **Copy Sync Script** copies them. **Sync
 Script…** opens the whole script in a [console](console.md) tab of the target named “Sync script”, to read (it can't
@@ -135,6 +180,8 @@ line, for a spreadsheet) or **Markdown** (for a ticket). HTML and Markdown list 
 
 - More than 100,000 differing rows in one table are reported as too many to list, without sync statements for that
   table: narrow the compare with a WHERE, or copy the table instead.
+- A server compare keeps every pair's differing rows in memory: on servers that differ a lot, compare **Structure** first.
+- A tick is for a whole object: the changes within a table go or stay together.
 - Column order and row formats are compared and synced. Partitioning is only noticed on one side: a table partitioned
   differently on both reads the same, and no statement adds or removes it. System versioning isn't compared.
 - The data compare reads each side as it goes, not one snapshot: on a busy table it can show rows that changed meanwhile.

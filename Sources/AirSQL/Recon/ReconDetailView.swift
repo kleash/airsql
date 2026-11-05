@@ -9,6 +9,14 @@ final class ReconDetailView: NSObject {
     let view = NSView()
     let tabs = NSSegmentedControl(labels: ["Structure", "Data"], trackingMode: .selectOne, target: nil, action: nil)
     static let structureTip = "Show the two definitions side by side", dataTip = "Show the rows that differ, down to the cell"
+    let style = NSSegmentedControl(labels: ["Side by Side", "Unified"], trackingMode: .selectOne, target: nil, action: nil)
+    let previous = button("↑", id: "recon.previousDifference", tip: Commands.previousDifference.tip, target: nil,
+                          action: #selector(ReconWindowController.previousDifference(_:)))
+    let next = button("↓", id: "recon.nextDifference", tip: Commands.nextDifference.tip, target: nil,
+                      action: #selector(ReconWindowController.nextDifference(_:)))
+    /// Where each run of differing lines starts in the left text, and the one gone to last.
+    private(set) var differences: [NSRange] = []
+    private var difference = -1
     let ignoring = label("", font: .systemFont(ofSize: 11.5), color: .quietText, truncates: true)
     let left = ReconDetailView.textView(id: "recon.sourceDDL")
     let right = ReconDetailView.textView(id: "recon.targetDDL")
@@ -27,6 +35,7 @@ final class ReconDetailView: NSObject {
     private var object: ReconObject?
     private var result: ReconResult?
     private var scrollingTogether = false
+    private var rightColumn: NSView?
 
     override init() {
         super.init()
@@ -39,7 +48,16 @@ final class ReconDetailView: NSObject {
         tabs.setAccessibilityIdentifier("recon.tabs")
         destructive.target = self
         destructive.action = #selector(destructiveToggled(_:))
-        let header = NSStackView(views: [tabs, ignoring])
+        style.target = self
+        style.action = #selector(tabChosen(_:))
+        style.selectedSegment = 0
+        style.selectedSegmentBezelColor = .selectedSegment
+        style.setToolTip("Show the two definitions next to each other", forSegment: 0)
+        style.setToolTip("Show one text: the target's lines the script takes out (-) and the source's it puts in (+)", forSegment: 1)
+        style.setAccessibilityIdentifier("recon.diffStyle")
+        previous.setAccessibilityLabel("Previous Difference")
+        next.setAccessibilityLabel("Next Difference")
+        let header = NSStackView(views: [tabs, style, previous, next, ignoring])
         header.spacing = Spacing.double
         header.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.double)
         func column(_ title: NSTextField, _ text: NSScrollView) -> NSView {
@@ -54,6 +72,7 @@ final class ReconDetailView: NSObject {
         structure.isVertical = true
         structure.dividerStyle = .thin
         let (leftColumn, rightColumn) = (column(leftTitle, left), column(rightTitle, right))
+        self.rightColumn = rightColumn
         structure.addArrangedSubview(leftColumn)
         structure.addArrangedSubview(rightColumn)
         let halves = leftColumn.widthAnchor.constraint(equalTo: rightColumn.widthAnchor)
@@ -132,6 +151,14 @@ final class ReconDetailView: NSObject {
         update()
     }
 
+    /// The same object with other ticks, keeping the rows on screen.
+    func refresh(_ object: ReconObject?, result: ReconResult) {
+        if object?.name != self.object?.name { rows?.removeFromSuperview(); rows = nil }
+        self.object = object
+        self.result = result
+        update()
+    }
+
     /// Before the first compare: what to do.
     func showStart() {
         for segment in 0..<2 {
@@ -140,23 +167,54 @@ final class ReconDetailView: NSObject {
         }
         structure.isHidden = true
         rowsHolder.isHidden = true
-        message.stringValue = "Choose a database on each side, then Compare (⌘R). The script it makes changes the target only "
-            + "when you run it."
+        message.stringValue = "Choose what to compare on each side, then Compare (⌘R). The script it makes changes the target "
+            + "only when you run it."
         message.isHidden = false
         scriptTitle.stringValue = "Sync script · review before running"
     }
 
+    /// A server compare's pair: what it found, in words; its details open with the pair.
+    private func showPair(_ result: ReconResult) {
+        for segment in 0..<2 {
+            tabs.setEnabled(false, forSegment: segment)
+            tabs.setToolTip("Open a pair of databases first: double-click it", forSegment: segment)
+        }
+        structure.isHidden = true
+        rowsHolder.isHidden = true
+        ignoring.stringValue = ""
+        message.isHidden = false
+        scriptTitle.stringValue = "Sync script · each pair of databases has its own"
+        text(script).string = ""
+        guard let object else {
+            message.stringValue = "Select a pair of databases to see how it compares; double-click it to open it."
+            return
+        }
+        switch object.status {
+        case .onlyInSource: message.stringValue = "\(object.name) is only on \(result.source.name)."
+        case .onlyInTarget: message.stringValue = "\(object.name) is only on \(result.target.name)."
+        case .same: message.stringValue = "\(object.name) matches on both servers. Double-click to see its objects."
+        case .different:
+            message.stringValue = result.databases[object.name].map {
+                "\(object.name): \(ReconObjectCell.what(pair: $0)). Double-click to see what differs, and its sync script."
+            } ?? "\(object.name) couldn't be compared: \(object.parts.first?.detail ?? "")"
+        }
+    }
+
     func update() {
         guard let result else { return }
+        if result.isServer { return showPair(result) }
         tabs.setEnabled(true, forSegment: 0)
         tabs.setToolTip(Self.structureTip, forSegment: 0)
         let ignored = result.options.ignore.names
         ignoring.stringValue = ignored.isEmpty ? "Nothing ignored" : "Ignoring " + ignored.joined(separator: ", ")
+        ignoring.toolTip = ignoring.stringValue
         tabs.setEnabled(object?.data != nil, forSegment: 1)
         tabs.setToolTip(object?.data != nil ? Self.dataTip : object == nil ? "Select a table first"
                         : "Only tables on both sides whose rows were compared show their rows", forSegment: 1)
         if object?.data == nil { tabs.selectedSegment = 0 }
         let showsData = tabs.selectedSegment == 1
+        differences = []
+        difference = -1
         structure.isHidden = showsData || object == nil
         rowsHolder.isHidden = !showsData || object == nil
         message.isHidden = true
@@ -168,12 +226,16 @@ final class ReconDetailView: NSObject {
             return
         }
         if showsData { showRows(object) } else { showStructure(object, result) }
+        for control in [previous, next] {
+            control.isEnabled = !differences.isEmpty
+            control.toolTip = differences.isEmpty ? differenceBlocked : control === next ? Commands.nextDifference.tip : Commands.previousDifference.tip
+        }
         // The object's own steps: its script alone, in the same order as within the whole script.
         var alone = result
         alone.objects = [object]
         let own = alone.steps(destructive: includeDestructive)
-        text(script).string = own.isEmpty ? "-- Nothing to sync for \(object.name)" + (object.differs && !includeDestructive
-            ? ": what differs only goes away with destructive steps" : "")
+        text(script).string = own.isEmpty ? "-- Nothing to sync for \(object.name)" + (object.leftOut ? ": it is unticked in the list"
+            : object.differs && !includeDestructive ? ": what differs only goes away with destructive steps" : "")
             : own.prefix(200).map { $0.sql + ";" }.joined(separator: "\n\n")
                 + (own.count > 200 ? "\n\n-- … and \(own.count - 200) more statements: Sync Script… shows them all" : "")
     }
@@ -190,6 +252,7 @@ final class ReconDetailView: NSObject {
             structure.isHidden = true
             return
         }
+        rightColumn?.isHidden = false
         let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         let plain: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
         let absent: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.secondaryLabelColor]
@@ -201,24 +264,71 @@ final class ReconDetailView: NSObject {
                 string: object.targetDDL ?? "Not in \(result.target.name)", attributes: object.targetDDL == nil ? absent : plain))
             return
         }
+        let spaceless = result.options.ignore.whitespace
+        let rows = ReconLines.aligned(sourceDDL, targetDDL, ignoringSpace: spaceless)
+        if style.selectedSegment == 1 { return showUnified(rows, plain: plain, ignoringSpace: spaceless) }
         let missing = NSAttributedString(string: "(missing)", attributes: [.foregroundColor: NSColor.quietText, .font: font])
         let (a, b) = (NSMutableAttributedString(), NSMutableAttributedString())
-        let rows = ReconLines.aligned(sourceDDL, targetDDL)
+        var inRun = false
         for (index, row) in rows.enumerated() {
             let end = index == rows.count - 1 ? "" : "\n"
-            for (side, line, mark) in [(a, row.left, NSColor.statusOK), (b, row.right, NSColor.statusBad)] {
-                if let line {
-                    var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
-                    if (row.left == nil) != (row.right == nil) { attributes[.backgroundColor] = mark.withAlphaComponent(0.16) }
-                    side.append(NSAttributedString(string: line + end, attributes: attributes))
-                } else {
+            let differs = ReconLines.differs(row, ignoringSpace: spaceless)
+            if differs, !inRun { differences.append(NSRange(location: a.length, length: 0)) }
+            inRun = differs
+            var words: (left: [NSRange], right: [NSRange]) = ([], [])
+            if differs, let left = row.left, let right = row.right {
+                words = ReconLines.changedWords(left, right, ignoringSpace: spaceless)
+            }
+            for (side, line, mark, changed) in [(a, row.left, NSColor.statusOK, words.left), (b, row.right, NSColor.statusBad, words.right)] {
+                guard let line else {
                     side.append(missing)
                     side.append(NSAttributedString(string: end, attributes: [.font: font]))
+                    continue
+                }
+                var attributes = plain
+                if differs { attributes[.backgroundColor] = mark.withAlphaComponent(row.left == nil || row.right == nil ? 0.16 : 0.07) }
+                let start = side.length
+                side.append(NSAttributedString(string: line + end, attributes: attributes))
+                for range in changed {
+                    side.addAttribute(.backgroundColor, value: mark.withAlphaComponent(0.3),
+                                      range: NSRange(location: start + range.location, length: range.length))
                 }
             }
         }
         text(left).textStorage?.setAttributedString(a)
         text(right).textStorage?.setAttributedString(b)
+    }
+
+    /// One text in the left column, as the script changes the target: its lines out (-), the source's in (+).
+    private func showUnified(_ rows: [ReconLines.Row], plain: [NSAttributedString.Key: Any], ignoringSpace: Bool) {
+        rightColumn?.isHidden = true
+        leftTitle.stringValue = "\(rightTitle.stringValue) → \(leftTitle.stringValue)"
+        leftTitle.toolTip = leftTitle.stringValue
+        let lines = ReconLines.unified(rows, ignoringSpace: ignoringSpace)
+        let all = NSMutableAttributedString()
+        var inRun = false
+        for (index, line) in lines.enumerated() {
+            let differs = line.mark != " "
+            if differs, !inRun { differences.append(NSRange(location: all.length, length: 0)) }
+            inRun = differs
+            var attributes = plain
+            if differs { attributes[.backgroundColor] = (line.mark == "+" ? NSColor.statusOK : .statusBad).withAlphaComponent(0.16) }
+            all.append(NSAttributedString(string: "\(line.mark) \(line.line)" + (index == lines.count - 1 ? "" : "\n"), attributes: attributes))
+        }
+        text(left).textStorage?.setAttributedString(all)
+    }
+
+    /// Why Next and Previous Difference can't move, or nil when they can.
+    var differenceBlocked: String? {
+        differences.isEmpty ? "Select an object whose two definitions differ, on the Structure tab, first" : nil
+    }
+
+    /// Goes to the next or previous run of differing lines, round from the end; the other side scrolls along.
+    func goToDifference(by step: Int) {
+        guard !differences.isEmpty else { return }
+        difference = difference < 0 && step < 0 ? differences.count - 1 : (difference + step + differences.count) % differences.count
+        text(left).setSelectedRange(differences[difference])
+        text(left).scrollRangeToVisible(differences[difference])
     }
 
     // MARK: Rows
