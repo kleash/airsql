@@ -19,14 +19,36 @@ extension ConsoleViewController {
         open.currentDatabase = chosenDatabase
     }
 
-    /// No silent reconnect: a session that dropped is reported, and it takes another Run to open a new one.
-    func sessionWasLost() -> Bool {
-        guard !sharesSession, let lost = Self.shared[sessionKey]?.session, lost.wasLost else { return false }
-        Self.shared[sessionKey] = nil
-        sharing = nil
-        note(.warning, "This tab's session was lost" + (lost.inTransaction ? ", and its open transaction was rolled back" : "")
-             + ", so nothing ran. Run again to open a new session.")
-        return true
+    /// Reports, on this tab, a session that ended without the person closing it: the connection or the session dropped, or
+    /// a Disconnect took an open transaction with it. Until they answer (`askAboutLostSession`) nothing runs here.
+    func noticeLostSession() {
+        guard lostSession == nil, let id = connectionID, let record = Self.shared[sessionKey], let old = record.session,
+              !old.isConnected || Self.openConnection(id) == nil, old.wasLost || old.inTransaction else { return }
+        var dropped = old.wasLost
+        if case .failed? = model.states[id] { dropped = true }
+        let lost = LostSession(transaction: old.inTransaction, changes: record.changes, manual: !old.autocommit, isolation: record.isolation,
+                               dropped: dropped, server: connection?.displayName ?? "the server")
+        lostSession = lost
+        note(.error, lost.message)
+        contentChanged()
+    }
+
+    /// The explicit step before a new session: the sheet says what went, and only its button lets the next Run through.
+    func askAboutLostSession(_ lost: LostSession) {
+        guard let window = view.window, window.attachedSheet == nil else { return NSSound.beep() }
+        ConsoleClosing.alert(window, lost.heading, lost.message + " Nothing ran. A new session starts empty"
+                                + (lost.manual ? ", in Manual Commit as this one was." : "."),
+                             buttons: [("Open New Session", "Leave what was lost behind; the next Run opens a new session"),
+                                       ("Cancel", "Open no session and run nothing")], destructive: nil) { [weak self] choice in
+            // The gate (plan §2.8): saying the lost work is gone is the person's to do.
+            guard choice == 0, let self, !AgentGuard.refuses("Only the person at the Mac can leave a lost transaction behind.") else { return }
+            self.lostSession = nil
+            self.carried = lost
+            if Self.shared[self.sessionKey]?.session?.isConnected != true { Self.shared[self.sessionKey] = nil }
+            self.sharing = nil
+            self.note(.info, "The lost session is left behind: the next Run opens a new one.")
+            self.contentChanged()
+        }
     }
 
     /// The session to run on, opened and set up as the connection says if it isn't yet.
@@ -49,14 +71,15 @@ extension ConsoleViewController {
         let session: DBConnection
         if let opened { session = opened } else { session = try await connection.session(.main) }
         // Before it counts as the tab's: one that failed to start as asked must not go on to run in Auto-commit.
-        let level = self.connection?.startIsolation
+        let level = carried?.isolation ?? self.connection?.startIsolation
         do {
-            if self.connection?.startsManual == true { _ = try await session.query("SET autocommit = 0") }
+            if self.connection?.startsManual == true || carried?.manual == true { _ = try await session.query("SET autocommit = 0") }
             if let level { _ = try await session.query(level.sql) }
         } catch {
             await opened?.close()
             throw error
         }
+        carried = nil
         sharing = sharesSession
         changeShared {
             $0.session = session
@@ -72,5 +95,27 @@ extension ConsoleViewController {
         chosenDatabase = nil
         guard !sharesSession, let session = Self.shared.removeValue(forKey: documentID)?.session else { return }
         Task.detached { await session.close() }
+    }
+}
+
+/// What went with a session that ended without the person closing it.
+struct LostSession {
+    var transaction: Bool
+    /// Rows changed in that transaction.
+    var changes: UInt64
+    /// It was in Manual Commit, and at this isolation level: its replacement starts the same.
+    var manual: Bool
+    var isolation: IsolationLevel?
+    /// It dropped, rather than being closed by Disconnect.
+    var dropped: Bool
+    var server: String
+
+    var heading: String { transaction ? "This tab's transaction was rolled back" : "This tab's session was lost" }
+
+    var message: String {
+        let how = dropped ? "The connection to \(server) was lost" : "The connection to \(server) was closed"
+        guard transaction else { return how + ", and this tab's session with it." }
+        let rows = changes == 0 ? "Everything in it is gone" : "Its \(changes.formatted()) row change\(changes == 1 ? " is" : "s are") gone"
+        return how + ", and the server rolled back this tab's open transaction. \(rows): nothing since the last Commit was kept."
     }
 }

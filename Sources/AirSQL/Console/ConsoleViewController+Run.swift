@@ -100,6 +100,8 @@ extension ConsoleViewController {
 
     /// Fills in `?` and `:name`, asking their values first; everything after this sees the final SQL.
     private func withParameters(_ statements: [SQLStatement], then run: @escaping ([SQLStatement]) -> Void) {
+        noticeLostSession()
+        if let lostSession { return askAboutLostSession(lostSession) }  // before any other question about statements that won't run
         let noBackslashEscapes = editor.noBackslashEscapes
         let places = QueryParameters.places(in: statements.map(\.sql), noBackslashEscapes: noBackslashEscapes)
         let keys = QueryParameters.keys(places)
@@ -220,7 +222,11 @@ extension ConsoleViewController {
                  + "waits until it ends.")
             return done?() ?? ()
         }
-        guard !sessionWasLost() else { return done?() ?? () }
+        noticeLostSession()
+        if let lostSession {
+            askAboutLostSession(lostSession)
+            return done?() ?? ()
+        }
         if session == nil { sharing = nil }
         if run.kind == .run, run.statements.contains(where: { !$0.range.isEmpty }) {
             dropUnpinnedResults()
@@ -367,6 +373,7 @@ extension ConsoleViewController {
     }
 
     private func finish(_ run: ConsoleRun) {
+        defer { noticeLostSession() }
         run.timer?.invalidate()
         run.activity?.end()
         if running === run { running = nil }

@@ -107,6 +107,7 @@ extension ConsoleViewController: NSMenuItemValidation {
             return (running.map { !$0.cancelled } ?? false, "Nothing is running in this tab")
         case #selector(commit(_:)), #selector(rollback(_:)):
             if let reason = busy { return (false, reason) }
+            if lostSession?.transaction == true { return (false, "The server rolled this tab's transaction back when the connection ended") }
             return (session?.inTransaction == true, "No transaction is open in this tab")
         case #selector(setTransactionMode(_:)):
             item.state = (item.tag == 1) == !autocommit ? .on : .off

@@ -85,6 +85,9 @@ final class ConsoleViewController: NSViewController, TabContent {
     var sharing: Bool?
     /// The database of a tab with a session of its own, once it has run or been given one.
     var chosenDatabase: String?
+    /// A session that ended unasked, until the person answers; then what its replacement takes over from it.
+    var lostSession: LostSession?
+    var carried: LostSession?
     /// The next run keeps the result tabs (Keep Results).
     var keepsResults = false
     /// Run Result Again every so often: the seconds (0: off), the timer and the tab it reruns.
@@ -183,7 +186,12 @@ final class ConsoleViewController: NSViewController, TabContent {
         showResults()
         // Connecting or disconnecting, or the first connection saved, changes what the results say; Settings ▸ Editor the
         // text size.
-        observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.showResults() } })
+        observers.append(model.$states.sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.noticeLostSession()
+                self?.showResults()
+            }
+        })
         observers.append(model.$data.map(\.connections.isEmpty).removeDuplicates().dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async { self?.showResults() }
         })
@@ -289,6 +297,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         if session?.inTransaction == true, badgeTimer == nil {
             badgeTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] timer in
                 MainActor.assumeIsolated {
+                    self?.noticeLostSession()
                     guard let self, self.session?.inTransaction == true else {
                         timer.invalidate()
                         self?.badgeTimer = nil
@@ -335,6 +344,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     }
 
     var transactionBadge: String? {
+        if lostSession?.transaction == true { return "Transaction rolled back: the connection ended" }
         guard let session, session.inTransaction else { return nil }
         var badge = "Transaction open"
         let changes = shared.changes

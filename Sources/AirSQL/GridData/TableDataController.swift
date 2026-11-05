@@ -1,5 +1,6 @@
 import AirSQLCore
 import AppKit
+import Combine
 
 /// What the table tab sends its statements to: the connection's data session (plan §2.2), or the tests' own.
 protocol TableSession: AnyObject {
@@ -63,6 +64,11 @@ final class TableDataController: NSViewController, TabContent {
     var openSession: () async throws -> TableSession
     /// In Manual Commit: the tab's own session, which then is what `openSession` gives.
     var transactionSession: DBConnection?
+    /// Rows the open transaction changed, and what became of them if its session ended unasked.
+    var transactionRows: UInt64 = 0
+    var lostTransaction: LostSession?
+    /// Watches for that while the tab is in Manual Commit.
+    var transactionWatch: (AnyCancellable, Timer)?
     private(set) var source: TableDataSource?
     let viewer = GridViewer(source: nil)
     var grid: DataGridView { viewer.grid }

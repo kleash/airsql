@@ -191,8 +191,12 @@ extension AppTests {
             _ = try await killer.query("KILL \(thread)")
             try? await session.ping()
             #expect(session.wasLost)
-            await run("SELECT 1;")
-            #expect(console.messagesView.messages.last?.text.contains("session was lost") == true)
+            console.editor.setText("SELECT 1;")
+            console.runStatement(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(console.messagesView.messages.last?.text.contains("session with it") == true)
+            #expect(await call(harness, "press", ["title": "Open New Session"]).error == nil)
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
             await run("SELECT 2;")
             #expect(console.lastOutcome?.results.first?.rows?.string(0, 0) == "2", "\(console.messagesView.messages.map(\.text))")
             #expect(console.session !== session)
@@ -450,6 +454,136 @@ extension AppTests {
             await connection.disconnect()
             _ = try await root.query("DROP USER lane_run_limit")
             await admin.disconnect()
+        }
+
+        /// A killed session and a whole connection lost, each with a transaction open: the tab says the server rolled it back
+        /// and how many rows, Run runs nothing until the person opens a new session, and that one stays in Manual.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aLostTransactionStopsTheTabUntilThePersonAnswers() async throws {
+            let (main, harness, console, connection) = try await Self.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let admin = try await connection.toolsSession()
+            let database = "lane_run_lost"
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)", "CREATE TABLE \(database).t (id INT PRIMARY KEY)"] {
+                _ = try await admin.query(sql)
+            }
+            func count() async throws -> String? { try await admin.query("SELECT COUNT(*) FROM \(database).t").first?.rows?.string(0, 0) }
+            func write(_ sql: String) async {
+                console.editor.setText(sql)
+                console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+                console.runStatement(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 3])
+                if main.window?.attachedSheet != nil { _ = await call(harness, "press", ["title": "Run"]) }
+                _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            }
+            /// Run is stopped by the sheet and sends nothing; its button lets the next Run through.
+            func runIsStopped() async throws {
+                let before = console.lastOutcome?.statement.sql
+                console.editor.setText("INSERT INTO \(database).t VALUES (99);")
+                console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+                console.runStatement(nil)
+                #expect(await eventually(timeout: 10) { main.window?.attachedSheet != nil })
+                #expect(console.lastOutcome?.statement.sql == before && console.running == nil)
+                #expect(await call(harness, "press", ["title": "Cancel"]).error == nil)
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                #expect(console.lostSession != nil, "Cancel leaves it stopped")
+                console.runStatement(nil)
+                #expect(await eventually(timeout: 10) { main.window?.attachedSheet != nil })
+                #expect(await call(harness, "press", ["title": "Open New Session"]).error == nil)
+                _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+                #expect(console.lostSession == nil && console.session == nil)
+            }
+
+            console.setTransactionMode(Self.manualItem())
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            await write("INSERT INTO \(database).t VALUES (1), (2), (3);")
+            #expect(console.transactionBadge?.hasPrefix("Transaction open · 3 changes") == true, "\(console.messagesView.messages.map(\.text))")
+            let thread = try #require(console.session?.server?.threadID)
+
+            // The session alone: killed, then noticed by keep-alive's ping.
+            let session = try #require(console.session)
+            _ = try await admin.query("KILL \(thread)")
+            try? await session.ping()
+            console.noticeLostSession()
+            #expect(console.lostSession?.changes == 3 && console.lostSession?.dropped == true)
+            let said = console.messagesView.messages.last
+            #expect(said?.level == .error && said?.text.contains("rolled back this tab's open transaction") == true
+                    && said?.text.contains("3 row changes are gone") == true, "\(said?.text ?? "")")
+            #expect(console.selectedResult === console.messagesTab)
+            #expect(console.transactionBadge == "Transaction rolled back: the connection ended")
+            try await runIsStopped()
+            #expect(try await count() == "0")
+
+            await write("INSERT INTO \(database).t VALUES (4), (5);")
+            #expect(console.session?.autocommit == false, "still Manual: it would otherwise commit each statement")
+            #expect(try await count() == "0", "held in the new session's transaction")
+
+            // The whole connection: the route goes, every session closes, and a later Connect gives a new Connection.
+            let replacement = Connection(options: DBLab.options(Lab.mariadb114, tls: DBLab.required), log: DBLab.log)
+            try await replacement.connect()
+            await connection.disconnect()
+            console.model.states[Fixtures.production.id] = .failed("The connection was lost.")
+            #expect(await eventually(timeout: 5) { console.lostSession != nil })
+            ConsoleViewController.openConnection = { $0 == Fixtures.production.id ? replacement : nil }
+            console.model.states[Fixtures.production.id] = .connected(server: "MariaDB")
+            #expect(console.lostSession?.changes == 2)
+            #expect(console.messagesView.messages.last?.text.contains("was lost, and the server rolled back") == true)
+            try await runIsStopped()
+            await write("INSERT INTO \(database).t VALUES (6);")
+            #expect(console.session?.autocommit == false && console.session?.inTransaction == true)
+            console.rollback(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let fresh = try await replacement.toolsSession()
+            _ = try await fresh.query("DROP DATABASE \(database)")
+            await replacement.disconnect()
+        }
+
+        /// A table tab's manual transaction, killed: the tab says so, Apply is stopped, and a new session reads the truth.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aTableTabsLostTransactionStopsApply() async throws {
+            let connection = Connection(options: DBLab.options(Lab.mariadb114, tls: DBLab.required), log: DBLab.log)
+            try await connection.connect()
+            defer { Task { await connection.disconnect() } }
+            let database = "lane_run_lost_table"
+            let admin = try await connection.session(.schema)
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)",
+                        "CREATE TABLE \(database).t (id INT PRIMARY KEY, name VARCHAR(20))", "INSERT INTO \(database).t VALUES (1, 'a')"] {
+                _ = try await admin.query(sql)
+            }
+            let schema = SchemaCache(source: admin, includes: { $0 == database })
+            try await schema.load()
+            let saved = SavedConnection(name: "Lab", host: "127.0.0.1", user: "airsql")
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let tab = TableDataController(model: model, context: EditorContext(connection: saved, sessions: connection, schema: schema),
+                                          database: database, table: "t")
+            main.select(main.open(tab, title: "t", connection: saved.id))
+            func ready() async { _ = await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return tab.source != nil && tab.loading == nil } }
+            await ready()
+            tab.setTransactionMode(Self.manualItem())
+            #expect(await eventually(timeout: 10) { tab.transactionSession != nil })
+            await ready()
+            let source = try #require(tab.source)
+            tab.keep(.text("b"), row: 0, column: 1)
+            tab.applyChanges(nil)
+            #expect(await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return source.changes.isEmpty && tab.loading == nil })
+            let session = try #require(tab.transactionSession)
+            _ = try await admin.query("KILL \(try #require(session.server?.threadID))")
+            try? await session.ping()
+            tab.noticeLostTransaction()
+            #expect(tab.lostTransaction?.changes == 1 && tab.problem?.contains("1 row change is gone") == true, "\(tab.problem ?? "")")
+            #expect(tab.transactionBadge == "Transaction rolled back: the connection ended")
+            tab.keep(.text("c"), row: 0, column: 1)
+            tab.applyChanges(nil)
+            #expect(await eventually(timeout: 10) { main.window?.attachedSheet != nil })
+            #expect(tab.source?.changes.isEmpty == false, "nothing applied")
+            #expect(await call(harness, "press", ["title": "Open New Session"]).error == nil)
+            #expect(await eventually(timeout: 10) { tab.lostTransaction == nil && tab.transactionSession?.isConnected == true })
+            await ready()
+            #expect(tab.problem == nil)
+            let name = try await admin.query("SELECT name FROM \(database).t WHERE id = 1").first?.rows?.string(0, 0)
+            #expect(name == "a")
+            _ = try await admin.query("DROP DATABASE \(database)")
         }
     }
 }
