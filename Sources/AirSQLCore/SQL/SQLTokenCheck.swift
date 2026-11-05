@@ -4,14 +4,15 @@ extension SQLLexer {
     /// reserved words may change case (`SQLWords.reserved`: they can't be names, unless after a dot as in shop.order);
     /// names, literals, comments, executable comments and DELIMITER lines must stay exactly as they were. Comparing the
     /// statements too catches a changed delimiter that tokens alone would miss (DELIMITER ;; and DELIMITER ; ;).
-    public static func sameTokens(_ original: String, _ formatted: String, noBackslashEscapes: Bool = false) -> Bool {
+    public static func sameTokens(_ original: String, _ formatted: String, noBackslashEscapes: Bool = false,
+                                  ignoringCaseOf caseFree: (String) -> Bool = { _ in false }) -> Bool {
         func tokens(_ sql: String) -> [String] {
             var lexer = SQLLexer(sql, noBackslashEscapes: noBackslashEscapes)
             var result: [String] = [], afterDot = false
             while let token = lexer.next() {
                 var text = lexer.string(token.range)
                 let upper = lexer.upper(token.range)
-                if token.kind == .word && !afterDot && lexer.openCodeComments == 0 && SQLWords.reserved.contains(upper) {
+                if token.kind == .word && lexer.openCodeComments == 0 && ((!afterDot && SQLWords.reserved.contains(upper)) || caseFree(upper)) {
                     text = upper
                 }
                 result.append("\(token.kind) \(text)")

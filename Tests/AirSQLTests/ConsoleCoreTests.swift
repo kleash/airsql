@@ -170,24 +170,122 @@ struct SQLFormatterTests {
         #expect(format("select a, b from t where x = 1 order by a") == "SELECT a, b\nFROM t\nWHERE x = 1\nORDER BY a")
         #expect(format("select * from a left join b on a.id = b.id join c on 1  group by a.x")
                 == "SELECT *\nFROM a\nLEFT JOIN b ON a.id = b.id\nJOIN c ON 1\nGROUP BY a.x")
-        #expect(format("update t set a = 1 where id in (select id from u where x)") == "UPDATE t\nSET a = 1\nWHERE id IN (SELECT id FROM u WHERE x)")
         #expect(format("insert into t (a) values (1) on duplicate key update a = values(a)")
-                == "INSERT INTO t (a)\nVALUES (1) ON duplicate KEY UPDATE a = VALUES(a)")
+                == "INSERT INTO t (a)\nVALUES (1)\nON DUPLICATE KEY UPDATE a = VALUES(a)")
         #expect(format("delete from t where a = 1") == "DELETE FROM t\nWHERE a = 1")
-        #expect(format("create table t (a varchar(10)) default character set utf8mb4") == "CREATE TABLE t (a VARCHAR(10)) DEFAULT CHARACTER SET utf8mb4")
+        #expect(format("select a from t limit 1 offset 2") == "SELECT a\nFROM t\nLIMIT 1 OFFSET 2")
+    }
+
+    @Test func subqueriesIndentAndConditionsTakeLines() {
+        #expect(format("update t set a = 1 where id in (select id from u where x)") == """
+            UPDATE t
+            SET a = 1
+            WHERE id IN (
+                SELECT id
+                FROM u
+                WHERE x
+            )
+            """)
+        #expect(format("select * from (select a from (select 1 a) b) c where x=1 and y between 1 and 2 or z") == """
+            SELECT *
+            FROM (
+                SELECT a
+                FROM (
+                    SELECT 1 a
+                ) b
+            ) c
+            WHERE x = 1
+              AND y BETWEEN 1 AND 2
+               OR z
+            """)
+        #expect(format("select 1 from a join b on a.x=b.x and a.y=b.y") == "SELECT 1\nFROM a\nJOIN b ON a.x = b.x\n    AND a.y = b.y")
+        #expect(format("with a as (select 1), b as (select 2) select * from a") == "WITH a AS (\n    SELECT 1\n),\nb AS (\n    SELECT 2\n)\nSELECT *\nFROM a")
+    }
+
+    @Test func casesRowsAndTables() {
+        #expect(format("select case when a then 1 else 2 end x from t") == "SELECT CASE\n           WHEN a THEN 1\n           ELSE 2\n       END x\nFROM t")
+        #expect(format("insert into t values (1,'a'),(2,'b')") == "INSERT INTO t\nVALUES (1, 'a'),\n       (2, 'b')")
+        #expect(format("create table t (id int primary key, long_name varchar(10) not null, text text, key k (id)) engine=InnoDB default character set utf8mb4") == """
+            CREATE TABLE t (
+                id        INT PRIMARY KEY,
+                long_name VARCHAR(10) NOT NULL,
+                text      TEXT,
+                KEY k (id)
+            ) ENGINE = InnoDB DEFAULT CHARACTER SET utf8mb4
+            """)
+    }
+
+    @Test func routineBodiesIndentByBlock() {
+        let script = "DELIMITER ;;\ncreate procedure p() begin declare i int; if i then select 1 from t; else while i do set i = 0; end while; end if; repeat set i = 1; until i end repeat; end;;\nDELIMITER ;\nselect 2 from dual;"
+        #expect(format(script) == """
+            DELIMITER ;;
+            CREATE PROCEDURE p()
+            BEGIN
+                DECLARE i INT;
+                IF i THEN
+                    SELECT 1
+                    FROM t;
+                ELSE
+                    WHILE i DO
+                        SET i = 0;
+                    END WHILE;
+                END IF;
+                REPEAT
+                    SET i = 1;
+                UNTIL i
+                END REPEAT;
+            END;;
+            DELIMITER ;
+            SELECT 2
+            FROM DUAL;
+            """)
     }
 
     @Test func namesLiteralsAndCommentsStayAsTheyAre() {
         #expect(format("select t.order, `from` from t") == "SELECT t.order, `from`\nFROM t")
         #expect(format("select 'from  x'  -- keep  this\nfrom t") == "SELECT 'from  x' -- keep  this\nFROM t")
-        #expect(format("select a,\n  -- the b column\n  b from t") == "SELECT a,\n-- the b column\nb\nFROM t")
+        #expect(format("select a,\n  -- the b column\n  b from t") == "SELECT a,\n       -- the b column\n       b\nFROM t")
         #expect(format("/*!40101 set   names utf8 */;") == "/*!40101 set   names utf8 */;")
         #expect(format("select count(*)  from t") == "SELECT count(*)\nFROM t")  // COUNT isn't reserved
+        #expect(format("select count (*) from t") == "SELECT count(*)\nFROM t")
+        #expect(format("alter table t add a int, add b int") == "ALTER TABLE t ADD a INT,\n    ADD b INT")
+        #expect(format("select 1 - -1, a*b, -c, t.*, @x:=1 from t") == "SELECT 1 - -1, a * b, -c, t.*, @x := 1\nFROM t")
+        #expect(format("-- @formatter:off\nselect  1;\n-- @formatter:on\nselect  2;") == "-- @formatter:off\nselect  1;\n-- @formatter:on\nSELECT 2;")
     }
 
-    @Test func delimiterBlocksAreLeftAlone() {
-        let script = "DELIMITER ;;\nCREATE PROCEDURE p() begin select 1; end;;\nDELIMITER ;\nselect 2 from dual;"
-        #expect(format(script) == "DELIMITER ;;\nCREATE PROCEDURE p() begin select 1; end;;\nDELIMITER ;\nSELECT 2\nFROM DUAL;")
+    @Test func rulesOfTheStyle() {
+        func format(_ sql: String, _ change: (inout SQLFormatStyle) -> Void) -> String? {
+            var style = SQLFormatStyle()
+            change(&style)
+            return SQLFormatter.format(sql, style: style)
+        }
+        #expect(format("SELECT a, b FROM t WHERE x = 1") { $0.keywords = .lower } == "select a, b\nfrom t\nwhere x = 1")
+        #expect(format("select count(*), cast(a as char), b from t") { $0.functions = .upper } == "SELECT COUNT(*), CAST(a AS CHAR), b\nFROM t")
+        #expect(format("select a, b from t") { $0.lists = .always } == "SELECT a,\n       b\nFROM t")
+        #expect(format("select a, b from t") { $0.lists = .always; $0.commaFirst = true } == "SELECT a\n     , b\nFROM t")
+        let long = "select " + (1...30).map { "column\($0)" }.joined(separator: ", ") + " from t"
+        #expect(format(long) { _ in }?.contains("column1,\n       column2") == true)
+        #expect(format("select a from t where x and y") { $0.conditionsOnLines = false } == "SELECT a\nFROM t\nWHERE x AND y")
+        #expect(format("select a from t where x and y") { $0.operatorFirst = false } == "SELECT a\nFROM t\nWHERE x AND\n      y")
+        #expect(format("select 1 from a join b on x") { $0.joinOnOwnLine = true } == "SELECT 1\nFROM a\nJOIN b\n    ON x")
+        #expect(format("select 1 from a join b on x") { $0.joinsIndented = true } == "SELECT 1\nFROM a\n    JOIN b ON x")
+        #expect(format("select * from (select 1) a") { $0.brackets = .ownLine } == "SELECT *\nFROM\n(\n    SELECT 1\n) a")
+        #expect(format("select * from (select 1) a") { $0.brackets = .indented } == "SELECT *\nFROM\n    (\n        SELECT 1\n    ) a")
+        #expect(format("select f(a,b) x from t") { $0.spaceAfterComma = false; $0.spaceInsideBrackets = true } == "SELECT f( a,b ) x\nFROM t")
+        #expect(format("select a=1 from t") { $0.spaceAroundOperators = false } == "SELECT a=1\nFROM t")
+        #expect(format("select case when a then 1 end") { $0.caseOnLines = false } == "SELECT CASE WHEN a THEN 1 END")
+        #expect(format("select a from t where x and y group by a") { $0.river = true } == "SELECT a\n  FROM t\n WHERE x\n   AND y\n GROUP BY a")
+        #expect(format("insert into t values (1),(2)") { $0.rowsOnLines = false } == "INSERT INTO t\nVALUES (1), (2)")
+        #expect(format("create table t (a int, bb int)") { $0.alignColumns = false } == "CREATE TABLE t (\n    a INT,\n    bb INT\n)")
+        // Names follow their rule everywhere they're used.
+        #expect(format("select o.Total as Amount from Orders o order by Amount") { $0.aliases = .lower } == "SELECT o.Total AS amount\nFROM Orders o\nORDER BY amount")
+        #expect(format("select Total from Orders") { $0.identifiers = .lower } == "SELECT total\nFROM orders")
+    }
+
+    @Test func aStyleSavedByAnOlderVersionKeepsItsDefaults() throws {
+        let style = try JSONDecoder().decode(SQLFormatStyle.self, from: Data(#"{"indent": 2}"#.utf8))
+        #expect(style.indent == 2 && style.keywords == .upper)
+        #expect(SQLFormatStyle.presets.first?.style == SQLFormatStyle() && SQLFormatStyle.presets.count >= 6)
     }
 
     @Test(arguments: AttackCorpus.all + ReadCorpus.all)
@@ -195,6 +293,10 @@ struct SQLFormatterTests {
         let formatted = SQLFormatter.format(sql)
         #expect(formatted != nil, "\(sql)")
         if let formatted { #expect(SQLLexer.sameTokens(sql, formatted)) }
+        // Formatting what's formatted changes nothing.
+        if let formatted { #expect(SQLFormatter.format(formatted) == formatted, "\(sql)") }
+        // Every preset holds to it too.
+        for preset in SQLFormatStyle.presets { #expect(SQLFormatter.format(sql, style: preset.style) != nil, "\(preset.name): \(sql)") }
     }
 }
 
@@ -232,12 +334,186 @@ struct SQLCompletionTests {
 
     @Test func functionsOfTheServerAndKeywords() async throws {
         let items = try await suggest("SELECT CONC|")
-        #expect(items.map(\.label) == ["CONCAT", "CONCAT_WS"] && items.first?.text == "CONCAT(")
+        #expect(items.map(\.label).prefix(2) == ["CONCAT", "CONCAT_WS"] && items.first?.text == "CONCAT(")
         #expect(try await suggest("SELECT JSON_D|").map(\.label) == ["JSON_DETAILED"], "MariaDB's")
         #expect(try await suggest("SELECT REGEXP_L|").isEmpty, "MySQL's only")
         #expect(try await suggest("SELECT 1 FR|").map(\.label) == ["FROM", "FROM_UNIXTIME"])
         // A name that needs quoting is offered quoted.
         #expect(try await suggest("SELECT * FROM we|").first?.text == "`we``ird 'name' ✓`")
+    }
+
+    func suggest(_ text: String, options: CompletionOptions) async throws -> [CompletionItem] {
+        let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+        let caret = (text as NSString).range(of: "|").location
+        return SQLCompletion.suggestions(text: text.replacingOccurrences(of: "|", with: ""), caret: caret, snapshot: cache.snapshot,
+                                         database: "airsql_fixture", options: options).items
+    }
+
+    @Test func matchesByAbbreviationAndTheMiddleOfAWord() async throws {
+        #expect(SQLCompletion.match("film_category", "fica") == 2)
+        #expect(SQLCompletion.match("ORDER BY", "ob") == 2)
+        #expect(SQLCompletion.match("filmCategory", "fc") == 2)
+        #expect(SQLCompletion.match("old_customers", "cust") == 1)
+        #expect(SQLCompletion.match("old_customers", "stom") == 3)
+        #expect(SQLCompletion.match("customers", "cu") == 0)
+        #expect(SQLCompletion.match("customers", "xy") == nil)
+        #expect(try await suggest("SELECT * FROM orl|").first?.label == "order_lines")
+        #expect(try await suggest("SELECT * FROM mail|").first?.label == "customer_emails")
+        #expect(try await suggest("SELECT * FROM orders ob|").first?.label == "ORDER BY")
+        // What was chosen before goes first among equals.
+        var options = CompletionOptions()
+        options.recent = ["customer_emails": 3]
+        #expect(try await suggest("SELECT * FROM cu|", options: options).first?.label == "customer_emails")
+    }
+
+    @Test func offersWhatTheGrammarAllowsHere() async throws {
+        #expect(try await suggest("SELECT * FROM orders ORDER |").map(\.label) == ["BY"])
+        #expect(try await suggest("SELECT * FROM orders o LEFT |").map(\.label) == ["JOIN", "OUTER JOIN"])
+        #expect(try await suggest("SELECT * FROM orders o WH|").map(\.label) == ["WHERE"])
+        let start = try await suggest("IN|").map(\.label)
+        #expect(start.contains("INSERT INTO") && !start.contains("INNER JOIN"))
+        let tail = try await suggest("SELECT * FROM orders ORDER BY id L|").map(\.label)
+        #expect(tail.contains("LIMIT") && !tail.contains("LEFT JOIN"))
+        #expect(try await suggest("CREATE TABLE x (a int) ENGINE=Inn|").map(\.text) == ["InnoDB"])
+        #expect(try await suggest("CALL add|").map(\.text) == ["add_customer("])
+        var lower = CompletionOptions()
+        lower.keywordCase = .lower
+        lower.functionCase = .lower
+        #expect(try await suggest("SELECT * FROM orders GR|", options: lower).first?.text == "group by")
+        #expect(try await suggest("SELECT CONC|", options: lower).first?.text == "concat(")
+    }
+
+    @Test func columnsOfCTEsDerivedTablesAndOutputs() async throws {
+        #expect(try await suggest("WITH c AS (SELECT id, status s FROM customers) SELECT c.| FROM c").map(\.label) == ["id", "s", "all columns"])
+        #expect(try await suggest("SELECT d.| FROM (SELECT id a FROM orders) d").map(\.label) == ["a"])
+        #expect(try await suggest("WITH recent AS (SELECT 1) SELECT * FROM rec|").first?.detail == "CTE")
+        #expect(try await suggest("SELECT total AS amount FROM orders ORDER BY am|").first?.detail == "alias")
+        // Two tables with the same name: it comes with its table.
+        let both = try await suggest("SELECT i| FROM orders o JOIN customers c ON 1").map(\.text)
+        #expect(both.prefix(2) == ["o.id", "c.id"])
+        #expect(try await suggest("SELECT airsql_fixture.orders.cust| FROM orders").map(\.label) == ["customer_id"])
+    }
+
+    @Test func insertColumnsValuesAndStars() async throws {
+        let list = try await suggest("INSERT INTO orders (|")
+        #expect(list.first?.text == "customer_id, region, number, total, parent_id", "AUTO_INCREMENT left out of the whole list")
+        #expect(list.contains { $0.label == "id" } && list.allSatisfy { $0.kind == .column })
+        #expect(try await suggest("INSERT INTO orders (id, re|").first?.label == "region")
+        let values = try await suggest("INSERT INTO orders (id, total) VALUES (|")
+        #expect(values.first?.text == "$id$, $total$$END$")
+        #expect(try await suggest("SELECT *| FROM orders").first?.text == "id, customer_id, region, number, total, parent_id")
+        #expect(try await suggest("SELECT *| FROM orders").first?.replacing == 7..<8)
+        #expect(try await suggest("SELECT o.*| FROM orders o").first?.replacing == 7..<10)
+        let two = try #require(try await suggest("SELECT *| FROM log l JOIN audit a ON 1").first?.text)
+        #expect(two == "l.at, l.message, a.id, a.what, a.address")
+        #expect(try await suggest("SELECT 2 *| FROM orders").first?.replacing == nil, "a product, not a star")
+    }
+
+    @Test func joinsAndConditions() async throws {
+        let on = try await suggest("SELECT * FROM orders o JOIN customers c ON |")
+        #expect(on.first?.text == "c.id = o.customer_id" && on.first?.kind == .join)
+        // Names alone: orders.customer_id to customers.id with no key in the way.
+        var snapshot = try await SchemaTests.loaded(SchemaFixtures.mariadb118).0.snapshot
+        let index = try #require(snapshot.databases.firstIndex { $0.name == "airsql_fixture" })
+        let table = try #require(snapshot.databases[index].tables.firstIndex { $0.name == "orders" })
+        snapshot.databases[index].tables[table].foreignKeys = []
+        let text = "SELECT * FROM orders o JOIN "
+        let items = SQLCompletion.suggestions(text: text, caret: (text as NSString).length, snapshot: snapshot, database: "airsql_fixture").items
+        #expect(items.contains { $0.text == "customers c ON c.id = o.customer_id" && $0.detail == "same names" }, "\(items.prefix(3).map(\.text))")
+        // A key the person defined counts as a key.
+        let virtual = SchemaForeignKey(name: "v", columns: ["message"], referencedDatabase: "airsql_fixture", referencedTable: "audit", referencedColumns: ["what"], onUpdate: "", onDelete: "")
+        let added = snapshot.adding(["airsql_fixture": ["log": [virtual]]])
+        let log = "SELECT * FROM log l JOIN "
+        let joined = SQLCompletion.suggestions(text: log, caret: (log as NSString).length, snapshot: added, database: "airsql_fixture").items
+        #expect(joined.first?.text == "audit a ON a.what = l.message")
+    }
+
+    @Test func aliasOnlyWhereOneFits() async throws {
+        var options = CompletionOptions()
+        options.tableAlias = true
+        #expect(try await suggest("SELECT * FROM order_li|", options: options).first?.text == "order_lines ol")
+        #expect(try await suggest("SELECT * FROM orders o, cust|", options: options).first?.text == "customers c")
+        #expect(try await suggest("SELECT * FROM cust|  c2", options: options).first?.text == "customers", "it has one")
+        #expect(try await suggest("DELETE FROM cust|", options: options).first?.text == "customers")
+        #expect(try await suggest("INSERT INTO cust|", options: options).first?.text == "customers")
+        #expect(SQLCompletion.alias("order_regions", used: []) == "or2", "OR is reserved")
+        #expect(SQLCompletion.alias("orders", used: ["o"]) == "o2")
+    }
+
+    @Test func valuesOfEnumsAndSettings() async throws {
+        #expect(try await suggest("SELECT * FROM customers WHERE status = '|").map(\.text) == ["'new'", "'active'", "'gone'"])
+        #expect(try await suggest("SELECT * FROM customers c WHERE c.status IN ('new', 'g|").map(\.text) == ["'gone'"])
+        #expect(try await suggest("SELECT * FROM customers WHERE status = |").first?.text == "'new'")
+        #expect(try await suggest("SELECT * FROM customers WHERE email = '|").isEmpty)
+        #expect(try await suggest("SELECT 1 -- status = '|").isEmpty)
+    }
+
+    @Test func variablesWordsAndColumnsBeforeFrom() async throws {
+        #expect(try await suggest("SELECT @@sql_m|").map(\.text) == ["@@sql_mode"])
+        #expect(try await suggest("SET @total = 1; SELECT @to|").map(\.text) == ["@total"])
+        #expect(try await suggest("SET sql_m|").map(\.text) == ["sql_mode"])
+        #expect(try await suggest("SELECT zebra; SELECT zeb|").map(\.label) == ["zebra"])
+        let first = try #require(try await suggest("SELECT ema|").first { $0.label == "email_domain" })
+        #expect(first.text == "email_domain$END$ FROM customers" && first.kind == .template)
+    }
+
+    @Test func postfixAndTemplates() async throws {
+        let post = try await suggest("orders.|")
+        #expect(post.map(\.label) == ["from", "cfrom", "afrom", "join", "cast"])
+        #expect(post[0].text == "SELECT * FROM orders$END$" && post[0].replacing == 0..<7)
+        #expect(post[2].text.hasPrefix("SELECT o.id, o.customer_id") && post[2].text.hasSuffix("FROM orders o$END$"))
+        #expect(post[3].text == "SELECT * FROM orders o JOIN customers c ON c.id = o.customer_id$END$")
+        #expect(try await suggest("SELECT o.total.ca| FROM orders o").first?.text == "CAST(o.total AS $type$)$END$")
+        #expect(try await suggest("SELECT 1 FROM orders WHERE log.fr|").isEmpty, "a query can't start here")
+        let sel = try await suggest("sel|")
+        #expect(sel.first?.kind == .template && sel.first?.label == "sel")
+        #expect(try await suggest("se|").first?.kind == .keyword, "the abbreviation isn't whole yet")
+        var options = CompletionOptions()
+        options.snippets = [SQLSnippet(name: "Mine", abbreviation: "sel", body: "SELECT 1"), SQLSnippet(name: "No word", body: "SELECT 2")]
+        #expect(try await suggest("sel|", options: options).first?.text == "SELECT 1")
+    }
+}
+
+struct SnippetSettingsTests {
+    @Test func ownSnippetsComeFirstAndSurviveSaving() throws {
+        var settings = AppSettings()
+        settings.snippets = [SQLSnippet(name: "Mine", abbreviation: "sel", folder: "Work", body: "SELECT 1")]
+        settings.formatStyle.keywords = .lower
+        settings.completionTableAlias = false
+        let options = settings.completionOptions(recent: ["x": 1])
+        #expect(options.snippets.first?.name == "Mine" && options.snippets.count == SQLSnippet.builtIn.count + 1)
+        #expect(options.keywordCase == .lower && !options.tableAlias && options.recent == ["x": 1])
+        let back = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+        #expect(back == settings)
+        #expect(try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8)) == AppSettings(), "older settings")
+    }
+
+    @Test func documentationOfASuggestion() async throws {
+        let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+        let table = CompletionItem(kind: .table, text: "log", label: "log", detail: "table")
+        #expect(SQLCompletion.documentation(table, snapshot: cache.snapshot, database: "airsql_fixture") == "at datetime, message varchar(200)")
+        let template = CompletionItem(kind: .template, text: "SELECT $a$$END$", label: "x", detail: "")
+        #expect(SQLCompletion.documentation(template, snapshot: nil, database: nil) == "SELECT a")
+    }
+}
+
+struct SQLTemplateTests {
+    @Test func fieldsEndAndDollars() {
+        let plain = SQLTemplate.expand("SELECT * FROM $table$ WHERE $a$ = $a$;$END$")
+        #expect(plain.text == "SELECT * FROM table WHERE a = a;")
+        #expect(plain.fields == [[14..<19], [26..<27, 30..<31]] && plain.end == 32)
+        #expect(SQLTemplate.expand("a $$ b $1 $ $x y$").text == "a $ b $1 $ $x y$")
+        #expect(SQLTemplate.expand("($SELECTION$) AS $alias$", selection: "SELECT 1").text == "(SELECT 1) AS alias")
+        #expect(SQLTemplate.expand("x").fields.isEmpty && SQLTemplate.expand("x").end == nil)
+        #expect(SQLTemplate.expand(SQLTemplate.escape("a$b$c")).text == "a$b$c")
+    }
+
+    @Test func builtInsHaveFieldsAndAnEnd() {
+        #expect(Set(SQLSnippet.builtIn.map(\.abbreviation)) == ["sel", "selw", "selc", "lim", "ins", "upd", "del", "tab", "view", "col"])
+        for snippet in SQLSnippet.builtIn {
+            let expansion = SQLTemplate.expand(snippet.body)
+            #expect(!expansion.fields.isEmpty && expansion.end != nil && !expansion.text.contains("$"), "\(snippet.name)")
+        }
     }
 }
 

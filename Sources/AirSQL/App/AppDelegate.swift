@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         self.main = main
         agents = AgentService(model: model, main: main)
         agents?.consoles = main
+        SQLEditorView.settings = { [weak model] in model?.data.settings ?? AppSettings() }
         // The console's sessions, schema and query timeout: the connected connection's.
         ConsoleViewController.openConnection = { [weak model] in model?.openConnection($0)?.connection }
         ConsoleViewController.schemaCache = { [weak model] in model?.openConnection($0)?.schema }

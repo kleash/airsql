@@ -66,6 +66,10 @@ final class ConsoleViewController: NSViewController, TabContent {
     /// The editor and results, and the helpers panel beside them when shown.
     let outer = NSSplitView()
     lazy var helpers: HelpersPanel = makeHelpers()
+    /// While the helpers show: what tells them the tree's selection moved.
+    var treeObserver: NSObjectProtocol?
+    /// The foreign keys the person defined on this connection, for completion's joins, as last read.
+    var virtualKeys: [String: [String: [SchemaForeignKey]]] = [:]
     private let initialText: String
     /// The run under way, if any.
     var running: ConsoleRun?
@@ -136,9 +140,15 @@ final class ConsoleViewController: NSViewController, TabContent {
         editor.onDropFiles = { [weak self] urls in self?.mainWindow?.openFiles(urls) }
         editor.completions = { [weak self] text, caret in
             guard let self else { return (caret..<caret, []) }
-            let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }
+            let snapshot = self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }?.adding(self.virtualKeys)
+            self.refreshVirtualKeys()
             return SQLCompletion.suggestions(text: text, caret: caret, snapshot: snapshot, database: self.database,
-                                             noBackslashEscapes: self.editor.noBackslashEscapes)
+                                             noBackslashEscapes: self.editor.noBackslashEscapes,
+                                             options: self.model.data.settings.completionOptions(recent: CompletionPopup.chosen))
+        }
+        editor.completionDocs = { [weak self] item in
+            guard let self else { return nil }
+            return SQLCompletion.documentation(item, snapshot: self.connectionID.flatMap { Self.schemaCache($0)?.snapshot }, database: self.database)
         }
         editor.nameContext = { [weak self] in
             guard let self, let id = self.connectionID, !self.shared.ranCode else { return nil }

@@ -51,7 +51,7 @@ extension ConsoleViewController: NSMenuItemValidation {
         let selection = editor.selectedRange()
         let range = selection.length > 0 ? selection : NSRange(location: 0, length: (text as NSString).length)
         let original = (text as NSString).substring(with: range)
-        guard let formatted = SQLFormatter.format(original, noBackslashEscapes: editor.noBackslashEscapes) else {
+        guard let formatted = SQLFormatter.format(original, noBackslashEscapes: editor.noBackslashEscapes, style: model.data.settings.formatStyle) else {
             return note(.info, "AirSQL couldn't tidy this SQL without changing what it says, so it left it as it was.")
         }
         guard formatted != original else { return }
@@ -118,7 +118,7 @@ extension ConsoleViewController: NSMenuItemValidation {
                 ? .on : .off
             if let reason = offline ?? busy { return (false, reason) }
             return (true, "")
-        case #selector(formatSQL(_:)):
+        case #selector(formatSQL(_:)), #selector(saveAsSnippet(_:)):
             return (hasText, "Type some SQL first")
         case #selector(toggleWordWrap(_:)):
             item.state = model.data.settings.editorWordWrap ? .on : .off
