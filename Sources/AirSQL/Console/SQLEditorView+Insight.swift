@@ -45,10 +45,13 @@ extension SQLEditorView {
             let analysis = SQLAnalysis(text, snapshot: context?.snapshot, database: context?.database, changed: context?.changed ?? [],
                                        noBackslashEscapes: noBackslashEscapes)
             let found = SQLInspections.problems(analysis, readOnly: readOnly, disabled: disabled, noBackslashEscapes: noBackslashEscapes)
+            let hints = SQLIntentions.hints(in: analysis)
             DispatchQueue.main.async {
                 guard let self, self.string == text else { return }  // the check after this edit is on its way
                 self.insight = analysis
                 self.inspected = found
+                self.showHints(hints)
+                self.markUsages()
             }
         }
     }
@@ -211,13 +214,16 @@ extension SQLEditorView {
         usageMarks = []
     }
 
-    /// Tints the other places of the name at the caret, and the partner of a BEGIN, CASE or END there.
+    /// Tints the other places of the name at the caret, and the partner of a BEGIN, CASE or END there. Runs on the main
+    /// thread at every stop of the caret, so only for a name there, and not in a long script.
     @objc func markUsages() {
         clearUsageMarks()
-        guard selectedRange().length == 0, let analysis = insight, analysis.text == string, let layout = layoutManager else { return }
+        guard selectedRange().length == 0, (string as NSString).length <= Self.longText, let analysis = insight, analysis.text == string,
+              let layout = layoutManager, let token = tokens.first(where: { $0.range.lowerBound <= caret && caret <= $0.range.upperBound
+                  && [.word, .quotedName, .variable].contains($0.kind) }) else { return }
         var ranges = usages(at: caret, in: analysis)
         if ranges.count < 2 { ranges = [] }
-        ranges += SQLBlocks.pair(at: caret, tokens: tokens, text: analysis.text)
+        if token.kind == .word { ranges += SQLBlocks.pair(at: caret, tokens: tokens, text: analysis.text) }
         let color = NSColor.accent.withAlphaComponent(0.14)
         for range in ranges {
             layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: NSRange(range))
@@ -361,6 +367,54 @@ extension SQLEditorView {
         popover.show(relativeTo: NSRect(x: point.x, y: point.y - 14, width: 1, height: 14), of: self, preferredEdge: .maxY)
     }
 
+    // MARK: Hover
+
+    /// A tooltip only appears on entering its area, so the mouse carries one small area along with it, over the name
+    /// it's on. Not for an editor with a tooltip of its own, or with nothing to look names up in.
+    func trackHover() {
+        guard hoverTracker == nil, toolTip == nil, nameContext != nil else { return }
+        let tracker = HoverTracker(editor: self)
+        hoverTracker = tracker
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: tracker))
+    }
+
+    /// What a pause over a name shows: its Quick Documentation, from the last reading.
+    func hoverText(at index: Int) -> String {
+        guard let insight, insight.text == string, let doc = SQLIntentions.documentation(at: index, in: insight) else { return "" }
+        return doc.title + "\n" + doc.body
+    }
+
+    // MARK: Hints in the text
+
+    /// Opens a gap before each hint's place, with kerning on the character there. Attributes follow the text as it
+    /// changes and never touch Undo, and colouring resets those it recolours, until the next reading puts them back.
+    func showHints(_ hints: [(offset: Int, text: String)]) {
+        guard let storage = textStorage else { return }
+        let whole = NSRange(location: 0, length: storage.length)
+        var old: [(Int, String)] = []
+        storage.enumerateAttribute(.sqlHint, in: whole) { value, range, _ in
+            if let value = value as? String { old.append((range.location + 1, value)) }
+        }
+        guard !old.elementsEqual(hints.map { ($0.offset, $0.text) }, by: { $0 == $1 }) else { return }
+        storage.beginEditing()
+        storage.enumerateAttribute(.sqlHint, in: whole) { value, range, _ in
+            guard value != nil else { return }
+            storage.removeAttribute(.sqlHint, range: range)
+            storage.removeAttribute(.kern, range: range)
+        }
+        for hint in hints where hint.offset > 0 && hint.offset <= storage.length {
+            let range = NSRange(location: hint.offset - 1, length: 1)
+            storage.addAttributes([.sqlHint: hint.text, .kern: InlayOverlay.width(hint.text) + 5], range: range)
+        }
+        storage.endEditing()
+        if inlayOverlay == nil, !hints.isEmpty {
+            let overlay = InlayOverlay(editor: self)
+            addSubview(overlay)
+            inlayOverlay = overlay
+        }
+        inlayOverlay?.needsDisplay = true
+    }
+
     // MARK: The margin
 
     /// Keeps the stripe beside the scroller up to date.
@@ -369,6 +423,9 @@ extension SQLEditorView {
         if problemStripe == nil, !problems.isEmpty {
             let stripe = ProblemStripe(editor: self)
             scroll.addSubview(stripe)
+            scroll.addSubview(stripe.count)
+            scroll.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(stripe, selector: #selector(ProblemStripe.place), name: NSView.frameDidChangeNotification, object: scroll)
             problemStripe = stripe
         }
         problemStripe?.update()
@@ -376,6 +433,76 @@ extension SQLEditorView {
 
     func goToProblem(_ problem: SQLProblem) {
         select(problem.range)
+    }
+}
+
+extension NSAttributedString.Key {
+    /// The note drawn in the gap after this character.
+    static let sqlHint = NSAttributedString.Key("AirSQLHint")
+}
+
+/// Draws the hints in their gaps, over the text, and takes no clicks.
+final class InlayOverlay: NSView {
+    private weak var editor: SQLEditorView?
+    private static let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
+                                                                    .foregroundColor: NSColor.tertiaryLabelColor]
+
+    static func width(_ text: String) -> CGFloat { ceil((text as NSString).size(withAttributes: attributes).width) }
+
+    init(editor: SQLEditorView) {
+        self.editor = editor
+        super.init(frame: editor.bounds)
+        autoresizingMask = [.width, .height]
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let editor, let layout = editor.layoutManager, let container = editor.textContainer, let storage = editor.textStorage else { return }
+        let origin = editor.textContainerOrigin
+        let area = dirtyRect.intersection(bounds).offsetBy(dx: -origin.x, dy: -origin.y)
+        let glyphs = layout.glyphRange(forBoundingRect: area, in: container)
+        let characters = layout.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        storage.enumerateAttribute(.sqlHint, in: characters) { value, range, _ in
+            guard let text = value as? String else { return }
+            let glyph = layout.glyphIndexForCharacter(at: range.location)
+            var line = NSRange()
+            let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: &line)
+            guard NSMaxRange(line) > glyph + 1 else { return }  // its gap is at a line's end: wrapped away
+            let x = fragment.minX + layout.location(forGlyphAt: glyph + 1).x - Self.width(text) - 3 + origin.x
+            (text as NSString).draw(at: NSPoint(x: x, y: fragment.minY + origin.y + 2), withAttributes: Self.attributes)
+        }
+    }
+}
+
+/// Keeps a tooltip area on the name under the mouse.
+final class HoverTracker: NSObject {
+    private weak var editor: SQLEditorView?
+    private var tag: NSView.ToolTipTag?
+    private(set) var name: Range<Int>?
+
+    init(editor: SQLEditorView) { self.editor = editor }
+
+    @objc func mouseMoved(with event: NSEvent) {
+        guard let editor else { return }
+        hover(at: editor.convert(event.locationInWindow, from: nil))
+    }
+
+    func hover(at point: NSPoint) {
+        guard let editor, let layout = editor.layoutManager, let container = editor.textContainer else { return }
+        let index = editor.characterIndexForInsertion(at: point)
+        let found = editor.insight?.reference(at: index)?.range
+        guard found != name else { return }
+        if let tag { editor.removeToolTip(tag) }
+        tag = nil
+        name = found
+        guard let found, found.upperBound <= (editor.string as NSString).length else { return }
+        let glyphs = layout.glyphRange(forCharacterRange: NSRange(found), actualCharacterRange: nil)
+        let rect = layout.boundingRect(forGlyphRange: glyphs, in: container)
+        tag = editor.addToolTip(rect.offsetBy(dx: editor.textContainerOrigin.x, dy: editor.textContainerOrigin.y), owner: editor, userData: nil)
     }
 }
 
@@ -389,14 +516,20 @@ private final class FixBox {
 /// on a mark goes to it.
 final class ProblemStripe: NSView {
     private weak var editor: SQLEditorView?
-    private var marks: [(y: CGFloat, problem: SQLProblem)] = []
-    private static let width: CGFloat = 8
+    /// `at`: how far down the text, 0 to 1.
+    private var marks: [(at: CGFloat, problem: SQLProblem)] = []
+    /// "2 errors, 1 warning", at the top of the editor.
+    let count = NSTextField(labelWithString: "")
 
     init(editor: SQLEditorView) {
         self.editor = editor
         super.init(frame: .zero)
-        autoresizingMask = [.minXMargin, .height]
         setAccessibilityIdentifier("console.problemStripe")
+        count.font = .systemFont(ofSize: 10)
+        count.textColor = .secondaryLabelColor
+        count.drawsBackground = true
+        count.backgroundColor = .content
+        count.setAccessibilityIdentifier("console.problemCount")
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -404,32 +537,44 @@ final class ProblemStripe: NSView {
     override var isFlipped: Bool { true }
 
     func update() {
-        guard let editor, let scroll = editor.enclosingScrollView else { return }
-        let content = scroll.contentView.frame
-        frame = NSRect(x: content.maxX - Self.width, y: content.minY, width: Self.width, height: content.height)
-        let text = Array(editor.string.utf16)
-        var lineStarts = [0]
-        for (index, unit) in text.enumerated() where unit == 0x0A { lineStarts.append(index + 1) }
-        marks = editor.problems.map { problem in
-            let line = lineStarts.lastIndex { $0 <= problem.range.lowerBound } ?? 0
-            return (CGFloat(line) / CGFloat(max(lineStarts.count, 1)) * bounds.height, problem)
-        }
+        guard let editor else { return }
+        // By characters, not lines: near enough for a mark, and no pass over the text on the main thread.
+        let length = CGFloat(max((editor.string as NSString).length, 1))
+        marks = editor.problems.map { (CGFloat($0.range.lowerBound) / length, $0) }
         let errors = editor.problems.filter { $0.severity == .error }.count, warnings = editor.problems.filter { $0.severity == .warning }.count
-        toolTip = marks.isEmpty ? nil : "\(errors) error\(errors == 1 ? "" : "s"), \(warnings) warning\(warnings == 1 ? "" : "s"): click a mark to go to it"
+        var parts: [String] = []
+        if errors > 0 { parts.append("\(errors) error\(errors == 1 ? "" : "s")") }
+        if warnings > 0 { parts.append("\(warnings) warning\(warnings == 1 ? "" : "s")") }
+        toolTip = marks.isEmpty ? nil : "Click a mark to go to that problem"
         isHidden = marks.isEmpty
+        count.stringValue = parts.joined(separator: ", ")
+        count.toolTip = "Problems in this text: ⌥F2 goes to the next one"
+        count.isHidden = parts.isEmpty
+        place()
         needsDisplay = true
+    }
+
+    /// Beside the scroller, with the count to its left at the top. The scroll view tiles its own subviews by hand, so
+    /// these follow its frame by hand too.
+    @objc func place() {
+        guard let scroll = superview else { return }
+        let scroller: CGFloat = NSScroller.preferredScrollerStyle == .legacy ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 2
+        frame = NSRect(x: scroll.bounds.width - scroller - 8, y: 0, width: 8, height: scroll.bounds.height)
+        count.sizeToFit()
+        let top = scroll.isFlipped ? 2 : scroll.bounds.height - count.frame.height - 2
+        count.setFrameOrigin(NSPoint(x: frame.minX - count.frame.width - 6, y: top))
     }
 
     override func draw(_ dirtyRect: NSRect) {
         for mark in marks {
             let color: NSColor = mark.problem.severity == .error ? .statusBad : mark.problem.severity == .warning ? .statusWarning : .tertiaryLabelColor
             color.setFill()
-            NSRect(x: 1, y: min(mark.y, bounds.height - 3), width: bounds.width - 2, height: 3).intersection(bounds).fill()
+            NSRect(x: 1, y: min(mark.at * bounds.height, bounds.height - 3), width: bounds.width - 2, height: 3).intersection(bounds).fill()
         }
     }
 
     override func mouseDown(with event: NSEvent) {
         let y = convert(event.locationInWindow, from: nil).y
-        if let nearest = marks.min(by: { abs($0.y - y) < abs($1.y - y) }) { editor?.goToProblem(nearest.problem) }
+        if let nearest = marks.min(by: { abs($0.at * bounds.height - y) < abs($1.at * bounds.height - y) }) { editor?.goToProblem(nearest.problem) }
     }
 }

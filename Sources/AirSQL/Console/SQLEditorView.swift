@@ -37,6 +37,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     /// What the last note said, for the tests.
     var shownNote = ""
     var problemStripe: ProblemStripe?
+    var inlayOverlay: InlayOverlay?
+    var hoverTracker: HoverTracker?
     private(set) var tokens: [SQLToken] = []
     private var highlightedLength = 0
     /// Its own, not the window's: Undo in one console must never change another's hidden text, and an object editor's
@@ -254,7 +256,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
         let index = characterIndexForInsertion(at: point)
-        return problems.first { ($0.range.lowerBound...$0.range.upperBound).contains(index) }?.message ?? ""
+        return problems.first { ($0.range.lowerBound...$0.range.upperBound).contains(index) }?.message ?? hoverText(at: index)
     }
 
     // MARK: Marks (what ran, the matching bracket)

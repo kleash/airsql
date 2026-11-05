@@ -160,8 +160,8 @@ public struct SQLAnalysis {
 
     /// Every place that means `symbol`, declaration included.
     public func usages(of symbol: SQLSymbol) -> [SQLReference] {
-        let key = symbol.key
-        return references.filter { $0.symbol.key == key }
+        let key = symbol.key, length = symbol.name.utf16.count
+        return references.filter { $0.symbol.name.utf16.count == length && $0.symbol.key == key }
     }
 
     /// The innermost scope around `offset`.

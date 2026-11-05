@@ -149,12 +149,17 @@ extension SQLParser {
     }
 
     /// A query starts at token `at`, under any number of brackets.
-    func looksLikeQuery(_ start: Int) -> Bool {
+    /// In a value VALUES (a) is a function; in FROM, `inFrom`, it's rows.
+    func looksLikeQuery(_ start: Int, inFrom: Bool = false) -> Bool {
         var i = start
         while i < tokens.count, tokens[i].upper == "(" { i += 1 }
         guard i < tokens.count else { return false }
-        return ["SELECT", "WITH"].contains(tokens[i].upper) || (["VALUES", "TABLE"].contains(tokens[i].upper) && i + 1 < tokens.count
-            && (tokens[i].upper == "TABLE" || tokens[i + 1].upper == "ROW"))
+        let next = i + 1 < tokens.count ? tokens[i + 1].upper : ""
+        switch tokens[i].upper {
+        case "SELECT", "WITH", "TABLE": return true
+        case "VALUES": return next == "ROW" || (inFrom && next == "(")
+        default: return false
+        }
     }
 
     private mutating func prefix() -> SQLExpr {

@@ -10,6 +10,7 @@ extension ConsoleViewController {
             refreshSchema: { [weak self] in self?.refresh(nil) },
             previewRows: { [weak self] sql in self?.previewRows(sql) },
             openObject: { [weak self] symbol in self?.open(symbol) })
+        editor.trackHover()
     }
 
     /// Runs a preview's SELECT as a result of this tab: nothing is written, whatever the statement it came from.

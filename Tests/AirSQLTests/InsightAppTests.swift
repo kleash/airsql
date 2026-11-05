@@ -131,7 +131,33 @@ extension AppTests {
         @Test func theStripeMarksProblems() async throws {
             let editor = try await editor("SELECT 1\nFROM nosuch")
             let stripe = try #require(editor.problemStripe)
-            #expect(!stripe.isHidden && stripe.toolTip?.hasPrefix("1 error, 0 warnings") == true)
+            #expect(!stripe.isHidden && stripe.count.stringValue == "1 error")
+        }
+
+        @Test func hintsOpenGapsWithoutTouchingTheText() async throws {
+            let text = "INSERT INTO orders (id, total) VALUES (1, 2)"
+            let editor = try await editor(text)
+            let storage = try #require(editor.textStorage)
+            #expect(await eventually(timeout: 5) { storage.attribute(.sqlHint, at: 38, effectiveRange: nil) as? String == "id:" })
+            #expect(storage.attribute(.kern, at: 38, effectiveRange: nil) != nil && editor.string == text && editor.inlayOverlay != nil)
+            editor.setText("SELECT 1")
+            editor.check()
+            #expect(await eventually(timeout: 5) { editor.insight?.text == "SELECT 1" })
+            #expect(storage.attribute(.sqlHint, at: 3, effectiveRange: nil) == nil)
+            #expect(editor.undoManager?.canUndo == false)
+        }
+
+        @Test func hoveringOverANameShowsWhatItIs() async throws {
+            let editor = try await editor("SELECT id FROM orders")
+            #expect(editor.hoverText(at: 16).hasPrefix("orders\nTable in shop"))
+            #expect(editor.hoverText(at: 3) == "")
+            let tracker = try #require(editor.hoverTracker), layout = try #require(editor.layoutManager)
+            let glyphs = layout.glyphRange(forCharacterRange: NSRange(location: 16, length: 1), actualCharacterRange: nil)
+            let rect = layout.boundingRect(forGlyphRange: glyphs, in: try #require(editor.textContainer))
+            let over = NSPoint(x: rect.midX + editor.textContainerOrigin.x, y: rect.midY + editor.textContainerOrigin.y)
+            tracker.hover(at: over)
+            #expect(tracker.name == 15..<21)
+            #expect(editor.view(editor, stringForToolTip: 0, point: over, userData: nil).hasPrefix("orders\nTable in shop"))
         }
 
         @Test func theCodeMenuIsThere() throws {

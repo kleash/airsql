@@ -191,6 +191,37 @@ import Testing
         }
     }
 
+    /// The odd corners of real statements, as a second net for false alarms.
+    @Test func everydaySQLHasNoErrors() {
+        let valid = [
+            "SELECT * FROM t1 LEFT JOIN (t2, t3) ON t1.a = t2.a", "SELECT 1 FROM t WHERE a = 'x' COLLATE utf8mb4_bin", "SELECT a, b FROM t ORDER BY a LIMIT 1 FOR UPDATE",
+            "SELECT COUNT(*) AS c, b FROM t GROUP BY 2 HAVING c > 1", "SELECT CONCAT(a, ' ', b) name FROM t", "SELECT DISTINCT(a), b FROM t", "SELECT COUNT(DISTINCT(a)) FROM t",
+            "SELECT -1, +1, - -1, 1--1", "SELECT CURRENT_DATE + 1, CURDATE() - INTERVAL 1 DAY", "SELECT * FROM t WHERE d > NOW() - INTERVAL 7 DAY", "SELECT ADDDATE(x, INTERVAL 1 MONTH), ADDDATE(x, 1) FROM t",
+            "SELECT LAST_INSERT_ID(), FOUND_ROWS(), VERSION(), USER(), CHARSET('a'), COLLATION(a), CHARACTER_LENGTH(a), LOCALTIME(), UTC_TIMESTAMP(3) FROM t", "SELECT a MOD b, a DIV b, ASCII('a'), FORMAT(1, 2), TRUNCATE(1.5, 0) FROM t",
+            "SELECT MICROSECOND(a), SECOND(a), MINUTE(a), YEAR(d), DATE(d), TIME(d), TIMESTAMP(d), DATE_FORMAT(d, '%Y') FROM t", "SELECT EXISTS(SELECT 1), 1 = 1 IS TRUE, ROW_COUNT(), GET_LOCK('a', 1), SLEEP(1)",
+            "SELECT JSON_OBJECT('a', 1), JSON_ARRAYAGG(a ORDER BY b), JSON_VALUE(a, '$.b' RETURNING CHAR(3)) FROM t", "SELECT a FROM t1 UNION ALL (SELECT b FROM t2 ORDER BY 1 LIMIT 1) LIMIT 5",
+            "SELECT * FROM (SELECT 1) a JOIN (SELECT 2) b", "SELECT * FROM t WHERE (a, b) IN (SELECT a, b FROM u)", "SELECT a FROM t WHERE b LIKE CONCAT('%', ?, '%')", "SELECT BINARY 'a' = 'A'", "SELECT a FROM t HAVING a > 1",
+            "SELECT a FROM t ORDER BY CASE WHEN a THEN 1 ELSE 2 END DESC, FIELD(b, 1, 2)", "SELECT DATE_SUB(NOW(), INTERVAL -1 DAY)", "SELECT a, @rownum := @rownum + 1 FROM t, (SELECT @rownum := 0) r", "SELECT @a:=1",
+            "INSERT INTO t SET a = 1 ON DUPLICATE KEY UPDATE a = a + 1", "INSERT INTO t (a) VALUES (1) ON DUPLICATE KEY UPDATE a = VALUES(a), b = (VALUES(a) + 1)", "INSERT INTO t (a, b) SELECT a, b FROM u WHERE 1 ON DUPLICATE KEY UPDATE a = 1",
+            "INSERT INTO t SELECT * FROM u UNION SELECT * FROM v", "UPDATE t SET a = (SELECT MAX(b) FROM u) WHERE c", "UPDATE t SET a = DEFAULT", "UPDATE t1 INNER JOIN t2 USING (id) SET t1.a = 1",
+            "DELETE FROM t WHERE a IN (SELECT a FROM (SELECT a FROM t) x)", "LOCK TABLES t READ", "UNLOCK TABLES", "FLUSH PRIVILEGES", "OPTIMIZE TABLE t", "CHECK TABLE t",
+            "CREATE TABLE t (a INT) COMMENT 'x' AS SELECT 1",
+            "CREATE TABLE t (a INT CHECK (a > 0), b VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin, c ENUM('a', 'b') NOT NULL DEFAULT 'a', d DATETIME ON UPDATE CURRENT_TIMESTAMP, e TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3), INDEX (b), FULLTEXT KEY ft (b))",
+            "CREATE TABLE t (a INT, FOREIGN KEY (a) REFERENCES u (b) ON DELETE CASCADE)", "CREATE TABLE t (id INT PRIMARY KEY AUTO_INCREMENT)", "SET @a := (SELECT 1)", "SET @a = 1, @@session.x = 2",
+            "SELECT `a`.`b`.`c` FROM a.b", "SELECT a.*, b.x FROM a, b", "SELECT 1 LIMIT 1;", "SELECT * FROM t WHERE a = b'101'", "SELECT .5 + 1.", "SELECT a FROM t WHERE b = :name AND c = :n2",
+            "SELECT CAST(a AS JSON), CAST('1' AS SIGNED INTEGER), CAST(a AS CHAR(10) CHARACTER SET utf8) FROM t", "SELECT 1 AS 'a b', 2 \"c d\"", "SELECT a FROM t USE INDEX FOR JOIN (i)", "SELECT * FROM t1 NATURAL RIGHT JOIN t2",
+            "SELECT a FROM t PROCEDURE ANALYSE()", "SELECT LAG(a, 1, 0) OVER (ORDER BY b) FROM t", "SELECT a FROM t WHERE MATCH(a) AGAINST('b' IN BOOLEAN MODE) > 0", "SELECT GROUPING(a) FROM t GROUP BY a WITH ROLLUP",
+            "SELECT (SELECT 1) + 1, (SELECT 1), (2), ((1))", "(SELECT 1) LIMIT 1", "(SELECT 1) ORDER BY 1", "WITH a AS (SELECT 1) (SELECT * FROM a)", "SELECT * FROM (VALUES ROW(1)) t (a)", "SELECT * FROM (VALUES (1), (2)) t",
+            "SELECT * FROM t WHERE a IN (1)", "SELECT a b, c AS d, e FROM t", "SELECT year, month, day, date, time, text, status, name, type, value, comment, data, count, sum FROM t",
+            "SELECT t.year FROM year t", "SELECT * FROM user", "SELECT * FROM status WHERE type = 1", "SELECT a FROM t WHERE date > '2020-01-01' AND time < 3", "UPDATE t SET date = NOW(), text = 'x', value = 1",
+            "INSERT INTO t (date, text, status) VALUES ('2020-01-01', 'x', 1)", "SELECT CHAR(65), CONVERT('a' USING utf8mb4), CHAR(65 USING utf8mb4), DAY(d), WEEK(d, 1) FROM t",
+        ]
+        for sql in valid {
+            let wrong = SQLParser.parse(sql).flatMap(\.errors).first?.message
+            #expect(wrong == nil, "\(sql)")
+        }
+    }
+
     @Test func realReadsHaveNoErrors() {
         for sql in ReadCorpus.all {
             let wrong = SQLParser.parse(sql).flatMap(\.errors).first?.message
@@ -666,6 +697,7 @@ import Testing
     @Test func previewsWhatAWriteWouldTouch() {
         func preview(_ sql: String) -> String? { let found = analysis(sql); return SQLIntentions.preview(of: found.statements[0], in: found) }
         #expect(preview("DELETE FROM orders WHERE id = 1") == "SELECT orders.* FROM orders WHERE id = 1 LIMIT 1000")
+        #expect(preview("UPDATE orders o JOIN customers c ON c.id = o.id SET o.total = 1") == "SELECT 1 AS `new total`, o.*, c.* FROM orders o JOIN customers c ON c.id = o.id LIMIT 1000")
         #expect(preview("DELETE o FROM orders o JOIN customers c ON c.id = o.id WHERE c.id = 2 ") == "SELECT o.* FROM orders o JOIN customers c ON c.id = o.id WHERE c.id = 2 LIMIT 1000")
         #expect(preview("DELETE FROM orders ORDER BY id DESC LIMIT 5") == "SELECT orders.* FROM orders ORDER BY id DESC LIMIT 5")
         #expect(preview("UPDATE orders SET total = total + 1, customer_id = 2 WHERE id = 1")
@@ -732,9 +764,19 @@ import Testing
         #expect(info("SELECT 1|") == nil)
     }
 
-    @Test func hintsNameEachValue() {
-        let found = analysis("INSERT INTO orders (id, total) VALUES (1, 2)")
-        #expect(SQLIntentions.valueHints(in: found, range: 0..<100).map(\.column) == ["id", "total"])
+    @Test func hintsNameValuesStarsAndJoins() {
+        #expect(SQLIntentions.hints(in: analysis("INSERT INTO orders (id, total) VALUES (1, 2)")).map(\.text) == ["id:", "total:"])
+        #expect(SQLIntentions.hints(in: analysis("SELECT * FROM customers")).map(\.text) == ["id, name"])
+        #expect(SQLIntentions.hints(in: analysis("SELECT * FROM orders")).first?.text == "id, total, customer_id, twice")
+        #expect(SQLIntentions.hints(in: analysis("SELECT 1 FROM nosuch")).isEmpty)
+        var snapshot = InspectionTests.snapshot()
+        let index = snapshot.databases[0].tables.firstIndex { $0.name == "orders" }!
+        snapshot.databases[0].tables[index].foreignKeys = [SchemaForeignKey(name: "fk", columns: ["customer_id"], referencedDatabase: "shop", referencedTable: "customers",
+                                                                            referencedColumns: ["id"], onUpdate: "", onDelete: "")]
+        func joins(_ sql: String) -> [String] { SQLIntentions.hints(in: SQLAnalysis(sql, snapshot: snapshot, database: "shop")).map(\.text).filter { $0.contains(":") } }
+        #expect(joins("SELECT 1 FROM customers c JOIN orders o ON o.customer_id = c.id") == ["1:n"])
+        #expect(joins("SELECT 1 FROM orders o JOIN customers c ON o.customer_id = c.id") == ["n:1"])
+        #expect(joins("SELECT 1 FROM orders o JOIN customers c ON o.id = c.id").isEmpty)
     }
 
     @Test func offersRenameOnNames() {

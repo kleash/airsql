@@ -445,6 +445,9 @@ When AirSQL isn't sure it says nothing: a database whose details aren't loaded y
 altered in the same text or session, code in `/*! … */` comments, and routine bodies. Turn any check off in
 **Settings ▸ Editor**. If a table is new, **Refresh** the schema and the underline goes.
 
+Small grey notes in the text say which column each INSERT value goes to, what a `*` stands for, and whether a JOIN meets
+one row or many (`1:n`, from the foreign keys). They aren't part of the text: they're never copied, saved or run.
+
 ## Work with the code
 
 Everything here is in **Query ▸ Code**, and none of it changes anything on the server.
@@ -460,6 +463,7 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
   column it changes the text and writes the `RENAME TABLE` or `ALTER TABLE … RENAME COLUMN` above the statement, for you
   to read and run.
 - **Quick Documentation** (F1) shows a table's columns and keys, a column's type and default, or a function's signature.
+  Pausing the mouse over a name shows the same.
 - **Parameter Info** (⌥⌘I) shows what each argument of a call is for, or which column each value of an INSERT row goes
   to, with the one at the cursor in bold.
 - **Preview Rows to Change** (⌥⌘↩) shows, as a result, the rows the UPDATE or DELETE at the cursor would touch, with an

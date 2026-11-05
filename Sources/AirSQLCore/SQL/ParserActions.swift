@@ -37,7 +37,8 @@ public enum SQLIntentions {
             columns.append("\(reader.string(assignment.value.range)) AS \(SQLQuote.identifier("new " + assignment.column.last.value))")
         }
         if write.deleteTargets.isEmpty {
-            columns.append(write.tables.count == 1 ? (write.tables[0].alias?.value ?? write.tables[0].name?.last.value).map { SQLCompletion.quote($0) + ".*" } ?? "*" : "*")
+            // Each table by name: a bare * can't follow other items.
+            columns += write.tables.compactMap { ($0.alias?.value ?? $0.name?.last.value).map { SQLCompletion.quote($0) + ".*" } }
         } else {
             columns += write.deleteTargets.map { reader.string($0.range) + ".*" }
         }
@@ -103,17 +104,33 @@ public enum SQLIntentions {
         Reader(analysis: analysis).parameters(at: caret)
     }
 
-    /// Where each value of each row goes: the hints beside INSERT's values.
-    public static func valueHints(in analysis: SQLAnalysis, range: Range<Int>) -> [(offset: Int, column: String)] {
-        var hints: [(offset: Int, column: String)] = []
-        for statement in analysis.statements where statement.range.overlaps(range) {
-            guard statement.kind == .insert || statement.kind == .replace, let write = statement.write else { continue }
-            let names = Reader(analysis: analysis).targetColumns(write, statement)
-            for row in write.rows where row.range.overlaps(range) {
-                for (value, name) in zip(row.values, names) { hints.append((value.range.lowerBound, name)) }
+    /// Small grey notes to show in the text, before `offset`: each INSERT value's column, what a `*` stands for, and
+    /// how many rows a JOIN meets on each side as its foreign keys say. The first few hundred are plenty for a screen.
+    public static func hints(in analysis: SQLAnalysis) -> [(offset: Int, text: String)] {
+        var hints: [(offset: Int, text: String)] = []
+        let reader = Reader(analysis: analysis), limit = 500
+        for statement in analysis.statements where statement.errors.isEmpty && hints.count < limit {
+            if statement.kind == .insert || statement.kind == .replace, let write = statement.write {
+                let names = reader.targetColumns(write, statement)
+                for row in write.rows.prefix(limit) {
+                    for (value, name) in zip(row.values, names) { hints.append((value.range.lowerBound, name + ":")) }
+                }
+            }
+            for query in statement.allQueries {
+                for block in query.blocks {
+                    guard let scope = analysis.scope(at: block.range.lowerBound + 1) else { continue }
+                    for item in block.items {
+                        if case .star = item.expr.kind, let text = reader.starHint(item.expr, scope) { hints.append((item.expr.range.upperBound, text)) }
+                    }
+                    for (index, ref) in block.from.enumerated() {
+                        if let join = ref.join, index < scope.sources.count, let text = reader.cardinality(join, scope.sources[index], scope.sources[..<index]) {
+                            hints.append((join.range.upperBound, text))
+                        }
+                    }
+                }
             }
         }
-        return hints
+        return Array(hints.prefix(limit)).sorted { $0.offset < $1.offset }
     }
 
     private struct Reader {
@@ -368,6 +385,35 @@ public enum SQLIntentions {
             let word = string(start..<end).uppercased()
             guard let function = SQLFunction.all.first(where: { $0.name == word }) else { return nil }
             return (function.name, "\(function.call)\n\(function.group.rawValue)")
+        }
+
+        /// A `*`'s columns, cut short.
+        func starHint(_ star: SQLExpr, _ scope: SQLScope) -> String? {
+            let qualifier = star.name?.last.value
+            let sources = scope.sources.filter { source in qualifier.map { source.name.caseInsensitiveCompare($0) == .orderedSame } ?? true }
+            let names = sources.flatMap { $0.columns.filter { $0.schema?.invisible != true }.map(\.name) }
+            guard !names.isEmpty else { return nil }
+            return names.prefix(4).joined(separator: ", ") + (names.count > 4 ? ", …" : "")
+        }
+
+        /// 1:n when `right` has a foreign key to a table before it and ON uses that key, n:1 the other way.
+        func cardinality(_ join: SQLJoin, _ right: SQLRowSource, _ before: ArraySlice<SQLRowSource>) -> String? {
+            guard let on = join.on, let table = right.table else { return nil }
+            var used = Set<String>()
+            on.walk { expr in
+                if case .column = expr.kind, let name = expr.name, let symbol = analysis.reference(at: name.last.range.lowerBound)?.symbol, symbol.kind == .column {
+                    used.insert(symbol.key)
+                }
+            }
+            func key(_ owner: SchemaTable, _ database: String?, _ columns: [String]) -> Bool {
+                columns.allSatisfy { used.contains(SQLSymbol(kind: .column, name: $0, database: database, table: owner.name).key) }
+            }
+            for left in before {
+                guard let other = left.table else { continue }
+                if table.foreignKeys.contains(where: { $0.referencedTable.caseInsensitiveCompare(other.name) == .orderedSame && key(table, right.database, $0.columns) }) { return "1:n" }
+                if other.foreignKeys.contains(where: { $0.referencedTable.caseInsensitiveCompare(table.name) == .orderedSame && key(other, left.database, $0.columns) }) { return "n:1" }
+            }
+            return nil
         }
 
         // MARK: Parameters

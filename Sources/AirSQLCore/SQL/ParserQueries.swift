@@ -300,7 +300,7 @@ extension SQLParser {
         let start = current.range.lowerBound
         var ref: SQLTableRef
         let lateral = accept("LATERAL")
-        if at("("), looksLikeQuery(index + 1) {
+        if at("("), looksLikeQuery(index + 1, inFrom: true) {
             index += 1
             let inner = query()
             closeQuery(inner)

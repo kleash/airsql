@@ -126,7 +126,7 @@ public enum SQLInspections {
                 if let error = statement.errors.first { syntax(error) }
                 // What follows a syntax error isn't what was meant, so nothing else is said of the statement.
                 if statement.errors.isEmpty, !statement.shallow || statement.kind == .create { check(statement) }
-                if readOnly, !statement.shallow || statement.kind != .other, StatementCheck.writes(string(statement.range), noBackslashEscapes: noBackslashEscapes) {
+                if readOnly, StatementCheck.writes(string(statement.range), noBackslashEscapes: noBackslashEscapes) {
                     say("readOnlyWrite", verbRange(statement), "This connection is read-only: AirSQL will refuse to run this")
                 }
             }
