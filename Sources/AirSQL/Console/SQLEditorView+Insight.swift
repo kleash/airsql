@@ -75,6 +75,7 @@ extension SQLEditorView {
         guard (text as NSString).length <= Self.insightLimit else {
             insight = nil
             inspected = []
+            problemsOutOfDate = false
             return
         }
         let context = nameContext?(), readOnly = insightHooks.isReadOnly(), disabled = insightHooks.disabledInspections()
@@ -90,6 +91,7 @@ extension SQLEditorView {
                 guard let self, self.string == text else { return }  // the check after this edit is on its way
                 self.insight = analysis
                 self.inspected = found
+                self.problemsOutOfDate = false
                 self.showHints(hints)
                 self.markUsages()
             }
@@ -126,7 +128,7 @@ extension SQLEditorView {
 
     /// What Option-Return lists at `caret`: fixes of the problems there, then what can be done.
     func contextActions(at caret: Int, in analysis: SQLAnalysis) -> [SQLFix] {
-        problems.filter { $0.range.lowerBound <= caret && caret <= $0.range.upperBound }.flatMap(\.fixes)
+        (problemsOutOfDate ? [] : problems.filter { $0.range.lowerBound <= caret && caret <= $0.range.upperBound }.flatMap(\.fixes))
             + SQLIntentions.actions(at: caret, in: analysis)
     }
 
@@ -201,6 +203,7 @@ extension SQLEditorView {
     }
 
     private func select(_ range: Range<Int>) {
+        guard range.upperBound <= (string as NSString).length else { return }  // a problem older than the last edit
         let target = NSRange(range)
         setSelectedRange(target)
         scrollRangeToVisible(target)
@@ -496,7 +499,7 @@ final class InlayOverlay: NSView {
         let glyphs = layout.glyphRange(forBoundingRect: area, in: container)
         let characters = layout.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
         storage.enumerateAttribute(.sqlHint, in: characters) { value, range, _ in
-            guard let text = value as? String else { return }
+            guard let text = value as? String, !editor.folds.contains(where: { $0.contains(range.location) }) else { return }
             let glyph = layout.glyphIndexForCharacter(at: range.location)
             var line = NSRange()
             let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: &line)

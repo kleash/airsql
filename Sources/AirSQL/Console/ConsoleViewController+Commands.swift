@@ -50,13 +50,9 @@ extension ConsoleViewController: NSMenuItemValidation {
     @objc func formatSQL(_ sender: Any?) {
         let selection = editor.selectedRange()
         let range = selection.length > 0 ? selection : NSRange(location: 0, length: (text as NSString).length)
-        let original = (text as NSString).substring(with: range)
-        guard let formatted = SQLFormatter.format(original, noBackslashEscapes: editor.noBackslashEscapes, style: model.data.settings.formatStyle) else {
-            return note(.info, "AirSQL couldn't tidy this SQL without changing what it says, so it left it as it was.")
+        editor.format(range, activity: model.activity, connection: connectionID) { [weak self] refused in
+            if refused { self?.note(.info, "AirSQL couldn't tidy this SQL without changing what it says, so it left it as it was.") }
         }
-        guard formatted != original else { return }
-        editor.replace(range, with: formatted, select: selection.length > 0
-                       ? NSRange(location: range.location, length: (formatted as NSString).length) : NSRange(location: 0, length: 0))
     }
 
     @objc func toggleWordWrap(_ sender: Any?) { model.data.settings.editorWordWrap.toggle() }
@@ -124,6 +120,7 @@ extension ConsoleViewController: NSMenuItemValidation {
             if let reason = offline ?? busy { return (false, reason) }
             return (true, "")
         case #selector(formatSQL(_:)), #selector(saveAsSnippet(_:)):
+            if item.action == #selector(formatSQL(_:)), editor.isFormatting { return (false, "Wait until the SQL is formatted") }
             return (hasText, "Type some SQL first")
         case #selector(toggleWordWrap(_:)):
             item.state = model.data.settings.editorWordWrap ? .on : .off

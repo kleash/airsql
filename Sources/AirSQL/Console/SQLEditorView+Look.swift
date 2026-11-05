@@ -5,7 +5,7 @@ import AppKit
 /// the name it's on wherever else it appears, and the line and column in the corner.
 extension SQLEditorView {
     /// Past `longText`, the shade and the marks stay off, so moving the cursor never waits for them.
-    private var marksTheText: Bool { (string as NSString).length <= Self.longText }
+    var marksTheText: Bool { (string as NSString).length <= Self.longText }
 
     /// The band of the lines `range` lies on, across the whole editor.
     private func band(_ range: NSRange) -> NSRect {
@@ -30,7 +30,7 @@ extension SQLEditorView {
     /// The statement at the cursor, when there's another to tell it from.
     var markedStatement: SQLStatement? {
         guard marksTheText, statements.count > 1 else { return nil }
-        return SQLSplitter.statement(at: selectedRange().location, in: string, noBackslashEscapes: noBackslashEscapes)
+        return SQLSplitter.statement(at: selectedRange().location, in: string, noBackslashEscapes: noBackslashEscapes, of: statements)
     }
 
     override func drawBackground(in rect: NSRect) {

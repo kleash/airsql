@@ -61,7 +61,10 @@ extension Recon {
     static func paired(_ left: [String], _ right: [String], caseless: Bool) -> [(source: String?, target: String?)] {
         func same(_ a: String, _ b: String) -> Bool { caseless ? a.caseInsensitiveCompare(b) == .orderedSame : a == b }
         var rest = right
-        var pairs: [(source: String?, target: String?)] = left.map { name in
+        // Exact names first: a caseless match mustn't take the partner of a name that has its own.
+        let exact = left.map { name in rest.firstIndex(of: name).map { rest.remove(at: $0) } }
+        var pairs: [(source: String?, target: String?)] = zip(left, exact).map { name, partner in
+            if let partner { return (name, partner) }
             guard let match = rest.firstIndex(where: { same($0, name) }) else { return (name, nil) }
             return (name, rest.remove(at: match))
         }

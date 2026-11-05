@@ -71,13 +71,7 @@ enum TreeIcon {
 }
 
 /// Sizes as the tree shows them: 12 MB.
-func shortSize(_ bytes: Int) -> String {
-    let formatter = ByteCountFormatter()
-    formatter.countStyle = .file
-    formatter.allowsNonnumericFormatting = false  // 0 KB, not Zero KB
-    formatter.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
-    return formatter.string(fromByteCount: Int64(bytes))
-}
+func shortSize(_ bytes: Int) -> String { DiskUsage.size(bytes) }
 
 /// Counts as the tree shows them: 88 K, 2.4 M.
 func shortCount(_ value: Int) -> String {

@@ -123,7 +123,7 @@ final class LineNumberRuler: NSRulerView {
         let key = [editor.selectedRange().location, editor.tokens.count, (editor.string as NSString).length]
         if key != startKey {
             startKey = key
-            startCache = SQLSplitter.statement(at: key[0], in: editor.string, noBackslashEscapes: editor.noBackslashEscapes)?.range.lowerBound
+            startCache = SQLSplitter.statement(at: key[0], in: editor.string, noBackslashEscapes: editor.noBackslashEscapes, of: editor.statements)?.range.lowerBound
         }
         return startCache
     }

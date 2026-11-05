@@ -6,14 +6,15 @@ public struct FuzzyName {
     /// Where a word of the name starts: its first letter, after `_` and the like, a capital after a small letter.
     private let starts: [Bool]
 
+    private static let separators: Set<UInt16> = Set("_-. /$".utf16)
+
     public init(_ name: String) {
         let lower = name.lowercased()
         let letters = Array(lower.utf16), original = Array(name.utf16)
         self.letters = letters
-        let separators: Set<UInt16> = Set("_-. /".utf16)
         starts = letters.indices.map { index in
             guard index > 0 else { return true }
-            if separators.contains(letters[index - 1]) { return true }
+            if Self.separators.contains(letters[index - 1]) { return true }
             guard original.count == letters.count else { return false }
             return original[index] != letters[index] && original[index - 1] == letters[index - 1]
         }
@@ -22,6 +23,25 @@ public struct FuzzyName {
     /// The words typed, as `score` takes them.
     public static func words(_ text: String) -> [[UInt16]] {
         text.lowercased().split(whereSeparator: \.isWhitespace).map { Array($0.utf16) }
+    }
+
+    /// One of the name's words starts with `word`.
+    func aWordStarts(with word: [UInt16]) -> Bool {
+        letters.indices.contains { starts[$0] && letters[$0...].starts(with: word) }
+    }
+
+    /// `word` is, in order, the start of some of the name's words, at least a letter of each: `fica`, `ob` for ORDER BY.
+    func isAbbreviated(by word: [UInt16]) -> Bool {
+        func from(_ typed: Int, _ place: Int) -> Bool {
+            if typed == word.count { return true }
+            return (place..<letters.count).contains { start in
+                guard starts[start] else { return false }
+                var common = 0
+                while start + common < letters.count, typed + common < word.count, letters[start + common] == word[typed + common] { common += 1 }
+                return common > 0 && (1...common).reversed().contains { from(typed + $0, start + $0) }
+            }
+        }
+        return !word.isEmpty && from(0, 0)
     }
 
     /// How well the name holds every word's letters in order; nil: it doesn't. Word starts and runs of letters score

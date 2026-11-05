@@ -59,7 +59,7 @@ extension SQLEditorView {
 
     /// The word before the cursor is a template's whole abbreviation, or a postfix like `orders.from`.
     private func expandAbbreviation() -> Bool {
-        guard extraCarets.isEmpty, selectedRange().length == 0, let completions else { return false }
+        guard extraCarets.isEmpty, selectedRange().length == 0, completesWhileTyping, let completions else { return false }
         let (range, items) = completions(string, selectedRange().location)
         let typed = (string as NSString).substring(with: NSRange(range))
         guard !typed.isEmpty, let item = items.first(where: { $0.kind == .template && $0.label.caseInsensitiveCompare(typed) == .orderedSame }) else { return false }
@@ -71,6 +71,9 @@ extension SQLEditorView {
     /// of the current field is in it: that's the typing.
     override func shouldChangeText(in range: NSRange, replacementString: String?) -> Bool {
         guard super.shouldChangeText(in: range, replacementString: replacementString) else { return false }
+        // Now, while their ranges are right: the marks move with the text.
+        clearMarks()
+        clearUsageMarks()
         if let replacementString, !templateFields.isEmpty { moveTemplateFields(range, replacementString.utf16.count - range.length) }
         return true
     }

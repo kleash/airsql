@@ -101,43 +101,10 @@ public enum SQLCompletion {
         guard !query.isEmpty else { return 0 }
         let lower = name.lowercased()
         if lower.hasPrefix(query) { return 0 }
-        let parts = words(of: name)
-        if parts.contains(where: { $0.hasPrefix(query) }) { return 1 }
-        if abbreviates(Array(query.utf8.filter { $0 != 0x5F }), parts.map { Array($0.utf8) }) { return 2 }
+        let fuzzy = FuzzyName(name)
+        if fuzzy.aWordStarts(with: Array(query.utf16)) { return 1 }
+        if fuzzy.isAbbreviated(by: query.utf16.filter { $0 != 0x5F }) { return 2 }
         return lower.contains(query) ? 3 : nil
-    }
-
-    /// `film_category`, `ORDER BY` and `filmCategory` in small letters, word by word.
-    private static func words(of name: String) -> [String] {
-        var parts: [String] = [], current = "", previousLower = false
-        for character in name {
-            if character == "_" || character == " " || character == "$" {
-                if !current.isEmpty { parts.append(current) }
-                current = ""
-                previousLower = false
-                continue
-            }
-            if character.isUppercase, previousLower {
-                parts.append(current)
-                current = ""
-            }
-            current += character.lowercased()
-            previousLower = character.isLowercase
-        }
-        if !current.isEmpty { parts.append(current) }
-        return parts
-    }
-
-    /// `query` is, in order, the start of some of `parts`, at least one letter of each it takes from.
-    private static func abbreviates(_ query: [UInt8], _ parts: [[UInt8]]) -> Bool {
-        func from(_ q: Int, _ part: Int) -> Bool {
-            if q == query.count { return true }
-            guard part < parts.count else { return false }
-            var common = 0
-            while common < parts[part].count, q + common < query.count, parts[part][common] == query[q + common] { common += 1 }
-            return (0...common).reversed().contains { from(q + $0, part + 1) }
-        }
-        return from(0, 0)
     }
 
     /// Those that match what was typed, the closest match first, then what was chosen before, then the best kind (the

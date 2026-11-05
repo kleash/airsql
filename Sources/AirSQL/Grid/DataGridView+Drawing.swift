@@ -114,7 +114,7 @@ extension DataGridView {
                 // Rows of several lines: the lines after the first, under it. The first goes on below as ever.
                 if styles.lines > 1, case .text(let whole) = cell, whole.contains(where: \.isNewline) {
                     let parts = whole.split(whereSeparator: \.isNewline).prefix(styles.lines).map { GridStyles.display(String($0)) }
-                    text = parts[0]
+                    text = parts.first ?? text  // only line breaks: no parts
                     for (index, part) in parts.enumerated().dropFirst() {
                         let line = CTLineCreateWithAttributedString(NSAttributedString(string: part, attributes: attributes))
                         context.textPosition = CGPoint(x: rect.minX + GridStyles.padding, y: y + styles.baseline + CGFloat(index) * styles.lineHeight)

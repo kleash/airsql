@@ -174,6 +174,23 @@ extension AppTests {
             #expect(await eventually(timeout: 5) { main.sidebar.treeNodes[.category(id, "airsql_fixture", .table)] != nil })
         }
 
+        /// Select in Tree can't show what Favourites Only leaves out, and doesn't take the person's filter for nothing.
+        @Test func revealKeepsTheFilterWhenTheRowStaysHidden() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let orders = DatabaseObject(.table, "airsql_fixture", "orders")
+            #expect(await eventually(timeout: 5) { main.sidebar.treeNodes[.object(id, orders)] != nil })
+            main.sidebar.toggleTreeOption(option(.favouritesOnly))
+            main.sidebar.filter.stringValue = "zzz"
+            main.sidebar.reload()
+            #expect(!main.sidebar.reveal(.object(id, orders)))
+            #expect(main.sidebar.filter.stringValue == "zzz")
+            main.sidebar.toggleTreeOption(option(.favouritesOnly))
+            main.sidebar.reload()
+            #expect(main.sidebar.reveal(.object(id, orders)) && main.sidebar.filter.stringValue.isEmpty, "only the filter hid it")
+        }
+
         @Test func favouritesStayOnTheConnectionAndCanBeAllTheTreeShows() async throws {
             let model = testModel(Fixtures.shop)
             let (main, _) = appWindow(model)

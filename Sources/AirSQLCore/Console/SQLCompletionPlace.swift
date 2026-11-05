@@ -157,6 +157,7 @@ struct SQLCompletionPlace {
 
     /// `total.cast`, `o.total.cast`: CAST around a name.
     private func postfixCast() -> [CompletionItem] {
+        guard start > lower, utf16[start - 1] == 0x2E else { return [] }  // `t. x`: the word isn't against the dot
         let before = nameStart(before: start), name = String(decoding: utf16[before..<(start - 1)], as: UTF16.self)
         return [CompletionItem(kind: .template, text: "\(options.functionCase.apply("CAST"))(\(SQLTemplate.escape(name)) \(keyword("AS")) $type$)$END$",
                                label: "cast", detail: "CAST(\(name) AS type)", replacing: before..<caret)]

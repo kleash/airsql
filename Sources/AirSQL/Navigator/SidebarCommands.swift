@@ -302,8 +302,8 @@ extension SidebarController: NSMenuItemValidation {
             return showError("Connect to a server first: the process list shows what a connected server is running.",
                              title: "No connected server", on: view.window)
         }
-        if let tab = main.tabs.first(where: { ($0.content as? ProcessListContent)?.open === open }) {
-            main.select(tab)
+        if let tab = model.allTabs.first(where: { ($0.content as? ProcessListContent)?.open === open }) {
+            main.show(tab)
         } else {
             main.open(ProcessListContent(open), title: "Processes", connection: open.id)
         }

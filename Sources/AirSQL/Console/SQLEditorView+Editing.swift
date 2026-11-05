@@ -17,9 +17,32 @@ extension SQLEditorView {
     /// Replaces `range` with `text` as an edit the person made: undoable, coloured, reported. Selects `select` after.
     func replace(_ range: NSRange, with text: String, select: NSRange? = nil) {
         guard shouldChangeText(in: range, replacementString: text) else { return }
+        completionPopup?.close()  // its range is of the text before this
         textStorage?.replaceCharacters(in: range, with: text)
         didChangeText()
         if let select { setSelectedRange(select) }
+    }
+
+    /// Format SQL: `range` laid out off the main thread, under an activity, then replaced as one edit unless the text
+    /// changed meanwhile. `done` gets whether the formatter refused it. Selects what came of a selection.
+    func format(_ range: NSRange, activity center: ActivityCenter, connection: UUID?, done: @escaping (_ refused: Bool) -> Void = { _ in }) {
+        guard !isFormatting else { return }
+        isFormatting = true
+        let before = string, original = (before as NSString).substring(with: range), escapes = noBackslashEscapes
+        let style = Self.settings().formatStyle, selected = selectedRange().length > 0
+        let ticket = InsightTicket()
+        let work = center.start("Formatting the SQL", connection: connection) { ticket.cancelled = true }
+        Task { @MainActor [weak self] in
+            let formatted = await Task.detached { SQLFormatter.format(original, noBackslashEscapes: escapes, style: style) }.value
+            work.end()
+            guard let self else { return }
+            self.isFormatting = false
+            guard !ticket.cancelled, self.string == before else { return }
+            guard let formatted else { return done(true) }
+            guard formatted != original else { return }
+            self.replace(range, with: formatted, select: NSRange(location: range.location, length: selected ? (formatted as NSString).length : 0))
+            done(false)
+        }
     }
 
     /// The whole lines the selection touches.
@@ -40,7 +63,7 @@ extension SQLEditorView {
     func changeLines(_ change: ([String]) -> [String]) {
         let range = selectedLines
         let block = (string as NSString).substring(with: range)
-        let endsWithNewline = block.hasSuffix("\n")
+        let endsWithNewline = (block as NSString).hasSuffix("\n")
         var lines = block.components(separatedBy: "\n")
         if endsWithNewline { lines.removeLast() }
         let changed = change(lines).joined(separator: "\n") + (endsWithNewline ? "\n" : "")
@@ -110,6 +133,7 @@ extension SQLEditorView {
     /// Several values pasted between the brackets of an IN become a quoted list, and text pasted inside a 'string' is
     /// escaped for it, each as one undoable step; anything else pastes as usual (Paste Without Formatting always does).
     override func paste(_ sender: Any?) {
+        completionPopup?.close()
         if !extraCarets.isEmpty, !applyingCarets { return pasteAtEveryCaret() }
         guard let clipboard = NSPasteboard.general.string(forType: .string),
               let selection = Range(selectedRange()) else { return super.paste(sender) }
@@ -122,6 +146,11 @@ extension SQLEditorView {
         replace(NSRange(edit.range), with: edit.text,
                 select: NSRange(location: edit.range.lowerBound + (edit.text as NSString).length, length: 0))
         breakUndoCoalescing()
+    }
+
+    override func pasteAsPlainText(_ sender: Any?) {
+        completionPopup?.close()
+        super.pasteAsPlainText(sender)
     }
 
     /// One line of the clipboard per caret when the counts match, as a copy from as many carets gives; else all of it at each.

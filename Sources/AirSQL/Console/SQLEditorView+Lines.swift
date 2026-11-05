@@ -6,7 +6,7 @@ extension SQLEditorView {
     @objc func duplicateLine(_ sender: Any?) {
         let lines = selectedLines, selection = selectedRange()
         let block = (string as NSString).substring(with: lines)
-        let copy = block.hasSuffix("\n") ? block : "\n" + block
+        let copy = (block as NSString).hasSuffix("\n") ? block : "\n" + block
         let shift = (copy as NSString).length
         replace(NSRange(location: NSMaxRange(lines), length: 0), with: copy,
                 select: NSRange(location: selection.location + shift, length: selection.length))
@@ -42,10 +42,8 @@ extension SQLEditorView {
     private func swapLines(_ first: NSRange, _ second: NSRange, moved: NSRange) {
         let text = string as NSString, selection = selectedRange()
         var top = text.substring(with: second), bottom = text.substring(with: first)
-        if !top.hasSuffix("\n") {
-            top += "\n"
-            bottom.removeLast()
-        }
+        // As NSString: to a Swift string \r\n is one character, which doesn't end in \n.
+        if !(top as NSString).hasSuffix("\n") { top.append(bottom.removeLast()) }
         let start = moved == first ? first.location + (top as NSString).length : first.location
         replace(NSUnionRange(first, second), with: top + bottom,
                 select: NSRange(location: start + selection.location - moved.location, length: selection.length))
@@ -54,11 +52,13 @@ extension SQLEditorView {
     @objc func joinLines(_ sender: Any?) {
         let text = string as NSString
         var lines = selectedLines
-        if !text.substring(with: lines).dropLast().contains("\n"), NSMaxRange(lines) < text.length {
+        if !text.substring(with: lines).dropLast().contains(where: \.isNewline), NSMaxRange(lines) < text.length {
             lines = NSUnionRange(lines, text.lineRange(for: NSRange(location: NSMaxRange(lines), length: 0)))
         }
         // The last line's own break stays, with whatever comes after the lines.
-        if text.substring(with: lines).hasSuffix("\n") { lines.length -= 1 }
+        if text.substring(with: lines).last?.isNewline == true {
+            lines.length -= lines.length > 1 && text.character(at: NSMaxRange(lines) - 2) == 0x0D ? 2 : 1
+        }
         let joined = SQLEditing.joined(string, lines.location..<NSMaxRange(lines), noBackslashEscapes: noBackslashEscapes)
         guard joined != text.substring(with: lines) else { return }
         replace(lines, with: joined, select: NSRange(location: lines.location + (joined as NSString).length, length: 0))

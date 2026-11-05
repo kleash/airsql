@@ -213,7 +213,7 @@ extension AppTests {
             #expect(other.list.selectedRow == 1)
             other.undo.undo()
             #expect(other.design.columns.count == before)
-            // ⇧⌘↑ and ⇧⌘↓ move what's selected, and stop at the ends.
+            // ⌃⇧⌘↑ and ⌃⇧⌘↓ move what's selected, and stop at the ends.
             let first = other.design.columns[0].name, second = other.design.columns[1].name
             other.list.selectRowIndexes([1], byExtendingSelection: false)
             other.moveRowsUp(nil)

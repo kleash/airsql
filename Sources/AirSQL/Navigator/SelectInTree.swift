@@ -18,14 +18,17 @@ extension MainWindowController {
     @objc func selectInTree(_ sender: Any?) {
         guard let tab = selectedTab, let open = model.openConnection(tab.connectionID) else { return }
         guard let console = tab.shown as? ConsoleViewController else {
-            sidebar.reveal(tab.treeRow(in: open))
-            return focusSidebar(sender)
+            return reveal(tab.treeRow(in: open), sender)
         }
         console.editor.withInsight { [weak self] analysis in
             let symbol = analysis.reference(at: console.editor.selectedRange().location)?.symbol
-            self?.sidebar.reveal(Self.treeRow(of: symbol, in: open) ?? (console.chosenDatabase ?? open.currentDatabase).map { .database(open.id, $0) } ?? .connection(open.id))
-            self?.focusSidebar(sender)
+            self?.reveal(Self.treeRow(of: symbol, in: open) ?? (console.chosenDatabase ?? open.currentDatabase).map { .database(open.id, $0) } ?? .connection(open.id), sender)
         }
+    }
+
+    /// Favourites Only, the database filter or View ▸ Tree can leave the row out.
+    private func reveal(_ row: SidebarNode.Kind, _ sender: Any?) {
+        if sidebar.reveal(row) { focusSidebar(sender) } else { NSSound.beep() }
     }
 
     /// The tree's row of a name in SQL: a column's is its table's.

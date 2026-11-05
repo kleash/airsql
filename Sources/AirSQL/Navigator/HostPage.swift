@@ -437,8 +437,8 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
 extension MainWindowController {
     /// Shows `pane` on the connection's host page: in the tab that has it, else in the preview tab.
     func showHost(_ open: OpenConnection, pane: HostContent.Pane? = nil) {
-        if let tab = tabs.first(where: { ($0.shown as? HostContent)?.open === open }), let host = tab.shown as? HostContent {
-            select(tab)
+        if let tab = model.allTabs.first(where: { ($0.shown as? HostContent)?.open === open }), let host = tab.shown as? HostContent {
+            show(tab)
             if let pane { host.show(pane) }
         } else {
             preview(HostContent(open, pane: pane ?? .databases), title: model.connection(open.id)?.displayName ?? "Server", connection: open.id)
