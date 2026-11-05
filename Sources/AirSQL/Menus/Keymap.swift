@@ -50,8 +50,10 @@ enum Keymap {
     /// Why this shortcut can't be used; nil: it can.
     static func refusal(key: String, modifiers: NSEvent.ModifierFlags) -> String? {
         let isFunctionKey = key.unicodeScalars.first.map { (0xF704...0xF726).contains($0.value) } ?? false
-        if !isFunctionKey, modifiers.intersection([.command, .control, .option]).isEmpty {
-            return "Add ⌘, ⌃ or ⌥ to it: a plain key types in the editor"
+        // Menus see only ⌘ and ⌃ keys, function keys and arrows: ⌥ and a letter would type a character.
+        let isArrow = key.unicodeScalars.first.map { (0xF700...0xF703).contains($0.value) } ?? false
+        if !isFunctionKey, modifiers.intersection([.command, .control]).isEmpty, !(isArrow && modifiers.contains(.option)) {
+            return "Add ⌘ or ⌃ to it: without them the key types in the editor"
         }
         let shortcut = Command.shortcut(key, modifiers)
         return reserved.contains(shortcut) ? "macOS keeps \(shortcut) for itself" : nil

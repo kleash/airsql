@@ -4,7 +4,7 @@ import Foundation
 /// editor has it mid-word: `parse` always returns a tree for each statement of `SQLSplitter`, with what it could read.
 /// SELECT, INSERT, REPLACE, UPDATE, DELETE and the heads of CREATE, ALTER and DROP are read in full; the rest as far as
 /// their first word. A false alarm costs more than a miss, so errors come only from grammar this reads completely, and
-/// only the first of a statement. Linear in the text and safe off the main thread; it runs nothing and goes nowhere.
+/// only the first of a statement. Linear in the text but for hundreds of joins in one statement, and safe off the main thread; it runs nothing and goes nowhere.
 public struct SQLParser {
     /// Every statement of `text`, in order.
     public static func parse(_ text: String, noBackslashEscapes: Bool = false) -> [SQLParsedStatement] {

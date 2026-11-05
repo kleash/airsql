@@ -158,7 +158,8 @@ final class HostList: NSViewController, NSTableViewDataSource, NSTableViewDelega
     private func arrange() {
         let selected = Set(self.selected.map(\.key))
         let text = filter.stringValue.trimmingCharacters(in: .whitespaces)
-        rows = text.isEmpty ? all : all.filter { row in row.cells.values.contains { Self.matches($0, text) } }
+        let filter = NameFilter(text)
+        rows = text.isEmpty ? all : all.filter { row in row.cells.values.contains(where: filter.matches) }
         if let sort = table.sortDescriptors.first, let key = sort.key {
             let numeric = columns.contains { $0.id == key && ($0.numeric || $0.bar) }
             rows.sort { first, second in
@@ -175,12 +176,6 @@ final class HostList: NSViewController, NSTableViewDataSource, NSTableViewDelega
         table.reloadData()
         table.selectRowIndexes(IndexSet(rows.indices.filter { selected.contains(rows[$0].key) }), byExtendingSelection: false)
         updateCaption()
-    }
-
-    /// `text` as a regular expression, or as plain text where it isn't a valid one.
-    private static func matches(_ value: String, _ text: String) -> Bool {
-        guard (try? NSRegularExpression(pattern: text)) != nil else { return value.localizedCaseInsensitiveContains(text) }
-        return value.range(of: text, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     private func updateCaption() {

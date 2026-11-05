@@ -357,6 +357,8 @@ struct SQLCompletionTests {
         #expect(SQLCompletion.match("old_customers", "stom") == 3)
         #expect(SQLCompletion.match("customers", "cu") == 0)
         #expect(SQLCompletion.match("customers", "xy") == nil)
+        #expect(SQLCompletion.match("film_category", "fia") == nil, "a's no word's start, and not next to the i")
+        #expect(SQLCompletion.match("a$b_c", "bc") == 2, "$ parts words too")
         #expect(try await suggest("SELECT * FROM orl|").first?.label == "order_lines")
         #expect(try await suggest("SELECT * FROM mail|").first?.label == "customer_emails")
         #expect(try await suggest("SELECT * FROM orders ob|").first?.label == "ORDER BY")

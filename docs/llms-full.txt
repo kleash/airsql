@@ -502,7 +502,7 @@ session of its own, so a long query in one tab leaves the others free.
   the word at the cursor in capitals, or in small letters. **Complete Statement** (⌃⇧↩) closes its brackets, adds its `;` and starts a
   new line.
 - **Edit ▸ Carets** lets you type in several places at once. **Select Next Occurrence** (⌥⌘G) selects the word at the cursor, then
-  adds a caret at each next place its text appears; **Select All Occurrences** (⌃⌘G) does them all. **Add Caret to Each Line** (⌥⇧G)
+  adds a caret at each next place its text appears; **Select All Occurrences** (⌃⌘G) does them all. **Add Caret to Each Line** (⌃⇧G)
   puts one at the end of each selected line, **Add Caret Above** and **Below** (⌃⌥⇧↑, ⌃⌥⇧↓) one on the next line, and ⌥⇧-click one
   where you click. ⌥-drag selects a block, as does a plain drag in **Column Selection Mode** (⌘*), where ⇧↑ and ⇧↓ add carets too.
   Typing, deleting and moving happen at every caret. Copy takes a line from each, and Paste gives each caret its line when the
@@ -1029,7 +1029,7 @@ server is, how you reach it and how long it has been up. A click on a row select
 - **Processes**: the [process list](#see-what-the-server-is-running).
 - **Command Statistics**: how many statements of each kind the server has run, with their rates and share.
 
-Every list has a **Filter** that takes a word or a regular expression and says how many rows it kept. Click a column's
+Every list has a **Filter** that takes a word or, between slashes, a regular expression (`/^wp_/`), and says how many rows it kept. Click a column's
 title to sort; right-click a title to show or hide columns. **⌘C** copies the selected rows. **Copy List** and **Export
 List…** take the whole list as CSV. **⌘R** reads it again.
 
@@ -1208,7 +1208,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
   **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
-  the selected cells and clears them: NULL where the column allows it, else empty. **Set Expression…** (⌃F2) sets them to any SQL expression or function, sent as you typed it when you apply. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set Expression…** (⌃⇧F2) sets them to any SQL expression or function, sent as you typed it when you apply. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`
@@ -1477,7 +1477,7 @@ parts, chosen at the top:
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
 green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Revert** takes back all of them.
-Drag columns to put them in another order, or press ⇧⌘↑ and ⇧⌘↓. ⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
+Drag columns to put them in another order, or press ⌃⇧⌘↑ and ⌃⇧⌘↓. ⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
 as new rows.
 
 Under the lists, the SQL that Apply would run updates as you type. When something can't work yet (a VARCHAR without a
@@ -2393,8 +2393,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Shift Left | ⌘[ |
 | Query Helpers | ⌃⌘H |
 | Go to Line… | ⌃G |
-| Move Up | ⇧⌘↑ |
-| Move Down | ⇧⌘↓ |
+| Move Up | ⌃⇧⌘↑ |
+| Move Down | ⌃⇧⌘↓ |
 | Fixes and Actions… | ⌥↩ |
 | Go to Declaration | ⌘B |
 | Find Usages… | ⌥F7 |
@@ -2403,7 +2403,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Parameter Info | ⌥⌘I |
 | Next Problem | ⌥F2 |
 | Previous Problem | ⌥⇧F2 |
-| Show Problem | ⌃F1 |
+| Show Problem | ⇧F1 |
 | Preview Rows to Change | ⌥⌘↩ |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
@@ -2422,7 +2422,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Sort Descending | ⌃⌥⌘↓ |
 | Go to Row… | ⌘L |
 | Related Rows | ⌃⌘↓ |
-| Set Expression… | ⌃F2 |
+| Set Expression… | ⌃⇧F2 |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
 | Create Table… | ⌃⌘N |
@@ -2445,7 +2445,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Unfold All | ⌃⌥⇧→ |
 | Select Next Occurrence | ⌥⌘G |
 | Select All Occurrences | ⌃⌘G |
-| Add Caret to Each Line | ⌥⇧G |
+| Add Caret to Each Line | ⌃⇧G |
 | Add Caret Above | ⌃⌥⇧↑ |
 | Add Caret Below | ⌃⌥⇧↓ |
 | Column Selection Mode | ⌘* |

@@ -42,7 +42,7 @@ extension Commands {
                                               tip: "Select the word at the cursor, then add a caret where its text appears next")
     static let selectAllOccurrences = Command("Select All Occurrences", #selector(SQLEditorView.selectAllOccurrences(_:)), "g", [.command, .control],
                                               tip: "Put a caret on every place the selection or word at the cursor appears")
-    static let caretPerLine = Command("Add Caret to Each Line", #selector(SQLEditorView.caretPerLine(_:)), "G", .option,
+    static let caretPerLine = Command("Add Caret to Each Line", #selector(SQLEditorView.caretPerLine(_:)), "G", .control,
                                       tip: "Put a caret at the end of each selected line")
     static let addCaretAbove = Command("Add Caret Above", #selector(SQLEditorView.addCaretAbove(_:)), up, [.control, .option, .shift],
                                        tip: "Add a caret on the line above, at the same column")

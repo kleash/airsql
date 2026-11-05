@@ -31,6 +31,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     var nameContext: (() -> (snapshot: SchemaSnapshot?, database: String?, changed: Set<String>)?)?
     /// What `SQLInspections` said, as of the last pause in the typing.
     var inspected: [SQLProblem] = [] { didSet { if inspected != oldValue { underlineProblems() } } }
+    /// The text changed since `unclosed` and `inspected` were made: their places, and so their fixes, are out of date.
+    var problemsOutOfDate = false
     /// The text as last read (`SQLAnalysis`), for Option-Return and the Code menu.
     var insight: SQLAnalysis?
     /// What the console gives the Code menu: see `ConsoleViewController.wireInsight`.
@@ -64,6 +66,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         return found
     }
     private var cachedStatements: [SQLStatement]?
+    /// Format SQL is reading the text.
+    var isFormatting = false
     /// The steps Extend Selection took, for Shrink Selection.
     var grownSelections: [(from: NSRange, to: NSRange)] = []
     /// What's drawn now behind the text, to redraw it when the cursor moves.
@@ -207,8 +211,15 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         return super.validateMenuItem(item)
     }
 
-    @objc func undo(_ sender: Any?) { ownUndoManager.undo() }
-    @objc func redo(_ sender: Any?) { ownUndoManager.redo() }
+    @objc func undo(_ sender: Any?) {
+        completionPopup?.close()
+        ownUndoManager.undo()
+    }
+
+    @objc func redo(_ sender: Any?) {
+        completionPopup?.close()
+        ownUndoManager.redo()
+    }
 
     // MARK: Colours
 
@@ -300,6 +311,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     /// A pause first: `(` is only a problem if nothing follows it.
     func checkLater() {
+        problemsOutOfDate = true
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(check), object: nil)
         perform(#selector(check), with: nil, afterDelay: 0.5)
     }
@@ -340,7 +352,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     private var bracketMarks: [NSRange] = []
 
-    private func clearMarks() {
+    func clearMarks() {
         guard let layout = layoutManager else { return }
         let length = (string as NSString).length
         for range in bracketMarks where NSMaxRange(range) <= length {
@@ -377,7 +389,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     /// The bracket next to the caret and its partner, outside strings and comments.
     private func markMatchingBracket() {
         let caret = selectedRange()
-        guard caret.length == 0, let layout = layoutManager else { return }
+        guard caret.length == 0, marksTheText, let layout = layoutManager else { return }
         let utf16 = Array(string.utf16)
         // During an edit the tokens are the text's before it: only those still inside the text count.
         let symbols = tokens.filter { $0.kind == .symbol && $0.range.count == 1 && $0.range.upperBound <= utf16.count }

@@ -12,6 +12,7 @@ extension SQLEditorView {
         }
         if pairTyped(typed, replacementRange) {
             if typed == "'" { updateCompletion(force: false) }  // an ENUM's values
+            if typed == "(" { applyKeywordCase(before: selectedRange().location - 1) }
             return
         }
         super.insertText(string, replacementRange: replacementRange)
@@ -93,6 +94,11 @@ extension SQLEditorView {
     private var popupOpenInString: Bool { completionPopup?.isShown == true && completionPopup?.items.first?.kind == .value }
 
     override func doCommand(by selector: Selector) {
+        // Menus see only ⌘ and ⌃ keys and function keys: ⌥↩ arrives here, as a line break.
+        if selector == #selector(insertNewlineIgnoringFieldEditor(_:)), Commands.showContextActions.shortcut == "⌥↩" {
+            completionPopup?.close()
+            return showContextActions(nil)
+        }
         if completionPopup?.isShown != true, !applyingCarets, templateCommand(selector) { return }
         if selector == #selector(insertNewline(_:)) || selector == #selector(insertTab(_:)), completionPopup?.isShown != true {
             applyKeywordCase(before: selectedRange().location)
@@ -121,10 +127,19 @@ extension SQLEditorView {
         return super.resignFirstResponder()
     }
 
+    /// Reading the statement at the cursor takes too long for a key in a long script or a long statement (a dump's INSERT).
+    var completesWhileTyping: Bool {
+        guard (string as NSString).length <= Self.longText else { return false }
+        let caret = selectedRange().location
+        return statements.first { $0.range.lowerBound <= caret && caret <= $0.end }.map { $0.range.count <= Self.longStatement } ?? true
+    }
+
+    static let longStatement = 50_000
+
     /// Asks for the suggestions at the cursor and shows them (`force`: even with nothing typed yet).
     func updateCompletion(force: Bool) {
         // In a long script the list opens only when asked (⌥⎋), so typing never waits for it.
-        guard let completions, extraCarets.isEmpty, !applyingCarets, selectedRange().length == 0, force || (string as NSString).length <= Self.longText else {
+        guard let completions, extraCarets.isEmpty, !applyingCarets, selectedRange().length == 0, force || completesWhileTyping else {
             completionPopup?.close()
             return
         }

@@ -138,7 +138,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
   **Delete Rows** (⌘⌫, or ⌫ on rows selected by their numbers) marks the selected rows for deletion. **Cut** (⌘X) copies
-  the selected cells and clears them: NULL where the column allows it, else empty. **Set Expression…** (⌃F2) sets them to any SQL expression or function, sent as you typed it when you apply. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
+  the selected cells and clears them: NULL where the column allows it, else empty. **Set Expression…** (⌃⇧F2) sets them to any SQL expression or function, sent as you typed it when you apply. **Set NULL** (⌥⌘N) and **Set DEFAULT** set the selected
   cells.
 - **Edit ▸ Paste** (⌘V) puts cells copied from Excel, Numbers or a grid (tab-separated, or CSV) into the cells from the
   selected one on, as pending edits: numbers with a comma for decimals and dates such as `31.12.2026` or `12/31/2026`

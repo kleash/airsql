@@ -600,9 +600,9 @@ enum Commands {
     static let shiftRight = Command("Shift Right", #selector(AirSQLActions.indentLines(_:)), "]", tip: "Indent the selected lines")
     static let shiftLeft = Command("Shift Left", #selector(AirSQLActions.outdentLines(_:)), "[",
                                    tip: "Take one indent off the selected lines")
-    static let moveRowsUp = Command("Move Up", #selector(AirSQLActions.moveRowsUp(_:)), up, [.command, .shift],
+    static let moveRowsUp = Command("Move Up", #selector(AirSQLActions.moveRowsUp(_:)), up, [.command, .control, .shift],
                                     tip: "Move the selected columns one place up in the table")
-    static let moveRowsDown = Command("Move Down", #selector(AirSQLActions.moveRowsDown(_:)), down, [.command, .shift],
+    static let moveRowsDown = Command("Move Down", #selector(AirSQLActions.moveRowsDown(_:)), down, [.command, .control, .shift],
                                       tip: "Move the selected columns one place down in the table")
     static let goToLine = Command("Go to Line…", #selector(AirSQLActions.goToLine(_:)), "g", .control, tip: "Go to a line of the SQL by its number")
     static let wordWrap = Command("Word Wrap", #selector(AirSQLActions.toggleWordWrap(_:)),
@@ -708,7 +708,7 @@ enum Commands {
                                    tip: "Put the columns, the sort and the filter back as they come")
     static let openURL = Command("Open URL", #selector(AirSQLActions.openCellURL(_:)), tip: "Open the web address in the selected cell in your browser")
     static let compareCells = Command("Compare Cells", #selector(AirSQLActions.compareCells(_:)), tip: "Show how two selected cells' values differ, line by line")
-    static let setExpression = Command("Set Expression…", #selector(AirSQLActions.setCellExpression(_:)), f2, .control,
+    static let setExpression = Command("Set Expression…", #selector(AirSQLActions.setCellExpression(_:)), f2, [.control, .shift],
                                        tip: "Set the selected cells to an SQL expression or function, sent as it is typed")
     static let loadFullCell = Command("Load Full Cell", #selector(AirSQLActions.loadFullCell(_:)),
                                       tip: "Read the rest of a long value that was cut when the rows loaded")
@@ -958,7 +958,7 @@ enum Commands {
                                      tip: "Move to the next underlined problem in the SQL editor")
     static let previousProblem = Command("Previous Problem", #selector(AirSQLActions.previousProblem(_:)), f2, [.option, .shift],
                                          tip: "Move to the previous underlined problem in the SQL editor")
-    static let showProblem = Command("Show Problem", #selector(AirSQLActions.showProblem(_:)), f1, .control,
+    static let showProblem = Command("Show Problem", #selector(AirSQLActions.showProblem(_:)), f1, .shift,
                                      tip: "Say what's wrong with the underlined text at the cursor")
     static let previewAffectedRows = Command("Preview Rows to Change", #selector(AirSQLActions.previewAffectedRows(_:)), "\r", [.command, .option],
                                              tip: "Show the rows the UPDATE or DELETE at the cursor would touch, changing nothing")

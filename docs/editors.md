@@ -33,7 +33,7 @@ parts, chosen at the top:
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
 green and changed ones in amber until you apply. **Edit ▸ Undo** takes back a change; **Revert** takes back all of them.
-Drag columns to put them in another order, or press ⇧⌘↑ and ⇧⌘↓. ⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
+Drag columns to put them in another order, or press ⌃⇧⌘↑ and ⌃⇧⌘↓. ⌘C copies the selected rows as the lines of a CREATE TABLE; ⌘V in this list, here or in another table's editor, adds them
 as new rows.
 
 Under the lists, the SQL that Apply would run updates as you type. When something can't work yet (a VARCHAR without a

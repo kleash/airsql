@@ -120,8 +120,8 @@ extension SQLEditorView: NSLayoutManagerDelegate, NSTextStorageDelegate {
 
     /// Where a fold's "…" is drawn, at the end of its first line.
     func foldMark(_ fold: Range<Int>) -> NSRect {
-        guard let layout = layoutManager, fold.lowerBound > 0, fold.lowerBound <= (string as NSString).length else { return .zero }
-        let glyph = layout.glyphIndexForCharacter(at: fold.lowerBound - 1)
+        guard let layout = layoutManager, fold.lowerBound <= (string as NSString).length else { return .zero }
+        let glyph = layout.glyphIndexForCharacter(at: max(fold.lowerBound - 1, 0))
         let used = layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
         let origin = textContainerOrigin
         return NSRect(x: used.maxX + origin.x + 4, y: used.minY + origin.y, width: 22, height: used.height)

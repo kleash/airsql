@@ -129,32 +129,6 @@ public enum SQLEditing {
         return escaped == clipboard ? nil : (selection, escaped)
     }
 
-    /// The BEGIN or CASE and the END of the block whose word `caret` is on, outside strings and comments.
-    public static func blockPair(at caret: Int, in text: String, noBackslashEscapes: Bool = false) -> (Range<Int>, Range<Int>)? {
-        let units = Array(text.utf16)
-        let words = SQLLexer.tokens(text, noBackslashEscapes: noBackslashEscapes).filter { $0.kind == .word }
-        func word(_ index: Int) -> String { String(decoding: units[words[index].range], as: UTF16.self).uppercased() }
-        var open: [Int] = []
-        for index in words.indices {
-            switch word(index) {
-            case "BEGIN", "CASE":
-                // END CASE closes a CASE: that word isn't another one opening.
-                if index > 0, word(index - 1) == "END", word(index) == "CASE" { continue }
-                open.append(index)
-            case "END":
-                // END IF, END LOOP and the like close blocks this doesn't follow.
-                if index + 1 < words.count, ["IF", "LOOP", "WHILE", "REPEAT"].contains(word(index + 1)) { continue }
-                guard let start = open.popLast() else { continue }
-                let pair = (words[start].range, words[index].range)
-                if pair.0.lowerBound <= caret && caret <= pair.0.upperBound || pair.1.lowerBound <= caret && caret <= pair.1.upperBound {
-                    return pair
-                }
-            default: break
-            }
-        }
-        return nil
-    }
-
     /// Complete Statement: what closes the statement at `caret`: its open brackets and a `;`, if it has none, written at
     /// its end; the caret goes on a new line after it, which is `caret`.
     public static func completed(_ text: String, caret: Int, noBackslashEscapes: Bool = false)

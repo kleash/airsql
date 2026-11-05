@@ -415,18 +415,24 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         if let first = rows.first { outline.scrollRowToVisible(first) }
     }
 
-    /// Selects a row of a connected connection's tree and scrolls to it: the filter goes if it hides the row, and what's
+    /// Selects a row of a connected connection's tree and scrolls to it: the filter goes if only it hides the row (false: the row can't be shown), and what's
     /// above the row opens. `showing`: what a click on it shows appears too.
-    func reveal(_ kind: SidebarNode.Kind, showing: Bool = false) {
+    @discardableResult func reveal(_ kind: SidebarNode.Kind, showing: Bool = false) -> Bool {
         func row() -> SidebarNode? {
             if case .connection(let id) = kind { return connections[id] }
             return treeNodes[kind]
         }
-        if row() == nil {
+        let typed = filter.stringValue
+        if row() == nil, !typed.isEmpty {
             filter.stringValue = ""
             reload()
+            // Left out by something else too (Favourites Only, the database filter): the person's filter stays.
+            if row() == nil {
+                filter.stringValue = typed
+                reload()
+            }
         }
-        guard let node = row(), let id = node.connectionOfTree ?? node.connectionID else { return }
+        guard let node = row(), let id = node.connectionOfTree ?? node.connectionID else { return false }
         var above = [model.connection(id)?.folderID.flatMap { folders[$0] }, connections[id]]
         if let database = node.database, kind != .database(id, database) {
             above.append(treeNodes[.database(id, database)])
@@ -437,11 +443,12 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         }
         above.compactMap { $0 }.forEach(outline.expandItem)
         let index = outline.row(forItem: node)
-        guard index >= 0 else { return }
+        guard index >= 0 else { return false }
         revealing = !showing
         outline.selectRowIndexes([index], byExtendingSelection: false)
         revealing = false
         outline.scrollRowToVisible(index)
+        return true
     }
 
     /// Follow Tab: a row the tree shows now, selected unless it is already; the filter stays.

@@ -74,8 +74,8 @@ public enum SQLSplitter {
     /// The statement ⌘↩ runs with the caret at `caret` (a UTF-16 offset): the one the caret is in, or right after up to
     /// the end of its delimiter. Between statements, the one before while the caret is still on its line, otherwise
     /// the next one (or the last, at the end of the script).
-    public static func statement(at caret: Int, in sql: String, noBackslashEscapes: Bool = false) -> SQLStatement? {
-        let all = statements(in: sql, noBackslashEscapes: noBackslashEscapes), text = Array(sql.utf16)
+    public static func statement(at caret: Int, in sql: String, noBackslashEscapes: Bool = false, of known: [SQLStatement]? = nil) -> SQLStatement? {
+        let all = known ?? statements(in: sql, noBackslashEscapes: noBackslashEscapes), text = Array(sql.utf16)
         let caret = min(max(caret, 0), text.count)
         if let hit = all.first(where: { $0.range.lowerBound <= caret && caret <= $0.end }) { return hit }
         let before = all.last { $0.end < caret }, after = all.first { $0.range.lowerBound > caret }

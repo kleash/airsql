@@ -362,7 +362,7 @@ extension TableEditorController {
         moveColumns(list.selectedRowIndexes, to: last + 2)
     }
 
-    /// Not while a cell is being typed in: there ⇧⌘↑ and ⇧⌘↓ are the text's.
+    /// Not while a cell is being typed in: there the keys are the text's.
     var canMoveRows: Bool { !isBusy && section == .columns && !list.selectedRowIndexes.isEmpty && !(view.window?.firstResponder is NSText) }
 
     // MARK: Dragging columns into a new order

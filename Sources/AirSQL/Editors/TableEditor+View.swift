@@ -201,6 +201,8 @@ extension TableEditorController {
     /// Why Apply can't run now (nil: it can).
     var applyReason: String? {
         if isBusy { return "Wait until the server has answered" }
+        // The ALTER would wait for the lock that tab's own transaction holds.
+        if (parent as? TableDataController)?.inTransaction == true { return "Commit or roll back this tab's transaction first, on its Data page" }
         if context.connection.readOnly {
             return "“\(context.connection.displayName)” is read-only: turn that off in its connection settings to change anything"
         }

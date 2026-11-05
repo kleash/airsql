@@ -507,6 +507,7 @@ struct ReconTests {
         func text(_ pairs: [(source: String?, target: String?)]) -> [String] { pairs.map { "\($0.source ?? "-")/\($0.target ?? "-")" } }
         #expect(text(Recon.paired(["a", "Shop"], ["shop", "z"], caseless: true)) == ["a/-", "Shop/shop", "-/z"])
         #expect(text(Recon.paired(["Shop"], ["shop"], caseless: false)) == ["Shop/-", "-/shop"])
+        #expect(text(Recon.paired(["Sales", "sales"], ["sales"], caseless: true)) == ["Sales/-", "sales/sales"], "the exact name first")
     }
 
     /// A server's result: the pairs in the summary and the report, each difference named within its database, and no script.

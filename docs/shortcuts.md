@@ -91,8 +91,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Shift Left | ⌘[ |
 | Query Helpers | ⌃⌘H |
 | Go to Line… | ⌃G |
-| Move Up | ⇧⌘↑ |
-| Move Down | ⇧⌘↓ |
+| Move Up | ⌃⇧⌘↑ |
+| Move Down | ⌃⇧⌘↓ |
 | Fixes and Actions… | ⌥↩ |
 | Go to Declaration | ⌘B |
 | Find Usages… | ⌥F7 |
@@ -101,7 +101,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Parameter Info | ⌥⌘I |
 | Next Problem | ⌥F2 |
 | Previous Problem | ⌥⇧F2 |
-| Show Problem | ⌃F1 |
+| Show Problem | ⇧F1 |
 | Preview Rows to Change | ⌥⌘↩ |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
@@ -120,7 +120,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Sort Descending | ⌃⌥⌘↓ |
 | Go to Row… | ⌘L |
 | Related Rows | ⌃⌘↓ |
-| Set Expression… | ⌃F2 |
+| Set Expression… | ⌃⇧F2 |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
 | Create Table… | ⌃⌘N |
@@ -143,7 +143,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Unfold All | ⌃⌥⇧→ |
 | Select Next Occurrence | ⌥⌘G |
 | Select All Occurrences | ⌃⌘G |
-| Add Caret to Each Line | ⌥⇧G |
+| Add Caret to Each Line | ⌃⇧G |
 | Add Caret Above | ⌃⌥⇧↑ |
 | Add Caret Below | ⌃⌥⇧↓ |
 | Column Selection Mode | ⌘* |

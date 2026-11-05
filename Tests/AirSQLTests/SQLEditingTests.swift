@@ -66,13 +66,14 @@ import Testing
     @Test func blocksPairUp() {
         func pair(_ text: String, _ caret: Int) -> [String]? {
             let units = Array(text.utf16)
-            return SQLEditing.blockPair(at: caret, in: text).map { [$0.0, $0.1].map { String(decoding: units[$0], as: UTF16.self) + "@\($0.lowerBound)" } }
+            let found = SQLBlocks.pair(at: caret, tokens: SQLLexer.tokens(text), text: text)
+            return found.isEmpty ? nil : found.map { String(decoding: units[$0], as: UTF16.self) + "@\($0.lowerBound)" }
         }
         let body = "BEGIN IF a THEN CASE WHEN 1 THEN 2 END; END IF; END"
         #expect(pair(body, 2) == ["BEGIN@0", "END@48"], "END IF is skipped")
         #expect(pair(body, 18) == ["CASE@16", "END@35"])
         #expect(pair(body, 49) == ["BEGIN@0", "END@48"], "from the END too")
-        #expect(pair(body, 8) == nil)
+        #expect(pair(body, 8) == ["IF@6", "END IF@40"])
         #expect(pair("SELECT 'BEGIN END'", 10) == nil, "a string")
         #expect(pair("BEGIN CASE WHEN 1 THEN 2 END CASE; END", 2) == ["BEGIN@0", "END@35"], "END CASE closes one CASE")
     }

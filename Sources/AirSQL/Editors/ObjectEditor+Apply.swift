@@ -54,10 +54,8 @@ extension ObjectEditorController {
 
     /// Query ▸ Format SQL, as in a console; only spaces and words' case change, so it's still the same code.
     @objc func formatSQL(_ sender: Any?) {
-        let range = NSRange(location: 0, length: code.string.utf16.count)
-        guard let formatted = SQLFormatter.format(code.string, noBackslashEscapes: code.noBackslashEscapes, style: SQLEditorView.settings().formatStyle),
-              formatted != code.string else { return }
-        code.replace(range, with: formatted, select: NSRange(location: 0, length: 0))
+        code.setSelectedRange(NSRange(location: 0, length: 0))
+        code.format(NSRange(location: 0, length: code.string.utf16.count), activity: activity, connection: context.connection.id)
     }
 
     @objc func revertChanges(_ sender: Any?) {

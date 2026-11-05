@@ -44,7 +44,9 @@ public enum SQLInPaste {
         let trimmed = clipboard.trimmingCharacters(in: .whitespacesAndNewlines)
         let tokens = SQLLexer.tokens(trimmed, noBackslashEscapes: noBackslashEscapes), units = Array(trimmed.utf16)
         func text(_ range: Range<Int>) -> String { String(decoding: units[range], as: UTF16.self) }
-        if let first = tokens.first, first.kind == .word, startsQuery(text(first.range)) { return nil }
+        // A column of single words may well start with Table or Values: a query has more on one of its lines.
+        if let first = tokens.first, first.kind == .word, startsQuery(text(first.range)),
+           trimmed.split(whereSeparator: \.isNewline).contains(where: { $0.contains { $0.isWhitespace } }) { return nil }
         var values: [String]
         if let items = listItems(tokens, units), items.count > 1 {
             // Written as a list already, on one line or several: it stays. Plain numbers still go through the rule above.

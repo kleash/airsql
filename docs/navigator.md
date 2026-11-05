@@ -152,7 +152,7 @@ server is, how you reach it and how long it has been up. A click on a row select
 - **Processes**: the [process list](#see-what-the-server-is-running).
 - **Command Statistics**: how many statements of each kind the server has run, with their rates and share.
 
-Every list has a **Filter** that takes a word or a regular expression and says how many rows it kept. Click a column's
+Every list has a **Filter** that takes a word or, between slashes, a regular expression (`/^wp_/`), and says how many rows it kept. Click a column's
 title to sort; right-click a title to show or hide columns. **⌘C** copies the selected rows. **Copy List** and **Export
 List…** take the whole list as CSV. **⌘R** reads it again.
 

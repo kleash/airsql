@@ -26,6 +26,8 @@ import Testing
         #expect(pasted("  a  \n\n\n  b\n\n", "WHERE x IN (|)") == "WHERE x IN ('a', 'b')", "blanks drop out, spaces trim")
         #expect(pasted("a\t\tb\nc\td", "WHERE x IN (|)") == "WHERE x IN ('a', 'b', 'c', 'd')", "a block of cells")
         #expect(pasted("a,\nb,\nc", "WHERE x IN (|)") == "WHERE x IN ('a', 'b', 'c')", "a comma ending a line")
+        #expect(pasted("Table\nChair", "WHERE x IN (|)") == "WHERE x IN ('Table', 'Chair')", "a word, not a query")
+        #expect(pasted("SELECT a\nFROM t", "WHERE x IN (|)") == nil, "a query goes in as it is")
         #expect(pasted("NULL\nb", "WHERE x IN (|)") == "WHERE x IN ('NULL', 'b')", "NULL is text here")
         #expect(pasted("1\n2", "WHERE x IN (|)") == "WHERE x IN ('1', '2')", "the column's type isn't known")
         #expect(pasted("12 High St, Leeds\n3 Low Rd, York", "WHERE x IN (|)") == "WHERE x IN ('12 High St, Leeds', '3 Low Rd, York')")

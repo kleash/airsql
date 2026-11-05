@@ -66,16 +66,6 @@ extension SQLParser {
 
     // MARK: Writes
 
-    /// `table [PARTITION …] [[AS] alias]`.
-    private mutating func namedTable() -> SQLTableRef? {
-        let start = current.range.lowerBound
-        guard let name = dottedName("a table name") else { return nil }
-        var ref = SQLTableRef(kind: .table, range: name.range, name: name)
-        afterTableName(&ref)
-        ref.range = start..<lastEnd
-        return ref
-    }
-
     private mutating func insert(_ result: inout SQLParsedStatement) {
         result.kind = current.upper == "INSERT" ? .insert : .replace
         index += 1

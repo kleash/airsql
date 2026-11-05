@@ -46,6 +46,17 @@ func appWindow(_ model: AppModel, size: NSSize = MainWindowController.defaultSiz
     return (main, AgentServer(main: main, model: model, windows: windows))
 }
 
+/// A key as the system delivers one, through NSApp's event routing: menus first or not as AppKit decides, then the first
+/// responder. The harness's `key` tool walks the menu instead, so it can't show that a key reaches a command.
+@MainActor
+func press(_ window: NSWindow?, _ characters: String, ignoringModifiers: String? = nil, code: UInt16, _ flags: NSEvent.ModifierFlags) {
+    guard let window, let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: window.windowNumber,
+                                                   context: nil, characters: characters, charactersIgnoringModifiers: ignoringModifiers ?? characters,
+                                                   isARepeat: false, keyCode: code) else { return }
+    window.makeKey()  // the event goes to the key window
+    NSApp.sendEvent(event)
+}
+
 /// A tool's reply: its text as JSON, or the error text; and its image, if any.
 struct Reply {
     var json: [String: Any] = [:]
