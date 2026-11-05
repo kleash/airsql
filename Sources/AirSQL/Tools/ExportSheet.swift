@@ -185,6 +185,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         off([dataMode, wrapInTransactions, insertSize], structure ? "Off with structure only: no rows are written" : nil)
         off([createDatabase], several ? "Several databases always say their names" : nil)
         off([dropDatabase], onlySome ? "Off with only some tables ticked: restoring would delete the others" : nil)
+        off([dropDatabase], output.indexOfSelectedItem == 1 ? "Off for a folder: restoring each file would delete what the last one restored" : nil)
         off([gzip], output.indexOfSelectedItem == 2 ? "The clipboard holds plain text" : nil)
         off([choose], output.indexOfSelectedItem == 2 ? "The clipboard needs no file" : nil)
         off([fileFormat], output.indexOfSelectedItem == 1 ? nil : "Only a folder has other formats: one file is SQL")
@@ -193,6 +194,12 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
             off([content, dataMode, gzip, hexBlob, dropTable, objects, createDatabase, dropDatabase, removeDefiner, removeAutoIncrement,
                  wrapInTransactions, insertSize], why)
         }
+    }
+
+    /// The folder a folder export makes: the file's name without its extension.
+    private var folder: URL {
+        let name = url.lastPathComponent
+        return url.deletingLastPathComponent().appendingPathComponent(String(name[..<(name.range(of: ".sql", options: .backwards)?.lowerBound ?? name.endIndex)]))
     }
 
     /// The data format of a folder's files, nil for SQL or Excel.
@@ -282,9 +289,10 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         if wantsGzip != name.hasSuffix(".gz") {
             let base = name.hasSuffix(".sql.gz") ? String(name.dropLast(3)) : name
             url = url.deletingLastPathComponent().appendingPathComponent(wantsGzip ? base + ".gz" : base)
-            saveTo.stringValue = SettingsPaneController.shown(url)
-            saveTo.toolTip = url.path
         }
+        let target = output.indexOfSelectedItem == 1 ? folder : url
+        saveTo.stringValue = output.indexOfSelectedItem == 2 ? "The clipboard" : SettingsPaneController.shown(target)
+        saveTo.toolTip = target.path
         if !running { fitControls() }
         hexBlob.isEnabled = !running && tool != nil && dataFormat == nil && !wantsExcel
         if !running, dataFormat == nil, !wantsExcel {
@@ -371,7 +379,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
         request.dataMode = DumpRequest.DataMode.allCases[max(0, dataMode.indexOfSelectedItem)]
         if request.content == .structure { request.dataMode = .insert }
         request.createDatabase = createDatabase.state == .on && included.count == 1 && request.content != .data
-        request.dropDatabase = dropDatabase.state == .on && request.tables.isEmpty && request.content != .data
+        request.dropDatabase = dropDatabase.state == .on && request.tables.isEmpty && request.content != .data && output.indexOfSelectedItem != 1
         request.removeDefiner = removeDefiner.state == .on && request.content != .data
         request.removeAutoIncrement = removeAutoIncrement.state == .on && request.content != .data
         request.wrapInTransactions = wrapInTransactions.state == .on && request.content != .structure
@@ -441,8 +449,7 @@ final class ExportSheet: ToolSheet, NSTextFieldDelegate {
                                   + "sheet for them, or use run_queries with to_file.") else { return }
         guard let request = makeRequest() else { return }
         reveal.isHidden = true
-        let name = url.lastPathComponent
-        let folder = url.deletingLastPathComponent().appendingPathComponent(String(name.prefix(upTo: name.range(of: ".sql")?.lowerBound ?? name.endIndex)))
+        let folder = self.folder
         let url = self.url, options = self.options
         let tables = picker.databases.flatMap(\.tables).filter(\.included)
         let estimate = tables.reduce(Int64(0)) { $0 + $1.bytes }

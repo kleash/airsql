@@ -954,6 +954,7 @@ enum Commands {
     /// Menu items that only open a submenu, by title.
     static let submenus: [String: String] = [
         "Server Home": "Show what the server holds and does: databases, variables, status, processes",
+        "Flush": "Clear the server's caches, logs and counters, or lock its tables",
         "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",

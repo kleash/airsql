@@ -426,6 +426,26 @@ extension AppTests {
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("CREATE TABLE") == true)
         }
 
+        /// A result comes with its names, NULLs apart from empty text, and a clipboard's text is guessed as a file's is.
+        @Test func theImportSheetTakesAResultAndText() async throws {
+            let (main, _) = Self.window()
+            let sheet = CSVImportSheet(model: main.model, connection: ToolFixtures.local, options: ToolFixtures.options)
+            sheet.show(on: main.window!, loads: false)
+            defer { sheet.close() }
+            sheet.show(databases: ToolFixtures.databases())
+            sheet.show(columns: ToolFixtures.customerColumns)
+            let content = try #require(sheet.window?.contentView)
+            let preview = try #require(find(NSTableView.self, id: "csv.preview", in: content))
+            sheet.use(rows: [["name", "email"], ["Ada", nil]], title: "The result (1 row)")
+            _ = await eventually(timeout: 5) { preview.numberOfRows == 1 }
+            #expect(preview.dataSource?.tableView?(preview, objectValueFor: preview.tableColumns[1], row: 0) as? String == "NULL")
+            #expect(try #require(find(NSButton.self, id: "csv.header", in: content)).isEnabled == false)
+            sheet.use(text: "name\temail\nAda\ta@example.com\nGrace\tg@example.com\n")
+            _ = await eventually(timeout: 5) { preview.numberOfRows == 2 }
+            #expect(preview.numberOfColumns == 2 && sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            #expect(try #require(find(NSPopUpButton.self, id: "csv.separator", in: content)).titleOfSelectedItem == "Tab")
+        }
+
         /// JSON brings its own names; a file with no text format turns the text controls off.
         @Test func theImportSheetTakesJSONAndOffersOnlyWhatFits() async throws {
             let (main, _) = Self.window()

@@ -48,6 +48,8 @@ public final class SQLFolderSink: SQLSink {
     private let gzip: Bool
     private let cancellation: Cancellation
     private var prelude: [SQLPiece] = []
+    /// What every file starts with, without any one database's CREATE and USE.
+    private var settings: [SQLPiece]?
     private var current: (fd: Int32, writer: Runner.Writer)?
     public private(set) var bytes: Int64 = 0
 
@@ -69,7 +71,13 @@ public final class SQLFolderSink: SQLSink {
     private func writeOne(_ piece: SQLPiece) throws {
         if case .object(let name) = piece {
             try closeCurrent()
-            if let name { try open(name) }
+            if let name {
+                try open(name)
+            } else if let settings {
+                prelude = settings
+            } else {
+                settings = prelude
+            }
         } else if let current {
             try current.writer.write(piece.fileText)
         } else {

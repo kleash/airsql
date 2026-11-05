@@ -282,7 +282,16 @@ struct ClientToolsLabTests {
         #expect(files == ["T2.sql", "p.sql", "t.sql", "v.sql"], "\(files)")
         let table = try String(contentsOf: folder.appendingPathComponent("t.sql"), encoding: .utf8)
         #expect(table.contains("SET NAMES utf8mb4;") && table.contains("CREATE TABLE `t`") && !table.contains("CREATE TABLE `T2`"))
+        // Several databases: each file names only its own, and a folder never drops one.
         _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(other))
+        _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(other, "o")) (id INT)")
+        var both = DumpRequest(databases: [target, other])
+        both.dropDatabase = true
+        let many = URL(fileURLWithPath: try scratch()).appendingPathComponent("many")
+        _ = try await ToolRun.exportFolder(both, options: Self.options(server), to: many, cancellation: Cancellation()) { _, _ in }
+        let second = try String(contentsOf: many.appendingPathComponent(other + ".o.sql"), encoding: .utf8)
+        #expect(second.contains("USE `\(other)`;") && !second.contains("`\(target)`") && !second.contains("DROP DATABASE"), "\(second)")
+        _ = try await session.query("DROP TABLE " + SQLQuote.identifier(other, "o"))
         _ = try await session.query("USE " + SQLQuote.identifier(other))
         let cleanup = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
         _ = try await cleanup.connect()

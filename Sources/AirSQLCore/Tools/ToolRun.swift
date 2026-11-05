@@ -100,12 +100,15 @@ public enum ToolRun {
     }
 
     /// AirSQL's own export into the new folder `folder`, a file for each object; a failed or cancelled run leaves no folder.
+    /// Never with DROP DATABASE: each file starts the same way, so restoring one would delete the ones restored before.
     public static func exportFolder(_ request: DumpRequest, options: ConnectOptions, to folder: URL, cancellation: Cancellation,
                                     progress: @escaping (SQLExport.Progress, Int64) -> Void) async throws -> ToolOutcome {
         let started = Date()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
         let session = DBConnection(options: options, role: .tools)
         let sink = SQLFolderSink(folder, gzip: request.gzip, cancellation: cancellation)
+        var request = request
+        request.dropDatabase = false
         do {
             _ = try await session.connect()
             try await SQLExport.run(request, from: session, into: sink, cancellation: cancellation) { progress($0, sink.bytes) }

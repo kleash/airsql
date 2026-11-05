@@ -215,10 +215,9 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
         for control in [separatorMenu, otherSeparator, quoteMenu, encodingMenu, trim, backslash] as [NSControl] {
             control.isEnabled = delimited
         }
-        // JSON's keys and a result's columns always come first.
-        let named = source.map { $0.kind == .json || isRows($0) } ?? false
-        header.isEnabled = !named
-        if named { header.state = .on }
+        header.isEnabled = !hasNames
+        skipRows.isEnabled = !hasNames
+        if hasNames { header.state = .on }
         emptyFirst.isEnabled = !isNew
         if isNew { emptyFirst.state = .off }
         emptyFirst.toolTip = isNew ? "A new table has no rows to delete"
@@ -229,6 +228,9 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
         if case .rows = source { return true }
         return false
     }
+
+    /// JSON's keys and a result's columns always come first.
+    private var hasNames: Bool { source.map { $0.kind == .json || isRows($0) } ?? false }
 
     private var isDelimited: Bool { source.map { $0.kind == .delimited && !isRows($0) } ?? true }
 
@@ -409,7 +411,7 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
         options.escape = backslash.state == .on ? 0x5C : nil
         options.encoding = Self.encodings[max(0, encodingMenu.indexOfSelectedItem)].encoding
         options.trim = trim.state == .on
-        options.skipRecords = max(0, skipRows.integerValue)
+        options.skipRecords = hasNames ? 0 : max(0, skipRows.integerValue)
         options.header = header.state == .on
         options.emptyIsNull = emptyIsNull.state == .on
         options.decimalComma = decimalComma.state == .on
@@ -599,7 +601,7 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
     private func rejectsFile() -> URL {
         let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSHomeDirectory())
         let stamp = ExportSheet.fileName("skipped", gzip: false).replacingOccurrences(of: ".sql", with: ".csv")
-        return folder.appendingPathComponent(newName.stringValue + "-" + stamp)
+        return folder.appendingPathComponent(SQLFolderSink.fileName(newName.stringValue + "-" + stamp))
     }
 
     @objc private func showSkipped(_ sender: Any?) {
@@ -639,9 +641,9 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
                         names = types.map(\.name)
                         fields = self.fields(of: types)
                     }
-                    let kinds = { (word: [String]) in Set(types.filter { column in word.contains { column.type.lowercased().contains($0) } }.map(\.name)) }
-                    options.binaryColumns = kinds(["binary", "blob"])
-                    options.numberColumns = kinds(["int", "dec", "float", "double", "numeric"])
+                    options.binaryColumns = Set(types.filter { $0.type.lowercased().contains("binary") || $0.type.lowercased().contains("blob") }.map(\.name))
+                    let numbers = ["tinyint", "smallint", "mediumint", "int", "bigint", "dec", "numeric", "float", "double"]
+                    options.numberColumns = Set(types.filter { column in numbers.contains { column.type.lowercased().hasPrefix($0) } }.map(\.name))
                     let done = try await CSVImport.run(source, options: options, into: session, database: database, table: table,
                                                        columns: names, mapping: fields, cancellation: cancellation) { state in
                         updates.send {
