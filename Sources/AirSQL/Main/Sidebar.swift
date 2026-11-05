@@ -765,7 +765,7 @@ final class SidebarCell: NSTableCellView {
         shield.isHidden = !connection.hasCustomSafety
         lock.isHidden = !connection.readOnly
         badge.isHidden = false
-        badge.stringValue = (connection.colour == .production ? "PROD · " : "") + connection.routeBadge
+        badge.stringValue = (connection.isProduction ? "PROD · " : "") + connection.routeBadge
         // Each state its own shape, not only its own colour.
         let symbol: (name: String, colour: NSColor)?
         var next = "double-click to connect"

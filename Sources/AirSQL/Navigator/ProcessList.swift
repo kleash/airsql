@@ -357,10 +357,16 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
 
     /// Why a command can't act on the selection now (nil: it can).
     private func reason(_ action: Selector?) -> String? {
+        // A kill reaches other people's sessions, which READ ONLY doesn't stop.
+        let readOnly = NavigatorActions.readOnlyReason(open, open.model)
         switch action {
-        case Commands.killQuery.action?, Commands.copyQuery.action?:
+        case Commands.killQuery.action?:
+            return readOnly ?? (selected.contains { $0.info != nil } ? nil : "Select a process that is running a statement first")
+        case Commands.copyQuery.action?:
             return selected.contains { $0.info != nil } ? nil : "Select a process that is running a statement first"
-        case Commands.killConnection.action?, Commands.copy.action?:
+        case Commands.killConnection.action?:
+            return readOnly ?? (selected.isEmpty ? "Select a process first" : nil)
+        case Commands.copy.action?:
             return selected.isEmpty ? "Select a process first" : nil
         case Commands.explain.action?:
             return selected.count == 1 && selected[0].info != nil ? nil : "Select one process that is running a statement first"

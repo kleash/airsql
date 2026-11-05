@@ -102,7 +102,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
             views.append(banner("Asked by \(agent). Nothing runs until you approve it here; agents can't approve their own "
                                 + "changes.", symbol: "sparkles", color: .accent, id: "preview.agent"))
         }
-        if let connection, connection.colour == .production {
+        if let connection, connection.isProduction {
             let words = request.text == nil ? "This runs on \(connection.displayName), a production connection."
                 : "\(connection.displayName) is a production connection."
             views.append(banner(words, symbol: "exclamationmark.octagon.fill",

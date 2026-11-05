@@ -344,7 +344,7 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
     private var editRefusal: String? {
         guard let saved = open.model?.connection(open.id) else { return "Connect to the server again first" }
         if saved.readOnly { return "“\(saved.displayName)” is read-only: variables can't be changed" }
-        if saved.colour == .production || saved.safety == .production { return "“\(saved.displayName)” is Production: variables can't be changed from here" }
+        if saved.isProduction { return "“\(saved.displayName)” is Production: variables can't be changed from here" }
         return nil
     }
 

@@ -7,7 +7,7 @@ extension SavedConnection {
     var usersRefusal: String? {
         if AgentGate.agent != nil { return "Only the person at the Mac can change users, roles and grants: nothing was changed." }
         if readOnly { return "“\(displayName)” is read-only: users can't be changed" }
-        if colour == .production || safety == .production { return "“\(displayName)” is Production: users can't be changed from here" }
+        if isProduction { return "“\(displayName)” is Production: users can't be changed from here" }
         return nil
     }
 }

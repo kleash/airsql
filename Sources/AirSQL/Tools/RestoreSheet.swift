@@ -300,7 +300,7 @@ final class RestoreSheet: ToolSheet {
             let safety = model.data.safety(for: connection)
             // What an agent set off waits for the person here (plan §2.8).
             let agent = AgentGate.agent != nil && safety.askBeforeAgentChanges
-            guard agent || connection.colour == .production || (safety.askBeforeRiskyRestore && !warnings.isEmpty) else {
+            guard agent || connection.isProduction || (safety.askBeforeRiskyRestore && !warnings.isEmpty) else {
                 start(file, database: database)
                 return
             }
