@@ -18,11 +18,13 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     private lazy var hideMatching = checkbox("Hide Matching", id: "recon.hideMatching", tip: "Show only the objects that differ",
                                              on: false, target: self, action: #selector(hideMatchingToggled(_:)))
     private let listBar = NSStackView()
+    private lazy var back = button(Commands.backToServer.title, id: "recon.back", tip: Commands.backToServer.tip, target: nil,
+                                   action: #selector(ReconWindowController.backToServer(_:)))
 
     /// The list's first width, wide enough for names, when nothing is remembered (the window calls it once laid out).
     func placeDivider() {
         guard UserDefaults.standard.object(forKey: "NSSplitView Subview Frames " + (split.autosaveName ?? "")) == nil else { return }
-        split.setPosition(320, ofDividerAt: 0)
+        split.setPosition(348, ofDividerAt: 0)
     }
 
     override init() {
@@ -54,7 +56,8 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         split.isVertical = true
         split.dividerStyle = .thin
         split.autosaveName = layoutName("Compare split")
-        listBar.setViews([filter, hideMatching], in: .leading)
+        back.isHidden = true
+        listBar.setViews([back, filter, hideMatching], in: .leading)
         listBar.spacing = Spacing.unit
         listBar.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.unit)
         listBar.setHuggingPriority(.defaultHigh, for: .vertical)
@@ -117,9 +120,25 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
 
     private static func key(_ object: ReconObject) -> String { "\(object.kind) \(object.name)" }
 
+    /// The same result with other ticks: the list and the details follow, selection and scrolling kept.
+    func refresh(_ result: ReconResult) {
+        ordered = result.objects.sorted { Self.rank($0) < Self.rank($1) }
+        arrange()
+        detail.refresh(selected.count == 1 ? selected.first : nil, result: result)
+    }
+
     @objc private func hideMatchingToggled(_ sender: Any?) { arrange() }
 
-    func update() { detail.update() }
+    func update() {
+        back.isHidden = window?.serverResult == nil
+        detail.update()
+    }
+
+    @objc func tickToggled(_ sender: NSButton) {
+        let row = list.row(for: sender)
+        guard objects.indices.contains(row) else { return }
+        window?.set([objects[row]], leftOut: sender.state == .off)
+    }
 
     var selected: [ReconObject] { list.selectedRowIndexes.compactMap { objects.indices.contains($0) ? objects[$0] : nil } }
 
@@ -166,6 +185,8 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let cell = tableView.makeView(withIdentifier: ReconObjectCell.identifier, owner: self) as? ReconObjectCell ?? ReconObjectCell()
         if let result = window?.result { cell.show(objects[row], result: result) }
+        cell.tick.target = self
+        cell.tick.action = #selector(tickToggled(_:))
         return cell
     }
 
@@ -179,6 +200,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     @objc private func open(_ sender: Any?) {
         let row = list.clickedRow >= 0 ? list.clickedRow : list.selectedRow
         guard objects.indices.contains(row), let result = window?.result else { return }
+        if result.isServer { return window?.openPair(objects[row]) ?? () }
         detail.show(objects[row], result: result, data: objects[row].data?.differs == true)
     }
 
@@ -188,13 +210,16 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
             list.selectRowIndexes(IndexSet(integer: list.clickedRow), byExtendingSelection: false)
         }
         menu.removeAllItems()
-        for command in [Commands.copy, Commands.copySyncScript, Commands.leaveOutOfCompare] { menu.addItem(command.item()) }
+        for command in [Commands.copy, Commands.copySyncScript, Commands.includeInSync, Commands.leaveOutOfCompare] {
+            menu.addItem(command.item())
+        }
     }
 }
 
-/// A row of the objects list: its state as a chip, its name, and what differs.
+/// A row of the objects list: a tick for the sync script, its state as a chip, its name, and what differs.
 final class ReconObjectCell: NSTableCellView {
     static let identifier = NSUserInterfaceItemIdentifier("reconObject")
+    let tick = checkbox("", id: "recon.tick", tip: Commands.includeInSync.tip, on: true, target: nil, action: nil)
     let chip = ChipView("", style: .neutral)
     let name = label("", truncates: true)
     let what = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
@@ -204,7 +229,15 @@ final class ReconObjectCell: NSTableCellView {
     init() {
         super.init(frame: .zero)
         identifier = Self.identifier
-        let stack = NSStackView(views: [chip, name, what])
+        // Rows without a tick keep its room, so the names line up.
+        let tickRoom = NSView()
+        tickRoom.addSubview(tick)
+        tick.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            tickRoom.widthAnchor.constraint(equalToConstant: 16), tick.centerYAnchor.constraint(equalTo: tickRoom.centerYAnchor),
+            tick.leadingAnchor.constraint(equalTo: tickRoom.leadingAnchor),
+        ])
+        let stack = NSStackView(views: [tickRoom, chip, name, what])
         stack.spacing = Spacing.unit
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
         what.alignment = .right
@@ -231,17 +264,20 @@ final class ReconObjectCell: NSTableCellView {
         let (text, style) = Self.chip(object)
         chip.text = text
         chip.style = style
-        name.stringValue = object.kind == .table ? object.name : "\(object.name) (\(object.kind.rawValue))"
+        tick.isHidden = !object.differs || result.isServer
+        tick.state = object.leftOut ? .off : .on
+        tick.setAccessibilityLabel("Include \(object.name) in the sync script")
+        name.stringValue = [.table, .database].contains(object.kind) ? object.name : "\(object.name) (\(object.kind.rawValue))"
         name.toolTip = name.stringValue + (object.targetName == object.name ? "" : " → \(object.targetName)")
         name.textColor = object.differs ? .labelColor : .secondaryLabelColor
-        what.stringValue = Self.what(object)
+        what.stringValue = result.databases[object.name].map(Self.what(pair:)) ?? Self.what(object)
         whatMinimum.constant = what.intrinsicContentSize.width
         what.toolTip = [what.stringValue, ReconReport.status(object, result)].filter { !$0.isEmpty }.joined(separator: ": ")
         setAccessibilityLabel("\(object.kind.rawValue) \(object.name), \(ReconReport.status(object, result))")
     }
 
     /// The widest chip's width: its text, its label's 2-point margins and the chip's 9-point insets.
-    static let chipWidth = ["only source", "only target", "structure", "data", "match"].map {
+    static let chipWidth = ["only source", "only target", "structure", "data", "match", "differs"].map {
         NSAttributedString(string: $0, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).size().width.rounded(.up) + 22
     }.max() ?? 0
 
@@ -249,13 +285,24 @@ final class ReconObjectCell: NSTableCellView {
         switch object.status {
         case .onlyInSource: return ("only source", .tinted(.statusBad))
         case .onlyInTarget: return ("only target", .tinted(.statusBad))
+        case .different where object.kind == .database: return ("differs", .tinted(.statusWarning))
         case .different: return ("structure", .tinted(.statusWarning))
         case .same: return object.data?.differs == true ? ("data", .accent) : ("match", .tinted(.statusOK))
         }
     }
 
+    /// A pair of databases: "3 objects differ, 12 rows", or "" when it matches.
+    static func what(pair: ReconResult) -> String {
+        let objects = pair.objects.filter(\.differs)
+        guard !objects.isEmpty else { return "" }
+        let rows = objects.compactMap(\.data).reduce(0) { $0 + $1.differenceCount }
+        return "\(objects.count) \(objects.count == 1 ? "object differs" : "objects differ")"
+            + (rows > 0 ? ", \(rows.formatted()) \(rows == 1 ? "row" : "rows")" : "")
+    }
+
     /// "1 column, 1 index · 12 changed, 3 missing".
     static func what(_ object: ReconObject) -> String {
+        if object.kind == .database { return object.status == .different ? "couldn't be read" : "" }
         var parts: [String] = []
         let kinds: [(ReconPart.Kind, String, String)] = [(.column, "column", "columns"), (.index, "index", "indexes"),
                                                           (.foreignKey, "foreign key", "foreign keys"), (.check, "check", "checks")]

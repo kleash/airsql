@@ -130,7 +130,9 @@ final class OffReasons: NSObject, NSMenuDelegate {
         "Tools": "Select a connection in the sidebar first",
     ]
     private static let inCompare: Set<Selector> = [Commands.syncScript.action, Commands.exportReport.action,
-                                                   Commands.copySyncScript.action, Commands.leaveOutOfCompare.action]
+                                                   Commands.copySyncScript.action, Commands.leaveOutOfCompare.action,
+                                                   Commands.includeInSync.action, Commands.backToServer.action,
+                                                   Commands.nextDifference.action, Commands.previousDifference.action]
     private static let inLists: [Selector: String] = [
         Commands.diskUsageUp.action: "Open Tools ▸ Disk Usage first", Commands.diskUsageCompare.action: "Open Tools ▸ Disk Usage first",
         Commands.copyList.action: "Open Disk Usage or Server Home first", Commands.exportList.action: "Open Disk Usage or Server Home first",

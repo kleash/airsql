@@ -61,6 +61,10 @@ final class ReconTablesSheet: NSWindowController, NSTableViewDataSource, NSTable
             column.headerToolTip = spec.tip
             table.addTableColumn(column)
         }
+        // Two chosen objects: the pair says what is compared with what, so only the columns and WHERE are left to choose.
+        for id in ["include", "target"] where compare?.level == .object {
+            table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(id))?.isHidden = true
+        }
         table.dataSource = self
         table.delegate = self
         table.centreText(rowHeight: 24)

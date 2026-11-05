@@ -4,7 +4,7 @@ import Testing
 
 /// Compare and reconcile against the lab (AIRSQL_LAB=1): structure and data on MariaDB and MySQL, across the two
 /// flavours, the hashing's edge cases on real servers, the million-row table, and a sync script that makes the target
-/// match. Writes only in databases named lane_l8a_*.
+/// match. Writes only in databases named lane_l8a_* and lane_compare_*.
 @Suite(.serialized, .enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests"))
 struct ReconLabTests {
     static let log = SQLLog(fileURL: FileManager.default.temporaryDirectory
@@ -209,6 +209,102 @@ struct ReconLabTests {
         #expect(result.script().contains("UPDATE `items_v2` SET `name` = 'b' WHERE `id` IN (2)"))
         try await Self.run(source, ["DROP DATABASE lane_l8a_opt_src"])
         try await Self.run(target, ["DROP DATABASE lane_l8a_opt_dst"])
+    }
+
+    /// Two tables of one database, under different names: structure and rows, then a sync that changes only the target.
+    @Test func comparesAndSyncsTwoTablesOfOneDatabase() async throws {
+        let source = try await Self.session(Lab.mariadb114), target = try await Self.session(Lab.mariadb114)
+        defer { Task { await source.close(); await target.close() } }
+        let name = "lane_compare_pair"
+        try await Self.database(source, name, [
+            "CREATE TABLE parent (id INT PRIMARY KEY)", "INSERT INTO parent VALUES (1)",
+            """
+            CREATE TABLE a (id INT PRIMARY KEY, p INT, note VARCHAR(20), KEY ix (note),
+                CONSTRAINT fk_a FOREIGN KEY (p) REFERENCES parent (id))
+            """,
+            "CREATE TABLE b (id INT PRIMARY KEY, p INT, KEY kp (p), CONSTRAINT fk_b FOREIGN KEY (p) REFERENCES parent (id))",
+            "INSERT INTO a VALUES (1, 1, 'x'), (2, NULL, 'y')", "INSERT INTO b VALUES (1, 1), (3, NULL)",
+        ])
+        var options = ReconOptions()
+        options.only = ReconPair(kind: .table, source: "a", target: "b")
+        let result = try await Self.compare(source, name, target, name, options: options)
+        #expect(result.objects.map(\.name) == ["a"])
+        let object = try #require(result.object(.table, "a"))
+        #expect(object.targetName == "b" && object.status == .different)
+        #expect(!object.parts.contains { $0.kind == .foreignKey }, "\(object.parts.map(\.name))")
+        #expect(object.parts.contains { $0.kind == .column && $0.name == "note" && $0.change == .added })
+        #expect(object.data?.missing.count == 1 && object.data?.extra.count == 1)
+        #expect(object.sourceDDL?.contains("CREATE TABLE `a`") == true && object.targetDDL?.contains("CREATE TABLE `b`") == true)
+        try await result.apply(destructive: true, on: target) { _ in }
+        let again = try await Self.compare(source, name, target, name, options: options)
+        #expect(again.object(.table, "a")?.data?.changed.count == 2, "the new column's values follow on a second run")
+        try await again.apply(destructive: true, on: target) { _ in }
+        let last = try await Self.compare(source, name, target, name, options: options)
+        #expect(last.object(.table, "a")?.data?.outcome == .same)
+        #expect(try await source.rows("SELECT COUNT(*) FROM \(name).a").first?.first == "2", "the source is untouched")
+        try await Self.run(source, ["DROP DATABASE \(name)"])
+    }
+
+    /// Two views, routines and triggers under other names, in two databases and in one, and a missing object.
+    @Test func comparesAndSyncsTwoObjects() async throws {
+        let source = try await Self.session(Lab.mariadb114), target = try await Self.session(Lab.mariadb114)
+        defer { Task { await source.close(); await target.close() } }
+        let name = "lane_compare_obj"
+        try await Self.database(source, name, [
+            "CREATE TABLE t (id INT PRIMARY KEY)", "CREATE VIEW v1 AS SELECT id FROM t", "CREATE VIEW v2 AS SELECT id FROM t",
+            "CREATE VIEW v3 AS SELECT id + 1 AS id FROM t", "CREATE PROCEDURE p1() SELECT 1", "CREATE PROCEDURE p2() SELECT 2",
+            "CREATE TRIGGER g1 BEFORE INSERT ON t FOR EACH ROW SET @a = 1", "CREATE TRIGGER g2 BEFORE UPDATE ON t FOR EACH ROW SET @a = 2",
+        ])
+        func pair(_ kind: ReconObject.Kind, _ left: String, _ right: String) async throws -> ReconResult {
+            var options = ReconOptions()
+            options.only = ReconPair(kind: kind, source: left, target: right)
+            return try await Self.compare(source, name, target, name, options: options)
+        }
+        let same = try await pair(.view, "v1", "v2")
+        #expect(same.objects.map(\.status) == [.same] && same.options.mode == .structure)
+        let different = try await pair(.view, "v1", "v3")
+        #expect(different.objects.first?.status == .different && different.objects.first?.targetName == "v3")
+        #expect(try await pair(.procedure, "p1", "p2").objects.first?.status == .different)
+        #expect(try await pair(.trigger, "g1", "g2").objects.first?.status == .different)
+        await #expect(throws: ReconError.self) { _ = try await pair(.view, "v1", "nothing") }
+        await #expect(throws: ReconError.self) { _ = try await pair(.table, "nothing", "t") }
+        try await different.apply(destructive: false, on: target) { _ in }
+        #expect(try await pair(.view, "v1", "v3").objects.first?.status == .same)
+        let routine = try await pair(.procedure, "p1", "p2")
+        try await routine.apply(destructive: false, on: target) { _ in }
+        #expect(try await pair(.procedure, "p1", "p2").objects.first?.status == .same)
+        let body = try await source.rows("SHOW CREATE VIEW \(name).v1").first?[1] ?? ""
+        #expect(body.contains("`v1`"), "the source is untouched")
+        try await Self.run(source, ["DROP DATABASE \(name)"])
+    }
+
+    /// Two servers: every database paired by name, each with its own result; those on one side listed.
+    @Test func comparesTwoServers() async throws {
+        let source = try await Self.session(Lab.mariadb114), target = try await Self.session(Lab.mariadb106)
+        defer { Task { await source.close(); await target.close() } }
+        try await Self.database(source, "lane_compare_srv", ["CREATE TABLE t (id INT PRIMARY KEY, n INT)", "INSERT INTO t VALUES (1, 1)"])
+        try await Self.database(target, "lane_compare_srv", ["CREATE TABLE t (id INT PRIMARY KEY)", "INSERT INTO t VALUES (2)"])
+        try await Self.database(source, "lane_compare_srv_same", ["CREATE TABLE t (id INT PRIMARY KEY)"])
+        try await Self.database(target, "lane_compare_srv_same", ["CREATE TABLE t (id INT PRIMARY KEY)"])
+        try await Self.database(source, "lane_compare_srv_left", [])
+        try await Self.database(target, "lane_compare_srv_right", [])
+        var steps: [ReconProgress] = []
+        let lock = NSLock()
+        let result = try await Recon.runServer(source: ReconSide(name: "A", database: "", session: source),
+                                               target: ReconSide(name: "B", database: "", session: target),
+                                               options: ReconOptions()) { step in lock.withLock { steps.append(step) } }
+        #expect(result.isServer && result.source.isMariaDB && result.objects.allSatisfy { $0.kind == .database })
+        #expect(result.object(.database, "lane_compare_srv")?.status == .different)
+        #expect(result.object(.database, "lane_compare_srv_same")?.status == .same)
+        #expect(result.object(.database, "lane_compare_srv_left")?.status == .onlyInSource)
+        #expect(result.object(.database, "lane_compare_srv_right")?.status == .onlyInTarget)
+        #expect(result.object(.database, "mysql") == nil && result.object(.database, "information_schema") == nil)
+        let pair = try #require(result.databases["lane_compare_srv"])
+        #expect(pair.source.database == "lane_compare_srv" && pair.object(.table, "t")?.status == .different)
+        #expect(pair.script().first == "USE `lane_compare_srv`")
+        #expect(steps.last?.fraction ?? 0 > 0 && steps.contains { $0.step.contains("lane_compare_srv") })
+        for database in ["lane_compare_srv", "lane_compare_srv_same", "lane_compare_srv_left"] { try await Self.run(source, ["DROP DATABASE \(database)"]) }
+        for database in ["lane_compare_srv", "lane_compare_srv_same", "lane_compare_srv_right"] { try await Self.run(target, ["DROP DATABASE \(database)"]) }
     }
 
     /// Hostile names and values go through every statement a compare and a sync write, on a target whose sql_mode has

@@ -239,6 +239,12 @@ import AppKit
     @objc optional func restoreDatabase(_ sender: Any?)
     @objc optional func copyToServer(_ sender: Any?)
     @objc optional func compareDatabases(_ sender: Any?)
+    @objc optional func compareWith(_ sender: Any?)
+    @objc optional func compareRows(_ sender: Any?)
+    @objc optional func backToServer(_ sender: Any?)
+    @objc optional func includeInSync(_ sender: Any?)
+    @objc optional func nextDifference(_ sender: Any?)
+    @objc optional func previousDifference(_ sender: Any?)
     @objc optional func showSyncScript(_ sender: Any?)
     @objc optional func exportReport(_ sender: Any?)
     @objc optional func copySyncScript(_ sender: Any?)
@@ -800,7 +806,19 @@ enum Commands {
     static let copyToServer = Command("Copy to Another Server…", #selector(AirSQLActions.copyToServer(_:)),
                                       tip: "Copy databases or tables, with their rows, to another connection")
     static let compare = Command("Compare…", #selector(AirSQLActions.compareDatabases(_:)),
-                                 tip: "Compare two databases' structure and data, and make a script that syncs them")
+                                 tip: "Compare two servers, databases or objects, and make a script that syncs them")
+    static let compareWith = Command("Compare With…", #selector(AirSQLActions.compareWith(_:)),
+                                     tip: "Compare the selected connection, database or object with another you choose")
+    static let compareRows = Command("Compare", #selector(AirSQLActions.compareRows(_:)),
+                                     tip: "Compare the two selected connections, databases or objects with each other")
+    static let backToServer = Command("Back to All Databases", #selector(AirSQLActions.backToServer(_:)),
+                                      tip: "Go back to the server compare's list of databases")
+    static let nextDifference = Command("Next Difference", #selector(AirSQLActions.nextDifference(_:)), f7, [],
+                                        tip: "Go to the next place the two definitions differ")
+    static let previousDifference = Command("Previous Difference", #selector(AirSQLActions.previousDifference(_:)), f7, .shift,
+                                            tip: "Go to the previous place the two definitions differ")
+    static let includeInSync = Command("Include in Sync Script", #selector(AirSQLActions.includeInSync(_:)),
+                                       tip: "Tick or untick the selected objects: unticked ones stay out of the sync script")
     static let syncScript = Command("Sync Script…", #selector(AirSQLActions.showSyncScript(_:)),
                                     tip: "Review the script that makes the target match the source, then run it if you want")
     static let exportReport = Command("Export Report…", #selector(AirSQLActions.exportReport(_:)),
@@ -909,7 +927,8 @@ enum Commands {
         killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder, moveToFolder,
-        export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
+        export, restore, copyToServer, compare, compareWith, compareRows, backToServer, includeInSync, nextDifference, previousDifference,
+        syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,

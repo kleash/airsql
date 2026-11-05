@@ -1,14 +1,31 @@
 import AirSQLCore
 import AppKit
 
-/// One side of a compare: a saved connection and one of its databases (listed once the connection answers; a name can
-/// be typed too).
+/// What each side of a compare is: a whole server, a database, or one table or other object.
+enum ReconLevel: Int {
+    case server, database, object
+}
+
+/// One side of a compare: a saved connection, one of its databases (listed once the connection answers; a name can be
+/// typed too) and, for two objects, one of its tables, views, routines, triggers, events or sequences.
 @MainActor
 final class ReconSidePicker: NSObject, NSComboBoxDelegate {
     let view = NSStackView()
     let popup = NSPopUpButton(frame: .zero, pullsDown: false)
     let databases = NSComboBox()
+    let objects = NSComboBox()
     let spinner = NSProgressIndicator()
+    /// The objects of the chosen database, by the title `objects` lists them under.
+    private var listed: [String: (kind: ReconObject.Kind, name: String)] = [:]
+    /// The database `listed` belongs to: leaving the field unchanged keeps the choice.
+    private var listedDatabase = ""
+    private var loadingObjects: Task<Void, Never>?
+    var level = ReconLevel.database {
+        didSet {
+            databases.isHidden = level == .server
+            if level == .object, listed.isEmpty { loadObjects() }
+        }
+    }
     var connections: [SavedConnection] = [] { didSet { reload() } }
     private(set) var connection: SavedConnection?
     var changed: (() -> Void)?
@@ -16,8 +33,22 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
     private let side: String
 
     var database: String { databases.stringValue.trimmingCharacters(in: .whitespaces) }
-    /// "Production · shop", or "" before a connection is chosen.
-    var summary: String { connection.map { "\($0.displayName) · \(database.isEmpty ? "no database" : database)" } ?? "" }
+    /// The object chosen from the list, for a compare of two objects.
+    var object: (kind: ReconObject.Kind, name: String)? { listed[objects.stringValue] }
+    /// "Production · shop", "Production", "Production · shop.orders", or "" before a connection is chosen.
+    var summary: String {
+        guard let connection else { return "" }
+        switch level {
+        case .server: return connection.displayName
+        case .object where object != nil: return "\(connection.displayName) · \(database).\(object?.name ?? "")"
+        default: return "\(connection.displayName) · \(database.isEmpty ? "no database" : database)"
+        }
+    }
+
+    /// How the objects' list writes an object: a table by its name, others with their kind, as the compare's list does.
+    private static func title(_ kind: ReconObject.Kind, _ name: String) -> String {
+        kind == .table ? name : "\(name) (\(kind.rawValue))"
+    }
 
     init(side: String) {
         self.side = side
@@ -43,12 +74,21 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         spinner.toolTip = "Reading the databases on this connection"
         spinner.isHidden = true  // a hidden spinner keeps no space in the bar
         for view in [popup, databases] as [NSView] { view.translatesAutoresizingMaskIntoConstraints = false }
-        popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 150).isActive = true
+        popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
         // A long connection name is shortened (its menu has all of it) rather than widening the window past its minimum.
         popup.setContentCompressionResistancePriority(.init(490), for: .horizontal)
         popup.widthAnchor.constraint(lessThanOrEqualToConstant: 240).isActive = true
         databases.widthAnchor.constraint(greaterThanOrEqualToConstant: 130).isActive = true
         databases.widthAnchor.constraint(lessThanOrEqualToConstant: 220).isActive = true
+        objects.placeholderString = "Table, View or Routine"
+        objects.toolTip = "Choose the table, view, routine, trigger, event or sequence to compare"
+        objects.setAccessibilityIdentifier("recon.\(side).object")
+        objects.setAccessibilityLabel(side == "source" ? "Source object" : "Target object")
+        objects.delegate = self
+        objects.completes = true
+        objects.numberOfVisibleItems = 16
+        objects.translatesAutoresizingMaskIntoConstraints = false
+        objects.widthAnchor.constraint(equalToConstant: 320).isActive = true
         view.setViews([title, popup, databases, spinner], in: .leading)
         view.spacing = Spacing.unit
         reload()
@@ -76,12 +116,22 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         }
     }
 
-    func choose(_ saved: SavedConnection?, database: String? = nil) {
+    func choose(_ saved: SavedConnection?, database: String? = nil, object: (kind: ReconObject.Kind, name: String)? = nil) {
         connection = saved
         reload()
         databases.removeAllItems()
         databases.stringValue = database ?? saved?.database ?? ""
         loadDatabases()
+        listed = [:]
+        listedDatabase = self.database
+        objects.removeAllItems()
+        objects.stringValue = ""
+        if let object {
+            let title = Self.title(object.kind, object.name)
+            listed[title] = object
+            objects.stringValue = title
+        }
+        if level == .object { loadObjects() }
         changed?()
     }
 
@@ -122,11 +172,74 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         }
     }
 
+    /// Lists the chosen database's objects, off the main thread, through a tools session of its own; what is chosen stays.
+    private func loadObjects() {
+        loadingObjects?.cancel()
+        let database = self.database
+        guard let saved = connection, let connect = ReconWindowController.connect, !database.isEmpty else { return }
+        spinner.isHidden = false
+        spinner.startAnimation(nil)
+        let window = popup.window
+        loadingObjects = Task { [weak self] in
+            var found: [(kind: ReconObject.Kind, name: String)] = [], failure: String?
+            do {
+                let session = try await connect(saved, window).toolsSession()
+                do {
+                    let cache = SchemaCache(source: session, includes: { $0 == database })
+                    try await cache.load()
+                    try await cache.loadDetails([database])
+                    found = cache.snapshot.database(database).map(Self.objects) ?? []
+                } catch {
+                    failure = error.localizedDescription
+                }
+                await session.close()
+            } catch {
+                failure = error.localizedDescription
+            }
+            guard let self, !Task.isCancelled else { return }
+            self.spinner.stopAnimation(nil)
+            self.spinner.isHidden = true
+            for object in found { self.listed[Self.title(object.kind, object.name)] = object }
+            self.objects.removeAllItems()
+            self.objects.addItems(withObjectValues: found.map { Self.title($0.kind, $0.name) })
+            self.objects.placeholderString = failure == nil ? "Table, View or Routine" : "Couldn't read the objects"
+            self.objects.toolTip = failure.map { "Couldn't list the objects: \($0)" }
+                ?? "Choose the table, view, routine, trigger, event or sequence to compare"
+            self.changed?()
+        }
+    }
+
+    static func objects(of database: SchemaDatabase) -> [(kind: ReconObject.Kind, name: String)] {
+        let kinds: [SchemaTable.Kind: ReconObject.Kind] = [.table: .table, .view: .view, .sequence: .sequence]
+        let tables = database.tables.compactMap { table in kinds[table.kind].map { (kind: $0, name: table.name) } }
+        let routines = database.routines.map { (kind: $0.kind == .procedure ? ReconObject.Kind.procedure : .function, name: $0.name) }
+        return tables + routines + database.triggers.map { (kind: .trigger, name: $0.name) }
+            + database.events.map { (kind: .event, name: $0.name) }
+    }
+
     func comboBoxSelectionDidChange(_ notification: Notification) {
-        DispatchQueue.main.async { self.changed?() }  // the field shows the choice after this returns
+        // The field shows the choice after this returns.
+        DispatchQueue.main.async {
+            if notification.object as? NSComboBox === self.databases { self.databaseChanged() }
+            self.changed?()
+        }
     }
 
     func controlTextDidChange(_ notification: Notification) { changed?() }
+
+    func controlTextDidEndEditing(_ notification: Notification) {
+        if notification.object as? NSComboBox === databases { databaseChanged() }
+    }
+
+    /// Another database has other objects.
+    private func databaseChanged() {
+        guard level == .object, database != listedDatabase else { return }
+        listedDatabase = database
+        listed = [:]
+        objects.removeAllItems()
+        objects.stringValue = ""
+        loadObjects()
+    }
 }
 
 extension NSToolbarItem.Identifier {
@@ -146,6 +259,10 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
     weak var window: ReconWindowController?
     let compare = button("Compare", id: "recon.compareButton", tip: "Compare the two databases (⌘R)", target: nil,
                          action: #selector(ReconWindowController.refresh(_:)))
+    static let levelTip = "Choose what to compare: two servers, two databases, or two tables or other objects"
+    /// In the setup bar, before the sides it speaks of.
+    let level = popup(["Servers", "Databases", "Objects"], selected: ReconLevel.database.rawValue, id: "recon.level",
+                      tip: levelTip, target: nil, action: nil)
     static let modeTip = "Choose what to compare: tables' structure, their rows, or both"
     static let ignoreTip = "Choose differences the compare doesn't count: AUTO_INCREMENT values, DEFINER, collations, whitespace"
     let mode = popup(["Structure and Data", "Structure", "Data"], selected: 0, id: "recon.mode", tip: modeTip, target: nil, action: nil)
@@ -163,12 +280,17 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         ("DEFINER", "Don't count who views, routines, triggers and events run as; the script leaves DEFINER out", \.definer),
         ("Collations and Character Sets", "Don't count tables' and columns' character sets and collations", \.collation),
         ("Whitespace in Definitions", "Don't count spaces and line breaks in views, routines, triggers and events", \.whitespace),
+        ("Column Order", "Don't count the order of a table's columns", \.columnOrder),
+        ("Letter Case in Definitions", "Don't count upper and lower case in views, routines, triggers and events", \.letterCase),
+        ("Definitions", "Don't count what views, routines, triggers and events say, only whether each exists", \.definitions),
     ]
 
     override init() {
         super.init()
         mode.target = self
         mode.action = #selector(modeChosen(_:))
+        level.target = self
+        level.action = #selector(levelChosen(_:))
         ignore.addItem(withTitle: "Ignore Rules")
         for (index, rule) in Self.rules.enumerated() {
             ignore.addItem(withTitle: rule.title)
@@ -211,6 +333,10 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
         window?.options.mode = [ReconOptions.Mode.both, .structure, .data][max(0, sender.indexOfSelectedItem)]
     }
 
+    @objc private func levelChosen(_ sender: NSPopUpButton) {
+        window?.choose(level: ReconLevel(rawValue: sender.indexOfSelectedItem) ?? .database)
+    }
+
     @objc private func ruleToggled(_ sender: NSMenuItem) {
         guard let window else { return }
         window.options.ignore[keyPath: Self.rules[sender.tag].rule].toggle()
@@ -230,14 +356,17 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
             window.window?.toolbar?.items.first { $0.view === control }?.toolTip = control.toolTip
         }
         let noResult = window.result == nil ? "Compare first: then there is something to show" : nil
-        set(compare, window.compareBlocked, "Compare the two databases (⌘R)")
+        let noScript = window.scriptBlocked
+        let what = ["the two servers", "the two databases", "the two objects"][window.level.rawValue]
+        set(compare, window.compareBlocked, "Compare \(what) (⌘R)")
         set(tables, window.tablesBlocked,
             "Choose the tables to compare, columns to leave out, a WHERE per table and renamed tables")
         set(export, noResult, Commands.exportReport.tip)
-        set(changeset, noResult, "Save the sync script as a Liquibase changeset")
-        set(sync, noResult, Commands.syncScript.tip)
+        set(changeset, noScript, "Save the sync script as a Liquibase changeset")
+        set(sync, noScript, Commands.syncScript.tip)
         let running = window.isRunning ? window.compareBlocked : nil  // "A compare is running…"
         set(mode, running, Self.modeTip)
+        set(level, running, Self.levelTip)
         set(ignore, running, Self.ignoreTip)
     }
 }

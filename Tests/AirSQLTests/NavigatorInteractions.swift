@@ -12,9 +12,9 @@ extension AppTests.InteractionTests {
         let procedure = DatabaseObject(.procedure, "airsql_fixture", "add_customer")
         let views = SidebarNode.Kind.category(id, "airsql_fixture", .view)
         let tableMenu = ["Open Data", "Open Structure", "Select Top 1000 Rows", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Generate SELECT",
-                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Maintenance", "Truncate…", "Rename…", "Drop…", "Disk Usage", "Refresh"]
+                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare", "Maintenance", "Truncate…", "Rename…", "Drop…", "Refresh"]
         let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Generate SELECT", "Generate INSERT",
-                                          "Generate UPDATE", "Copy Table…", "Bulk Table Editor…", "Maintenance", "Truncate…",
+                                          "Generate UPDATE", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Maintenance", "Truncate…",
                                           "Rename…", "Drop…", "Refresh"]
         @MainActor func preview(_ main: MainWindowController) -> NSViewController? {
             (main.selectedTab?.content as? PreviewContent)?.shown
@@ -30,8 +30,8 @@ extension AppTests.InteractionTests {
                         main.model.openConnection(id)?.currentDatabase == "airsql_fixture" && expanded(main, .database(id, "airsql_fixture"))
                     },
                     menu: ["New Query", "New Database…", "Create Table…", "Copy Name", "Copy Name Without Quotes", "Export…", "Restore…", "Generate Liquibase Changelog…",
-                           "Compare…", "Disk Usage", "Edit Database…", "Refresh", "Drop…"],
-                    enabled: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Refresh", "Drop…"]),
+                           "Compare With…", "Compare", "Disk Usage", "Edit Database…", "Refresh", "Drop…"],
+                    enabled: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Compare With…", "Refresh", "Drop…"]),
             Surface(name: "Table or view in the tree",
                     place: { main, _ in treeRow(main, .object(id, orders))?.point },
                     clicked: { $0.selectedTab?.title == "orders" && preview($0) != nil },
@@ -41,8 +41,8 @@ extension AppTests.InteractionTests {
                     place: { main, _ in treeRow(main, .object(id, procedure))?.point },
                     clicked: { preview($0) is TextContent && $0.selectedTab?.title == "add_customer" },
                     doubleClicked: { main, _ in main.selectedTab?.content is ObjectEditorController },
-                    menu: ["Open", "Run…", "Copy CREATE", "Drop…", "Refresh"],
-                    enabled: ["Open", "Run…", "Copy CREATE", "Drop…", "Refresh"]),
+                    menu: ["Open", "Run…", "Copy CREATE", "Compare With…", "Compare", "Drop…", "Refresh"],
+                    enabled: ["Open", "Run…", "Copy CREATE", "Compare With…", "Drop…", "Refresh"]),
             Surface(name: "Folder or category in the tree",
                     place: { main, _ in treeRow(main, views)?.point },
                     clicked: { $0.sidebar.selectedNodes.map(\.kind) == [views] },
@@ -65,7 +65,7 @@ extension AppTests.InteractionTests {
                         if let tab = main.tabs.first(where: { $0.content is DatabaseViewController }) { main.select(tab) }
                         return opened
                     },
-                    menu: tableMenu, enabled: tableCommands),
+                    menu: tableMenu.filter { !$0.hasPrefix("Compare") }, enabled: tableCommands.subtracting(["Compare With…"])),
             Surface(name: "Process list row",
                     place: { main, _ in
                         guard let open = main.model.openConnection(id) else { return nil }

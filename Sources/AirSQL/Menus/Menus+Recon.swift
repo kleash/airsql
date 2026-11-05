@@ -7,8 +7,9 @@ extension MainMenu {
         // After Compare…, for the compare window (elsewhere nothing answers them, so they are off).
         let tools = menus.tools
         let after = tools.items.firstIndex { $0.action == Commands.compare.action }.map { $0 + 1 } ?? tools.numberOfItems
-        for (offset, command) in [Commands.syncScript, Commands.exportReport, Commands.copySyncScript,
-                                  Commands.leaveOutOfCompare].enumerated() {
+        for (offset, command) in [Commands.compareWith, Commands.compareRows, Commands.syncScript, Commands.exportReport,
+                                  Commands.copySyncScript, Commands.includeInSync, Commands.leaveOutOfCompare,
+                                  Commands.backToServer, Commands.nextDifference, Commands.previousDifference].enumerated() {
             tools.insertItem(command.item(), at: after + offset)
         }
         // The console's statements as a changeset (LiquibaseResponder), with the console's other commands.

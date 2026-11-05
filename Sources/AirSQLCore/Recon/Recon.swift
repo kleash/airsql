@@ -44,13 +44,15 @@ public struct ReconError: LocalizedError {
     public var errorDescription: String? { message }
 }
 
-/// Compares two databases (plan §2.9, R6): reads both schemas fresh through each side's own session, compares their
-/// structure, then the rows of every table both have. Off the main thread; cancel the task to stop (a running
-/// statement is stopped on its server).
+/// Compares two databases (plan §2.9, R6), or the pair in `options.only`: reads both schemas fresh through each side's
+/// own session, compares their structure, then the rows of every table both have. Off the main thread; cancel the task
+/// to stop (a running statement is stopped on its server). `runServer` does it for every database of two servers.
 public enum Recon {
     public static func run(source: ReconSide, target: ReconSide, options: ReconOptions,
                            progress: @escaping (ReconProgress) -> Void = { _ in }) async throws -> ReconResult {
         let started = Date()
+        var options = options
+        if let only = options.only, only.kind != .table { options.mode = .structure }  // only tables have rows
         progress(ReconProgress(step: "Reading the schemas"))
         // UTC on both sides: TIMESTAMP values, and TIMESTAMP defaults in SHOW CREATE TABLE, then read the same.
         async let left = schema(source)
@@ -67,6 +69,10 @@ public enum Recon {
 
         progress(ReconProgress(step: "Comparing the structure"))
         let (pairs, onlyInTarget) = structure.tablePairs()
+        if let only = options.only, only.kind == .table {
+            guard let pair = pairs.first else { throw missing(only.kind, only.source, source) }
+            guard pair.target != nil else { throw missing(only.kind, only.target, target) }
+        }
         var tables: [ReconObject] = []
         for (left, right) in pairs {
             var object = ReconObject(kind: .table, name: left.name, targetName: right?.name, status: .onlyInSource)
@@ -140,6 +146,10 @@ public enum Recon {
         return result
     }
 
+    private static func missing(_ kind: ReconObject.Kind, _ name: String, _ side: ReconSide) -> ReconError {
+        ReconError(message: "There is no \(kind.rawValue) \(name) in \(side.database) on \(side.name), or this login can't see it.")
+    }
+
     /// A side's server and database, details and statistics loaded, read fresh through its session (in UTC).
     private static func schema(_ side: ReconSide) async throws -> (SchemaServer, SchemaDatabase) {
         _ = try await ReconQuery.store(side.session, "SET time_zone = '+00:00'")
@@ -203,6 +213,15 @@ public enum Recon {
             (.event, "EVENT", 3, { $0.events.map(\.name) }),
         ]
         var objects: [ReconObject] = []
+        if let only = structure.options.only {
+            guard let kind = kinds.first(where: { $0.kind == only.kind }) else { return [] }
+            guard kind.names(left).contains(only.source) else { throw missing(only.kind, only.source, source) }
+            guard kind.names(right).contains(only.target) else { throw missing(only.kind, only.target, target) }
+            let sourceText = try await showCreate(source, kind.show, only.source, column: kind.column)
+            let targetText = try await showCreate(target, kind.show, only.target, column: kind.column)
+            return [structure.definition(only.kind, name: only.source, targetName: only.target, source: sourceText, target: targetText)]
+                .compactMap { $0 }
+        }
         for kind in kinds {
             let ours = kind.names(left), theirs = kind.names(right)
             for name in ours + theirs.filter({ !ours.contains($0) }) {

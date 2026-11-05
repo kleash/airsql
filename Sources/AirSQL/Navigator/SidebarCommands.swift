@@ -105,23 +105,25 @@ extension SidebarController: NSMenuItemValidation {
         case .database:
             menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
                       Commands.export, Commands.restore,
-                      Commands.generateLiquibase, Commands.compare, Commands.diskUsage, nil, Commands.editDatabase, Commands.refresh,
-                      Commands.drop])
+                      Commands.generateLiquibase, Commands.compareWith, Commands.compareRows, Commands.diskUsage, nil, Commands.editDatabase,
+                      Commands.refresh, Commands.drop])
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
         case .object(_, let object) where object.kind.isTableLike:
             menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.copyName, Commands.copyPlainName,
                       Commands.copyCreate, nil, Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
-                      Commands.bulkEdit])
+                      Commands.bulkEdit, Commands.compareWith, Commands.compareRows])
             menu.addItem(NavigatorMenus.maintenance())
             menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.diskUsage, Commands.refresh])
         case .part:
             menu.add([Commands.openStructure, Commands.openData])
-        case .detail:
+        case .detail(_, _, let part, _):
             menu.add([Commands.openStructure, Commands.openData, nil, Commands.copyName, Commands.copyPlainName])
+            if part == .triggers { menu.add([nil, Commands.compareWith, Commands.compareRows]) }
         default:
-            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, nil, Commands.drop, Commands.refresh])
+            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, nil, Commands.compareWith, Commands.compareRows,
+                      nil, Commands.drop, Commands.refresh])
         }
         return menu
     }

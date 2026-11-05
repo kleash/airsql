@@ -242,9 +242,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
   `objectEditor.definer`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
   `erDiagram.canvas`, `erDiagram.exportImage`, `erDiagram.exportMermaid`.
-- **Compare window**: `recon.source.connection`, `recon.source.database`, `recon.target.connection`,
-  `recon.target.database`, `recon.swap`, `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`,
-  `recon.filter`, `recon.hideMatching`, `recon.list`, `recon.tabs`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
+- **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,
+  `recon.source.object`, `recon.target.connection`, `recon.target.database`, `recon.target.object`, `recon.swap`,
+  `recon.mode`, `recon.tables`, `recon.compareButton`, `recon.ignore`, `recon.filter`, `recon.hideMatching`, `recon.back`,
+  `recon.list` (`recon.tick` in its rows), `recon.tabs`, `recon.diffStyle`, `recon.previousDifference`,
+  `recon.nextDifference`, `recon.sourceDDL`, `recon.targetDDL`, `recon.rows` (the rows that differ: a grid),
   `recon.script`, `recon.destructive`,
   `recon.sync`, `recon.changeset`, `recon.export`, `recon.reportFormat`, `recon.progress`, `recon.cancel`; its tables
   sheet `reconTables.filter`, `reconTables.list`, `reconTables.all`, `reconTables.none`, `reconTables.done`, `reconTables.cancel`.

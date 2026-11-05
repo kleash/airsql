@@ -529,6 +529,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             reason = "Select a connection in the sidebar first"
             let raw = item.representedObject as? String
             item.state = !connections.isEmpty && connections.allSatisfy({ $0.colour.rawValue == raw }) ? .on : .off
+        case Commands.compareWith.action?:
+            reason = sidebar.compareWithBlocked
+            enabled = reason == nil
+        case Commands.compareRows.action?:
+            reason = sidebar.compareRowsBlocked
+            enabled = reason == nil
         case Commands.focusEditor.action?:
             enabled = shownView(SQLEditorView.self) != nil
             reason = "The tab shown has no SQL editor"

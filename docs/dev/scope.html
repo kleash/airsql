@@ -358,6 +358,8 @@ const GROUPS = [
  ]},
  { id: "recon", title: "Compare and reconcile", items: [
   ["Compare any two databases, on the same or different connections", "For example production against staging, or MySQL 8 against MariaDB; each side uses its own route", "A", "1.0", "S"],
+  ["Compare two servers: every database paired by name, one summary, any pair opened", "A new level above the database compare; same window and engine", "A", "1.1", "M"],
+  ["Compare any two tables or objects, by chosen names, in one database or two; from the tree too", "Compare With… on a row, Compare on two rows; the script writes only the target", "A", "1.1", "M"],
   ["Structure compare (DDL): tables, columns, indexes, foreign keys, checks, views, routines, triggers, events", "Ignores noise you choose: AUTO_INCREMENT values, DEFINER, default collation, whitespace; maps MySQL and MariaDB type spellings", "D", "1.0", "L"],
   ["Data compare (DML) by primary or unique key: missing, extra and changed rows, down to the cell", "Row counts and chunked checksums on each server first, so only differing chunks are fetched", "A", "1.0", "L"],
   ["Structure and data in one run, with a summary: matching, different, only in source, only in target", "", "A", "1.0", "S"],
