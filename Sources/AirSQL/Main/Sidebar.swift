@@ -74,6 +74,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     var shownTreeNote = ""
     /// Called when the selected connections change.
     var onSelect: (() -> Void)?
+    /// The attached folders and scratch files: in the tree's place while `showsFiles` (`setFilesShown`).
+    private(set) lazy var files = FilesPanelController(model: model)
+    private var treeViews: [NSView] = []
 
     init(model: AppModel) {
         self.model = model
@@ -81,6 +84,26 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    private var filesBottom: NSLayoutYAxisAnchor?
+
+    /// Shows the Files panel in the tree's place, or the tree again.
+    func setFilesShown(_ shown: Bool) {
+        if shown, files.view.superview == nil, let filesBottom {
+            view.addSubview(files.view)
+            files.view.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                files.view.topAnchor.constraint(equalTo: view.topAnchor), files.view.bottomAnchor.constraint(equalTo: filesBottom),
+                files.view.leadingAnchor.constraint(equalTo: view.leadingAnchor), files.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            ])
+            addChild(files)
+        }
+        if shown { files.reload() }
+        if files.isViewLoaded { files.view.isHidden = !shown }
+        treeViews.forEach { $0.isHidden = shown }
+    }
+
+    var filesShown: Bool { files.isViewLoaded && !files.view.isHidden }
 
     override func loadView() {
         let root = SurfaceView(.side)
@@ -174,9 +197,17 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         processes.toolTip = Commands.processList.tip + " (⌥⌘P)"
         processes.setAccessibilityIdentifier("sidebar.processes")
         processes.translatesAutoresizingMaskIntoConstraints = false
+        let filesButton = NSButton(image: NSImage(systemSymbolName: "folder", accessibilityDescription: "Files") ?? NSImage(), target: nil,
+                                   action: Commands.filesPanel.action)
+        filesButton.isBordered = false
+        filesButton.contentTintColor = .secondaryLabelColor
+        filesButton.toolTip = Commands.filesPanel.tip
+        filesButton.setAccessibilityIdentifier("sidebar.files")
+        filesButton.translatesAutoresizingMaskIntoConstraints = false
         let footerLine = Hairline()
+        treeViews = [filters, scroll]
 
-        [filters, scroll, footerLine, add, processes].forEach(root.addSubview)
+        [filters, scroll, footerLine, add, processes, filesButton].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             filters.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.unit),
             filters.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
@@ -192,10 +223,14 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             add.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -6),
             add.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
             processes.centerYAnchor.constraint(equalTo: add.centerYAnchor),
-            processes.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
+            filesButton.centerYAnchor.constraint(equalTo: add.centerYAnchor),
+            filesButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
+            processes.trailingAnchor.constraint(equalTo: filesButton.leadingAnchor, constant: -Spacing.unit),
             processes.leadingAnchor.constraint(greaterThanOrEqualTo: add.trailingAnchor, constant: Spacing.unit),
         ])
         view = root
+        filesBottom = footerLine.topAnchor
+        setFilesShown(model.data.settings.tree.showsFiles)
         observers.append(model.$data.map(\.connections).removeDuplicates().sink { [weak self] _ in
             DispatchQueue.main.async { self?.reload() }
         })

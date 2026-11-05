@@ -74,6 +74,7 @@ extension MainWindowController: AgentConsoles {
                     let known = ConsoleViewController.rememberedConnection(of: url).flatMap { model.connection($0)?.id }
                     let tab = openConsole(text: read.text, title: nil, connection: known ?? connection, fileURL: url)
                     (tab.content as? ConsoleViewController)?.fileFormat = read.format
+                    (tab.content as? ConsoleViewController)?.chosenDatabase = ConsoleViewController.rememberedDatabase(of: url)
                     NSDocumentController.shared.noteNewRecentDocumentURL(url)
                 case .failure(let error):
                     showError(error.localizedDescription, title: "AirSQL couldn't open “\(url.lastPathComponent)”", on: window)

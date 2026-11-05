@@ -677,7 +677,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = model.openConnection(activeConnection?.id) != nil
             reason = "Connect first: only a connected connection has sessions"
         default:
-            if let check = validateEditorItem(item) ?? validateConnectionItem(item) { (enabled, reason) = check }
+            if let check = validateEditorItem(item) ?? validateConnectionItem(item) ?? validateWorkspaceItem(item) { (enabled, reason) = check }
         }
         item.explain(enabled: enabled, reason: enabled ? nil : reason)
         return enabled

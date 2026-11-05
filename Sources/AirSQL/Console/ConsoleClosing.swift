@@ -58,6 +58,10 @@ enum ConsoleClosing {
 
     private static func unsaved(_ console: ConsoleViewController, _ window: NSWindow, answer: @escaping (Bool) -> Void) {
         guard console.isEdited else { return finish(console, answer: answer, true) }
+        // A scratch file has nothing to decide: it keeps what it was left with.
+        if let url = console.fileURL, ScriptFiles.isScratch(url) {
+            return console.save(as: false) { saved in finish(console, answer: answer, saved) }
+        }
         let name = console.tab?.title ?? "this tab"
         alert(window, "Save the changes to “\(name)”?",
               console.fileURL == nil ? "The text isn't saved in a file; it's lost if you don't save it."

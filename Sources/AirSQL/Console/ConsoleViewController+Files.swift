@@ -98,6 +98,19 @@ extension ConsoleViewController {
         UserDefaults.standard.set(all, forKey: fileConnections)
     }
 
+    private static let fileDatabases = "ConsoleFileDatabases"
+
+    /// The database a .sql file was last used in, for the next time it opens.
+    static func rememberedDatabase(of url: URL) -> String? {
+        UserDefaults.standard.dictionary(forKey: fileDatabases)?[url.path] as? String
+    }
+
+    static func rememberDatabase(of url: URL, _ database: String?) {
+        var all = UserDefaults.standard.dictionary(forKey: fileDatabases) ?? [:]
+        all[url.path] = database
+        UserDefaults.standard.set(all, forKey: fileDatabases)
+    }
+
     @objc func changeConnection(_ sender: Any?) {
         guard let window = view.window else { return }
         let choices = model.data.connections.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }

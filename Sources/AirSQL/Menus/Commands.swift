@@ -983,7 +983,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ] + editorCommands + treeCommands
+    ] + editorCommands + treeCommands + workspaceCommands
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {
@@ -1029,6 +1029,7 @@ enum Commands {
         "Table Page": "Switch a table tab between its rows, its structure and its DDL",
         "Tree": "Choose how the sidebar's tree shows a server's objects",
         "Object Kinds": "Choose which kinds of object the tree shows",
+        "Run On": "Run this on a connection: a sheet shows it first, and nothing runs until you press Run",
     ]
 }
 

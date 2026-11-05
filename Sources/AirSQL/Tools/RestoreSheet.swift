@@ -28,6 +28,8 @@ final class RestoreSheet: ToolSheet {
                                     target: nil, action: nil)
     private var tools: [ClientTool] = []
     private var file: URL?
+    /// A folder's other files, each taken once the one before has run; every one waits for its own Run.
+    var nextFiles: [URL] = []
     private var fileSize: Int64 = 0
 
     init(model: AppModel, connection: SavedConnection, options: ConnectOptions, builtIn: Bool) {
@@ -340,6 +342,13 @@ final class RestoreSheet: ToolSheet {
         return Int(rows?.string(0, 0) ?? "") ?? 0
     }
 
+    private func takeNextFile(after file: URL) {
+        guard !nextFiles.isEmpty else { return }
+        let next = nextFiles.removeFirst()
+        use(next)
+        status.stringValue = "Ran \(file.lastPathComponent). Press Run for \(next.lastPathComponent), \(ObjectPicker.count(nextFiles.count + 1, "file")) to go."
+    }
+
     private func start(_ file: URL, database: String) {
         let options = self.options
         let command = tool.map { toolCommand($0, server: server) }
@@ -371,6 +380,7 @@ final class RestoreSheet: ToolSheet {
                 let errors = outcome.errors == 0 ? "" : " \(ObjectPicker.count(outcome.errors, "statement")) failed; the last: "
                     + (outcome.lastError ?? "")
                 finish("Ran \(file.lastPathComponent) in \(database).\(errors)", failed: outcome.errors > 0)
+                if outcome.errors == 0 { takeNextFile(after: file) }
             } catch {
                 updates.cancel()
                 finish(cancellation.isCancelled ? "Stopped. What ran before stays." : error.localizedDescription, failed: true)

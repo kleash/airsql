@@ -44,6 +44,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [AI agents](https://kleash.github.io/airsql/agents.html): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at
   the access you choose.
 - [Liquibase changelogs](https://kleash.github.io/airsql/liquibase.html): a database as formatted SQL changesets, and any change saved as one.
+- [Files and your workspace](https://kleash.github.io/airsql/workspace.html): attached folders, scratch files and a connection's consoles.
 - [Keyboard shortcuts](https://kleash.github.io/airsql/shortcuts.html): every command's shortcut.
 - [Accessibility](https://kleash.github.io/airsql/accessibility.html): VoiceOver, the keyboard, motion and text size.
 - [Privacy and security](https://kleash.github.io/airsql/privacy-security.html): what AirSQL connects to, where passwords are kept, what agents may do.
@@ -2124,6 +2125,41 @@ settings. Read-only and Production connections don't offer this: they say the pa
 
 ---
 
+Source: https://kleash.github.io/airsql/workspace.html
+
+# Files and your workspace
+
+## The Files panel
+
+**View ▸ Files** (⌥⌘4, or the folder button at the foot of the sidebar) shows your scripts in the tree's place. Press it
+again for the tree.
+
+- **Attach Folder…** adds a folder of scripts. AirSQL only reads it: **Detach Folder** takes it out of the list, and it
+  stays on disk.
+- A click selects a file, a double-click or Return opens it in a query tab, and a double-click on a folder opens or
+  closes it. ⌘ and ⇧ select several.
+- Right-click a file or folder and choose **Run On** and a connection: **Run SQL File…** opens with the file chosen, and
+  nothing runs until you press its Run. A folder runs its .sql and .sql.gz files by name, its subfolders first, with a
+  Run for each file.
+- The list follows the disk as AirSQL comes to the front; right-click and choose **Refresh** to read it now.
+
+A file remembers the connection and the database it was last used on, and opens there next time.
+
+## Scratch files
+
+**File ▸ New Scratch File** (⌥⇧⌘N) opens a throwaway .sql file with no name to choose. Scratch files are listed under
+Scratches in the Files panel. Closing one saves it without asking, every save goes into its Local History, and **Move to
+Trash** in its menu removes it.
+
+## A connection's consoles
+
+**File ▸ Consoles…** (⇧⌘J) lists the query tabs of the connection, to jump to one by typing part of its name, and offers a
+new one. **File ▸ Default Console** opens the tab the connection keeps for good: its text is there next time, whatever
+you closed.
+
+
+---
+
 Source: https://kleash.github.io/airsql/accessibility.html
 
 # Accessibility
@@ -2323,6 +2359,9 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Forward | ⌃⌘→ |
 | Recent Tabs… | ⌃⌘E |
 | Go to Statement… | ⌃⌘O |
+| Files | ⌥⌘4 |
+| New Scratch File | ⌥⇧⌘N |
+| Consoles… | ⇧⌘J |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
 HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,
