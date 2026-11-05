@@ -189,6 +189,7 @@ of them after.
 - **Lines per row**: how many lines of a value with line breaks each row shows (1 by default).
 - **Date format**: the pattern Display As ▸ Settings' Date Format uses.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
+- **Most rows in a result**: where a console result stops; the statement stops on the server there (100,000 by default).
 - **Open tables newest first**: a table with an AUTO_INCREMENT key shows its newest rows first until you sort it (on by
   default).
 - **Long values**: how many characters of a long value a table's page reads (1,000 by default; 0 reads every value whole).
@@ -639,7 +640,7 @@ share the current database too.
   warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
   names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
   to select its statement.
-- A result keeps at most its first 100,000 rows; the tab then says it is cut short.
+- A result keeps at most its first 100,000 rows (**Settings ▸ Grid ▸ Most rows in a result**); the tab then says it is cut short.
 - **Edit ▸ Find** (⌘F) with a result's rows focused finds values in them, as in a [table tab](https://kleash.github.io/airsql/table-data.html): ⌘G and ⇧⌘G
   move between matches, and Options has Match Case, Regular Expression, Whole Words and Filter Rows. Replace is for
   table tabs.
@@ -834,7 +835,9 @@ programs chosen, startup SQL and agent access. TLS starts strict, except for a s
 Double-click a connection (once it is connected, a double-click opens or closes its tree), or select it and choose
 **Connection ▸ Connect** (⌘K). The status bar shows each step, hop
 by hop, with Cancel. A connection that drops (the network goes away, the server restarts) is marked in the sidebar;
-AirSQL never reconnects behind your back. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
+AirSQL never reconnects behind your back: Connect sets it up again on the same route and says if an open transaction was rolled
+back. To have a connection connect each time AirSQL opens, tick **Connect when AirSQL opens** in its Options; a
+Production connection can't, and only connects when you ask. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
 transaction or edits that aren't applied.
 
 Connected connections are kept alive with a ping every minute, except a session whose transaction has been open longer

@@ -19,6 +19,10 @@ final class GridPane: SettingsPaneController {
                                           tip: "Type how many rows a table or result loads at a time (1,000 by default)",
                                           range: 100...100_000, width: 90)],
                  caption: "Load More (⌥⌘↓) loads the next page.")
+        form.row("Most rows in a result", [number(\.resultRowCap, id: "settings.resultRowCap",
+                                                  tip: "Type how many rows a console result keeps before the statement stops (100,000 by default)",
+                                                  range: 1_000...10_000_000, width: 110), label("rows")],
+                 caption: "The rows are held in memory while the tab is open. Run to File has no limit.")
         form.row("Load All asks above", [number(\.loadAllAsksAbove, id: "settings.loadAllAsksAbove",
                                                 tip: "Ask before loading every row of a table with more rows than this",
                                                 range: 1_000...100_000_000, width: 110), label("rows")],

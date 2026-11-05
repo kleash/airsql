@@ -81,6 +81,11 @@ final class Connector {
         connecting[id] = (task, activity)
     }
 
+    /// Connects what the person chose to have connected when AirSQL opens: never a Production connection.
+    func connectAtLaunch(on window: NSWindow?) {
+        for saved in model.data.connections where saved.connectsAtLaunch { connect(saved.id, on: window) }
+    }
+
     /// The connection's sessions, for another window (the compare window): connects it first, its prompts on `window`,
     /// unless it is connected, and waits for the connect to end. Throws why it didn't connect (shown on `window` too).
     func connection(_ id: UUID, on window: NSWindow?) async throws -> Connection {

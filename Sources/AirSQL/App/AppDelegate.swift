@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ConsoleViewController.openConnection = { [weak model] in model?.openConnection($0)?.connection }
         ConsoleViewController.schemaCache = { [weak model] in model?.openConnection($0)?.schema }
         ConsoleViewController.queryTimeout = { [weak model] in model?.connection($0)?.queryTimeout ?? 0 }
+        ConsoleViewController.rowCap = { [weak model] in model?.data.settings.resultRowCap ?? 100_000 }
         // The compare window connects a connection that isn't, as the main window does (its prompts on the compare
         // window), then works on tools sessions of its own.
         ReconWindowController.connect = { [weak model] saved, window in
@@ -65,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ConsoleDocuments.shared.restore(into: main)
         if !filesToOpen.isEmpty { main.openFiles(filesToOpen) }
         filesToOpen = []
+        model.connector.connectAtLaunch(on: main.window)
         NSApp.activate(ignoringOtherApps: true)
         log.log("launched with \(model.data.connections.count, privacy: .public) connection(s)")
     }

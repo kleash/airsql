@@ -190,6 +190,12 @@ extension ConnectionEditor {
         let form = Form()
         form.row("", [toggle("Read-only", \.readOnly, id: "editor.readOnly",
                              tip: "Refuse anything but reads on this connection, from every window and from agents")])
+        let production = draft.isProduction
+        let atLaunch = toggle("Connect when AirSQL opens", \.reconnectAtLaunch, id: "editor.reconnectAtLaunch",
+                              tip: production ? "A Production connection connects only when you ask"
+                                  : "Connect this connection each time AirSQL opens")
+        atLaunch.isEnabled = !production
+        form.row("", [atLaunch], caption: production ? "Not for a Production connection: it connects only when you ask." : nil)
         form.row("", [toggle("Compress traffic", \.compress, id: "editor.compress",
                              tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
         let timeout = textField(draft.queryTimeout == 0 ? "" : String(draft.queryTimeout), placeholder: "none",

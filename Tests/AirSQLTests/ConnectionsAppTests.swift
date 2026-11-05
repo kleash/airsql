@@ -292,6 +292,36 @@ extension AppTests {
 }
 
 /// The outline row of folder `id`.
+extension AppTests {
+    /// At launch only what was chosen connects, never Production; the editor says why Production can't.
+    @Test func connectingAtLaunchLeavesOutProduction() async throws {
+        var chosen = SavedConnection(name: "Chosen", host: "127.0.0.1", port: 1, user: "u")
+        chosen.reconnectAtLaunch = true
+        var production = chosen
+        production.id = UUID()
+        production.colour = .production
+        let other = SavedConnection(name: "Other", host: "127.0.0.1", port: 1, user: "u")
+        let model = testModel([chosen, production, other])
+        let (main, harness) = appWindow(model)
+        model.connector.connectAtLaunch(on: main.window)
+        #expect(model.states[chosen.id] != nil && model.states[production.id] == nil && model.states[other.id] == nil)
+        model.connector.cancel(chosen.id)
+
+        main.edit(production, isNew: false, on: main.window)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        #expect(await call(harness, "press", ["title": "Options"]).error == nil)
+        let sheet = try #require(main.window?.attachedSheet)
+        func find(_ view: NSView) -> NSButton? {
+            if let box = view as? NSButton, box.accessibilityIdentifier() == "editor.reconnectAtLaunch" { return box }
+            return view.subviews.lazy.compactMap(find).first
+        }
+        let box = try #require(sheet.contentView.flatMap(find))
+        #expect(!box.isEnabled && box.toolTip == "A Production connection connects only when you ask")
+        #expect(await call(harness, "press", ["id": "editor.cancel"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+}
+
 @MainActor
 func folderRowIndex(_ main: MainWindowController, _ id: UUID) -> Int? {
     let outline = main.sidebar.outline

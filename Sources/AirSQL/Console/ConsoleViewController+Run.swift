@@ -318,7 +318,7 @@ extension ConsoleViewController {
             run.index = index
             updateRunning()
             if !statement.range.isEmpty, text == run.text { editor.flash(NSRange(statement.range)) }
-            let outcome = await ConsoleRunner.run(statement, in: run.text, on: session, timeout: Self.queryTimeout(id))
+            let outcome = await ConsoleRunner.run(statement, in: run.text, on: session, rowCap: Self.rowCap(), timeout: Self.queryTimeout(id))
             let previous = all.last { $0.end <= statement.range.lowerBound }?.end ?? 0
             let title = statement.range.isEmpty ? nil
                 : ConsoleScript.title(of: statement, in: run.text, after: previous, noBackslashEscapes: session.noBackslashEscapes)
@@ -398,7 +398,7 @@ extension ConsoleViewController {
             return note(.info, "Explain Analyze needs MySQL 8.0.18 or later, or MariaDB: nothing ran.")
         }
         if text == run.text { editor.flash(NSRange(statement.range)) }
-        let outcome = await ConsoleRunner.run(SQLStatement(sql: sql), in: run.text, on: session, timeout: Self.queryTimeout(id))
+        let outcome = await ConsoleRunner.run(SQLStatement(sql: sql), in: run.text, on: session, rowCap: Self.rowCap(), timeout: Self.queryTimeout(id))
         if let error = outcome.error { return planFailed(error, run: run, session: session) }
         let plan = outcome.results.first?.rows.flatMap { $0.rowCount > 0 ? $0.string(0, 0) : nil } ?? ""
         addPlan(table: nil, tree: json ? ExplainPlan.tree(fromJSON: plan) : plan, nodes: ExplainPlan.nodes(from: plan, json: json),
