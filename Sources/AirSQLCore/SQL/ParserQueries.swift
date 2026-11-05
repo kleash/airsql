@@ -252,6 +252,7 @@ extension SQLParser {
     private mutating func joinChain(_ tables: inout [SQLTableRef], _ clauses: inout [(clause: SQLClause, start: Int)]) {
         tableFactor(&tables, &clauses, nil)
         while let join = joinWords() {
+            clauses.append((.from, join.range.upperBound))
             let first = tables.count
             tableFactor(&tables, &clauses, join)
             guard tables.count > first else { return }
@@ -259,7 +260,6 @@ extension SQLParser {
                 clauses.append((.on, current.range.upperBound))
                 index += 1
                 tables[first].join?.on = expression()
-                clauses.append((.from, lastEnd))
             } else if at("USING") {
                 index += 1
                 if at("(") { tables[first].join?.using = nameList("a column name") } else { fail("Expected ( after USING\(foundText)") }

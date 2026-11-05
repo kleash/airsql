@@ -258,7 +258,7 @@ import Testing
     @Test func clausesTellWhereACaretIs() throws {
         let sql = "SELECT a FROM t JOIN u ON x WHERE b ORDER BY c"
         let select = try #require(one(sql).query?.blocks[0])
-        #expect(select.clauses.map { "\($0.clause)" } == ["selectList", "from", "on", "from", "whereClause", "orderBy"])
+        #expect(select.clauses.map { "\($0.clause)" } == ["selectList", "from", "from", "on", "whereClause", "orderBy"])
     }
 
     @Test func deepNestingEndsQuietly() {
@@ -303,5 +303,125 @@ import Testing
         let parsed = SQLParser.parse("INSERT INTO t (a, b, c, d) VALUES " + rows)
         #expect(parsed[0].write?.rows.count == 20_000)
         #expect(Date().timeIntervalSince(start) < 5)  // a debug build; a release one is several times quicker
+    }
+}
+
+@Suite struct ParserScopeTests {
+    func analysis(_ sql: String, snapshot: SchemaSnapshot? = SQLNameCheckTests.snapshot()) -> SQLAnalysis {
+        SQLAnalysis(sql, snapshot: snapshot, database: "shop")
+    }
+
+    /// Where the `n`th `word` starts.
+    func offset(_ sql: String, _ word: String, _ n: Int = 0) -> Int {
+        var from = sql.startIndex, found = 0
+        while let range = sql.range(of: word, range: from..<sql.endIndex) {
+            if found == n { return sql.utf16.distance(from: sql.startIndex, to: range.lowerBound) }
+            found += 1
+            from = range.upperBound
+        }
+        return -1
+    }
+
+    @Test func aliasesAndTheirUses() throws {
+        let sql = "SELECT o.id, o.total FROM orders o WHERE o.id = 1"
+        let found = analysis(sql)
+        let reference = try #require(found.reference(at: offset(sql, "o.total")))
+        #expect(reference.symbol.kind == .tableAlias)
+        #expect(found.usages(of: reference.symbol).map(\.range.lowerBound) == [offset(sql, "o.id"), offset(sql, "o.total"), offset(sql, "o WHERE"), offset(sql, "o.id", 1)])
+        #expect(found.usages(of: reference.symbol).filter(\.isDeclaration).count == 1)
+    }
+
+    @Test func columnsResolveToTheSchemaAcrossStatements() throws {
+        let sql = "SELECT total FROM orders; UPDATE orders SET total = 1; SELECT o.total FROM orders o"
+        let found = analysis(sql)
+        let reference = try #require(found.reference(at: offset(sql, "total")))
+        #expect(reference.symbol.kind == .column && reference.symbol.table == "orders" && reference.symbol.database == "shop")
+        #expect(found.usages(of: reference.symbol).count == 3)
+        let table = try #require(found.reference(at: offset(sql, "orders")))
+        #expect(table.symbol.kind == .table && found.usages(of: table.symbol).count == 3)
+    }
+
+    @Test func aCaretAtANamesEndCounts() {
+        let found = analysis("SELECT id FROM orders")
+        #expect(found.reference(at: 7)?.symbol.name == "id" && found.reference(at: 9)?.symbol.name == "id")
+        #expect(found.reference(at: 10) == nil)
+    }
+
+    @Test func ctesAndDerivedColumnsWorkWithoutASchema() throws {
+        let sql = "WITH c (a) AS (SELECT 1), d AS (SELECT 2 AS b) SELECT c.a, x.b, y FROM c, d x, (SELECT 3 AS y) z"
+        let found = analysis(sql, snapshot: nil)
+        let c = try #require(found.reference(at: offset(sql, "c.a")))
+        #expect(c.symbol.kind == .cte && c.symbol.declaration?.lowerBound == offset(sql, "c (a)"))
+        let a = try #require(found.reference(at: offset(sql, "a, x.b")))
+        #expect(a.symbol.kind == .selectAlias && a.symbol.declaration?.lowerBound == offset(sql, "a) AS"))
+        let b = try #require(found.reference(at: offset(sql, "b, y")))
+        #expect(b.symbol.declaration?.lowerBound == offset(sql, "b)"))
+        let y = try #require(found.reference(at: offset(sql, "y FROM")))
+        #expect(y.symbol.declaration?.lowerBound == offset(sql, "y) z"))
+        #expect(found.issues.isEmpty)
+    }
+
+    @Test func starsCarryColumnsThroughQueries() throws {
+        let sql = "SELECT d.name FROM (SELECT * FROM customers) d"
+        let found = analysis(sql)
+        let name = try #require(found.reference(at: offset(sql, "name")))
+        #expect(name.symbol.kind == .column && name.symbol.table == "customers")
+    }
+
+    @Test func aRecursiveCTESeesItself() {
+        let found = analysis("WITH RECURSIVE c (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c WHERE n < 3) SELECT n FROM c")
+        #expect(found.issues.isEmpty)
+    }
+
+    @Test func aScopeTellsWhatsVisibleAtACaret() throws {
+        let sql = "SELECT * FROM orders o WHERE EXISTS (SELECT 1 FROM customers c WHERE  ) AND o.id = 1 "
+        let found = analysis(sql)
+        let inner = try #require(found.scope(at: offset(sql, "  )") + 1))
+        #expect(inner.sources.map(\.name) == ["c"])
+        #expect(inner.visibleSources.map(\.name) == ["c", "o"])
+        #expect(inner.clause(at: offset(sql, "  )") + 1) == .whereClause)
+        let outer = try #require(found.scope(at: sql.utf16.count))
+        #expect(outer.sources.map(\.name) == ["o"] && outer.sources[0].columns.count == 5)
+        #expect(outer.clause(at: sql.utf16.count) == .whereClause)
+    }
+
+    @Test func aHalfTypedStatementStillHasItsScope() throws {
+        let sql = "SELECT o. FROM orders o JOIN customers c ON "
+        let found = analysis(sql)
+        let scope = try #require(found.scope(at: 9))
+        #expect(scope.sources.map(\.name) == ["o", "c"])
+        #expect(scope.clause(at: 9) == .selectList && scope.clause(at: sql.utf16.count) == .on)
+    }
+
+    @Test func aWriteHasAScopeToo() throws {
+        let sql = "UPDATE orders o SET o.total = 1 WHERE "
+        let scope = try #require(analysis(sql).scope(at: sql.utf16.count))
+        #expect(scope.sources.map(\.name) == ["o"] && scope.clause(at: sql.utf16.count) == .whereClause)
+        #expect(scope.clause(at: offset(sql, "o.total")) == .set)
+    }
+
+    @Test func outputsAnswerOrderByButNotWhere() {
+        func names(_ sql: String) -> [String] { analysis(sql).issues.map(\.name) }
+        #expect(names("SELECT id + 1 AS n FROM orders ORDER BY n").isEmpty)
+        #expect(names("SELECT id + 1 AS n FROM orders GROUP BY n HAVING n > 1").isEmpty)
+        #expect(names("SELECT id + 1 AS n FROM orders WHERE n > 1") == ["n"])
+    }
+
+    @Test func saysWhichNamesAreAmbiguous() {
+        func kinds(_ sql: String) -> [String] { analysis(sql).issues.compactMap { if case .ambiguous(let sources) = $0.kind { return "\($0.name) in \(sources)" } else { return nil } } }
+        #expect(kinds("SELECT id FROM orders o JOIN customers c ON c.id = o.id") == [#"id in ["o", "c"]"#])
+        #expect(kinds("SELECT id FROM orders JOIN customers USING (id)").isEmpty)
+        #expect(kinds("SELECT id FROM orders NATURAL JOIN customers").isEmpty)
+        #expect(kinds("SELECT o.id FROM orders o JOIN customers c ON 1 ORDER BY id").isEmpty)
+        #expect(kinds("SELECT total FROM orders o JOIN customers c ON 1").isEmpty)
+        #expect(kinds("SELECT 1 FROM orders a, orders b WHERE total > 1") == [#"total in ["a", "b"]"#])
+        // The nearest scope that has it wins.
+        #expect(kinds("SELECT 1 FROM orders WHERE EXISTS (SELECT id FROM customers)").isEmpty)
+    }
+
+    @Test func unknownQualifiersAndRoutines() {
+        let found = analysis("SELECT x.id FROM orders o; CALL nosuch()")
+        #expect(found.issues.map(\.name) == ["x", "nosuch"])
+        #expect(analysis("SELECT 1 FROM orders o WHERE EXISTS (SELECT o.id)").issues.isEmpty)
     }
 }
