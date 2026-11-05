@@ -155,7 +155,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             button.isEnabled = reason == nil
             button.toolTip = reason ?? command.tip
         }
-        statement.string = selected.count == 1 ? selected[0].info ?? "" : ""
+        statement.string = selected.count == 1 ? selected[0].shownInfo ?? "" : ""
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) { updateButtons() }
@@ -256,7 +256,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         case "command": return process.command
         case "time": return String(process.time)
         case "state": return process.state ?? ""
-        default: return (process.info ?? "").replacingOccurrences(of: "\n", with: " ")
+        default: return (process.shownInfo ?? "").replacingOccurrences(of: "\n", with: " ")
         }
     }
 
@@ -275,13 +275,13 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         else { return }
         let alert = NSAlert()
         alert.messageText = "Process \(process.id): \(process.user)@\(process.host)"
-        alert.informativeText = process.info ?? "It isn't running a statement now (\(process.command.lowercased()))."
+        alert.informativeText = process.shownInfo ?? "It isn't running a statement now (\(process.command.lowercased()))."
         alert.addOK()
         alert.beginSheetModal(for: window)
     }
 
     @objc func copyQuery(_ sender: Any?) {
-        let text = selected.compactMap(\.info).joined(separator: ";\n")
+        let text = selected.compactMap(\.shownInfo).joined(separator: ";\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
@@ -339,7 +339,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         guard let process = selected.first, process.info != nil, let main = view.window?.windowController as? MainWindowController,
               let session else { return }
         let sql = session.server?.flavor == .mariadb ? "SHOW EXPLAIN FOR \(process.id)" : "EXPLAIN FOR CONNECTION \(process.id)"
-        let content = TextContent(title: "Explain · process \(process.id)", caption: process.info ?? "") {
+        let content = TextContent(title: "Explain · process \(process.id)", caption: process.shownInfo ?? "") {
             guard let rows = try await session.query(sql).first?.rows else { return "" }
             let header = rows.columns.map(\.name).joined(separator: "   ")
             return ([header] + (0..<rows.rowCount).map { row in

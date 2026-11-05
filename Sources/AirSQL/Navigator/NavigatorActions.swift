@@ -104,7 +104,8 @@ enum NavigatorActions {
                     if changeset { SQLPreviewSheet.changesetWriter?(request.change, request.noBackslashEscapes) }
                     done?(results)
                 } catch {
-                    showError(error.localizedDescription, title: "Couldn't \(request.actionTitle.lowercased())", on: window)
+                    showError(UserSQL.errorText(error, hiding: request.password), title: "Couldn't \(request.actionTitle.lowercased())",
+                              on: window)
                 }
             }
         }
@@ -113,7 +114,8 @@ enum NavigatorActions {
         guard ask || agent else { return run(false) }
         guard let window else { return }
         var shown = request
-        shown.offersChangeset = true
+        // A changelog is a file: what carries a credential stays out of it.
+        shown.offersChangeset = SQLLog.mask(request.change.text, noBackslashEscapes: request.noBackslashEscapes) == request.change.text
         SQLPreviewSheet.show(shown, connection: saved, on: window) { result in
             if result.approved { run(result.saveAsChangeset) }
         }

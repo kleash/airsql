@@ -14,6 +14,8 @@ public struct ServerProcess: Hashable {
     public var info: String?
     /// MariaDB's id of the running statement, for KILL QUERY ID: it can't stop the next statement by mistake.
     public var queryID: UInt64?
+    /// `info` to show: another session's CREATE USER has its password masked. Kill checks against `info` itself.
+    public var shownInfo: String? { info.map { SQLLog.mask($0) } }
 
     public init(id: UInt64, user: String, host: String, database: String?, command: String, time: Int, state: String?,
                 info: String?, queryID: UInt64?) {
