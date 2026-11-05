@@ -226,7 +226,14 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   Value, Delete Rows in a one-table result, Undo, Revert); the status bar's `result.editState` says Editable or Read-only (its tooltip says why), and a double-click on
   a read-only cell says why in `grid.readOnlyReason`. Pending changes show in the notice `tableData.notice`
   (`tableData.apply`, `tableData.preview`, `tableData.revert`); Apply opens the SQL preview, whose Run is the person's.
-- **SQL log window**: `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`.
+- **SQL log** (under the tabs while a server is connected, or its window): `sqlLog.filter`, `sqlLog.text`, `sqlLog.reveal`, `sqlLog.clear`,
+  `sqlLog.window`.
+- **Table tab's switch**: `tableData.page` (Data, Structure, DDL); View ▸ Table Page does the same.
+- **Sidebar**: `sidebar.filter` (part of a name, or `/a regular expression/`), `sidebar.databaseFilter`, `sidebar.favourites`, `sidebar.options`,
+  each row's `tree.star`; View ▸ Tree holds the choices (saving them is the person's while Ask before agents change anything is on).
+- **Quick Open** (`quickOpen.field`, `quickOpen.list`, `quickOpen.open`): commands listed there are refused to agents; use the `menu` tool.
+  Quick Documentation on a tree row leaves out the table's rows for an agent.
+- **Find in Tabs and Files**: `findFiles.text`, `findFiles.results`, `findFiles.status`; `findFiles.replace` is the person's.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,

@@ -46,6 +46,70 @@ extension NavigatorSQL {
         return pattern + "%"
     }
 
+    /// How Find Text compares a column with the text.
+    public enum FindMode: String, CaseIterable {
+        case contains = "Contains", exact = "Exactly", regexp = "Regular expression"
+    }
+
+    /// The rows of a table where any of `columns` matches `text` in that way.
+    public static func matches(_ text: String, mode: FindMode, columns: [String], noBackslashEscapes: Bool) -> String {
+        let value = SQLQuote.string(text, noBackslashEscapes: noBackslashEscapes)
+        switch mode {
+        case .contains: return contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes)
+        case .exact: return columns.map { "\(SQLQuote.identifier($0)) = \(value)" }.joined(separator: " OR ")
+        case .regexp: return columns.map { "\(SQLQuote.identifier($0)) REGEXP \(value)" }.joined(separator: " OR ")
+        }
+    }
+
+    /// How many rows of `table` match, counting no further than `limit` (nil: all of them), so a huge table stops early.
+    public static func countMatching(_ condition: String, in table: DatabaseObject, limit: Int?) -> String {
+        guard let limit else { return "SELECT COUNT(*) FROM \(table.quoted) WHERE " + condition }
+        return "SELECT COUNT(*) FROM (SELECT 1 FROM \(table.quoted) WHERE \(condition) LIMIT \(limit)) AS matched"
+    }
+
+    /// Definitions that may name `name` (kind, database, object, definition), wherever the login can read them. The LIKE
+    /// narrows them; `names(_:in:)` then checks a whole word.
+    public static func usages(of name: String, noBackslashEscapes: Bool) -> String {
+        let pattern = SQLQuote.string(containsPattern(name), noBackslashEscapes: noBackslashEscapes)
+        func like(_ column: String) -> String { "\(column) LIKE \(pattern) ESCAPE '!'" }
+        return "SELECT 'view', TABLE_SCHEMA, TABLE_NAME, VIEW_DEFINITION FROM information_schema.VIEWS WHERE " + like("VIEW_DEFINITION")
+            + " UNION ALL SELECT LOWER(ROUTINE_TYPE), ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_DEFINITION FROM information_schema.ROUTINES WHERE " + like("ROUTINE_DEFINITION")
+            + " UNION ALL SELECT 'trigger', TRIGGER_SCHEMA, TRIGGER_NAME, ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE " + like("ACTION_STATEMENT")
+            + " UNION ALL SELECT 'event', EVENT_SCHEMA, EVENT_NAME, EVENT_DEFINITION FROM information_schema.EVENTS WHERE " + like("EVENT_DEFINITION")
+    }
+
+    /// Whether `text` has `name` as a whole word, without case.
+    public static func names(_ name: String, in text: String) -> Bool {
+        let wordLetters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_$"))
+        var from = text.startIndex
+        while let found = text.range(of: name, options: .caseInsensitive, range: from..<text.endIndex) {
+            let before = found.lowerBound == text.startIndex ? nil : text[text.index(before: found.lowerBound)]
+            let after = found.upperBound == text.endIndex ? nil : text[found.upperBound]
+            func isWord(_ character: Character?) -> Bool { character?.unicodeScalars.allSatisfy(wordLetters.contains) == true }
+            if !isWord(before), !isWord(after) { return true }
+            from = found.upperBound
+        }
+        return false
+    }
+
+    /// Drops an index, primary key, foreign key or check from its table.
+    public static func dropPart(_ part: TablePart, _ name: String, of table: DatabaseObject) -> String? {
+        let what: String
+        switch part {
+        case .indexes: what = name == "PRIMARY" ? "PRIMARY KEY" : "INDEX " + SQLQuote.identifier(name)
+        case .foreignKeys: what = "FOREIGN KEY " + SQLQuote.identifier(name)
+        case .checks: what = "CONSTRAINT " + SQLQuote.identifier(name)
+        case .columns, .triggers: return nil
+        }
+        return "ALTER TABLE \(table.quoted) DROP " + what
+    }
+
+    /// Changes a table's or routine's comment.
+    public static func setComment(_ comment: String, of object: DatabaseObject, noBackslashEscapes: Bool) -> String {
+        let text = SQLQuote.string(comment, noBackslashEscapes: noBackslashEscapes)
+        return object.kind == .table ? "ALTER TABLE \(object.quoted) COMMENT = \(text)" : "ALTER \(object.kind.keyword) \(object.quoted) COMMENT \(text)"
+    }
+
     /// `col1` LIKE '%text%' ESCAPE '!' OR `col2` LIKE …: the rows of a table where any of `columns` contains `text`.
     public static func contains(_ text: String, columns: [String], noBackslashEscapes: Bool) -> String {
         let pattern = SQLQuote.string(containsPattern(text), noBackslashEscapes: noBackslashEscapes)
@@ -55,7 +119,7 @@ extension NavigatorSQL {
     /// How many rows of `table` hold `text` in one of `columns`.
     public static func countContaining(_ text: String, in table: DatabaseObject, columns: [String],
                                        noBackslashEscapes: Bool) -> String {
-        "SELECT COUNT(*) FROM \(table.quoted) WHERE " + contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes)
+        countMatching(contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes), in: table, limit: nil)
     }
 
     /// Every connection to the server and what it runs (MariaDB adds the statement's id).

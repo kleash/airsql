@@ -297,7 +297,7 @@ struct Command {
                                        String(UnicodeScalar(NSLeftArrowFunctionKey)!): "←",
                                        String(UnicodeScalar(NSRightArrowFunctionKey)!): "→",
                                        String(UnicodeScalar(NSF9FunctionKey)!): "F9", String(UnicodeScalar(NSF2FunctionKey)!): "F2",
-                                       String(UnicodeScalar(NSF1FunctionKey)!): "F1", String(UnicodeScalar(NSF6FunctionKey)!): "F6",
+                                       String(UnicodeScalar(NSF1FunctionKey)!): "F1", String(UnicodeScalar(NSF4FunctionKey)!): "F4", String(UnicodeScalar(NSF6FunctionKey)!): "F6",
                                        String(UnicodeScalar(NSF7FunctionKey)!): "F7"]
         return (flags.contains(.control) ? "⌃" : "") + (flags.contains(.option) ? "⌥" : "")
             + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "") + (names[key] ?? key.uppercased())
@@ -343,7 +343,7 @@ enum Commands {
                                   tip: "Open a new query tab on the selected connection")
     static let open = Command("Open…", #selector(AirSQLActions.openSQLFile(_:)), "o", tip: "Open a .sql file in a new query tab")
     static let quickOpen = Command("Quick Open…", #selector(AirSQLActions.quickOpen(_:)), "p",
-                                   tip: "Go to a tab, connection, database object, recent file or command by typing letters of its name")
+                                   tip: "Go to a tab, connection, object, recent file or command by typing letters of its name")
     static let closeTab = Command("Close Tab", #selector(AirSQLActions.closeTab(_:)), "w",
                                   tip: "Close the tab shown; asks first about unsaved text or pending edits")
     static let closeOtherTabs = Command("Close Other Tabs", #selector(AirSQLActions.closeOtherTabs(_:)), "w", [.command, .option],
@@ -457,7 +457,7 @@ enum Commands {
     static let columnList = Command("Column List…", #selector(AirSQLActions.showColumnList(_:)), "j",
                                     tip: "Find a column by name, jump to it, and show or hide columns")
     static let sqlLog = Command("SQL Log", #selector(AirSQLActions.showSQLLog(_:)), "l", [.command, .option],
-                                tip: "Show every statement AirSQL sent, with times and results (passwords masked)")
+                                tip: "Show or hide every statement AirSQL sent, passwords masked, under the tabs")
     static let clearSQLLog = Command("Clear SQL Log", #selector(AirSQLActions.clearSQLLog(_:)),
                                      tip: "Remove the statements listed in the SQL log")
     static let activity = Command("Activity", #selector(AirSQLActions.showActivity(_:)),
@@ -833,7 +833,7 @@ enum Commands {
     static let renameSymbol = Command("Rename Name…", #selector(AirSQLActions.renameSymbol(_:)), f6, .shift,
                                       tip: "Rename the name at the cursor in this text; a table or column gets its statement too")
     static let quickDocumentation = Command("Quick Documentation", #selector(AirSQLActions.quickDocumentation(_:)), f1, [],
-                                            tip: "Show the columns, type or signature of the name at the cursor")
+                                            tip: "Show the columns, type or signature of the name at the cursor or the row selected in the tree")
     static let parameterInfo = Command("Parameter Info", #selector(AirSQLActions.parameterInfo(_:)), "i", [.command, .option],
                                        tip: "Show what each argument of the call, or each value of the INSERT row, at the cursor is for")
     static let nextProblem = Command("Next Problem", #selector(AirSQLActions.nextProblem(_:)), f2, .option,
@@ -876,7 +876,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ] + editorCommands
+    ] + editorCommands + treeCommands
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {
@@ -917,6 +917,9 @@ enum Commands {
         "New Object": "Write a new view, procedure, function, trigger or event as its CREATE statement",
         "Colour": colour.tip,
         "Agents": "Let AI agents use AirSQL, see what they did, or turn them off",
+        "Table Page": "Switch a table tab between its rows, its structure and its DDL",
+        "Tree": "Choose how the sidebar's tree shows a server's objects",
+        "Object Kinds": "Choose which kinds of object the tree shows",
     ]
 }
 

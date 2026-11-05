@@ -27,7 +27,7 @@ extension SidebarController: NSMenuItemValidation {
     var selectedObjects: [DatabaseObject] { treeSelection?.nodes.compactMap(\.object) ?? [] }
 
     /// What Open Data and Open Structure open: the selected tables and views, and those of the rows under one, once each.
-    private var tablesToOpen: [DatabaseObject] {
+    var tablesToOpen: [DatabaseObject] {
         var seen = Set<DatabaseObject>()
         return (treeSelection?.nodes ?? []).compactMap { $0.object ?? $0.owner }.filter { $0.kind.isTableLike && seen.insert($0).inserted }
     }
@@ -78,7 +78,7 @@ extension SidebarController: NSMenuItemValidation {
         case .database(let id, let name):
             model.openConnection(id)?.currentDatabase = name
             fallthrough
-        case .category, .part:
+        case .category, .part, .prefix:
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .object(let id, let object):
             // The double-click's first click showed it in the preview: its own tab takes over, leaving no second copy.
@@ -106,7 +106,8 @@ extension SidebarController: NSMenuItemValidation {
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
         case .object(_, let object) where object.kind.isTableLike:
-            menu.add([Commands.openData, Commands.openStructure, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, nil,
+            menu.add([Commands.openData, Commands.openStructure, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, Commands.favourite, Commands.findUsedBy, nil,
+                      Commands.newColumn, Commands.newIndex, Commands.newForeignKey, Commands.editComment, nil,
                       Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
                       Commands.bulkEdit])
@@ -115,9 +116,10 @@ extension SidebarController: NSMenuItemValidation {
         case .part:
             menu.add([Commands.openStructure, Commands.openData])
         case .detail:
-            menu.add([Commands.openStructure, Commands.openData, nil, Commands.copyName, Commands.copyPlainName])
+            menu.add([Commands.openStructure, Commands.openData, nil, Commands.copyName, Commands.copyPlainName, Commands.findUsedBy])
+            if nodes.allSatisfy(\.isDroppablePart) { menu.add([nil, Commands.drop]) }
         default:
-            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, nil, Commands.drop, Commands.refresh])
+            menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, Commands.favourite, Commands.findUsedBy, Commands.editComment, nil, Commands.drop, Commands.refresh])
         }
         return menu
     }
@@ -208,7 +210,8 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     @objc func dropObject(_ sender: Any?) {
-        guard let open = treeSelection?.open else { return }
+        guard let (open, nodes) = treeSelection else { return }
+        if nodes.allSatisfy(\.isDroppablePart) { return NavigatorActions.dropParts(nodes, on: open, window: view.window) }
         let databases = selectedDatabases
         if !databases.isEmpty {
             NavigatorActions.dropDatabases(databases, on: open, window: view.window)
@@ -274,12 +277,161 @@ extension SidebarController: NSMenuItemValidation {
         }
     }
 
+    // MARK: View ▸ Tree
+
+    @objc func toggleTreeOption(_ sender: Any?) {
+        guard let tag = (sender as? NSMenuItem)?.tag ?? (sender as? NSButton)?.tag, let option = TreeOption(rawValue: tag) else { return }
+        switch option {
+        case .flat: model.data.settings.tree.flat.toggle()
+        case .favouritesOnly: model.data.settings.tree.favouritesOnly.toggle()
+        case .sizes: model.data.settings.tree.showsSizes.toggle()
+        case .comments: model.data.settings.tree.showsComments.toggle()
+        case .prefixes: model.data.settings.tree.groupsByPrefix.toggle()
+        case .followTab: model.data.settings.tree.followsTab.toggle()
+        case .databaseBox:
+            databaseFilter.isHidden.toggle()
+            databaseFilter.stringValue = ""
+            reload()
+            if !databaseFilter.isHidden { view.window?.makeFirstResponder(databaseFilter) }
+        }
+    }
+
+    private func isOn(_ option: TreeOption) -> Bool {
+        let tree = model.data.settings.tree
+        switch option {
+        case .flat: return tree.flat
+        case .favouritesOnly: return tree.favouritesOnly
+        case .sizes: return tree.showsSizes
+        case .comments: return tree.showsComments
+        case .prefixes: return tree.groupsByPrefix
+        case .followTab: return tree.followsTab
+        case .databaseBox: return !databaseFilter.isHidden
+        }
+    }
+
+    /// The item's tag is the kind's place in `allCases`.
+    @objc func toggleTreeKind(_ sender: Any?) {
+        guard let kind = DatabaseObject.Kind.allCases[safe: (sender as? NSMenuItem)?.tag ?? -1]?.rawValue else { return }
+        if model.data.settings.tree.hiddenKinds.contains(kind) {
+            model.data.settings.tree.hiddenKinds.removeAll { $0 == kind }
+        } else {
+            model.data.settings.tree.hiddenKinds.append(kind)
+        }
+    }
+
+    @objc func hideTreeNames(_ sender: Any?) {
+        guard let window = view.window else { return }
+        let field = AirSQL.textField(model.data.settings.tree.hiddenNames, placeholder: "tmp_*, *_old", id: "tree.hiddenNames",
+                              tip: "Type names or patterns with * and ?, separated by commas", width: 280)
+        NavigatorActions.ask("Hide Names", "Objects with these names stay out of the tree, on every connection. Leave it empty to show them all.",
+                             field: field, action: "Hide", tip: "Leave these names out of the tree", on: window) { [weak self] in
+            self?.model.data.settings.tree.hiddenNames = field.stringValue
+        }
+    }
+
+    /// Databases Shown…: writes the connection's database filter, which a tree follows at once. The names ticked are what
+    /// the server showed at connect, so one left out then comes back only through the connection's own settings.
+    @objc func chooseDatabases(_ sender: Any?) {
+        guard let window = view.window, let open = targetOpen, var saved = model.connection(open.id) else { return }
+        let names = open.snapshot.databases.map(\.name)
+        let boxes = names.map { name -> NSButton in
+            let box = NSButton(checkboxWithTitle: name, target: nil, action: nil)
+            box.state = saved.showsDatabase(name) ? .on : .off
+            box.toolTip = "Show \(name) in the tree"
+            return box
+        }
+        let list = NSStackView(views: boxes)
+        list.orientation = .vertical
+        list.alignment = .leading
+        list.spacing = Spacing.half
+        let scroll = NSScrollView()
+        scroll.documentView = FlippedView()
+        scroll.documentView?.addSubview(list)
+        list.translatesAutoresizingMaskIntoConstraints = false
+        scroll.documentView?.translatesAutoresizingMaskIntoConstraints = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        if let document = scroll.documentView {
+            list.pin(to: document)
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+        }
+        scroll.widthAnchor.constraint(equalToConstant: 300).isActive = true
+        scroll.heightAnchor.constraint(equalToConstant: min(CGFloat(names.count) * 22 + 8, 280)).isActive = true
+        scroll.setAccessibilityIdentifier("tree.databases")
+        NavigatorActions.ask("Databases Shown", "Tick the databases the tree shows on \(saved.displayName).", field: scroll, action: "Show",
+                             tip: "Show the databases ticked", on: window) { [weak self] in
+            let chosen = zip(names, boxes).filter { $0.1.state == .on }.map(\.0)
+            guard !chosen.isEmpty else { return NSSound.beep() }
+            saved.databaseFilter = chosen.count == names.count ? "" : chosen.joined(separator: ", ")
+            self?.model.save(saved)
+        }
+    }
+
+    @objc func showTreeOptions(_ sender: NSButton) {
+        let menu = NSMenu(title: "Tree")
+        Commands.treeMenuItems().forEach(menu.addItem)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
+    }
+
+    @objc func toggleFavourite(_ sender: Any?) {
+        guard let id = treeSelection?.open.id else { return }
+        let objects = selectedObjects
+        setFavourite(objects, !isFavourite(objects, id), on: id)
+    }
+
+    /// Every one of them is a favourite.
+    private func isFavourite(_ objects: [DatabaseObject], _ id: UUID) -> Bool {
+        let favourites = model.connection(id)?.favourites ?? []
+        return !objects.isEmpty && objects.allSatisfy(favourites.contains)
+    }
+
+    func setFavourite(_ objects: [DatabaseObject], _ on: Bool, on id: UUID) {
+        guard var saved = model.connection(id) else { return }
+        saved.favourites.removeAll(where: objects.contains)
+        if on { saved.favourites += objects }
+        model.save(saved)
+    }
+
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let selection = treeSelection
         var reason: String?
         switch item.action {
+        case Commands.drop.action? where selection?.nodes.allSatisfy(\.isDroppablePart) == true:
+            reason = NavigatorActions.readOnlyReason(selection?.open, model)
+        case Commands.findUsedBy.action?:
+            reason = usageName == nil ? "Select one object or column in the tree first" : nil
+        case Commands.editComment.action?:
+            let kinds: [DatabaseObject.Kind] = [.table, .procedure, .function]
+            reason = selectedObjects.count == 1 && kinds.contains(selectedObjects[0].kind)
+                ? NavigatorActions.readOnlyReason(selection?.open, model)
+                : "Select one table or routine first"
+        case Commands.newColumn.action?:
+            reason = selectedObjects.count == 1 && selectedObjects[0].kind == .table
+                ? NavigatorActions.readOnlyReason(selection?.open, model)
+                : "Select one table first"
+        case Commands.moveConnectionUp.action?, Commands.moveConnectionDown.action?:
+            reason = selectedConnectionIDs.count == 1 ? nil : "Select one connection in the sidebar first"
+        case Commands.quickDocumentation.action?, Commands.quickDefinition.action?, Commands.goToDDL.action?:
+            reason = notedObject == nil && !(item.action == Commands.quickDocumentation.action && selectedDatabases.count == 1)
+                ? "Select an object in the tree first" : nil
+        case Commands.openNameData.action?:
+            reason = tablesToOpen.isEmpty && selectedCategory == nil ? "Select a table, or a group of tables, in the tree first" : nil
+        case Commands.treeFlat.action?:
+            item.state = TreeOption(rawValue: item.tag).map(isOn) == true ? .on : .off
+        case Commands.treeKind.action?:
+            let kind = DatabaseObject.Kind.allCases[safe: item.tag]?.rawValue ?? ""
+            item.state = model.data.settings.tree.hiddenKinds.contains(kind) ? .off : .on
+        case Commands.hideNames.action?:
+            break
+        case Commands.databasesShown.action?:
+            reason = targetOpen == nil ? "Connect first: this lists a connected server's databases" : nil
+        case Commands.favourite.action?:
+            let favourite = selection.map { isFavourite(selectedObjects, $0.open.id) } == true
+            item.title = favourite ? "Remove from Favourites" : "Add to Favourites"
+            reason = selectedObjects.isEmpty ? "Select objects in the tree first" : nil
         case Commands.refresh.action?:
             let open = selection != nil || selectedConnectionIDs.contains { model.openConnection($0) != nil }
             reason = open ? nil : "Select a connected connection or something in its tree first"

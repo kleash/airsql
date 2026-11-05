@@ -103,9 +103,9 @@ extension AppTests {
                             && main.model.states[Fixtures.production.id] == .connected(server: "MariaDB 11.8.3")
                     },
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
-                           "Compare…", "Colour", "Move to Folder", "Delete…"],
+                           "Compare…", "Colour", "Move to Folder", "Move Up", "Move Down", "Databases Shown…", "Delete…"],
                     enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour",
-                              "Delete…"]),
+                              "Move Up", "Move Down", "Databases Shown…", "Delete…"]),
             Surface(name: "Folder in the sidebar",
                     place: { main, _ in folderRow(main, "Clients") },
                     clicked: { $0.sidebar.selectedFolderNodeID == InteractionTests.folder.id },
@@ -300,7 +300,7 @@ extension AppTests {
             Surface(name: "Status bar: SQL log",
                     place: { main, _ in windowPoint(main.statusBar.sqlLog.bounds, in: main.statusBar.sqlLog) },
                     clicked: { _ in true },
-                    doubleClicked: { _, received in received.contains("showSQLLog(_:)") },
+                    doubleClicked: { main, _ in !main.logDocked || main.model.data.settings.tree.showsLog == main.logDocked },
                     menu: ["SQL Log", "Clear SQL Log"], enabled: ["SQL Log"]),
             Surface(name: "Status bar: grid",
                     place: { main, _ in

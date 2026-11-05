@@ -9,6 +9,12 @@ AirSQL writes every statement it sends to a server into one file on your Mac, ju
 Use it to see exactly what AirSQL did: what a query tab ran, what a table edit applied, what the navigator asked the
 server for.
 
+## Where to read it
+
+While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
+or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
+window.
+
 ## Where it is
 
 `~/Library/Logs/AirSQL/SQL.log`. Only you can read it (file mode 0600). At 10 MB it becomes `SQL.1.log`, replacing the

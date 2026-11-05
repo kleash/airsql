@@ -59,6 +59,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Go to Sidebar | ⌥⌘1 |
 | Go to Editor | ⌥⌘2 |
 | Go to Results | ⌥⌘3 |
+| Select in Tree | ⇧⌘L |
 | Filter Sidebar | ⌥⌘J |
 | Value Panel | ⇧↩ |
 | Record View | ⌥⌘R |
@@ -156,6 +157,17 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Toggle Case | ⌃⇧U |
 | Comment Selection | ⌥⌘/ |
 | Complete Statement | ⌃⇧↩ |
+| Find in Tabs and Files… | ⌃⌥F |
+| Data | ⌃⌥1 |
+| Structure | ⌃⌥2 |
+| DDL | ⌃⌥3 |
+| Quick Definition | ⌥F1 |
+| Open Data of Name | F4 |
+| Go to DDL | ⌥⌘B |
+| Back | ⌃⌘← |
+| Forward | ⌃⌘→ |
+| Recent Tabs… | ⌃⌘E |
+| Go to Statement… | ⌃⌘O |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
 HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,

@@ -6,9 +6,10 @@ extension Tab {
     func treeRow(in open: OpenConnection) -> SidebarNode.Kind {
         if let view = shown as? DatabaseViewController { return .database(open.id, view.database) }
         guard let place, let database = place.database, let name = place.object else { return .connection(open.id) }
-        let table = open.snapshot.table(database, name)
-        let kind = DatabaseObject.Kind(rawValue: place.kind.rawValue) ?? table.flatMap { DatabaseObject.Kind(rawValue: $0.kind.rawValue) } ?? .table
-        return .object(open.id, DatabaseObject(table.flatMap { DatabaseObject.Kind(rawValue: $0.kind.rawValue) } ?? kind, database, name))
+        // A table tab's place doesn't say table or view; a routine may share a table's name.
+        var kind = DatabaseObject.Kind(rawValue: place.kind.rawValue) ?? .table
+        if kind == .table, let table = open.snapshot.table(database, name) { kind = DatabaseObject.Kind(rawValue: table.kind.rawValue) ?? .table }
+        return .object(open.id, DatabaseObject(kind, database, name))
     }
 }
 
@@ -29,16 +30,24 @@ extension MainWindowController {
 
     /// The tree's row of a name in SQL: a column's is its table's.
     private static func treeRow(of symbol: SQLSymbol?, in open: OpenConnection) -> SidebarNode.Kind? {
-        guard let symbol, let database = symbol.database else { return nil }
+        guard let symbol else { return nil }
+        if symbol.kind == .database { return .database(open.id, symbol.name) }
+        return open.object(of: symbol).map { .object(open.id, $0) }
+    }
+}
+
+extension OpenConnection {
+    /// The table, view or routine a name in SQL means: a column's table.
+    func object(of symbol: SQLSymbol) -> DatabaseObject? {
+        guard let database = symbol.database else { return nil }
         switch symbol.kind {
-        case .database: return .database(open.id, symbol.name)
         case .table, .column:
             let name = symbol.table ?? symbol.name
-            guard let table = open.snapshot.table(database, name), let kind = DatabaseObject.Kind(rawValue: table.kind.rawValue) else { return nil }
-            return .object(open.id, DatabaseObject(kind, database, name))
+            guard let table = snapshot.table(database, name), let kind = DatabaseObject.Kind(rawValue: table.kind.rawValue) else { return nil }
+            return DatabaseObject(kind, database, name)
         case .routine:
-            guard let routine = open.snapshot.database(database)?.routines.first(where: { $0.name == symbol.name }) else { return nil }
-            return .object(open.id, DatabaseObject(routine.kind == .function ? .function : .procedure, database, routine.name))
+            guard let routine = snapshot.database(database)?.routines.first(where: { $0.name == symbol.name }) else { return nil }
+            return DatabaseObject(routine.kind == .function ? .function : .procedure, database, routine.name)
         default: return nil
         }
     }

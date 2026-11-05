@@ -133,6 +133,15 @@ final class TableDataController: NSViewController, TabContent {
     var autoRefresh: Timer?
     var autoRefreshSeconds = 0
     private let initialFilter: String?
+    /// The switch at the top (`TableDataController+Pages`), what it shows, and the pages other than Data, kept so a
+    /// structure's edits outlast a look at the rows.
+    let pageSwitch = NSSegmentedControl()
+    let dataPage = NSView()
+    let pageHolder = NSView()
+    var page = TablePage.data
+    var pages: [TablePage: NSViewController] = [:]
+    /// The first page of rows waits until Data shows.
+    var rowsWaiting = false
 
     init(model: AppModel, context: EditorContext, database: String, table: String, filter: String? = nil) {
         self.model = model
@@ -183,20 +192,22 @@ final class TableDataController: NSViewController, TabContent {
         // The rows take all the height the bars leave, whatever the viewer shows beside them (the value panel).
         for part in [bars, viewer] as [NSView] {
             part.translatesAutoresizingMaskIntoConstraints = false
-            view.addSubview(part)
+            dataPage.addSubview(part)
         }
         NSLayoutConstraint.activate([
-            bars.topAnchor.constraint(equalTo: view.topAnchor), bars.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bars.trailingAnchor.constraint(equalTo: view.trailingAnchor), viewer.topAnchor.constraint(equalTo: bars.bottomAnchor),
-            viewer.leadingAnchor.constraint(equalTo: view.leadingAnchor), viewer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            viewer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            bars.topAnchor.constraint(equalTo: dataPage.topAnchor), bars.leadingAnchor.constraint(equalTo: dataPage.leadingAnchor),
+            bars.trailingAnchor.constraint(equalTo: dataPage.trailingAnchor), viewer.topAnchor.constraint(equalTo: bars.bottomAnchor),
+            viewer.leadingAnchor.constraint(equalTo: dataPage.leadingAnchor), viewer.trailingAnchor.constraint(equalTo: dataPage.trailingAnchor),
+            viewer.bottomAnchor.constraint(equalTo: dataPage.bottomAnchor),
         ])
+        addPages(to: view)
         emptyNote.clear.target = self
         emptyNote.add.target = self
         emptyNote.place(in: viewer.body)
         viewer.didPresent = { [weak self] in self?.updateBars() }
         self.view = view
         updateBars()
+        showChosenPage()
         open()
     }
 
@@ -228,14 +239,19 @@ final class TableDataController: NSViewController, TabContent {
                 updateBars()
             }
             loading = nil
-            guard let source, !abandoned else { return }
-            // A saved filter the read-only check refuses stays in the bar, unused, and no rows load until it changes.
-            if refusesOnReadOnly(source) {
-                source.filter = ""
-                finishLoading()
-            } else {
-                loadRows(more: false)
-            }
+            guard !abandoned else { return }
+            if page == .data { loadFirstRows() } else { rowsWaiting = true }
+        }
+    }
+
+    func loadFirstRows() {
+        guard let source else { return }
+        // A saved filter the read-only check refuses stays in the bar, unused, and no rows load until it changes.
+        if refusesOnReadOnly(source) {
+            source.filter = ""
+            finishLoading()
+        } else {
+            loadRows(more: false)
         }
     }
 
@@ -671,8 +687,8 @@ final class TableDataController: NSViewController, TabContent {
 
     // MARK: TabContent
 
-    var isEdited: Bool { source?.changes.isEmpty == false }
-    var statusAccessory: NSView? { viewer.status }
+    var isEdited: Bool { source?.changes.isEmpty == false || structureEdited }
+    var statusAccessory: NSView? { page == .data ? viewer.status : nil }
 
     var reopen: ((MainWindowController) -> Void)? {
         let (table, database, connection) = (tableName, database, context.connection)
@@ -683,7 +699,10 @@ final class TableDataController: NSViewController, TabContent {
     }
 
     func shouldClose(_ closes: @escaping (Bool) -> Void) {
-        askAboutTransaction(proceed: { [weak self] in self?.shouldCloseWithoutTransaction(closes) }, stay: { closes(false) })
+        askAboutStructure { [weak self] ok in
+            guard ok, let self else { return closes(false) }
+            askAboutTransaction(proceed: { [weak self] in self?.shouldCloseWithoutTransaction(closes) }, stay: { closes(false) })
+        }
     }
 
     private func shouldCloseWithoutTransaction(_ closes: @escaping (Bool) -> Void) {

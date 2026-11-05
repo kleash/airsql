@@ -99,6 +99,25 @@ public enum SQLIntentions {
         Reader(analysis: analysis).documentation(at: caret)
     }
 
+    /// The same notes for a row of the tree, as if the name were at the cursor in a statement: an object, or its column.
+    /// nil for what no statement names (a trigger, an event).
+    public static func documentation(of object: DatabaseObject, column: String? = nil, snapshot: SchemaSnapshot) -> (title: String, body: String)? {
+        let text: String
+        switch object.kind {
+        case .table, .view, .sequence:
+            text = "SELECT \(column.map { SQLQuote.identifier($0) } ?? "*") FROM \(object.quoted)"
+            if column != nil {
+                let analysis = SQLAnalysis(text, snapshot: snapshot, database: object.database)
+                return Reader(analysis: analysis).documentation(at: "SELECT ".utf16.count + 1)
+            }
+        case .procedure: text = "CALL \(object.quoted)()"
+        case .function: text = "SELECT \(object.quoted)()"
+        case .trigger, .event: return nil
+        }
+        let offset = (text as NSString).range(of: SQLQuote.identifier(object.name), options: .backwards).location + 1
+        return Reader(analysis: SQLAnalysis(text, snapshot: snapshot, database: object.database)).documentation(at: offset)
+    }
+
     /// The call or INSERT row around `caret`: what goes in each place, and which place the caret is in.
     public static func parameters(at caret: Int, in analysis: SQLAnalysis) -> (title: String, items: [String], active: Int)? {
         Reader(analysis: analysis).parameters(at: caret)

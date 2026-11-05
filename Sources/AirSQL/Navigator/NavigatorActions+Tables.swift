@@ -114,10 +114,11 @@ extension NavigatorActions {
         }
     }
 
-    static func copyTable(_ table: DatabaseObject, on open: OpenConnection, window: NSWindow?) {
+    /// `into`: the database chosen at first (a table dragged onto it).
+    static func copyTable(_ table: DatabaseObject, on open: OpenConnection, window: NSWindow?, into: String? = nil) {
         guard let window else { return }
         let databases = open.snapshot.databases.map(\.name)
-        let target = popup(databases, selected: databases.firstIndex(of: table.database) ?? 0, id: "copyTable.database",
+        let target = popup(databases, selected: databases.firstIndex(of: into ?? table.database) ?? 0, id: "copyTable.database",
                            tip: "Choose the database the copy goes in", target: nil, action: nil)
         let name = textField(table.name + "_copy", placeholder: "Name", id: "copyTable.name", tip: "Type the copy's name", width: 260)
         let rows = checkbox("Copy the rows", id: "copyTable.rows", tip: "Copy the rows too, not only the table's definition", on: true,

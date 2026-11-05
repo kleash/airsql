@@ -31,15 +31,18 @@ enum NavigatorMenus {
 /// SQL before anything changes (plan §1, Data safety), runs it on a session of its own and reads the changes back.
 @MainActor
 enum NavigatorActions {
+    /// Why nothing may change on this connection; nil: it's writable.
+    static func readOnlyReason(_ open: OpenConnection?, _ model: AppModel?) -> String? {
+        guard let connection = model?.connection(open?.id), connection.readOnly else { return nil }
+        return "“\(connection.displayName)” is read-only: turn that off in its connection settings to change anything"
+    }
+
     /// Why a command can't act on these objects or databases now; nil: it can.
     static func reason(for action: Selector?, objects: [DatabaseObject], databases: [String], open: OpenConnection?,
                        target: OpenConnection?, model: AppModel?) -> String? {
         let tables = objects.filter { $0.kind == .table }
         let tableLike = objects.filter { $0.kind.isTableLike }
-        func writable(_ open: OpenConnection?) -> String? {
-            guard let connection = model?.connection(open?.id), connection.readOnly else { return nil }
-            return "“\(connection.displayName)” is read-only: turn that off in its connection settings to change anything"
-        }
+        func writable(_ open: OpenConnection?) -> String? { readOnlyReason(open, model) }
         let onlyTables = tables.isEmpty || tables.count != objects.count ? "Select tables first (not views or other objects)"
             : writable(open)
         switch action {

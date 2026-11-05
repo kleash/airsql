@@ -218,7 +218,7 @@ extension MainWindowController {
         return items
     }
 
-    private func fileItems() -> [QuickOpenSheet.Item] {
+    func fileItems() -> [QuickOpenSheet.Item] {
         NSDocumentController.shared.recentDocumentURLs.map { url in
             .init(name: url.lastPathComponent, place: "File in " + url.deletingLastPathComponent().path) { [weak self] in
                 self?.openFiles([url])

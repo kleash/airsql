@@ -24,9 +24,13 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         ("comment", "Comment", 200, 80, "Its comment"),
     ]
 
-    init(_ open: OpenConnection, _ database: String) {
+    /// Only tables, or only views: a group of the tree as a list.
+    private let only: SchemaTable.Kind?
+
+    init(_ open: OpenConnection, _ database: String, only: SchemaTable.Kind? = nil) {
         self.open = open
         self.database = database
+        self.only = only
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -129,7 +133,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         let selected = Set(table.selectedRowIndexes.compactMap { rows[safe: $0]?.name })
         let found = open.snapshot.database(database)
         let text = filter.stringValue.trimmingCharacters(in: .whitespaces)
-        let all = found?.tables ?? []
+        let all = (found?.tables ?? []).filter { only == nil || $0.kind == only }
         rows = sorted(text.isEmpty ? all : all.filter { $0.name.localizedCaseInsensitiveContains(text) }, found?.statistics ?? [:])
         table.reloadData()
         table.selectRowIndexes(IndexSet(rows.indices.filter { selected.contains(rows[$0].name) }), byExtendingSelection: false)
