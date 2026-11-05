@@ -213,10 +213,17 @@ final class TabBarView: NSView {
 
     /// The tab's menu (plan §2.12): Close, Close Others, Close All, Duplicate, Rename, Reveal in Finder, Change Connection.
     func menu(for button: TabButton) -> NSMenu {
+        let before = controller?.selectedTab
         if let tab = button.tab { controller?.select(tab) }
         let menu = NSMenu(title: "Tab")
         menu.add([Commands.closeTab, Commands.closeOtherTabs, Commands.closeAllTabs, Commands.duplicateTab, Commands.renameTab,
                   nil, Commands.revealInFinder, Commands.changeConnection])
+        if let before, before !== button.tab {
+            let beside = Commands.showBeside.item()
+            beside.title = "Show Beside “\(before.title)”"
+            beside.representedObject = before
+            menu.addItem(beside)
+        }
         return menu
     }
 }

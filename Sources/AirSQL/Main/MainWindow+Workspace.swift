@@ -79,6 +79,13 @@ extension MainWindowController {
         case Commands.filesPanel.action?:
             item.state = sidebar.filesShown ? .on : .off
             return (true, nil)
+        case Commands.splitRight.action?:
+            item.state = splitPanes != nil ? .on : .off
+            return (selectedTab != nil, "Open a tab first")
+        case Commands.showBeside.action?:
+            return (selectedTab != nil, "Open a tab first")
+        case Commands.otherPane.action?:
+            return (splitPanes != nil, "Split the window first: View ▸ Split Right")
         case Commands.consoleList.action?, Commands.defaultConsole.action?:
             if window?.attachedSheet != nil { return (false, "A sheet is open: answer it first") }
             return (activeConnection != nil, "Select one connection in the sidebar first")

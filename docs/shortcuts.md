@@ -171,6 +171,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Forward | ⌃⌘→ |
 | Recent Tabs… | ⌃⌘E |
 | Go to Statement… | ⌃⌘O |
+| Split Right | ⌥⌘\ |
+| Go to Other Side | ⌃⌘\ |
 | Files | ⌥⌘4 |
 | New Scratch File | ⌥⇧⌘N |
 | Consoles… | ⇧⌘J |

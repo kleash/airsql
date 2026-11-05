@@ -25,7 +25,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// Holds the split view controller (in the responder chain after its view); the window's content view is its view.
     private var root: NSViewController?
     private(set) var tabs: [Tab] = []
-    private(set) var selectedTab: Tab?
+    private(set) var selectedTab: Tab? { didSet { paneFollows(from: oldValue) } }
+    /// Split Right: the two tabs on show side by side, one of them the selected tab (SplitPanes.swift).
+    var splitPanes: (left: Tab, right: Tab)?
+    var paneViews: PanesView?
+    var focusWatch: NSKeyValueObservation?
     /// The tabs shown, oldest first, and where Back and Forward have got to (`TabHistory`).
     var tabHistory: [Tab] = []
     var historyPlace = 0
@@ -89,6 +93,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         updateLogDock()
         ToolsResponder.install(on: self)
         LiquibaseResponder.install(on: self)
+        focusWatch = window.observe(\.firstResponder) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.followFocus() }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -245,7 +252,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             preview.show(content)
         } else {
             tabs[index] = Tab(title: tab.title, connectionID: tab.connectionID, content: content)
-            if selectedTab === tab { selectedTab = tabs[index] }
+            if selectedTab === tab {
+                selectedTab = tabs[index]
+            } else if let panes = splitPanes {
+                splitPanes = (panes.left === tab ? tabs[index] : panes.left, panes.right === tab ? tabs[index] : panes.right)
+            }
         }
         refresh()
         if selectedTab === tabs[index], let table = content as? TableDataController, table.page == .data { window?.makeFirstResponder(table.grid) }
@@ -264,9 +275,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 self.closedTabs.append((tab.connectionID, reopen))
                 self.closedTabs = Array(self.closedTabs.suffix(20))
             }
+            // A split ends with either of its tabs, and the other shows.
+            let beside = self.splitPanes.flatMap { $0.left === tab ? $0.right : $0.right === tab ? $0.left : nil }
+            if beside != nil { self.splitPanes = nil }
             self.tabs.remove(at: index)
             if self.selectedTab === tab {
-                self.selectedTab = self.tabs.first { $0 === before } ?? (self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)])
+                self.selectedTab = beside ?? self.tabs.first { $0 === before } ?? (self.tabs.isEmpty ? nil : self.tabs[min(index, self.tabs.count - 1)])
             }
             self.refresh()
             ConsoleDocuments.shared.tabsChanged(in: self)
@@ -326,7 +340,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private func updateContent() {
         let kind: String
         var view: NSView?
-        if let tab = selectedTab {
+        if let panes = splitPanes {
+            kind = "tab:" + panes.left.id.uuidString + panes.right.id.uuidString
+        } else if let tab = selectedTab {
             kind = "tab:" + tab.id.uuidString
             view = tab.content.view
         } else if model.data.connections.isEmpty {
@@ -336,8 +352,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         } else {
             kind = "select"
         }
+        paneViews?.mark(selectedTab)
         guard kind != contentKindKey else { return }
         contentKindKey = kind
+        shownContent?.removeFromSuperview()
+        paneViews = splitPanes.map { PanesView($0.left, $0.right, in: contentHolder.bounds, selected: selectedTab) }
+        view = paneViews ?? view
         contentKind = kind.components(separatedBy: ":").first ?? kind
         if view == nil {
             switch contentKind {
@@ -349,7 +369,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             default: view = selectConnectionView()
             }
         }
-        shownContent?.removeFromSuperview()
         if let view {
             contentHolder.addSubview(view)
             view.pin(to: contentHolder)

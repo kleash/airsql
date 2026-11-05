@@ -129,6 +129,45 @@ extension AppTests {
             #expect(try String(contentsOf: url, encoding: .utf8) == "SELECT 2")
         }
 
+        @Test func twoTabsShowSideBySideAndTheFocusChoosesTheSelectedOne() throws {
+            let (main, _) = appWindow(testModel())
+            let first = FixtureContent("one"), second = FixtureContent("two"), third = FixtureContent("three")
+            let a = main.open(first, title: "A", connection: nil), b = main.open(second, title: "B", connection: nil)
+            let c = main.open(third, title: "C", connection: nil)
+            main.select(a)
+            main.splitRight(nil)
+            #expect(main.splitPanes?.left === a && main.splitPanes?.right === b)
+            #expect(first.view.window === main.window && second.view.window === main.window)
+            #expect(main.contentKind == "tab")
+
+            // The focus on the other side makes its tab the selected one.
+            let field = NSTextField()
+            second.view.addSubview(field)
+            main.window?.makeFirstResponder(field)
+            main.followFocus()
+            #expect(main.selectedTab === b)
+
+            // Another tab takes the side in use.
+            main.select(c)
+            #expect(main.splitPanes?.left === a && main.splitPanes?.right === c)
+            #expect(third.view.window === main.window && second.view.window == nil)
+
+            main.close(c)
+            #expect(main.splitPanes == nil && first.view.window != nil && main.selectedTab != nil)
+        }
+
+        @Test func aLoneTabSplitsWithANewQueryAndPressedAgainShowsOne() {
+            let (main, _) = appWindow(testModel([Fixtures.local]))
+            let content = FixtureContent()
+            let tab = main.open(content, title: "A", connection: Fixtures.local.id)
+            main.splitRight(nil)
+            #expect(main.tabs.count == 2 && main.splitPanes?.left === tab)
+            #expect(main.splitPanes?.right.content is ConsoleViewController)
+            main.splitRight(nil)
+            #expect(main.splitPanes == nil && main.selectedTab === tab && content.view.window === main.window)
+            #expect(main.tabs[1].content.view.window == nil)
+        }
+
         @Test func aConnectionKeepsOneDefaultConsole() async throws {
             let (main, _) = appWindow(testModel([Fixtures.local]))
             main.sidebar.select([Fixtures.local.id])

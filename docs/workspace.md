@@ -32,3 +32,11 @@ Trash** in its menu removes it.
 **File ▸ Consoles…** (⇧⌘J) lists the query tabs of the connection, to jump to one by typing part of its name, and offers a
 new one. **File ▸ Default Console** opens the tab the connection keeps for good: its text is there next time, whatever
 you closed.
+
+## Two tabs side by side
+
+**View ▸ Split Right** (⌥⌘\\) shows the next tab beside the one on show, or a new query if it's the only one; press it
+again for one tab. Right-click a tab and choose **Show Beside** to pair it with the tab you were looking at.
+
+The side with the focus has an accent line along its top, and the status bar and every command follow it. Showing another
+tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the focus across; closing either tab ends the split.
