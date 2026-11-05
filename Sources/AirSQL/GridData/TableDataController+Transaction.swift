@@ -10,7 +10,7 @@ extension TableDataController {
 
     @objc func setTransactionMode(_ sender: Any?) {
         let manual = (sender as? NSMenuItem)?.tag == 1 || (sender as? NSPopUpButton)?.selectedTag() == 1
-        guard manual != (transactionSession != nil) else { return }
+        guard manual != (transactionSession != nil), !inTransaction, editingOff == nil else { return }
         guard manual else { return endTransactionSession() }
         let sessions = context.sessions
         Task {

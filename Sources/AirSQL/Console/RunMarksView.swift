@@ -63,7 +63,8 @@ final class RunMarksView: NSView {
         guard !marks.isEmpty, let layout = editor.layoutManager, let container = editor.textContainer else { return }
         let origin = editor.textContainerOrigin
         let area = dirtyRect.intersection(bounds)
-        let shown = layout.glyphRange(forBoundingRectWithoutAdditionalLayout: area.offsetBy(dx: -origin.x, dy: -origin.y), in: container)
+        let glyphs = layout.glyphRange(forBoundingRectWithoutAdditionalLayout: area.offsetBy(dx: -origin.x, dy: -origin.y), in: container)
+        let shown = layout.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
         let font = NSFont.systemFont(ofSize: max(editor.fontSize - 2, 9))
         let length = (editor.string as NSString).length
         NSGraphicsContext.current?.saveGraphicsState()
@@ -71,9 +72,8 @@ final class RunMarksView: NSView {
         // The last mark of a line is the one that shows: statements sharing a line share its end.
         var lines: [CGFloat: Mark] = [:], places: [CGFloat: CGFloat] = [:]
         for mark in marks where NSMaxRange(mark.range) <= length && mark.range.length > 0 {
-            let glyph = layout.glyphIndexForCharacter(at: NSMaxRange(mark.range) - 1)
-            guard NSLocationInRange(glyph, NSRange(location: shown.location, length: shown.length + 1)) else { continue }
-            let line = layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+            guard NSLocationInRange(NSMaxRange(mark.range) - 1, shown) else { continue }
+            let line = layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: NSMaxRange(mark.range) - 1), effectiveRange: nil)
             lines[line.minY] = mark
             places[line.minY] = line.maxX
         }

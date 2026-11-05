@@ -417,5 +417,39 @@ extension AppTests {
             #expect(await eventually(timeout: 5) { console.messagesView.messages.last?.text.contains("changed on disk: saving") == true })
             #expect(console.text == "SELECT 3")
         }
+
+        /// The server has no room for another session of this login: the tab shares the main session, and says so.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aTabSharesTheMainSessionWhenTheServerHasNoRoom() async throws {
+            #expect(Connection.hasRoom(used: 10, limit: 16) && !Connection.hasRoom(used: 11, limit: 16))
+            let admin = Connection(options: DBLab.options(Lab.mariadb114, tls: DBLab.required), log: DBLab.log)
+            let root = try await admin.session(.schema)
+            for sql in ["DROP USER IF EXISTS lane_run_limit", "CREATE USER lane_run_limit IDENTIFIED BY 'lane-pass' WITH MAX_USER_CONNECTIONS 1",
+                        "GRANT SELECT ON fixture.* TO lane_run_limit"] {
+                _ = try await root.query(sql)
+            }
+            var options = DBLab.options(Lab.mariadb114, tls: DBLab.required)
+            options.user = "lane_run_limit"
+            options.password = "lane-pass"
+            let connection = Connection(options: options, log: DBLab.log)
+            try await connection.connect()
+            ConsoleViewController.openConnection = { $0 == Fixtures.production.id ? connection : nil }
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let model = testModel(Fixtures.shop)
+            model.states[Fixtures.production.id] = .connected(server: "MariaDB")
+            let (_, harness, console) = try await ConsoleAppTests.console(model)
+            console.editor.setText("SELECT 7")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            console.runStatement(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let main = try await connection.session(.main)
+            #expect(console.session === main && console.sharesSession, "\(console.messagesView.messages.map(\.text))")
+            #expect(console.messagesView.messages.contains { $0.text.contains("near its limit") })
+            #expect(console.lastOutcome?.results.first?.rows?.string(0, 0) == "7")
+            ConsoleViewController.shared[Fixtures.production.id] = nil
+            await connection.disconnect()
+            _ = try await root.query("DROP USER lane_run_limit")
+            await admin.disconnect()
+        }
     }
 }

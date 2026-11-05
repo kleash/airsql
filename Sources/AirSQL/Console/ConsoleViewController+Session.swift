@@ -36,7 +36,7 @@ extension ConsoleViewController {
         if !sharesSession, await connection.hasRoom() {
             do {
                 opened = try await connection.toolsSession(role: .query)
-            } catch let error as AirSQLError where [1040, 1203].contains(error.code) {
+            } catch let error as AirSQLError where [1040, 1203, 1226].contains(error.code) {
                 // Too many connections: the server's or this login's.
             }
         }
@@ -48,15 +48,20 @@ extension ConsoleViewController {
         }
         let session: DBConnection
         if let opened { session = opened } else { session = try await connection.session(.main) }
+        // Before it counts as the tab's: one that failed to start as asked must not go on to run in Auto-commit.
+        let level = self.connection?.startIsolation
+        do {
+            if self.connection?.startsManual == true { _ = try await session.query("SET autocommit = 0") }
+            if let level { _ = try await session.query(level.sql) }
+        } catch {
+            await opened?.close()
+            throw error
+        }
         sharing = sharesSession
         changeShared {
             $0.session = session
             $0.runner = documentID
-        }
-        if self.connection?.startsManual == true { _ = try await session.query("SET autocommit = 0") }
-        if let level = self.connection?.startIsolation {
-            _ = try await session.query(level.sql)
-            changeShared { $0.isolation = level }
+            $0.isolation = level ?? $0.isolation
         }
         return session
     }
