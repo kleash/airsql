@@ -15,6 +15,42 @@ extension AppTests {
         return texts(content).joined(separator: "\n")
     }
 
+    /// A drop keeps the login, so Connect sets the same sessions up again through the same route (plan §2.2, R8) and the
+    /// tabs holding them work on. It used to wipe the password: the reconnect then failed its login and started over.
+    @Test(.enabled(if: Lab.enabled)) func aDroppedConnectionReconnectsWithItsLogin() async throws {
+        var saved = SavedConnection(name: "Drops", host: "127.0.0.1", port: Lab.mariadb114.port, user: Lab.airsql.user)
+        saved.tls = TLSOptions(mode: .off)
+        let model = testModel([saved])
+        model.setSavedPassword(saved.id.uuidString, Lab.airsql.password)
+        func connected() async -> Bool {
+            await eventually(timeout: 30) { if case .connected? = model.states[saved.id] { return true } else { return false } }
+        }
+        model.connector.connect(saved.id, on: nil)
+        #expect(await connected(), "\(String(describing: model.states[saved.id]))")
+        let open = try #require(model.connector.open[saved.id])
+        let main = try await open.connection.session(.main)
+        let tab = try await open.connection.toolsSession(role: .query)
+        _ = try await main.query("START TRANSACTION")
+        let thread = try #require(main.server?.threadID)
+        _ = try await tab.query("KILL \(thread)")
+        try? await main.ping()
+        #expect(main.wasLost)
+
+        model.connector.dropped(saved.id, open, "Lost.")
+        #expect(model.openConnection(saved.id) == nil && model.states[saved.id] == .failed("Lost."))
+        #expect(await eventually(timeout: 5) { !tab.isConnected }, "its transaction is gone, as the tab says")
+        await #expect(throws: AirSQLError.self, "nothing opens until the person connects") { _ = try await open.connection.session(.data) }
+
+        model.connector.connect(saved.id, on: nil)
+        #expect(await connected(), "\(String(describing: model.states[saved.id]))")
+        let again = try #require(model.connector.open[saved.id])
+        #expect(again.connection === open.connection, "the kept connection, not a fresh connect")
+        #expect(try await again.connection.session(.main) === main && main.isConnected && !main.wasLost)
+        let data = try await again.connection.session(.data)
+        #expect(try await data.query("SELECT 1").first?.rows?.string(0, 0) == "1")
+        model.connector.disconnect(saved.id)
+    }
+
     @Test(.enabled(if: Lab.enabled)) func trustingASelfSignedCertificatePinsIt() async throws {
         var mysql = SavedConnection(name: "MySQL 8.4", host: "127.0.0.1", port: Lab.mysql84.port, user: Lab.airsql.user)
         mysql.tls = TLSOptions(mode: .verifyIdentity)

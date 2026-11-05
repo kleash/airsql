@@ -491,6 +491,8 @@ struct DBLabTests {
 
         relay.cut()
         #expect(await kind { try await main.query("SELECT 1") } == .disconnected)
+        connection.dropped()  // what the connector does: only Reconnect brings sessions back, on the login it kept
+        #expect(await kind { _ = try await connection.toolsSession() } == .disconnected)
 
         let report = try await connection.reconnect()
         #expect(report.rolledBack && report.killedOldSession && report.server.threadID != old)

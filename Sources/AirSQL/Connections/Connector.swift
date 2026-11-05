@@ -318,10 +318,11 @@ final class Connector {
 
     /// `connected` dropped (if it is still the one open): it is reported, and kept so the next Connect can reconnect it
     /// through the same route and clear the thread the server may still have (plan §2.2, R8). Its keep-alive stops.
-    private func dropped(_ id: UUID, _ connected: Open?, _ message: String) {
+    func dropped(_ id: UUID, _ connected: Open?, _ message: String) {
         guard let connected, open[id] === connected else { return }
         open[id] = nil
-        model.detach(id)
+        model.detach(id, closingSessions: false)
+        connected.connection.dropped()
         model.states[id] = .failed(message)
         connected.keepAlive?.invalidate()
         if let previous = droppedOpens.updateValue(connected, forKey: id) { Task { await previous.close() } }

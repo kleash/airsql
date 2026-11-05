@@ -180,13 +180,15 @@ final class OpenConnection {
         return results
     }
 
-    /// Disconnect: stops loading, forgets the schema and closes every session.
-    func close() {
+    /// Disconnect: stops loading, forgets the schema and closes every session. After a drop the sessions are the
+    /// connector's to keep for the reconnect.
+    func close(closingSessions: Bool = true) {
         tasks.values.forEach { $0.cancel() }
         tasks = [:]
         stopReadingSizes()
         running = [:]
         schema.clear()
+        guard closingSessions else { return }
         let connection = self.connection
         Task.detached { await connection.disconnect() }
     }
@@ -212,8 +214,8 @@ extension AppModel {
         return opened
     }
 
-    /// Disconnect: forgets the connection's schema and closes its sessions.
-    func detach(_ id: UUID) {
-        open.removeValue(forKey: id)?.close()
+    /// Disconnect: forgets the connection's schema and closes its sessions (a drop leaves those to the connector).
+    func detach(_ id: UUID, closingSessions: Bool = true) {
+        open.removeValue(forKey: id)?.close(closingSessions: closingSessions)
     }
 }
