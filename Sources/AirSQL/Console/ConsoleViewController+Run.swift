@@ -1,10 +1,11 @@
 import AirSQLCore
 import AppKit
+import UniformTypeIdentifiers
 
 /// A run under way: its statements, the one running, and how to stop it.
 @MainActor
 final class ConsoleRun {
-    enum Kind { case run, explain, analyze, profile }
+    enum Kind { case run, explain, analyze, profile, toFile }
 
     let kind: Kind
     let statements: [SQLStatement]
@@ -18,6 +19,8 @@ final class ConsoleRun {
     var timer: Timer?
     /// A statement ended in an error.
     var failed = false
+    /// Run to File: where the rows go.
+    var target: URL?
     /// Skip All, after an error in a script.
     var skipsErrors = false
     /// Run Again: the result tab its rows take the place of.
@@ -110,7 +113,10 @@ extension ConsoleViewController {
             textField(parameterValues[key] ?? "", placeholder: "value", id: "parameter.\(index)",
                       tip: "Type the value for \(key): a number or NULL goes in as it is, anything else as quoted text", width: 240)
         }
-        let grid = NSGridView(views: zip(keys, fields).map { key, field in [label(key.hasPrefix("?") ? "? " + key.dropFirst() : key), field] })
+        let hints = Dictionary(places.joined().map { ($0.key, $0.hint) }, uniquingKeysWith: { first, _ in first })
+        let grid = NSGridView(views: zip(keys, fields).map { key, field in
+            [label((hints[key] ?? nil) ?? (key.hasPrefix("?") ? "? " + key.dropFirst() : key)), field]
+        })
         grid.column(at: 0).xPlacement = .trailing
         grid.layoutSubtreeIfNeeded()
         grid.frame.size = grid.fittingSize
@@ -146,6 +152,33 @@ extension ConsoleViewController {
                 self.start(ConsoleRun(kind: .analyze, statements: statements, text: self.text))
             }
         }
+    }
+
+    /// Run to File: the rows of a statement that only reads go straight to a file, without a grid, however many there are.
+    @objc func runToFile(_ sender: Any?) {
+        // The gate (plan §2.8): files on this Mac are the person's to write.
+        guard !AgentGuard.refuses("Run to File writes a file on this Mac: only the person at the Mac can do that."),
+              let chosen = chosen(all: false).first else { return }
+        withParameters([chosen]) { [weak self] statements in
+            guard let self, let window = self.view.window else { return }
+            guard ReadOnlyClassifier.classify(statements[0].sql, noBackslashEscapes: self.editor.noBackslashEscapes) == .readOnly else {
+                return self.note(.error, "Run to File takes a statement that only reads, such as a SELECT: nothing ran.", statement: statements[0])
+            }
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = ["csv", "tsv", "json"].compactMap { UTType(filenameExtension: $0) }
+            panel.nameFieldStringValue = (self.tab?.title ?? "Rows") + ".csv"
+            panel.message = "Write the rows to a file: .csv, .tsv or .json, by the name you give it"
+            panel.beginSheetModal(for: window) { [weak self] response in
+                guard let self, response == .OK, let url = panel.url else { return }
+                self.writeRows(of: statements[0], to: url)
+            }
+        }
+    }
+
+    func writeRows(of statement: SQLStatement, to url: URL) {
+        let run = ConsoleRun(kind: .toFile, statements: [statement], text: text)
+        run.target = url
+        start(run)
     }
 
     /// Run Again: the shown result's statement once more, its rows taking the tab's place. It goes through the same
@@ -272,11 +305,15 @@ extension ConsoleViewController {
         }
         if run.kind == .explain { return await explain(run, on: session) }
         if run.kind == .analyze { return await analyze(run, on: session, connection: id) }
+        if run.kind == .toFile { return await writeRows(run, on: session) }
         let profile = run.kind == .profile ? await QueryProfile.start(on: session) : nil
         let all = SQLSplitter.statements(in: run.text, noBackslashEscapes: session.noBackslashEscapes)
         var schemaChanged = false
         defer { if schemaChanged { model.openConnection(id)?.load() } }  // the navigator's tree shows the change
-        for (index, statement) in run.statements.enumerated() {
+        var index = -1
+        while index + 1 < run.statements.count {
+            index += 1
+            let statement = run.statements[index]
             guard !run.cancelled else { break }
             run.index = index
             updateRunning()
@@ -294,7 +331,11 @@ extension ConsoleViewController {
                     $0.ranCode = $0.ranCode || code
                 }
             }
-            if outcome.error != nil, !run.cancelled, index + 1 < run.statements.count, await scriptGoesOn(after: outcome, run: run) { continue }
+            if outcome.error != nil, !run.cancelled, index + 1 < run.statements.count {
+                let answer = await scriptAnswer(after: outcome, run: run)
+                if answer == .retry { index -= 1 }
+                if answer != .stop { continue }
+            }
             if outcome.error != nil || run.cancelled {
                 let left = run.statements.count - index - 1
                 if left > 0 { note(.info, "Stopped: the \(left) statement\(left == 1 ? "" : "s") after it didn't run.") }
@@ -308,17 +349,20 @@ extension ConsoleViewController {
         }
     }
 
-    /// A script's statement failed with others to come: Skip goes on past it, Skip All past every error from here on, Stop
-    /// ends the run, as it always has where nobody can answer.
-    private func scriptGoesOn(after outcome: ConsoleOutcome, run: ConsoleRun) async -> Bool {
-        if run.skipsErrors { return true }
-        guard let window = view.window, window.attachedSheet == nil else { return false }
+    private enum ScriptAnswer { case stop, retry, skip }
+
+    /// A script's statement failed with others to come: Retry sends it again, Skip goes on past it, Skip All past every error
+    /// from here on, Stop ends the run, as it always has where nobody can answer.
+    private func scriptAnswer(after outcome: ConsoleOutcome, run: ConsoleRun) async -> ScriptAnswer {
+        if run.skipsErrors { return .skip }
+        guard let window = view.window, window.attachedSheet == nil else { return .stop }
         return await withCheckedContinuation { continuation in
             ConsoleClosing.alert(window, "A statement failed: go on with the rest?", outcome.error?.localizedDescription ?? "",
-                                 buttons: [("Stop", "End the run here"), ("Skip", "Leave this statement and run the next"),
+                                 buttons: [("Stop", "End the run here"), ("Retry", "Send this statement again"),
+                                           ("Skip", "Leave this statement and run the next"),
                                            ("Skip All", "Run the rest, leaving any that fail")], destructive: nil) { choice in
-                if choice == 2 { run.skipsErrors = true }
-                continuation.resume(returning: choice > 0)
+                if choice == 3 { run.skipsErrors = true }
+                continuation.resume(returning: choice == 0 ? .stop : choice == 1 ? .retry : .skip)
             }
         }
     }
@@ -360,6 +404,22 @@ extension ConsoleViewController {
         addPlan(table: nil, tree: json ? ExplainPlan.tree(fromJSON: plan) : plan, nodes: ExplainPlan.nodes(from: plan, json: json),
                 raw: plan, title: "Plan (Analyzed)")
         note(.ok, "Ran and analyzed · \(milliseconds(outcome.duration))", statement: statement, run: run)
+    }
+
+    private func writeRows(_ run: ConsoleRun, on session: DBConnection) async {
+        guard let url = run.target else { return }
+        let statement = run.statements[0], started = Date(), writer = RowFileWriter(url)
+        do {
+            try await session.stream(statement.sql, batchRows: 10_000) { try writer.write($0) }
+            try writer.finish()
+            let rows = writer.rows
+            note(.ok, "\(rows.formatted()) row\(rows == 1 ? "" : "s") written to \(url.lastPathComponent) · \(milliseconds(Date().timeIntervalSince(started)))",
+                 statement: statement, run: run)
+        } catch {
+            writer.close()
+            run.failed = true
+            note(.error, "Not every row reached \(url.lastPathComponent): \(error.localizedDescription)", statement: statement, run: run)
+        }
     }
 
     private func planFailed(_ error: AirSQLError, run: ConsoleRun, session: DBConnection) {

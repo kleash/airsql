@@ -65,7 +65,7 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
   database view) write a statement with its columns. A `?` marks each value for you to fill in: INSERT leaves out the
   columns the server fills itself (auto-increment and generated ones), and UPDATE finds the row by its primary key (or a
   unique key whose columns can't be NULL; without one, you write the condition).
-- **Run…** on a procedure's menu writes its `CALL`, with a `?` and the name and type of each value it takes; OUT and
+- **Run…** on a procedure's menu writes its `CALL`, with a `?` and the name and type of each value it takes (Run then asks for each by name); OUT and
   INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
 - **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
 

@@ -22,7 +22,8 @@ session of its own, so a long query in one tab leaves the others free.
 - When you quit, the open query tabs are kept, unsaved text included, and come back the next time you open AirSQL. The
   other tabs come back too: see [Getting back to your tabs](navigator.md#getting-back-to-your-tabs).
 - **File ▸ Open Recent** lists the .sql files you had open lately. A file opens on the connection you last used it with.
-- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Messages says so; Save writes UTF-8.
+- A file that isn't UTF-8 opens by its byte-order mark, else as Windows Latin 1, and Save keeps its encoding. If the text
+  no longer fits that encoding, Save offers UTF-8.
 - If a file changes on disk, its tab follows, and ⌘Z brings back what it showed; with unsaved edits, Messages warns instead.
 - **Query ▸ Change Connection…** runs the tab's statements on another connection. A tab with no connection, such as a
   file opened with nothing selected, takes the one the toolbar shows.
@@ -104,12 +105,15 @@ session of its own, so a long query in one tab leaves the others free.
 | The selected text as it stands, not split on `;` | Query ▸ Run Selection as One Statement |
 | The smallest query in brackets around the cursor | Query ▸ Run Subquery |
 | The statement at the cursor and every one after it | Query ▸ Run from Cursor |
+| The rows of a SELECT, straight to a .csv, .tsv or .json file | Query ▸ Run to File… |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
+The ▶ beside the line numbers, at the start of the statement at the cursor, runs it too.
+
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
 on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another. If one fails with others to come, a
-sheet asks whether to **Stop**, **Skip** it, or **Skip All** that fail from there on. Each
+sheet asks whether to **Stop**, **Retry** it, **Skip** it, or **Skip All** that fail from there on. Each
 statement that ran then shows a tick, or a cross if it failed, and its time at the end of its line, until you change it
 or run again.
 
@@ -165,6 +169,8 @@ share the current database too.
 - **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
   which keeps its name and pin. **Copy Result's Query** copies the statement. **View ▸ Refresh Every** does it every few
   seconds, for a statement that only reads, until it fails or you choose Off.
+- **Open Result in Window** moves a result to a window of its own, to keep beside the query. Closing it with edits not
+  applied asks first.
 - **Query ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
 - Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
@@ -261,7 +267,8 @@ shows in a sheet, with what it will do:
 - **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](sql-log.md).
 - **Query ▸ Explain** (⌥⌘E) shows how the server would run the statement at the cursor, without running it. **Operations**
   lists the steps as a tree with the server's rows and cost; click a header to sort the steps of each level, and the
-  steps that take a large share are marked in orange. **Table** is the server's EXPLAIN, **Tree** the steps as text and
+  steps that take a large share are marked in orange; select a step to read all the server says about it. **Diagram** draws
+  the steps as boxes, and **Flame** as bars as wide as their time, or their cost before Explain Analyze. **Table** is the server's EXPLAIN, **Tree** the steps as text and
   **Raw** the server's own answer, to copy.
 - **Query ▸ Explain Analyze** (⌥⇧⌘E) runs the statement and adds what really happened: rows read, time and loops. It uses
   `ANALYZE FORMAT=JSON` on MariaDB and `EXPLAIN ANALYZE` on MySQL 8.0.18 or later. As it really runs the statement, a

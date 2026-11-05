@@ -97,7 +97,7 @@ extension ConsoleViewController: NSMenuItemValidation {
         case Commands.refresh.action:
             return (isConnected, offline ?? "")
         case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(runFromCaret(_:)), #selector(runSubquery(_:)), #selector(explain(_:)),
-             #selector(explainAnalyze(_:)), #selector(profileQuery(_:)):
+             #selector(explainAnalyze(_:)), #selector(profileQuery(_:)), Commands.runToFile.action:
             if let reason = offline ?? busy { return (false, reason) }
             return (hasText, "Type a statement first")
         case #selector(runSelection(_:)), #selector(runSelectionWhole(_:)):
@@ -132,6 +132,9 @@ extension ConsoleViewController: NSMenuItemValidation {
                 return (false, "This is the only result tab")
             }
             return (currentResult != nil, "Run a query first: there is no result tab yet")
+        case #selector(openResultInWindow(_:)):
+            guard let tab = currentResult else { return (false, "Run a query first: there is no result tab yet") }
+            return (tab.pendingRows == 0, "Apply or discard this result's edits first")
         case #selector(rerunResult(_:)), #selector(copyResultQuery(_:)):
             guard currentResult?.sql != nil else {
                 return (false, currentResult == nil ? "Run a query first: there is no result tab yet" : "This tab didn't come from a statement")

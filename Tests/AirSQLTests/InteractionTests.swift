@@ -146,7 +146,7 @@ extension AppTests {
                         guard let console = main.selectedTab?.content as? ConsoleViewController else { return false }
                         return console.results.tabButton(for: console.resultTabs[0])?.renameField != nil
                     },
-                    menu: ["Run Result Again", "Copy Result's Query", "Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
+                    menu: ["Run Result Again", "Copy Result's Query", "Open Result in Window", "Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Compare With…"],
                     enabled: ["Pin Result", "Rename Result…", "Close Result", "Export Result…"]),
             // region: a plain text cell (a foreign key's double-click opens its drop-down, an ENUM's its list).
             Surface(name: "Table rows: cell",

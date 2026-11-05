@@ -5,24 +5,27 @@ import AppKit
 /// server's own answer, one at a time by the switch at its top.
 @MainActor
 final class PlanView: NSView {
-    let choice = NSSegmentedControl(labels: ["Operations", "Table", "Tree", "Raw"], trackingMode: .selectOne, target: nil, action: nil)
+    let choice = NSSegmentedControl(labels: ["Operations", "Diagram", "Flame", "Table", "Tree", "Raw"], trackingMode: .selectOne, target: nil, action: nil)
     private let holder = NSView()
     private let pages: [NSView]
-    var operations: PlanOperationsView? { pages[0] as? PlanOperationsView }
+    private(set) var operations: PlanOperationsView?
 
     init(table: ResultStore?, tree: String, nodes: [PlanNode], raw: String, nullText: String, fontSize: CGFloat) {
         let none = label("The server gave no steps for this statement.", color: .secondaryLabelColor)
-        pages = [nodes.isEmpty ? none : PlanOperationsView(nodes: nodes, fontSize: fontSize),
+        let steps = nodes.isEmpty ? nil : PlanOperationsView(nodes: nodes, fontSize: fontSize)
+        operations = steps
+        pages = [steps.map { Self.withDetails($0, fontSize: fontSize) } ?? none,
+                 Self.scrolled(PlanDiagramView(nodes: nodes)), Self.scrolled(PlanFlameView(nodes: nodes)),
                  table.map { ResultGridView(store: $0, nullText: nullText, fontSize: fontSize) }
                     ?? label("Explain Analyze has no plan table: see Operations or Tree.", color: .secondaryLabelColor),
                  Self.text(tree.isEmpty ? "The server gave no plan tree for this statement." : tree, id: "console.planTree", fontSize: fontSize),
                  Self.text(raw, id: "console.planRaw", fontSize: fontSize)]
         super.init(frame: .zero)
-        choice.selectedSegment = nodes.isEmpty ? (table == nil ? 2 : 1) : 0
+        choice.selectedSegment = nodes.isEmpty ? (table == nil ? 4 : 3) : 0
         choice.selectedSegmentBezelColor = .selectedSegment
         choice.target = self
         choice.action = #selector(switched(_:))
-        choice.toolTip = "Show the plan as steps with figures, the server's table, a tree of text, or the server's own answer"
+        choice.toolTip = "Show the plan as steps with figures, a diagram, a flame graph, the server's table, a tree of text, or the server's own answer"
         choice.setAccessibilityIdentifier("console.planChoice")
         choice.translatesAutoresizingMaskIntoConstraints = false
         holder.translatesAutoresizingMaskIntoConstraints = false
@@ -39,6 +42,34 @@ final class PlanView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// The steps over what the selected one says in full.
+    private static func withDetails(_ steps: PlanOperationsView, fontSize: CGFloat) -> NSView {
+        let details = text("Select a step to read all the server says about it.", id: "console.planDetails", fontSize: fontSize)
+        steps.onSelect = { node in
+            (details as? NSScrollView).flatMap { $0.documentView as? NSTextView }?.string = node.map { ([$0.operation] + $0.details).joined(separator: "\n") } ?? ""
+        }
+        let split = NSSplitView()
+        split.isVertical = false
+        split.dividerStyle = .thin
+        split.addArrangedSubview(steps)
+        split.addArrangedSubview(details)
+        split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
+        details.heightAnchor.constraint(greaterThanOrEqualToConstant: 70).isActive = true
+        return split
+    }
+
+    private static func scrolled(_ view: NSView) -> NSView {
+        let scroll = NSScrollView()
+        scroll.documentView = view
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        scroll.drawsBackground = true
+        scroll.backgroundColor = .content
+        return scroll
+    }
 
     private static func text(_ string: String, id: String, fontSize: CGFloat) -> NSView {
         let scroll = NSTextView.scrollableTextView()
@@ -91,6 +122,8 @@ final class PlanOperationsView: NSScrollView, NSOutlineViewDataSource, NSOutline
     ]
 
     let outline = NSOutlineView()
+    /// A step is selected.
+    var onSelect: ((PlanNode?) -> Void)?
     private var items: [Item]
     private let font: NSFont
 
@@ -152,6 +185,10 @@ final class PlanOperationsView: NSScrollView, NSOutlineViewDataSource, NSOutline
         field.toolTip = id == "operation" ? node.operation + (node.hot ? " (a large share of the plan)" : "") : nil
         if node.hot { field.textColor = .statusWarning }
         return field
+    }
+
+    func outlineViewSelectionDidChange(_ notification: Notification) {
+        onSelect?((outline.item(atRow: outline.selectedRow) as? Item)?.node)
     }
 
     func outlineView(_ outlineView: NSOutlineView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {

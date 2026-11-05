@@ -62,7 +62,7 @@ extension MainWindowController: AgentConsoles {
                     sequence(first: self as NSResponder, next: \.nextResponder).lazy.compactMap { $0 as? ToolsResponder }.first?.open(file: url)
                     continue
                 }
-                let read = await Task.detached { () -> Result<(text: String, encoding: String?), Error> in
+                let read = await Task.detached { () -> Result<(text: String, format: ConsoleScript.FileFormat), Error> in
                     Result { ConsoleScript.decoded(try Data(contentsOf: url)) }
                 }.value
                 if let tab = tabs.first(where: { ($0.content as? ConsoleViewController)?.fileURL == url }) {
@@ -73,9 +73,7 @@ extension MainWindowController: AgentConsoles {
                 case .success(let read):
                     let known = ConsoleViewController.rememberedConnection(of: url).flatMap { model.connection($0)?.id }
                     let tab = openConsole(text: read.text, title: nil, connection: known ?? connection, fileURL: url)
-                    if let encoding = read.encoding {
-                        (tab.content as? ConsoleViewController)?.note(.info, "This file isn't UTF-8: it was read as \(encoding), and Save writes UTF-8.")
-                    }
+                    (tab.content as? ConsoleViewController)?.fileFormat = read.format
                     NSDocumentController.shared.noteNewRecentDocumentURL(url)
                 case .failure(let error):
                     showError(error.localizedDescription, title: "AirSQL couldn't open “\(url.lastPathComponent)”", on: window)

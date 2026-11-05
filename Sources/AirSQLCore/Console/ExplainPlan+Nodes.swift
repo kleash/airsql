@@ -11,6 +11,8 @@ public struct PlanNode: Equatable, Sendable {
     public var time: Double?
     public var loops: Double?
     public var children: [PlanNode] = []
+    /// Everything else the server said about it, a "name: value" a line.
+    public var details: [String] = []
     /// It took a large share of the plan's time (or, not analyzed, its cost) by itself.
     public var hot = false
 
@@ -88,11 +90,18 @@ extension ExplainPlan {
     private static func figures(of object: [String: Any], operation: String) -> PlanNode {
         let cost = object["cost_info"] as? [String: Any]
         let tableTime = number(object["r_table_time_ms"]), otherTime = number(object["r_other_time_ms"])
-        return PlanNode(operation: operation, rows: number(object["rows"] ?? object["rows_examined_per_scan"]),
+        let details = object.keys.sorted().compactMap { key -> String? in
+            let value = object[key]!
+            if let list = value as? [Any], list.allSatisfy({ !($0 is [String: Any]) && !($0 is [Any]) }) { return "\(key): \(text(list))" }
+            return value is [String: Any] || value is [Any] ? nil : "\(plain(key)): \(value)"
+        }
+        var node = PlanNode(operation: operation, rows: number(object["rows"] ?? object["rows_examined_per_scan"]),
                         cost: number(object["cost"] ?? cost?["query_cost"] ?? cost?["prefix_cost"]),
                         actualRows: number(object["r_rows"]),
                         time: number(object["r_total_time_ms"]) ?? tableTime.map { $0 + (otherTime ?? 0) },
                         loops: number(object["r_loops"]))
+        node.details = details
+        return node
     }
 
     private static func number(_ value: Any?) -> Double? {

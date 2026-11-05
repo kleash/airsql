@@ -94,6 +94,8 @@ final class ConsoleViewController: NSViewController, TabContent {
     var refreshSeconds = 0
     var refreshTimer: Timer?
     weak var refreshedResult: ResultTab?
+    /// How the file is stored, which Save keeps.
+    var fileFormat = ConsoleScript.FileFormat()
     /// The file's date on disk as last read or saved.
     var fileDate: Date?
     /// The values last given to `?` and `:name`, offered at the next run.
@@ -129,6 +131,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         editorScroll = scroll
         editor.setText(initialText)
         runMarks = RunMarksView(editor: editor)
+        (scroll.verticalRulerView as? LineNumberRuler)?.onRun = { [weak self] in self?.runStatement(nil) }
         editor.onChange = { [weak self] in self?.textChanged() }
         editor.onDropFiles = { [weak self] urls in self?.mainWindow?.openFiles(urls) }
         editor.completions = { [weak self] text, caret in

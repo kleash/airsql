@@ -31,15 +31,42 @@ public enum ConsoleScript {
         return SQLSplitter.statement(at: caret, in: text, noBackslashEscapes: noBackslashEscapes).map { [$0] } ?? []
     }
 
-    /// A file's text: by its byte-order mark, else as UTF-8, else as Windows Latin. `encoding`: its name when it wasn't UTF-8.
-    public static func decoded(_ data: Data) -> (text: String, encoding: String?) {
-        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]), let text = String(data: data, encoding: .utf16) {
-            return (text, "UTF-16")
+    /// How a file's text is stored, which Save keeps.
+    public struct FileFormat: Equatable, Sendable {
+        public var encoding: String.Encoding = .utf8
+        /// UTF-8 with a byte-order mark.
+        public var mark = false
+
+        public init(encoding: String.Encoding = .utf8, mark: Bool = false) {
+            self.encoding = encoding
+            self.mark = mark
         }
-        let body = data.starts(with: [0xEF, 0xBB, 0xBF]) ? data.dropFirst(3) : data
-        if let text = String(data: body, encoding: .utf8) { return (text, nil) }
-        if let text = String(data: data, encoding: .windowsCP1252) { return (text, "Windows Latin 1") }
-        return (String(decoding: data, as: UTF8.self), "damaged UTF-8")
+
+        /// Its name, when it isn't plain UTF-8.
+        public var name: String? {
+            switch encoding {
+            case .utf16: return "UTF-16"
+            case .windowsCP1252: return "Windows Latin 1"
+            default: return mark ? "UTF-8 with a byte-order mark" : nil
+            }
+        }
+    }
+
+    /// A file's text: by its byte-order mark, else as UTF-8, else as Windows Latin.
+    public static func decoded(_ data: Data) -> (text: String, format: FileFormat) {
+        if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]), let text = String(data: data, encoding: .utf16) {
+            return (text, FileFormat(encoding: .utf16))
+        }
+        let mark = data.starts(with: [0xEF, 0xBB, 0xBF])
+        if let text = String(data: mark ? data.dropFirst(3) : data, encoding: .utf8) { return (text, FileFormat(mark: mark)) }
+        if let text = String(data: data, encoding: .windowsCP1252) { return (text, FileFormat(encoding: .windowsCP1252)) }
+        return (String(decoding: data, as: UTF8.self), FileFormat())
+    }
+
+    /// `text` as `format` stores it; nil: it holds characters that format can't.
+    public static func encoded(_ text: String, _ format: FileFormat) -> Data? {
+        guard let data = text.data(using: format.encoding) else { return nil }
+        return format.mark ? Data([0xEF, 0xBB, 0xBF]) + data : data
     }
 
     /// The statement at the caret and all those after it.

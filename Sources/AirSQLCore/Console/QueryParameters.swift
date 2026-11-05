@@ -8,6 +8,8 @@ public enum QueryParameters {
     public struct Place: Equatable, Sendable {
         public var range: Range<Int>
         public var key: String
+        /// The comment right after it, which says what it is (a routine's `? /* p_id int */`).
+        public var hint: String?
     }
 
     /// Each statement's places, in order.
@@ -20,7 +22,12 @@ public enum QueryParameters {
             for (index, token) in tokens.enumerated() where token.kind == .symbol && token.range.count == 1 {
                 if text[token.range.lowerBound] == 0x3F {
                     question += 1
-                    found.append(Place(range: token.range, key: "?\(question)"))
+                    var hint: String?
+                    if index + 1 < tokens.count, tokens[index + 1].kind == .comment {
+                        hint = String(decoding: text[tokens[index + 1].range], as: UTF16.self)
+                            .trimmingCharacters(in: CharacterSet(charactersIn: "/* "))
+                    }
+                    found.append(Place(range: token.range, key: "?\(question)", hint: hint))
                 } else if text[token.range.lowerBound] == 0x3A, index + 1 < tokens.count, tokens[index + 1].kind == .word,
                           tokens[index + 1].range.lowerBound == token.range.upperBound,
                           // lbl:LOOP is a label.

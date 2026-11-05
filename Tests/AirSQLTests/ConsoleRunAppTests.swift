@@ -585,5 +585,119 @@ extension AppTests {
             #expect(name == "a")
             _ = try await admin.query("DROP DATABASE \(database)")
         }
+
+        /// Run to File streams a read to a file, refuses anything else; Retry sends the statement again; a result moves to a
+        /// window; a step shows its details; Save keeps the file's encoding.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func rowsGoToAFileAndResultsToAWindow() async throws {
+            let (main, harness, console, connection) = try await Self.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            let folder = URL(fileURLWithPath: try scratch())
+            console.editor.setText("SELECT id FROM fixture.big ORDER BY id LIMIT 25000;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            let csv = folder.appendingPathComponent("rows.csv")
+            console.writeRows(of: SQLStatement(sql: "SELECT id, NULL AS n FROM fixture.big ORDER BY id LIMIT 25000"), to: csv)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 30])
+            let lines = try String(contentsOf: csv, encoding: .utf8).split(separator: "\n")
+            #expect(lines.count == 25_001 && lines[0] == "id,n" && lines[1] == "1,NULL", "\(console.messagesView.messages.map(\.text))")
+            #expect(console.messagesView.messages.last?.text.hasPrefix("25,000 rows written to rows.csv") == true)
+            let json = folder.appendingPathComponent("rows.json")
+            console.writeRows(of: SQLStatement(sql: "SELECT 1 AS a UNION SELECT 2"), to: json)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 30])
+            let parsed = try JSONSerialization.jsonObject(with: Data(contentsOf: json)) as? [[String: Any]]
+            #expect(parsed?.count == 2)
+            console.editor.setText("DELETE FROM nothing;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            console.runToFile(nil)
+            #expect(console.messagesView.messages.last?.text.hasPrefix("Run to File takes a statement that only reads") == true)
+
+            // Retry: the table that was missing is there the second time.
+            let setup = try await connection.toolsSession()
+            _ = try await setup.query("DROP DATABASE IF EXISTS lane_run_retry")
+            _ = try await setup.query("CREATE DATABASE lane_run_retry")
+            console.editor.setText("SELECT * FROM lane_run_retry.t;\nSELECT 2;")
+            console.runAll(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = try await setup.query("CREATE TABLE lane_run_retry.t (a INT)")
+            #expect(await call(harness, "press", ["title": "Retry"]).error == nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.resultTabs.count == 2 && console.runMarks.marks.last?.failed == false, "\(console.messagesView.messages.map(\.text))")
+            _ = try await setup.query("DROP DATABASE lane_run_retry")
+
+            let moved = try #require(console.resultTabs.first)
+            let window = console.moveToWindow(moved)
+            #expect(console.resultTabs.count == 1 && ResultWindowController.open.contains { $0 === window })
+            #expect(window.window?.contentView === moved.view)
+            window.close()
+            #expect(!ResultWindowController.open.contains { $0 === window })
+
+            console.editor.setText("SELECT * FROM fixture.customers WHERE id > 0;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            console.explain(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let plan = try #require(console.resultTabs.last?.view as? PlanView)
+            let outline = try #require(plan.operations?.outline)
+            outline.selectRowIndexes([outline.numberOfRows - 1], byExtendingSelection: false)
+            let details = try #require(find(NSTextView.self, id: "console.planDetails", in: plan))
+            #expect(details.string.contains("table_name: customers"), "\(details.string)")
+            await connection.disconnect()
+            _ = main
+        }
+
+        /// The steps as boxes and bars: a child sits under its parent, a bar's width follows its share.
+        @Test func aPlanDrawsAsBoxesAndBars() {
+            let leaf = { (name: String, time: Double) in PlanNode(operation: name, time: time) }
+            let nodes = [PlanNode(operation: "root", time: 10, children: [leaf("a", 3), leaf("b", 1)])]
+            let diagram = PlanDiagramView(nodes: nodes)
+            let root = diagram.boxes.first { $0.node.operation == "root" }, a = diagram.boxes.first { $0.node.operation == "a" }
+            let b = diagram.boxes.first { $0.node.operation == "b" }
+            #expect(a?.parent == root?.frame && b?.parent == root?.frame && (a?.frame.minY ?? 0) > (root?.frame.maxY ?? 0))
+            #expect(root?.frame.midX == ((a?.frame.midX ?? 0) + (b?.frame.midX ?? 0)) / 2)
+            let flame = PlanFlameView(nodes: nodes)
+            let wide = flame.boxes.first { $0.node.operation == "a" }, thin = flame.boxes.first { $0.node.operation == "b" }
+            #expect(wide?.frame.width == 3 * (thin?.frame.width ?? 0))
+        }
+
+        /// Save keeps a file's encoding, and asks before changing it.
+        @Test func saveKeepsTheFilesEncoding() async throws {
+            let (main, harness, console) = try await ConsoleAppTests.console()
+            let url = URL(fileURLWithPath: try scratch()).appendingPathComponent("latin.sql")
+            console.setFile(url, savedText: "")
+            console.fileFormat = ConsoleScript.FileFormat(encoding: .windowsCP1252)
+            console.editor.setText("SELECT 'é'")
+            var saved = false
+            console.save(as: false) { saved = $0 }
+            #expect(await eventually(timeout: 5) { saved })
+            #expect(try Data(contentsOf: url).last == 0x27 && Data(contentsOf: url).contains(0xE9))
+            console.editor.setText("SELECT '日本'")
+            saved = false
+            console.save(as: false) { saved = $0 }
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(main.window?.attachedSheet != nil)
+            #expect(await call(harness, "press", ["title": "Save as UTF-8"]).error == nil)
+            #expect(await eventually(timeout: 5) { saved })
+            #expect(try String(contentsOf: url, encoding: .utf8) == "SELECT '日本'" && console.fileFormat == ConsoleScript.FileFormat())
+        }
+
+        /// A click on the ▶ beside the statement at the cursor runs it; a click beside another line doesn't.
+        @Test func theGuttersArrowRunsTheStatement() async throws {
+            let (main, harness, console) = try await ConsoleAppTests.console()
+            console.editor.setText("SELECT 1;\n\n\nSELECT 2;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            main.window?.layoutIfNeeded()
+            let ruler = try #require(console.resultsRuler)
+            ruler.display()
+            var runs = 0
+            ruler.onRun = { runs += 1 }
+            func click(line: CGFloat) async {
+                let height = console.editor.layoutManager?.defaultLineHeight(for: console.editor.font!) ?? 16
+                let point = ruler.convert(NSPoint(x: 6, y: 8 + height * (line + 0.5)), to: nil)
+                _ = await call(harness, "click", ["x": point.x, "y": (main.window?.frame.height ?? 0) - point.y])
+            }
+            await click(line: 2)
+            #expect(runs == 0)
+            await click(line: 0)
+            #expect(runs == 1)
+        }
     }
 }
