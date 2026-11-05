@@ -14,6 +14,7 @@ final class AccountEditor: NSWindowController, NSTextFieldDelegate {
     private let plugins: [String]
     let tree: GrantsTree
     let tabs = NSTabView()
+    private let sections = NSSegmentedControl()
     let user = AirSQL.textField("", placeholder: "Name", id: "users.name", tip: "Type the name it logs in with", width: 260)
     let host = AirSQL.textField("", placeholder: "Host", id: "users.host", tip: "Type where it may log in from: a name, an address, or % for anywhere", width: 260)
     let password = NSSecureTextField()
@@ -74,6 +75,7 @@ final class AccountEditor: NSWindowController, NSTextFieldDelegate {
         if let level {
             tree.add(level)
             tabs.selectTabViewItem(withIdentifier: "privileges")
+            sections.selectedSegment = tabs.indexOfTabViewItem(withIdentifier: "privileges")
         }
     }
 
@@ -94,18 +96,29 @@ final class AccountEditor: NSWindowController, NSTextFieldDelegate {
         let title = label(heading, font: .systemFont(ofSize: 14, weight: .semibold))
         title.setAccessibilityIdentifier("users.heading")
         tabs.translatesAutoresizingMaskIntoConstraints = false
-        tabs.setAccessibilityIdentifier("users.tabs")
+        tabs.tabViewType = .noTabsNoBorder
+        var tips: [String] = []
         func tab(_ id: String, _ title: String, _ tip: String, _ view: NSView) {
             let item = NSTabViewItem(identifier: id)
             item.label = title
-            item.toolTip = tip
             item.view = view
             tabs.addTabViewItem(item)
+            tips.append(tip)
         }
         tab("login", draft.isRole ? "Role" : "Login", "Show its name and how it logs in", loginTab())
         if !draft.isRole { tab("limits", "Limits", "Show what it may use and what it must show of TLS", limitsTab()) }
         tab("privileges", "Privileges", "Show what it may do, level by level", tree.view)
         if let roles, !roles.isEmpty { tab("roles", "Roles", "Show the roles it takes on", rolesTab(roles, grants)) }
+        sections.segmentCount = tips.count
+        sections.trackingMode = .selectOne
+        for (index, tip) in tips.enumerated() {
+            sections.setLabel(tabs.tabViewItem(at: index).label, forSegment: index)
+            sections.setToolTip(tip, forSegment: index)
+        }
+        sections.selectedSegment = 0
+        sections.target = self
+        sections.action = #selector(sectionChosen(_:))
+        sections.setAccessibilityIdentifier("users.tabs")
         let cancel = button("Cancel", id: "users.cancel", tip: "Close this without changing anything", target: self, action: #selector(cancel(_:)))
         cancel.keyEquivalent = "\u{1b}"
         let next = button("Next…", id: "users.next", tip: "Show the SQL; nothing runs before you say so", target: self, action: #selector(next(_:)), primary: true)
@@ -115,7 +128,7 @@ final class AccountEditor: NSWindowController, NSTextFieldDelegate {
         let row = NSStackView(views: [helpButton(.users), spacer, cancel, next])
         row.spacing = Spacing.unit
         problem.setAccessibilityIdentifier("users.problem")
-        let stack = NSStackView(views: [title, tabs, problem, row])
+        let stack = NSStackView(views: [title, sections, tabs, problem, row])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
@@ -226,6 +239,8 @@ final class AccountEditor: NSWindowController, NSTextFieldDelegate {
         document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
         return scroll
     }
+
+    @objc private func sectionChosen(_ sender: NSSegmentedControl) { tabs.selectTabViewItem(at: sender.selectedSegment) }
 
     @objc private func defaultChosen(_ sender: NSButton) {
         // MariaDB keeps one default role.
