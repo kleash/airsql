@@ -244,10 +244,6 @@ struct SQLResolver {
         return statement.errors.isEmpty && !(statement.shallow && statement.kind != .create) && snapshot != nil
     }
 
-    func newScope(_ parent: SQLScope?, _ extent: Range<Int>) -> SQLScope {
-        SQLScope(parent: parent, extent: extent)
-    }
-
     mutating func reference(_ range: Range<Int>, _ symbol: SQLSymbol, isDeclaration: Bool = false) {
         result.references.append(SQLReference(range: range, symbol: symbol, isDeclaration: isDeclaration))
     }
@@ -259,7 +255,7 @@ struct SQLResolver {
         let next = statementIndex + 1 < result.statements.count ? result.statements[statementIndex + 1].range.lowerBound : utf16.count
         statementEnd = (statement.range.upperBound, statement.end > statement.range.upperBound ? statement.end : next)
         let extent = statement.range.lowerBound..<statementEnd.extended
-        let root = newScope(nil, extent)
+        let root = SQLScope(parent: nil, extent: extent)
         result.scopes.append(root)
         declare(statement.ctes, in: root)
         if statement.kind == .use, let name = statement.objects.first?.name.last {
@@ -319,15 +315,14 @@ struct SQLResolver {
                 reference(target.last.range, symbol)
             }
         }
-        let tableScope = scope
-        if statement.write?.columnsRange != nil, let table = scope.sources.first {
-            for column in write.columns { resolveColumn(column.value, column.range, in: [table], scope, canSayWhich: true) }
+        if write.columnsRange != nil, let table = scope.sources.first {
+            for column in write.columns { resolveColumn(column.value, column.range, in: [table]) }
         }
         for row in write.rows {
-            for value in row.values { resolve(value, tableScope) }
+            for value in row.values { resolve(value, scope) }
         }
         // ON DUPLICATE KEY sees the row alias, or under a SELECT that query's tables.
-        let conflict = newScope(scope, scope.extent)
+        let conflict = SQLScope(parent: scope, extent: scope.extent)
         conflict.open = statement.query != nil
         if let alias = write.rowAlias, let table = scope.sources.first {
             var source = table
@@ -368,7 +363,7 @@ struct SQLResolver {
     /// Resolves `query` under `parent` and returns what it outputs.
     mutating func visit(_ query: SQLQuery, _ parent: SQLScope) -> (columns: [SQLColumnInfo], complete: Bool) {
         if query.extent.upperBound >= statementEnd.written { query.extent = query.extent.lowerBound..<statementEnd.extended }
-        let shell = newScope(parent, query.extent)
+        let shell = SQLScope(parent: parent, extent: query.extent)
         result.scopes.append(shell)
         declare(query.ctes, in: shell, recursive: query.recursive)
         var outputs: (columns: [SQLColumnInfo], complete: Bool) = ([], false)
@@ -381,7 +376,7 @@ struct SQLResolver {
         }
         // A union's own ORDER BY reads its output's names.
         if !query.orderBy.isEmpty || !query.limit.isEmpty {
-            let scope = newScope(shell, query.extent)
+            let scope = SQLScope(parent: shell, extent: query.extent)
             scope.outputs = outputs.columns
             scope.open = true
             for item in query.orderBy { resolve(item.expr, scope, aliases: true) }
@@ -393,13 +388,13 @@ struct SQLResolver {
     private mutating func visit(_ block: SQLSelect, _ parent: SQLScope, _ extent: Range<Int>) -> (columns: [SQLColumnInfo], complete: Bool) {
         if let nested = block.nested {
             let found = visit(nested, parent)
-            let scope = newScope(parent, nested.range)
+            let scope = SQLScope(parent: parent, extent: nested.range)
             scope.outputs = found.columns
             scope.open = true
             for item in block.orderBy { resolve(item.expr, scope, aliases: true) }
             return found
         }
-        let scope = newScope(parent, extent)
+        let scope = SQLScope(parent: parent, extent: extent)
         scope.clauses = block.clauses
         result.scopes.append(scope)
         if let table = block.table { addSources([table], scope) }
@@ -629,7 +624,7 @@ struct SQLResolver {
             // Sequences read as s.nextval in Oracle mode.
             guard !["NEXTVAL", "CURRVAL"].contains(column.value.uppercased()) else { return }
             guard let source = resolve(qualifier: name.qualifier!, scope) else { return }
-            resolveColumn(column.value, column.range, in: [source], scope, canSayWhich: true)
+            resolveColumn(column.value, column.range, in: [source])
         default:
             let table = name.qualifier!.value, place = name.parts[name.parts.count - 3].value
             reference(name.parts[name.parts.count - 3].range, SQLSymbol(kind: .database, name: place))
@@ -638,11 +633,11 @@ struct SQLResolver {
             }
             guard !sources.isEmpty else { return }
             if let symbol = sources[0].symbol, symbol.kind == .table { reference(name.qualifier!.range, symbol) }
-            resolveColumn(column.value, column.range, in: [sources[0]], scope, canSayWhich: true)
+            resolveColumn(column.value, column.range, in: [sources[0]])
         }
     }
 
-    private mutating func resolveColumn(_ name: String, _ range: Range<Int>, in sources: [SQLRowSource], _ scope: SQLScope, canSayWhich: Bool) {
+    private mutating func resolveColumn(_ name: String, _ range: Range<Int>, in sources: [SQLRowSource]) {
         if let found = sources.lazy.compactMap({ $0.has(name) }).first {
             reference(range, found.symbol)
             columnInfo[range.lowerBound] = found

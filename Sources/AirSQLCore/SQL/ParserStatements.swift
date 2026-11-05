@@ -353,9 +353,7 @@ extension SQLParser {
         var type: [String] = [], inType = true
         while !atEnd, !at(","), !at(")") {
             if at(Self.columnWords) { inType = false }
-            if at("NOT"), peek().upper == "NULL" { column.notNull = true }
             if at("AUTO_INCREMENT") { column.autoIncrement = true }
-            if at("DEFAULT") { column.hasDefault = true }
             if at("(") {
                 let open = index
                 skipBrackets()

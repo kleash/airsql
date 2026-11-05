@@ -229,9 +229,7 @@ public struct SQLColumnDefinition: Sendable {
     /// The type as written, upper case: "VARCHAR(20)".
     public var type: String
     public var range: Range<Int>
-    public var notNull = false
     public var autoIncrement = false
-    public var hasDefault = false
 }
 
 /// A named object a statement makes, changes or drops.
