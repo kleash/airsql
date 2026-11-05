@@ -53,6 +53,12 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     /// What's drawn now behind the text, to redraw it when the cursor moves.
     var shadedStatement: Range<Int>?
     var shownCaretBand = NSRect.zero
+    /// The carets besides the main one, in the text's order, and whether `atEveryCaret` is moving through them.
+    var extraCarets: [NSRange] = [] { didSet { markExtraSelections(old: oldValue) } }
+    var applyingCarets = false
+    var caretsChangedText = false
+    /// Column Selection Mode.
+    var columnSelection = false
     /// "Ln 3, Col 14", in the editor's corner.
     let positionLabel = NSTextField(labelWithString: "")
 
@@ -167,6 +173,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         if item.action == #selector(performTextFinderAction(_:)), !usesFindBar { return onFind != nil }
         if item.action == Commands.undo.action { return ownUndoManager.canUndo }
         if item.action == Commands.redo.action { return ownUndoManager.canRedo }
+        if item.action == Commands.columnSelection.action { item.state = columnSelection ? .on : .off }
         return super.validateMenuItem(item)
     }
 
@@ -187,6 +194,10 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     override func didChangeText() {
         super.didChangeText()
         cachedStatements = nil
+        if applyingCarets {  // once, after the last caret
+            caretsChangedText = true
+            return
+        }
         // A long script is coloured a moment after the typing stops, so keys never wait for it.
         if (string as NSString).length > Self.longText {
             NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(highlightLater), object: nil)
@@ -318,7 +329,10 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
-        guard !stillSelecting else { return }
+        guard !stillSelecting, !applyingCarets else { return }
+        if !extraCarets.isEmpty { extraCarets = [] }
+        // A block dragged out with ⌥ arrives as several selections: each becomes a caret.
+        if ranges.count > 1 { return setCarets(ranges.map(\.rangeValue)) }
         clearMarks()
         markUsagesAtCaret()
         markMatchingBracket()

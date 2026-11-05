@@ -436,6 +436,12 @@ own session, which every query tab of that connection shares.
 - **Edit ▸ Comment Selection** (⌥⌘/) puts `/* */` around the selection, or takes it away. **Toggle Case** (⌃⇧U) puts the selection or
   the word at the cursor in capitals, or in small letters. **Complete Statement** (⌃⇧↩) closes its brackets, adds its `;` and starts a
   new line.
+- **Edit ▸ Carets** lets you type in several places at once. **Select Next Occurrence** (⌥⌘G) selects the word at the cursor, then
+  adds a caret at each next place its text appears; **Select All Occurrences** (⌃⌘G) does them all. **Add Caret to Each Line** (⌥⇧G)
+  puts one at the end of each selected line, **Add Caret Above** and **Below** (⌃⌥⇧↑, ⌃⌥⇧↓) one on the next line, and ⌥⇧-click one
+  where you click. ⌥-drag selects a block, as does a plain drag in **Column Selection Mode** (⌘*), where ⇧↑ and ⇧↓ add carets too.
+  Typing, deleting and moving happen at every caret. Copy takes a line from each, and Paste gives each caret its line when the
+  counts match. Escape, or a click, goes back to one caret.
 - The cursor's line has a band and, when the text has several statements, the statement it's in has a light shade: that's what ⌘↩
   runs. Other uses of the name at the cursor are marked, and its line and column show in the editor's corner.
 - Settings ▸ Editor sets the font, the text size, the width of a tab and whether Tab puts in a tab character or spaces.
@@ -1797,6 +1803,12 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Show Previous Tab | ⌃⇧⇥ |
 | Show Next Tab | ⌃⇥ |
 | Tab 1 | ⌘1 |
+| Select Next Occurrence | ⌥⌘G |
+| Select All Occurrences | ⌃⌘G |
+| Add Caret to Each Line | ⌥⇧G |
+| Add Caret Above | ⌃⌥⇧↑ |
+| Add Caret Below | ⌃⌥⇧↓ |
+| Column Selection Mode | ⌘* |
 | Next Statement | ⌃⌥↓ |
 | Previous Statement | ⌃⌥↑ |
 | Select Statement | ⌃⌘A |

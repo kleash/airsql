@@ -114,8 +114,21 @@ extension SQLEditorView {
         replace(NSRange(location: done.caret, length: 0), with: "\n", select: NSRange(location: done.caret + 1, length: 0))
     }
 
-    /// ⌘C with nothing selected copies the line.
+    override func cut(_ sender: Any?) {
+        guard !extraCarets.isEmpty else { return super.cut(sender) }
+        copy(sender)
+        atEveryCaret { self.replace(self.selectedRange(), with: "") }
+    }
+
+    /// ⌘C with nothing selected copies the line; with several carets, their selections, a line each.
     override func copy(_ sender: Any?) {
+        if !extraCarets.isEmpty {
+            let text = string as NSString
+            let all = ([selectedRange()] + extraCarets).sorted { $0.location < $1.location }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(all.map { text.substring(with: $0) }.joined(separator: "\n"), forType: .string)
+            return
+        }
         guard selectedRange().length == 0 else { return super.copy(sender) }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString((string as NSString).substring(with: selectedLines), forType: .string)

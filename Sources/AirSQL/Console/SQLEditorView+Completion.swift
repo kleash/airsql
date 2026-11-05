@@ -7,6 +7,9 @@ import AppKit
 extension SQLEditorView {
     override func insertText(_ string: Any, replacementRange: NSRange) {
         let typed = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
+        if !extraCarets.isEmpty, !applyingCarets {
+            return atEveryCaret { self.insertText(typed, replacementRange: self.selectedRange()) }
+        }
         if pairTyped(typed, replacementRange) { return }
         super.insertText(string, replacementRange: replacementRange)
         // One character typed: a letter, digit, _ or a dot opens or narrows the list; anything else closes it.
@@ -67,6 +70,12 @@ extension SQLEditorView {
     override func complete(_ sender: Any?) { updateCompletion(force: true) }
 
     override func doCommand(by selector: Selector) {
+        if !extraCarets.isEmpty, !applyingCarets {
+            if selector == #selector(cancelOperation(_:)) { return dropExtraCarets() }
+            return atEveryCaret { super.doCommand(by: selector) }
+        }
+        if columnSelection, selector == #selector(moveUpAndModifySelection(_:)) { return addCaretAbove(nil) }
+        if columnSelection, selector == #selector(moveDownAndModifySelection(_:)) { return addCaretBelow(nil) }
         guard let popup = completionPopup, popup.isShown else { return super.doCommand(by: selector) }
         switch selector {
         case #selector(moveUp(_:)): popup.move(-1)
@@ -79,11 +88,6 @@ extension SQLEditorView {
         }
     }
 
-    override func mouseDown(with event: NSEvent) {
-        completionPopup?.close()
-        super.mouseDown(with: event)
-    }
-
     override func resignFirstResponder() -> Bool {
         completionPopup?.close()
         return super.resignFirstResponder()
@@ -92,7 +96,7 @@ extension SQLEditorView {
     /// Asks for the suggestions at the cursor and shows them (`force`: even with nothing typed yet).
     func updateCompletion(force: Bool) {
         // In a long script the list opens only when asked (⌥⎋), so typing never waits for it.
-        guard let completions, selectedRange().length == 0, force || (string as NSString).length <= Self.longText else {
+        guard let completions, extraCarets.isEmpty, !applyingCarets, selectedRange().length == 0, force || (string as NSString).length <= Self.longText else {
             completionPopup?.close()
             return
         }

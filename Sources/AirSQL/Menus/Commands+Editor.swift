@@ -36,7 +36,21 @@ extension Commands {
     static let moveStatementDown = Command("Move Statement Down", #selector(SQLEditorView.moveStatementDown(_:)), down, [.control, .shift],
                                            tip: "Swap the statement at the cursor with the one after it")
 
-    static let editorCommands = [nextStatement, previousStatement, selectStatement, moveStatementUp, moveStatementDown,
+    static let selectNextOccurrence = Command("Select Next Occurrence", #selector(SQLEditorView.selectNextOccurrence(_:)), "g", [.command, .option],
+                                              tip: "Select the word at the cursor, then add a caret where its text appears next")
+    static let selectAllOccurrences = Command("Select All Occurrences", #selector(SQLEditorView.selectAllOccurrences(_:)), "g", [.command, .control],
+                                              tip: "Put a caret on every place the selection or word at the cursor appears")
+    static let caretPerLine = Command("Add Caret to Each Line", #selector(SQLEditorView.caretPerLine(_:)), "G", .option,
+                                      tip: "Put a caret at the end of each selected line")
+    static let addCaretAbove = Command("Add Caret Above", #selector(SQLEditorView.addCaretAbove(_:)), up, [.control, .option, .shift],
+                                       tip: "Add a caret on the line above, at the same column")
+    static let addCaretBelow = Command("Add Caret Below", #selector(SQLEditorView.addCaretBelow(_:)), down, [.control, .option, .shift],
+                                       tip: "Add a caret on the line below, at the same column")
+    static let columnSelection = Command("Column Selection Mode", #selector(SQLEditorView.toggleColumnSelection(_:)), "*", .command,
+                                         tip: "Select a block with a drag, and add carets with ⇧↑ and ⇧↓")
+
+    static let editorCommands = [selectNextOccurrence, selectAllOccurrences, caretPerLine, addCaretAbove, addCaretBelow, columnSelection,
+                                 nextStatement, previousStatement, selectStatement, moveStatementUp, moveStatementDown,
                                  duplicateLine, deleteLine, moveLineUp, moveLineDown, joinLines, sortLines, reverseLines, toggleCase, blockComment,
                                  completeStatement]
 }

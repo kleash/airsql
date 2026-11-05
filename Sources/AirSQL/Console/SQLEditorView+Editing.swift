@@ -103,8 +103,8 @@ extension SQLEditorView {
     /// Several values pasted between the brackets of an IN become a quoted list, as one undoable step; anything else
     /// pastes as usual (Paste Without Formatting always does).
     override func paste(_ sender: Any?) {
-        let selections = selectedRanges
-        guard selections.count == 1, let clipboard = NSPasteboard.general.string(forType: .string),
+        if !extraCarets.isEmpty, !applyingCarets { return pasteAtEveryCaret() }
+        guard let clipboard = NSPasteboard.general.string(forType: .string),
               let selection = Range(selectedRange()) else { return super.paste(sender) }
         let context = nameContext?()
         guard let edit = SQLInPaste.edit(pasting: clipboard, into: string, selection: selection, snapshot: context?.snapshot,
@@ -114,6 +114,18 @@ extension SQLEditorView {
         replace(NSRange(edit.range), with: edit.text,
                 select: NSRange(location: edit.range.lowerBound + (edit.text as NSString).length, length: 0))
         breakUndoCoalescing()
+    }
+
+    /// One line of the clipboard per caret when the counts match, as a copy from as many carets gives; else all of it at each.
+    private func pasteAtEveryCaret() {
+        guard let clipboard = NSPasteboard.general.string(forType: .string) else { return }
+        let lines = clipboard.components(separatedBy: "\n")
+        var pieces = lines.count == extraCarets.count + 1 ? lines : []
+        atEveryCaret {
+            let piece = pieces.popLast() ?? clipboard
+            self.replace(self.selectedRange(), with: piece,
+                         select: NSRange(location: self.selectedRange().location + (piece as NSString).length, length: 0))
+        }
     }
 
     // MARK: Drag and drop

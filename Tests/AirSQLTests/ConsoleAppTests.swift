@@ -267,6 +267,97 @@ extension AppTests {
             #expect(!marked(7) && !marked(46))
         }
 
+        /// Several carets: made each way, every edit and move at all of them, one Undo, and any other selection ends them.
+        @Test func severalCarets() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            func caret(_ place: Int, _ length: Int = 0) -> NSRange { NSRange(location: place, length: length) }
+            func all() -> [NSRange] { ([editor.selectedRange()] + editor.extraCarets).sorted { $0.location < $1.location } }
+            func type(_ text: String) { editor.insertText(text, replacementRange: editor.selectedRange()) }
+            func start(_ text: String, _ selection: NSRange) {
+                editor.setText(text)
+                editor.setSelectedRange(selection)
+            }
+
+            start("ab\ncd\nef", caret(0, 8))
+            editor.caretPerLine(nil)
+            #expect(all() == [caret(2), caret(5), caret(8)])
+            type("x")
+            #expect(editor.string == "abx\ncdx\nefx" && all() == [caret(3), caret(7), caret(11)])
+            #expect(console.text == editor.string, "the console hears of the change")
+            editor.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+            #expect(editor.string == "ab\ncd\nef")
+            editor.doCommand(by: #selector(NSResponder.moveToBeginningOfLine(_:)))
+            #expect(all() == [caret(0), caret(3), caret(6)], "moves go through the text view's own commands")
+            editor.doCommand(by: #selector(NSResponder.moveRight(_:)))
+            #expect(all() == [caret(1), caret(4), caret(7)])
+            editor.doCommand(by: #selector(NSResponder.moveToEndOfLine(_:)))
+            editor.undoManager?.removeAllActions()
+            type("(")
+            #expect(editor.string == "ab()\ncd()\nef()", "brackets pair at each")
+            editor.undoManager?.undo()
+            #expect(editor.string == "ab\ncd\nef", "one Undo")
+            #expect(editor.extraCarets.isEmpty, "and a selection made any other way ends them")
+
+            start("ab\ncd\nef", caret(1))
+            editor.addCaretBelow(nil)
+            editor.addCaretBelow(nil)
+            #expect(all() == [caret(1), caret(4), caret(7)])
+            editor.addCaretBelow(nil)
+            #expect(all().count == 3, "no line below")
+            editor.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+            #expect(all() == [caret(1)], "Escape keeps the main one")
+            start("abc\nd\nabc", caret(9))
+            editor.addCaretAbove(nil)
+            #expect(all() == [caret(5), caret(9)], "the line's end when it's shorter")
+
+            start("foo bar FOO foo", caret(1))
+            editor.selectNextOccurrence(nil)
+            #expect(all() == [caret(0, 3)], "first the word")
+            editor.selectNextOccurrence(nil)
+            #expect(all() == [caret(0, 3), caret(8, 3)], "whatever its case")
+            editor.selectNextOccurrence(nil)
+            editor.selectNextOccurrence(nil)
+            #expect(all().count == 3, "no more")
+            type("x")
+            #expect(editor.string == "x bar x x", "typing the same length or not, each one goes")
+
+            start("aaa", caret(0, 1))
+            editor.selectAllOccurrences(nil)
+            #expect(all() == [caret(0, 1), caret(1, 1), caret(2, 1)], "side by side they stay apart")
+
+            // A block dragged out with ⌥ arrives as several selections.
+            start("abcd\nefgh", caret(0))
+            editor.setSelectedRanges([NSValue(range: caret(1, 2)), NSValue(range: caret(6, 2))], affinity: .downstream, stillSelecting: false)
+            #expect(all() == [caret(1, 2), caret(6, 2)])
+            type("z")
+            #expect(editor.string == "azd\nezh")
+
+            // Cut from each, paste back a line each; a clipboard that doesn't fit goes in at every caret.
+            let pasteboard = NSPasteboard.general, saved = pasteboard.string(forType: .string)
+            defer {
+                pasteboard.clearContents()
+                if let saved { pasteboard.setString(saved, forType: .string) }
+            }
+            start("one two\nthree two", caret(0, 3))
+            editor.setCarets([caret(0, 3), caret(8, 5)])
+            editor.cut(nil)
+            #expect(pasteboard.string(forType: .string) == "one\nthree" && editor.string == " two\n two")
+            editor.paste(nil)
+            #expect(editor.string == "one two\nthree two" && all() == [caret(3), caret(13)])
+            pasteboard.clearContents()
+            pasteboard.setString("x", forType: .string)
+            editor.paste(nil)
+            #expect(editor.string == "onex two\nthreex two")
+
+            // Column mode: ⇧↓ adds a caret instead of selecting.
+            start("ab\ncd", caret(1))
+            editor.toggleColumnSelection(nil)
+            defer { editor.columnSelection = false }
+            editor.doCommand(by: #selector(NSResponder.moveDownAndModifySelection(_:)))
+            #expect(all() == [caret(1), caret(4)])
+        }
+
         /// Settings ▸ Editor reaches open editors: the font, keywords in it too; the indent Tab puts in.
         @Test func editorSettingsReachTheEditor() async throws {
             let model = testModel(Fixtures.shop)
