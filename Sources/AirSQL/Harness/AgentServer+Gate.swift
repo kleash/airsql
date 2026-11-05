@@ -8,9 +8,13 @@ extension AgentServer {
     static let pasteActions: Set<String> = ["paste:", "pasteAsPlainText:", "pasteAsRichText:", "pasteAndMatchStyle:",
                                             "pasteFromHistory:"]
 
-    /// Refuses an agent's action in `window` (or a sheet of it) when that window is the person's alone: Settings.
-    func checkAgentMayAct(in window: NSWindow?) throws {
+    /// Refuses an agent's action in `window` (or a sheet of it) when that window is the person's alone: Settings, and an
+    /// Open or Save panel but for its Cancel (`pressing`: the button's title), as what it opens or writes is theirs.
+    func checkAgentMayAct(in window: NSWindow?, pressing: String? = nil) throws {
         guard AgentGate.agent != nil, var root = window else { return }
+        if root is NSSavePanel, pressing != "Cancel" {
+            throw Failure("Open and Save panels are the person's: agents can only press Cancel.")
+        }
         while let parent = root.sheetParent { root = parent }
         if root.windowController is SettingsWindowController {
             throw Failure("Settings are the person's: agents can look at them (snapshot, include settings) but not change them.")
@@ -80,13 +84,15 @@ extension AgentServer {
     /// Value…'s field), the compare's rows and sync script, the process list (other sessions' statements carry their
     /// values), the console's Messages (a server's error quotes values: Duplicate entry '…') and an EXPLAIN's steps, tree
     /// and raw answer, in any of its views (conditions quote values; its table is a grid), the SQL preview's statements (an Apply's or a sync's carry the rows' values) and the SQL log
-    /// (every connection's statements, in a window of its own: hidden from every agent), and who may log in (the accounts and their grants).
+    /// (every connection's statements, in a window of its own: hidden from every agent), who may log in (the accounts and their grants),
+    /// the selected process's statement, Export Rows' and Import's previews of rows, and a note with a table's first rows.
     static func showsData(_ view: NSView) -> Bool {
         view is DataGridView || ["valuePanel", "grid.text", "grid.tree", "grid.chart", "columnSummary", "grid.figure", "grid.set",
                                  "grid.lookup", "grid.editor.problem", "result.filter", "tableData.where", "tableData.suggestions", "values.list",
                                  "quickFilter.value", "recon.rows", "recon.script", "processes.list", "console.messages",
                                  "console.planTree", "console.planOperations", "console.planRaw", "console.planDetails", "console.planDiagram", "preview.sql", "sqlLog.text", "history.every",
-                                 "list.usersandroles.table", "users.grants"]
+                                 "list.usersandroles.table", "users.grants",
+                                 "processes.statement", "export.preview", "csv.preview", "console.insightNote"]
             .contains(view.accessibilityIdentifier())
     }
 

@@ -224,7 +224,7 @@ final class CopySheet: ToolSheet, NSTextFieldDelegate {
             // The other server is written to: the preview asks when that drops tables or the server is production.
             // And when an agent set it off: then it waits for the person (plan §2.8).
             let agent = AgentGate.agent != nil && model.data.safety(for: target).askBeforeAgentChanges
-            guard agent || request.addDropTable || target.colour == .production else {
+            guard agent || request.addDropTable || target.isProduction else {
                 start(request, names: names, source: options, target: targetOptions, to: target)
                 return
             }

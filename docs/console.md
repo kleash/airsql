@@ -222,7 +222,7 @@ others wait.
 If the server is within five connections of its `max_connections`, or refuses another, a tab shares the connection's
 main session instead of opening its own, and Messages says so.
 
-If a tab's session ends without you closing it (the connection drops, or Disconnect takes an open transaction with it),
+If a tab's session ends without you closing it (the connection drops, or Disconnect takes an open transaction or Manual Commit with it),
 the tab says so in Messages and the status bar, with how many rows the server rolled back. Nothing runs in that tab until
 you press **Open New Session** in the sheet Run shows. A tab that was in Manual Commit stays in it.
 

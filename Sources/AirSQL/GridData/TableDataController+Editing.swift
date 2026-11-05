@@ -286,6 +286,7 @@ extension TableDataController: DataGridViewDelegate {
         self.activity = activity
         loading = Task {
             defer { Self.applying.remove(connection) }
+            let appliedBefore = transactionRows
             do {
                 var insertIDs: [UInt64] = [], warnings = 0
                 if let held = transactionSession, !held.inTransaction { _ = try await held.query("START TRANSACTION") }
@@ -340,8 +341,20 @@ extension TableDataController: DataGridViewDelegate {
                 bar.busy = false
                 noticeLostTransaction()
                 if let failure = error as? ApplyFailure { point(at: failure) }
-                showError((error as? LocalizedError)?.errorDescription ?? error.localizedDescription,
-                          title: "Nothing was applied to \(tableName)", on: view.window)
+                var said = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                // A deadlock ends the whole transaction, not only this Apply's savepoint, and an error doesn't update the
+                // session's state: a ROLLBACK, which has nothing left to do, does.
+                if let held = transactionSession, ((error as? ApplyFailure)?.error as? AirSQLError)?.code == 1213 {
+                    _ = try? await held.query("ROLLBACK")
+                    transactionRows = 0
+                    if appliedBefore > 0 {
+                        said += " The server rolled back the whole transaction: the \(appliedBefore.formatted()) row changes applied before "
+                            + "this are gone too."
+                        source.setSaved([])
+                        loadRows(more: false, through: source.loadedRows)
+                    }
+                }
+                showError(said, title: "Nothing was applied to \(tableName)", on: view.window)
             }
         }
     }

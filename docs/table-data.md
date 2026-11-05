@@ -99,7 +99,7 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
-  match. Replacements are pending edits, like any other.
+  match. Replacements are pending edits, like any other. A long value is read whole first, so what comes back is all of it.
 
 ## Edit rows
 
@@ -195,7 +195,8 @@ says why; so are views. Generated columns can't be edited.
   own. Each Apply then writes into a transaction left open, and the rows you read show those changes, until **Commit** or
   **Roll Back**. Each Apply is still all or nothing. Closing the tab or quitting with the transaction open asks first. If the connection
   drops, the tab says the server rolled the transaction back, with how many rows, and nothing is applied until you press
-  **Open New Session**; the rows are then read again.
+  **Open New Session**; the rows are then read again. A deadlock ends the whole transaction too: Apply says so, and the
+  rows are read again.
 - What Apply can't check: FLOAT, TIMESTAMP, JSON, spatial and vector values, dates with a zero month or day and values
   over 64 KB don't compare exactly, so edits to those go by the key alone and overwrite what is there; the preview
   names them. A change that only differs in case or trailing spaces can pass on a column whose collation ignores

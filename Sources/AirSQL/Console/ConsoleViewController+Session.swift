@@ -20,10 +20,10 @@ extension ConsoleViewController {
     }
 
     /// Reports, on this tab, a session that ended without the person closing it: the connection or the session dropped, or
-    /// a Disconnect took an open transaction with it. Until they answer (`askAboutLostSession`) nothing runs here.
+    /// a Disconnect took an open transaction or Manual Commit with it. Until they answer (`askAboutLostSession`) nothing runs here.
     func noticeLostSession() {
         guard lostSession == nil, let id = connectionID, let record = Self.shared[sessionKey], let old = record.session,
-              !old.isConnected || Self.openConnection(id) == nil, old.wasLost || old.inTransaction else { return }
+              !old.isConnected || Self.openConnection(id) == nil, old.wasLost || old.inTransaction || !old.autocommit else { return }
         var dropped = old.wasLost
         if case .failed? = model.states[id] { dropped = true }
         let lost = LostSession(transaction: old.inTransaction, changes: record.changes, manual: !old.autocommit, isolation: record.isolation,
@@ -53,23 +53,30 @@ extension ConsoleViewController {
 
     /// The session to run on, opened and set up as the connection says if it isn't yet.
     func sessionForRun(on connection: Connection) async throws -> DBConnection {
-        if let session { return session }
+        // A session that came back with Reconnect is a new one, whatever `carried` says it must be set up as.
+        let held = session
+        if let held, carried == nil { return held }
         var opened: DBConnection?
-        if !sharesSession, await connection.hasRoom() {
+        if held == nil, !sharesSession, await connection.hasRoom() {
             do {
                 opened = try await connection.toolsSession(role: .query)
             } catch let error as AirSQLError where [1040, 1203, 1226].contains(error.code) {
                 // Too many connections: the server's or this login's.
             }
         }
-        if !sharesSession, opened == nil {
+        if held == nil, !sharesSession, opened == nil {
             Self.shared[documentID] = nil
             sharing = true
             note(.warning, "The server is near its limit of connections, so this tab shares the connection's main session with "
                  + "any other tab in the same position.")
         }
+        // `start` checked the runner of the tab's own session, not of the main session it has just moved to.
+        if let runner = Self.shared[sessionKey]?.runner, runner != documentID {
+            throw AirSQLError(.other, "Another query tab is running a statement on the main session this tab now shares: nothing ran. Run "
+                              + "it again when that one ends.")
+        }
         let session: DBConnection
-        if let opened { session = opened } else { session = try await connection.session(.main) }
+        if let opened = opened ?? held { session = opened } else { session = try await connection.session(.main) }
         // Before it counts as the tab's: one that failed to start as asked must not go on to run in Auto-commit.
         let level = carried?.isolation ?? self.connection?.startIsolation
         do {

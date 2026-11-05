@@ -48,7 +48,7 @@ enum AgentGuard {
         }
         return main.tabs.lazy.compactMap { tab -> SavedConnection? in
             guard (tab.content as? ConsoleViewController)?.editor === editor, let saved = main.model.connection(tab.connectionID),
-                  saved.colour == .production else { return nil }
+                  saved.isProduction else { return nil }
             return saved
         }.first
     }

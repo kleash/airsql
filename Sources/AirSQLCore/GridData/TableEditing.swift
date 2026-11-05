@@ -4,7 +4,7 @@ import os
 /// What Apply warns about first (plan §2.5, R7). Whether a table's rows can be edited at all: `SchemaTable.editingKey`.
 public enum TableEditing {
     /// Engines whose changes a ROLLBACK undoes.
-    static let transactional: Set<String> = ["innodb", "xtradb", "rocksdb", "tokudb", "ndb", "ndbcluster"]
+    public static let transactional: Set<String> = ["innodb", "xtradb", "rocksdb", "tokudb", "ndb", "ndbcluster"]
 
     /// What the SQL preview says about Apply's check for someone else's change; `reading` is what it compares with.
     public static func applyCaption(reading: String, unchecked: [String]) -> String {

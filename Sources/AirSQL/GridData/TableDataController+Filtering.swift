@@ -68,7 +68,7 @@ extension TableDataController {
     /// Quick Filter ▸ for the focused cell (and every selected value of its column, for IN): each item shows its SQL;
     /// with ⌥ it is added to the current filter instead.
     func quickFilterItem() -> NSMenuItem {
-        QuickFilter.menuItem(focusedValues(), noBackslashEscapes: noBackslashEscapes, target: self,
+        QuickFilter.menuItem(filtersOnCutValue ? nil : focusedValues(), noBackslashEscapes: noBackslashEscapes, target: self,
                              action: #selector(applyQuickFilter(_:)))
     }
 
@@ -94,7 +94,7 @@ extension TableDataController {
     }
 
     private func quickFilter(_ op: GridCondition.Operator) {
-        guard let focus = focusedValues(), QuickFilter.reason(op, focus) == nil else { return NSSound.beep() }
+        guard !filtersOnCutValue, let focus = focusedValues(), QuickFilter.reason(op, focus) == nil else { return NSSound.beep() }
         filter(by: QuickFilter.condition(op, focus), adding: false)
     }
 
@@ -104,6 +104,13 @@ extension TableDataController {
         QuickFilter.ask(focus, canAdd: !bar.filterText.isEmpty, on: window) { [weak self] condition, adding in
             self?.filter(by: condition, adding: adding)
         }
+    }
+
+    /// A quick filter would compare with the start of a value: the focused cell's, or one of the others selected.
+    var filtersOnCutValue: Bool {
+        guard let source else { return false }
+        return (viewer.focusedCell.map { [$0] } ?? []).contains { source.isCut($0.row, $0.column) }
+            || viewer.selectedCells(limit: 10_000).contains { source.isCut($0.row, $0.column) }
     }
 
     func focusedValues() -> QuickFilter.Focus? {

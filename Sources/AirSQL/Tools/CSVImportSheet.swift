@@ -611,7 +611,7 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
     // MARK: Running
 
     override func run() {
-        guard let source, let session, let window, let chosenDatabase = databaseMenu.titleOfSelectedItem,
+        guard let source, let session, window != nil, let chosenDatabase = databaseMenu.titleOfSelectedItem,
               let chosenTable = tableMenu.titleOfSelectedItem else { return }
         // The gate (plan §2.8): a file on this Mac is the person's to write.
         if keepGoing.state == .on, AgentGuard.refuses("Skipping refused rows writes a file on this Mac: only the person at the Mac can "
@@ -625,6 +625,7 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
         let what = fileLabel.stringValue
         let names = columns.map(\.name), fields = mapping.map { $0.indexOfSelectedItem > 0 ? $0.indexOfSelectedItem - 1 : nil }
         let types = columns
+        var rollsBack = true
         let start = { [self] in
             reveal.isHidden = true
             let cancellation = begin("Importing \(what) into \(table)")
@@ -660,7 +661,8 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
                 } catch {
                     updates.cancel()
                     finish((cancellation.isCancelled ? "Stopped." : error.localizedDescription)
-                           + (created ? " The table \(table) stays, empty." : " Nothing of this import was kept."), failed: true)
+                           + (created ? " The table \(table) stays, empty." : rollsBack ? " Nothing of this import was kept."
+                              : " \(table) can't roll back: what happened before the failure stays."), failed: true)
                 }
                 if created {
                     detection = nil
@@ -670,24 +672,39 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
         }
         // Production asks, and so does what an agent set off (plan §2.8), and deleting the table's rows.
         let agent = AgentGate.agent != nil && model.data.safety(for: connection).askBeforeAgentChanges
-        guard agent || options.emptyFirst || connection.colour == .production else {
-            start()
-            return
-        }
         let target = SQLQuote.identifier(database, table)
         let used = zip(names, fields).compactMap { name, field in field.map { _ in SQLQuote.identifier(name) } }
         var statements = create.map { [$0] } ?? []
         if options.emptyFirst { statements.append("DELETE FROM " + target) }
         statements.append("\(options.duplicates.verb) \(target) " + (used.isEmpty ? "" : "(" + used.joined(separator: ", ") + ") ") + "VALUES …")
+        let emptyFirst = options.emptyFirst, literal = { SQLQuote.string($0, noBackslashEscapes: session.noBackslashEscapes) }
+        Task { [self] in
+            let engine = create != nil ? nil : try? await session.rows("SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = "
+                                                                       + literal(database) + " AND TABLE_NAME = " + literal(table)).first?.first ?? nil
+            let warnings = Self.warnings(table: table, engine: engine, emptyFirst: emptyFirst)
+            rollsBack = warnings.count == (emptyFirst ? 1 : 0)
+            guard agent || emptyFirst || !rollsBack || connection.isProduction else { return start() }
+            confirm(statements, what: what, table: table, warnings: warnings, destructive: emptyFirst, then: start)
+        }
+    }
+
+    /// What the preview warns of: the rows deleted first, and an engine that can't undo the import when a row fails.
+    static func warnings(table: String, engine: String?, emptyFirst: Bool) -> [String] {
+        (emptyFirst ? ["Every row \(table) has now is deleted first."] : [])
+            + (engine.map { !TableEditing.transactional.contains($0.lowercased()) } == true
+                ? ["\(table) uses \(engine ?? ""), which can't roll back: if a row fails, " + (emptyFirst ? "its old rows are gone and " : "")
+                    + "the rows before it stay."] : [])
+    }
+
+    private func confirm(_ statements: [String], what: String, table: String, warnings: [String], destructive: Bool, then start: @escaping () -> Void) {
+        guard let window else { return }
         var request = SQLPreviewRequest(change: ChangeSQL(title: "Import \(what)", statements: statements, connection: connection.id),
                                         heading: "Import \(what) into \(table)?",
                                         caption: keepGoing.state == .on ? "Rows the server refuses are skipped; the rest are kept."
                                             : "The rows are added in one transaction: if one fails, none stay.")
         request.actionTitle = "Import"
-        if options.emptyFirst {
-            request.destructive = true
-            request.warnings = ["Every row \(table) has now is deleted first."]
-        }
+        request.destructive = destructive
+        request.warnings = warnings
         SQLPreviewSheet.show(request, connection: connection, on: window) { result in
             if result.approved { start() }
         }

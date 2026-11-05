@@ -625,7 +625,7 @@ others wait.
 If the server is within five connections of its `max_connections`, or refuses another, a tab shares the connection's
 main session instead of opening its own, and Messages says so.
 
-If a tab's session ends without you closing it (the connection drops, or Disconnect takes an open transaction with it),
+If a tab's session ends without you closing it (the connection drops, or Disconnect takes an open transaction or Manual Commit with it),
 the tab says so in Messages and the status bar, with how many rows the server rolled back. Nothing runs in that tab until
 you press **Open New Session** in the sheet Run shows. A tab that was in Manual Commit stays in it.
 
@@ -1169,7 +1169,7 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
 - **Find** (⌘F) and **Find and Replace** (⌥⌘F) work on the loaded rows: ⌘G and ⇧⌘G go to the next and previous match,
   the bar says `3 of 12`, and every match is tinted, as are the cells Search All Columns found. **Options** has Match
   Case, Regular Expression (`$1` in the replacement), Whole Words and Filter Rows, which hides the loaded rows without a
-  match. Replacements are pending edits, like any other.
+  match. Replacements are pending edits, like any other. A long value is read whole first, so what comes back is all of it.
 
 ## Edit rows
 
@@ -1265,7 +1265,8 @@ says why; so are views. Generated columns can't be edited.
   own. Each Apply then writes into a transaction left open, and the rows you read show those changes, until **Commit** or
   **Roll Back**. Each Apply is still all or nothing. Closing the tab or quitting with the transaction open asks first. If the connection
   drops, the tab says the server rolled the transaction back, with how many rows, and nothing is applied until you press
-  **Open New Session**; the rows are then read again.
+  **Open New Session**; the rows are then read again. A deadlock ends the whole transaction too: Apply says so, and the
+  rows are read again.
 - What Apply can't check: FLOAT, TIMESTAMP, JSON, spatial and vector values, dates with a zero month or day and values
   over 64 KB don't compare exactly, so edits to those go by the key alone and overwrite what is there; the preview
   names them. A change that only differs in case or trailing spaces can pass on a column whose collation ignores
@@ -1704,7 +1705,7 @@ and 0, and nested values go in as their JSON.
   lets the server adjust values that don't fit, so check its warnings); **Replace duplicates** puts the file's row in its
   place (`REPLACE`).
 - **Delete the table's rows first** deletes them in the same transaction, after a warning, so a failed import brings them
-  back (not on MyISAM and other tables without transactions).
+  back. On MyISAM and other tables without transactions it can't: the preview warns of that, and a failed import says what stays.
 - **Skip rows the server refuses** keeps the good rows and writes the others, each with the reason, to a CSV in
   Downloads; **Show Skipped Rows** finds it. A lost connection or a deadlock still stops the import and undoes it.
 
@@ -1723,7 +1724,7 @@ read-only connection.
 
 **Lock All Tables for Reading…** stops every write on the server (`FLUSH TABLES WITH READ LOCK`), for a consistent copy of
 its files. AirSQL keeps the lock on a connection of its own while a sheet says so; **Unlock** releases it, and so does
-quitting. It is off for agents.
+quitting. Should its session end first, Unlock says so: don't count on a copy made under that lock. It is off for agents.
 
 ## Open the mysql command line in Terminal
 
@@ -2732,7 +2733,7 @@ failure, and every reply after an action carries the sheet it opened, if any.
   (answers with the menu it opens). Points come from `snapshot` frames or a scale-1 screenshot.
 - `wait {until: sheet | no_sheet | popover | idle | text, text?, timeout?}`: idle means nothing runs.
 
-Open and Save panels can't be driven: press Cancel, or leave them to the person.
+Open and Save panels can't be driven: `press` Cancel, or leave them to the person. Every other tool is refused there.
 
 ## gate
 
@@ -2752,10 +2753,10 @@ its own:
   list's Kill (the person's sheet) still works, as it changes no data.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
-  whether agents are allowed, the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
+  whether agents are allowed, which connections there are (none can be deleted for you), the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
   rows per page, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
   Ask before agents change anything is on. The Settings window is to look at.
-- **Files, the clipboard, trust:** you can't save a console's file, start an export, save a Liquibase changelog, save
+- **Files, the clipboard, trust:** you can't save a console's file, open a client in Terminal, start an export, save a Liquibase changelog, save
   or remember a password, trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or
   `set` for text, and run_queries `to_file` for results. A button marked destructive (Don't Save, Disconnect with a
   transaction open, Delete, Clear) is the person's call, and so is Quit. The connection editor opens for you, but its
@@ -2766,7 +2767,8 @@ its own:
   control keys (⌃K, ⌃T, ⌃Y) are refused there: use `type` or `set`.
 - **Data you may not read is hidden:** on connections below Schema + read, grids, query results (and the value panel,
   View As, charts, Column Summary and the status bar's figure), the filters a value goes into (`result.filter`,
-  `tableData.where`, `values.list`, `quickFilter.value`), the process list, a compare's rows and sync script, the
+  `tableData.where`, `values.list`, `quickFilter.value`), the process list and its selected statement (`processes.statement`), Export Rows' and Import's
+  previews (`export.preview`, `csv.preview`), a table's note in the tree (`console.insightNote`), a compare's rows and sync script, the
   console's Messages (`console.messages`: a server's error can quote a value), an EXPLAIN's tree (`console.planTree`)
   and the SQL preview's statements (`preview.sql`) are covered in screenshots ("Hidden from agents") and left out of
   snapshots (`hidden`: no value, title or help; `set` still types into a hidden field). The SQL log's text

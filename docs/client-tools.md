@@ -131,7 +131,7 @@ and 0, and nested values go in as their JSON.
   lets the server adjust values that don't fit, so check its warnings); **Replace duplicates** puts the file's row in its
   place (`REPLACE`).
 - **Delete the table's rows first** deletes them in the same transaction, after a warning, so a failed import brings them
-  back (not on MyISAM and other tables without transactions).
+  back. On MyISAM and other tables without transactions it can't: the preview warns of that, and a failed import says what stays.
 - **Skip rows the server refuses** keeps the good rows and writes the others, each with the reason, to a CSV in
   Downloads; **Show Skipped Rows** finds it. A lost connection or a deadlock still stops the import and undoes it.
 
@@ -150,7 +150,7 @@ read-only connection.
 
 **Lock All Tables for Reading…** stops every write on the server (`FLUSH TABLES WITH READ LOCK`), for a consistent copy of
 its files. AirSQL keeps the lock on a connection of its own while a sheet says so; **Unlock** releases it, and so does
-quitting. It is off for agents.
+quitting. Should its session end first, Unlock says so: don't count on a copy made under that lock. It is off for agents.
 
 ## Open the mysql command line in Terminal
 

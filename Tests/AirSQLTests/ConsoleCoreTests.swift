@@ -858,7 +858,7 @@ struct ResultSetSourceTests {
         #expect(bound("null") == "SELECT NULL, ':v'")
         #expect(bound("") == "SELECT '', ':v'")
         #expect(bound("1 OR 1=1") == "SELECT '1 OR 1=1', ':v'")
-        #expect(bound("x'; DROP TABLE t; -- ") == #"SELECT 'x\'; DROP TABLE t; -- ', ':v'"#)
+        #expect(bound("x'; DROP TABLE t; -- ") == "SELECT 'x''; DROP TABLE t; -- ', ':v'")
         #expect(bound("a'b\\", noBackslashEscapes: true) == #"SELECT 'a''b\', ':v'"#)
     }
 
