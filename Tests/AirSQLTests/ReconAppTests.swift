@@ -119,7 +119,7 @@ extension AppTests {
             defer { ReconWindowController.connect = nil }
             let controller = Self.window(nil)
             #expect(controller.level == .database && controller.compareBlocked == nil)
-            #expect(controller.source.objects.isHidden && !controller.source.databases.isHidden)
+            #expect(controller.objectBar.isHidden && !controller.source.databases.isHidden)
             controller.choose(level: .server)
             #expect(controller.source.databases.isHidden && controller.target.databases.isHidden)
             #expect(controller.compareBlocked == nil && controller.tablesBlocked?.hasPrefix("Tables… chooses") == true)
@@ -127,7 +127,7 @@ extension AppTests {
             controller.target.choose(Fixtures.production)
             #expect(controller.compareBlocked == "Choose two different connections: these are the same one")
             controller.choose(level: .object)
-            #expect(!controller.source.objects.isHidden && !controller.target.objects.isHidden)
+            #expect(!controller.objectBar.isHidden)
             controller.source.choose(Fixtures.production, database: "shop", object: (.table, "orders"))
             controller.target.choose(Fixtures.production, database: "shop")
             #expect(controller.compareBlocked == "Choose an object on each side first")
@@ -290,6 +290,50 @@ extension AppTests {
             #expect(detail.differenceBlocked != nil && !detail.next.isEnabled)
             let item = Commands.nextDifference.item()
             #expect(!controller.validateMenuItem(item) && item.toolTip == detail.differenceBlocked)
+        }
+
+        /// The window on the lab: two tables of one database compared and synced, then two servers, a pair opened.
+        @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests"))
+        func levelsRunOnTheLab() async throws {
+            let saved = (SavedConnection(name: "New"), SavedConnection(name: "Old"))
+            let connections = [saved.0.id: Connection(options: DBLab.options(Lab.mariadb114), log: DBLab.log),
+                               saved.1.id: Connection(options: DBLab.options(Lab.mariadb106), log: DBLab.log)]
+            ReconWindowController.connect = { connection, _ in connections[connection.id]! }
+            defer { ReconWindowController.connect = nil }
+            let left = try await ReconLabTests.session(Lab.mariadb114), right = try await ReconLabTests.session(Lab.mariadb106)
+            let name = "lane_compare_window"
+            try await ReconLabTests.database(left, name, ["CREATE TABLE a (id INT PRIMARY KEY, v INT)", "CREATE TABLE b (id INT PRIMARY KEY)",
+                                                          "INSERT INTO a VALUES (1, 1)"])
+            try await ReconLabTests.database(right, name, ["CREATE TABLE a (id INT PRIMARY KEY, v INT)"])
+            let controller = ReconWindowController(model: testModel([saved.0, saved.1]))
+            keptWindows.append(controller)
+            controller.window?.setFrameOrigin(NSPoint(x: -22000, y: -22000))
+            func compare() async {
+                controller.refresh(nil)
+                #expect(await eventually(timeout: 60) { !controller.isRunning })
+            }
+            controller.start(.object, left: ReconStart(connection: saved.0, database: name, object: (.table, "a")),
+                             right: ReconStart(connection: saved.0, database: name, object: (.table, "b")))
+            await compare()
+            #expect(controller.result?.objects.map(\.name) == ["a"] && controller.result?.objects.first?.targetName == "b")
+            #expect(controller.result?.object(.table, "a")?.parts.map(\.name) == ["v"])
+            // Its list comes in the background, and keeps the choice.
+            #expect(await eventually(timeout: 20) { controller.target.objects.numberOfItems >= 2 })
+            #expect(controller.target.object?.name == "b")
+            controller.start(.server, left: ReconStart(connection: saved.0), right: ReconStart(connection: saved.1))
+            await compare()
+            let server = try #require(controller.result)
+            #expect(server.isServer && server.object(.database, name)?.status == .different)
+            controller.openPair(try #require(server.object(.database, name)))
+            #expect(controller.result?.object(.table, "b")?.status == .onlyInSource && controller.source.database == name)
+            await compare()
+            #expect(controller.serverResult?.databases[name]?.objects.count == controller.result?.objects.count, "the pair's new result counts")
+            controller.backToServer(nil)
+            #expect(controller.result?.isServer == true)
+            try await ReconLabTests.run(left, ["DROP DATABASE \(name)"])
+            try await ReconLabTests.run(right, ["DROP DATABASE \(name)"])
+            await left.close()
+            await right.close()
         }
 
         /// The script runs where the result was compared, not where the picker has moved to since.

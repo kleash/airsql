@@ -23,7 +23,7 @@ Both are in the **Tools** menu too.
 
 ## Run a compare
 
-1. Choose the **level** in the toolbar: **Servers**, **Databases**, or **Tables and Objects**.
+1. Choose the **level** at the left: **Servers**, **Databases**, or **Objects**.
 2. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
    type its name), then at the third level an object from the list. The sync script makes the target like the source;
    **Swap** turns them around.
@@ -56,7 +56,7 @@ belongs to one pair, so **Sync Script…** needs a pair open. **Export Report…
 
 ## Two tables or objects
 
-At the **Tables and Objects** level, each side is one object, by any name: `orders` against `orders_old`, in one
+At the **Objects** level, each side is one object, by any name: `orders` against `orders_old`, in one
 database or in two. Both must be of one kind.
 
 - **Tables** compare in structure and rows, as in a database compare. **Tables…** chooses the columns to leave out and a

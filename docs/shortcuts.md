@@ -126,6 +126,8 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Process List | ⌥⌘P |
 | Connect | ⌘K |
 | Disconnect | ⇧⌘K |
+| Next Difference | F7 |
+| Previous Difference | ⇧F7 |
 | Minimize | ⌘M |
 | Show Previous Tab | ⌘{ |
 | Show Next Tab | ⌘} |

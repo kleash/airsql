@@ -23,7 +23,6 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
     var level = ReconLevel.database {
         didSet {
             databases.isHidden = level == .server
-            objects.isHidden = level != .object
             if level == .object, listed.isEmpty { loadObjects() }
         }
     }
@@ -75,7 +74,7 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         spinner.toolTip = "Reading the databases on this connection"
         spinner.isHidden = true  // a hidden spinner keeps no space in the bar
         for view in [popup, databases] as [NSView] { view.translatesAutoresizingMaskIntoConstraints = false }
-        popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 150).isActive = true
+        popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
         // A long connection name is shortened (its menu has all of it) rather than widening the window past its minimum.
         popup.setContentCompressionResistancePriority(.init(490), for: .horizontal)
         popup.widthAnchor.constraint(lessThanOrEqualToConstant: 240).isActive = true
@@ -90,13 +89,8 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
         objects.numberOfVisibleItems = 16
         objects.translatesAutoresizingMaskIntoConstraints = false
         objects.widthAnchor.constraint(equalToConstant: 320).isActive = true
-        objects.isHidden = true
-        let row = NSStackView(views: [title, popup, databases, spinner])
-        row.spacing = Spacing.unit
-        view.setViews([row, objects], in: .top)
-        view.orientation = .vertical
-        view.alignment = .trailing
-        view.spacing = Spacing.half
+        view.setViews([title, popup, databases, spinner], in: .leading)
+        view.spacing = Spacing.unit
         reload()
     }
 
@@ -250,7 +244,6 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
 
 extension NSToolbarItem.Identifier {
     static let reconCompare = Self("recon.compare")
-    static let reconLevel = Self("recon.level")
     static let reconMode = Self("recon.mode")
     static let reconIgnore = Self("recon.ignore")
     static let reconTables = Self("recon.tables")
@@ -267,7 +260,8 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
     let compare = button("Compare", id: "recon.compareButton", tip: "Compare the two databases (⌘R)", target: nil,
                          action: #selector(ReconWindowController.refresh(_:)))
     static let levelTip = "Choose what to compare: two servers, two databases, or two tables or other objects"
-    let level = popup(["Servers", "Databases", "Tables and Objects"], selected: ReconLevel.database.rawValue, id: "recon.level",
+    /// In the setup bar, before the sides it speaks of.
+    let level = popup(["Servers", "Databases", "Objects"], selected: ReconLevel.database.rawValue, id: "recon.level",
                       tip: levelTip, target: nil, action: nil)
     static let modeTip = "Choose what to compare: tables' structure, their rows, or both"
     static let ignoreTip = "Choose differences the compare doesn't count: AUTO_INCREMENT values, DEFINER, collations, whitespace"
@@ -312,7 +306,7 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.reconCompare, .reconLevel, .reconMode, .reconIgnore, .reconTables, .flexibleSpace, .reconExport, .reconChangeset, .reconSync]
+        [.reconCompare, .reconMode, .reconIgnore, .reconTables, .flexibleSpace, .reconExport, .reconChangeset, .reconSync]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -322,7 +316,7 @@ final class ReconToolbar: NSObject, NSToolbarDelegate {
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
                  willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
         let views: [NSToolbarItem.Identifier: (NSControl, String)] = [
-            .reconCompare: (compare, "Compare"), .reconLevel: (level, "Level"), .reconMode: (mode, "Compare What"), .reconIgnore: (ignore, "Ignore Rules"),
+            .reconCompare: (compare, "Compare"), .reconMode: (mode, "Compare What"), .reconIgnore: (ignore, "Ignore Rules"),
             .reconTables: (tables, "Tables"), .reconExport: (export, "Export Report"),
             .reconChangeset: (changeset, "Save as Changeset"), .reconSync: (sync, "Sync Script"),
         ]

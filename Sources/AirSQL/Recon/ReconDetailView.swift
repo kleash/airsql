@@ -182,6 +182,8 @@ final class ReconDetailView: NSObject {
         structure.isHidden = true
         rowsHolder.isHidden = true
         ignoring.stringValue = ""
+        ignoring.toolTip = nil
+        for control in [style, previous, next, destructive] as [NSView] { control.isHidden = true }
         message.isHidden = false
         scriptTitle.stringValue = "Sync script · each pair of databases has its own"
         text(script).string = ""
@@ -215,6 +217,8 @@ final class ReconDetailView: NSObject {
         let showsData = tabs.selectedSegment == 1
         differences = []
         difference = -1
+        for control in [style, previous, next] as [NSView] { control.isHidden = showsData }
+        destructive.isHidden = false
         structure.isHidden = showsData || object == nil
         rowsHolder.isHidden = !showsData || object == nil
         message.isHidden = true

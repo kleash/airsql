@@ -277,7 +277,7 @@ public enum ReconLines {
         }
         let a = words(left), b = words(right)
         // shortcut: a very long line (a view on one line) is marked whole; a real word diff of it costs seconds on the main thread.
-        guard a.count * b.count <= 4_000_000 else {
+        guard a.count * b.count <= 1_000_000 else {
             return ([NSRange(location: 0, length: (left as NSString).length)], [NSRange(location: 0, length: (right as NSString).length)])
         }
         var lengths = [[Int32]](repeating: [Int32](repeating: 0, count: b.count + 1), count: a.count + 1)

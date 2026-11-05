@@ -34,6 +34,8 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
     let progressBar = NSProgressIndicator()
     let progressLabel = label("", color: .secondaryLabelColor, truncates: true)
     let progressStrip = NSStackView()
+    /// The two objects, under the sides, at the Objects level.
+    let objectBar = SurfaceView(.bar)
     let results = ReconResultsView()
 
     /// Opens a compare window, with `source` chosen as the source when given.
@@ -94,7 +96,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         let swap = button("Swap", id: "recon.swap", tip: "Swap source and target", target: self, action: #selector(swapSides(_:)))
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let setup = NSStackView(views: [source.view, arrow, target.view, swap, spacer, helpButton(.compare)])
+        let setup = NSStackView(views: [toolbarItems.level, source.view, arrow, target.view, swap, spacer, helpButton(.compare)])
         setup.spacing = Spacing.double
         setup.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         setup.setHuggingPriority(.defaultLow, for: .horizontal)
@@ -114,8 +116,17 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         progressStrip.spacing = Spacing.unit
         progressStrip.edgeInsets = NSEdgeInsets(top: Spacing.half, left: Spacing.double, bottom: Spacing.half, right: Spacing.double)
         progressStrip.isHidden = true
+        let objects = NSStackView(views: [label("Objects", font: .systemFont(ofSize: 12, weight: .semibold), color: .secondaryLabelColor),
+                                          source.objects, label("→", font: .systemFont(ofSize: 15, weight: .medium), color: .secondaryLabelColor),
+                                          target.objects])
+        objects.spacing = Spacing.double
+        objects.edgeInsets = NSEdgeInsets(top: 0, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
+        objects.setHuggingPriority(.defaultLow, for: .horizontal)
+        objectBar.addSubview(objects)
+        objects.pin(to: objectBar)
+        objectBar.isHidden = true
         let line = ReconWindowController.line()
-        let stack = NSStackView(views: [bar, line, progressStrip, results.view])
+        let stack = NSStackView(views: [bar, objectBar, line, progressStrip, results.view])
         stack.orientation = .vertical
         stack.distribution = .fill
         stack.spacing = 0
@@ -123,7 +134,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         setup.setHuggingPriority(.defaultHigh, for: .vertical)
         progressStrip.setHuggingPriority(.defaultHigh, for: .vertical)
         stack.alignment = .leading
-        for view in [bar, line, progressStrip, results.view] {
+        for view in [bar, objectBar, line, progressStrip, results.view] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         root.addSubview(stack)
@@ -153,6 +164,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         toolbarItems.level.selectItem(at: level.rawValue)
         source.level = level
         target.level = level
+        objectBar.isHidden = level != .object
         serverResult = nil
         update()
     }
@@ -354,7 +366,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
 
     /// Back to the pairs of the server compare, with what was done in the open pair.
     @objc func backToServer(_ sender: Any?) {
-        guard var server = serverResult, let result else { return }
+        guard var server = serverResult, let result, !isRunning else { return }
         server.update(pair: result.source.database, with: result)
         choose(level: .server)
         show(server)
@@ -395,7 +407,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         case #selector(exportReport(_:)):
             reason = result == nil ? "Compare first: then there is something to show" : nil
         case #selector(backToServer(_:)):
-            reason = serverResult == nil ? "No server compare is open behind this one" : nil
+            reason = serverResult == nil ? "No server compare is open behind this one" : isRunning ? compareBlocked : nil
         case #selector(copySyncScript(_:)), #selector(includeInSync(_:)):
             reason = scriptBlocked ?? (results.selected.isEmpty ? "Select objects in the list first" : nil)
             if menuItem.action == #selector(includeInSync(_:)) {
