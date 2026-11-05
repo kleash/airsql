@@ -55,6 +55,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     private var reloading = false
     /// A right-click is choosing the row its menu acts on: that shows nothing, so the tab in front stays.
     fileprivate var openingMenu = false
+    /// A tab's own row is being selected: the tab stays as it is.
+    private var revealing = false
     /// Called when the selected connections change.
     var onSelect: (() -> Void)?
 
@@ -317,10 +319,36 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         if let first = rows.first { outline.scrollRowToVisible(first) }
     }
 
+    /// Selects a row of a connected connection's tree and scrolls to it: the filter goes if it hides the row, and what's
+    /// above the row opens. `showing`: what a click on it shows appears too.
+    func reveal(_ kind: SidebarNode.Kind, showing: Bool = false) {
+        func row() -> SidebarNode? {
+            if case .connection(let id) = kind { return connections[id] }
+            return treeNodes[kind]
+        }
+        if row() == nil {
+            filter.stringValue = ""
+            reload()
+        }
+        guard let node = row(), let id = node.connectionOfTree ?? node.connectionID else { return }
+        var above = [model.connection(id)?.folderID.flatMap { folders[$0] }, connections[id]]
+        if let database = node.database, kind != .database(id, database) {
+            above.append(treeNodes[.database(id, database)])
+            if let object = node.object { above.append(treeNodes[.category(id, database, object.kind)]) }
+        }
+        above.compactMap { $0 }.forEach(outline.expandItem)
+        let index = outline.row(forItem: node)
+        guard index >= 0 else { return }
+        revealing = !showing
+        outline.selectRowIndexes([index], byExtendingSelection: false)
+        revealing = false
+        outline.scrollRowToVisible(index)
+    }
+
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard !reloading else { return }
         onSelect?()
-        guard !openingMenu else { return }
+        guard !openingMenu, !revealing else { return }
         // Arrowing passes over rows: only the one it stops on is read, or the others would queue ahead of it.
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(showSelectedObject), object: nil)
         if NSApp.currentEvent?.type == .keyDown {

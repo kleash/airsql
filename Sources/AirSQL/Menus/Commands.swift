@@ -42,6 +42,7 @@ import AppKit
     @objc optional func closeAllTabs(_ sender: Any?)
     @objc optional func reopenClosedTab(_ sender: Any?)
     @objc optional func quickOpen(_ sender: Any?)
+    @objc optional func selectInTree(_ sender: Any?)
     @objc optional func duplicateTab(_ sender: Any?)
     @objc optional func renameTab(_ sender: Any?)
     @objc optional func renameSelection(_ sender: Any?)
@@ -342,7 +343,7 @@ enum Commands {
                                   tip: "Open a new query tab on the selected connection")
     static let open = Command("Open…", #selector(AirSQLActions.openSQLFile(_:)), "o", tip: "Open a .sql file in a new query tab")
     static let quickOpen = Command("Quick Open…", #selector(AirSQLActions.quickOpen(_:)), "p",
-                                   tip: "Go to a table, view or connection by typing part of its name")
+                                   tip: "Go to a tab, connection, database object, recent file or command by typing letters of its name")
     static let closeTab = Command("Close Tab", #selector(AirSQLActions.closeTab(_:)), "w",
                                   tip: "Close the tab shown; asks first about unsaved text or pending edits")
     static let closeOtherTabs = Command("Close Other Tabs", #selector(AirSQLActions.closeOtherTabs(_:)), "w", [.command, .option],
@@ -431,6 +432,8 @@ enum Commands {
                                      tip: "Put the keyboard in the SQL editor of the tab shown")
     static let focusResults = Command("Go to Results", #selector(AirSQLActions.focusResults(_:)), "3", [.command, .option],
                                       tip: "Put the keyboard in the grid of the tab shown")
+    static let selectInTree = Command("Select in Tree", #selector(AirSQLActions.selectInTree(_:)), "L",
+                                      tip: "Show the tab's table or object, or the name at the cursor, in the sidebar's tree")
     static let filterSidebar = Command("Filter Sidebar", #selector(AirSQLActions.filterSidebar(_:)), "j", [.command, .option],
                                        tip: "Type part of a name to narrow the connections and the tree")
     static let valuePanel = Command("Value Panel", #selector(AirSQLActions.toggleValuePanel(_:)), "\r", .shift,
@@ -850,7 +853,7 @@ enum Commands {
         runSQLFile, importCSV, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, pastePlain, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,
         copyQuery, find, findAndReplace, findNext, findPrevious, useSelectionForFind,
-        toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
+        toggleSidebar, focusSidebar, focusEditor, focusResults, selectInTree, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
         runStatement, runSelection, runSelectionWhole, keepResults, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,

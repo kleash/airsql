@@ -52,7 +52,7 @@ enum MainMenu {
         menus.edit.addItem(submenu("Find", [Commands.find, Commands.findAndReplace, Commands.findNext, Commands.findPrevious,
                                             Commands.useSelectionForFind].map { $0.item() }))
 
-        menus.view.add([Commands.toggleSidebar, Commands.filterSidebar, nil, Commands.focusSidebar, Commands.focusEditor, Commands.focusResults, nil, Commands.sqlLog, Commands.clearSQLLog,
+        menus.view.add([Commands.toggleSidebar, Commands.filterSidebar, Commands.selectInTree, nil, Commands.focusSidebar, Commands.focusEditor, Commands.focusResults, nil, Commands.sqlLog, Commands.clearSQLLog,
                         Commands.activity, Commands.cancelAll, nil, Commands.refresh])
 
         menus.query.add([Commands.runStatement, Commands.runAll, Commands.runAllF9, Commands.runStatementF9, Commands.explain,
