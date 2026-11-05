@@ -94,9 +94,10 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         if let settings = (NSApp.delegate as? AppDelegate)?.model?.data.settings { applyLook(settings) }
     }
 
-    /// Settings ▸ Grid's font and date format.
+    /// Settings ▸ Grid's font, lines per row and date format.
     private func applyLook(_ settings: AppSettings) {
         if grid.fontFamily != settings.gridFontFamily { grid.fontFamily = settings.gridFontFamily }
+        if grid.rowLines != settings.gridRowLines { grid.rowLines = settings.gridRowLines }
         GridDisplay.pattern = settings.gridDatePattern.isEmpty ? AppSettings().gridDatePattern : settings.gridDatePattern
     }
 

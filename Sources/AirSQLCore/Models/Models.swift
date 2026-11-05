@@ -209,6 +209,8 @@ public struct AppSettings: Codable, Equatable {
     public var rowsPerPage = 1_000
     /// The grid's font family (empty: the system's) and Display As's date format.
     public var gridFontFamily = ""
+    /// How many lines of a value with line breaks a grid row shows.
+    public var gridRowLines = 1
     public var gridDatePattern = "yyyy-MM-dd HH:mm:ss"
     /// Tables with an AUTO_INCREMENT key open with their newest rows first, until sorted.
     public var newestFirst = true
@@ -249,6 +251,7 @@ public struct AppSettings: Codable, Equatable {
         longValueLimit = try value(.longValueLimit, defaults.longValueLimit)
         newestFirst = try value(.newestFirst, defaults.newestFirst)
         gridFontFamily = try value(.gridFontFamily, defaults.gridFontFamily)
+        gridRowLines = try value(.gridRowLines, defaults.gridRowLines)
         gridDatePattern = try value(.gridDatePattern, defaults.gridDatePattern)
         nullText = try value(.nullText, defaults.nullText)
         detailsTableThreshold = try value(.detailsTableThreshold, defaults.detailsTableThreshold)

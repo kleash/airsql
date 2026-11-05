@@ -29,6 +29,15 @@ extension AppTests {
             #expect(panel.contentTintColor == .accent)
         }
 
+        @Test func theFindButtonOpensTheFindBarFromAnywhere() async throws {
+            let (main, _, tab) = try await GridDataAppTests.tab()
+            main.window?.makeFirstResponder(main.sidebar.outline)
+            tab.toolbar.validate()
+            let find = try #require(tab.toolbar.button(Commands.find))
+            find.performClick(nil)
+            #expect(!tab.findBar.isHidden)
+        }
+
         @Test func aResultShowsItsEditingButtonsOnlyWhenItCanBeEdited() async throws {
             let (main, _) = appWindow(testModel())
             let store = ConsoleFixtures.customers(rows: 2)
@@ -302,6 +311,11 @@ extension AppTests {
             #expect(tab.refusesOnReadOnly(source))
             source.orderText = "LENGTH(region)"
             #expect(!tab.refusesOnReadOnly(source))
+        }
+
+        @Test func rowsOfSeveralLinesAreTaller() {
+            let one = GridStyles(fontSize: 12), three = GridStyles(fontSize: 12, lines: 3)
+            #expect(three.rowHeight == one.rowHeight + 2 * three.lineHeight && three.baseline == one.baseline)
         }
 
         @Test func aResultsHeaderHasFunnels() async throws {

@@ -9,6 +9,9 @@ final class GridPane: SettingsPaneController {
                                       tip: "Choose the size of the grid's text (12 pt by default)", fontSizes)])
         form.row("Font", [choice(\.gridFontFamily, id: "settings.gridFontFamily", tip: "Choose the grid's font, or the system's",
                                  [(title: "System", value: "")] + NSFontManager.shared.availableFontFamilies.map { (title: $0, value: $0) })])
+        form.row("Lines per row", [number(\.gridRowLines, id: "settings.gridRowLines",
+                                          tip: "Type how many lines of a value with line breaks each row shows (1 by default)",
+                                          range: 1...5, width: 60)])
         form.row("Date format", [text(\.gridDatePattern, id: "settings.gridDatePattern",
                                       tip: "Type the pattern Display As ▸ Settings' Date Format uses, such as dd/MM/yyyy HH:mm",
                                       placeholder: "yyyy-MM-dd HH:mm:ss", width: 180)])

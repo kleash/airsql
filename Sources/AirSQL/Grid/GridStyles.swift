@@ -17,15 +17,21 @@ struct GridStyles {
     /// From a row's top to the text's baseline.
     let baseline: CGFloat
 
-    init(fontSize: CGFloat, family: String = "") {
+    /// From one line of a cell to the next, and how many a row shows.
+    let lineHeight: CGFloat
+    let lines: Int
+
+    init(fontSize: CGFloat, family: String = "", lines: Int = 1) {
         let chosen = family.isEmpty ? nil : NSFontManager.shared.font(withFamily: family, traits: [], weight: 5, size: fontSize)
         regular = chosen ?? .monospacedDigitSystemFont(ofSize: fontSize, weight: .regular)
         key = chosen.map { NSFontManager.shared.convert($0, toHaveTrait: .boldFontMask) } ?? .monospacedDigitSystemFont(ofSize: fontSize, weight: .semibold)
         mono = .monospacedSystemFont(ofSize: max(8, fontSize - 1), weight: .regular)
         null = NSFont(descriptor: regular.fontDescriptor.withSymbolicTraits(.italic), size: fontSize) ?? regular
-        rowHeight = ceil(fontSize + 11)
-        let textHeight = regular.ascender - regular.descender
-        baseline = ((rowHeight - textHeight) / 2 + regular.ascender).rounded()
+        let oneLine = ceil(fontSize + 11), textHeight = regular.ascender - regular.descender
+        self.lines = max(1, lines)
+        lineHeight = ceil(textHeight) + 1
+        rowHeight = oneLine + CGFloat(self.lines - 1) * lineHeight
+        baseline = ((oneLine - textHeight) / 2 + regular.ascender).rounded()
     }
 
     func font(_ column: GridColumn, isNull: Bool) -> NSFont {
