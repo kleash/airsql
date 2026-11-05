@@ -85,7 +85,7 @@ extension SQLEditorView {
     // MARK: The name at the cursor
 
     /// Every other use of the name at the cursor or selected, in the text. Keywords and short-lived text don't count.
-    func markUsages(_ add: (NSRange) -> Void) {
+    func markSameNames(_ add: (NSRange) -> Void) {
         guard marksTheText, tokens.last.map({ $0.range.upperBound <= (string as NSString).length }) ?? false else { return }
         let text = string as NSString, selection = selectedRange()
         guard let token = tokens.first(where: { ($0.kind == .word || $0.kind == .quotedName || $0.kind == .variable)

@@ -347,24 +347,18 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         // A block dragged out with ⌥ arrives as several selections: each becomes a caret.
         if ranges.count > 1 { return setCarets(ranges.map(\.rangeValue)) }
         clearMarks()
-        markUsagesAtCaret()
+        markSelectedName()
         markMatchingBracket()
         updateCaretMarks()
         markUsagesLater()
         onSelectionChange?()
     }
 
-    private func markUsagesAtCaret() {
-        guard let layout = layoutManager else { return }
-        if selectedRange().length == 0, (string as NSString).length <= Self.longText,
-           let pair = SQLEditing.blockPair(at: selectedRange().location, in: string, noBackslashEscapes: noBackslashEscapes) {
-            for range in [NSRange(pair.0), NSRange(pair.1)] {
-                layout.addTemporaryAttribute(.backgroundColor, value: NSColor.accent.withAlphaComponent(0.25), forCharacterRange: range)
-                bracketMarks.append(range)
-            }
-        }
+    /// A selected name marks its other uses by spelling; at the caret the parser's `markUsages` knows the scope.
+    private func markSelectedName() {
+        guard let layout = layoutManager, selectedRange().length > 0 else { return }
         let color = NSColor.labelColor.withAlphaComponent(0.1)
-        markUsages { range in
+        markSameNames { range in
             layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: range)
             bracketMarks.append(range)
         }
