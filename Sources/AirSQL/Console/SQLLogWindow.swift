@@ -132,7 +132,7 @@ final class SQLLogViewController: NSViewController, NSSearchFieldDelegate {
         let matches = { (line: String) in words.allSatisfy { line.lowercased().contains($0) } }
         let matching = lines.filter(matches).count
         status.stringValue = lines.isEmpty ? "Nothing sent yet: statements show here once you connect"
-            : words.isEmpty ? "\(lines.count.formatted()) lines" : "\(matching.formatted()) of \(lines.count.formatted()) lines"
+            : words.isEmpty ? "\(lines.count.formatted()) line\(lines.count == 1 ? "" : "s")" : "\(matching.formatted()) of \(lines.count.formatted()) lines"
         status.toolTip = status.stringValue  // whole, when a narrow window shortens it
         let added = (new ?? lines).filter(matches)
         guard new == nil || !added.isEmpty || !dropped.isEmpty else { return }
