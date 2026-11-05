@@ -65,6 +65,8 @@ session of its own, so a long query in one tab leaves the others free.
 |---|---|
 | The statement at the cursor, or the selected text | ⌘↩ (or ⌃F9) |
 | Only the selected text | Query ▸ Run Selection |
+| The smallest query in brackets around the cursor | Query ▸ Run Subquery |
+| The statement at the cursor and every one after it | Query ▸ Run from Cursor |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
@@ -81,6 +83,13 @@ Messages counts the rows changed; the server's note beside it says how many matc
 
 If you've gone to another app and a run of 10 seconds or more ends, AirSQL's Dock icon bounces once and a notification
 says which tab finished. It never shows the SQL. Turn the notification off in System Settings ▸ Notifications.
+
+### Parameters
+
+A statement with `?` or `:name` in its code, not in a string or comment, asks for their values before it runs. The same
+`:name` takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
+become code. The tab remembers the values for the next run. AirSQL fills them in before sending, so Messages, the SQL
+log and the history show the final SQL, and the read-only and safety checks see it too.
 
 ### Sessions
 

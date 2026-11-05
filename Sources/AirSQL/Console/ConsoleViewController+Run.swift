@@ -45,22 +45,73 @@ extension ConsoleViewController {
 
     @objc func runAll(_ sender: Any?) { run(all: true) }
 
-    private func run(all: Bool, kind: ConsoleRun.Kind = .run) {
-        if kind == .run, handedToCompare() { return }
+    /// The statement at the caret and those after it.
+    @objc func runFromCaret(_ sender: Any?) {
+        run(ConsoleScript.statements(from: editor.selectedRange().location, in: text, noBackslashEscapes: editor.noBackslashEscapes))
+    }
+
+    /// The smallest query in brackets around the caret, else the statement.
+    @objc func runSubquery(_ sender: Any?) {
+        guard let subquery = ConsoleScript.subquery(at: editor.selectedRange().location, in: text,
+                                                    noBackslashEscapes: editor.noBackslashEscapes) else {
+            return note(.info, "The cursor isn't in a query in brackets: put it inside a subquery.")
+        }
+        run([subquery])
+    }
+
+    private func run(all: Bool, kind: ConsoleRun.Kind = .run) { run(chosen(all: all), kind: kind) }
+
+    /// What a run sends: the selection, or everything, or the statement at the caret.
+    private func chosen(all: Bool) -> [SQLStatement] {
         let selection = editor.selectedRange()
-        let statements = ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil,
-                                                  caret: selection.location, all: all,
-                                                  noBackslashEscapes: editor.noBackslashEscapes)
-        guard !statements.isEmpty else {
+        return ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil, caret: selection.location,
+                                        all: all, noBackslashEscapes: editor.noBackslashEscapes)
+    }
+
+    private func run(_ chosen: [SQLStatement], kind: ConsoleRun.Kind = .run) {
+        if kind == .run, handedToCompare() { return }
+        guard !chosen.isEmpty else {
             note(.info, "There is no statement here to run: type one, or put the cursor in one.")
             return
         }
-        let sent = kind == .explain ? [ExplainPlan.tableSQL(statements[0].sql)] : statements.map(\.sql)
-        guard !ConsoleSafety.refusesOnReadOnly(sent, in: self) else { return }
-        guard kind == .run else { return start(ConsoleRun(kind: kind, statements: [statements[0]], text: text)) }
-        ConsoleSafety.check(statements, in: self) { [weak self] approved in
-            guard approved, let self else { return }
-            self.start(ConsoleRun(kind: kind, statements: statements, text: self.text))
+        withParameters(kind == .run ? chosen : [chosen[0]]) { [weak self] statements in
+            guard let self else { return }
+            let sent = kind == .explain ? [ExplainPlan.tableSQL(statements[0].sql)] : statements.map(\.sql)
+            guard !ConsoleSafety.refusesOnReadOnly(sent, in: self) else { return }
+            guard kind == .run else { return self.start(ConsoleRun(kind: kind, statements: statements, text: self.text)) }
+            ConsoleSafety.check(statements, in: self) { [weak self] approved in
+                guard approved, let self else { return }
+                self.start(ConsoleRun(kind: kind, statements: statements, text: self.text))
+            }
+        }
+    }
+
+    /// Fills in `?` and `:name`, asking their values first; everything after this sees the final SQL.
+    private func withParameters(_ statements: [SQLStatement], then run: @escaping ([SQLStatement]) -> Void) {
+        let noBackslashEscapes = editor.noBackslashEscapes
+        let places = QueryParameters.places(in: statements.map(\.sql), noBackslashEscapes: noBackslashEscapes)
+        let keys = QueryParameters.keys(places)
+        guard !keys.isEmpty, let window = view.window else { return run(statements) }
+        let fields = keys.enumerated().map { index, key in
+            textField(parameterValues[key] ?? "", placeholder: "value", id: "parameter.\(index)",
+                      tip: "Type the value for \(key): a number or NULL goes in as it is, anything else as quoted text", width: 240)
+        }
+        let grid = NSGridView(views: zip(keys, fields).map { key, field in [label(key.hasPrefix("?") ? "? " + key.dropFirst() : key), field] })
+        grid.column(at: 0).xPlacement = .trailing
+        grid.layoutSubtreeIfNeeded()
+        grid.frame.size = grid.fittingSize
+        grid.translatesAutoresizingMaskIntoConstraints = true
+        ConsoleClosing.alert(window, keys.count == 1 ? "Value for this parameter" : "Values for these parameters",
+                             "They're filled in before the SQL is sent. A number or NULL goes in as it is, anything else as quoted text.",
+                             buttons: [("Run", "Fill in the values and run"), ("Cancel", "Run nothing")], destructive: nil, accessory: grid) {
+            [weak self] choice in
+            guard choice == 0, let self else { return }
+            for (key, field) in zip(keys, fields) { self.parameterValues[key] = field.stringValue }
+            run(zip(statements, places).map { statement, places in
+                var bound = statement
+                bound.sql = QueryParameters.bind(statement.sql, places, values: self.parameterValues, noBackslashEscapes: noBackslashEscapes)
+                return bound
+            })
         }
     }
 
@@ -70,17 +121,16 @@ extension ConsoleViewController {
     /// asks first.
     @objc func explainAnalyze(_ sender: Any?) {
         guard !handedToCompare() else { return }
-        let selection = editor.selectedRange()
-        guard let statement = ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil,
-                                                       caret: selection.location, all: false,
-                                                       noBackslashEscapes: editor.noBackslashEscapes).first else {
+        guard let chosen = chosen(all: false).first else {
             return note(.info, "There is no statement here to run: type one, or put the cursor in one.")
         }
-        guard let sent = ExplainPlan.analyzeSQL(statement.sql, server: session?.server)?.sql,
-              !ConsoleSafety.refusesOnReadOnly([sent], in: self) else { return }
-        ConsoleSafety.check([statement], in: self, askWrites: true) { [weak self] approved in
-            guard approved, let self else { return }
-            self.start(ConsoleRun(kind: .analyze, statements: [statement], text: self.text))
+        withParameters([chosen]) { [weak self] statements in
+            guard let self, let sent = ExplainPlan.analyzeSQL(statements[0].sql, server: self.session?.server)?.sql,
+                  !ConsoleSafety.refusesOnReadOnly([sent], in: self) else { return }
+            ConsoleSafety.check(statements, in: self, askWrites: true) { [weak self] approved in
+                guard approved, let self else { return }
+                self.start(ConsoleRun(kind: .analyze, statements: statements, text: self.text))
+            }
         }
     }
 
@@ -106,15 +156,13 @@ extension ConsoleViewController {
     }
 
     @objc func profileQuery(_ sender: Any?) {
-        guard !handedToCompare() else { return }
-        let selection = editor.selectedRange()
-        guard let statement = ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil,
-                                                       caret: selection.location, all: false,
-                                                       noBackslashEscapes: editor.noBackslashEscapes).first,
-              !ConsoleSafety.refusesOnReadOnly([statement.sql], in: self) else { return }
-        ConsoleSafety.check([statement], in: self) { [weak self] approved in
-            guard approved, let self else { return }
-            self.start(ConsoleRun(kind: .profile, statements: [statement], text: self.text))
+        guard !handedToCompare(), let chosen = chosen(all: false).first else { return }
+        withParameters([chosen]) { [weak self] statements in
+            guard let self, !ConsoleSafety.refusesOnReadOnly(statements.map(\.sql), in: self) else { return }
+            ConsoleSafety.check(statements, in: self) { [weak self] approved in
+                guard approved, let self else { return }
+                self.start(ConsoleRun(kind: .profile, statements: statements, text: self.text))
+            }
         }
     }
 

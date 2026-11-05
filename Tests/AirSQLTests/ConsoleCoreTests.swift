@@ -540,3 +540,53 @@ struct ResultSetSourceTests {
         }
     }
 }
+
+/// `?` and `:name`, and what runs from the caret.
+@Suite struct QueryParameterTests {
+    func keys(_ sql: String) -> [String] { QueryParameters.places(in: [sql], noBackslashEscapes: false)[0].map(\.key) }
+
+    @Test func parametersAreFoundOnlyInCode() {
+        #expect(keys("SELECT * FROM t WHERE a = ? AND b = :name OR c = :name AND d=:other") == ["?1", ":name", ":name", ":other"])
+        #expect(keys("SELECT '?', ':no', `?` -- ? :x\n/* ? */ # :y\n").isEmpty)
+        #expect(keys("SET @a := 1").isEmpty)
+        #expect(keys("lbl:LOOP LEAVE lbl; END LOOP").isEmpty)
+        #expect(keys("lbl: LOOP").isEmpty)
+        #expect(keys("SELECT (:a)") == [":a"])
+        let two = QueryParameters.places(in: ["SELECT ?", "SELECT ?, :a"], noBackslashEscapes: false)
+        #expect(QueryParameters.keys(two) == ["?1", "?2", ":a"])
+    }
+
+    @Test func aValueCanNeverBecomeCode() {
+        func bound(_ value: String, noBackslashEscapes: Bool = false) -> String {
+            let sql = "SELECT :v, ':v'"
+            let places = QueryParameters.places(in: [sql], noBackslashEscapes: noBackslashEscapes)[0]
+            return QueryParameters.bind(sql, places, values: [":v": value], noBackslashEscapes: noBackslashEscapes)
+        }
+        #expect(bound("7") == "SELECT 7, ':v'")
+        #expect(bound("-1.5") == "SELECT -1.5, ':v'")
+        #expect(bound("007") == "SELECT '007', ':v'")
+        #expect(bound("null") == "SELECT NULL, ':v'")
+        #expect(bound("") == "SELECT '', ':v'")
+        #expect(bound("1 OR 1=1") == "SELECT '1 OR 1=1', ':v'")
+        #expect(bound("x'; DROP TABLE t; -- ") == #"SELECT 'x\'; DROP TABLE t; -- ', ':v'"#)
+        #expect(bound("a'b\\", noBackslashEscapes: true) == #"SELECT 'a''b\', ':v'"#)
+    }
+
+    @Test func runningFromTheCaretTakesTheRest() {
+        let text = "SELECT 1;\nSELECT 2;\nSELECT 3;"
+        #expect(ConsoleScript.statements(from: 12, in: text, noBackslashEscapes: false).map(\.sql) == ["SELECT 2", "SELECT 3"])
+    }
+
+    @Test func theSmallestSubqueryAroundTheCaret() {
+        let text = "SELECT * FROM (SELECT a FROM t WHERE b IN (SELECT c FROM u /* x */)) d WHERE e IN (1, 2)"
+        func at(_ word: String) -> String? {
+            ConsoleScript.subquery(at: (text as NSString).range(of: word).location, in: text, noBackslashEscapes: false)?.sql
+        }
+        #expect(at("c FROM") == "SELECT c FROM u")
+        #expect(at("a FROM") == "SELECT a FROM t WHERE b IN (SELECT c FROM u /* x */)")
+        #expect(at("1, 2") == nil, "brackets that hold no query")
+        #expect(at("d WHERE") == nil)
+        let cte = "SELECT * FROM (WITH x AS (SELECT 1) SELECT * FROM x) y"
+        #expect(ConsoleScript.subquery(at: 40, in: cte, noBackslashEscapes: false)?.sql == "WITH x AS (SELECT 1) SELECT * FROM x")
+    }
+}

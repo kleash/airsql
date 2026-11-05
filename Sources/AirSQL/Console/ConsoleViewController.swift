@@ -85,6 +85,8 @@ final class ConsoleViewController: NSViewController, TabContent {
     var sharing: Bool?
     /// The database of a tab with a session of its own, once it has run or been given one.
     var chosenDatabase: String?
+    /// The values last given to `?` and `:name`, offered at the next run.
+    var parameterValues: [String: String] = [:]
     /// It said yes to closing: it isn't kept for the next launch.
     var closing = false
     private var placedDivider = false

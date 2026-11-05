@@ -31,6 +31,30 @@ public enum ConsoleScript {
         return SQLSplitter.statement(at: caret, in: text, noBackslashEscapes: noBackslashEscapes).map { [$0] } ?? []
     }
 
+    /// The statement at the caret and all those after it.
+    public static func statements(from caret: Int, in text: String, noBackslashEscapes: Bool) -> [SQLStatement] {
+        let all = SQLSplitter.statements(in: text, noBackslashEscapes: noBackslashEscapes)
+        guard let first = SQLSplitter.statement(at: caret, in: text, noBackslashEscapes: noBackslashEscapes) else { return [] }
+        return all.filter { $0.range.lowerBound >= first.range.lowerBound }
+    }
+
+    /// The smallest query in brackets around the caret: a SELECT or WITH right after an opening bracket, up to its partner.
+    public static func subquery(at caret: Int, in text: String, noBackslashEscapes: Bool) -> SQLStatement? {
+        let utf16 = Array(text.utf16)
+        let tokens = SQLLexer.tokens(text, noBackslashEscapes: noBackslashEscapes).filter { $0.kind != .comment && $0.kind != .hint }
+        var open: [Int] = []
+        for (index, token) in tokens.enumerated() where token.kind == .symbol && token.range.count == 1 {
+            if utf16[token.range.lowerBound] == 0x28 { open.append(index) }
+            guard utf16[token.range.lowerBound] == 0x29, let start = open.popLast(), start + 1 < index,
+                  tokens[start].range.upperBound <= caret, caret <= token.range.lowerBound, tokens[start + 1].kind == .word else { continue }
+            let first = tokens[start + 1].range
+            guard ["SELECT", "WITH"].contains(String(decoding: utf16[first], as: UTF16.self).uppercased()) else { continue }
+            let range = first.lowerBound..<tokens[index - 1].range.upperBound
+            return SQLStatement(range: range, end: range.upperBound, sql: String(decoding: utf16[range], as: UTF16.self))
+        }
+        return nil
+    }
+
     /// The line (from 1) that the UTF-16 offset is on.
     public static func line(of offset: Int, in text: String) -> Int {
         var line = 1

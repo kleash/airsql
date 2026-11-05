@@ -249,5 +249,34 @@ extension AppTests {
             #expect(await call(harness, "press", ["title": "Cancel"]).error == nil)
             await connection.disconnect()
         }
+
+        /// Parameters are asked for, filled in, and the read-only check sees the final SQL; Run from Cursor and Run Subquery
+        /// send what they say.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func parametersAreAskedForAndRunTheWayTheCursorSays() async throws {
+            let (main, harness, console, connection) = try await Self.labConsole()
+            defer { ConsoleViewController.openConnection = { _ in nil } }
+            console.parameterValues = [":a": "7", "?1": "it's"]
+            console.editor.setText("SELECT :a, ?, ':a', :a;")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 0))
+            console.runStatement(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(main.window?.attachedSheet != nil)
+            #expect(await call(harness, "press", ["title": "Run"]).error == nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            let rows = try #require(console.lastOutcome?.results.first?.rows, "\(console.messagesView.messages.map(\.text))")
+            #expect((0..<4).map { rows.string(0, $0) } == ["7", "it's", ":a", "7"])
+
+            console.editor.setText("SELECT 1;\nSELECT 2;\nSELECT (SELECT 3 + 0) AS four, 4;")
+            console.editor.setSelectedRange(NSRange(location: 10, length: 0))
+            console.runFromCaret(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.resultTabs.count == 2)
+            console.editor.setSelectedRange(NSRange(location: 30, length: 0))
+            console.runSubquery(nil)
+            _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
+            #expect(console.lastOutcome?.statement.sql == "SELECT 3 + 0")
+            await connection.disconnect()
+        }
     }
 }

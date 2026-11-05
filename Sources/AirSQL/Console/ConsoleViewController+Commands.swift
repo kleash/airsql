@@ -96,7 +96,8 @@ extension ConsoleViewController: NSMenuItemValidation {
         switch item.action {
         case Commands.refresh.action:
             return (isConnected, offline ?? "")
-        case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(explain(_:)), #selector(explainAnalyze(_:)), #selector(profileQuery(_:)):
+        case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(runFromCaret(_:)), #selector(runSubquery(_:)), #selector(explain(_:)),
+             #selector(explainAnalyze(_:)), #selector(profileQuery(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (hasText, "Type a statement first")
         case #selector(runSelection(_:)):
