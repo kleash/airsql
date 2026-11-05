@@ -36,6 +36,15 @@ struct ModelsTests {
         #expect(!data.settings.agentsAllowed)
     }
 
+    /// 1.0.1 saved `editorWraps` as false for everyone, so the default wrap has to reach those files; a choice since stays.
+    @Test func wordWrapIsOnForFilesThatSavedTheOldDefault() throws {
+        func wraps(_ settings: String) throws -> Bool {
+            try JSONDecoder().decode(AirSQLData.self, from: Data(#"{"settings": \#(settings)}"#.utf8)).settings.editorWordWrap
+        }
+        #expect(try wraps(#"{"editorWraps": false}"#))
+        #expect(try !wraps(#"{"editorWraps": false, "editorWordWrap": false}"#))
+    }
+
     @Test func anUnreadableFileIsMovedAsideNeverOverwritten() throws {
         let url = URL(fileURLWithPath: try scratch() + "/airsql.json")
         try Data("{ not json".utf8).write(to: url)

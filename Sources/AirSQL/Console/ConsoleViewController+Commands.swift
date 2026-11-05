@@ -59,7 +59,7 @@ extension ConsoleViewController: NSMenuItemValidation {
                        ? NSRange(location: range.location, length: (formatted as NSString).length) : NSRange(location: 0, length: 0))
     }
 
-    @objc func toggleWordWrap(_ sender: Any?) { model.data.settings.editorWraps.toggle() }
+    @objc func toggleWordWrap(_ sender: Any?) { model.data.settings.editorWordWrap.toggle() }
 
     @objc func zoomIn(_ sender: Any?) { zoom(by: 1) }
     @objc func zoomOut(_ sender: Any?) { zoom(by: -1) }
@@ -119,7 +119,7 @@ extension ConsoleViewController: NSMenuItemValidation {
         case #selector(formatSQL(_:)):
             return (hasText, "Type some SQL first")
         case #selector(toggleWordWrap(_:)):
-            item.state = model.data.settings.editorWraps ? .on : .off
+            item.state = model.data.settings.editorWordWrap ? .on : .off
             return (true, "")
         case #selector(editAsTable(_:)):
             if let reason = offline { return (false, reason) }

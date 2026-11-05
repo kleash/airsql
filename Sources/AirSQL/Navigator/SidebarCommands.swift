@@ -7,6 +7,7 @@ extension SidebarNode {
         switch kind {
         case .database(_, let name): return SQLQuote.identifier(name)
         case .object(_, let object): return SQLQuote.identifier(object.name)
+        case .detail(_, _, _, let name): return SQLQuote.identifier(name)
         default: return nil
         }
     }
@@ -24,6 +25,12 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     var selectedObjects: [DatabaseObject] { treeSelection?.nodes.compactMap(\.object) ?? [] }
+
+    /// What Open Data and Open Structure open: the selected tables and views, and those of the rows under one, once each.
+    private var tablesToOpen: [DatabaseObject] {
+        var seen = Set<DatabaseObject>()
+        return (treeSelection?.nodes ?? []).compactMap { $0.object ?? $0.owner }.filter { $0.kind.isTableLike && seen.insert($0).inserted }
+    }
 
     var selectedDatabases: [String] {
         treeSelection?.nodes.compactMap { node in
@@ -65,13 +72,13 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     /// A double-click makes a database current and opens or closes it, opens or closes a group, opens an object in its
-    /// own tab.
+    /// own tab, and a row under a table opens that table's structure (a trigger, its own editor).
     func treeDoubleClicked(_ node: SidebarNode) {
         switch node.kind {
         case .database(let id, let name):
             model.openConnection(id)?.currentDatabase = name
             fallthrough
-        case .category:
+        case .category, .part:
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .object(let id, let object):
             // The double-click's first click showed it in the preview: its own tab takes over, leaving no second copy.
@@ -80,6 +87,9 @@ extension SidebarController: NSMenuItemValidation {
             }
             if object.kind.isTableLike { openData(nil) } else { openObject(nil) }
             if let preview { main?.close(preview) }
+        case .detail(let id, let object, let part, let name):
+            guard let open = model.openConnection(id) else { return }
+            main?.openEditor(part == .triggers ? DatabaseObject(.trigger, object.database, name) : object, of: open)
         default:
             break
         }
@@ -102,6 +112,10 @@ extension SidebarController: NSMenuItemValidation {
                       Commands.bulkEdit])
             menu.addItem(NavigatorMenus.maintenance())
             menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.refresh])
+        case .part:
+            menu.add([Commands.openStructure, Commands.openData])
+        case .detail:
+            menu.add([Commands.openStructure, Commands.openData, nil, Commands.copyName, Commands.copyPlainName])
         default:
             menu.add([Commands.openObject, Commands.runRoutine, Commands.copyCreate, nil, Commands.drop, Commands.refresh])
         }
@@ -112,12 +126,12 @@ extension SidebarController: NSMenuItemValidation {
 
     @objc func openData(_ sender: Any?) {
         guard let main, let open = treeSelection?.open else { return }
-        for table in selectedObjects where table.kind.isTableLike { main.openTableData(table, of: open) }
+        for table in tablesToOpen { main.openTableData(table, of: open) }
     }
 
     @objc func openStructure(_ sender: Any?) {
         guard let main, let open = treeSelection?.open else { return }
-        for table in selectedObjects where table.kind.isTableLike { main.openEditor(table, of: open) }
+        for table in tablesToOpen { main.openEditor(table, of: open) }
     }
 
     @objc func openObject(_ sender: Any?) {
@@ -175,8 +189,13 @@ extension SidebarController: NSMenuItemValidation {
         }
     }
 
+    /// Down to the objects: opening every table too would bury the tree in columns.
     @objc func expandAll(_ sender: Any?) {
-        for node in selectedNodes { outline.expandItem(node, expandChildren: true) }
+        func expand(_ node: SidebarNode) {
+            outline.expandItem(node)
+            node.children.filter { $0.object == nil }.forEach(expand)
+        }
+        selectedNodes.forEach(expand)
     }
 
     @objc func collapseAll(_ sender: Any?) {
@@ -267,7 +286,12 @@ extension SidebarController: NSMenuItemValidation {
         case Commands.copy.action?:
             reason = copyableNames.isEmpty ? "Select a connection, database or object first" : nil
         case Commands.expandAll.action?, Commands.collapseAll.action?:
-            reason = selectedNodes.contains { !$0.children.isEmpty } ? nil : "Select a row that has rows under it first"
+            reason = selectedNodes.contains { outline.isExpandable($0) } ? nil : "Select a row that has rows under it first"
+        case Commands.openData.action?, Commands.openStructure.action?:
+            reason = tablesToOpen.isEmpty ? "Select a table or view in the tree first" : nil
+        case Commands.copyName.action? where selectedNodes.contains { $0.detail != nil },
+             Commands.copyPlainName.action? where selectedNodes.contains { $0.detail != nil }:
+            reason = nil
         case Commands.renameF2.action? where selectedFolderNodeID != nil || selectedConnectionIDs.count == 1:
             reason = nil
         case Commands.renameF2.action?:

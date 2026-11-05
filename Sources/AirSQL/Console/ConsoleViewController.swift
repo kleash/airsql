@@ -171,7 +171,7 @@ final class ConsoleViewController: NSViewController, TabContent {
             guard let self, self.zoomedSize == nil else { return }
             self.editor.setFontSize(CGFloat(size))
         })
-        observers.append(model.$data.map(\.settings.editorWraps).removeDuplicates().sink { [weak self] wraps in
+        observers.append(model.$data.map(\.settings.editorWordWrap).removeDuplicates().sink { [weak self] wraps in
             self?.editor.setWraps(wraps)
         })
     }

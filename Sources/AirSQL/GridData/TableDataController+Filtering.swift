@@ -217,7 +217,7 @@ extension TableDataController {
 
     // MARK: Sort
 
-    /// The sort control in a header: ascending, descending, then off; with ⌥ the column joins the sort.
+    /// The sort control in a header: ascending, descending, then off; `adding`, the column joins the sort.
     func sort(by column: Int, adding: Bool) {
         guard let source else { return }
         if bar.loadedOnly.state == .on { return sortLocally(by: column, adding: adding) }
@@ -266,6 +266,10 @@ extension TableDataController {
 
     @objc func sortAscending(_ sender: Any?) { sortFocused(ascending: true) }
     @objc func sortDescending(_ sender: Any?) { sortFocused(ascending: false) }
+    @objc func addToSort(_ sender: Any?) {
+        guard let column = viewer.focusedColumn else { return NSSound.beep() }
+        sort(by: column, adding: true)
+    }
     @objc func clearSort(_ sender: Any?) {
         if source?.localSort.isEmpty == false { setLocalSort([]) } else { setSort([]) }
     }

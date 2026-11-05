@@ -272,6 +272,83 @@ extension AppTests {
             #expect(await eventually(timeout: 5) { !main.sidebar.outline.isItemExpanded(fixture) })
         }
 
+        /// A connected connection opens and closes on a double-click (and Return), and stays as it was left over a reload.
+        @Test func aDoubleClickOnAConnectedConnectionOpensAndClosesItsTree() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let sidebar = main.sidebar, outline = sidebar.outline
+            sidebar.select([id])
+            let row = try #require(outline.item(atRow: outline.selectedRow) as? SidebarNode)
+            #expect(row.connectionID == id && outline.isItemExpanded(row))
+            let doubleClick = try #require(outline.doubleAction)
+            NSApp.sendAction(doubleClick, to: outline.target, from: outline)
+            #expect(await eventually(timeout: 5) { !outline.isItemExpanded(row) })
+            sidebar.reload()
+            #expect(!outline.isItemExpanded(row))
+            NSApp.sendAction(doubleClick, to: outline.target, from: outline)
+            #expect(await eventually(timeout: 5) { outline.isItemExpanded(row) })
+        }
+
+        /// A table's row opens to what the schema cache knows of it, with no query, and stays open over a reload.
+        @Test func aTableOpensToItsColumnsIndexesAndKeys() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let sidebar = main.sidebar, outline = sidebar.outline
+            let orders = DatabaseObject(.table, "airsql_fixture", "orders")
+            _ = try #require(treeRow(main, .object(id, orders)))
+            let table = try #require(sidebar.treeNodes[.object(id, orders)])
+            #expect(outline.isExpandable(table) && table.children.isEmpty)  // nothing is made until it opens
+            outline.expandItem(table)
+            let schema = try #require(open.snapshot.database("airsql_fixture")?.table("orders"))
+            let columns = try #require(sidebar.treeNodes[.part(id, orders, .columns)])
+            #expect(table.children.first === columns && columns.children.compactMap(\.name) == schema.columns.map(\.name))
+            #expect(table.children.contains { $0.name == "Indexes" } && table.children.contains { $0.name == "Foreign Keys" })
+            // The key's column says so, in the icon's flag and in words.
+            let key = try #require(schema.primaryKey?.parts.first?.column)
+            let keyRow = try #require(columns.children.first { $0.name == key })
+            #expect(keyRow.detail?.isKey == true && keyRow.detail?.about.contains("primary key") == true)
+
+            // A reload keeps it open with the same column selected, its rows made again from the new snapshot.
+            outline.expandItem(columns)
+            outline.selectRowIndexes([outline.row(forItem: keyRow)], byExtendingSelection: false)
+            sidebar.reload()
+            let kept = try #require(sidebar.treeNodes[.detail(id, orders, .columns, key)])
+            #expect(outline.row(forItem: kept) >= 0 && sidebar.selectedNodes.first === kept)
+
+            // A column's row copies its name, opens its table, and reaches nothing that changes the table.
+            #expect(sidebar.selectedObjects.isEmpty)
+            sidebar.dropObject(nil)
+            #expect(main.window?.attachedSheet == nil)
+            sidebar.copy(nil)
+            #expect(NSPasteboard.general.string(forType: .string) == "`\(key)`")
+            sidebar.treeDoubleClicked(kept)
+            #expect(await eventually(timeout: 5) { main.selectedTab?.title.contains("orders") == true })
+            #expect(sidebar.treeMenu([kept]).items.compactMap { $0.isSeparatorItem ? nil : $0.title }
+                    == ["Open Structure", "Open Data", "Copy Name", "Copy Name Without Quotes"])
+
+            // A group's Expand All stops at the tables: it doesn't open them, or the tree would drown in columns.
+            let tables = try #require(sidebar.treeNodes[.category(id, "airsql_fixture", .table)])
+            outline.collapseItem(tables)
+            outline.selectRowIndexes([outline.row(forItem: tables)], byExtendingSelection: false)
+            sidebar.expandAll(nil)
+            #expect(outline.isItemExpanded(tables))
+            let customers = try #require(tables.children.first { $0.name == "customers" })
+            #expect(!outline.isItemExpanded(customers))
+        }
+
+        /// A view has columns only.
+        @Test func aViewOpensToItsColumnsOnly() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, id)
+            let sidebar = main.sidebar
+            let view = try #require(open.snapshot.database("airsql_fixture")?.tables.first { $0.kind == .view })
+            let parts = sidebar.tableParts(id, DatabaseObject(.view, "airsql_fixture", view.name))
+            #expect(parts.compactMap(\.name) == ["Columns"])
+        }
+
         /// Every navigator screen and dialog, light and dark, at the window's smallest and usual size: every control says
         /// what it does, and nothing is cut, crosses a rounded edge or overlaps.
         @Test func everyScreenIsExplainedAndTidy() async throws {

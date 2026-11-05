@@ -124,7 +124,7 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         let editable = edits?.editing?.isEditable == true
         switch target {
         case .column:
-            menu.add([Commands.sortAscending, Commands.sortDescending, Commands.sortColumns, Commands.clearSort, nil,
+            menu.add([Commands.sortAscending, Commands.sortDescending, Commands.addToSort, Commands.sortColumns, Commands.clearSort, nil,
                       Commands.filterByValues, Commands.clearFilter])
         case .cells:
             menu.addItem(quickFilterItem())

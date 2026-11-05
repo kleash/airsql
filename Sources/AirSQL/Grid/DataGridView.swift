@@ -26,7 +26,7 @@ protocol DataGridViewDelegate: AnyObject {
         -> (text: String, part: NSRange)?
     /// The menu for a right click on the selected cells, a column's header or a row's number (selected first).
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu?
-    /// The sort control in a column's header was clicked, or the header double-clicked; with ⌥ `adding` the column to the sort.
+    /// The sort control in a column's header was clicked, or the header double-clicked; with ⌥ or ⇧ `adding` the column to the sort.
     func dataGrid(_ grid: DataGridView, sortBy column: Int, adding: Bool)
     /// Whether the headers show a funnel for filtering a column by its values (default false), and it was clicked at
     /// `rect` of the header.

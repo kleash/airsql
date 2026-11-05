@@ -168,6 +168,10 @@ extension ResultGridView {
     @objc func sortAscending(_ sender: Any?) { sortFocused(ascending: true) }
     @objc func sortDescending(_ sender: Any?) { sortFocused(ascending: false) }
     @objc func clearSort(_ sender: Any?) { sortRows([]) }
+    @objc func addToSort(_ sender: Any?) {
+        guard let column = viewer.focusedColumn else { return NSSound.beep() }
+        dataGrid(grid, sortBy: column, adding: true)
+    }
 
     private func sortFocused(ascending: Bool) {
         guard let column = viewer.focusedColumn else { return NSSound.beep() }
@@ -252,6 +256,9 @@ extension ResultGridView {
             return (viewer.focusedColumn != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:
             return (!conditions.isEmpty || !filterBar.searchField.stringValue.isEmpty, "The rows aren't filtered")
+        case Commands.addToSort.action:
+            guard let column = viewer.focusedColumn else { return (false, "Select a cell or a column first") }
+            return (!grid.sortOrder.contains { $0.column == column }, "This column is already in the sort")
         case Commands.clearSort.action: return (!grid.sortOrder.isEmpty, "The rows aren't sorted")
         case Commands.sortColumns.action, Commands.searchAllColumns.action:
             return (!(grid.source is TransposedSource), "Leave Transpose or Record View first")

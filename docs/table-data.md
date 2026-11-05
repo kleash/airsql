@@ -63,7 +63,9 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   funnel opens over the rows and replaces its own earlier choice, so you can widen it again. In
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
 - **Sort**: double-click a header, or click the arrow at its right, to sort by that column, ascending, then descending,
-  then not at all; hold ⌥ to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
+  then not at all. To sort by several columns, ⇧-click the next column's arrow (⌥ works too, and ⌥-double-click on a
+  header), or right-click its header for **Add to Sort**; each arrow shows its place in the order. **Data ▸ Sort by
+  Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
   repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting

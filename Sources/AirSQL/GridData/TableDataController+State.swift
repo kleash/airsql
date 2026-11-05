@@ -139,6 +139,10 @@ extension TableDataController: NSMenuItemValidation {
              Commands.sortDescending.action:
             return (viewer.focusedColumn != nil, "Select a cell first")
         case Commands.filterPrompt.action: return (viewer.focusedCell != nil, "Select a cell first")
+        case Commands.addToSort.action:
+            guard let column = viewer.focusedColumn else { return (false, "Select a cell or a column first") }
+            let sorted = source.localSort.contains { $0.column == column } || source.sort.contains { $0.column == source.columns[column].name }
+            return (!sorted, "This column is already in the sort")
         case Commands.clearSort.action: return (!source.sort.isEmpty || !source.localSort.isEmpty, "The rows aren't sorted")
         case Commands.sortColumns.action: return (!(grid.source is TransposedSource), "Leave Transpose or Record View first")
         case Commands.filterByValues.action: return (viewer.focusedColumn != nil, "Select a cell or a column first")

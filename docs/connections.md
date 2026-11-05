@@ -89,7 +89,8 @@ programs chosen, startup SQL and agent access. TLS starts strict, except for a s
 
 ## Connect and disconnect
 
-Double-click a connection, or select it and choose **Connection ▸ Connect** (⌘K). The status bar shows each step, hop
+Double-click a connection (once it is connected, a double-click opens or closes its tree), or select it and choose
+**Connection ▸ Connect** (⌘K). The status bar shows each step, hop
 by hop, with Cancel. A connection that drops (the network goes away, the server restarts) is marked in the sidebar;
 AirSQL never reconnects behind your back. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
 transaction or edits that aren't applied.

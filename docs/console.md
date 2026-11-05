@@ -48,8 +48,8 @@ own session, which every query tab of that connection shares.
   that **Undo** takes back.
 - Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete
   between an empty pair takes both.
-- **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. **View ▸ Word Wrap** (also in Settings ▸ Editor) wraps
-  long lines at the editor's edge.
+- **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
+  (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
   (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
 - **Query ▸ Format SQL** (⌥⇧⌘F) puts each main clause on a line of its own and reserved words in capitals. It changes
@@ -106,8 +106,8 @@ nothing runs.
   table tabs.
 - **Filter, search and sort a result** on its rows, at once, without running the query again: right-click a cell for
   **Quick Filter** (the same conditions as in a [table tab](table-data.md#filter-search-and-sort), Type a Value…
-  included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Sort by
-  Columns…**, or click a value in **Column Summary…**. **Data ▸ Search All Columns** (⇧⌘E) keeps the rows with the text
+  included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Add to Sort**
+  and **Sort by Columns…** (⇧-click a header's arrow adds to the sort too), or click a value in **Column Summary…**. **Data ▸ Search All Columns** (⇧⌘E) keeps the rows with the text
   in any column and tints it. A bar over the rows shows while a filter or a search is on: **Local · 12 of 200 rows**,
   the conditions as SQL, and the search; its ⓧ or **Data ▸ Clear Filter** shows every row again. Copy and Export Rows…
   take the rows shown. The **?** at the right of the result tabs opens [Read the data in a grid](data-grid.md).

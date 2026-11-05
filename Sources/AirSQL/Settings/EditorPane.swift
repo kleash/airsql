@@ -7,7 +7,7 @@ final class EditorPane: SettingsPaneController {
         form.row("Text size", [choice(\.editorFontSize, id: "settings.editorFontSize",
                                       tip: "Choose the size of the SQL editor's text (13 pt by default)", fontSizes)],
                  caption: "The editor uses SF Mono. ⌘+ and ⌘− change it for a moment; Actual Size goes back to this.")
-        form.row("", [toggle("Wrap long lines", id: "settings.editorWraps", tip: "Wrap long lines at the editor's edge instead of scrolling sideways",
-                             \.editorWraps)])
+        form.row("", [toggle("Wrap long lines", id: "settings.editorWordWrap", tip: "Wrap long lines at the editor's edge instead of scrolling sideways",
+                             \.editorWordWrap)])
     }
 }

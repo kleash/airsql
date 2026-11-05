@@ -236,7 +236,7 @@ final class GridHeaderView: NSView {
             return
         }
         if isInSortControl(point, column) {
-            grid.delegate?.dataGrid(grid, sortBy: grid.columnOrder[column], adding: flags.contains(.option))
+            grid.delegate?.dataGrid(grid, sortBy: grid.columnOrder[column], adding: !flags.isDisjoint(with: [.option, .shift]))
             return
         }
         // Double-clicking the header acts as its sort control does (the first click has selected the column, the native rule).
@@ -303,8 +303,8 @@ final class GridHeaderView: NSView {
             toolTip = "Drag to resize the column; double-click to fit its values"
         } else if let column, let info = grid.source?.columns[grid.columnOrder[column]] {
             toolTip = funnel(at: point, column) != nil ? "Filter by \(info.name)'s values"
-                : isInSortControl(point, column) ? "Sort by \(info.name); ⌥-click to add it to the sort"
-                : "Select the column; drag to move it; double-click to sort by it\n" + info.details
+                : isInSortControl(point, column) ? "Sort by \(info.name); ⇧-click to add it to the sort"
+                : "Select the column; drag to move it; double-click to sort by it, ⌥-double-click to add it to the sort\n" + info.details
         } else {
             toolTip = nil
         }

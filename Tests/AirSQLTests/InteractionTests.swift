@@ -180,7 +180,7 @@ extension AppTests {
                         (main.selectedTab?.content as? TableDataController)?.source?.sort.isEmpty == false
                     },
                     // region: not a key (Use as Label) nor a foreign key (Add Virtual Foreign Key…).
-                    menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
+                    menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Add to Sort", "Sort by Columns…", "Clear Sort", "Filter by Values…",
                            "Clear Filter", "Use as Label", "Add Virtual Foreign Key…", "Remove Virtual Foreign Key", "Column Summary…",
                            "Hide Column", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
@@ -239,7 +239,7 @@ extension AppTests {
                     },
                     clicked: { main in resultGrid(main).selection.containsColumn(1) },
                     doubleClicked: { main, _ in !resultGrid(main).sortOrder.isEmpty },
-                    menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Clear Sort", "Filter by Values…",
+                    menu: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Add to Sort", "Sort by Columns…", "Clear Sort", "Filter by Values…",
                            "Clear Filter", "Column Summary…", "Hide Column", "Freeze", "Column List…", "Heatmap", "Chart", "Display As"],
                     enabled: ["Copy Column Name", "Sort Ascending", "Sort Descending", "Sort by Columns…", "Filter by Values…",
                               "Column Summary…", "Hide Column", "Freeze", "Column List…", "Chart"]),

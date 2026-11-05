@@ -15,7 +15,7 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## Editor
 
-- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways (**View ▸ Word Wrap** too).
+- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways; on at first (**View ▸ Word Wrap** too).
 
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.

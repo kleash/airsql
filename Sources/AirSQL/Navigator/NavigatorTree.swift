@@ -18,6 +18,9 @@ extension DatabaseObject.Kind {
     /// One of them, in plain words ("view").
     var noun: String { rawValue }
 
+    /// Its row opens to its columns and, for a table, indexes and keys.
+    var hasParts: Bool { self == .table || self == .view }
+
     /// The letters and colour of its icon (the mockup's).
     var badge: (String, UInt32) {
         switch self {
@@ -54,6 +57,17 @@ enum TreeIcon {
 
     static var database: NSImage { image("DB", 0x6B7785) }
     static func of(_ kind: DatabaseObject.Kind) -> NSImage { image(kind.badge.0, kind.badge.1) }
+    static var primaryKey: NSImage { image("PK", 0xD9911E) }
+
+    static func of(_ part: TablePart) -> NSImage {
+        switch part {
+        case .columns: return image("C", 0x6B7785)
+        case .indexes: return image("I", 0x2E9E5B)
+        case .foreignKeys: return image("FK", 0x8A4BAF)
+        case .checks: return image("Ck", 0x0A7F91)
+        case .triggers: return of(.trigger)
+        }
+    }
 }
 
 /// Counts as the tree shows them: 88 K, 2.4 M.
@@ -85,7 +99,11 @@ extension SidebarController {
                 let shown = all ? names : names.filter { $0.localizedCaseInsensitiveContains(text) }
                 if (!all && shown.isEmpty) || (kind == .sequence && names.isEmpty) { return nil }
                 let group = node(.category(id, database.name, kind))
-                group.children = shown.map { node(.object(id, DatabaseObject(kind, database.name, $0))) }
+                group.children = shown.map { name in
+                    let row = node(.object(id, DatabaseObject(kind, database.name, name)))
+                    row.children = []  // made again when it opens, from this snapshot
+                    return row
+                }
                 return group
             }
             guard all || !groups.isEmpty else { return nil }
@@ -101,6 +119,34 @@ extension SidebarController {
         return [(.table, tables(.table)), (.view, tables(.view)), (.sequence, tables(.sequence)),
                 (.procedure, routines(.procedure)), (.function, routines(.function)),
                 (.trigger, database.triggers.map(\.name)), (.event, database.events.map(\.name))]
+    }
+
+    /// The rows under a table or view: a group for each thing it has, from the schema cache, or a message until that
+    /// has its database's details. They join `treeNodes`, so a reload finds them to select again.
+    func tableParts(_ id: UUID, _ object: DatabaseObject) -> [SidebarNode] {
+        guard let open = model.openConnection(id), let database = open.snapshot.database(object.database),
+              let table = database.table(object.name) else { return [] }
+        guard database.detailsLoaded else {
+            // Not by `treeNodes`: the same message under two tables must be two rows.
+            return [SidebarNode(.message(id, open.loadError.map { "Couldn't read the schema: " + $0 } ?? "Loading the columns…"))]
+        }
+        func row(_ kind: SidebarNode.Kind) -> SidebarNode {
+            let node = treeNodes[kind] ?? SidebarNode(kind)
+            treeNodes[kind] = node
+            return node
+        }
+        return TablePart.allCases.compactMap { part in
+            var seen = Set<String>()  // an outline shows each item once
+            let rows = part.rows(of: table, in: database).filter { seen.insert($0.name).inserted }
+            guard !rows.isEmpty else { return nil }
+            let group = row(.part(id, object, part))
+            group.children = rows.map { detail in
+                let node = row(.detail(id, object, part, detail.name))
+                node.detail = detail
+                return node
+            }
+            return group
+        }
     }
 
     /// The cell of a tree row.
@@ -131,7 +177,15 @@ extension SidebarController {
             let action = object.kind.isTableLike ? "its data" : "its definition"
             cell.show(TreeIcon.of(object.kind), object.name, count: count, busy: false,
                       tip: "\(object.name), a \(object.kind.noun)\(count.isEmpty ? "" : " of about \(count) rows, the server's estimate"): "
-                        + "click to see \(action), double-click to open it in a tab, right-click for more")
+                        + "click to see \(action), double-click to open it in a tab, right-click for more"
+                        + (object.kind.hasParts ? ", its arrow shows its columns" + (object.kind == .table ? " and indexes" : "") : ""))
+        case .part(_, let object, let part):
+            cell.show(TreeIcon.of(part), part.rawValue, count: "\(node.children.count)", busy: false,
+                      tip: "\(part.rawValue) of \(object.name): double-click to open or close, right-click for more")
+        case .detail(_, _, let part, let name):
+            cell.show(node.detail?.isKey == true ? TreeIcon.primaryKey : TreeIcon.of(part), name, count: node.detail?.note ?? "", countGivesWay: true, busy: false,
+                      tip: (node.detail?.about ?? name) + "\nDouble-click to open " + (part == .triggers ? "it" : "the table's structure")
+                        + ", right-click for more")
         default:
             break
         }
@@ -143,7 +197,8 @@ extension SidebarNode {
     /// The connection of a tree row (a database, group, object or message).
     var connectionOfTree: UUID? {
         switch kind {
-        case .database(let id, _), .category(let id, _, _), .object(let id, _), .message(let id, _): return id
+        case .database(let id, _), .category(let id, _, _), .object(let id, _), .part(let id, _, _), .detail(let id, _, _, _),
+             .message(let id, _): return id
         default: return nil
         }
     }
@@ -152,7 +207,7 @@ extension SidebarNode {
     var database: String? {
         switch kind {
         case .database(_, let name), .category(_, let name, _): return name
-        case .object(_, let object): return object.database
+        case .object(_, let object), .part(_, let object, _), .detail(_, let object, _, _): return object.database
         default: return nil
         }
     }
@@ -162,12 +217,23 @@ extension SidebarNode {
         return nil
     }
 
+    /// The table or view a row under one belongs to. Not an `object`: Drop and the like must never reach a table from
+    /// its column's row.
+    var owner: DatabaseObject? {
+        switch kind {
+        case .part(_, let object, _), .detail(_, let object, _, _): return object
+        default: return nil
+        }
+    }
+
     /// What type-to-find and the drag read.
     var name: String? {
         switch kind {
         case .database(_, let name): return name
         case .category(_, _, let kind): return kind.group
         case .object(_, let object): return object.name
+        case .part(_, _, let part): return part.rawValue
+        case .detail(_, _, _, let name): return name
         default: return nil
         }
     }
@@ -197,6 +263,7 @@ final class TreeCell: NSTableCellView {
         name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
         count.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        count.lineBreakMode = .byTruncatingTail
         count.setContentCompressionResistancePriority(.required, for: .horizontal)
         count.setContentHuggingPriority(.required, for: .horizontal)
         spinner.style = .spinning
@@ -223,7 +290,8 @@ final class TreeCell: NSTableCellView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func show(_ image: NSImage, _ text: String, count value: String, bold: Bool = false, busy: Bool, tip: String) {
+    /// `countGivesWay`: the count is words (a column's type), cut before the name rather than beside it.
+    func show(_ image: NSImage, _ text: String, count value: String, countGivesWay: Bool = false, bold: Bool = false, busy: Bool, tip: String) {
         icon.isHidden = false
         icon.image = image
         name.stringValue = text
@@ -232,6 +300,7 @@ final class TreeCell: NSTableCellView {
         colour()
         count.stringValue = value
         count.isHidden = value.isEmpty
+        count.setContentCompressionResistancePriority(countGivesWay ? .defaultLow - 1 : .required, for: .horizontal)
         setBusy(busy)
         toolTip = tip
         setAccessibilityLabel(bold ? text + ", current database" : text)

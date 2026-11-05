@@ -421,6 +421,14 @@ extension AppTests {
             await ready { tab.loading != nil }
             #expect(session.statements.last?.contains("ORDER BY `id` DESC, `region` ASC LIMIT") == true, "\(session.statements.last ?? "")")
             #expect(tab.grid.sortOrder.map(\.column) == [0, 2] && tab.settings.sort.count == 2)
+
+            // Add to Sort keeps those and goes after them; a column already in the sort can't be added again.
+            tab.grid.selection.select(GridPosition(row: 1, column: 1))
+            #expect(await call(harness, "menu", ["path": "Data > Add to Sort"]).error == nil)
+            await ready { tab.loading != nil }
+            #expect(tab.grid.sortOrder.map(\.column) == [0, 2, 1])
+            #expect(session.statements.last?.contains("ORDER BY `id` DESC, `region` ASC, `") == true, "\(session.statements.last ?? "")")
+            #expect(await call(harness, "menu", ["path": "Data > Add to Sort"]).error != nil)
         }
 
         @Test func findAndReplaceInTheLoadedRows() async throws {
@@ -743,6 +751,9 @@ extension AppTests {
             result.dataGrid(viewer.grid, sortBy: 1, adding: false)
             #expect((0..<viewer.grid.rowCount).map { result.rows.value($0, 1) ?? "" } == found.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
             #expect(result.filterBar.scope.text == "Local · 4 of 5 rows")
+            viewer.grid.selection.select(GridPosition(row: 0, column: 0))
+            result.addToSort(nil)
+            #expect(viewer.grid.sortOrder.map(\.column) == [1, 0])
 
             // Filter by Values counts the rows shown.
             result.clearFilter(nil)

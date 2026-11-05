@@ -127,6 +127,7 @@ import AppKit
     @objc optional func sortDescending(_ sender: Any?)
     @objc optional func clearSort(_ sender: Any?)
     @objc optional func sortColumns(_ sender: Any?)
+    @objc optional func addToSort(_ sender: Any?)
     @objc optional func goToRow(_ sender: Any?)
     @objc optional func goToLine(_ sender: Any?)
     @objc optional func moveRowsUp(_ sender: Any?)
@@ -560,6 +561,8 @@ enum Commands {
     static let sortDescending = Command("Sort Descending", #selector(AirSQLActions.sortDescending(_:)), down, [.command, .control, .option],
                                         tip: "Sort by this column, largest first")
     static let clearSort = Command("Clear Sort", #selector(AirSQLActions.clearSort(_:)), tip: "Show rows in the table's own order again")
+    static let addToSort = Command("Add to Sort", #selector(AirSQLActions.addToSort(_:)),
+                                   tip: "Sort by this column too, after the columns already sorted")
     static let sortColumns = Command("Sort by Columns…", #selector(AirSQLActions.sortColumns(_:)),
                                      tip: "Sort by several columns, each ascending or descending, in the order you set")
     static let goToRow = Command("Go to Row…", #selector(AirSQLActions.goToRow(_:)), "l", tip: "Go to a row by its number, or to column:row")
@@ -755,7 +758,7 @@ enum Commands {
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
+        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,

@@ -164,11 +164,12 @@ extension AppTests {
             #expect(editor.selectedRange().location == 8)
             editor.goTo(line: 99)
             #expect(editor.selectedRange().location == 13)
-            console.toggleWordWrap(nil)
-            #expect(editor.textContainer?.widthTracksTextView == true && !editor.isHorizontallyResizable)
+            #expect(editor.textContainer?.widthTracksTextView == true && !editor.isHorizontallyResizable)  // on from the start
             #expect(editor.enclosingScrollView?.hasHorizontalScroller == false)
             console.toggleWordWrap(nil)
             #expect(editor.textContainer?.widthTracksTextView == false && editor.isHorizontallyResizable)
+            console.toggleWordWrap(nil)
+            #expect(editor.textContainer?.widthTracksTextView == true && !editor.isHorizontallyResizable)
         }
 
         /// An unknown table is underlined from the schema cache a moment after the typing, with no session; Run isn't held back.

@@ -16,6 +16,11 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   empty database, for **Create Table…**.
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
+- **Click the arrow** beside a table or view (or press →) to see what it holds without opening it: **Columns** with
+  their types (the primary key's are marked **PK**), and for a table **Indexes**, **Foreign Keys**, **Checks** and
+  **Triggers**. Hold the pointer over a row for all of it: a column's default, an index's columns, where a key points.
+  **Double-click** a row to open the table's structure (a trigger, its editor); right-click a column for **Copy Name**,
+  or drag it into the SQL editor. All of this comes from what AirSQL already read, so it asks the server nothing.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](editors.md));
   **Create Table…** makes a table in the database you right-clicked; **New…** on a group (Tables, Views…) makes
   another of its kind.
@@ -27,7 +32,7 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
   filter, a connected connection whose name doesn't match shows the objects that do, opened.
-- Drag a table or database into the SQL editor to insert its name, quoted for SQL.
+- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL.
 - F2 renames the selected table or view (or folder), as **Database ▸ Rename…** does.
 - **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
 

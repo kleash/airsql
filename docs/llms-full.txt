@@ -159,7 +159,7 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## Editor
 
-- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways (**View ▸ Word Wrap** too).
+- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways; on at first (**View ▸ Word Wrap** too).
 
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
@@ -414,8 +414,8 @@ own session, which every query tab of that connection shares.
   that **Undo** takes back.
 - Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete
   between an empty pair takes both.
-- **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. **View ▸ Word Wrap** (also in Settings ▸ Editor) wraps
-  long lines at the editor's edge.
+- **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
+  (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
   (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
 - **Query ▸ Format SQL** (⌥⇧⌘F) puts each main clause on a line of its own and reserved words in capitals. It changes
@@ -472,8 +472,8 @@ nothing runs.
   table tabs.
 - **Filter, search and sort a result** on its rows, at once, without running the query again: right-click a cell for
   **Quick Filter** (the same conditions as in a [table tab](https://kleash.github.io/airsql/table-data.html#filter-search-and-sort), Type a Value…
-  included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Sort by
-  Columns…**, or click a value in **Column Summary…**. **Data ▸ Search All Columns** (⇧⌘E) keeps the rows with the text
+  included), a header for **Filter by Values…** (the values in the rows shown, with their counts) or **Add to Sort**
+  and **Sort by Columns…** (⇧-click a header's arrow adds to the sort too), or click a value in **Column Summary…**. **Data ▸ Search All Columns** (⇧⌘E) keeps the rows with the text
   in any column and tints it. A bar over the rows shows while a filter or a search is on: **Local · 12 of 200 rows**,
   the conditions as SQL, and the search; its ⓧ or **Data ▸ Clear Filter** shows every row again. Copy and Export Rows…
   take the rows shown. The **?** at the right of the result tabs opens [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html).
@@ -644,7 +644,8 @@ programs chosen, startup SQL and agent access. TLS starts strict, except for a s
 
 ## Connect and disconnect
 
-Double-click a connection, or select it and choose **Connection ▸ Connect** (⌘K). The status bar shows each step, hop
+Double-click a connection (once it is connected, a double-click opens or closes its tree), or select it and choose
+**Connection ▸ Connect** (⌘K). The status bar shows each step, hop
 by hop, with Cancel. A connection that drops (the network goes away, the server restarts) is marked in the sidebar;
 AirSQL never reconnects behind your back. **Connection ▸ Disconnect** (⇧⌘K) asks first when a tab has an open
 transaction or edits that aren't applied.
@@ -678,6 +679,11 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   empty database, for **Create Table…**.
 - **Click** a table or view to see its rows; **double-click** it (or press Return) to open it in a tab of its own.
 - **Click** a routine, trigger or event to see its definition; **double-click** (or **Open**) to open it in its editor.
+- **Click the arrow** beside a table or view (or press →) to see what it holds without opening it: **Columns** with
+  their types (the primary key's are marked **PK**), and for a table **Indexes**, **Foreign Keys**, **Checks** and
+  **Triggers**. Hold the pointer over a row for all of it: a column's default, an index's columns, where a key points.
+  **Double-click** a row to open the table's structure (a trigger, its editor); right-click a column for **Copy Name**,
+  or drag it into the SQL editor. All of this comes from what AirSQL already read, so it asks the server nothing.
 - **Open Structure** in a table's menu opens the table editor ([Change tables, views and routines](https://kleash.github.io/airsql/editors.html));
   **Create Table…** makes a table in the database you right-clicked; **New…** on a group (Tables, Views…) makes
   another of its kind.
@@ -689,7 +695,7 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
 - Hold ⌘ or ⇧ to select several tables, then drop, empty, check or change them all at once.
 - Type a few letters of a name to jump to it, or type in the sidebar's filter (⌥⌘J) to show only what matches. While you
   filter, a connected connection whose name doesn't match shows the objects that do, opened.
-- Drag a table or database into the SQL editor to insert its name, quoted for SQL.
+- Drag a table, column or database into the SQL editor to insert its name, quoted for SQL.
 - F2 renames the selected table or view (or folder), as **Database ▸ Rename…** does.
 - **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
 
@@ -827,7 +833,9 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   funnel opens over the rows and replaces its own earlier choice, so you can widen it again. In
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
 - **Sort**: double-click a header, or click the arrow at its right, to sort by that column, ascending, then descending,
-  then not at all; hold ⌥ to add the column to the sort. **Data ▸ Sort by Columns…** (or a header's menu) sets several at once: a line per
+  then not at all. To sort by several columns, ⇧-click the next column's arrow (⌥ works too, and ⌥-double-click on a
+  header), or right-click its header for **Add to Sort**; each arrow shows its place in the order. **Data ▸ Sort by
+  Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
   repeat or miss a row (a view or a table without a key has no such order). On a table of over a million rows, sorting

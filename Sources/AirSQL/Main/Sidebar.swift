@@ -3,7 +3,7 @@ import AppKit
 import Combine
 
 /// A row of the sidebar's outline: the connections in their folders and, under a connected one, the navigator's tree
-/// (its databases, each object kind's group, the objects, and a message while it loads).
+/// (its databases, each object kind's group, the objects, what a table holds, and a message while it loads).
 @MainActor
 final class SidebarNode: NSObject {
     enum Kind: Hashable {
@@ -13,11 +13,16 @@ final class SidebarNode: NSObject {
         case database(UUID, String)
         case category(UUID, String, DatabaseObject.Kind)
         case object(UUID, DatabaseObject)
+        /// A group under a table or view, and a row of that group, by its name.
+        case part(UUID, DatabaseObject, TablePart)
+        case detail(UUID, DatabaseObject, TablePart, String)
         case message(UUID, String)
     }
 
     let kind: Kind
     var children: [SidebarNode] = []
+    /// What a `detail` row shows.
+    var detail: TablePart.Row?
 
     init(_ kind: Kind) {
         self.kind = kind
@@ -31,7 +36,8 @@ final class SidebarNode: NSObject {
 
 /// The sidebar (plan §2.4, §2.12): a filter field, the connections in their folders (the navigator's tree goes under
 /// a connected one), and a footer with New Connection and the process list. A click selects a connection and shows its
-/// summary, a double-click connects, a right-click opens its menu; ⌘ and ⇧ select several.
+/// summary, a double-click connects it (or, connected, opens or closes its tree), a right-click opens its menu; ⌘ and ⇧
+/// select several.
 @MainActor
 final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate {
     let model: AppModel
@@ -42,7 +48,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     private var folders: [UUID: SidebarNode] = [:]
     private var connections: [UUID: SidebarNode] = [:]
     /// The tree's rows by kind, kept across reloads so they stay selected and expanded.
-    private(set) var treeNodes: [SidebarNode.Kind: SidebarNode] = [:]
+    var treeNodes: [SidebarNode.Kind: SidebarNode] = [:]
     /// Connections whose tree has been opened once since they connected.
     private var treeShown: Set<UUID> = []
     private var observers: [AnyCancellable] = []
@@ -225,7 +231,13 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
                 let current = first && database.database == model.openConnection(id)?.currentDatabase
                 guard filtered || current || expanded.contains(database.kind) else { continue }
                 outline.expandItem(database)
-                for group in database.children where filtered || expanded.contains(group.kind) { outline.expandItem(group) }
+                for group in database.children where filtered || expanded.contains(group.kind) {
+                    outline.expandItem(group)
+                    for table in group.children where expanded.contains(table.kind) {
+                        outline.expandItem(table)
+                        for part in table.children where expanded.contains(part.kind) { outline.expandItem(part) }
+                    }
+                }
             }
         }
         let rows = IndexSet(selected.compactMap { kind -> Int? in
@@ -293,7 +305,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             switch node.kind {
             case .header: return nil
             case .folder(let id), .connection(let id), .database(let id, _), .category(let id, _, _), .object(let id, _),
-                 .message(let id, _): return id
+                 .part(let id, _, _), .detail(let id, _, _, _), .message(let id, _): return id
             }
         }
     }
@@ -325,8 +337,12 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     }
 
     func outlineViewItemDidExpand(_ notification: Notification) {
-        guard let node = notification.userInfo?["NSObject"] as? SidebarNode, case .database(let id, let name) = node.kind else { return }
-        model.openConnection(id)?.loadDetails(name)
+        guard let node = notification.userInfo?["NSObject"] as? SidebarNode else { return }
+        switch node.kind {
+        case .database(let id, let name): model.openConnection(id)?.loadDetails(name)
+        case .object(let id, let object): model.openConnection(id)?.loadDetails(object.database)
+        default: break
+        }
     }
 
     func outlineView(_ outlineView: NSOutlineView, typeSelectStringFor tableColumn: NSTableColumn?, item: Any) -> String? {
@@ -389,10 +405,14 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         case .header: break
         case .folder:
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
-        case .connection:
-            // Connect (or show it when connected): whatever connects implements it.
-            outline.sendCommand(Commands.connect.action)
-        case .database, .category, .object:
+        case .connection(let id):
+            // Connected, it opens and closes as the tree's rows do; else whatever connects implements Connect.
+            guard model.openConnection(id) != nil else {
+                outline.sendCommand(Commands.connect.action)
+                return
+            }
+            if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
+        case .database, .category, .object, .part, .detail:
             treeDoubleClicked(node)
         case .message:
             break
@@ -430,6 +450,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
 
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
         guard let node = item as? SidebarNode else { return 1 }
+        // A table's rows are made when it opens: reloads leave them out, a server can have thousands of tables.
+        if node.children.isEmpty, case .object(let id, let object) = node.kind, object.kind.hasParts {
+            node.children = tableParts(id, object)
+        }
         return node.children.count
     }
 
@@ -441,6 +465,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
         guard let node = item as? SidebarNode else { return false }
         if case .folder = node.kind { return true }
+        if case .object(_, let object) = node.kind { return object.kind.hasParts }
         return node.kind == .header || !node.children.isEmpty
     }
 
@@ -469,7 +494,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             if let connection = model.connection(id) {
                 cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true)
             }
-        case .database, .category, .object, .message:
+        case .database, .category, .object, .part, .detail, .message:
             return treeCell(node, in: outlineView)
         }
         return cell
