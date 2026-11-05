@@ -93,24 +93,31 @@ extension SQLEditorView {
 
     override func insertBacktab(_ sender: Any?) { outdentLines(sender) }
 
-    /// Return keeps the line's indentation.
+    /// Return keeps the line's indentation, one level deeper after a bracket; between a pair the closer gets a line of its own.
     override func insertNewline(_ sender: Any?) {
-        let text = string as NSString
-        let line = text.lineRange(for: NSRange(location: selectedRange().location, length: 0))
-        let indent = text.substring(with: line).prefix { $0 == " " || $0 == "\t" }
-        insertText("\n" + indent, replacementRange: selectedRange())
+        let text = string as NSString, selection = selectedRange()
+        let line = text.lineRange(for: NSRange(location: selection.location, length: 0))
+        let indent = String(text.substring(with: line).prefix { $0 == " " || $0 == "\t" })
+        let opened = selection.location > 0 && text.character(at: selection.location - 1) == 0x28
+            && !tokens.contains { $0.kind != .symbol && $0.range.lowerBound < selection.location && selection.location <= $0.range.upperBound }
+        guard opened else { return insertText("\n" + indent, replacementRange: selection) }
+        let closes = NSMaxRange(selection) < text.length && text.character(at: NSMaxRange(selection)) == 0x29
+        let inner = "\n" + indent + indentUnit
+        replace(selection, with: inner + (closes ? "\n" + indent : ""),
+                select: NSRange(location: selection.location + (inner as NSString).length, length: 0))
     }
 
-    /// Several values pasted between the brackets of an IN become a quoted list, as one undoable step; anything else
-    /// pastes as usual (Paste Without Formatting always does).
+    /// Several values pasted between the brackets of an IN become a quoted list, and text pasted inside a 'string' is
+    /// escaped for it, each as one undoable step; anything else pastes as usual (Paste Without Formatting always does).
     override func paste(_ sender: Any?) {
         if !extraCarets.isEmpty, !applyingCarets { return pasteAtEveryCaret() }
         guard let clipboard = NSPasteboard.general.string(forType: .string),
               let selection = Range(selectedRange()) else { return super.paste(sender) }
         let context = nameContext?()
-        guard let edit = SQLInPaste.edit(pasting: clipboard, into: string, selection: selection, snapshot: context?.snapshot,
-                                         database: context?.database, noBackslashEscapes: noBackslashEscapes)
-        else { return super.paste(sender) }
+        let edit = SQLInPaste.edit(pasting: clipboard, into: string, selection: selection, snapshot: context?.snapshot,
+                                   database: context?.database, noBackslashEscapes: noBackslashEscapes)
+            ?? SQLEditing.pastedInString(clipboard, into: string, selection: selection, noBackslashEscapes: noBackslashEscapes)
+        guard let edit else { return super.paste(sender) }
         breakUndoCoalescing()
         replace(NSRange(edit.range), with: edit.text,
                 select: NSRange(location: edit.range.lowerBound + (edit.text as NSString).length, length: 0))
@@ -199,15 +206,21 @@ extension SQLEditorView {
         return menu
     }
 
+    /// The commands that change the text: they need an editable editor, and an agent can't choose them in a production
+    /// console, where deleting a WHERE line would change what the person then runs.
+    static let textCommands: Set<Selector> = [
+        #selector(toggleComment(_:)), #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(duplicateLine(_:)),
+        #selector(deleteLine(_:)), #selector(moveLineUp(_:)), #selector(moveLineDown(_:)), #selector(joinLines(_:)),
+        #selector(sortLines(_:)), #selector(reverseLines(_:)), #selector(toggleCase(_:)), #selector(toggleBlockComment(_:)),
+        #selector(completeStatement(_:)), #selector(moveStatementUp(_:)), #selector(moveStatementDown(_:)),
+    ]
+
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         switch item.action {
-        case #selector(toggleComment(_:)), #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(duplicateLine(_:)),
-             #selector(deleteLine(_:)), #selector(moveLineUp(_:)), #selector(moveLineDown(_:)), #selector(joinLines(_:)),
-             #selector(sortLines(_:)), #selector(reverseLines(_:)), #selector(toggleCase(_:)), #selector(toggleBlockComment(_:)),
-             #selector(completeStatement(_:)), #selector(moveStatementUp(_:)), #selector(moveStatementDown(_:)):
-            return isEditable
         case Commands.copy.action:
             return !string.isEmpty  // with no selection, it copies the line
+        case let action? where Self.textCommands.contains(action):
+            return isEditable
         default:
             return super.validateUserInterfaceItem(item)
         }

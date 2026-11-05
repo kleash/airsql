@@ -1,3 +1,4 @@
+import AirSQLCore
 import AppKit
 
 /// Find and replace in the editor (⌘F, ⌥⌘F; plan §2.6), with regular expressions: the matches marked in the text, the
@@ -11,6 +12,10 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
     private let count = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
     let matchCase = NSButton(checkboxWithTitle: "Match Case", target: nil, action: nil)
     let regex = NSButton(checkboxWithTitle: "Regular Expression", target: nil, action: nil)
+    let wholeWords = NSButton(checkboxWithTitle: "Whole Words", target: nil, action: nil)
+    let inSelection = NSButton(checkboxWithTitle: "In Selection", target: nil, action: nil)
+    /// The selection In Selection looks in, kept while the matches found there get selected in turn.
+    private var scope: NSRange?
     private let replaceRow = NSStackView()
     private var marks: [NSRange] = []
     /// Shows or hides the bar (the console lays it out).
@@ -28,13 +33,17 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         replacement.placeholderString = "Replace with"
         replacement.toolTip = "Type the replacement: $1, $2… put in a regular expression's groups"
         replacement.setAccessibilityIdentifier("find.replace")
-        for box in [matchCase, regex] {
+        for box in [matchCase, wholeWords, regex, inSelection] {
             box.target = self
             box.action = #selector(optionsChanged(_:))
             box.controlSize = .small
         }
         matchCase.toolTip = "Find only text with the same capitals"
         regex.toolTip = "Read what to find as a regular expression, such as ^id_[0-9]+"
+        wholeWords.toolTip = "Find only whole words: id doesn't find order_id"
+        inSelection.toolTip = "Find and replace only in the text that's selected now"
+        wholeWords.setAccessibilityIdentifier("find.wholeWords")
+        inSelection.setAccessibilityIdentifier("find.inSelection")
         matchCase.setAccessibilityIdentifier("find.matchCase")
         regex.setAccessibilityIdentifier("find.regex")
         let previous = icon("chevron.left", "Previous Match", "Show the previous match (⇧⌘G)", #selector(previousMatch(_:)), "find.previous")
@@ -48,7 +57,7 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         [replace, all].forEach { $0.controlSize = .small }
         let doneSpacer = NSView()
         doneSpacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let findRow = NSStackView(views: [search, previous, next, count, matchCase, regex, doneSpacer, done])
+        let findRow = NSStackView(views: [search, previous, next, count, matchCase, wholeWords, regex, inSelection, doneSpacer, done])
         findRow.spacing = Spacing.unit
         findRow.setCustomSpacing(Spacing.half, after: previous)
         replaceRow.setViews([replacement, replace, all], in: .leading)
@@ -134,21 +143,31 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
     func matches() -> [NSRange]? {
         guard let editor, !search.stringValue.isEmpty else { return [] }
         let text = editor.string as NSString
+        let area = inSelection.state == .on ? scope ?? NSRange(location: 0, length: 0) : NSRange(location: 0, length: text.length)
         if regex.state == .on {
-            guard let expression = try? NSRegularExpression(pattern: search.stringValue,
-                                                            options: matchCase.state == .on ? [] : [.caseInsensitive]) else { return nil }
-            return expression.matches(in: editor.string, range: NSRange(location: 0, length: text.length)).map(\.range)
-                .filter { $0.length > 0 }
+            guard let expression = expression else { return nil }
+            return expression.matches(in: editor.string, range: area).map(\.range).filter { $0.length > 0 && isWhole($0, text) }
         }
-        var found: [NSRange] = [], start = 0
+        var found: [NSRange] = [], start = area.location
         let options: NSString.CompareOptions = matchCase.state == .on ? [] : [.caseInsensitive]
-        while start < text.length {
-            let range = text.range(of: search.stringValue, options: options, range: NSRange(location: start, length: text.length - start))
+        while start < NSMaxRange(area) {
+            let range = text.range(of: search.stringValue, options: options, range: NSRange(location: start, length: NSMaxRange(area) - start))
             guard range.location != NSNotFound else { break }
-            found.append(range)
+            if isWhole(range, text) { found.append(range) }
             start = NSMaxRange(range)
         }
         return found
+    }
+
+    private var expression: NSRegularExpression? {
+        try? NSRegularExpression(pattern: search.stringValue, options: matchCase.state == .on ? [] : [.caseInsensitive])
+    }
+
+    /// With Whole Words on: no letter, digit or _ touches the match on either side.
+    private func isWhole(_ range: NSRange, _ text: NSString) -> Bool {
+        guard wholeWords.state == .on else { return true }
+        func isName(_ index: Int) -> Bool { index >= 0 && index < text.length && SQLLexer.isNameChar(text.character(at: index)) }
+        return !isName(range.location - 1) && !isName(NSMaxRange(range))
     }
 
     /// Marks the matches and says how many there are.
@@ -205,14 +224,10 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
         guard !Self.refusesAgentText(editor) else { return }
         let text = editor.string as NSString, whole = NSRange(location: 0, length: text.length)
         let result: String
-        if regex.state == .on, let expression = try? NSRegularExpression(pattern: search.stringValue,
-                                                                          options: matchCase.state == .on ? [] : [.caseInsensitive]) {
-            result = expression.stringByReplacingMatches(in: editor.string, range: whole, withTemplate: replacement.stringValue)
-        } else {
-            let copy = NSMutableString(string: text)
-            for range in found.reversed() { copy.replaceCharacters(in: range, with: replacement.stringValue) }
-            result = copy as String
-        }
+        // Match by match: Whole Words and In Selection leave some text out, and groups are each match's own.
+        let copy = NSMutableString(string: text)
+        for range in found.reversed() { copy.replaceCharacters(in: range, with: replacementText(for: range)) }
+        result = copy as String
         editor.replace(whole, with: result, select: NSRange(location: 0, length: 0))
         count.stringValue = "Replaced \(found.count.formatted())"
         clearMarks()
@@ -226,13 +241,15 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
 
     /// The replacement for one match: with a regular expression, its groups put in for $1, $2….
     private func replacementText(for range: NSRange) -> String {
-        guard regex.state == .on, let editor,
-              let expression = try? NSRegularExpression(pattern: search.stringValue, options: matchCase.state == .on ? [] : [.caseInsensitive]),
+        guard regex.state == .on, let editor, let expression,
               let match = expression.firstMatch(in: editor.string, range: range) else { return replacement.stringValue }
         return expression.replacementString(for: match, in: editor.string, offset: 0, template: replacement.stringValue)
     }
 
-    @objc private func optionsChanged(_ sender: Any?) { update() }
+    @objc private func optionsChanged(_ sender: Any?) {
+        if sender as? NSButton === inSelection { scope = inSelection.state == .on ? editor?.selectedRange() : nil }
+        update()
+    }
 
     func controlTextDidChange(_ notification: Notification) {
         if (notification.object as? NSSearchField) === search { update() }

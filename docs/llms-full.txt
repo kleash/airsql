@@ -411,8 +411,8 @@ own session, which every query tab of that connection shares.
 - **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names, the
   server's functions by kind, and the keywords. Double-click one to put it in at the cursor, or drag it into the editor
   (a column's name comes quoted where it needs to be, as completion puts it in).
-- **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression** and **Match
-  Case**. With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
+- **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression**, **Match
+  Case**, **Whole Words** and **In Selection** (the text selected when you tick it). With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
 - Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete
   between an empty pair takes both.
@@ -423,6 +423,9 @@ own session, which every query tab of that connection shares.
   Blank lines drop out, spaces around values go, `NULL` stays text, and a list that's already quoted stays as it is. When
   there are lines or tabs, a comma inside a value is the value's own. One value, or a subquery, pastes as usual, and one
   **Undo** takes the paste back. **Edit ▸ Paste Without Formatting** (⌥⇧⌘V) always pastes the text just as it was copied.
+- Text pasted inside a `'string'` is escaped so its quotes don't end the string; **Paste Without Formatting** keeps it as copied.
+- Return after `(` indents one level, and between `(` and `)` puts the `)` on a line of its own.
+- The `BEGIN` or `CASE` and `END` of a block are marked when the cursor is on one of them.
 - **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**

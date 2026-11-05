@@ -116,6 +116,45 @@ public enum SQLEditing {
     private static let clauseWords: Set<String> = ["SELECT", "FROM", "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT", "SET", "VALUES", "UNION",
                                                    "JOIN", "LEFT", "RIGHT", "INNER", "CROSS", "ON", "RETURNING"]
 
+    /// `clipboard` escaped for the single-quoted string `selection` lies inside, so its quotes don't end the string. Nil
+    /// anywhere else, and when there's nothing to escape.
+    public static func pastedInString(_ clipboard: String, into text: String, selection: Range<Int>, noBackslashEscapes: Bool = false)
+        -> (range: Range<Int>, text: String)? {
+        let units = Array(text.utf16)
+        guard let string = SQLLexer.tokens(text, noBackslashEscapes: noBackslashEscapes).first(where: {
+            $0.kind == .string && $0.range.lowerBound < selection.lowerBound
+                && (selection.upperBound < $0.range.upperBound || !$0.isClosed)
+        }), units[string.range.lowerBound] == 0x27 else { return nil }
+        let escaped = String(SQLQuote.string(clipboard, noBackslashEscapes: noBackslashEscapes).dropFirst().dropLast())
+        return escaped == clipboard ? nil : (selection, escaped)
+    }
+
+    /// The BEGIN or CASE and the END of the block whose word `caret` is on, outside strings and comments.
+    public static func blockPair(at caret: Int, in text: String, noBackslashEscapes: Bool = false) -> (Range<Int>, Range<Int>)? {
+        let units = Array(text.utf16)
+        let words = SQLLexer.tokens(text, noBackslashEscapes: noBackslashEscapes).filter { $0.kind == .word }
+        func word(_ index: Int) -> String { String(decoding: units[words[index].range], as: UTF16.self).uppercased() }
+        var open: [Int] = []
+        for index in words.indices {
+            switch word(index) {
+            case "BEGIN", "CASE":
+                // END CASE closes a CASE: that word isn't another one opening.
+                if index > 0, word(index - 1) == "END", word(index) == "CASE" { continue }
+                open.append(index)
+            case "END":
+                // END IF, END LOOP and the like close blocks this doesn't follow.
+                if index + 1 < words.count, ["IF", "LOOP", "WHILE", "REPEAT"].contains(word(index + 1)) { continue }
+                guard let start = open.popLast() else { continue }
+                let pair = (words[start].range, words[index].range)
+                if pair.0.lowerBound <= caret && caret <= pair.0.upperBound || pair.1.lowerBound <= caret && caret <= pair.1.upperBound {
+                    return pair
+                }
+            default: break
+            }
+        }
+        return nil
+    }
+
     /// Complete Statement: what closes the statement at `caret`: its open brackets and a `;`, if it has none, written at
     /// its end; the caret goes on a new line after it, which is `caret`.
     public static func completed(_ text: String, caret: Int, noBackslashEscapes: Bool = false)

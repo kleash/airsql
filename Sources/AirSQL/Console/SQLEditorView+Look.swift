@@ -65,7 +65,7 @@ extension SQLEditorView {
     }
 
     /// Writes "Ln 3, Col 14" and what's selected in the corner.
-    private func updatePosition() {
+    func updatePosition() {
         let text = string as NSString, selection = selectedRange()
         guard selection.location <= text.length else { return }
         let lineStart = text.lineRange(for: NSRange(location: selection.location, length: 0)).location
@@ -77,7 +77,9 @@ extension SQLEditorView {
         guard let scroll = enclosingScrollView else { return }
         positionLabel.sizeToFit()
         let size = positionLabel.frame.size
-        positionLabel.setFrameOrigin(NSPoint(x: scroll.bounds.maxX - size.width - 16, y: scroll.isFlipped ? scroll.bounds.maxY - size.height - 2 : 2))
+        // Above the sideways scroller wherever there can be one: it comes and goes after this runs.
+        let gap = 2 + (scroll.hasHorizontalScroller ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: scroll.scrollerStyle) : 0)
+        positionLabel.setFrameOrigin(NSPoint(x: scroll.bounds.maxX - size.width - 16, y: scroll.isFlipped ? scroll.bounds.maxY - size.height - gap : gap))
     }
 
     // MARK: The name at the cursor

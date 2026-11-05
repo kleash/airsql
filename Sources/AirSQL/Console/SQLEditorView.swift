@@ -166,6 +166,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         container.widthTracksTextView = wraps
         container.size = NSSize(width: wraps ? scroll.contentSize.width : .greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
         if wraps { setFrameSize(NSSize(width: scroll.contentSize.width, height: frame.height)) }
+        updatePosition()
     }
 
     override func performTextFinderAction(_ sender: Any?) {
@@ -350,6 +351,13 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
 
     private func markUsagesAtCaret() {
         guard let layout = layoutManager else { return }
+        if selectedRange().length == 0, (string as NSString).length <= Self.longText,
+           let pair = SQLEditing.blockPair(at: selectedRange().location, in: string, noBackslashEscapes: noBackslashEscapes) {
+            for range in [NSRange(pair.0), NSRange(pair.1)] {
+                layout.addTemporaryAttribute(.backgroundColor, value: NSColor.accent.withAlphaComponent(0.25), forCharacterRange: range)
+                bracketMarks.append(range)
+            }
+        }
         let color = NSColor.labelColor.withAlphaComponent(0.1)
         markUsages { range in
             layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: range)

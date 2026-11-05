@@ -410,6 +410,51 @@ extension AppTests {
             #expect(editor.folds.isEmpty, "a new text has none")
         }
 
+        /// Return after a bracket; a paste inside a string; Fold on a selection; Find's whole words and selection.
+        @Test func smallEditorRows() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            editor.setText("    f()")
+            editor.setSelectedRange(NSRange(location: 6, length: 0))
+            editor.insertNewline(nil)
+            #expect(editor.string == "    f(\n        \n    )" && editor.selectedRange().location == 15)
+            editor.setText("'('")
+            editor.setSelectedRange(NSRange(location: 2, length: 0))
+            editor.insertNewline(nil)
+            #expect(editor.string == "'(\n'", "not a bracket inside a string")
+
+            editor.setText("SELECT a\nFROM b\nWHERE c")
+            editor.setSelectedRange(NSRange(location: 8, length: 7))
+            editor.foldHere(nil)
+            #expect(editor.folds == [8..<15])
+
+            let find = try #require(console.findBar)
+            defer { find.close(nil) }
+            editor.setText("id order_id ID id2 id")
+            find.show(replace: true)
+            find.search.stringValue = "id"
+            func matched() -> [Int] { (find.matches() ?? []).map(\.location) }
+            #expect(matched() == [0, 9, 12, 15, 19])
+            find.wholeWords.performClick(nil)
+            #expect(matched() == [0, 12, 19])
+            editor.setSelectedRange(NSRange(location: 5, length: 10))
+            find.inSelection.performClick(nil)
+            #expect(matched() == [12], "the selection at the moment it was ticked")
+            editor.setSelectedRange(NSRange(location: 12, length: 2))
+            #expect(matched() == [12], "still there as matches get selected")
+            find.replacement.stringValue = "x"
+            find.perform(.replaceAll)
+            #expect(editor.string == "id order_id x id2 id", "Replace All keeps to it")
+            find.inSelection.performClick(nil)
+            find.regex.performClick(nil)
+            find.search.stringValue = "(i)d"
+            find.replacement.stringValue = "$1D"
+            find.perform(.replaceAll)
+            #expect(editor.string == "iD order_id x id2 iD", "groups, match by match, whole words kept")
+            find.regex.performClick(nil)
+            find.wholeWords.performClick(nil)
+        }
+
         /// Settings ▸ Editor reaches open editors: the font, keywords in it too; the indent Tab puts in.
         @Test func editorSettingsReachTheEditor() async throws {
             let model = testModel(Fixtures.shop)

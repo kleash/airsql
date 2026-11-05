@@ -49,6 +49,34 @@ import Testing
         #expect(regions("SELECT '(\n)'") == ["\n)'"], "brackets in a string are text; the statement still spans lines")
     }
 
+    @Test func pastesInAStringAreEscaped() {
+        func pasted(_ clipboard: String, _ text: String, at place: Int, _ noBackslashEscapes: Bool = false) -> String? {
+            SQLEditing.pastedInString(clipboard, into: text, selection: place..<place, noBackslashEscapes: noBackslashEscapes)?.text
+        }
+        #expect(pasted("O'Brien", "SELECT ''", at: 8) == "O\\'Brien")
+        #expect(pasted("O'Brien", "SELECT ''", at: 8, true) == "O''Brien")
+        #expect(pasted("O'Brien", "SELECT 'open", at: 12) == "O\\'Brien", "a string left open")
+        #expect(pasted("plain", "SELECT ''", at: 8) == nil, "nothing to escape")
+        #expect(pasted("O'Brien", "SELECT ", at: 7) == nil, "outside a string")
+        #expect(pasted("O'Brien", "SELECT ''", at: 9) == nil, "just after one")
+        #expect(pasted("O'Brien", "SELECT \"\"", at: 8) == nil, "double quotes may be a name")
+        #expect(pasted("O'Brien", "-- ''", at: 4) == nil, "a comment")
+    }
+
+    @Test func blocksPairUp() {
+        func pair(_ text: String, _ caret: Int) -> [String]? {
+            let units = Array(text.utf16)
+            return SQLEditing.blockPair(at: caret, in: text).map { [$0.0, $0.1].map { String(decoding: units[$0], as: UTF16.self) + "@\($0.lowerBound)" } }
+        }
+        let body = "BEGIN IF a THEN CASE WHEN 1 THEN 2 END; END IF; END"
+        #expect(pair(body, 2) == ["BEGIN@0", "END@48"], "END IF is skipped")
+        #expect(pair(body, 18) == ["CASE@16", "END@35"])
+        #expect(pair(body, 49) == ["BEGIN@0", "END@48"], "from the END too")
+        #expect(pair(body, 8) == nil)
+        #expect(pair("SELECT 'BEGIN END'", 10) == nil, "a string")
+        #expect(pair("BEGIN CASE WHEN 1 THEN 2 END CASE; END", 2) == ["BEGIN@0", "END@35"], "END CASE closes one CASE")
+    }
+
     @Test func aStatementCompletes() {
         func completed(_ text: String) -> String? {
             SQLEditing.completed(text, caret: text.utf16.count).map { edit in

@@ -87,8 +87,9 @@ extension SQLEditorView: NSLayoutManagerDelegate, NSTextStorageDelegate {
         if region.contains(selectedRange().location) { setSelectedRange(NSRange(location: region.lowerBound, length: 0)) }
     }
 
-    /// Fold: the innermost region at the cursor that isn't folded yet.
+    /// Fold: the selection, or the innermost region at the cursor that isn't folded yet.
     @objc func foldHere(_ sender: Any?) {
+        if selectedRange().length > 0, let selection = Range(selectedRange()) { return fold(selection) }
         let caret = selectedRange().location, text = string as NSString
         let line = text.lineRange(for: NSRange(location: caret, length: 0))
         let candidates = foldRegions.filter { !folds.contains($0) && (NSLocationInRange($0.lowerBound, line) || $0.contains(caret)) }

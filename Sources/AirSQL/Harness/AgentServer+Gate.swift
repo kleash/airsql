@@ -29,6 +29,11 @@ extension AgentServer {
         if Self.pasteActions.contains(NSStringFromSelector(action)) {
             throw Failure("The clipboard is the person's: agents can't paste. Use type or set to put text in a field.")
         }
+        let cutting = action == #selector(NSText.cut(_:)) || action == #selector(NSText.delete(_:))
+        if SQLEditorView.textCommands.contains(action) || cutting,
+           AgentGuard.productionConsole((target ?? NSApp.target(forAction: action)) as? NSView) != nil {
+            throw Failure("Changing a production console's text needs the person's OK: use type or set, which ask them once.")
+        }
         if action == #selector(NSApplication.terminate(_:)) { throw Failure("Only the person at the Mac can quit AirSQL.") }
         let window = (target as? NSView)?.window ?? target as? NSWindow ?? (target as? NSWindowController)?.window
             ?? (target as? NSViewController)?.view.window
@@ -54,8 +59,12 @@ extension AgentServer {
     /// once): refused.
     func checkAgentMayPress(_ keys: KeyCombo, in window: NSWindow) throws {
         guard AgentGate.agent != nil else { return }
-        for action in menuItems(for: keys).compactMap(\.action) { try checkAgentMayChoose(action, target: nil) }  // ⌘V, ⌘Q
-        if keys.modifiers.intersection([.command, .control]).isEmpty, AgentGuard.productionConsole(window.firstResponder as? NSView) != nil {
+        let items = menuItems(for: keys)
+        // The focus, not the app's: a window that isn't key has no target to ask for.
+        for action in items.compactMap(\.action) { try checkAgentMayChoose(action, target: window.firstResponder) }  // ⌘V, ⌘Q, ⌃D
+        // ⌃K, ⌃T and ⌃Y are the text view's own edits, in no menu.
+        let editsText = keys.modifiers.intersection([.command, .control]).isEmpty || (!keys.modifiers.contains(.command) && items.isEmpty)
+        if editsText, AgentGuard.productionConsole(window.firstResponder as? NSView) != nil {
             throw Failure("Typing into a production console needs the person's OK: use type or set, which ask them once.")
         }
     }
