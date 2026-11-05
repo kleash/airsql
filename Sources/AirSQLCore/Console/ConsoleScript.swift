@@ -2,12 +2,24 @@ import Foundation
 
 /// A place in the text to underline in red, and what to say about it on hover. UTF-16 offsets, as NSTextView's.
 public struct SQLProblem: Equatable, Sendable {
+    public enum Severity: Int, Sendable {
+        /// Red: it won't run. Yellow: it runs, probably not as meant. Grey: it could be tidier.
+        case weak, warning, error
+    }
+
     public var range: Range<Int>
     public var message: String
+    public var severity = Severity.error
+    /// Which inspection said it (`SQLInspections.all`); "" for what isn't one.
+    public var code = ""
+    public var fixes: [SQLFix] = []
 
-    public init(range: Range<Int>, message: String) {
+    public init(range: Range<Int>, message: String, severity: Severity = .error, code: String = "", fixes: [SQLFix] = []) {
         self.range = range
         self.message = message
+        self.severity = severity
+        self.code = code
+        self.fixes = fixes
     }
 }
 

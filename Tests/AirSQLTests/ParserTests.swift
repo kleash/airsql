@@ -1,4 +1,4 @@
-import AirSQLCore
+@testable import AirSQLCore
 import Foundation
 import Testing
 
@@ -423,5 +423,180 @@ import Testing
         let found = analysis("SELECT x.id FROM orders o; CALL nosuch()")
         #expect(found.issues.map(\.name) == ["x", "nosuch"])
         #expect(analysis("SELECT 1 FROM orders o WHERE EXISTS (SELECT o.id)").issues.isEmpty)
+    }
+}
+
+@Suite struct InspectionTests {
+    static func snapshot() -> SchemaSnapshot {
+        func column(_ name: String, nullable: Bool = true, generated: Bool = false, auto: Bool = false) -> SchemaColumn {
+            SchemaColumn(name: name, dataType: "int", columnType: "int", nullable: nullable, defaultValue: .none, autoIncrement: auto, onUpdate: nil,
+                         generated: generated ? .init(expression: "1", stored: false) : nil, invisible: false, isJSON: false, charset: nil, collation: nil, comment: "")
+        }
+        var orders = SchemaTable(name: "orders", kind: .table)
+        orders.columns = [column("id", nullable: false, auto: true), column("total"), column("customer_id", nullable: false), column("twice", generated: true)]
+        orders.indexes = [SchemaIndex(name: "PRIMARY", unique: true, type: "BTREE", parts: [.init(column: "id", expression: nil, prefixLength: nil, descending: false)], visible: true, comment: "")]
+        var customers = SchemaTable(name: "customers", kind: .table)
+        customers.columns = [column("id", nullable: false), column("name")]
+        var shop = SchemaDatabase(name: "shop", charset: "utf8mb4", collation: "utf8mb4_bin")
+        shop.tables = [customers, orders]
+        shop.detailsLoaded = true
+        var snapshot = SchemaSnapshot()
+        snapshot.server = SchemaServer(version: "8.4.3")
+        snapshot.databases = [shop]
+        return snapshot
+    }
+
+    func problems(_ sql: String, readOnly: Bool = false) -> [SQLProblem] {
+        SQLInspections.problems(SQLAnalysis(sql, snapshot: Self.snapshot(), database: "shop"), readOnly: readOnly)
+    }
+
+    /// `code: underlined text` of each problem.
+    func found(_ sql: String, readOnly: Bool = false) -> [String] {
+        problems(sql, readOnly: readOnly).map { "\($0.code): " + (sql as NSString).substring(with: NSRange($0.range)) }
+    }
+
+    /// The text after the first edit fix of the problem at `index`, by title.
+    func fixed(_ sql: String, _ title: String) -> String? {
+        for problem in problems(sql) {
+            for fix in problem.fixes where fix.title == title {
+                guard case .edit(let edits) = fix.action else { continue }
+                let text = NSMutableString(string: sql)
+                for edit in edits.sorted(by: { $0.range.lowerBound > $1.range.lowerBound }) { text.replaceCharacters(in: NSRange(edit.range), with: edit.text) }
+                return text as String
+            }
+        }
+        return nil
+    }
+
+    @Test func cleanStatementsSayNothing() {
+        for sql in [
+            "SELECT id, total FROM orders WHERE total > 1 ORDER BY id DESC LIMIT 5",
+            "SELECT c.name, COUNT(*) FROM customers c JOIN orders o ON o.customer_id = c.id GROUP BY c.name",
+            "SELECT id, total FROM orders GROUP BY id", "SELECT total + 1 FROM orders GROUP BY total + 1",
+            "SELECT total AS t FROM orders GROUP BY t ORDER BY t", "SELECT COUNT(*) FROM orders", "SELECT 1 FROM orders WHERE 1 = 1 AND id = 1",
+            "INSERT INTO orders (total, customer_id) VALUES (1, 2), (3, 4)", "INSERT INTO orders VALUES (NULL, 1, 2, DEFAULT)",
+            "UPDATE orders SET total = 1 WHERE id = 1", "DELETE FROM orders WHERE id = 1", "WITH c AS (SELECT 1 AS a) SELECT a FROM c",
+            "SELECT ROUND(total), ROUND(total, 2), SUBSTRING('a', 1), SUBSTRING('a' FROM 1), NOW(), NOW(3), COALESCE(total, 0) FROM orders",
+            "SELECT `rank` FROM (SELECT 1 AS `rank`) d", "SELECT MAX(total) OVER (), id FROM orders GROUP BY id",
+        ] {
+            #expect(found(sql) == [], "\(sql)")
+        }
+    }
+
+    @Test func syntaxErrorsSilenceTheirStatement() {
+        #expect(found("SELECT nope, FROM orders") == ["syntax: FROM"])
+        #expect(found("SELECT nope FROM orders; SELECT FROM") == ["unknownName: nope", "syntax: FROM"])
+    }
+
+    @Test func reservedWordsGetAQuoteFix() {
+        #expect(fixed("SELECT * FROM order", "Quote “order” as a Name") == "SELECT * FROM `order`")
+    }
+
+    @Test func didYouMean() {
+        #expect(fixed("SELECT totl FROM orders", "Change to “total”") == "SELECT total FROM orders")
+        #expect(fixed("SELECT * FROM order_s", "Change to “orders”") == "SELECT * FROM orders")
+        #expect(fixed("SELECT oo.id FROM orders o", "Change to “o”") == "SELECT o.id FROM orders o")
+        #expect(fixed("SELECT zzzzz FROM orders", "Change to “total”") == nil)
+    }
+
+    @Test func offersToRefreshAndToAddTheColumn() throws {
+        let problem = try #require(problems("SELECT nope FROM orders").first)
+        #expect(problem.fixes.contains { $0.action == .refreshSchema })
+        #expect(fixed("SELECT nope FROM orders", "Write ALTER TABLE to Add “nope”")
+                == "ALTER TABLE shop.orders ADD COLUMN nope VARCHAR(255);\nSELECT nope FROM orders")
+    }
+
+    @Test func ambiguousColumnsCanBeQualified() {
+        let sql = "SELECT id FROM orders o JOIN customers c ON c.id = o.id"
+        #expect(found(sql) == ["ambiguousColumn: id"])
+        #expect(fixed(sql, "Qualify as c.id") == "SELECT c.id FROM orders o JOIN customers c ON c.id = o.id")
+    }
+
+    @Test func insertCounts() {
+        #expect(found("INSERT INTO orders (id, total) VALUES (1)") == ["insertCount: (1)"])
+        #expect(found("INSERT INTO orders (id) VALUES (1), (2, 3)") == ["insertCount: (2, 3)"])
+        #expect(found("INSERT INTO orders VALUES (1, 2)") == ["insertCount: (1, 2)"])
+        #expect(found("INSERT INTO nosuch VALUES (1, 2)") == ["unknownName: nosuch"])
+    }
+
+    @Test func nullComparisons() {
+        #expect(found("SELECT 1 FROM orders WHERE total = NULL") == ["nullComparison: ="])
+        #expect(fixed("SELECT 1 FROM orders WHERE total = NULL", "Change to IS NULL") == "SELECT 1 FROM orders WHERE total IS NULL")
+        #expect(fixed("SELECT 1 FROM orders WHERE total <> NULL", "Change to IS NOT NULL") == "SELECT 1 FROM orders WHERE total IS NOT NULL")
+        #expect(found("SELECT 1 FROM orders WHERE total <=> NULL") == [])
+        #expect(found("UPDATE orders SET total = NULL WHERE id = 1") == [])
+    }
+
+    @Test func writesWithoutLimits() {
+        #expect(found("UPDATE orders SET total = 1") == ["noWhere: UPDATE"])
+        #expect(found("DELETE FROM orders") == ["noWhere: DELETE"])
+        #expect(found("EXPLAIN DELETE FROM orders") == [])
+        #expect(found("UPDATE orders o JOIN customers c SET o.total = 1 WHERE o.id = 1") == ["joinWithoutOn: JOIN"])
+        #expect(found("DELETE o FROM orders o JOIN customers c ON c.id = o.id WHERE o.id = 1") == [])
+    }
+
+    @Test func groupByColumns() {
+        #expect(found("SELECT name, COUNT(*) FROM customers GROUP BY id") == ["groupBy: name"])
+        #expect(found("SELECT customer_id, total FROM orders GROUP BY customer_id") == ["groupBy: total"])
+        #expect(fixed("SELECT customer_id, total FROM orders GROUP BY customer_id", "Add “total” to GROUP BY")
+                == "SELECT customer_id, total FROM orders GROUP BY customer_id, total")
+        #expect(found("SELECT customer_id FROM orders GROUP BY customer_id HAVING total > 1") == ["groupBy: total"])
+        #expect(found("SELECT customer_id FROM orders GROUP BY customer_id ORDER BY total") == ["groupBy: total"])
+        #expect(found("SELECT customer_id, ANY_VALUE(total) FROM orders GROUP BY customer_id") == [])
+    }
+
+    @Test func aggregatesInTheWrongPlace() {
+        #expect(found("SELECT 1 FROM orders WHERE SUM(total) > 1") == ["aggregateMisuse: SUM(total)"])
+        #expect(found("SELECT SUM(COUNT(total)) FROM orders") == ["aggregateMisuse: COUNT(total)"])
+        #expect(found("SELECT 1 FROM orders GROUP BY MAX(total)") == ["aggregateMisuse: MAX(total)"])
+        #expect(found("SELECT customer_id FROM orders GROUP BY customer_id HAVING SUM(total) > 1") == [])
+    }
+
+    @Test func subqueriesAndAliases() {
+        #expect(found("SELECT * FROM (SELECT 1)") == ["derivedAlias: (SELECT 1)"])
+        #expect(fixed("SELECT * FROM (SELECT 1)", "Add an Alias") == "SELECT * FROM (SELECT 1) AS d")
+        #expect(found("SELECT 1 FROM orders o JOIN customers o ON 1") == ["duplicateAlias: o"])
+        #expect(found("SELECT 1 FROM orders JOIN orders ON 1") == ["duplicateAlias: orders"])
+        #expect(found("SELECT 1 FROM orders JOIN customers USING (total)") == ["usingColumn: total"])
+        #expect(found("WITH c AS (SELECT 1) SELECT 2") == ["unusedCTE: c"])
+    }
+
+    @Test func functions() {
+        #expect(found("SELECT COUNT (*) FROM orders") == ["functionSpace: COUNT"])
+        #expect(fixed("SELECT COUNT (*) FROM orders", "Remove the Space") == "SELECT COUNT(*) FROM orders")
+        #expect(found("SELECT IF(1, 2) FROM orders") == ["functionArguments: IF"])
+        #expect(found("SELECT LEFT('a') FROM orders") == ["functionArguments: LEFT"])
+        #expect(problems("SELECT CONCAT_WS(',') FROM orders").first?.message == "CONCAT_WS takes at least 2 arguments, not 1")
+    }
+
+    @Test func insertValues() {
+        #expect(found("INSERT INTO orders (total, customer_id) VALUES (1, NULL)") == ["nullIntoNotNull: NULL"])
+        #expect(found("INSERT INTO orders (id, customer_id) VALUES (NULL, 1)") == [])
+        #expect(found("INSERT INTO orders (customer_id, twice) VALUES (1, 2)") == ["generatedColumn: 2"])
+    }
+
+    @Test func tidying() {
+        #expect(found("SELECT id FROM orders ORDER BY id ASC") == ["redundantCode: ASC"])
+        #expect(fixed("SELECT id FROM orders ORDER BY id ASC", "Remove ASC") == "SELECT id FROM orders ORDER BY id")
+        #expect(fixed("SELECT id AS id FROM orders", "Remove the Alias") == "SELECT id FROM orders")
+        #expect(fixed("SELECT CASE WHEN id THEN 1 ELSE NULL END FROM orders", "Remove ELSE NULL") == "SELECT CASE WHEN id THEN 1 END FROM orders")
+        #expect(found("SELECT 1 FROM orders WHERE 'a' = 'a'") == ["constantCondition: 'a' = 'a'"])
+        #expect(found("SELECT 1 FROM orders WHERE 1 = 2") == ["constantCondition: 1 = 2"])
+    }
+
+    @Test func mysql8Words() {
+        #expect(found("SELECT rank FROM (SELECT 1 AS `rank`) d") == ["reservedWord: rank"])
+    }
+
+    @Test func readOnlyMarksWrites() {
+        #expect(found("DELETE FROM orders WHERE id = 1", readOnly: true) == ["readOnlyWrite: DELETE"])
+        #expect(found("SELECT 1 FROM orders", readOnly: true) == [])
+        #expect(found("DROP TABLE orders", readOnly: true) == ["readOnlyWrite: DROP"])
+        #expect(found("SHOW TABLES", readOnly: true) == [])
+    }
+
+    @Test func aDisabledInspectionIsQuiet() {
+        let analysis = SQLAnalysis("DELETE FROM orders", snapshot: Self.snapshot(), database: "shop")
+        #expect(SQLInspections.problems(analysis, disabled: ["noWhere"]).isEmpty)
     }
 }

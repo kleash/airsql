@@ -117,6 +117,8 @@ public struct SQLNameIssue: Sendable {
     public var name: String
     /// Names that could have been meant.
     public var candidates: [String] = []
+    /// The one table a column should have been in, when there's just one.
+    public var table: SQLRowSource?
     /// Which statement.
     public var statement: Int
 }
@@ -133,6 +135,8 @@ public struct SQLAnalysis: Sendable {
     public var snapshot: SchemaSnapshot?
     /// The current database at each statement: USE moves it.
     public var databases: [String?] = []
+    /// Where each statement's scopes start in `scopes`.
+    var firstScopes: [Int] = []
 
     /// `text` read with what `snapshot` knows. `changed`: `SQLNameCheck.changedNames` of what the session has run.
     public init(_ text: String, snapshot: SchemaSnapshot?, database: String?, changed: Set<String> = [], noBackslashEscapes: Bool = false) {
@@ -162,13 +166,26 @@ public struct SQLAnalysis: Sendable {
 
     /// The innermost scope around `offset`.
     public func scope(at offset: Int) -> SQLScope? {
+        guard let index = statementIndex(at: offset) else { return nil }
+        let first = firstScopes[index], last = index + 1 < firstScopes.count ? firstScopes[index + 1] : scopes.count
         // The last of equals: a query's block comes after the shell that holds its CTEs.
-        scopes.reversed().filter { $0.extent.lowerBound <= offset && offset <= $0.extent.upperBound }.min { $0.extent.count < $1.extent.count }
+        return scopes[first..<last].reversed().filter { $0.extent.lowerBound <= offset && offset <= $0.extent.upperBound }
+            .min { $0.extent.count < $1.extent.count }
     }
 
-    /// The statement `offset` is in, or just after.
-    public func statement(at offset: Int) -> SQLParsedStatement? {
-        statements.first { $0.range.lowerBound <= offset && offset <= max($0.end, $0.range.upperBound) }
+    /// The statement `offset` is in or that goes on to it: the last one that starts at or before it, up to its
+    /// delimiter when it has one.
+    public func statement(at offset: Int) -> SQLParsedStatement? { statementIndex(at: offset).map { statements[$0] } }
+
+    private func statementIndex(at offset: Int) -> Int? {
+        var low = 0, high = statements.count
+        while low < high {
+            let middle = (low + high) / 2
+            if statements[middle].range.lowerBound <= offset { low = middle + 1 } else { high = middle }
+        }
+        guard low > 0 else { return nil }
+        let found = statements[low - 1]
+        return found.end > found.range.upperBound && offset > found.end ? nil : low - 1
     }
 }
 
@@ -205,6 +222,7 @@ struct SQLResolver {
         for (index, statement) in result.statements.enumerated() {
             statementIndex = index
             result.databases.append(database)
+            result.firstScopes.append(result.scopes.count)
             resolve(statement)
             if ["CALL", "EXECUTE", "DECLARE"].contains(statement.verb) || (statement.verb == "BEGIN" && string(statement.range).uppercased().contains("NOT ATOMIC"))
                 || (statement.kind == .create && statement.bodyStart != nil) {
@@ -215,9 +233,9 @@ struct SQLResolver {
         return result
     }
 
-    mutating func issue(_ kind: SQLNameIssue.Kind, _ range: Range<Int>, _ name: String, candidates: [String] = []) {
+    mutating func issue(_ kind: SQLNameIssue.Kind, _ range: Range<Int>, _ name: String, candidates: [String] = [], table: SQLRowSource? = nil) {
         guard !silent, canReport else { return }
-        result.issues.append(SQLNameIssue(kind: kind, range: range, name: name, candidates: candidates, statement: statementIndex))
+        result.issues.append(SQLNameIssue(kind: kind, range: range, name: name, candidates: candidates, table: table, statement: statementIndex))
     }
 
     /// A statement half typed or with code in an executable comment is one nothing can be said of.
@@ -629,7 +647,8 @@ struct SQLResolver {
             reference(range, found.symbol)
             columnInfo[range.lowerBound] = found
         } else if sources.allSatisfy(\.complete), Self.isASCII(name) {
-            issue(.unknownColumn(place: "“\(sources[0].objectName ?? sources[0].name)”"), range, name, candidates: sources.flatMap(\.columns).map(\.name))
+            issue(.unknownColumn(place: "“\(sources[0].objectName ?? sources[0].name)”"), range, name, candidates: sources.flatMap(\.columns).map(\.name),
+                  table: sources.count == 1 ? sources[0] : nil)
         }
     }
 
@@ -659,7 +678,8 @@ struct SQLResolver {
         }
         guard !open, !sourcesSeen.isEmpty, Self.isASCII(column.value), column.quoted || !Self.notColumns.contains(column.value.uppercased()) else { return }
         let place = sourcesSeen.count == 1 ? "“\(sourcesSeen[0].objectName ?? sourcesSeen[0].name)”" : "the tables this statement uses"
-        issue(.unknownColumn(place: place), column.range, column.value, candidates: sourcesSeen.flatMap(\.columns).map(\.name))
+        issue(.unknownColumn(place: place), column.range, column.value, candidates: sourcesSeen.flatMap(\.columns).map(\.name),
+              table: sourcesSeen.count == 1 ? sourcesSeen[0] : nil)
     }
 
     /// What each resolved column in the text is, by where it starts: what an item's output takes from.
