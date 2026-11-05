@@ -455,7 +455,7 @@ extension AppTests {
             let (_, _, _, _, users) = await opened()
             #expect(users.list.rows.map { $0.cells["user"] } == ["bob", "r"])
             #expect(users.list.rows[0].cells["password"] == "Set" && users.list.rows[1].cells["kind"] == "Role")
-            #expect(users.list.rows[0].cells["limits"] == "5 / 0 / 0 / 0")
+            #expect(users.list.rows[0].cells["limits"] == "5 queries/h")
             users.copyList(nil)
             #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("Name,Host,Kind,") == true)
         }
