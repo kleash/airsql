@@ -1,7 +1,7 @@
 import AirSQLCore
 import AppKit
 
-/// Settings ▸ Grid: its text, how many rows load at a time and when Load All asks, how NULL looks, and whether a
+/// Settings ▸ Grid: its text, how many rows load at a time and when Load All asks, how much of a long value a page reads, how NULL looks, and whether a
 /// one-row result opens transposed.
 final class GridPane: SettingsPaneController {
     override func build() {
@@ -15,6 +15,10 @@ final class GridPane: SettingsPaneController {
                                                 tip: "Ask before loading every row of a table with more rows than this",
                                                 range: 1_000...100_000_000, width: 110), label("rows")],
                  caption: "All the rows are held in memory while the tab is open.")
+        form.row("Long values", [number(\.longValueLimit, id: "settings.longValueLimit",
+                                        tip: "Type how many characters of a long value a table's page reads; 0 reads every value whole",
+                                        range: 0...100_000_000, width: 110), label("characters")],
+                 caption: "Load Full Cell reads the rest, as do editing, copying and exporting.")
         form.row("NULL shown as", [text(\.nullText, id: "settings.nullText",
                                         tip: "Type how empty (NULL) values look in the grid; they are drawn in grey italics",
                                         placeholder: "NULL", width: 120)],

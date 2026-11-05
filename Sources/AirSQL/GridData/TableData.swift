@@ -56,10 +56,14 @@ extension TableDataController {
     @objc func exportRows(_ sender: Any?) {
         guard let source, let window = view.window else { return NSSound.beep() }
         let order = viewer.shownColumns, rows = viewer.selectedRows(), sessions = context.sessions
+        let readWhole = { [weak self] (loaded: Bool, then: @escaping () -> Void) -> Void in
+            self?.readWhole(loaded ? Array(0..<source.rowCount) : rows, columns: order, then: then)
+        }
         let sql = source.pageSQL(offset: 0, limit: nil)
         let request = ExportRowsRequest(
             title: tableName, columns: order.map { source.columns[$0] }, database: database, table: tableName,
-            noBackslashEscapes: noBackslashEscapes, hiddenColumns: source.columns.count - order.count, selectedCount: rows.count, selected: { rows.map { row in order.map { source.value(row, $0) } } },
+            noBackslashEscapes: noBackslashEscapes, hiddenColumns: source.columns.count - order.count, readWhole: readWhole, selectedCount: rows.count,
+            selected: { rows.map { row in order.map { source.value(row, $0) } } },
             loadedCount: source.rowCount, loaded: { (0..<source.rowCount).map { row in order.map { source.value(row, $0) } } },
             all: { write in
                 let session = try await sessions.toolsSession()

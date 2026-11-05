@@ -136,6 +136,7 @@ import AppKit
     @objc optional func showRelatedRows(_ sender: Any?)
     @objc optional func showColumnSummary(_ sender: Any?)
     @objc optional func loadMore(_ sender: Any?)
+    @objc optional func loadFullCell(_ sender: Any?)
     @objc optional func loadAll(_ sender: Any?)
     @objc optional func countRows(_ sender: Any?)
     @objc optional func hideColumn(_ sender: Any?)
@@ -578,6 +579,8 @@ enum Commands {
                                      tip: "Show the rows this value refers to, or the rows that refer to it")
     static let columnSummary = Command("Column Summary…", #selector(AirSQLActions.showColumnSummary(_:)),
                                        tip: "Count the column's distinct values, NULLs, minimum and maximum on the server")
+    static let loadFullCell = Command("Load Full Cell", #selector(AirSQLActions.loadFullCell(_:)),
+                                      tip: "Read the rest of a long value that was cut when the rows loaded")
     static let loadMore = Command("Load More", #selector(AirSQLActions.loadMore(_:)), down, [.command, .option],
                                   tip: "Load the next page of rows")
     static let loadAll = Command("Load All", #selector(AirSQLActions.loadAll(_:)), down, [.command, .option, .shift],
@@ -758,7 +761,7 @@ enum Commands {
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
+        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, loadFullCell, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,

@@ -95,9 +95,13 @@ extension TableDataController: DataGridViewDelegate {
     /// and generated ones are always left to the server; without keys, the key columns are too.
     private func duplicate(keepingKeys: Bool) {
         guard let source, editingOff == nil else { return NSSound.beep() }
+        let rows = viewer.selectedRows()
+        guard !rows.contains(where: { row in source.columns.indices.contains { source.isCut(row, $0) } }) else {
+            return readWhole(rows) { [weak self] in self?.duplicate(keepingKeys: keepingKeys) }
+        }
         var last: UUID?
         let depth = source.changes.undoDepth
-        for row in viewer.selectedRows() {
+        for row in rows {
             var values: [String: PendingChanges.Value] = [:]
             for (index, column) in source.table.columns.enumerated() where column.generated == nil {
                 if column.autoIncrement || !keepingKeys && source.columns[index].isKey { continue }
@@ -126,8 +130,11 @@ extension TableDataController: DataGridViewDelegate {
 
     /// Cut: copies the selected cells, then clears them (NULL where the column allows it), as pending edits.
     @objc func cut(_ sender: Any?) {
-        viewer.copy(sender)
-        setSelected { [source] in source?.table.columns[$0].nullable == true ? .null : .text("") }
+        readWhole(viewer.selectedRows(), columns: viewer.shownColumns) { [weak self] in
+            guard let self else { return }
+            viewer.copy(sender)
+            setSelected { [source] in source?.table.columns[$0].nullable == true ? .null : .text("") }
+        }
     }
 
     /// Revert (⌥⌘Z): the selected rows' changes.

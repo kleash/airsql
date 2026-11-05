@@ -86,6 +86,10 @@ extension TableDataController {
             return true
         }
         guard typed == nil else { return false }
+        if source.isCut(row, column) {
+            readWhole([row], columns: [column]) { [weak self] in self?.viewer.editInValuePanel() }
+            return true
+        }
         if foreignKey(column) != nil {
             showLookup(row: row, column: column)
             return true

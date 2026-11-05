@@ -78,6 +78,9 @@ extension TableDataController: NSMenuItemValidation {
             reason = QuickFilter.reason(GridCondition.Operator.allCases[menuItem.tag], focusedValues())
             enabled = reason == nil
         }
+        if Self.exactValueActions.contains(menuItem.action), let cell = viewer.focusedCell, source?.isCut(cell.row, cell.column) == true {
+            (enabled, reason) = (false, "Only the start of this value is loaded: Load Full Cell first")
+        }
         menuItem.explain(enabled: enabled, reason: reason)
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
         if menuItem.action == Commands.useAsLabel.action { menuItem.state = isLabel(viewer.focusedColumn) ? .on : .off }
@@ -93,6 +96,9 @@ extension TableDataController: NSMenuItemValidation {
         return super.responds(to: selector) || viewer.responds(to: selector)
     }
     override func forwardingTarget(for selector: Selector!) -> Any? { viewer.responds(to: selector) ? viewer : nil }
+
+    /// The commands that take the focused cell's value for a condition.
+    private static let exactValueActions: Set<Selector?> = [Commands.quickFilter.action, Commands.filterEquals.action, Commands.filterNotEquals.action]
 
     /// Whether a command can run now, and why not.
     private func state(of action: Selector?) -> (Bool, String?) {
@@ -133,6 +139,9 @@ extension TableDataController: NSMenuItemValidation {
         case Commands.redo.action: return (source.changes.canRedo, "Nothing to redo")
         case Commands.loadMore.action, Commands.loadAll.action:
             return (source.hasMore && loading == nil, source.hasMore ? "Wait until the rows have loaded" : "Every row is loaded")
+        case Commands.loadFullCell.action:
+            if loading != nil { return (false, "Wait until the rows have loaded") }
+            return (viewer.focusedCell.map { source.isCut($0.row, $0.column) } ?? false, "This cell holds its whole value")
         case Commands.cancelQuery.action: return (canCancel, "Nothing is running in this tab")
         case Commands.countRows.action: return (loading == nil, "Wait until the rows have loaded")
         case Commands.filterEquals.action, Commands.filterNotEquals.action, Commands.sortAscending.action,

@@ -25,6 +25,8 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 - **Text size**: the grid's (12 pt at first), open grids' too. ⌘+, ⌘− and ⌘0 change it the same way for the grid with
   the focus; a grid made bigger or smaller keeps its size until ⌘0.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
+- **Long values**: how many characters of a long value a table's page reads (1,000 by default; 0 reads every value whole).
+  Load Full Cell reads the rest.
 - **Load All asks above**: Load All asks first when a table has more rows than this (100,000 by default), since every
   row is then held in memory.
 - **NULL shown as**: how empty values look in the grid, open grids' too.

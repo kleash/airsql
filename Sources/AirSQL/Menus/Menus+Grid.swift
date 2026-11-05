@@ -26,7 +26,7 @@ extension MainMenu {
                         Commands.addToSort, Commands.sortColumns, Commands.clearSort, nil,
                         Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn, Commands.freeze])
         menus.data.addItem(GridViewer.displayMenu())
-        menus.data.add([nil, Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.exportRows])
+        menus.data.add([nil, Commands.loadFullCell, Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.exportRows])
         let refresh = menus.view.items.firstIndex { $0.action == Commands.refresh.action } ?? menus.view.items.count - 1
         menus.view.insertItem(submenu("Refresh Every", TableDataController.autoRefreshItems()), at: refresh + 1)
         menus.view.add([nil, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,

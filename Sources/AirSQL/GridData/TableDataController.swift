@@ -149,6 +149,9 @@ final class TableDataController: NSViewController, TabContent {
         viewer.serverSummary = { [weak self] column, done in self?.summarize(column, done: done) }
         viewer.filterByValue = { [weak self] column, value in self?.filter(column, by: value) }
         viewer.keepValue = { [weak self] row, column, text in self?.keep(.text(text), row: row, column: column) }
+        viewer.isCut = { [weak self] row, column in self?.source?.isCut(row, column) == true }
+        viewer.readWhole = { [weak self] rows, columns, then in self?.readWhole(rows, columns: columns, then: then) }
+        viewer.hiddenColumnsDidChange = { [weak self] in self?.hiddenColumnsChanged() }
         grid.cellSuffix = { [weak self] row, column in
             guard let self, let cell = viewer.hostCell(row, column) else { return nil }
             return label(cell.row, cell.column)
@@ -229,6 +232,7 @@ final class TableDataController: NSViewController, TabContent {
         settings = saved
         let names = Set(source.columns.map(\.name))
         source.sort = saved.sort.filter { names.contains($0.column) }
+        source.hiddenColumns = Set(source.columns.indices.filter { saved.hiddenColumns.contains(source.columns[$0].name) })
         bar.filterText = initialFilter ?? saved.filter
         source.filter = GridFilter.condition(bar.filterText)
         if let changes, source.key != nil {
@@ -250,7 +254,8 @@ final class TableDataController: NSViewController, TabContent {
     func loadRows(more: Bool, through rows: Int? = nil, keepingSaved: Bool = false) {
         guard let source, loading == nil else { return }
         let limit = more ? rowsPerPage : max(rowsPerPage, rows ?? 0)
-        let sql = more ? source.nextPageSQL(limit: limit) : source.pageSQL(offset: 0, limit: limit)
+        if !more { source.cutLength = max(0, model.data.settings.longValueLimit) }
+        let sql = more ? source.nextPageSQL(limit: limit) : source.pageSQL(offset: 0, limit: limit, trimmed: true)
         // Load More's first row repeats the last one loaded (`nextPageSQL`).
         let requested = more && source.loadedRows > 0 ? limit + 1 : limit
         let filter = source.filter
@@ -418,6 +423,57 @@ final class TableDataController: NSViewController, TabContent {
 
     @objc func loadMore(_ sender: Any?) { loadRows(more: true) }
 
+    /// Load Full Cell: the focused cell's whole value, and its row's.
+    @objc func loadFullCell(_ sender: Any?) {
+        guard let cell = viewer.focusedCell else { return NSSound.beep() }
+        readWhole([cell.row], columns: [cell.column]) {}
+    }
+
+    /// Reads whole the `rows` whose cells in `columns` hold less than their value, then runs `then`, which can't be left to
+    /// the cut values: an edit, a copy or an export. Nothing to read: `then` runs at once. Cancelled or failed, it doesn't.
+    func readWhole(_ rows: [Int], columns: [Int]? = nil, then: @escaping () -> Void) {
+        guard let source else { return }
+        let columns = (columns ?? Array(source.columns.indices)).filter(source.trims)
+        let cut = columns.isEmpty ? [] : rows.filter { row in columns.contains { source.isCut(row, $0) } }
+        guard !cut.isEmpty else { return then() }
+        guard loading == nil else {
+            problem = "Wait for the rows to load, then try again: this needs the whole of some long values."
+            return updateBars()
+        }
+        let statements = source.readBackSQL(cut.compactMap(source.rowKey), noBackslashEscapes: noBackslashEscapes)
+        beginRead("Reading long values of \(tableName)")
+        loading = Task {
+            do {
+                let session = try await openSession()
+                var stores: [ResultStore] = []
+                for sql in statements {
+                    if let store = try await stoppable(session, sql, { try await session.query(sql, rowCap: PendingChanges.deleteBatch).first?.rows }) {
+                        stores.append(store)
+                    }
+                }
+                let found = source.patch(stores, deleted: [])
+                problem = found && !cut.contains(where: { row in columns.contains { source.isCut(row, $0) } }) ? nil
+                    : "A row has changed or gone on the server, so its whole value couldn't be read. Refresh (⌘R) reads the rows again."
+            } catch where Task.isCancelled {
+                problem = "Cancelled: the whole values weren't read."
+            } catch {
+                problem = "The whole values weren't read: " + error.localizedDescription
+            }
+            let done = problem == nil
+            finishLoading()
+            if done { then() }
+        }
+    }
+
+    /// A column hidden stops being read with the next page; one shown again needs the rows read again.
+    func hiddenColumnsChanged() {
+        guard let source else { return }
+        let shown = Set(viewer.shownColumns), hidden = Set(source.columns.indices).subtracting(shown)
+        let needsRows = !source.hiddenColumns.subtracting(hidden).isEmpty
+        source.hiddenColumns = hidden
+        if needsRows { reloadRows() }
+    }
+
     /// Column Summary on the server: every row within the filter, on the data session; a table over 2 GB asks first.
     private func summarize(_ column: Int, done: @escaping (Result<ColumnSummary, Error>) -> Void) {
         guard let source, loading == nil else { return done(.failure(AirSQLError(.other, "Wait for the rows to load, then ask again."))) }
@@ -517,6 +573,8 @@ final class TableDataController: NSViewController, TabContent {
         let names = Set(fresh.columns.map(\.name))
         fresh.filter = old.filter
         fresh.sort = old.sort.filter { names.contains($0.column) }
+        fresh.cutLength = old.cutLength
+        fresh.hiddenColumns = Set(old.hiddenColumns.compactMap { old.columns[$0].name }.compactMap { name in fresh.columns.firstIndex { $0.name == name } })
         fresh.changes = old.changes
         source = fresh
         editContext = nil

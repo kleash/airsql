@@ -207,6 +207,8 @@ public struct AppSettings: Codable, Equatable {
     /// Settings ▸ Grid: the grid's font size, rows per page, and how NULL is shown.
     public var gridFontSize = 12.0
     public var rowsPerPage = 1_000
+    /// How much of a long value a table's page reads, in characters; the rest comes on demand. 0: all of it.
+    public var longValueLimit = 1_000
     public var nullText = "NULL"
     /// Settings ▸ Connections: above this many tables on a server, a database's columns, indexes and keys load when
     /// it is opened rather than at connect (plan §2.7).
@@ -239,6 +241,7 @@ public struct AppSettings: Codable, Equatable {
         editorWordWrap = try value(.editorWordWrap, defaults.editorWordWrap)
         gridFontSize = try value(.gridFontSize, defaults.gridFontSize)
         rowsPerPage = try value(.rowsPerPage, defaults.rowsPerPage)
+        longValueLimit = try value(.longValueLimit, defaults.longValueLimit)
         nullText = try value(.nullText, defaults.nullText)
         detailsTableThreshold = try value(.detailsTableThreshold, defaults.detailsTableThreshold)
         agentsAllowed = try value(.agentsAllowed, defaults.agentsAllowed)

@@ -122,3 +122,70 @@ struct TableDataSourceTests {
         #expect(source.value(0, 1) == long)
     }
 }
+
+/// Long values cut at the server and hidden columns not read.
+struct TableDataSourceTrimTests {
+    static func source() -> TableDataSource {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table())
+        source.cutLength = 3
+        return source
+    }
+
+    static func page(photo: [UInt8]) -> ResultStore {
+        let store = TableDataSourceTests.page([])
+        _ = store.append([Array("1".utf8), Array("Ann".utf8), photo, Array("1.50".utf8)])
+        return store
+    }
+
+    @Test func aPageCutsLongColumnsLeavesOutHiddenOnesAndKeepsTheKeyWhole() {
+        let source = Self.source()
+        source.hiddenColumns = [0, 3]
+        // photo is a BLOB; name is varchar(20), past the cut; hidden price is left out; the hidden key stays.
+        #expect(source.pageSQL(offset: 0, limit: 5, trimmed: true)
+            == "SELECT `id`, LEFT(`name`, 4), LEFT(`photo`, 4), NULL FROM `shop`.`items` ORDER BY `id` ASC LIMIT 5")
+        // Exports and statements that want the values stay whole.
+        #expect(source.pageSQL(offset: 0, limit: 5).hasPrefix("SELECT `id`, `name`, `photo`, `price` FROM"))
+        source.cutLength = 0
+        source.hiddenColumns = []
+        #expect(source.pageSQL(offset: 0, limit: 5, trimmed: true) == source.pageSQL(offset: 0, limit: 5))
+    }
+
+    @Test func aTableWithoutAKeyReadsWhole() {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table(key: false))
+        source.cutLength = 3
+        source.hiddenColumns = [3]
+        #expect(source.pageSQL(offset: 0, limit: 5, trimmed: true) == source.pageSQL(offset: 0, limit: 5))
+    }
+
+    @Test func aValueOnePastTheLimitIsCutAndAllOfItIsReadBack() {
+        let source = Self.source()
+        source.append(Self.page(photo: [1, 2, 3, 4]), requested: 5)
+        #expect(source.isCut(0, 2))
+        #expect(!source.isCut(0, 1))  // three characters: whole
+        #expect(!source.isCut(0, 0))
+        #expect(source.note(0, 2)?.contains("Load Full Cell") == true)
+        #expect(source.patch([Self.page(photo: [1, 2, 3, 4, 5, 6])], deleted: []))
+        #expect(!source.isCut(0, 2))
+    }
+
+    @Test func charactersCountNotBytes() {
+        let source = Self.source()
+        let store = TableDataSourceTests.page([])
+        _ = store.append([Array("1".utf8), Array("äöü".utf8), [1], Array("1.50".utf8)])  // six bytes, three characters
+        _ = store.append([Array("2".utf8), Array("äöüß".utf8), [1], Array("1.50".utf8)])
+        source.append(store, requested: 5)
+        #expect(!source.isCut(0, 1))
+        #expect(source.isCut(1, 1))
+        #expect(source.cell(1, 1) == .text("äöüß…"))
+    }
+
+    /// The start of a value can't stand for it: Apply mustn't compare it, nor may typing it back drop the edit.
+    @Test func anEditOverACutValueComparesNothing() {
+        let source = Self.source()
+        source.append(Self.page(photo: [1, 2, 3, 4]), requested: 5)
+        let start = source.value(0, 2)
+        source.set(.text(start ?? ""), row: 0, column: 2)
+        #expect(source.changes.state.edits[["1"]]?["photo"] != nil)
+        #expect(source.changes.state.originals[["1"]] == nil)
+    }
+}

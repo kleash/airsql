@@ -24,6 +24,13 @@ session, a session of their own, so a long query in a query tab never holds them
   toolbar's Cancel or the status bar's activity. A cancelled page leaves the rows as they were; Refresh (⌘R) loads them.
 - Pages are read by offset. If someone adds or deletes rows between pages, a row can repeat or be missing: a notice says
   so when it happens, and Refresh reads the rows again.
+- A long value (TEXT, BLOB, JSON, a very long VARCHAR) comes cut at the server, to its first 1,000 characters
+  (**Settings ▸ Grid ▸ Long values**; 0 reads every value whole), so a table of large blobs opens at once. Such a cell ends
+  in `…`. **Data ▸ Load Full Cell**, or the button in the value panel, reads the rest. Editing the cell, copying it,
+  Duplicate Row and exporting read the whole value first, so nothing written or copied is ever the cut text; a quick filter
+  on a cut cell asks for Load Full Cell first. Search on the loaded rows and Find look only at what's loaded.
+  A table with no key can't find a row to read it back, so its values come whole.
+- A hidden column isn't read at all. Showing it again loads the rows again.
 - **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds,
   until you choose **Off**. Pending changes stay.
 

@@ -31,6 +31,12 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     var filterByValue: ((_ column: Int, _ value: String?) -> Void)?
     /// Keeps a value edited in the value panel as the host's cell's pending value (nil: the panel only shows values).
     var keepValue: ((_ row: Int, _ column: Int, _ text: String) -> Void)?
+    /// Whether the host's cell holds only the start of its value, and reads the host's `rows` whole in `columns` before
+    /// what must have them (nil: a host's cells are always whole).
+    var isCut: ((_ row: Int, _ column: Int) -> Bool)?
+    var readWhole: ((_ rows: [Int], _ columns: [Int], _ then: @escaping () -> Void) -> Void)?
+    /// Columns were hidden or shown.
+    var hiddenColumnsDidChange: (() -> Void)?
     /// Why the host's cell can't be edited, said when it is double-clicked; nil: nothing to say.
     var whyReadOnly: ((_ row: Int, _ column: Int) -> String?)?
     /// Where the columns are kept; nil: nowhere.
@@ -379,7 +385,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             valuePanel.keep = nil
             return valuePanel.show(column: nil, value: nil, bytes: nil)
         }
-        if let keepValue, host?.dataGrid(grid, canEditRow: row, column: column) == true {
+        let cut = isCut?(row, column) == true
+        if !cut, let keepValue, host?.dataGrid(grid, canEditRow: row, column: column) == true {
             valuePanel.keep = { [weak self] text in
                 guard let self else { return nil }
                 if let refusal = host?.dataGrid(grid, check: text, row: row, column: column) { return refusal }
@@ -392,7 +399,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         var placeholder: String?
         if case .placeholder(let words) = source.cell(row, column) { placeholder = words }
         valuePanel.show(column: source.columns[column], value: placeholder == nil ? source.value(row, column) : nil,
-                        bytes: (source as? GridBytes)?.bytes(row, column), placeholder: placeholder)
+                        bytes: (source as? GridBytes)?.bytes(row, column), placeholder: placeholder,
+                        loadFull: cut ? { [weak self] in self?.readWhole?([row], [column]) {} } : nil)
     }
 
     /// Edits the focused cell's value in the value panel, opening it first (a long or multi-line value).
@@ -466,6 +474,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         grid.columnOrder = order
         saveColumns()
         status.update()
+        hiddenColumnsDidChange?()
     }
 
     // MARK: Commands (they reach the viewer while its grid has the focus)
@@ -583,9 +592,13 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
 
     private func copySelection(_ format: CopyFormat, headers: Bool) {
         if copiesEverything, grid.selection.isEmpty, grid.selection.cursor == nil { grid.selectAll(nil) }
-        guard let copied else { return NSSound.beep() }
-        GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name,
-                     noBackslashEscapes: noBackslashEscapes)
+        guard copied != nil else { return NSSound.beep() }
+        let copy = { [self] in
+            guard let copied else { return }
+            GridCopy.copy(grid, source: copied, format: format, headers: headers, database: copyTable.database, table: copyTable.name,
+                          noBackslashEscapes: noBackslashEscapes)
+        }
+        if let readWhole { readWhole(selectedRows(), shownColumns, copy) } else { copy() }
     }
 
     // MARK: The host's cells

@@ -12,6 +12,8 @@ struct ExportRowsRequest {
     var noBackslashEscapes = false
     /// The columns hidden in the grid, which aren't written.
     var hiddenColumns = 0
+    /// Reads the selected or loaded rows' long values whole (a table's rows load them cut), then runs what's given.
+    var readWhole: (_ loaded: Bool, _ then: @escaping () -> Void) -> Void = { $1() }
     var selectedCount: Int
     var selected: () -> [[String?]]
     var loadedCount: Int
@@ -128,12 +130,14 @@ final class ExportRowsSheet: NSWindowController {
 
     @objc private func copyRows(_ sender: Any?) {
         guard let format = chosenFormat else { return }
-        let rows = scope.indexOfSelectedItem == 0 ? request.selected() : request.loaded()
-        let text = CopyWriter.text(format, columns: request.columns, rows: rows, database: request.database, table: request.table,
-                                   options: options)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        let request = request, options = options, selected = scope.indexOfSelectedItem == 0
         dismiss()
+        request.readWhole(!selected) {
+            let text = CopyWriter.text(format, columns: request.columns, rows: selected ? request.selected() : request.loaded(), database: request.database,
+                                       table: request.table, options: options)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
     }
 
     @objc private func saveRows(_ sender: Any?) {
@@ -150,39 +154,47 @@ final class ExportRowsSheet: NSWindowController {
         panel.message = "Export the rows of \(request.title)"
         panel.beginSheetModal(for: parent) { response in
             guard response == .OK, let url = panel.url else { return }
-            // The rows at hand are taken now, on the main thread; every row streams from the server instead.
-            let rows: [[String?]]? = which == 0 ? request.selected() : which == 1 ? request.loaded() : nil
-            let stop = StopFlag()
-            let work = activity.start("Exporting the rows of \(request.title)") { stop.set() }
-            Task.detached {
-                do {
-                    let output = try ExportOutput(url: url, format: format, columns: request.columns, database: request.database,
-                                                  table: request.table, options: options)
-                    if let rows {
-                        try output.write(rows)
-                    } else if let all = request.all {
-                        try await all { batch in
-                            if stop.isSet { throw CancellationError() }
-                            try output.write(batch)
-                        }
+            guard which < 2 else { return Self.write(nil, to: url, format: format, options: options, request: request, activity: activity, parent: parent) }
+            request.readWhole(which == 1) {
+                // The rows at hand are taken now, on the main thread; every row streams from the server instead.
+                Self.write(which == 0 ? request.selected() : request.loaded(), to: url, format: format, options: options, request: request,
+                           activity: activity, parent: parent)
+            }
+        }
+    }
+
+    private static func write(_ rows: [[String?]]?, to url: URL, format: CopyFormat?, options: CopyOptions, request: ExportRowsRequest, activity: ActivityCenter,
+                              parent: NSWindow) {
+        let stop = StopFlag()
+        let work = activity.start("Exporting the rows of \(request.title)") { stop.set() }
+        Task.detached {
+            do {
+                let output = try ExportOutput(url: url, format: format, columns: request.columns, database: request.database,
+                                              table: request.table, options: options)
+                if let rows {
+                    try output.write(rows)
+                } else if let all = request.all {
+                    try await all { batch in
+                        if stop.isSet { throw CancellationError() }
+                        try output.write(batch)
                     }
-                    try output.finish()
-                    let cut = output.cutCells
-                    await MainActor.run {
-                        work.end()
-                        guard cut > 0 else { return }
-                        showError("\(cut.formatted()) \(cut == 1 ? "cell was" : "cells were") longer than the 32,767 characters a cell of Excel "
-                                  + "holds, and the file has only the start of them. Export as CSV to keep every value whole.",
-                                  title: "\(url.lastPathComponent) was saved with values cut", on: parent)
-                    }
-                } catch {
-                    try? FileManager.default.removeItem(at: url)
-                    await MainActor.run {
-                        work.end()
-                        guard !(error is CancellationError) else { return }
-                        showError(error.localizedDescription,
-                                  title: "The rows of \(request.title) weren't exported", on: parent)
-                    }
+                }
+                try output.finish()
+                let cut = output.cutCells
+                await MainActor.run {
+                    work.end()
+                    guard cut > 0 else { return }
+                    showError("\(cut.formatted()) \(cut == 1 ? "cell was" : "cells were") longer than the 32,767 characters a cell of Excel "
+                              + "holds, and the file has only the start of them. Export as CSV to keep every value whole.",
+                              title: "\(url.lastPathComponent) was saved with values cut", on: parent)
+                }
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                await MainActor.run {
+                    work.end()
+                    guard !(error is CancellationError) else { return }
+                    showError(error.localizedDescription,
+                              title: "The rows of \(request.title) weren't exported", on: parent)
                 }
             }
         }

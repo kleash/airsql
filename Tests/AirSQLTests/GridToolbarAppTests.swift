@@ -3,7 +3,7 @@ import Testing
 @testable import AirSQL
 @testable import AirSQLCore
 
-/// The row of actions over a grid.
+/// The row of actions over a grid, and long values read on demand.
 extension AppTests {
     @MainActor @Suite struct GridToolbarAppTests {
         @Test func aTableTabsButtonsActOnItsRowsAndSayWhyTheyCant() async throws {
@@ -65,6 +65,80 @@ extension AppTests {
             #expect((main.window?.frame.width ?? 0) <= MainWindowController.minimumSize.width, "\(main.window?.frame.width ?? 0) \(tab.toolbar.frame)")
             let shown = tab.toolbar.subviews.flatMap(\.subviews).filter { !$0.isHidden }.count
             #expect(shown > 3, "\(shown)")
+        }
+
+        /// customers with a `note` cut at the server, and what reading its row back finds.
+        static func cutTab() async throws -> (MainWindowController, AgentServer, TableDataController, FakeTableSession, String) {
+            let session = FakeTableSession.customers()
+            let whole = String(repeating: "note ", count: 400) + "end", row = session.rows[0]
+            session.rows[0][3] = String(whole.prefix(1_001))
+            session.edited = [row.enumerated().map { $0 == 3 ? whole : $1 }]
+            let (main, harness, tab) = try await GridDataAppTests.tab("customers", session: session)
+            await ready { tab.loading != nil }
+            return (main, harness, tab, session, whole)
+        }
+
+        @Test func aPageCutsTheLongColumnAndLoadFullCellReadsItBack() async throws {
+            let (_, harness, tab, session, whole) = try await Self.cutTab()
+            let source = try #require(tab.source)
+            #expect(session.statements.contains { $0.contains("LEFT(`note`, 1001)") })
+            #expect(source.isCut(0, 3))
+            tab.grid.selection.select(GridPosition(row: 0, column: tab.grid.columnOrder.firstIndex(of: 3) ?? 3))
+            tab.viewer.toggleValuePanel(nil)
+            let panel = try #require(tab.viewer.valuePanel)
+            #expect(!panel.loadFullButton.isHidden && !panel.text.isEditable)
+            #expect(await call(harness, "menu", ["path": "Data > Load Full Cell"]).error == nil)
+            await ready { tab.loading != nil }
+            #expect(source.value(0, 3) == whole && !source.isCut(0, 3))
+            #expect(panel.loadFullButton.isHidden && panel.text.string == whole)
+        }
+
+        @Test func editingACutCellOpensItsWholeValue() async throws {
+            let (_, _, tab, _, whole) = try await Self.cutTab()
+            tab.grid.selection.select(GridPosition(row: 0, column: tab.grid.columnOrder.firstIndex(of: 3) ?? 3))
+            #expect(tab.dataGrid(tab.grid, edit: 0, column: 3, typed: nil))
+            await ready { tab.loading != nil }
+            #expect(tab.viewer.valuePanel?.text.string == whole)
+            #expect(tab.viewer.valuePanel?.text.isEditable == true)
+        }
+
+        @Test func copyingACutCellCopiesItsWholeValue() async throws {
+            let (_, _, tab, _, whole) = try await Self.cutTab()
+            tab.grid.selection.select(GridPosition(row: 0, column: tab.grid.columnOrder.firstIndex(of: 3) ?? 3))
+            tab.viewer.copy(nil)
+            await ready { tab.loading != nil }
+            #expect(NSPasteboard.general.string(forType: .string)?.contains(whole) == true)
+        }
+
+        @Test func duplicatingARowWithACutCellCopiesItsWholeValue() async throws {
+            let (_, _, tab, _, whole) = try await Self.cutTab()
+            tab.grid.selection.selectRow(0)
+            tab.duplicateRow(nil)
+            await ready { tab.loading != nil }
+            let insert = try #require(tab.source?.changes.state.inserts.first)
+            #expect(insert.values["note"] == .text(whole))
+        }
+
+        @Test func aQuickFilterRefusesTheStartOfAValue() async throws {
+            let (_, _, tab, _, _) = try await Self.cutTab()
+            tab.grid.selection.select(GridPosition(row: 0, column: tab.grid.columnOrder.firstIndex(of: 3) ?? 3))
+            let item = Commands.filterEquals.item()
+            #expect(!tab.validateMenuItem(item))
+            #expect(item.toolTip?.contains("Load Full Cell") == true)
+        }
+
+        @Test func aHiddenColumnIsntReadAndShowingItReadsTheRowsAgain() async throws {
+            let session = FakeTableSession()
+            let (_, _, tab) = try await GridDataAppTests.tab(session: session)
+            tab.viewer.setHidden(true, columns: [4])
+            tab.refresh(nil)
+            await ready { tab.loading != nil }
+            #expect(session.statements.last { $0.hasPrefix("SELECT") && $0.contains("LIMIT") }?.contains("`region`, `number`, NULL,") == true)
+            let reads = session.statements.count
+            tab.viewer.setHidden(false, columns: [4])
+            await ready { tab.loading != nil }
+            #expect(session.statements.count > reads)
+            #expect(session.statements.last { $0.hasPrefix("SELECT") && $0.contains("LIMIT") }?.contains("`total`") == true)
         }
     }
 }
