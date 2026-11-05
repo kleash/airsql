@@ -2,16 +2,19 @@ import AirSQLCore
 import AppKit
 
 /// File ▸ Local History…: the states the tab's file was saved in, newest first. A click shows one, Restore (or a
-/// double-click) puts it in the editor, as an edit that ⌘Z takes back and nothing written until Save.
+/// double-click) puts it in the editor, the lines that differ from the editor's tinted, as an edit that ⌘Z takes back and nothing written until Save.
 @MainActor
 final class LocalHistorySheet: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
     private let versions: [(date: Date, text: String)]
     private let restore: (String) -> Void
+    /// The editor's text, which each state is compared with.
+    private let current: String
     private let table = ContentTable()
     private let preview = NSTextView.scrollableTextView()
 
-    init(versions: [(date: Date, text: String)], restore: @escaping (String) -> Void) {
+    init(versions: [(date: Date, text: String)], current: String, restore: @escaping (String) -> Void) {
         self.versions = versions
+        self.current = current
         self.restore = restore
         super.init(nibName: nil, bundle: nil)
         title = "Local History"
@@ -78,7 +81,16 @@ final class LocalHistorySheet: NSViewController, NSTableViewDataSource, NSTableV
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard versions.indices.contains(table.selectedRow) else { return }
-        (preview.documentView as? NSTextView)?.string = versions[table.selectedRow].text
+        let lines = versions[table.selectedRow].text.components(separatedBy: "\n")
+        let different = Set(lines.difference(from: current.components(separatedBy: "\n")).insertions.map(\.offset))
+        let shown = NSMutableAttributedString()
+        let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        for (index, line) in lines.enumerated() {
+            var attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+            if different.contains(index) { attributes[.backgroundColor] = NSColor.statusWarning.withAlphaComponent(0.2) }
+            shown.append(NSAttributedString(string: line + (index + 1 < lines.count ? "\n" : ""), attributes: attributes))
+        }
+        (preview.documentView as? NSTextView)?.textStorage?.setAttributedString(shown)
     }
 
     func select(row: Int) { table.selectRowIndexes([row], byExtendingSelection: false) }
@@ -107,7 +119,7 @@ extension ConsoleViewController {
             }.value
             guard let self else { return }
             guard !versions.isEmpty else { return self.note(.info, "This file has no saved states yet: they're kept each time you save it here.") }
-            let sheet = LocalHistorySheet(versions: versions) { [weak self] text in
+            let sheet = LocalHistorySheet(versions: versions, current: self.text) { [weak self] text in
                 guard let self else { return }
                 self.editor.replace(NSRange(location: 0, length: (self.text as NSString).length), with: text,
                                     select: NSRange(location: 0, length: 0))

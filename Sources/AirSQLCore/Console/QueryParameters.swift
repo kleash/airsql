@@ -1,6 +1,6 @@
 import Foundation
 
-/// The console's query parameters: `?` and `:name` in a statement's code, never in a string or comment. They are filled
+/// The console's query parameters: `?`, `:name` and `${name}` in a statement's code, never in a string or comment. They are filled
 /// in on this Mac before the statement goes, as quoted values, so the read-only and safety checks see the final SQL.
 public enum QueryParameters {
     /// A parameter in a statement: its place (UTF-16, in the statement) and its key: "?1", "?2"… by order among the
@@ -37,6 +37,17 @@ public enum QueryParameters {
                                        key: ":" + String(decoding: text[word], as: UTF16.self)))
                 }
             }
+            // ${name}: `$` is a name's letter to the lexer.
+            for (index, token) in tokens.enumerated() where index + 3 < tokens.count && token.kind == .word
+                && String(decoding: text[token.range], as: UTF16.self) == "$" {
+                let (open, name, close) = (tokens[index + 1], tokens[index + 2], tokens[index + 3])
+                guard open.kind == .symbol, text[open.range.lowerBound] == 0x7B, name.kind == .word, close.kind == .symbol,
+                      text[close.range.lowerBound] == 0x7D, open.range.lowerBound == token.range.upperBound,
+                      name.range.lowerBound == open.range.upperBound, close.range.lowerBound == name.range.upperBound else { continue }
+                found.append(Place(range: token.range.lowerBound..<close.range.upperBound,
+                                   key: ":" + String(decoding: text[name.range], as: UTF16.self)))
+            }
+            found.sort { $0.range.lowerBound < $1.range.lowerBound }
             return found
         }
     }

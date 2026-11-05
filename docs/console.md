@@ -128,8 +128,8 @@ says which tab finished. It never shows the SQL. Turn the notification off in Sy
 
 ### Parameters
 
-A statement with `?` or `:name` in its code, not in a string or comment, asks for their values before it runs. The same
-`:name` takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
+A statement with `?`, `:name` or `${name}` in its code, not in a string or comment, asks for their values before it runs.
+The same name takes one value. A number or `NULL` goes in as it is; anything else goes in as quoted text, so a value can't
 become code. The tab remembers the values for the next run. AirSQL fills them in before sending, so Messages, the SQL
 log and the history show the final SQL, and the read-only and safety checks see it too.
 
@@ -261,7 +261,7 @@ shows in a sheet, with what it will do:
   history. Passwords in statements are masked before they are kept, as in the SQL log. **All connections** searches
   every connection's statements, with a column saying which.
 - **File ▸ Local History…** lists the states a .sql file was saved in (the last 50, kept on this Mac only). Click one to read
-  it; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
+  it, with the lines that differ from the editor tinted; **Restore** puts it in the editor, ⌘Z takes it back, and nothing is written until you save.
 - **Query ▸ Sessions…** lists every session AirSQL has open on the connection: what uses it, its thread on the server, its
   database, and whether it is running or holds a transaction.
 - **View ▸ SQL Log** (⌥⌘L) shows every statement AirSQL sent, as they come. See [the SQL log](sql-log.md).

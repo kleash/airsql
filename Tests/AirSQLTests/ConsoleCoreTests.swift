@@ -552,6 +552,7 @@ struct ResultSetSourceTests {
         #expect(keys("lbl:LOOP LEAVE lbl; END LOOP").isEmpty)
         #expect(keys("lbl: LOOP").isEmpty)
         #expect(keys("SELECT (:a)") == [":a"])
+        #expect(keys("SELECT ${a}, :a, ? , '${b}', $x") == [":a", ":a", "?1"], "${name} and :name are one parameter")
         #expect(QueryParameters.places(in: ["CALL p(? /* p_id int */)"], noBackslashEscapes: false)[0].first?.hint == "p_id int")
         let two = QueryParameters.places(in: ["SELECT ?", "SELECT ?, :a"], noBackslashEscapes: false)
         #expect(QueryParameters.keys(two) == ["?1", "?2", ":a"])
