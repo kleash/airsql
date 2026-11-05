@@ -198,3 +198,64 @@ struct DDLScriptTests {
         #expect(items.map(\.code) == ["CREATE TABLE `t` (\n)", "CREATE EVENT `e`"])
     }
 }
+
+struct TableOptionsSQLTests {
+    let server = SchemaServer(version: "11.8.2-MariaDB")
+
+    func table() -> TableDesign {
+        var table = TableDesign(name: "t")
+        var id = ColumnDesign(name: "id", type: TypeSpec(name: "int"))
+        id.original = "id"
+        table.columns = [id]
+        return table
+    }
+
+    @Test func readsThePartitionClauseOfEitherServer() {
+        let mysql = "CREATE TABLE `t` (\n  `id` int\n) ENGINE=InnoDB COMMENT='PARTITION BY nothing'\n/*!50100 PARTITION BY HASH (`id`)\nPARTITIONS 4 */"
+        #expect(EditorQueries.partitionClause(mysql, noBackslashEscapes: false) == "PARTITION BY HASH (`id`)\nPARTITIONS 4")
+        let mariadb = "CREATE TABLE `t` (\n  `id` int\n) ENGINE=InnoDB\n PARTITION BY RANGE (`id`)\n(PARTITION `p0` VALUES LESS THAN (10) ENGINE = InnoDB)"
+        #expect(EditorQueries.partitionClause(mariadb, noBackslashEscapes: false)
+                == "PARTITION BY RANGE (`id`)\n(PARTITION `p0` VALUES LESS THAN (10) ENGINE = InnoDB)")
+        #expect(EditorQueries.partitionClause("CREATE TABLE `t` (\n  `id` int\n) COMMENT='PARTITION BY x'", noBackslashEscapes: false) == nil)
+    }
+
+    @Test func writesPartitionsInCreateAndAStatementOfTheirOwn() throws {
+        var new = table()
+        new.options.partitioning = "  PARTITION BY HASH (id) PARTITIONS 2\n"
+        #expect(try new.statements(database: "d", from: nil, server: server).first?.hasSuffix("\n)\nPARTITION BY HASH (id) PARTITIONS 2") == true)
+        var renamed = new
+        renamed.name = "u"
+        renamed.options.comment = "x"
+        let statements = try renamed.statements(database: "d", from: table(), server: server)
+        #expect(statements.count == 2 && statements[1] == "ALTER TABLE `d`.`u`\n  PARTITION BY HASH (id) PARTITIONS 2")
+        #expect(try table().statements(database: "d", from: new, server: server) == ["ALTER TABLE `d`.`t`\n  REMOVE PARTITIONING"])
+        var same = new
+        same.options.partitioning = "PARTITION BY HASH (id) PARTITIONS 2"
+        #expect(try same.statements(database: "d", from: new, server: server).isEmpty)
+    }
+
+    @Test func writesHowAnIndexIsStored() throws {
+        var hash = IndexDesign(name: "h", kind: .index, parts: [.init(column: "id")])
+        hash.algorithm = "HASH"
+        var old = table()
+        hash.original = "h"
+        old.indexes = [hash]
+        var new = old
+        new.indexes[0].algorithm = "BTREE"
+        #expect(try new.statements(database: "d", from: old, server: server)
+                == ["ALTER TABLE `d`.`t`\n  DROP INDEX `h`,\n  ADD INDEX `h` (`id`) USING BTREE"])
+        new.indexes[0].kind = .fulltext
+        #expect(try new.statements(database: "d", from: old, server: server).first?.contains("USING") == false)
+        new.indexes[0].kind = .index
+        new.indexes[0].algorithm = "NOPE; DROP TABLE t"
+        #expect(throws: DesignError.self) { try new.statements(database: "d", from: old, server: server) }
+    }
+
+    @Test func keepsBTREEOnMemoryTablesOnly() {
+        var table = SchemaTable(name: "t", kind: .table, engine: "MEMORY")
+        table.indexes = [SchemaIndex(name: "a", unique: false, type: "BTREE",
+                                     parts: [.init(column: "id", expression: nil, prefixLength: nil, descending: false)], visible: true, comment: "")]
+        #expect(TableDesign(table, options: TableOptions(engine: "MEMORY"), server: server).indexes[0].algorithm == "BTREE")
+        #expect(TableDesign(table, options: TableOptions(engine: "InnoDB"), server: server).indexes[0].algorithm == nil)
+    }
+}

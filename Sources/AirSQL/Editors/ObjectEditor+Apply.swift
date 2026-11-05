@@ -16,6 +16,7 @@ extension ObjectEditorController {
                                             + "\(kind.rawValue)'s own settings set, so it behaves as before.")
         request.actionTitle = name == nil ? "Create" : "Apply"
         request.offersChangeset = true
+        request.offersConsole = true
         if ObjectCode.dropsFirst(kind, server: server), name != nil {
             request.warnings.append("MySQL can't replace a \(kind.rawValue) in one step: it is dropped first, so if the new code fails "
                                     + "it is gone. Your code stays here to fix and apply again, and Revert puts the old code back.")
@@ -35,6 +36,21 @@ extension ObjectEditorController {
     }
 
     @objc func previewChanges(_ sender: Any?) { applyChanges(sender) }
+
+    /// Run…: as from the tree, a CALL or SELECT in a query tab, for the routine as the server has it.
+    @objc func runRoutine(_ sender: Any?) {
+        guard runReason == nil, let name, let main = view.window?.windowController as? MainWindowController,
+              let open = main.model.openConnection(context.connection.id),
+              let routineKind = DatabaseObject.Kind(rawValue: kind.rawValue) else { return }
+        NavigatorActions.runRoutine(DatabaseObject(routineKind, database, name), on: open, main: main)
+    }
+
+    /// Why Run… can't go now (nil: it can).
+    var runReason: String? {
+        if isBusy { return "Wait until the server has answered" }
+        if name == nil { return "Create the \(kind.rawValue) with Apply first" }
+        return code.string == original ? nil : "Apply your changes first: Run uses what the server has"
+    }
 
     /// Query ▸ Format SQL, as in a console; only spaces and words' case change, so it's still the same code.
     @objc func formatSQL(_ sender: Any?) {
@@ -112,6 +128,9 @@ extension ObjectEditorController {
         case Commands.revert.action?:
             enabled = revertButton.isEnabled
             reason = revertButton.toolTip
+        case Commands.runRoutine.action?:
+            reason = [.procedure, .function].contains(kind) ? runReason : "Only a procedure or function runs"
+            enabled = reason == nil
         default:
             break
         }

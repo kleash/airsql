@@ -8,6 +8,16 @@ public struct Collation: Hashable {
     public var isDefault: Bool
 }
 
+/// A partition of a table, as the server counts it (subpartitions are listed by their own names).
+public struct TablePartition: Equatable {
+    public var name: String
+    public var method: String
+    public var expression: String
+    public var values: String
+    public var rows: String
+    public var size: Int?
+}
+
 /// What the editors read beyond the schema cache, on the editor's own session: a table's options and column checks, the
 /// collations and engines to choose from, and who the person is on the server.
 public enum EditorQueries {
@@ -18,17 +28,52 @@ public enum EditorQueries {
         let literal = { (text: String) in SQLQuote.string(text, noBackslashEscapes: server.noBackslashEscapes) }
         // MySQL 8 otherwise answers from statistics up to a day old (the next AUTO_INCREMENT among them).
         if server.flavour == .mysql, server.atLeast(8) { _ = try await source.rows("SET SESSION information_schema_stats_expiry = 0") }
-        let rows = try await source.rows("SELECT ENGINE, TABLE_COLLATION, TABLE_COMMENT, AUTO_INCREMENT, ROW_FORMAT "
+        let rows = try await source.rows("SELECT ENGINE, TABLE_COLLATION, TABLE_COMMENT, AUTO_INCREMENT, ROW_FORMAT, CREATE_OPTIONS "
                                          + "FROM information_schema.TABLES WHERE TABLE_SCHEMA = " + literal(database)
                                          + " AND TABLE_NAME = " + literal(table))
         guard let row = rows.first, row.count >= 5 else { throw DesignError("\(database).\(table) isn't on the server any more") }
-        let options = TableOptions(engine: row[0], collation: row[1], comment: row[2] ?? "", autoIncrement: row[3].flatMap { UInt64($0) },
+        var options = TableOptions(engine: row[0], collation: row[1], comment: row[2] ?? "", autoIncrement: row[3].flatMap { UInt64($0) },
                                    rowFormat: row[4])
+        if row.count > 5, row[5]?.lowercased().contains("partitioned") == true {
+            let create = try await source.rows("SHOW CREATE TABLE " + SQLQuote.identifier(database, table)).first
+            options.partitioning = create.flatMap { $0.count > 1 ? $0[1] : nil }.flatMap { partitionClause($0, noBackslashEscapes: server.noBackslashEscapes) }
+        }
         guard server.flavour == .mariadb else { return (options, []) }
         guard server.atLeast(10, 5, 10) else { return (options, nil) }
         let checks = try await source.rows("SELECT CONSTRAINT_NAME FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = "
                                            + literal(database) + " AND TABLE_NAME = " + literal(table) + " AND LEVEL = 'Column'")
         return (options, Set(checks.compactMap { $0.first ?? nil }))
+    }
+
+    /// The PARTITION BY clause of SHOW CREATE TABLE's text: MySQL wraps it in a version comment, and a table comment may
+    /// say the same words.
+    static func partitionClause(_ create: String, noBackslashEscapes: Bool) -> String? {
+        guard let close = create.range(of: "\n)") else { return nil }
+        var tail = String(create[close.upperBound...]).replacingOccurrences(of: "/*!50100 ", with: "")
+            .replacingOccurrences(of: "/*!50500 ", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if tail.hasSuffix("*/") { tail = String(tail.dropLast(2)).trimmingCharacters(in: .whitespacesAndNewlines) }
+        let text = Array(tail.utf16)
+        let words = SQLLexer.tokens(tail, noBackslashEscapes: noBackslashEscapes).filter { $0.kind == .word }
+        let word = { (token: SQLToken) in String(decoding: text[token.range], as: UTF16.self).uppercased() }
+        guard let at = words.indices.dropLast().first(where: { word(words[$0]) == "PARTITION" && word(words[$0 + 1]) == "BY" }) else {
+            return nil
+        }
+        return String(decoding: text[words[at].range.lowerBound...], as: UTF16.self)
+    }
+
+    /// A partitioned table's partitions, in order.
+    public static func partitions(_ database: String, _ table: String, server: SchemaServer, from source: SchemaQuerying) async throws
+        -> [TablePartition] {
+        let literal = { (text: String) in SQLQuote.string(text, noBackslashEscapes: server.noBackslashEscapes) }
+        let rows = try await source.rows("SELECT PARTITION_NAME, SUBPARTITION_NAME, PARTITION_METHOD, PARTITION_EXPRESSION, PARTITION_DESCRIPTION, "
+                                         + "TABLE_ROWS, DATA_LENGTH + INDEX_LENGTH FROM information_schema.PARTITIONS WHERE TABLE_SCHEMA = "
+                                         + literal(database) + " AND TABLE_NAME = " + literal(table)
+                                         + " ORDER BY PARTITION_ORDINAL_POSITION, SUBPARTITION_ORDINAL_POSITION")
+        return rows.compactMap { row in
+            guard row.count >= 7, let name = row[1] ?? row[0] else { return nil }
+            return TablePartition(name: name, method: row[2] ?? "", expression: row[3] ?? "", values: row[4] ?? "", rows: row[5] ?? "",
+                                  size: row[6].flatMap { Int($0) })
+        }
     }
 
     /// Every collation, by name (MariaDB 10.10 and later: each character set's own names of the UCA 14 collations).

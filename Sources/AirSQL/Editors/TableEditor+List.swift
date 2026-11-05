@@ -85,6 +85,8 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
                     ListColumn(id: "kind", title: "Kind", width: 110, tip: "Choose primary key, unique, plain, full-text or spatial"),
                     ListColumn(id: "columns", title: "Columns", width: 300, minimum: 150,
                                tip: "List its columns in order, with commas; name(10) indexes the first 10 characters, DESC sorts down"),
+                    ListColumn(id: "using", title: "Using", width: 76, tip: "Choose how the index is stored; — leaves it to the engine"),
+                    ListColumn(id: "visible", title: "Visible", width: 50, tip: "Let queries use the index; off keeps it up to date but unused"),
                     ListColumn(id: "comment", title: "Comment", width: 220, minimum: 80, tip: "Keep a note with the index")]
         case .foreignKeys:
             return [mark, ListColumn(id: "name", title: "Name", width: 170, minimum: 100, tip: "Name the key"),
@@ -94,7 +96,14 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
                                tip: "List the columns there, in the same order, with commas"),
                     ListColumn(id: "onUpdate", title: "On update", width: 110, tip: "Choose what happens to these rows when that key changes"),
                     ListColumn(id: "onDelete", title: "On delete", width: 110, tip: "Choose what happens to these rows when that row goes")]
-        case .checks, .options:
+        case .references:
+            return [mark, ListColumn(id: "table", title: "Table", width: 200, minimum: 110, tip: "The table that points here; double-click to open it"),
+                    ListColumn(id: "key", title: "Key", width: 170, minimum: 100, tip: "The name of its foreign key"),
+                    ListColumn(id: "columns", title: "Its columns", width: 160, minimum: 100, tip: "The columns that hold the values"),
+                    ListColumn(id: "here", title: "Columns here", width: 160, minimum: 100, tip: "The columns of this table they point at"),
+                    ListColumn(id: "onUpdate", title: "On update", width: 110, tip: "What happens to those rows when a key here changes"),
+                    ListColumn(id: "onDelete", title: "On delete", width: 110, tip: "What happens to those rows when a row here goes")]
+        case .checks, .options, .partitions:
             return [mark, ListColumn(id: "name", title: "Name", width: 180, minimum: 100, tip: "Name the check"),
                     ListColumn(id: "clause", title: "Condition", width: 380, minimum: 200, tip: "Write what every row must satisfy, as SQL"),
                     ListColumn(id: "enforced", title: "Enforced", width: 70, tip: "Enforce the check; MySQL can keep one without enforcing it")]
@@ -120,7 +129,11 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
             list.setAccessibilityIdentifier("tableEditor.list")
             let menu = NSMenu()
             menu.add([Commands.addRow, Commands.duplicateRow, Commands.copy, Commands.paste, Commands.moveRowsUp, Commands.moveRowsDown,
-                      Commands.deleteRows])
+                      Commands.deleteRows, nil, Commands.indexFromColumns, Commands.uniqueFromColumns])
+            let addTo = NSMenuItem(title: "Add to Index", action: nil, keyEquivalent: "")
+            addTo.submenu = NSMenu()
+            addTo.submenu?.delegate = self
+            menu.addItem(addTo)
             list.menu = menu
         }
         // No rows while the columns change: the table view would ask the new section for the old rows' cells.
@@ -156,7 +169,8 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
         case .indexes: return design.indexes.count
         case .foreignKeys: return design.foreignKeys.count
         case .checks: return design.checks.count + columnCheckRows.count
-        case .options: return 0
+        case .references: return incoming.count
+        case .options, .partitions: return 0
         }
     }
 
@@ -166,6 +180,10 @@ extension TableEditorController: NSTableViewDataSource, NSTableViewDelegate {
     @objc func listDoubleClicked(_ sender: Any?) {
         let row = list.clickedRow >= 0 ? list.clickedRow : list.selectedRow
         guard row >= 0, !isBusy else { return }
+        if section == .references {
+            guard row < incoming.count, let main = view.window?.windowController as? MainWindowController else { return }
+            return main.openTableEditor(incoming[row].table, database: incoming[row].database, context: context)
+        }
         let column = list.clickedColumn > 0 ? list.clickedColumn : 1
         list.editColumn(column, row: row, with: nil, select: true)
     }

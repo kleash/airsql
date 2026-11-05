@@ -236,11 +236,11 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
-  `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.cancel`, `preview.run` (the person's).
+  `preview.confirm`, `preview.saveChangeset`, `preview.copy`, `preview.console`, `preview.cancel`, `preview.run` (the person's).
 - **Table editor**: `tableEditor.sections`, `tableEditor.list`, `tableEditor.options` (`.name`, `.database`, `.engine`,
   `.collation`, `.rowFormat`, `.autoIncrement`, `.comment`), `tableEditor.sql`, `tableEditor.apply`,
-  `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
-  `objectEditor.definer`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
+  `tableEditor.partitions`, `tableEditor.partitionClause`, `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
+  `objectEditor.definer`, `objectEditor.run`, `objectEditor.apply`, `objectEditor.revert`. **ER diagram**: `erDiagram.database`,
   `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`. **SQL Generator**: `generator.text`,
   `generator.copy`, `generator.console`, `generator.save`, `generator.layout`, and a box per option (`generator.indexes` and so on).
 - **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,

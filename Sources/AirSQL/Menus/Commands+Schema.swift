@@ -57,11 +57,16 @@ extension Commands {
     static let createToConsole = Command("Open CREATE in Query Tab", #selector(AirSQLActions.openCreateInConsole(_:)),
                                          tip: "Put the CREATE statements of what is selected in a new query tab")
 
+    static let indexFromColumns = Command("New Index from Columns", #selector(TableEditorController.indexFromColumns(_:)),
+                                          tip: "Make an index of the columns selected in the table editor")
+    static let uniqueFromColumns = Command("New Unique Index from Columns", #selector(TableEditorController.uniqueFromColumns(_:)),
+                                           tip: "Make a unique index of the columns selected in the table editor")
+
     static let diagramArrange = [arrangeLeftToRight, arrangeTopToBottom, arrangeGrid]
     static let diagramDetail = [detailAll, detailKeys, detailNames]
     static let diagramExports = [exportPNG, exportMermaid, exportPlantUML, exportDOT, exportGraphML, exportDrawIO]
 
     static let schema: [Command] = [diagramOfSelection, diagramOfNeighbours, diagramNew, diagramRename, diagramDelete, diagramNeighbours,
-                                    diagramRemove, diagramComments, diagramVirtualKeys, printDiagram, sqlGenerator, createToConsole]
+                                    diagramRemove, diagramComments, diagramVirtualKeys, printDiagram, sqlGenerator, createToConsole, indexFromColumns, uniqueFromColumns]
         + diagramArrange + diagramDetail + diagramExports
 }

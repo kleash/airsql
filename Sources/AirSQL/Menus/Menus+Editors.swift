@@ -21,5 +21,6 @@ extension MainMenu {
                                           + Commands.diagramExports + [Commands.printDiagram])
             .map { $0?.item() ?? .separator() })
         database.insertItem(diagram, at: at)
+        database.add([nil, Commands.indexFromColumns, Commands.uniqueFromColumns])
     }
 }

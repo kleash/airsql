@@ -105,7 +105,8 @@ extension AppTests {
             let other = middle(4, 1)
             let menu = await call(harness, "click", ["x": other.0, "y": other.1, "button": "right"])
             #expect(list.selectedRow == 4, "a right-click selects the row it is on: \(menu.error ?? "")")
-            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Move Up", "Move Down", "Delete Rows"])
+            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Move Up", "Move Down", "Delete Rows", "New Index from Columns",
+                                             "New Unique Index from Columns", "Add to Index"])
             // Paste waits for rows copied.
             #expect((menu["menu"] as? [[String: Any]])?.filter { $0["enabled"] as? Bool != true }.map { $0["title"] as? String } == ["Paste"])
             _ = await call(harness, "menu", ["path": "context > Delete Rows"])
@@ -160,10 +161,10 @@ extension AppTests {
             #expect(editor.sqlText.string.contains("COMMENT='Paid or not'"))
             editor.revertChanges(nil)
             #expect(!editor.isEdited)
-            for section in TableEditorController.Section.allCases.dropLast() {
+            for (section, rows) in [(TableEditorController.Section.columns, 6), (.indexes, 4), (.foreignKeys, 2), (.checks, 2)] {
                 editor.sections.selectedSegment = section.rawValue
                 editor.sectionChosen(editor.sections)
-                #expect(editor.list.numberOfRows == [6, 4, 2, 2][section.rawValue], "\(section)")
+                #expect(editor.list.numberOfRows == rows, "\(section)")
             }
         }
 
@@ -344,6 +345,70 @@ extension AppTests {
             #expect(again.layout.arrangement == .grid && again.canvas.boxes.count == diagram.canvas.boxes.count)
             again.deleteDiagram(nil)
             #expect(again.layouts.count == 1 && again.layout.tables == nil)
+        }
+
+        @Test func theTableEditorMakesIndexesFromColumnsAndShowsWhatPointsAtIt() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            let context = try await recordedEditorContext()
+            main.openTableEditor("customers", database: database, context: context)
+            let editor = try #require(main.selectedTab?.content as? TableEditorController)
+            await ready { editor.before == nil }
+            #expect(editor.incoming.contains { $0.table == "orders" })
+            editor.showSection(.references)
+            #expect(editor.list.numberOfRows == editor.incoming.count && !editor.addButton.isEnabled)
+            #expect(editor.sections.label(forSegment: TableEditorController.Section.references.rawValue)?.hasPrefix("Used by · ") == true)
+            editor.list.selectRowIndexes([0], byExtendingSelection: false)
+            editor.deleteRows(nil)
+            #expect(!editor.isEdited, "this list isn't the table's own to change")
+
+            editor.showSection(.columns)
+            editor.list.selectRowIndexes([1, 0], byExtendingSelection: false)
+            editor.uniqueFromColumns(nil)
+            #expect(editor.section == .indexes)
+            let made = try #require(editor.design.indexes.last)
+            #expect(made.kind == .unique && made.parts.compactMap(\.column) == Array(editor.design.columns.prefix(2).map(\.name)))
+
+            // A column added to it, then the SQL of how it is stored and that it is unused.
+            editor.showSection(.columns)
+            editor.list.selectRowIndexes([2], byExtendingSelection: false)
+            let item = NSMenuItem(title: made.name, action: nil, keyEquivalent: "")
+            item.tag = editor.design.indexes.count - 1
+            editor.addColumnsToIndex(item)
+            #expect(editor.design.indexes.last?.parts.count == 3)
+            editor.update { $0.indexes[$0.indexes.count - 1].visible = false }
+            #expect(editor.sqlText.string.contains("ADD UNIQUE INDEX") && editor.sqlText.string.contains("IGNORED"))
+
+            // The clause shows as SQL as it is typed, and Revert takes it back.
+            editor.showSection(.partitions)
+            editor.partitionsView.code.setText("PARTITION BY HASH (id) PARTITIONS 2")
+            editor.partitionsView.textDidChange(Notification(name: NSText.didChangeNotification))
+            #expect(editor.sqlText.string.contains("PARTITION BY HASH (id) PARTITIONS 2"))
+            editor.revertChanges(nil)
+            #expect(editor.partitionsView.code.string.isEmpty && !editor.isEdited)
+        }
+
+        @Test func aChangeCanGoToAQueryTabInsteadOfRunning() async throws {
+            let (main, harness, editor) = try await tableEditor("orders")
+            editor.update { $0.options.comment = "x" }
+            editor.applyChanges(nil)
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            _ = await call(harness, "press", ["title": "Open in Query Tab"])
+            _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(console.editor.string.hasPrefix("ALTER TABLE `airsql_fixture`.`orders`") && editor.isEdited)
+        }
+
+        @Test func aRoutineRunsOnlyAsTheServerHasIt() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.openObjectEditor(.procedure, name: "add_customer", database: database, context: try await recordedEditorContext())
+            let editor = try #require(main.selectedTab?.content as? ObjectEditorController)
+            await ready { editor.isBusy }
+            #expect(!editor.runButton.isHidden && editor.runButton.isEnabled)
+            editor.code.setText(editor.code.string + " ")
+            editor.updateControls()
+            #expect(!editor.runButton.isEnabled && editor.runButton.toolTip?.hasPrefix("Apply your changes first") == true)
         }
 
         @Test func theGeneratorShowsLiveDDLAndWritesAFilePerObject() async throws {

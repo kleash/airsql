@@ -11,18 +11,24 @@ first.
 
 ## The table editor
 
-Open it from a table's **Open Structure**, or make a new table with **Database ▸ Create Table…**. A table editor has five
+Open it from a table's **Open Structure**, or make a new table with **Database ▸ Create Table…**. A table editor has seven
 parts, chosen at the top:
 
 - **Columns**: name, type (the types your server has), length or ENUM values, unsigned, NULL, default, extra (counts up
   by itself, follows updates, or is generated from an expression), collation and comment. Drag rows to reorder the
   columns.
 - **Indexes**: primary key, unique, plain, full-text and spatial indexes. Write their columns separated by commas:
-  `email(10)` indexes the first 10 characters, `created_at DESC` sorts down.
+  `email(10)` indexes the first 10 characters, `created_at DESC` sorts down. **Using** chooses BTREE or HASH, and **Visible** off
+  keeps an index up to date while queries leave it alone (INVISIBLE on MySQL, IGNORED on MariaDB). In the Columns list, right-click
+  selected columns for **New Index from Columns**, **New Unique Index from Columns** and **Add to Index**.
 - **Foreign keys**: this table's columns, the table they point at and its columns, and what happens on update and on
   delete.
+- **Used by**: the foreign keys of other tables that point at this one, from the databases read so far. Double-click one to open
+  that table.
 - **Checks**: conditions every row must satisfy. On MariaDB, a check written with a column belongs to that column and
   stays with it when the column changes.
+- **Partitions**: the partitions the server has, with their rows and sizes, and the PARTITION BY clause. Edit the clause to add or change
+  partitions; empty it to remove them and keep the rows. Changing them copies the table, and rows that fit no partition stop the change.
 - **Options**: the table's name, engine, default collation, row format, next AUTO_INCREMENT number and comment.
 
 **+** adds a row, **−** removes the selected rows (or press Delete), and a right-click offers the same. New rows show in
@@ -35,7 +41,8 @@ length, two columns of one name, an emoji in a name, which the server would keep
 
 ## Apply
 
-**Apply** (⌘S) shows the statements in the [SQL preview](sql-preview.md) first. Then they run one at a time on a
+**Apply** (⌘S) shows the statements in the [SQL preview](sql-preview.md) first; **Open in Query Tab** there puts them in a query tab
+instead of running them. Then they run one at a time on a
 connection of their own, and the editor reads the table back from the server.
 
 - MySQL and MariaDB can't roll table changes back: each statement takes effect as it runs. When there are several, the
@@ -57,6 +64,7 @@ server keeps it, to edit as text.
 - MariaDB replaces it in one statement (CREATE OR REPLACE). MySQL replaces a view the same way, but drops a procedure,
   function, trigger or event first: if the new code fails, the old one is gone. Your code stays in the editor to fix and
   apply again, and **Revert** puts the old code back.
+- **Run…** on a procedure or function opens a CALL or SELECT of it in a query tab, for the code the server has: apply your changes first.
 - The code has the tab's editor: line numbers, completion, Comment Lines (⌘/), Format SQL and the matching bracket.
 - When the server refuses the code, the place it points to is underlined in red, with the message on hover, until you
   change the text.

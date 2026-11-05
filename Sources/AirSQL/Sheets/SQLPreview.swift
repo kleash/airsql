@@ -25,6 +25,8 @@ struct SQLPreviewRequest {
     var accessory: NSView?
     /// Shows "Save as Liquibase changeset": the caller saves the change once it has run, when the box is ticked.
     var offersChangeset = false
+    /// Shows "Open in Query Tab": the SQL goes to a new tab on `change`'s connection and nothing runs.
+    var offersConsole = false
     /// The session's NO_BACKSLASH_ESCAPES (`DBConnection.noBackslashEscapes`), as `SQLQuote.string` wrote the SQL: it
     /// decides where the strings end, so the colours match what the server will read.
     var noBackslashEscapes = false
@@ -253,6 +255,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         let help = helpButton(.sqlPreview)
         let copy = button("Copy SQL", id: "preview.copy", tip: "Copy the statements, to keep them or run them elsewhere",
                           target: self, action: #selector(copySQL(_:)))
+        let console = button("Open in Query Tab", id: "preview.console", tip: "Close this and put the statements in a new query tab: nothing runs until you do",
+                             target: self, action: #selector(openInConsole(_:)))
+        console.isHidden = !request.offersConsole || request.agent != nil
         let cancel = button(request.agent == nil ? "Cancel" : "Decline", id: "preview.cancel",
                             tip: request.agent == nil ? "Don't run it: nothing changes" : "Refuse the agent's change: nothing runs",
                             target: self, action: #selector(cancel(_:)))
@@ -267,7 +272,7 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         runButton.isEnabled = request.typeToConfirm == nil
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        let row = NSStackView(views: [help, copy, spacer, cancel, runButton])
+        let row = NSStackView(views: [help, copy, console, spacer, cancel, runButton])
         row.spacing = Spacing.unit
         return row
     }
@@ -281,6 +286,12 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
     @objc private func copySQL(_ sender: Any?) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(request.change.text, forType: .string)
+    }
+
+    @objc private func openInConsole(_ sender: Any?) {
+        let main = window?.sheetParent?.windowController as? MainWindowController
+        finish(SQLPreviewResult(approved: false, saveAsChangeset: false))
+        _ = main?.openConsole(text: request.change.text, title: nil, connection: request.change.connection)
     }
 
     @objc private func cancel(_ sender: Any?) { finish(SQLPreviewResult(approved: false, saveAsChangeset: false)) }

@@ -61,9 +61,16 @@ extension TableEditorController {
                 case "kind":
                     let kind = IndexDesign.Kind.allCases[index]
                     table.indexes[row].kind = kind
-                    if kind == .primary { table.indexes[row].name = "PRIMARY" }
+                    if kind == .primary {
+                        table.indexes[row].name = "PRIMARY"
+                        table.indexes[row].visible = true
+                    }
+                    if !table.indexes[row].takesAlgorithm { table.indexes[row].algorithm = nil }
                 case "columns":
                     do { table.indexes[row].parts = try EditorText.parts(from: value) } catch { failure = error as? DesignError }
+                case "using":
+                    table.indexes[row].algorithm = index == 0 ? nil : IndexDesign.algorithms[index]
+                case "visible": table.indexes[row].visible = on
                 default: table.indexes[row].comment = value
                 }
             }
@@ -111,7 +118,7 @@ extension TableEditorController {
     // MARK: Rows
 
     @objc func addRow(_ sender: Any?) {
-        guard !isBusy, section != .options else { return }
+        guard !isBusy, editsRows else { return }
         endEditing()
         let at = (list.selectedRowIndexes.last.map { $0 + 1 }) ?? numberOfRows(in: list)
         update { table in
@@ -127,7 +134,7 @@ extension TableEditorController {
                 table.foreignKeys.append(ForeignKeyDesign(name: Self.unused(table.name + "_fk", in: table.foreignKeys.map(\.name)),
                                                           columns: [], referencedDatabase: database ?? "", referencedTable: "",
                                                           referencedColumns: []))
-            case .checks, .options:
+            case .checks, .options, .references, .partitions:
                 table.checks.append(CheckDesign(name: Self.unused(table.name + "_chk", in: table.checks.map(\.name)), clause: ""))
             }
         }
@@ -140,7 +147,7 @@ extension TableEditorController {
 
     @objc func duplicateRow(_ sender: Any?) {
         let rows = list.selectedRowIndexes
-        guard !isBusy, !rows.isEmpty else { return }
+        guard !isBusy, !rows.isEmpty, editsRows else { return }
         update { table in
             switch section {
             case .columns:
@@ -165,7 +172,7 @@ extension TableEditorController {
                     copy.name = Self.unused(copy.name + "_copy", in: table.foreignKeys.map(\.name))
                     table.foreignKeys.append(copy)
                 }
-            case .checks, .options:
+            case .checks, .options, .references, .partitions:
                 for row in rows where row < table.checks.count {
                     var copy = table.checks[row]
                     copy.original = nil
@@ -179,7 +186,7 @@ extension TableEditorController {
 
     @objc func deleteRows(_ sender: Any?) {
         let rows = list.selectedRowIndexes
-        guard !isBusy, !rows.isEmpty else { return }
+        guard !isBusy, !rows.isEmpty, editsRows else { return }
         endEditing()
         let checkColumns = columnCheckRows
         update { table in
@@ -211,11 +218,11 @@ extension TableEditorController {
         case .indexes: return rows.indexes.isEmpty ? nil : rows
         case .foreignKeys: return rows.foreignKeys.isEmpty ? nil : rows
         case .checks: return rows.checks.isEmpty ? nil : rows
-        case .options: return nil
+        case .options, .references, .partitions: return nil
         }
     }
 
-    var canCopyRows: Bool { section != .options && !list.selectedRowIndexes.isEmpty }
+    var canCopyRows: Bool { editsRows && !list.selectedRowIndexes.isEmpty }
     var canPasteRows: Bool { !isBusy && copiedRows != nil }
 
     /// As text the rows are the lines of a CREATE TABLE; ⌘V in a table editor adds the rows themselves.
@@ -227,7 +234,7 @@ extension TableEditorController {
         case .columns: rows.columns = selected.filter { $0 < design.columns.count }.map { design.columns[$0] }
         case .indexes: rows.indexes = selected.filter { $0 < design.indexes.count }.map { design.indexes[$0] }
         case .foreignKeys: rows.foreignKeys = selected.filter { $0 < design.foreignKeys.count }.map { design.foreignKeys[$0] }
-        case .checks, .options: rows.checks = selected.filter { $0 < design.checks.count }.map { design.checks[$0] }
+        case .checks, .options, .references, .partitions: rows.checks = selected.filter { $0 < design.checks.count }.map { design.checks[$0] }
         }
         // A row still being typed may not write as SQL yet: its name is all there is to say.
         let names = rows.columns.map(\.name) + rows.indexes.map(\.name) + rows.foreignKeys.map(\.name) + rows.checks.map(\.name)
@@ -272,7 +279,7 @@ extension TableEditorController {
                     key.name = Self.unused(key.name, in: table.foreignKeys.map(\.name))
                     table.foreignKeys.append(key)
                 }
-            case .checks, .options:
+            case .checks, .options, .references, .partitions:
                 first = table.checks.count
                 count = rows.checks.count
                 for row in rows.checks {
@@ -292,6 +299,55 @@ extension TableEditorController {
         let taken = Set(names.map { $0.lowercased() })
         guard taken.contains(base.lowercased()) else { return base }
         return (2...).lazy.map { base + "_\($0)" }.first { !taken.contains($0.lowercased()) }!
+    }
+
+    // MARK: Indexes from the columns selected
+
+    @objc func indexFromColumns(_ sender: Any?) { newIndex(.index) }
+    @objc func uniqueFromColumns(_ sender: Any?) { newIndex(.unique) }
+
+    /// A new index on the selected columns, in their order, shown in the Indexes list.
+    private func newIndex(_ kind: IndexDesign.Kind) {
+        let names = selectedColumns
+        guard !isBusy, !names.isEmpty else { return }
+        endEditing()
+        update { table in
+            let name = Self.unused(String(((kind == .unique ? "uq_" : "idx_") + names.joined(separator: "_")).prefix(60)), in: table.indexes.map(\.name))
+            table.indexes.append(IndexDesign(name: name, kind: kind, parts: names.map { IndexDesign.Part(column: $0) }))
+        }
+        showSection(.indexes)
+        list.selectRowIndexes(IndexSet(integer: design.indexes.count - 1), byExtendingSelection: false)
+    }
+
+    private var selectedColumns: [String] {
+        section == .columns ? list.selectedRowIndexes.filter { $0 < design.columns.count }.map { design.columns[$0].name } : []
+    }
+
+    /// Add to Index: the indexes that can take a column.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        for (row, index) in design.indexes.enumerated() where section == .columns && !selectedColumns.isEmpty {
+            let item = NSMenuItem(title: index.name, action: #selector(addColumnsToIndex(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = row
+            item.toolTip = "Add the selected columns to the end of \(index.name)"
+            menu.addItem(item)
+        }
+        if menu.items.isEmpty {
+            let none = NSMenuItem(title: "No Index to Add To", action: nil, keyEquivalent: "")
+            none.toolTip = "Select columns in the Columns list of a table with an index first"
+            menu.addItem(none)
+        }
+    }
+
+    /// Adds the selected columns the index hasn't yet to its end.
+    @objc func addColumnsToIndex(_ sender: NSMenuItem) {
+        let names = selectedColumns
+        update { table in
+            guard table.indexes.indices.contains(sender.tag) else { return }
+            let held = table.indexes[sender.tag].parts.compactMap(\.column)
+            table.indexes[sender.tag].parts += names.filter { !held.contains($0) }.map { IndexDesign.Part(column: $0) }
+        }
     }
 
     // MARK: Moving columns

@@ -23,6 +23,7 @@ extension TableEditorController {
                 + "and writes to it wait until that is done.")
         request.actionTitle = creating ? "Create" : "Apply"
         request.offersChangeset = true
+        request.offersConsole = true
         request.warnings = warnings(statements)
         request.destructive = !droppedColumns.isEmpty
         SQLPreviewSheet.show(request, connection: context.connection, on: window) { [weak self] result in
@@ -57,6 +58,9 @@ extension TableEditorController {
         if !retyped.isEmpty {
             warnings.append("Changing the type of " + retyped.map(\.name).joined(separator: ", ") + " converts the values: values "
                             + "that don't fit are refused (strict mode) or cut.")
+        }
+        if before != nil, design.options.partitioning != before?.options.partitioning {
+            warnings.append("Changing partitions copies the whole table; rows that fit no partition stop the change, and the table stays as it was.")
         }
         return warnings
     }
@@ -119,6 +123,9 @@ extension TableEditorController {
         guard cached.kind == .table else { throw DesignError("\(table) is a \(cached.kind.rawValue), not a table") }
         let read = try await context.read { session in
             try await EditorQueries.table(database, table, server: server, from: session)
+        }
+        partitionList = read.options.partitioning == nil ? [] : try await context.read { session in
+            try await EditorQueries.partitions(database, table, server: server, from: session)
         }
         return TableDesign(cached, options: read.options, columnChecks: read.columnChecks, server: server)
     }

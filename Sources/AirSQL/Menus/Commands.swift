@@ -976,6 +976,7 @@ enum Commands {
         "Decimal Places": "Round this number column's values to some decimal places, grouped by thousands",
         "Time Zone": displayZone.tip,
         "Maintenance": maintenance.tip,
+        "Add to Index": "Add the columns selected to the end of an index",
         "Diagram": "Make, arrange, show and export ER diagrams of chosen tables",
         "New Object": "Write a new view, procedure, function, trigger or event as its CREATE statement",
         "Colour": colour.tip,

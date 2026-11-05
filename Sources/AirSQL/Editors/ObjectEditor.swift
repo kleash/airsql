@@ -24,6 +24,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     let applyButton = button("Apply", id: "objectEditor.apply", tip: "", target: nil, action: #selector(AirSQLActions.applyChanges(_:)),
                              primary: true)
     let revertButton = button("Revert", id: "objectEditor.revert", tip: "", target: nil, action: #selector(AirSQLActions.revertChanges(_:)))
+    let runButton = button("Run…", id: "objectEditor.run", tip: "", target: nil, action: #selector(AirSQLActions.runRoutine(_:)))
     let note = label("", font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, truncates: true)
     let status = NSProgressIndicator()
     let overlay = EditorOverlay()
@@ -79,9 +80,11 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         applyButton.keyEquivalentModifierMask = .command
         applyButton.target = self
         revertButton.target = self
+        runButton.target = self
+        runButton.isHidden = ![.procedure, .function].contains(kind)
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let bar = NSStackView(views: [kindLabel, definerLabel, definer, spacer, status, revertButton, applyButton,
+        let bar = NSStackView(views: [kindLabel, definerLabel, definer, spacer, status, runButton, revertButton, applyButton,
                                       helpButton(.editors)])
         bar.spacing = Spacing.unit
         bar.alignment = .centerY
@@ -160,6 +163,8 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         applyButton.toolTip = reason ?? "Show the statements in the preview sheet, then run them on the server (⌘S)"
         revertButton.isEnabled = !isBusy && name != nil && code.string != original
         revertButton.toolTip = revertButton.isEnabled ? "Put back the code the server has" : "Nothing to revert"
+        runButton.isEnabled = runReason == nil
+        runButton.toolTip = runReason ?? "Open a CALL or SELECT of it in a query tab: nothing runs until you do"
         code.isEditable = !isBusy
         var notes: [String] = []
         if let mode = definition?.sqlMode { notes.append("sql_mode: " + (mode.isEmpty ? "none" : mode)) }

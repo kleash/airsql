@@ -85,6 +85,10 @@ extension TableSQL {
         case .vector: sql = "VECTOR INDEX " + name
         }
         sql += "(" + parts.joined(separator: ", ") + ")"
+        if index.takesAlgorithm, let algorithm = index.algorithm {
+            guard IndexDesign.algorithms.contains(algorithm) else { throw DesignError("“\(algorithm)” isn't a way to store an index") }
+            sql += " USING " + algorithm
+        }
         if !index.comment.isEmpty { sql += " COMMENT " + text(index.comment) }
         if !index.visible { sql += server.flavour == .mysql ? " INVISIBLE" : " IGNORED" }
         return sql
@@ -137,7 +141,7 @@ extension TableSQL {
     // MARK: Comparing
 
     func same(_ a: IndexDesign, _ b: IndexDesign) -> Bool {
-        a.kind == b.kind && a.parts == b.parts && a.comment == b.comment && a.visible == b.visible
+        a.kind == b.kind && a.parts == b.parts && a.comment == b.comment && a.visible == b.visible && a.algorithm == b.algorithm
     }
 
     func same(_ a: ForeignKeyDesign, _ b: ForeignKeyDesign) -> Bool {
