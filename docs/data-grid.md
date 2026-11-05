@@ -10,6 +10,15 @@ status bar's figures, the value panel, Record View, Transpose, other ways to sho
 a column's summary. Loading, filtering, editing, copying and exporting a table's rows are on
 [A table's rows](table-data.md).
 
+## The toolbar
+
+A table tab and a console result each have a row of buttons over the rows: the actions that are also in the menu bar, kept
+beside the work. The buttons act on the grid under them, wherever the focus is. Hold the pointer over one to see what it
+does, or why it's dimmed. A table's has Refresh, Refresh Every, Add Row, Duplicate Row, Delete Rows, Revert, Preview SQL
+and Apply; every grid has Find, the Column List, Sort by Columns, the Value Panel, Record View, Transpose, View As and
+Chart. A console result adds Pin, Compare With and Export, and shows its editing buttons only when it can be edited. When
+the tab is narrow, the buttons at the end step out; the menu bar still has them.
+
 ## The header
 
 Each column's header shows its name and, under it, its type. Marks before the name tell you about keys:

@@ -75,6 +75,12 @@ extension ResultGridView {
         }
         viewer.reloadData()
         viewer.status.update()
+        updateToolbarEditing()
+    }
+
+    /// A result that can't be edited has no editing buttons.
+    func updateToolbarEditing() {
+        toolbar.left = edits?.editing?.isEditable == true ? [] : Set(GridToolbar.Item.changeItems.map(\.command.action))
     }
 
     // MARK: Changes

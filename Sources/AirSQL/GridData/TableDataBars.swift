@@ -11,7 +11,6 @@ final class TableDataBar: NSView, NSTextViewDelegate {
     let whereField = ConditionView.make()
     let recentButton = NSButton()
     let clearButton = NSButton()
-    let transposeButton = NSButton()
     let searchField = NSSearchField()
     let loadedOnly = checkbox("Loaded rows only", id: "tableData.loadedOnly",
                               tip: "Search only the rows loaded so far, without asking the server", on: false, target: nil, action: nil)
@@ -63,8 +62,6 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         configure(clearButton, symbol: "xmark.circle.fill", id: "tableData.clearFilter", tip: "Show every row again",
                   action: #selector(clearFilter(_:)))
         clearButton.isHidden = true
-        configure(transposeButton, symbol: "rectangle.landscape.rotate", id: "tableData.transpose",
-                  tip: "\(Commands.transpose.tip) (\(Commands.transpose.shortcut))", action: #selector(transposeRows(_:)))
         searchField.placeholderString = "Search all columns"
         searchField.toolTip = "Find rows with this text in any column; press Return to search"
         searchField.setAccessibilityIdentifier("tableData.search")
@@ -83,7 +80,7 @@ final class TableDataBar: NSView, NSTextViewDelegate {
         whereRow.setHuggingPriority(.defaultLow, for: .horizontal)
         spacer.isHidden = true
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        row.setViews([scope, whereRow, spacer, searchField, loadedOnly, spinner, transposeButton, helpButton(.tableData)], in: .leading)
+        row.setViews([scope, whereRow, spacer, searchField, loadedOnly, spinner, helpButton(.tableData)], in: .leading)
         row.setHuggingPriority(.defaultHigh, for: .vertical)  // a bar keeps its height; the rows get the rest
         row.spacing = Spacing.unit
         row.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.unit, bottom: 6, right: Spacing.unit)
@@ -156,8 +153,6 @@ final class TableDataBar: NSView, NSTextViewDelegate {
     @objc func clearFilter(_ sender: Any?) {
         owner?.applyFilter("")
     }
-
-    @objc private func transposeRows(_ sender: Any?) { owner?.viewer.transposeGrid(sender) }
 
     @objc private func searchEntered(_ sender: Any?) {
         owner?.search(searchField.stringValue, loadedOnly: loadedOnly.state == .on)

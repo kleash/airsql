@@ -31,13 +31,18 @@ extension MainMenu {
         menus.view.insertItem(submenu("Refresh Every", TableDataController.autoRefreshItems()), at: refresh + 1)
         menus.view.add([nil, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,
                         Commands.transpose, Commands.columnList, nil, Commands.heatmap, Commands.highlightEqual])
-        menus.view.addItem(submenu("View As", ["Table", "Text", "Tree"].enumerated().map { index, title in
+        menus.view.addItem(submenu("View As", viewAsItems()))
+        menus.view.add([Commands.chart])
+    }
+
+    /// View As's choices.
+    static func viewAsItems() -> [NSMenuItem] {
+        ["Table", "Text", "Tree"].enumerated().map { index, title in
             let item = Commands.viewAs.item()
             item.title = title
             item.tag = index
             return item
-        }))
-        menus.view.add([Commands.chart])
+        }
     }
 }
 

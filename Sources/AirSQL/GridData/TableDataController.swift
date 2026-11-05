@@ -68,6 +68,11 @@ final class TableDataController: NSViewController, TabContent {
     let findBar = TableFindBar()
     let notice = TableDataNotice()
     let emptyNote = TableEmptyNote()
+    private(set) lazy var toolbar = GridToolbar(grid: grid, groups: [
+        [.init(Commands.refresh, "arrow.clockwise"), .init(Commands.autoRefresh, "timer", menu: { Self.autoRefreshItems() })],
+        [.init(Commands.addRow, "plus"), .init(Commands.duplicateRow, "plus.square.on.square")] + GridToolbar.Item.changeItems,
+        GridToolbar.Item.findItems, GridToolbar.Item.viewItems, [.init(Commands.exportRows, "square.and.arrow.up")],
+    ])
     /// The status bar's links, after the rows' count (`viewer.status.rows`).
     lazy var countLink = link("Count Exactly", Commands.countRows, id: "tableData.count")
     lazy var moreLink = link("Load More", Commands.loadMore, id: "tableData.loadMore")
@@ -155,7 +160,8 @@ final class TableDataController: NSViewController, TabContent {
         bar.owner = self
         findBar.owner = self
         notice.owner = self
-        let bars = NSStackView(views: [bar, findBar, notice])
+        viewer.toolbar = toolbar
+        let bars = NSStackView(views: [toolbar, bar, findBar, notice])
         bars.orientation = .vertical
         bars.spacing = 0
         bars.alignment = .leading

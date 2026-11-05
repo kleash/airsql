@@ -125,6 +125,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     private(set) weak var summaryShown: GridSummaryView?
     /// View As or Chart (`GridViewer+Views`): what the body shows, and the view shown in place of the grid.
     var presentation = Presentation.table
+    /// The host's row of actions, kept up to date with the status bar.
+    weak var toolbar: GridToolbar?
     /// The host's find bar, for Esc.
     weak var findBar: TableFindBar?
     /// Called when View As changes what the body shows.
@@ -365,6 +367,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             valuePanel = panel
             updateValuePanel()
         }
+        status.update()
     }
 
     /// The panel shows the focused cell, editable where the host lets it be edited (`keepValue`); text being edited

@@ -513,9 +513,11 @@ extension AppTests {
             }
             let transpose = Commands.transpose.item()
             #expect(tab.validateMenuItem(transpose))
-            tab.bar.transposeButton.performClick(nil)
+            tab.toolbar.validate()
+            let button = try #require(tab.toolbar.button(Commands.transpose))
+            button.performClick(nil)
             #expect(tab.viewer.transposed)
-            #expect(tab.bar.transposeButton.image != nil)
+            #expect(button.image != nil)
             let menu = tab.viewer.dataGrid(tab.grid, menuFor: .row(0))
             #expect(menu?.items.contains { $0.action == Commands.transpose.action } == true)
         }

@@ -68,6 +68,7 @@ extension ConsoleViewController {
                                       transposed: settings.transposeSingleRow && store.rowCount == 1 && store.columns.count > 1,
                                       editable: query != nil)
             view.viewer.noBackslashEscapes = noBackslashEscapes
+            view.showToolbar()
             if let query, let self {
                 view.editingContext = context
                 view.model = model

@@ -156,8 +156,10 @@ extension ConsoleViewController {
         comparison.otherConnection = otherConnection
         let settings = model.data.settings, table = ResultGridView.table(of: store.columns)
         comparison.makeView = {
-            ResultGridView(source: diff, table: table, legend: diff.legend, nullText: settings.nullText,
-                           fontSize: CGFloat(settings.gridFontSize))
+            let view = ResultGridView(source: diff, table: table, legend: diff.legend, nullText: settings.nullText,
+                                      fontSize: CGFloat(settings.gridFontSize))
+            view.showToolbar()
+            return view
         }
         resultTabs.insert(comparison, at: (resultTabs.firstIndex { $0 === tab } ?? resultTabs.count - 1) + 1)
         selectResult(comparison)
