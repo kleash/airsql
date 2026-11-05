@@ -143,6 +143,8 @@ its own:
   Save keeps nothing that is the person's.
 - **A production console's text:** `type` or `set` into the editor of a console on a connection coloured Production
   shows the person the text first; single keys that would change it are refused.
+  The commands that change its text (Delete Line, Move Statement, Comment Lines, Cut and the like) and the text view's own
+  control keys (⌃K, ⌃T, ⌃Y) are refused there: use `type` or `set`.
 - **Data you may not read is hidden:** on connections below Schema + read, grids, query results (and the value panel,
   View As, charts, Column Summary and the status bar's figure), the filters a value goes into (`result.filter`,
   `tableData.where`, `values.list`, `quickFilter.value`), the process list, a compare's rows and sync script, the

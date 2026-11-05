@@ -455,6 +455,49 @@ extension AppTests {
             find.wholeWords.performClick(nil)
         }
 
+        /// Surround With takes the selection or word; Paste from History lists the editor's copies, newest first, without repeats.
+        @Test func surroundAndPasteHistory() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            func item(_ tag: Int) -> NSMenuItem {
+                let item = Commands.surroundWith.item()
+                item.tag = tag
+                return item
+            }
+            editor.setText("SELECT a FROM t")
+            editor.setSelectedRange(NSRange(location: 7, length: 1))
+            editor.surroundWith(item(0))
+            #expect(editor.string == "SELECT (a) FROM t" && editor.selectedRange() == NSRange(location: 7, length: 3))
+            editor.setText("name")
+            editor.setSelectedRange(NSRange(location: 2, length: 0))
+            editor.surroundWith(item(3))
+            #expect(editor.string == "COALESCE(name, )", "the word at the cursor")
+            editor.undoManager?.undo()
+            #expect(editor.string == "name")
+
+            let pasteboard = NSPasteboard.general, saved = pasteboard.string(forType: .string), kept = SQLEditorView.copied
+            defer {
+                SQLEditorView.copied = kept
+                pasteboard.clearContents()
+                if let saved { pasteboard.setString(saved, forType: .string) }
+            }
+            SQLEditorView.copied = []
+            let empty = NSMenu()
+            PasteHistoryMenu.shared.menuNeedsUpdate(empty)
+            #expect(empty.items.map(\.title) == ["Copy Something in the Editor First"] && empty.items[0].action == nil)
+            editor.setText("one two")
+            for range in [NSRange(location: 0, length: 3), NSRange(location: 4, length: 3), NSRange(location: 0, length: 3)] {
+                editor.setSelectedRange(range)
+                editor.copy(nil)
+            }
+            #expect(SQLEditorView.copied == ["one", "two"])
+            let menu = NSMenu()
+            PasteHistoryMenu.shared.menuNeedsUpdate(menu)
+            editor.setSelectedRange(NSRange(location: 7, length: 0))
+            editor.pasteFromHistory(menu.items[1])
+            #expect(editor.string == "one twotwo")
+        }
+
         /// Settings ▸ Editor reaches open editors: the font, keywords in it too; the indent Tab puts in.
         @Test func editorSettingsReachTheEditor() async throws {
             let model = testModel(Fixtures.shop)

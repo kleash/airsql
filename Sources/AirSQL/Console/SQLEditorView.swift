@@ -59,6 +59,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     var caretsChangedText = false
     /// Column Selection Mode.
     var columnSelection = false
+    /// The last texts copied from any editor, for Paste from History.
+    static var copied: [String] = []
     /// What's folded away, as ranges of the text.
     var folds: [Range<Int>] = []
     var cachedFoldRegions: [Range<Int>]?

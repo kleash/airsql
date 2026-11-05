@@ -212,7 +212,8 @@ extension SQLEditorView {
         #selector(toggleComment(_:)), #selector(indentLines(_:)), #selector(outdentLines(_:)), #selector(duplicateLine(_:)),
         #selector(deleteLine(_:)), #selector(moveLineUp(_:)), #selector(moveLineDown(_:)), #selector(joinLines(_:)),
         #selector(sortLines(_:)), #selector(reverseLines(_:)), #selector(toggleCase(_:)), #selector(toggleBlockComment(_:)),
-        #selector(completeStatement(_:)), #selector(moveStatementUp(_:)), #selector(moveStatementDown(_:)),
+        #selector(completeStatement(_:)), #selector(moveStatementUp(_:)), #selector(moveStatementDown(_:)), #selector(surroundWith(_:)),
+        #selector(pasteFromHistory(_:)),
     ]
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {

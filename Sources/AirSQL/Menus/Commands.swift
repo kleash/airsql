@@ -790,6 +790,8 @@ enum Commands {
         "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",
+        "Surround With": surroundWith.tip,
+        "Paste from History": "Paste something copied from an editor earlier, kept until AirSQL quits",
         "Folding": "Hide statements, brackets and comments down to their first line, or show them again",
         "Carets": "Type in several places at once, one caret for each",
         "Statements": "Move between statements, select one or change their order",

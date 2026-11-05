@@ -156,6 +156,9 @@ extension AppTests.AgentGateUITests {
             let refused = await agentCall(service, tool, arguments)
             #expect(refused.error?.contains("Changing a production console's text") == true, "\(arguments): \(refused.error ?? "let through")")
         }
+        #expect(throws: (any Error).self, "the history is the person's clipboard") {
+            try AgentGate.$agent.withValue("Claude Code") { try harness.checkAgentMayChoose(Commands.pasteFromHistory.action, target: console.editor) }
+        }
         console.editor.setSelectedRange(NSRange(location: 0, length: 0))
         let killed = await agentCall(service, "key", ["combo": "ctrl+k"])
         #expect(killed.error?.contains("needs the person's OK") == true, "the text view's own: \(killed.error ?? "let through")")

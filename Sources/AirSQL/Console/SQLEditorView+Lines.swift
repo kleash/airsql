@@ -107,6 +107,33 @@ extension SQLEditorView {
         replace(range, with: wrapped, select: NSRange(location: range.location, length: (wrapped as NSString).length))
     }
 
+    /// What Surround With offers: the text before and after the selection.
+    static let surrounds: [(title: String, before: String, after: String)] = [
+        ("Brackets", "(", ")"), ("Subquery", "SELECT * FROM (", ") AS t"), ("CASE", "CASE WHEN ", " THEN  END"),
+        ("COALESCE", "COALESCE(", ", )"), ("Backticks", "`", "`"),
+    ]
+
+    /// Edit ▸ Surround With ▸ one of `surrounds` (the item's tag), around the selection or the word at the cursor.
+    @objc func surroundWith(_ sender: Any?) {
+        let range = selectionOrWord, pair = Self.surrounds[(sender as? NSMenuItem)?.tag ?? 0]
+        let wrapped = pair.before + (string as NSString).substring(with: range) + pair.after
+        replace(range, with: wrapped, select: NSRange(location: range.location, length: (wrapped as NSString).length))
+    }
+
+    /// Edit ▸ Paste from History ▸ one of the editor's last copies (the item's represented text).
+    @objc func pasteFromHistory(_ sender: Any?) {
+        guard let text = (sender as? NSMenuItem)?.representedObject as? String else { return }
+        replace(selectedRange(), with: text, select: NSRange(location: selectedRange().location + (text as NSString).length, length: 0))
+    }
+
+    /// Keeps what the editor copied, newest first, in memory only: it's gone when AirSQL quits.
+    private func remember(_ text: String?) {
+        guard let text, !text.isEmpty else { return }
+        Self.copied.removeAll { $0 == text }
+        Self.copied.insert(text, at: 0)
+        Self.copied = Array(Self.copied.prefix(10))
+    }
+
     /// Closes the statement at the cursor and starts a line after it.
     @objc func completeStatement(_ sender: Any?) {
         guard let done = SQLEditing.completed(string, caret: selectedRange().location, noBackslashEscapes: noBackslashEscapes) else { return }
@@ -115,13 +142,17 @@ extension SQLEditorView {
     }
 
     override func cut(_ sender: Any?) {
-        guard !extraCarets.isEmpty else { return super.cut(sender) }
+        guard !extraCarets.isEmpty else {
+            remember((string as NSString).substring(with: selectedRange()))
+            return super.cut(sender)
+        }
         copy(sender)
         atEveryCaret { self.replace(self.selectedRange(), with: "") }
     }
 
     /// ⌘C with nothing selected copies the line; with several carets, their selections, a line each.
     override func copy(_ sender: Any?) {
+        defer { remember(NSPasteboard.general.string(forType: .string)) }
         if !extraCarets.isEmpty {
             let text = string as NSString
             let all = ([selectedRange()] + extraCarets).sorted { $0.location < $1.location }

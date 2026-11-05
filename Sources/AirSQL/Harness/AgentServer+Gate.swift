@@ -5,7 +5,8 @@ import AppKit
 /// to look at, the clipboard is the person's, text for a production console waits for their OK, and the rows of a
 /// connection whose agent access doesn't include reading data are left out of snapshots and covered in screenshots.
 extension AgentServer {
-    static let pasteActions: Set<String> = ["paste:", "pasteAsPlainText:", "pasteAsRichText:", "pasteAndMatchStyle:"]
+    static let pasteActions: Set<String> = ["paste:", "pasteAsPlainText:", "pasteAsRichText:", "pasteAndMatchStyle:",
+                                            "pasteFromHistory:"]
 
     /// Refuses an agent's action in `window` (or a sheet of it) when that window is the person's alone: Settings.
     func checkAgentMayAct(in window: NSWindow?) throws {

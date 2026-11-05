@@ -60,7 +60,13 @@ extension Commands {
     static let unfoldAll = Command("Unfold All", #selector(SQLEditorView.unfoldAll(_:)), right, [.control, .option, .shift],
                                    tip: "Show everything that's folded")
 
-    static let editorCommands = [foldHere, unfoldHere, foldAll, unfoldAll,
+    static let surroundWith = Command("Surround With", #selector(SQLEditorView.surroundWith(_:)),
+                                      tip: "Wrap the selection or the word at the cursor in this")
+    static let pasteFromHistory = Command("Paste from History", #selector(SQLEditorView.pasteFromHistory(_:)),
+                                          tip: "Paste this text, copied from an editor since AirSQL opened")
+
+    static let editorCommands = [surroundWith, pasteFromHistory,
+                                 foldHere, unfoldHere, foldAll, unfoldAll,
                                  selectNextOccurrence, selectAllOccurrences, caretPerLine, addCaretAbove, addCaretBelow, columnSelection,
                                  nextStatement, previousStatement, selectStatement, moveStatementUp, moveStatementDown,
                                  duplicateLine, deleteLine, moveLineUp, moveLineDown, joinLines, sortLines, reverseLines, toggleCase, blockComment,

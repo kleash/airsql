@@ -58,6 +58,8 @@ own session, which every query tab of that connection shares.
 - Text pasted inside a `'string'` is escaped so its quotes don't end the string; **Paste Without Formatting** keeps it as copied.
 - Return after `(` indents one level, and between `(` and `)` puts the `)` on a line of its own.
 - The `BEGIN` or `CASE` and `END` of a block are marked when the cursor is on one of them.
+- **Edit ▸ Surround With** wraps the selection or the word at the cursor in brackets, a subquery, `CASE`, `COALESCE` or backticks.
+- **Edit ▸ Paste from History** lists the last ten texts you copied or cut in an editor. They're kept in memory only, until you quit.
 - **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
