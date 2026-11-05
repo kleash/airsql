@@ -22,8 +22,9 @@ extension ReconResult {
     /// target-only tables last; then rows: DELETE (children first), UPDATE and INSERT (parents first). Destructive steps
     /// only when `destructive`.
     public func steps(destructive: Bool = false) -> [ReconStep] {
-        ReconScriptBuilder(result: self).steps().filter { step in
-            (destructive || !step.destructive)
+        let leftOut = Set(objects.filter(\.leftOut).map { "\($0.kind) \($0.name)" })
+        return ReconScriptBuilder(result: self).steps().filter { step in
+            (destructive || !step.destructive) && !leftOut.contains("\(step.objectKind) \(step.object)")
                 && (step.kind == .structure ? options.mode != .data : options.mode != .structure)
         }
     }
@@ -55,6 +56,7 @@ struct ReconScriptBuilder {
     private var ignoreDefiner: Bool { result.options.ignore.definer }
 
     func steps() -> [ReconStep] {
+        guard !result.isServer else { return [] }
         let tables = ordered(result.objects.filter { $0.kind == .table })
         let others = result.objects.filter { $0.kind != .table }
         var steps: [ReconStep] = []
@@ -169,6 +171,7 @@ struct ReconScriptBuilder {
         case .function: what = "FUNCTION"
         case .trigger: what = "TRIGGER"
         case .event: what = "EVENT"
+        case .database: what = "DATABASE"  // never reached: a server compare has no steps
         }
         return "DROP \(what) IF EXISTS " + q(object.targetName)
     }
@@ -177,6 +180,7 @@ struct ReconScriptBuilder {
     /// qualifier replaced by the target's; views and sequences as CREATE OR REPLACE.
     private func create(_ object: ReconObject) -> String? {
         guard var text = object.sourceDDL, !text.isEmpty else { return nil }
+        if object.targetName != object.name { text = ReconNormal.renamed(text, object.kind, to: object.targetName) }
         if ignoreDefiner { text = ReconNormal.definerRemoved(text) }
         text = ReconNormal.qualifiersMapped(text, from: result.source.database, to: result.target.database)
         if object.kind == .view || object.kind == .sequence, text.hasPrefix("CREATE ") {

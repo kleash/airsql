@@ -150,9 +150,7 @@ final class ReconDetailView: NSObject {
         guard let result else { return }
         tabs.setEnabled(true, forSegment: 0)
         tabs.setToolTip(Self.structureTip, forSegment: 0)
-        let rules = result.options.ignore
-        let ignored = [rules.autoIncrement ? "AUTO_INCREMENT" : nil, rules.definer ? "DEFINER" : nil,
-                       rules.collation ? "collations" : nil, rules.whitespace ? "whitespace" : nil].compactMap { $0 }
+        let ignored = result.options.ignore.names
         ignoring.stringValue = ignored.isEmpty ? "Nothing ignored" : "Ignoring " + ignored.joined(separator: ", ")
         tabs.setEnabled(object?.data != nil, forSegment: 1)
         tabs.setToolTip(object?.data != nil ? Self.dataTip : object == nil ? "Select a table first"

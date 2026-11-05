@@ -85,7 +85,34 @@ enum ReconNormal {
     static func definition(_ text: String, database: String, rules: ReconIgnoreRules) -> String {
         var text = qualifiersRemoved(text, database: database)
         if rules.definer { text = definerRemoved(text) }
+        if rules.letterCase { text = lowered(text) }
         return rules.whitespace ? compact(text, lowercase: false) : text
+    }
+
+    /// The text with everything but quoted text and comments in lower case.
+    private static func lowered(_ text: String) -> String {
+        var units = Array(text.utf16)
+        for token in SQLLexer.tokens(text) where [.word, .quotedName, .number, .symbol].contains(token.kind) {
+            let piece = Array(String(decoding: units[token.range], as: UTF16.self).lowercased().utf16)
+            // Lowering can change a text's length (İ): such a name stays as it is.
+            if piece.count == token.range.count { units.replaceSubrange(token.range, with: piece) }
+        }
+        return String(decoding: units, as: UTF16.self)
+    }
+
+    /// A CREATE statement with the name after its kind's keyword (CREATE … VIEW `db`.`v`) replaced, keeping any qualifier,
+    /// as a chosen pair's source reads for its target.
+    static func renamed(_ text: String, _ kind: ReconObject.Kind, to name: String) -> String {
+        let units = Array(text.utf16), tokens = SQLLexer.tokens(text)
+        func spelled(_ token: SQLToken) -> String { String(decoding: units[token.range], as: UTF16.self) }
+        guard var at = tokens.firstIndex(where: { $0.kind == .word && spelled($0).uppercased() == kind.rawValue.uppercased() }) else {
+            return text
+        }
+        at += 1
+        while at + 2 < tokens.count, spelled(tokens[at + 1]) == "." { at += 2 }
+        guard at < tokens.count, [.word, .quotedName].contains(tokens[at].kind) else { return text }
+        return String(decoding: units[..<tokens[at].range.lowerBound], as: UTF16.self) + SQLQuote.identifier(name)
+            + String(decoding: units[tokens[at].range.upperBound...], as: UTF16.self)
     }
 
     /// `db`.`name` → `name`, for the database a definition belongs to (MySQL qualifies the names in a view's body).

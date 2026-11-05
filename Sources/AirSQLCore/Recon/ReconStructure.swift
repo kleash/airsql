@@ -19,6 +19,10 @@ struct ReconStructure {
     func tablePairs() -> (pairs: [(source: SchemaTable, target: SchemaTable?)], onlyInTarget: [SchemaTable]) {
         let sourceTables = source.tables.filter { $0.kind == .table }
         let targetTables = target.tables.filter { $0.kind == .table }
+        if let only = options.only {
+            guard only.kind == .table, let table = sourceTables.first(where: { same($0.name, only.source) }) else { return ([], []) }
+            return ([(table, targetTables.first { same($0.name, only.target) })], [])
+        }
         var claimed: [String] = []
         var pairs: [(source: SchemaTable, target: SchemaTable?)] = []
         for table in sourceTables {
@@ -51,7 +55,7 @@ struct ReconStructure {
         }
         for column in left.columns {
             if let other = right.column(column.name) {
-                let isMoved = moved.contains(column.name.lowercased())
+                let isMoved = !options.ignore.columnOrder && moved.contains(column.name.lowercased())
                 let changes = columnChanges(from: other, to: column) + (isMoved ? ["moved"] : [])
                 if !changes.isEmpty {
                     var part = ReconPart(kind: .column, name: column.name, change: .changed, after: previous,
@@ -149,7 +153,18 @@ struct ReconStructure {
                     ReconNormal.rule(key.onUpdate), ReconNormal.rule(key.onDelete)]
                 + key.columns.map { $0.lowercased() } + ["→"] + key.referencedColumns.map { $0.lowercased() }
         }
-        return matched(left.foreignKeys, right.foreignKeys, name: \.name, kind: .foreignKey,
+        var theirs = right.foreignKeys
+        // Two tables of one database can't share a key's name: a chosen pair matches keys by what they do.
+        if options.only != nil {
+            for key in left.foreignKeys where !theirs.contains(where: { $0.name == key.name }) {
+                if let match = theirs.firstIndex(where: { other in
+                    !left.foreignKeys.contains { $0.name == other.name } && shape(other, target.name) == shape(key, source.name)
+                }) {
+                    theirs[match].name = key.name
+                }
+            }
+        }
+        return matched(left.foreignKeys, theirs, name: \.name, kind: .foreignKey,
                        differ: { shape($0, source.name) != shape($1, target.name) })
     }
 
@@ -233,19 +248,21 @@ struct ReconStructure {
     }
 
     /// A view, routine, trigger, event or sequence compared by its definition (SHOW CREATE …, nil where it doesn't
-    /// exist, "" where it exists but couldn't be read).
-    func definition(_ kind: ReconObject.Kind, name: String, source left: String?, target right: String?) -> ReconObject? {
+    /// exist, "" where it exists but couldn't be read); `targetName` when a chosen pair's names differ.
+    func definition(_ kind: ReconObject.Kind, name: String, targetName: String? = nil, source left: String?,
+                    target right: String?) -> ReconObject? {
         let status: ReconObject.Status
         switch (left, right) {
         case (nil, nil): return nil
         case (_?, nil): status = .onlyInSource
         case (nil, _?): status = .onlyInTarget
         case let (left?, right?):
-            status = !left.isEmpty && !right.isEmpty
-                && ReconNormal.definition(left, database: source.name, rules: options.ignore)
-                    == ReconNormal.definition(right, database: target.name, rules: options.ignore) ? .same : .different
+            let named = ReconNormal.renamed(left, kind, to: targetName ?? name)
+            status = !left.isEmpty && !right.isEmpty && (options.ignore.definitions
+                || ReconNormal.definition(named, database: source.name, rules: options.ignore)
+                    == ReconNormal.definition(right, database: target.name, rules: options.ignore)) ? .same : .different
         }
-        var object = ReconObject(kind: kind, name: name, status: status)
+        var object = ReconObject(kind: kind, name: name, targetName: targetName, status: status)
         object.sourceDDL = left
         object.targetDDL = right
         if left == "" || right == "" {

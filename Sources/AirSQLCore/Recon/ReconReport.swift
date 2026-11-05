@@ -26,6 +26,7 @@ public enum ReconReport {
 
     /// The summary the compare window shows too.
     public static func summary(_ result: ReconResult) -> [(label: String, value: String)] {
+        if result.isServer { return serverSummary(result) }
         let tables = result.objects.filter { $0.kind == .table }
         let others = result.objects.filter { $0.kind != .table }
         let rows = tables.filter { $0.status == .same || $0.status == .different }.compactMap(\.data).filter(\.differs)
@@ -40,10 +41,27 @@ public enum ReconReport {
                 ("views, routines, triggers and events differ", others.filter { $0.status == .different }.count.formatted())]
     }
 
+    /// The same six figures for two servers: the pairs, then what differs within them.
+    private static func serverSummary(_ result: ReconResult) -> [(label: String, value: String)] {
+        let pairs = result.objects
+        let matching = pairs.filter { $0.status == .same }.count, different = pairs.filter { $0.status == .different }.count
+        let tables = result.databases.values.flatMap(\.objects).filter { $0.kind == .table }.compactMap(\.data).filter(\.differs)
+        let rows = tables.reduce(0) { $0 + $1.differenceCount }
+        let objects = result.databases.values.flatMap(\.objects).filter(\.differs).count
+        return [(matching == 1 ? "database matches" : "databases match", matching.formatted()),
+                (different == 1 ? "database differs" : "databases differ", different.formatted()),
+                ("only in \(result.source.name)", pairs.filter { $0.status == .onlyInSource }.count.formatted()),
+                ("only in \(result.target.name)", pairs.filter { $0.status == .onlyInTarget }.count.formatted()),
+                ("\(rows == 1 ? "row differs" : "rows differ") in \(tables.count) \(tables.count == 1 ? "table" : "tables")",
+                 rows.formatted()),
+                ("objects differ in those databases", objects.formatted())]
+    }
+
     /// How an object compares, in plain words: "different structure and data", "only in Production".
     public static func status(_ object: ReconObject, _ result: ReconResult) -> String {
         switch object.status {
         case .same: return object.data?.differs == true ? "different data" : "same"
+        case .different where object.kind == .database: return "different"
         case .different: return object.data?.differs == true ? "different structure and data" : "different structure"
         case .onlyInSource: return "only in \(result.source.name)"
         case .onlyInTarget: return "only in \(result.target.name)"
@@ -58,6 +76,16 @@ public enum ReconReport {
                  detail: detail)
         }
         var lines = object.parts.map { line("structure", "\($0.kind.rawValue) \($0.name)", $0.detail) }
+        if let pair = result.databases[object.name] {
+            // A pair of databases: its objects' differences, each named within the database.
+            return lines + pair.objects.filter(\.differs).flatMap { inner in
+                Self.lines(inner, pair, limit: limit).map { found in
+                    var found = found
+                    found.object = "\(object.name).\(found.object)"
+                    return found
+                }
+            }
+        }
         guard let data = object.data else { return lines }
         let columns = data.columns
         let width = min(max(data.key.count, columns.isEmpty ? 0 : 1), columns.count)
@@ -91,11 +119,11 @@ public enum ReconReport {
     }
 
     private static func header(_ result: ReconResult) -> [String] {
-        let rules = result.options.ignore
-        let ignored = [rules.autoIncrement ? "AUTO_INCREMENT values" : nil, rules.definer ? "DEFINER" : nil,
-                       rules.collation ? "collations" : nil, rules.whitespace ? "whitespace" : nil].compactMap { $0 }
-        return ["\(result.source.name) · \(result.source.database) (\(result.source.version)) → "
-                    + "\(result.target.name) · \(result.target.database) (\(result.target.version))",
+        let ignored = result.options.ignore.names
+        func side(_ end: ReconEnd) -> String {
+            end.name + (end.database.isEmpty ? "" : " · \(end.database)") + " (\(end.version))"
+        }
+        return ["\(side(result.source)) → \(side(result.target))",
                 "Compared \(result.options.mode == .both ? "structure and data" : result.options.mode.rawValue) on "
                     + ISO8601DateFormatter().string(from: Date()) + String(format: " in %.1f s; ", result.duration)
                     + "\(result.rowsChecked) rows checked, \(result.rowsFetched) fetched",
@@ -119,6 +147,11 @@ public enum ReconReport {
         return rows.joined(separator: "\r\n") + "\r\n"
     }
 
+    /// A line's item, with the object it belongs to where that isn't the section's own (a pair of databases).
+    private static func item(_ line: Line, of object: ReconObject) -> String {
+        line.object == object.name ? line.item : "\(line.object): \(line.item)"
+    }
+
     private static func markdown(_ result: ReconResult) -> String {
         func cell(_ text: String) -> String {
             String(text.prefix(200)).replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "|", with: "\\|")
@@ -129,7 +162,7 @@ public enum ReconReport {
         for object in result.objects where object.differs {
             text += ["", "## \(object.kind.rawValue.capitalized) \(cell(object.name)): \(status(object, result))", "",
                      "| Difference | Item | Detail |", "|---|---|---|"]
-            text += lines(object, result, limit: rowsShown).map { "| \($0.difference) | \(cell($0.item)) | \(cell($0.detail)) |" }
+            text += lines(object, result, limit: rowsShown).map { "| \($0.difference) | \(cell(item($0, of: object))) | \(cell($0.detail)) |" }
         }
         return text.joined(separator: "\n") + "\n"
     }
@@ -146,7 +179,7 @@ public enum ReconReport {
             body.append("<h2>\(escape(object.kind.rawValue.capitalized)) \(escape(object.name)) "
                         + "<small>\(escape(status(object, result)))</small></h2>")
             body.append("<table><tr><th>Difference</th><th>Item</th><th>Detail</th></tr>" + lines(object, result, limit: rowsShown)
-                .map { "<tr><td>\(escape($0.difference))</td><td>\(escape($0.item))</td><td>\(escape($0.detail))</td></tr>" }
+                .map { "<tr><td>\(escape($0.difference))</td><td>\(escape(item($0, of: object)))</td><td>\(escape($0.detail))</td></tr>" }
                 .joined() + "</table>")
         }
         return """

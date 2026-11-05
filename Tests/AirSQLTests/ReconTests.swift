@@ -406,6 +406,135 @@ struct ReconTests {
         #expect(ReconReport.summary(result).map(\.label).prefix(2) == ["tables match", "table differs in structure"])
     }
 
+    @Test func aChosenPairReadsTheSourceUnderTheTargetsName() {
+        let view = "CREATE ALGORITHM=UNDEFINED DEFINER=`view`@`%` SQL SECURITY DEFINER VIEW `shop`.`a` AS select 1"
+        #expect(ReconNormal.renamed(view, .view, to: "b`c").hasSuffix("VIEW `shop`.`b``c` AS select 1"))
+        #expect(ReconNormal.renamed("CREATE DEFINER=`p`@`%` PROCEDURE `p`()\nBEGIN END", .procedure, to: "q")
+                == "CREATE DEFINER=`p`@`%` PROCEDURE `q`()\nBEGIN END")
+        #expect(ReconNormal.renamed("no such thing", .trigger, to: "q") == "no such thing")
+    }
+
+    /// In one database the script must replace the target and leave the source alone.
+    @Test func aPairsScriptWritesOnlyTheTarget() {
+        var view = ReconObject(kind: .view, name: "a", targetName: "b", status: .different)
+        view.sourceDDL = "CREATE VIEW `shop`.`a` AS select 1"
+        var routine = ReconObject(kind: .procedure, name: "p", targetName: "q", status: .different)
+        routine.sourceDDL = "CREATE PROCEDURE `p`()\nSELECT 1"
+        let end = ReconEnd(name: "Local", database: "shop", version: "11.8.9-MariaDB")
+        let script = ReconResult(source: end, target: end, options: ReconOptions(), objects: [view, routine]).steps().map(\.sql)
+        #expect(script == ["DROP PROCEDURE IF EXISTS `q`", "CREATE OR REPLACE VIEW `shop`.`b` AS select 1",
+                           "CREATE PROCEDURE `q`()\nSELECT 1"])
+    }
+
+    @Test func aPairOfDefinitionsComparesWithoutItsNames() async throws {
+        let schema = try await Self.fixture(SchemaFixtures.mariadb118)
+        let structure = Self.structure(schema, schema)
+        #expect(structure.definition(.view, name: "a", targetName: "b", source: "CREATE VIEW `airsql_fixture`.`a` AS select 1",
+                                     target: "CREATE VIEW `airsql_fixture`.`b` AS select 1")?.status == .same)
+        let different = structure.definition(.view, name: "a", targetName: "b", source: "CREATE VIEW `a` AS select 1",
+                                             target: "CREATE VIEW `b` AS select 2")
+        #expect(different?.status == .different && different?.targetName == "b")
+    }
+
+    @Test func aPairsForeignKeysMatchByWhatTheyDo() async throws {
+        var (server, database): (SchemaServer, SchemaDatabase) = try await Self.fixture(SchemaFixtures.mariadb118)
+        _ = server
+        let key = SchemaForeignKey(name: "fk_a", columns: ["c"], referencedDatabase: "airsql_fixture", referencedTable: "t",
+                                   referencedColumns: ["id"], onUpdate: "RESTRICT", onDelete: "CASCADE")
+        var other = key
+        other.name = "fk_b"
+        var (left, right) = (try #require(database.tables.first { $0.kind == .table }), try #require(database.tables.first { $0.kind == .table }))
+        left.foreignKeys = [key]
+        right.foreignKeys = [other]
+        database.tables = [left]
+        var options = ReconOptions()
+        #expect(Self.structure((server, database), (server, database), options: options).compare(left, right).count == 2)
+        options.only = ReconPair(kind: .table, source: left.name, target: right.name)
+        #expect(Self.structure((server, database), (server, database), options: options).compare(left, right).isEmpty)
+    }
+
+    @Test func thePairsTablesAreTheOnlyOnes() async throws {
+        let schema = try await Self.fixture(SchemaFixtures.mariadb118)
+        let tables = schema.1.tables.filter { $0.kind == .table }.map(\.name)
+        var options = ReconOptions()
+        options.only = ReconPair(kind: .table, source: tables[0], target: tables[1])
+        let (pairs, onlyInTarget) = Self.structure(schema, schema, options: options).tablePairs()
+        #expect(pairs.map(\.source.name) == [tables[0]] && pairs.map { $0.target?.name } == [tables[1]] && onlyInTarget.isEmpty)
+        options.only = ReconPair(kind: .view, source: "v", target: "w")
+        #expect(Self.structure(schema, schema, options: options).tablePairs().pairs.isEmpty)
+    }
+
+    @Test func aDefinitionsIgnoreRulesCount() async throws {
+        let schema = try await Self.fixture(SchemaFixtures.mariadb118)
+        func status(_ rules: (inout ReconIgnoreRules) -> Void, _ left: String, _ right: String) -> ReconObject.Status? {
+            var options = ReconOptions()
+            rules(&options.ignore)
+            return Self.structure(schema, schema, options: options).definition(.view, name: "a", source: left, target: right)?.status
+        }
+        let upper = "CREATE VIEW `a` AS SELECT 'Text'", lower = "create view `A` as select 'Text'"
+        #expect(status({ _ in }, upper, lower) == .different)
+        #expect(status({ $0.letterCase = true }, upper, lower) == .same)
+        #expect(status({ $0.letterCase = true }, upper, "CREATE VIEW `a` AS SELECT 'TEXT'") == .different, "quoted text keeps its case")
+        #expect(status({ $0.letterCase = true; $0.whitespace = false }, upper, lower) == .same)
+        #expect(status({ _ in }, upper, "CREATE VIEW `a` AS SELECT 2") == .different)
+        #expect(status({ $0.definitions = true }, upper, "CREATE VIEW `a` AS SELECT 2") == .same)
+        #expect(status({ $0.definitions = true }, upper, "") == .different, "unread isn't the same")
+    }
+
+    @Test func columnOrderCanBeIgnored() async throws {
+        let schema = try await Self.fixture(SchemaFixtures.mariadb118)
+        let table = try #require(schema.1.tables.first { $0.kind == .table && $0.columns.count > 1 })
+        var swapped = table
+        swapped.columns.swapAt(0, 1)
+        #expect(!Self.structure(schema, schema).compare(table, swapped).isEmpty)
+        var options = ReconOptions()
+        options.ignore.columnOrder = true
+        #expect(Self.structure(schema, schema, options: options).compare(table, swapped).isEmpty)
+    }
+
+    @Test func untickedObjectsLeaveTheScript() {
+        var kept = ReconObject(kind: .view, name: "kept", status: .different), skipped = kept
+        kept.sourceDDL = "CREATE VIEW `kept` AS select 1"
+        skipped.name = "skipped"
+        skipped.targetName = "skipped"
+        skipped.sourceDDL = "CREATE VIEW `skipped` AS select 1"
+        skipped.leftOut = true
+        let end = ReconEnd(name: "Local", database: "shop", version: "8.4.13")
+        #expect(ReconResult(source: end, target: end, options: ReconOptions(), objects: [kept, skipped]).steps().map(\.object) == ["kept"])
+    }
+
+    @Test func databasesPairByName() {
+        func text(_ pairs: [(source: String?, target: String?)]) -> [String] { pairs.map { "\($0.source ?? "-")/\($0.target ?? "-")" } }
+        #expect(text(Recon.paired(["a", "Shop"], ["shop", "z"], caseless: true)) == ["a/-", "Shop/shop", "-/z"])
+        #expect(text(Recon.paired(["Shop"], ["shop"], caseless: false)) == ["Shop/-", "-/shop"])
+    }
+
+    /// A server's result: the pairs in the summary and the report, each difference named within its database, and no script.
+    @Test func aServerResultReportsItsPairs() {
+        let left = ReconEnd(name: "Production", database: "", version: "8.4.13"), right = ReconEnd(name: "Staging", database: "", version: "8.4.13")
+        var inner = ReconResult(source: ReconEnd(name: "Production", database: "shop", version: "8.4.13"),
+                                target: ReconEnd(name: "Staging", database: "shop", version: "8.4.13"), options: ReconOptions())
+        var orders = ReconObject(kind: .table, name: "orders", status: .different)
+        orders.parts = [ReconPart(kind: .column, name: "currency", change: .added, detail: "added")]
+        inner.objects = [orders]
+        var result = ReconResult(source: left, target: right, options: ReconOptions(), objects: [
+            ReconObject(kind: .database, name: "shop", status: .different), ReconObject(kind: .database, name: "same", status: .same),
+            ReconObject(kind: .database, name: "gone", status: .onlyInTarget)])
+        result.databases["shop"] = inner
+        #expect(result.isServer && result.steps(destructive: true).isEmpty && result.script().isEmpty)
+        let summary = ReconReport.summary(result)
+        #expect(summary.count == 6 && summary.map(\.value) == ["1", "1", "0", "1", "0", "1"])
+        #expect(summary[0].label == "database matches")
+        #expect(ReconReport.text(result, format: .csv).contains("table,shop.orders,different structure,structure,column currency,added"))
+        let markdown = ReconReport.text(result, format: .markdown)
+        #expect(markdown.contains("## Database shop: different") && markdown.contains("shop.orders: column currency"))
+        #expect(markdown.contains("Production (8.4.13) → Staging (8.4.13)"))
+        // Compared again on its own, the pair matches, and the server's list says so.
+        inner.objects = [ReconObject(kind: .table, name: "orders", status: .same)]
+        result.update(pair: "shop", with: inner)
+        #expect(result.object(.database, "shop")?.status == .same)
+    }
+
     @Test func linesAlignSideBySide() {
         let rows = ReconLines.aligned("a\nb\nc\nd", "a\nc\nx\nd")
         #expect(rows.map { "\($0.left ?? "-")\($0.right ?? "-")" } == ["aa", "b-", "cc", "-x", "dd"])
