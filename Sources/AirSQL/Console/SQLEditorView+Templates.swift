@@ -6,6 +6,9 @@ import AppKit
 extension SQLEditorView {
     /// Puts `body` (`SQLTemplate`) in place of `range` as one undoable step. Its lines start as the line it goes in does.
     func insertTemplate(_ body: String, replacing range: NSRange, selection: String = "") {
+        // The paste gate (plan §2.8), as for Replace.
+        if AgentGuard.productionConsole(self) != nil, AgentGuard.refuses("Inserting text in a production console needs the person's OK: "
+                                                                         + "use set console.editor, which asks them once.") { return }
         let text = string as NSString, line = text.lineRange(for: NSRange(location: range.location, length: 0))
         let indent = text.substring(with: line).prefix { $0 == " " || $0 == "\t" }
         let expansion = SQLTemplate.expand(body.replacingOccurrences(of: "\n", with: "\n" + indent), selection: selection)
@@ -38,20 +41,18 @@ extension SQLEditorView {
     func templateCommand(_ selector: Selector) -> Bool {
         let next = selector == #selector(insertTab(_:)) || selector == #selector(insertNewline(_:))
         let back = selector == #selector(insertBacktab(_:))
-        if !templateFields.isEmpty {
-            guard next || back || selector == #selector(cancelOperation(_:)), templateFields.indices.contains(templateField) else { return false }
+        if templateFields.indices.contains(templateField), next || back || selector == #selector(cancelOperation(_:)) {
             let caret = selectedRange()
-            guard templateFields[templateField].contains(where: { caret.location >= $0.location && NSMaxRange(caret) <= NSMaxRange($0) }) else {
-                endTemplate()
-                return false
+            if templateFields[templateField].contains(where: { caret.location >= $0.location && NSMaxRange(caret) <= NSMaxRange($0) }) {
+                if next || back {
+                    nextTemplateField(next ? 1 : -1)
+                } else {
+                    endTemplate()
+                    dropExtraCarets()
+                }
+                return true
             }
-            if next || back {
-                nextTemplateField(next ? 1 : -1)
-            } else {
-                endTemplate()
-                dropExtraCarets()
-            }
-            return true
+            endTemplate()  // the cursor has left it
         }
         return selector == #selector(insertTab(_:)) && expandAbbreviation()
     }

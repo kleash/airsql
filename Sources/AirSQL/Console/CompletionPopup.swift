@@ -16,6 +16,11 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
     /// How often each suggestion was chosen since AirSQL opened: `CompletionOptions.recent`.
     static var chosen: [String: Int] = [:]
     static let footerHeight: CGFloat = 24
+    static let docHeight: CGFloat = 46
+    /// What's shown below the list for the selected suggestion.
+    var documentation: ((CompletionItem) -> String?)?
+    private let doc = label("", font: .monospacedSystemFont(ofSize: 10.5, weight: .regular), color: .secondaryLabelColor, wraps: true)
+    private var docHeightConstraint: NSLayoutConstraint?
 
     init(editor: NSTextView, id: String = "completion.list",
          footer text: String = "↩ inserts · ⎋ closes · from the schema cache: nothing is sent while you type") {
@@ -51,13 +56,23 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         let bar = SurfaceView(.bar)
         bar.translatesAutoresizingMaskIntoConstraints = false
         let box = SurfaceView(.content, radius: Radius.card, border: .separatorColor)
-        for view in [scroll, bar] { box.addSubview(view) }
+        doc.translatesAutoresizingMaskIntoConstraints = false
+        doc.setAccessibilityIdentifier(id + ".doc")
+        doc.lineBreakMode = .byTruncatingTail
+        doc.maximumNumberOfLines = 3
+        doc.toolTip = "Shows more about the selected suggestion"
+        let docHeight = doc.heightAnchor.constraint(equalToConstant: 0)
+        docHeightConstraint = docHeight
+        for view in [scroll, doc, bar] { box.addSubview(view) }
         bar.addSubview(footer)
         NSLayoutConstraint.activate([
             scroll.topAnchor.constraint(equalTo: box.topAnchor, constant: Spacing.half),
             scroll.leadingAnchor.constraint(equalTo: box.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: box.trailingAnchor),
-            bar.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: Spacing.half),
+            doc.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: Spacing.half),
+            doc.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: 10),
+            doc.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -10), docHeight,
+            bar.topAnchor.constraint(equalTo: doc.bottomAnchor),
             bar.leadingAnchor.constraint(equalTo: box.leadingAnchor), bar.trailingAnchor.constraint(equalTo: box.trailingAnchor),
             bar.bottomAnchor.constraint(equalTo: box.bottomAnchor), bar.heightAnchor.constraint(equalToConstant: Self.footerHeight),
             footer.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 10),
@@ -79,7 +94,10 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.selectRowIndexes([0], byExtendingSelection: false)
         table.scrollRowToVisible(0)
         let rows = CGFloat(min(items.count, 8))
-        let size = NSSize(width: 460, height: rows * Self.rowHeight + Self.footerHeight + 2 * Spacing.half)
+        let docs = documentation == nil ? 0 : Self.docHeight
+        docHeightConstraint?.constant = docs
+        showDocumentation()
+        let size = NSSize(width: 460, height: rows * Self.rowHeight + Self.footerHeight + 2 * Spacing.half + docs)
         var caret = editor.firstRect(forCharacterRange: NSRange(location: range.lowerBound, length: 0), actualRange: nil)
         if caret.isEmpty && caret.origin == .zero { caret = window.convertToScreen(editor.convert(editor.visibleRect, to: nil)) }
         var origin = NSPoint(x: caret.minX - 6, y: caret.minY - size.height - 2)
@@ -88,6 +106,10 @@ final class CompletionPopup: NSObject, NSTableViewDataSource, NSTableViewDelegat
         if panel.parent == nil { window.addChildWindow(panel, ordered: .above) }
         panel.orderFront(nil)
     }
+
+    private func showDocumentation() { doc.stringValue = selected.flatMap { documentation?($0) } ?? "" }
+
+    func tableViewSelectionDidChange(_ notification: Notification) { showDocumentation() }
 
     func close() {
         guard panel.isVisible else { return }

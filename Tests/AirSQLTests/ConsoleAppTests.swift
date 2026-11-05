@@ -899,6 +899,60 @@ extension AppTests {
             #expect(console.text != "xyz")
         }
 
+        @Test func snippetsAndHistoryInTheHelpers() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let model = testModel([saved])
+            model.data.settings.snippets = [SQLSnippet(name: "Wrap", abbreviation: "wr", folder: "Work", body: "($SELECTION$) AS $alias$")]
+            let (_, harness, console) = try await Self.console(model, on: saved.id)
+            #expect(await call(harness, "menu", ["path": "View > Query Helpers"]).error == nil)
+            let panel = console.helpers
+            panel.choice.selectedSegment = 3
+            panel.reload()
+            #expect((panel.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTextField)?.stringValue == "Work")
+            #expect((panel.table.view(atColumn: 0, row: 1, makeIfNecessary: true) as? NSTextField)?.stringValue == "Wrap (wr)")
+            // Inserted around the selection, with its field chosen.
+            console.editor.setText("SELECT 1")
+            console.editor.setSelectedRange(NSRange(location: 0, length: 8))
+            panel.table.selectRowIndexes([1], byExtendingSelection: false)
+            panel.insertSelected(nil)
+            #expect(console.text == "(SELECT 1) AS alias")
+            #expect((console.text as NSString).substring(with: console.editor.selectedRange()) == "alias")
+            // Its abbreviation works in the editor.
+            console.editor.setText("wr")
+            console.editor.setSelectedRange(NSRange(location: 2, length: 0))
+            console.editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(console.text == "() AS alias")
+            // Save as Snippet takes the statement, with its dollars kept.
+            console.editor.setText("SELECT '$1'")
+            console.saveAsSnippet(nil)
+            let sheet = try #require(console.presentedViewControllers?.first as? SnippetSheet)
+            let name = try #require(find(NSTextField.self, id: "snippet.name", in: sheet.view))
+            name.stringValue = "Dollar"
+            let save = try #require(find(NSButton.self, id: "snippet.save", in: sheet.view))
+            save.performClick(nil)
+            #expect(model.data.settings.snippets.last?.name == "Dollar" && model.data.settings.snippets.last?.body == "SELECT '$$1'")
+            #expect(SQLTemplate.expand(model.data.settings.snippets.last!.body).text == "SELECT '$1'")
+            // History comes by day, and inserts the statement.
+            let entries = [HistoryEntry(sql: "SELECT 2", connection: saved.id, duration: 2), HistoryEntry(sql: "SELECT 3\nFROM t", connection: saved.id, duration: 1)]
+            panel.history = { entries }
+            panel.choice.selectedSegment = 4
+            panel.reload()
+            #expect(await eventually(timeout: 5) { panel.table.numberOfRows == 3 })
+            panel.table.selectRowIndexes([2], byExtendingSelection: false)
+            console.editor.setText("")
+            panel.insertSelected(nil)
+            #expect(console.text == "SELECT 3\nFROM t")
+            // With no table in the statement the columns of the tree's table would show: with none selected, it says so.
+            panel.choice.selectedSegment = 0
+            console.editor.setText("")
+            panel.reload()
+            #expect(find(NSTextField.self, id: "helpers.empty", in: panel)?.stringValue.contains("in the tree") == true)
+        }
+
         @Test func keywordsTakeTheirCaseAsTyped() async throws {
             var saved = Fixtures.local
             saved.database = "airsql_fixture"

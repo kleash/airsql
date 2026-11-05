@@ -470,6 +470,29 @@ struct SQLCompletionTests {
     }
 }
 
+struct SnippetSettingsTests {
+    @Test func ownSnippetsComeFirstAndSurviveSaving() throws {
+        var settings = AppSettings()
+        settings.snippets = [SQLSnippet(name: "Mine", abbreviation: "sel", folder: "Work", body: "SELECT 1")]
+        settings.formatStyle.keywords = .lower
+        settings.completionTableAlias = false
+        let options = settings.completionOptions(recent: ["x": 1])
+        #expect(options.snippets.first?.name == "Mine" && options.snippets.count == SQLSnippet.builtIn.count + 1)
+        #expect(options.keywordCase == .lower && !options.tableAlias && options.recent == ["x": 1])
+        let back = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+        #expect(back == settings)
+        #expect(try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8)) == AppSettings(), "older settings")
+    }
+
+    @Test func documentationOfASuggestion() async throws {
+        let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+        let table = CompletionItem(kind: .table, text: "log", label: "log", detail: "table")
+        #expect(SQLCompletion.documentation(table, snapshot: cache.snapshot, database: "airsql_fixture") == "at datetime, message varchar(200)")
+        let template = CompletionItem(kind: .template, text: "SELECT $a$$END$", label: "x", detail: "")
+        #expect(SQLCompletion.documentation(template, snapshot: nil, database: nil) == "SELECT a")
+    }
+}
+
 struct SQLTemplateTests {
     @Test func fieldsEndAndDollars() {
         let plain = SQLTemplate.expand("SELECT * FROM $table$ WHERE $a$ = $a$;$END$")

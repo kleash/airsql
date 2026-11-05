@@ -15,6 +15,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     var onFind: ((NSTextFinder.Action) -> Void)?
     /// The suggestions at a place of a text: the console's, from its connection's schema cache.
     var completions: ((String, Int) -> (Range<Int>, [CompletionItem]))?
+    /// What the list shows below itself for a suggestion.
+    var completionDocs: ((CompletionItem) -> String?)?
     /// The completion list, once it has been shown.
     var completionPopup: CompletionPopup?
     /// The settings of every editor, consoles' and object editors' alike.

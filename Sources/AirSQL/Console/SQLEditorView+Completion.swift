@@ -141,6 +141,7 @@ extension SQLEditorView {
             return
         }
         if completionPopup == nil { completionPopup = CompletionPopup(editor: self) }
+        completionPopup?.documentation = completionDocs
         completionPopup?.show(items, replacing: range)
     }
 }

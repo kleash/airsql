@@ -73,6 +73,28 @@ public enum SQLCompletion {
         }
     }
 
+    /// A table's columns as a source of a statement gives them.
+    public static func columns(of table: SchemaTable) -> [SQLColumnInfo] {
+        table.columns.map {
+            SQLColumnInfo(name: $0.name, type: $0.columnType, schema: $0, symbol: SQLSymbol(kind: .column, name: $0.name, table: table.name))
+        }
+    }
+
+    /// What the list shows below itself for a suggestion: a table's columns, a template's SQL.
+    public static func documentation(_ item: CompletionItem, snapshot: SchemaSnapshot?, database: String?) -> String? {
+        switch item.kind {
+        case .table, .view:
+            guard let database, let table = snapshot?.table(database, item.label) else { return nil }
+            return table.columns.map { "\($0.name) \($0.columnType)" }.joined(separator: ", ")
+        case .template:
+            return SQLTemplate.expand(item.text).text
+        case .function, .routine, .join:
+            return item.kind == .join ? item.label : item.detail
+        default:
+            return nil
+        }
+    }
+
     /// How `query` (small letters) matches a name, best first: 0 its start, 1 the start of one of its words, 2 an
     /// abbreviation of its words (`fica`: film_category, `ob`: ORDER BY), 3 the middle of a word; nil if it doesn't.
     static func match(_ name: String, _ query: String) -> Int? {

@@ -119,6 +119,7 @@ import AppKit
     @objc optional func indentLines(_ sender: Any?)
     @objc optional func outdentLines(_ sender: Any?)
     @objc optional func toggleHelpers(_ sender: Any?)
+    @objc optional func saveAsSnippet(_ sender: Any?)
 
     // Data (the grid)
     @objc optional func addRow(_ sender: Any?)
@@ -524,6 +525,8 @@ enum Commands {
                                           tip: "Run this tab's statements on another connection")
     static let profile = Command("Profile", #selector(AirSQLActions.profileQuery(_:)),
                                  tip: "Run the statement and show where the server spent its time")
+    static let saveAsSnippet = Command("Save as Snippet…", #selector(AirSQLActions.saveAsSnippet(_:)),
+                                       tip: "Save the selection or the statement at the cursor as a snippet, to use again from Query Helpers")
     static let saveAsChangeset = Command("Save as Changeset…", #selector(AirSQLActions.saveAsChangeset(_:)),
                                          tip: "Save the selected statements as a Liquibase changeset in a changelog")
     static let editAsTable = Command("Edit as Table", #selector(AirSQLActions.editAsTable(_:)),
@@ -860,7 +863,7 @@ enum Commands {
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
         runStatement, runSelection, runSelectionWhole, keepResults, runToFile, resultWindow, runFromCaret, runSubquery, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
-        isolation, formatSQL, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
+        isolation, formatSQL, saveAsSnippet, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,
         showContextActions, goToDeclaration, findUsages, renameSymbol, quickDocumentation, parameterInfo, nextProblem, previousProblem, showProblem,

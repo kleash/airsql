@@ -118,7 +118,7 @@ extension ConsoleViewController: NSMenuItemValidation {
                 ? .on : .off
             if let reason = offline ?? busy { return (false, reason) }
             return (true, "")
-        case #selector(formatSQL(_:)):
+        case #selector(formatSQL(_:)), #selector(saveAsSnippet(_:)):
             return (hasText, "Type some SQL first")
         case #selector(toggleWordWrap(_:)):
             item.state = model.data.settings.editorWordWrap ? .on : .off
