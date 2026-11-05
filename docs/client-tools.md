@@ -46,7 +46,11 @@ No tools at all? Install MySQL's or MariaDB's client tools (for example `brew in
    SQL File take a `mysql` or `mariadb` the same way), where to save the file, and any extra options of your own (`--skip-comments`, `--where=…`).
 4. The box under the form shows the exact command line of the tool you picked, and **Copy Command** copies it. AirSQL's
    built-in export runs no command, so the box says what it does and the button isn't there.
-5. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
+5. **Output** says where it goes: **One file**, **The clipboard** (small dumps, up to 32 MB) or **A folder, a file per
+   object**. In a folder each table, view, routine, trigger and event gets its own `.sql` that restores on its own, read
+   in the same snapshot. Choose CSV, TSV, JSON, JSON Lines or Excel in the menu beside it for a data file per ticked
+   table instead: column names first, every row, and the SQL options turn off.
+6. **Export**. The window shows the table being written, the bytes so far and the time left. **Stop** ends it.
 
 The dump goes into a hidden file next to the one you chose and takes its name only when it is complete, so a stopped
 or failed export never leaves half a file. When it is done, **Show in Finder** shows you the file.
@@ -54,6 +58,20 @@ or failed export never leaves half a file. When it is done, **Show in Finder** s
 **AirSQL (built in)** in the Tool menu writes the SQL itself, through a connection of its own: the tables' `CREATE`
 statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
 consistent snapshot. Its files restore with `mysql` or with Run SQL File.
+
+### What goes in the SQL
+
+- **Rows as** writes `INSERT`, `INSERT IGNORE`, `REPLACE`, or `DELETE` then `INSERT` for each table, and **at most … KB
+  each** caps the size of one statement, for a server with a small `max_allowed_packet`.
+- **Add CREATE DATABASE and USE** makes one database restore under its own name; several always do.
+- **Add DROP DATABASE first** deletes the whole database of that name when the file is restored. It is off while only
+  some tables are ticked, so a file can't take the other tables with it.
+- **Remove DEFINER** leaves the account out of views, routines, triggers and events, so a server without that account
+  takes them; **Remove AUTO_INCREMENT values** leaves out each table's next value; **A transaction per table** speeds up
+  restoring InnoDB tables.
+
+Those last three, `DELETE` before the rows, a folder and the clipboard are AirSQL's own export's: with a dump tool chosen,
+the note says so and **Use AirSQL's Built-in** switches.
 
 ## Restore a dump, or run a .sql file
 

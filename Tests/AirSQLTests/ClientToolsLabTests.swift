@@ -239,6 +239,61 @@ struct ClientToolsLabTests {
         await session.close()
     }
 
+    /// The export's choices: rows as REPLACE, no DEFINER or AUTO_INCREMENT value, CREATE and DROP DATABASE, a transaction per
+    /// table; then a file per object that restores, and text for the clipboard.
+    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    func theBuiltInExportWritesWhatIsAsked(_ server: Lab.Server) async throws {
+        let session = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await session.connect()
+        let target = "lane_transfer_export", other = "lane_transfer_export2"
+        for name in [target, other] { _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(name)) }
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+        _ = try await session.query("USE " + SQLQuote.identifier(target))
+        for statement in ["CREATE TABLE t (id INT AUTO_INCREMENT PRIMARY KEY, a VARCHAR(9)) COMMENT 'kept'", "INSERT INTO t (a) VALUES ('x'), ('y')",
+                          "CREATE TABLE T2 (id INT)", "CREATE DEFINER=CURRENT_USER VIEW v AS SELECT id FROM t",
+                          "CREATE DEFINER=CURRENT_USER PROCEDURE p() BEGIN SELECT 1; END"] {
+            _ = try await session.query(statement)
+        }
+        var request = DumpRequest(databases: [target])
+        request.dataMode = .replace
+        request.removeDefiner = true
+        request.removeAutoIncrement = true
+        request.createDatabase = true
+        request.dropDatabase = true
+        request.wrapInTransactions = true
+        let text = try await ToolRun.exportText(request, options: Self.options(server), cancellation: Cancellation()) { _, _ in }
+        #expect(text.contains("DROP DATABASE IF EXISTS `\(target)`;") && text.contains("CREATE DATABASE IF NOT EXISTS `\(target)`"))
+        #expect(text.contains("USE `\(target)`;") && text.contains("REPLACE INTO `t` (`id`, `a`) VALUES (1,'x'),(2,'y');"))
+        #expect(text.contains("START TRANSACTION;") && text.contains("COMMIT;"))
+        #expect(!text.contains("DEFINER=") && !text.contains("AUTO_INCREMENT=") && text.contains("AUTO_INCREMENT,"), "\(text)")
+        // Only some tables: no DROP DATABASE, whatever the request says.
+        var some = DumpRequest(databases: [target], tables: ["t"])
+        some.dropDatabase = true
+        some.dataMode = .deleteInsert
+        some.insertSize = 1
+        let part = try await ToolRun.exportText(some, options: Self.options(server), cancellation: Cancellation()) { _, _ in }
+        #expect(!part.contains("DROP DATABASE") && part.contains("DELETE FROM `t`;"))
+        #expect(part.components(separatedBy: "INSERT INTO `t`").count == 3, "one row an INSERT at this size: \(part)")
+
+        // A file per object, each restoring on its own into another database.
+        let folder = URL(fileURLWithPath: try scratch()).appendingPathComponent("out")
+        _ = try await ToolRun.exportFolder(DumpRequest(databases: [target]), options: Self.options(server), to: folder, cancellation: Cancellation()) { _, _ in }
+        let files = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+        #expect(files == ["T2.sql", "p.sql", "t.sql", "v.sql"], "\(files)")
+        let table = try String(contentsOf: folder.appendingPathComponent("t.sql"), encoding: .utf8)
+        #expect(table.contains("SET NAMES utf8mb4;") && table.contains("CREATE TABLE `t`") && !table.contains("CREATE TABLE `T2`"))
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(other))
+        _ = try await session.query("USE " + SQLQuote.identifier(other))
+        let cleanup = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
+        _ = try await cleanup.connect()
+        let lines = table.components(separatedBy: "\n").filter { !$0.hasPrefix("--") }.joined(separator: "\n")
+        for statement in lines.components(separatedBy: ";\n") where !statement.isEmpty { _ = try await session.query(statement) }
+        #expect(try await session.rows("SELECT COUNT(*) FROM t") == [["2"]])
+        for name in [target, other] { _ = try await cleanup.query("DROP DATABASE " + SQLQuote.identifier(name)) }
+        await cleanup.close()
+        await session.close()
+    }
+
     /// A new table from a file, as the sheet makes it; then duplicates skipped or replaced, the table emptied in the same
     /// transaction, refused rows written to a file while the rest stay, and a result's NULLs and bytes kept apart.
     @Test(arguments: [Lab.mysql84, Lab.mariadb114])

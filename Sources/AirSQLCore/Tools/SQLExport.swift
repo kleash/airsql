@@ -1,4 +1,5 @@
 import CMariaDB
+import Darwin
 import Foundation
 
 /// A piece of AirSQL's own export: what a file gets, and what another server runs when copying.
@@ -9,6 +10,8 @@ public enum SQLPiece: Equatable, Sendable {
     case statement(String)
     /// A routine, trigger or event: its body holds semicolons, so a file puts it between DELIMITER lines.
     case routine(String)
+    /// What follows belongs to this object, for a folder of files; nil: to no object.
+    case object(String?)
 
     /// As a file for the mysql client (or Run SQL File) holds it.
     public var fileText: String {
@@ -16,6 +19,7 @@ public enum SQLPiece: Equatable, Sendable {
         case .comment(let text): return "-- " + text + "\n"
         case .statement(let sql): return sql + ";\n"
         case .routine(let sql): return "DELIMITER ;;\n" + sql + " ;;\nDELIMITER ;\n"
+        case .object: return ""
         }
     }
 }
@@ -37,6 +41,86 @@ public final class SQLFileSink: SQLSink {
     public func writeNow(_ pieces: [SQLPiece]) throws { try pieces.forEach { try writer.write($0.fileText) } }
 }
 
+/// An export into a folder: a file for each object, each starting with what came before the first object (the session's
+/// settings, the database to use), so it restores on its own.
+public final class SQLFolderSink: SQLSink {
+    private let folder: URL
+    private let gzip: Bool
+    private let cancellation: Cancellation
+    private var prelude: [SQLPiece] = []
+    private var current: (fd: Int32, writer: Runner.Writer)?
+    public private(set) var bytes: Int64 = 0
+
+    public init(_ folder: URL, gzip: Bool, cancellation: Cancellation) {
+        self.folder = folder
+        self.gzip = gzip
+        self.cancellation = cancellation
+    }
+
+    /// `name` as one file's name: nothing a path would read as a folder or a hidden file.
+    public static func fileName(_ name: String) -> String {
+        let safe = String(name.map { "/:\\\0".contains($0) ? "_" : $0 })
+        return safe.hasPrefix(".") ? "_" + safe.dropFirst() : safe
+    }
+
+    public func write(_ piece: SQLPiece) async throws { try writeOne(piece) }
+    public func writeNow(_ pieces: [SQLPiece]) throws { try pieces.forEach(writeOne) }
+
+    private func writeOne(_ piece: SQLPiece) throws {
+        if case .object(let name) = piece {
+            try closeCurrent()
+            if let name { try open(name) }
+        } else if let current {
+            try current.writer.write(piece.fileText)
+        } else {
+            prelude.append(piece)
+        }
+    }
+
+    /// The next free name: two objects can differ only in case, or in what `fileName` replaces.
+    private func open(_ name: String) throws {
+        let safe = Self.fileName(name), ending = gzip ? ".sql.gz" : ".sql"
+        var path = folder.appendingPathComponent(safe + ending).path, copy = 1
+        var fd = Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
+        while fd < 0 && errno == EEXIST {
+            copy += 1
+            path = folder.appendingPathComponent(safe + "_\(copy)" + ending).path
+            fd = Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o644)
+        }
+        guard fd >= 0 else { throw AirSQLError(.other, "Can't write in \(folder.path): \(String(cString: strerror(errno)))") }
+        let writer = try Runner.Writer(file: fd, through: gzip ? ["/usr/bin/gzip", "-c"] : nil, cancellation: cancellation)
+        current = (fd, writer)
+        for piece in prelude { try writer.write(piece.fileText) }
+    }
+
+    /// Ends the file being written.
+    public func closeCurrent() throws {
+        guard let open = current else { return }
+        current = nil
+        bytes += open.writer.bytes
+        let gzip = open.writer.finish()
+        close(open.fd)
+        if let gzip, gzip.status != 0 { throw AirSQLError(.other, "gzip stopped: " + gzip.stderr.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    }
+}
+
+/// An export kept as text, for the clipboard: small dumps only.
+public final class SQLTextSink: SQLSink {
+    public private(set) var text = ""
+    static let limit = 32 << 20
+
+    public init() {}
+
+    public func write(_ piece: SQLPiece) async throws { try writeNow([piece]) }
+
+    public func writeNow(_ pieces: [SQLPiece]) throws {
+        for piece in pieces { text += piece.fileText }
+        if text.utf8.count > Self.limit {
+            throw AirSQLError(.other, "That's too much for the clipboard (over 32 MB): export to a file instead.")
+        }
+    }
+}
+
 /// An export run on another server as it is read (Copy to Another Server): each statement through the target's session.
 public final class SQLServerSink: SQLSink {
     public let session: DBConnection
@@ -45,7 +129,7 @@ public final class SQLServerSink: SQLSink {
 
     public func write(_ piece: SQLPiece) async throws {
         switch piece {
-        case .comment: return
+        case .comment, .object: return
         case .statement(let sql), .routine(let sql): _ = try await session.query(sql)
         }
     }
@@ -90,7 +174,7 @@ public enum SQLExport {
     }
 
     /// The largest INSERT written, in bytes of SQL (mysqldump's net_buffer_length is 1 MB too).
-    static let statementSize = 1 << 20
+    public static let statementSize = 1 << 20
 
     /// Exports `request` from `source` (a session of its own: its time zone and transaction are set here) into `sink`.
     /// `names` maps each database to the name to create and use; nil writes a file: no CREATE DATABASE or USE for one
@@ -119,19 +203,27 @@ public enum SQLExport {
                 .filter { request.tables.isEmpty || request.tables.contains($0[0] ?? "") }
             done.totalRows += tables.reduce(0) { $0 + (Int64($1[2] ?? "") ?? 0) }
             let target = names?[database] ?? database
+            // Objects of several databases can share a name.
+            let fileName = { (name: String) in request.databases.count > 1 ? target + "." + name : name }
+            let cleaned = { (sql: String) in request.removeDefiner ? withoutDefiner(sql) : sql }
             // Views and routines name their tables with the database's name: the copy's, when it has another.
             let renamed = { (sql: String) in
                 target == database ? sql : sql.replacingOccurrences(of: SQLQuote.identifier(database) + ".",
                                                                     with: SQLQuote.identifier(target) + ".")
             }
             try await sink.write(.comment("Database \(target)"))
-            if names != nil || request.databases.count > 1, request.content != .data {
+            try await sink.write(.object(nil))
+            let named = names != nil || request.databases.count > 1 || request.createDatabase
+            if request.dropDatabase, request.tables.isEmpty, request.content != .data {
+                try await sink.write(.statement("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target)))
+            }
+            if named, request.content != .data {
                 // "CREATE DATABASE `shop` /*!40100 DEFAULT CHARACTER SET …*/": its options, for the name it gets.
                 let create = try await source.rows("SHOW CREATE DATABASE " + SQLQuote.identifier(database)).first?[1] ?? ""
                 let options = create.range(of: SQLQuote.identifier(database)).map { String(create[$0.upperBound...]) } ?? ""
                 try await sink.write(.statement("CREATE DATABASE IF NOT EXISTS " + SQLQuote.identifier(target) + options))
             }
-            if names != nil || request.databases.count > 1 { try await sink.write(.statement("USE " + SQLQuote.identifier(target))) }
+            if named { try await sink.write(.statement("USE " + SQLQuote.identifier(target))) }
             var views: [(name: String, sql: String)] = []
             for table in tables {
                 guard let name = table[0] else { continue }
@@ -139,45 +231,71 @@ public enum SQLExport {
                 if table[1] == "VIEW" {
                     if request.content != .data, request.objects,
                        let sql = try await source.rows("SHOW CREATE VIEW " + SQLQuote.identifier(database, name)).first?[1] {
-                        views.append((name, renamed(sql)))
+                        views.append((name, renamed(cleaned(sql))))
                     }
                     continue
                 }
+                try await sink.write(.object(fileName(name)))
                 if request.content != .data {
                     try await sink.write(.comment("Table \(name)"))
                     if request.addDropTable { try await sink.write(.statement("DROP TABLE IF EXISTS " + SQLQuote.identifier(name))) }
                     let create = try await source.rows("SHOW CREATE TABLE " + SQLQuote.identifier(database, name)).first?[1] ?? ""
-                    try await sink.write(.statement(create))
+                    try await sink.write(.statement(request.removeAutoIncrement ? withoutAutoIncrement(create) : create))
                 }
                 guard request.content != .structure, table[1] != "SEQUENCE" else { continue }
                 done.table = name
                 progress(done)
-                try await copyRows(of: name, in: database, from: source, into: sink, cancellation: cancellation) { count in
+                if request.wrapInTransactions { try await sink.write(.statement("START TRANSACTION")) }
+                if request.dataMode == .deleteInsert { try await sink.write(.statement("DELETE FROM " + SQLQuote.identifier(name))) }
+                try await copyRows(of: name, in: database, from: source, into: sink, verb: request.dataMode.verb, size: request.insertSize,
+                                   cancellation: cancellation) { count in
                     done.rows += count
                     progress(done)
                 }
+                if request.wrapInTransactions { try await sink.write(.statement("COMMIT")) }
             }
             guard request.content != .data, request.objects else { continue }
             for view in ordered(views) {
+                try await sink.write(.object(fileName(view.name)))
                 try await sink.write(.comment("View \(view.name)"))
                 if request.addDropTable { try await sink.write(.statement("DROP VIEW IF EXISTS " + SQLQuote.identifier(view.name))) }
                 try await sink.write(.statement(view.sql))
             }
             try await writeObjects(of: database, from: source, into: sink, tables: Set(tables.compactMap { $0[0] }),
-                                   addDrop: request.addDropTable, renamed: renamed, quote: quote)
+                                   addDrop: request.addDropTable, renamed: { renamed(cleaned($0)) }, fileName: fileName, quote: quote)
         }
+        try await sink.write(.object(nil))
         try await sink.write(.statement("SET FOREIGN_KEY_CHECKS = 1"))
         try await sink.write(.statement("SET UNIQUE_CHECKS = 1"))
         if request.singleTransaction { _ = try await source.query("COMMIT") }
     }
 
+    /// `sql` without its DEFINER clause, so the object takes the account that restores it.
+    static func withoutDefiner(_ sql: String) -> String {
+        guard let definer = CreateHeader(sql)?.definer else { return sql }
+        var text = sql
+        let end = text[definer.upperBound...].first == " " ? text.index(after: definer.upperBound) : definer.upperBound
+        text.removeSubrange(definer.lowerBound..<end)
+        return text
+    }
+
+    /// `create` (SHOW CREATE TABLE's) without the table's next AUTO_INCREMENT value, which comes first after the columns.
+    static func withoutAutoIncrement(_ create: String) -> String {
+        guard let columnsEnd = create.range(of: "\n)", options: .backwards),
+              let value = create.range(of: " AUTO_INCREMENT=[0-9]+", options: .regularExpression, range: columnsEnd.upperBound..<create.endIndex)
+        else { return create }
+        return create.replacingCharacters(in: value, with: "")
+    }
+
     /// Routines, then the exported tables' triggers, then events.
     private static func writeObjects(of database: String, from source: DBConnection, into sink: SQLSink, tables: Set<String>,
-                                     addDrop: Bool, renamed: (String) -> String, quote: (String) -> String) async throws {
+                                     addDrop: Bool, renamed: (String) -> String, fileName: (String) -> String,
+                                     quote: (String) -> String) async throws {
         let routines = try await source.rows("SELECT ROUTINE_NAME, ROUTINE_TYPE FROM information_schema.ROUTINES "
                                       + "WHERE ROUTINE_SCHEMA = \(quote(database)) ORDER BY ROUTINE_TYPE, ROUTINE_NAME")
         for routine in routines {
             guard let name = routine[0], let kind = routine[1], kind == "PROCEDURE" || kind == "FUNCTION" else { continue }
+            try await sink.write(.object(fileName(name)))
             if addDrop { try await sink.write(.statement("DROP \(kind) IF EXISTS " + SQLQuote.identifier(name))) }
             guard let sql = try await source.rows("SHOW CREATE \(kind) " + SQLQuote.identifier(database, name)).first?[2] else {
                 try await sink.write(.comment("\(kind.capitalized) \(name): its definition can't be read with this account"))
@@ -189,6 +307,7 @@ public enum SQLExport {
                                       + "WHERE TRIGGER_SCHEMA = \(quote(database)) ORDER BY EVENT_OBJECT_TABLE, ACTION_ORDER")
         for trigger in triggers where tables.contains(trigger[1] ?? "") {
             guard let name = trigger[0] else { continue }
+            try await sink.write(.object(fileName(name)))
             if addDrop { try await sink.write(.statement("DROP TRIGGER IF EXISTS " + SQLQuote.identifier(name))) }
             if let sql = try await source.rows("SHOW CREATE TRIGGER " + SQLQuote.identifier(database, name)).first?[2] {
                 try await sink.write(.routine(renamed(sql)))
@@ -198,6 +317,7 @@ public enum SQLExport {
                                     + "ORDER BY EVENT_NAME")
         for event in events {
             guard let name = event[0] else { continue }
+            try await sink.write(.object(fileName(name)))
             if addDrop { try await sink.write(.statement("DROP EVENT IF EXISTS " + SQLQuote.identifier(name))) }
             if let sql = try await source.rows("SHOW CREATE EVENT " + SQLQuote.identifier(database, name)).first?[3] {
                 try await sink.write(.routine(renamed(sql)))
@@ -207,15 +327,15 @@ public enum SQLExport {
 
     /// The table's rows as INSERTs of about `statementSize` bytes, streamed from the server; `counted` gets each batch's
     /// row count.
-    static func copyRows(of table: String, in database: String, from source: DBConnection, into sink: SQLSink,
-                         cancellation: Cancellation, counted: @escaping (Int64) -> Void) async throws {
+    static func copyRows(of table: String, in database: String, from source: DBConnection, into sink: SQLSink, verb: String = "INSERT INTO",
+                         size: Int = statementSize, cancellation: Cancellation, counted: @escaping (Int64) -> Void) async throws {
         let quote = { (text: String) in SQLQuote.string(text, noBackslashEscapes: source.noBackslashEscapes) }
         let columns = try await source.rows("SELECT COLUMN_NAME, EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "
                                      + "\(quote(database)) AND TABLE_NAME = \(quote(table)) ORDER BY ORDINAL_POSITION")
             .filter { !isGenerated($0[1] ?? "") }.compactMap { $0[0] }
         guard !columns.isEmpty else { return }
         let list = columns.map { SQLQuote.identifier($0) }.joined(separator: ", ")
-        let insert = "INSERT INTO \(SQLQuote.identifier(table)) (\(list)) VALUES "
+        let insert = "\(verb) \(SQLQuote.identifier(table)) (\(list)) VALUES "
         var pending = ""
         try await source.stream("SELECT \(list) FROM \(SQLQuote.identifier(database, table))", batchRows: 1_000) { store in
             if cancellation.isCancelled { throw AirSQLError.cancelled }
@@ -223,7 +343,7 @@ public enum SQLExport {
             for row in 0..<store.rowCount {
                 pending += (pending.isEmpty ? insert : ",") + "(" + (0..<store.columns.count).map { literal(store, row, $0) }
                     .joined(separator: ",") + ")"
-                if pending.utf8.count >= statementSize {
+                if pending.utf8.count >= size {
                     ready.append(.statement(pending))
                     pending = ""
                 }

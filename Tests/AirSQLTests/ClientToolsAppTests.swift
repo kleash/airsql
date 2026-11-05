@@ -330,6 +330,31 @@ extension AppTests {
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the field at least one column takes")
         }
 
+        /// What only AirSQL's own export does says so, offers the way out, and the data formats turn SQL's options off.
+        @Test func theExportSheetFitsItsOptionsToTheChoice() async throws {
+            let (main, harness) = Self.window()
+            let sheet = Self.exportSheet(on: main)
+            defer { sheet.close() }
+            let content = try #require(sheet.window?.contentView)
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            _ = await call(harness, "press", ["id": "export.removeDefiner"])
+            #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip?.contains("Removing DEFINER") == true)
+            #expect(!sheet.useBuiltIn.isHidden)
+            _ = await call(harness, "set", ["id": "export.tool", "value": "AirSQL (built in)"])
+            #expect(sheet.runButton.isEnabled, "\(sheet.runButton.toolTip ?? "")")
+            let format = try #require(find(NSPopUpButton.self, id: "export.fileFormat", in: content))
+            #expect(!format.isEnabled)
+            _ = await call(harness, "set", ["id": "export.output", "value": "A folder, a file per object"])
+            #expect(format.isEnabled)
+            _ = await call(harness, "set", ["id": "export.fileFormat", "value": "CSV"])
+            let mode = try #require(find(NSPopUpButton.self, id: "export.dataMode", in: content))
+            #expect(!mode.isEnabled && mode.toolTip == "Only SQL files have this option")
+            _ = await call(harness, "set", ["id": "export.fileFormat", "value": "SQL"])
+            #expect(mode.isEnabled)
+            _ = await call(harness, "set", ["id": "export.output", "value": "The clipboard"])
+            #expect(sheet.runButton.toolTip == "Put the export on the clipboard")
+        }
+
         /// New Table… proposes the CREATE TABLE from every value; the text can be edited, and only a CREATE TABLE is taken.
         @Test func theImportSheetProposesANewTableAndShowsTheRows() async throws {
             let (main, harness) = Self.window()
