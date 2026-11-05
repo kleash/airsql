@@ -2,6 +2,8 @@ import AppKit
 
 private let up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
 private let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
+private let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
+private let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
 
 /// The SQL editor's commands. They live on `SQLEditorView`, which sees them only while it has the focus.
 extension Commands {
@@ -49,7 +51,17 @@ extension Commands {
     static let columnSelection = Command("Column Selection Mode", #selector(SQLEditorView.toggleColumnSelection(_:)), "*", .command,
                                          tip: "Select a block with a drag, and add carets with ⇧↑ and ⇧↓")
 
-    static let editorCommands = [selectNextOccurrence, selectAllOccurrences, caretPerLine, addCaretAbove, addCaretBelow, columnSelection,
+    static let foldHere = Command("Fold", #selector(SQLEditorView.foldHere(_:)), left, [.control, .option],
+                                  tip: "Hide the statement, brackets or comment at the cursor, down to its first line")
+    static let unfoldHere = Command("Unfold", #selector(SQLEditorView.unfoldHere(_:)), right, [.control, .option],
+                                    tip: "Show again what's folded on the cursor's line")
+    static let foldAll = Command("Fold All", #selector(SQLEditorView.foldAll(_:)), left, [.control, .option, .shift],
+                                 tip: "Fold every statement and comment of several lines")
+    static let unfoldAll = Command("Unfold All", #selector(SQLEditorView.unfoldAll(_:)), right, [.control, .option, .shift],
+                                   tip: "Show everything that's folded")
+
+    static let editorCommands = [foldHere, unfoldHere, foldAll, unfoldAll,
+                                 selectNextOccurrence, selectAllOccurrences, caretPerLine, addCaretAbove, addCaretBelow, columnSelection,
                                  nextStatement, previousStatement, selectStatement, moveStatementUp, moveStatementDown,
                                  duplicateLine, deleteLine, moveLineUp, moveLineDown, joinLines, sortLines, reverseLines, toggleCase, blockComment,
                                  completeStatement]

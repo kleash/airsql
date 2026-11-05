@@ -790,6 +790,7 @@ enum Commands {
         "Move to Folder": "Put the selected connections in a folder",
         "Services": "Other apps' commands for what is selected",
         "Find": "Find text in the editor, or values in the grid",
+        "Folding": "Hide statements, brackets and comments down to their first line, or show them again",
         "Carets": "Type in several places at once, one caret for each",
         "Statements": "Move between statements, select one or change their order",
         "Lines": "Duplicate, delete, move, join, sort or reverse the selected lines of SQL",

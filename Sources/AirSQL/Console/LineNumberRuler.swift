@@ -16,6 +16,7 @@ final class LineNumberRuler: NSRulerView {
         // line crossed the find bar above the editor.
         if #available(macOS 14, *) { clipsToBounds = true }
         setAccessibilityElement(false)
+        toolTip = "Shows line numbers; click a triangle to fold or open what starts on that line"
         NotificationCenter.default.addObserver(self, selector: #selector(changed), name: NSView.boundsDidChangeNotification,
                                                object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(changed), name: NSTextView.didChangeSelectionNotification,
@@ -79,9 +80,35 @@ final class LineNumberRuler: NSRulerView {
             let size = label.size(withAttributes: attributes)
             label.draw(at: NSPoint(x: ruleThickness - 10 - size.width, y: y + (fragment.height - size.height) / 2),
                        withAttributes: attributes)
+            drawFoldTriangle(lineRange, y: y, height: fragment.height, font: font)
             line += 1
             if NSMaxRange(lineRange) <= index || (index == text.length) { break }
             index = NSMaxRange(lineRange)
+            // The lines a fold hides have no place here, but they keep their numbers.
+            if let fold = editor.folds.first(where: { $0.lowerBound < index && index <= $0.upperBound }) {
+                let hidden = text.substring(with: NSRange(location: index, length: fold.upperBound - index))
+                line += hidden.utf16.reduce(0) { $0 + ($1 == 0x0A ? 1 : 0) } + 1
+                index = NSMaxRange(text.lineRange(for: NSRange(location: fold.upperBound, length: 0)))
+            }
         }
+    }
+
+    /// ▾ on a line where something can fold, ▸ on one that's folded, in the margin right of the numbers.
+    private func drawFoldTriangle(_ lineRange: NSRange, y: CGFloat, height: CGFloat, font: NSFont) {
+        guard let editor else { return }
+        let folded = editor.folds.contains { NSLocationInRange($0.lowerBound, lineRange) }
+        guard folded || editor.foldRegion(startingIn: lineRange) != nil else { return }
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 8), .foregroundColor: NSColor.tertiaryLabelColor]
+        let mark = (folded ? "▸" : "▾") as NSString
+        let size = mark.size(withAttributes: attributes)
+        mark.draw(at: NSPoint(x: ruleThickness - 9, y: y + (height - size.height) / 2), withAttributes: attributes)
+    }
+
+    /// A click on the triangles' margin folds or opens that line.
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        guard let editor, point.x >= ruleThickness - 10 else { return super.mouseDown(with: event) }
+        let place = editor.characterIndexForInsertion(at: NSPoint(x: 0, y: editor.convert(event.locationInWindow, from: nil).y))
+        editor.toggleFold(lineRange: (editor.string as NSString).lineRange(for: NSRange(location: place, length: 0)))
     }
 }

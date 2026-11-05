@@ -62,6 +62,7 @@ extension SQLEditorView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        drawFoldMarks(in: dirtyRect.intersection(bounds))
         guard !extraCarets.isEmpty else { return }
         insertionPointColor.setFill()
         for caret in extraCarets where caret.length == 0 { caretRect(caret.location).intersection(dirtyRect).intersection(bounds).fill() }
@@ -168,6 +169,8 @@ extension SQLEditorView {
     /// ⌥⇧click adds a caret; in Column Selection Mode a drag is the text view's ⌥-drag, which selects a block.
     override func mouseDown(with event: NSEvent) {
         completionPopup?.close()
+        let point = convert(event.locationInWindow, from: nil)
+        if let fold = folds.first(where: { foldMark($0).contains(point) }) { return open(fold) }
         if event.modifierFlags.isSuperset(of: [.option, .shift]) {
             let place = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
             return setCarets([selectedRange()] + extraCarets + [NSRange(location: place, length: 0)])

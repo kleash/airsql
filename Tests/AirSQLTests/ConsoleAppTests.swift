@@ -358,6 +358,58 @@ extension AppTests {
             #expect(all() == [caret(1), caret(4)])
         }
 
+        /// A fold hides lines without touching the text, follows edits around it and opens for the cursor or an edit in it.
+        @Test func folding() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            let layout = try #require(editor.layoutManager), container = try #require(editor.textContainer)
+            func height() -> CGFloat {
+                layout.ensureLayout(for: container)
+                return layout.usedRect(for: container).height
+            }
+            func settled() async { await Task.yield() ; try? await Task.sleep(nanoseconds: 10_000_000) }
+            let script = "SELECT 1,\n  2,\n  3;\nSELECT 4"
+            editor.setText(script)
+            let open = height()
+            editor.setSelectedRange(NSRange(location: 3, length: 0))
+            editor.foldHere(nil)
+            #expect(editor.folds == [9..<19] && height() < open)
+            #expect(editor.string == script && console.text == script, "the text stays whole")
+            editor.display()  // the ruler and "…" draw with lines hidden
+            let ruler = try #require(editor.enclosingScrollView?.verticalRulerView)
+            ruler.display()
+
+            // An edit before it moves it; inside, opens it.
+            editor.replace(NSRange(location: 0, length: 0), with: "-- a\n")
+            #expect(editor.folds == [14..<24])
+            editor.replace(NSRange(location: 16, length: 1), with: "x")
+            await settled()
+            #expect(editor.folds.isEmpty && height() > open - 1)
+
+            editor.setText(script)
+            editor.setSelectedRange(NSRange(location: 3, length: 0))
+            editor.foldHere(nil)
+            editor.setSelectedRange(NSRange(location: 12, length: 0))
+            #expect(editor.folds.isEmpty, "a cursor landing inside opens it")
+
+            editor.foldAll(nil)
+            #expect(editor.folds == [9..<19])
+            editor.unfoldAll(nil)
+            #expect(editor.folds.isEmpty)
+
+            // The triangle's line: a click folds, another opens. A cursor in the fold comes out to its first line.
+            editor.setSelectedRange(NSRange(location: 12, length: 0))
+            editor.toggleFold(lineRange: NSRange(location: 0, length: 10))
+            #expect(editor.folds == [9..<19] && editor.selectedRange().location == 9)
+            editor.toggleFold(lineRange: NSRange(location: 0, length: 10))
+            #expect(editor.folds.isEmpty)
+
+            editor.setSelectedRange(NSRange(location: 3, length: 0))
+            editor.foldHere(nil)
+            editor.setText("x")
+            #expect(editor.folds.isEmpty, "a new text has none")
+        }
+
         /// Settings ▸ Editor reaches open editors: the font, keywords in it too; the indent Tab puts in.
         @Test func editorSettingsReachTheEditor() async throws {
             let model = testModel(Fixtures.shop)

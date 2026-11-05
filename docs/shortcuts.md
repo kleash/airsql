@@ -120,6 +120,10 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Show Previous Tab | ⌃⇧⇥ |
 | Show Next Tab | ⌃⇥ |
 | Tab 1 | ⌘1 |
+| Fold | ⌃⌥← |
+| Unfold | ⌃⌥→ |
+| Fold All | ⌃⌥⇧← |
+| Unfold All | ⌃⌥⇧→ |
 | Select Next Occurrence | ⌥⌘G |
 | Select All Occurrences | ⌃⌘G |
 | Add Caret to Each Line | ⌥⇧G |

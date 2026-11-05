@@ -6,6 +6,7 @@ import AppKit
 extension SQLEditorView {
     /// Puts the text in place as the starting text (not undoable), coloured.
     func setText(_ text: String) {
+        folds = []
         string = text
         undoManager?.removeAllActions()
         runProblem = nil

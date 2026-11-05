@@ -36,6 +36,19 @@ import Testing
         #expect(growing("") == [])
     }
 
+    @Test func foldsAreWhatSpansLines() {
+        func regions(_ text: String) -> [String] {
+            let units = Array(text.utf16)
+            return SQLFolding.regions(in: text).map { String(decoding: units[$0], as: UTF16.self) }
+        }
+        #expect(regions("SELECT 1;\nSELECT 2") == [], "one line each")
+        #expect(regions("SELECT 1\nFROM t;\nSELECT 2") == ["\nFROM t;"], "from the first line's end, its delimiter too")
+        #expect(regions("SELECT (\n  1\n);") == ["\n  1\n);", "\n  1\n"], "the statement, then the brackets")
+        #expect(regions("/* a\nb */\nSELECT 1") == ["\nb */"])
+        #expect(regions("-- region x\nSELECT 1;\n-- endregion\n") == ["\nSELECT 1;\n-- endregion"])
+        #expect(regions("SELECT '(\n)'") == ["\n)'"], "brackets in a string are text; the statement still spans lines")
+    }
+
     @Test func aStatementCompletes() {
         func completed(_ text: String) -> String? {
             SQLEditing.completed(text, caret: text.utf16.count).map { edit in

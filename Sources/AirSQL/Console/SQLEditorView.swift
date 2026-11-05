@@ -59,6 +59,9 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     var caretsChangedText = false
     /// Column Selection Mode.
     var columnSelection = false
+    /// What's folded away, as ranges of the text.
+    var folds: [Range<Int>] = []
+    var cachedFoldRegions: [Range<Int>]?
     /// "Ln 3, Col 14", in the editor's corner.
     let positionLabel = NSTextField(labelWithString: "")
 
@@ -122,6 +125,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         insertionPointColor = .accent
         textContainerInset = NSSize(width: 4, height: 8)
         layoutManager?.allowsNonContiguousLayout = true
+        layoutManager?.delegate = self
+        textStorage?.delegate = self
         setFontSize(fontSize)
         registerForDraggedTypes(readablePasteboardTypes + [.fileURL])
         setAccessibilityIdentifier("console.editor")
@@ -187,6 +192,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         tokens = []
         highlightedLength = 0
         cachedStatements = nil
+        cachedFoldRegions = nil
         highlight()
         checkLater()
     }
@@ -194,6 +200,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     override func didChangeText() {
         super.didChangeText()
         cachedStatements = nil
+        cachedFoldRegions = nil
         if applyingCarets {  // once, after the last caret
             caretsChangedText = true
             return
@@ -330,6 +337,7 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
         guard !stillSelecting, !applyingCarets else { return }
+        openFoldsAtSelection()
         if !extraCarets.isEmpty { extraCarets = [] }
         // A block dragged out with ⌥ arrives as several selections: each becomes a caret.
         if ranges.count > 1 { return setCarets(ranges.map(\.rangeValue)) }
