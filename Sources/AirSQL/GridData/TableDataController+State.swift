@@ -79,6 +79,7 @@ extension TableDataController: NSMenuItemValidation {
             enabled = reason == nil
         }
         menuItem.explain(enabled: enabled, reason: reason)
+        if menuItem.action == Commands.manualCommit.action { menuItem.state = (menuItem.tag == 1) == (transactionSession != nil) ? .on : .off }
         if menuItem.action == Commands.autoRefresh.action { menuItem.state = menuItem.tag == autoRefreshSeconds ? .on : .off }
         if menuItem.action == Commands.useAsLabel.action { menuItem.state = isLabel(viewer.focusedColumn) ? .on : .off }
         return enabled
@@ -97,6 +98,7 @@ extension TableDataController: NSMenuItemValidation {
     /// Whether a command can run now, and why not.
     private func state(of action: Selector?) -> (Bool, String?) {
         guard let source else { return (false, "The table is still loading") }
+        if let transaction = transactionState(of: action) { return transaction }
         let readOnly = editingOff ?? "This table can't be edited"
         let editable = editingOff == nil
         let hasSelection = !GridCopy.covered(grid).rows.isEmpty

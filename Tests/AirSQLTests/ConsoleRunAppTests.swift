@@ -278,5 +278,58 @@ extension AppTests {
             #expect(console.lastOutcome?.statement.sql == "SELECT 3 + 0")
             await connection.disconnect()
         }
+
+        /// Manual Commit in a table tab: Apply stays uncommitted and the tab reads its own changes; others don't see them;
+        /// Quit lists it, Roll Back undoes it, Commit writes it, and closing asks.
+        @Test(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
+        func aTableTabHoldsItsChangesInAManualTransaction() async throws {
+            let connection = Connection(options: DBLab.options(Lab.mariadb114, tls: DBLab.required), log: DBLab.log)
+            try await connection.connect()
+            defer { Task { await connection.disconnect() } }
+            let database = "lane_run_manual"
+            let admin = try await connection.session(.schema)
+            for sql in ["DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)",
+                        "CREATE TABLE \(database).t (id INT PRIMARY KEY, name VARCHAR(20))", "INSERT INTO \(database).t VALUES (1, 'a')"] {
+                _ = try await admin.query(sql)
+            }
+            let schema = SchemaCache(source: admin, includes: { $0 == database })
+            try await schema.load()
+            let saved = SavedConnection(name: "Lab", host: "127.0.0.1", user: "airsql")
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let tab = TableDataController(model: model, context: EditorContext(connection: saved, sessions: connection, schema: schema),
+                                          database: database, table: "t")
+            main.select(main.open(tab, title: "t", connection: saved.id))
+            func ready() async { _ = await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return tab.source != nil && tab.loading == nil } }
+            await ready()
+            func outside() async throws -> String? { try await admin.query("SELECT name FROM \(database).t WHERE id = 1").first?.rows?.string(0, 0) }
+
+            tab.setTransactionMode(Self.manualItem())
+            #expect(await eventually(timeout: 10) { tab.transactionSession != nil })
+            await ready()
+            let source = try #require(tab.source)
+            tab.keep(.text("b"), row: 0, column: 1)
+            tab.applyChanges(nil)
+            #expect(await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return source.changes.isEmpty && tab.loading == nil })
+            #expect(tab.inTransaction && tab.transactionBadge == "Transaction open")
+            #expect(await eventually(timeout: 10) { source.value(0, 1) == "b" }, "the tab reads its own change")
+            #expect(try await outside() == "a", "not committed")
+            #expect(main.unfinishedWork().contains { $0.hasPrefix("A transaction in “t”") })
+
+            tab.rollback(nil)
+            await ready()
+            #expect(await eventually(timeout: 10) { !tab.inTransaction })
+            #expect(try await outside() == "a")
+
+            tab.keep(.text("c"), row: 0, column: 1)
+            tab.applyChanges(nil)
+            #expect(await eventually(timeout: 20) { try? await Task.sleep(nanoseconds: 50_000_000); return source.changes.isEmpty && tab.loading == nil })
+            main.close(try #require(main.tabs.first))
+            _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+            #expect(await call(harness, "press", ["title": "Commit"]).error == nil)
+            #expect(await eventually(timeout: 10) { main.tabs.isEmpty })
+            #expect(try await outside() == "c")
+            _ = try await admin.query("DROP DATABASE \(database)")
+        }
     }
 }
