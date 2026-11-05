@@ -141,7 +141,7 @@ public struct Reconnected: Sendable {
 public final class DBConnection: @unchecked Sendable {
     /// The session's job (plan §2.2's session model, `Connection`): it names the session in tags and the SQL log.
     public enum Role: String, Sendable {
-        case main, data, schema, agent, tools, cancel
+        case main, data, schema, agent, tools, cancel, query
     }
 
     public let role: Role
@@ -269,6 +269,8 @@ public final class DBConnection: @unchecked Sendable {
 
     public var server: ServerInfo? { state.locked { _server } }
     public var isConnected: Bool { state.locked { mysql != nil } }
+    /// The connection dropped, and nothing has reconnected or closed it.
+    public var wasLost: Bool { state.locked { lost != nil } }
     /// A statement is running.
     public var isBusy: Bool { state.locked { running != nil } }
     /// A transaction is open on the server (SERVER_STATUS_IN_TRANS).

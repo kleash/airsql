@@ -83,6 +83,7 @@ import AppKit
     @objc optional func showHistory(_ sender: Any?)
     @objc optional func changeConnection(_ sender: Any?)
     @objc optional func rerunResult(_ sender: Any?)
+    @objc optional func explainAnalyze(_ sender: Any?)
     @objc optional func copyResultQuery(_ sender: Any?)
     @objc optional func profileQuery(_ sender: Any?)
     @objc optional func saveAsChangeset(_ sender: Any?)
@@ -447,6 +448,8 @@ enum Commands {
                                         tip: "Run the statement at the cursor, or the selected text (⌃F9)")
     static let explain = Command("Explain", #selector(AirSQLActions.explain(_:)), "e", [.command, .option],
                                  tip: "Show how the server would run the statement at the cursor, without running it")
+    static let explainAnalyze = Command("Explain Analyze", #selector(AirSQLActions.explainAnalyze(_:)), "e", [.command, .option, .shift],
+                                        tip: "Run the statement at the cursor and show what the server really did, with rows and times")
     static let cancelQuery = Command("Cancel", #selector(AirSQLActions.cancelQuery(_:)), ".",
                                      tip: "Stop the statement that is running in this tab")
     static let commit = Command("Commit", #selector(AirSQLActions.commit(_:)), tip: "Make the open transaction's changes permanent")
@@ -757,7 +760,7 @@ enum Commands {
         toggleSidebar, focusSidebar, focusEditor, focusResults, filterSidebar, valuePanel, recordView, previousRecord, nextRecord, heatmap, highlightEqual, transpose, viewAs,
         chart, columnList, sqlLog, clearSQLLog, activity,
         cancelAll, bigger, smaller, actualSize, refresh, autoRefresh, customizeToolbar, fullScreen,
-        runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, cancelQuery, commit, rollback, autoCommit, manualCommit,
+        runStatement, runSelection, runAll, runAllF9, runStatementF9, explain, explainAnalyze, cancelQuery, commit, rollback, autoCommit, manualCommit,
         isolation, formatSQL, history, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,

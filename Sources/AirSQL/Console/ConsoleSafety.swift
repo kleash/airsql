@@ -7,7 +7,9 @@ import AppKit
 @MainActor
 enum ConsoleSafety {
     /// Calls `answer` with true when the statements may run: at once when nothing needs asking, else after the sheet.
-    static func check(_ statements: [SQLStatement], in console: ConsoleViewController, answer: @escaping (Bool) -> Void) {
+    /// `askWrites`: any write asks, wherever (a command whose name doesn't say it changes data).
+    static func check(_ statements: [SQLStatement], in console: ConsoleViewController, askWrites: Bool = false,
+                      answer: @escaping (Bool) -> Void) {
         guard let saved = console.connection, let window = console.view.window else { return answer(true) }
         let safety = console.model.data.safety(for: saved)
         let noBackslashEscapes = console.editor.noBackslashEscapes
@@ -43,7 +45,7 @@ enum ConsoleSafety {
         // What an agent set off asks unless every statement is proven read-only (the agents' gate, plan §2.8).
         let agent = AgentGate.agent != nil && safety.askBeforeAgentChanges
             && statements.contains { !AgentGate.isReadOnly($0.sql, noBackslashEscapes: noBackslashEscapes) }
-        guard !warnings.isEmpty || (writes && safety.askBeforeConsoleWrite) || agent else { return answer(true) }
+        guard !warnings.isEmpty || (writes && (safety.askBeforeConsoleWrite || askWrites)) || agent else { return answer(true) }
         let count = statements.count, no = AgentGate.agent == nil ? "cancel" : "decline"
         let change = ChangeSQL(title: "Console", statements: statements.map(\.sql), connection: saved.id)
         var request = SQLPreviewRequest(

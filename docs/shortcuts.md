@@ -76,6 +76,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Run All | F9 |
 | Run Statement | ⌃F9 |
 | Explain | ⌥⌘E |
+| Explain Analyze | ⌥⇧⌘E |
 | Cancel | ⌘. |
 | Format SQL | ⌥⇧⌘F |
 | Query History | ⌘Y |

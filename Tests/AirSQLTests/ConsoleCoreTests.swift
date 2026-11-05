@@ -492,3 +492,51 @@ struct ResultSetSourceTests {
         #expect(SQLNameCheck.problems(in: script, snapshot: Self.snapshot(), database: "shop").count == 100)
     }
 }
+
+/// The plan's steps, from either of the servers' forms.
+@Suite struct ExplainPlanNodesTests {
+    @Test func mysqlsTreeBecomesStepsWithTheirFigures() throws {
+        let nodes = ExplainPlan.nodes(from: """
+            -> Nested loop inner join  (cost=4.50 rows=2) (actual time=0.10..9.00 rows=2 loops=1)
+                -> Table scan on c  (cost=0.50 rows=2) (actual time=0.05..0.10 rows=2 loops=1)
+                -> Filter: (o.id > 1)  (cost=2.00 rows=1) (actual time=4.00..4.40 rows=1 loops=2)
+                    -> Index lookup on o using k (c=c.id)  (cost=2.00 rows=1)
+            """, json: false)
+        let root = try #require(nodes.first)
+        #expect(nodes.count == 1 && root.operation == "Nested loop inner join")
+        #expect(root.cost == 4.5 && root.rows == 2 && root.actualRows == 2 && root.time == 9 && root.loops == 1)
+        #expect(root.children.map(\.operation) == ["Table scan on c", "Filter: (o.id > 1)"])
+        #expect(root.children[1].time == 8.8, "the time of a loop, for each loop")
+        #expect(root.children[1].children.first?.operation == "Index lookup on o using k (c=c.id)")
+        #expect(root.children[1].hot && !root.children[0].hot && !root.hot)
+    }
+
+    @Test func aJSONPlanBecomesStepsWithTheirFigures() throws {
+        let nodes = ExplainPlan.nodes(from: """
+            {"query_block": {"select_id": 1, "r_loops": 1, "r_total_time_ms": 2.5, "nested_loop": [
+                {"table": {"table_name": "c", "access_type": "ALL", "r_loops": 1, "rows": 10, "r_rows": 8, "r_table_time_ms": 1,
+                           "r_other_time_ms": 0.5, "cost": 0.25, "attached_condition": "c.id > 1"}},
+                {"table": {"table_name": "o", "access_type": "ref", "key": "k", "rows": 1, "cost_info": {"prefix_cost": "1.50"}}}]}}
+            """, json: true)
+        let block = try #require(nodes.first)
+        #expect(block.operation == "Query block #1" && block.time == 2.5)
+        let tables = try #require(block.children.first?.children)
+        #expect(tables.map(\.operation) == ["Table c · ALL · where c.id > 1", "Table o · ref · key k"])
+        #expect(tables[0].rows == 10 && tables[0].actualRows == 8 && tables[0].time == 1.5 && tables[0].cost == 0.25)
+        #expect(tables[1].cost == 1.5)
+        #expect(ExplainPlan.nodes(from: "not json", json: true).isEmpty)
+    }
+
+    @Test func analyzeUsesEachServersForm() {
+        func server(_ flavor: ServerInfo.Flavor, _ number: Int) -> ServerInfo {
+            ServerInfo(flavor: flavor, version: "", versionNumber: number, threadID: 1, tls: nil, certificate: nil)
+        }
+        #expect(ExplainPlan.analyzeSQL("SELECT 1", server: server(.mariadb, 110_404))?.sql == "ANALYZE FORMAT=JSON SELECT 1")
+        #expect(ExplainPlan.analyzeSQL("SELECT 1", server: server(.mysql, 80_018))?.sql == "EXPLAIN ANALYZE SELECT 1")
+        #expect(ExplainPlan.analyzeSQL("SELECT 1", server: server(.mysql, 80_017)) == nil)
+        // Both forms run the statement: never read-only.
+        for sql in ["ANALYZE FORMAT=JSON SELECT 1", "EXPLAIN ANALYZE SELECT 1"] {
+            #expect(StatementCheck.readOnlyRefusal(sql, on: "x", noBackslashEscapes: false) != nil)
+        }
+    }
+}

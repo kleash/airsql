@@ -4,7 +4,7 @@ import AppKit
 /// A run under way: its statements, the one running, and how to stop it.
 @MainActor
 final class ConsoleRun {
-    enum Kind { case run, explain, profile }
+    enum Kind { case run, explain, analyze, profile }
 
     let kind: Kind
     let statements: [SQLStatement]
@@ -65,6 +65,24 @@ extension ConsoleViewController {
     }
 
     @objc func explain(_ sender: Any?) { run(all: false, kind: .explain) }
+
+    /// Explain Analyze runs the statement for real, so read-only connections refuse it whatever it is, and a write always
+    /// asks first.
+    @objc func explainAnalyze(_ sender: Any?) {
+        guard !handedToCompare() else { return }
+        let selection = editor.selectedRange()
+        guard let statement = ConsoleScript.statements(in: text, selection: selection.length > 0 ? Range(selection) : nil,
+                                                       caret: selection.location, all: false,
+                                                       noBackslashEscapes: editor.noBackslashEscapes).first else {
+            return note(.info, "There is no statement here to run: type one, or put the cursor in one.")
+        }
+        guard let sent = ExplainPlan.analyzeSQL(statement.sql, server: session?.server)?.sql,
+              !ConsoleSafety.refusesOnReadOnly([sent], in: self) else { return }
+        ConsoleSafety.check([statement], in: self, askWrites: true) { [weak self] approved in
+            guard approved, let self else { return }
+            self.start(ConsoleRun(kind: .analyze, statements: [statement], text: self.text))
+        }
+    }
 
     /// Run Again: the shown result's statement once more, its rows taking the tab's place. It goes through the same
     /// checks as a Run, as a statement that returns rows can still write (CALL).
@@ -142,6 +160,8 @@ extension ConsoleViewController {
                  + "waits until it ends.")
             return done?() ?? ()
         }
+        guard !sessionWasLost() else { return done?() ?? () }
+        if session == nil { sharing = nil }
         if run.kind == .run, run.statements.contains(where: { !$0.range.isEmpty }) {
             dropUnpinnedResults()
             resultsRuler?.errorLine = nil
@@ -161,11 +181,11 @@ extension ConsoleViewController {
         contentChanged()
         Task { [weak self] in
             do {
-                let session = try await connection.session(.main)
-                run.session = session
-                self?.changeShared { $0.session = session }
-                self?.editor.noBackslashEscapes = session.noBackslashEscapes
-                await self?.perform(run, on: session, connection: id)
+                if let session = try await self?.sessionForRun(on: connection) {
+                    run.session = session
+                    self?.editor.noBackslashEscapes = session.noBackslashEscapes
+                    await self?.perform(run, on: session, connection: id)
+                }
             } catch {
                 self?.note(.error, error.localizedDescription)
             }
@@ -175,15 +195,17 @@ extension ConsoleViewController {
     }
 
     private func perform(_ run: ConsoleRun, on session: DBConnection, connection id: UUID) async {
-        // The database made current in the navigator or the toolbar since the session's last USE: used first, so the
-        // statements run where the window says (and a run under way is never switched midway). If it fails, nothing runs.
-        if run.isTheirs, let wanted = model.openConnection(id)?.currentDatabase,
-           wanted != shared.database ?? session.options.database {
+        // The database chosen in the navigator or the toolbar since the session's last USE: used first, so the statements
+        // run where the tab says (and a run under way is never switched midway). If it fails, nothing runs.
+        let wanted = (sharesSession ? nil : chosenDatabase) ?? model.openConnection(id)?.currentDatabase
+        if run.isTheirs, !sharesSession { chosenDatabase = wanted }
+        if run.isTheirs, let wanted, wanted != shared.database ?? session.options.database {
             let use = await ConsoleRunner.run(SQLStatement(sql: "USE " + SQLQuote.identifier(wanted)), in: run.text, on: session)
             show(use, title: nil, run: run, session: session)
             guard use.error == nil else { return }
         }
         if run.kind == .explain { return await explain(run, on: session) }
+        if run.kind == .analyze { return await analyze(run, on: session, connection: id) }
         let profile = run.kind == .profile ? await QueryProfile.start(on: session) : nil
         let all = SQLSplitter.statements(in: run.text, noBackslashEscapes: session.noBackslashEscapes)
         var schemaChanged = false
@@ -236,20 +258,36 @@ extension ConsoleViewController {
         let statement = run.statements[0]
         if text == run.text { editor.flash(NSRange(statement.range)) }
         let table = await ConsoleRunner.run(SQLStatement(sql: ExplainPlan.tableSQL(statement.sql)), in: run.text, on: session)
-        if let error = table.error {
-            let shown = error.localizedDescription
-            note(.error, shown, statement: statement, run: run)
-            if self.text == run.text {
-                editor.runProblem = ConsoleScript.problem(error.details.isEmpty ? error.message : error.details, shown: shown,
-                                                          statement: statement, noBackslashEscapes: session.noBackslashEscapes)
-            }
-            return
-        }
+        if let error = table.error { return planFailed(error, run: run, session: session) }
         let (sql, json) = ExplainPlan.treeSQL(statement.sql, server: session.server)
         let tree = (await runQuery(sql, on: session))?.first?.rows.flatMap { $0.rowCount > 0 ? $0.string(0, 0) : nil } ?? ""
         addPlan(table: table.results.first?.rows, tree: json ? ExplainPlan.tree(fromJSON: tree) : tree,
-                title: "Plan")
+                nodes: ExplainPlan.nodes(from: tree, json: json), raw: tree, title: "Plan")
         note(.ok, "Plan shown · \(milliseconds(table.duration))", statement: statement, run: run)
+    }
+
+    private func analyze(_ run: ConsoleRun, on session: DBConnection, connection id: UUID) async {
+        let statement = run.statements[0]
+        guard let (sql, json) = ExplainPlan.analyzeSQL(statement.sql, server: session.server) else {
+            return note(.info, "Explain Analyze needs MySQL 8.0.18 or later, or MariaDB: nothing ran.")
+        }
+        if text == run.text { editor.flash(NSRange(statement.range)) }
+        let outcome = await ConsoleRunner.run(SQLStatement(sql: sql), in: run.text, on: session, timeout: Self.queryTimeout(id))
+        if let error = outcome.error { return planFailed(error, run: run, session: session) }
+        let plan = outcome.results.first?.rows.flatMap { $0.rowCount > 0 ? $0.string(0, 0) : nil } ?? ""
+        addPlan(table: nil, tree: json ? ExplainPlan.tree(fromJSON: plan) : plan, nodes: ExplainPlan.nodes(from: plan, json: json),
+                raw: plan, title: "Plan (Analyzed)")
+        note(.ok, "Ran and analyzed · \(milliseconds(outcome.duration))", statement: statement, run: run)
+    }
+
+    private func planFailed(_ error: AirSQLError, run: ConsoleRun, session: DBConnection) {
+        let statement = run.statements[0], shown = error.localizedDescription
+        run.failed = true
+        note(.error, shown, statement: statement, run: run)
+        if text == run.text {
+            editor.runProblem = ConsoleScript.problem(error.details.isEmpty ? error.message : error.details, shown: shown,
+                                                      statement: statement, noBackslashEscapes: session.noBackslashEscapes)
+        }
     }
 
     private func finish(_ run: ConsoleRun) {

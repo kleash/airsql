@@ -20,7 +20,7 @@ public struct ConsoleOutcome {
 }
 
 /// How the console's transactions see each other's changes (SET SESSION TRANSACTION ISOLATION LEVEL).
-public enum IsolationLevel: String, CaseIterable, Sendable {
+public enum IsolationLevel: String, CaseIterable, Codable, Sendable {
     case readUncommitted = "READ UNCOMMITTED"
     case readCommitted = "READ COMMITTED"
     case repeatableRead = "REPEATABLE READ"
@@ -30,8 +30,8 @@ public enum IsolationLevel: String, CaseIterable, Sendable {
     public var sql: String { "SET SESSION TRANSACTION ISOLATION LEVEL " + rawValue }
 }
 
-/// Runs the console's statements, one at a time, on the connection's main session (statements are split on the
-/// client: multi-statements stay off).
+/// Runs the console's statements, one at a time, on its session (statements are split on the client: multi-statements
+/// stay off).
 public enum ConsoleRunner {
     /// The most warnings read after a statement.
     static let warningLimit = 20

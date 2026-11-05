@@ -26,8 +26,8 @@ extension AppTests {
         @Test func aClosedSessionsDatabaseIsForgotten() async throws {
             let (_, _, console) = try await Self.console()
             let closed = DBConnection(options: ConnectOptions(host: "127.0.0.1", user: "app"), role: .main)
-            ConsoleViewController.shared[Fixtures.production.id] = .init(database: "old", session: closed)
-            defer { ConsoleViewController.shared[Fixtures.production.id] = nil }
+            ConsoleViewController.shared[console.sessionKey] = .init(database: "old", session: closed)
+            defer { ConsoleViewController.shared[console.sessionKey] = nil }
             #expect(console.database == "shop")
         }
 

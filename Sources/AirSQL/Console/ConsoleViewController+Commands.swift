@@ -96,7 +96,7 @@ extension ConsoleViewController: NSMenuItemValidation {
         switch item.action {
         case Commands.refresh.action:
             return (isConnected, offline ?? "")
-        case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(explain(_:)), #selector(profileQuery(_:)):
+        case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(explain(_:)), #selector(explainAnalyze(_:)), #selector(profileQuery(_:)):
             if let reason = offline ?? busy { return (false, reason) }
             return (hasText, "Type a statement first")
         case #selector(runSelection(_:)):
@@ -149,6 +149,7 @@ extension ConsoleViewController: NSMenuItemValidation {
             return (!compareTargets(for: tab).isEmpty, "Run another query first, or connect: there is no other result or table to compare with")
         case #selector(changeConnection(_:)):
             if let reason = busy { return (false, reason) }
+            if !sharesSession, session?.inTransaction == true { return (false, "Commit or roll back first: the transaction is this tab's") }
             return (model.data.connections.count > 1 || connectionID == nil, "There is no other connection to choose")
         case #selector(toggleHelpers(_:)):
             item.state = helpersShown ? .on : .off

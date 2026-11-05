@@ -10,8 +10,8 @@ extension Notification.Name {
 
 /// A console tab (plan §2.6): a document bound to one connection, saved to a .sql file or kept as an unsaved tab that
 /// comes back after relaunch. The editor above, the result tabs and Messages below. Its statements run one at a time
-/// on the connection's main session, which every console tab of the connection shares (one transaction, shown in the
-/// toolbar and the status bar).
+/// on a session of its own (its own transaction and database, shown in the toolbar and the status bar), or on the
+/// connection's main session where the connection has its query tabs share one.
 @MainActor
 final class ConsoleViewController: NSViewController, TabContent {
     // A connected connection's sessions, its schema cache and its query timeout in seconds: the app sets them to the
@@ -20,7 +20,7 @@ final class ConsoleViewController: NSViewController, TabContent {
     static var schemaCache: (UUID) -> SchemaCache? = { _ in nil }
     static var queryTimeout: (UUID) -> Int = { _ in 0 }
 
-    /// What the console tabs of one connection share, as they share its main session.
+    /// What goes with a session: a tab's own, or the main session its connection's tabs share.
     struct Shared {
         /// The console running a statement on it: one at a time, so each Cancel stops its own statement.
         var runner: UUID?
@@ -29,13 +29,14 @@ final class ConsoleViewController: NSViewController, TabContent {
         /// Rows changed in the open transaction.
         var changes: UInt64 = 0
         var isolation: IsolationLevel?
-        /// The main session, once a console has used it.
+        /// The session, once a console has used it.
         var session: DBConnection?
         /// Names of tables CREATE, ALTER, DROP or RENAME touched on it: temporary tables are only known from here.
         var changedNames = Set<String>()
         /// CALL or EXECUTE ran on it, so it may hold temporary tables nothing here can name.
         var ranCode = false
     }
+    /// By `sessionKey`.
     static var shared: [UUID: Shared] = [:]
     /// The width Query Helpers last had, in any tab.
     static var helpersWidth: CGFloat = 260
@@ -79,6 +80,11 @@ final class ConsoleViewController: NSViewController, TabContent {
     var syncScript: (() -> Bool)?
     /// Query ▸ Save as Changeset… hands the sync script back to its compare too, which saves a changeset per step.
     var syncChangesets: (() -> Bool)?
+    /// Whether its session is the shared one, fixed while it has a session: changing the connection's setting mustn't
+    /// lose sight of an open transaction. Nil: the connection's setting.
+    var sharing: Bool?
+    /// The database of a tab with a session of its own, once it has run or been given one.
+    var chosenDatabase: String?
     /// It said yes to closing: it isn't kept for the next launch.
     var closing = false
     private var placedDivider = false
@@ -97,7 +103,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         if fileURL != nil { savedText = text }
         super.init(nibName: nil, bundle: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(sessionChanged(_:)), name: .consoleSessionDidChange, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(schemaChanged), name: .openConnectionDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(schemaChanged(_:)), name: .openConnectionDidChange, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -200,6 +206,7 @@ final class ConsoleViewController: NSViewController, TabContent {
         view.window?.layoutIfNeeded()
         placeDivider()
         view.window?.makeFirstResponder(editor)
+        showDatabase()
         syncToolbar()
     }
 
@@ -207,25 +214,25 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     var text: String { editor?.string ?? initialText }
     var connection: SavedConnection? { model.connection(connectionID) }
-    /// What the connection's consoles share; nothing once its session is closed (Disconnect), as the last USE, the
-    /// isolation level and the transaction went with it.
+    /// What goes with its session; nothing once the session is closed (Disconnect), as the last USE, the isolation level
+    /// and the transaction went with it.
     var shared: Shared {
-        guard let id = connectionID, let value = Self.shared[id], value.session?.isConnected != false else { return Shared() }
+        guard let value = Self.shared[sessionKey], value.session?.isConnected != false else { return Shared() }
         return value
     }
 
-    /// The connection's main session as it stands, if a console has used it and it is still connected.
+    /// Its session as it stands, if it has used one and that is still connected.
     var session: DBConnection? {
-        guard let id = connectionID, Self.openConnection(id) != nil, let session = Self.shared[id]?.session,
+        guard let id = connectionID, Self.openConnection(id) != nil, let session = Self.shared[sessionKey]?.session,
               session.isConnected else { return nil }
         return session
     }
 
-    /// The database its statements run in: the connection's current one (the navigator's bold one, chosen there, in the
-    /// toolbar or by a USE here, and made current on the session before the next statement), else the last USE on the
-    /// connection's main session, else the connection's own.
+    /// The database its statements run in, made current on the session before the next statement: the tab's own, else
+    /// the connection's current one (the navigator's bold one, chosen there or in the toolbar), else the last USE on the
+    /// session, else the connection's own.
     var database: String? {
-        model.openConnection(connectionID)?.currentDatabase ?? shared.database
+        (sharesSession ? nil : chosenDatabase) ?? model.openConnection(connectionID)?.currentDatabase ?? shared.database
             ?? connectionID.flatMap { Self.openConnection($0)?.options.database }
             ?? connection.flatMap { $0.database.isEmpty ? nil : $0.database }
     }
@@ -233,14 +240,14 @@ final class ConsoleViewController: NSViewController, TabContent {
     var isConnected: Bool {
         guard let id = connectionID, Self.openConnection(id) != nil else { return false }
         if case .connected? = model.states[id] { return true }
-        return Self.shared[id]?.session?.isConnected == true
+        return Self.shared[sessionKey]?.session?.isConnected == true
     }
 
     func changeShared(_ change: (inout Shared) -> Void) {
         guard let id = connectionID else { return }
         var value = shared
         change(&value)
-        Self.shared[id] = value
+        Self.shared[sessionKey] = value
         NotificationCenter.default.post(name: .consoleSessionDidChange, object: id)
     }
 
@@ -250,8 +257,14 @@ final class ConsoleViewController: NSViewController, TabContent {
         editor?.checkLater()
     }
 
-    /// The schema or the current database may have changed: what's unknown may have too.
-    @objc private func schemaChanged() { editor?.checkLater() }
+    /// The schema or the current database may have changed: what's unknown may have too. A database chosen in the tree
+    /// or the toolbar is for the tab on show.
+    @objc private func schemaChanged(_ notification: Notification) {
+        if let open = notification.object as? OpenConnection, open.id == connectionID, isShown, chosenDatabase != nil {
+            chosenDatabase = open.currentDatabase
+        }
+        editor?.checkLater()
+    }
 
     /// Tells the tab bar and the status bar.
     func contentChanged() {
@@ -336,12 +349,13 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     /// A tab without a connection works on the one the toolbar shows: nothing to choose while the window has one.
     func takeWindowConnection() {
-        guard connectionID == nil, let id = mainWindow?.activeConnection?.id else { return }
+        guard connectionID == nil, isViewLoaded, let id = mainWindow?.activeConnection?.id else { return }
         setConnection(id)
         showResults()
     }
 
     func setConnection(_ id: UUID) {
+        endSession()
         connectionID = id
         tab?.connectionID = id
         ConsoleDocuments.shared.changed(self)

@@ -1,7 +1,9 @@
 import Foundation
 
 /// A connected connection's sessions (plan §2.2, R12), each a `DBConnection` of its own:
-/// - main: the console tabs share it (one transaction context, shown in the toolbar);
+/// - main: the login's own, and what the query tabs share on a connection set to share one session;
+/// - query: a query tab's own, opened by its first run (`toolsSession(role: .query)`), so it has its own transaction and
+///   database and runs while the others do;
 /// - data: table tabs, grid paging and Apply, so Apply's own transaction never commits the console's;
 /// - schema: introspection;
 /// - agent: read-only, opened on first agent use;
@@ -32,7 +34,7 @@ public final class Connection: @unchecked Sendable {
     /// The session for `role` (main, data, schema or agent), opened on first use. Callers asking at the same time share
     /// one connect; a connect that failed is tried again by the next call.
     public func session(_ role: DBConnection.Role) async throws -> DBConnection {
-        precondition(role != .tools && role != .cancel, "tools sessions come from toolsSession(); Cancel opens its own")
+        precondition(![.tools, .query, .cancel].contains(role), "these sessions come from toolsSession(); Cancel opens its own")
         let task: Task<DBConnection, Error> = lock.locked {
             if let task = opening[role] { return task }
             var sessionOptions = _options
@@ -61,9 +63,10 @@ public final class Connection: @unchecked Sendable {
         }
     }
 
-    /// A new session of its own for a client tool or recon. Close it when done; `disconnect` closes it too.
-    public func toolsSession() async throws -> DBConnection {
-        let session = DBConnection(options: options, role: .tools, log: log)
+    /// A new session of its own for a client tool, recon or (`role: .query`) a query tab. Close it when done; `disconnect`
+    /// closes it too.
+    public func toolsSession(role: DBConnection.Role = .tools) async throws -> DBConnection {
+        let session = DBConnection(options: options, role: role, log: log)
         do {
             try await session.connect()
         } catch {
@@ -75,6 +78,24 @@ public final class Connection: @unchecked Sendable {
             tools.append(session)
         }
         return session
+    }
+
+    /// Every session open now.
+    public func sessions() async -> [DBConnection] {
+        (await openSessions() + lock.locked { tools }).filter(\.isConnected)
+    }
+
+    /// Whether `used` of the server's `limit` connections leave room for one more, and for other clients.
+    static func hasRoom(used: Int, limit: Int) -> Bool { used + 5 < limit }
+
+    /// Whether the server can take another session without crowding out others, as far as the main session can tell;
+    /// busy, or refused the figures, it doesn't hold up a tab: the server still says no by itself (error 1040).
+    public func hasRoom() async -> Bool {
+        guard let main = try? await session(.main), !main.isBusy,
+              let limit = try? await main.query("SELECT @@max_connections").first?.rows?.string(0, 0).flatMap({ Int($0) }),
+              let used = try? await main.query("SHOW GLOBAL STATUS LIKE 'Threads_connected'").first?.rows?.string(0, 1)
+                .flatMap({ Int($0) }) else { return true }
+        return Self.hasRoom(used: used, limit: limit)
     }
 
     /// Reconnects after a drop (plan §2.2, R8): the main session is set up again through the same route, the thread

@@ -92,10 +92,12 @@ extension ConsoleViewController {
     }
 
     /// An EXPLAIN's tab.
-    func addPlan(table: ResultStore?, tree: String, title: String) {
+    func addPlan(table: ResultStore?, tree: String, nodes: [PlanNode], raw: String, title: String) {
         let tab = ResultTab(title: title, content: .plan(table: table, tree: tree), summary: "")
         let settings = model.data.settings
-        tab.makeView = { PlanView(table: table, tree: tree, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize)) }
+        tab.makeView = {
+            PlanView(table: table, tree: tree, nodes: nodes, raw: raw, nullText: settings.nullText, fontSize: CGFloat(settings.gridFontSize))
+        }
         resultTabs.append(tab)
         selectedResult = tab
     }

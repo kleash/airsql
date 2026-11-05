@@ -91,6 +91,13 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var databaseFilter = ""
     /// Seconds a statement may run before it is cancelled; 0: no limit.
     public var queryTimeout = 0
+    /// Query tabs share one session (and transaction, and database), so they see each other's temporary tables; off:
+    /// each has its own.
+    public var sharedQuerySession = false
+    /// New query sessions start in Manual, not Auto-commit.
+    public var startsManual = false
+    /// New query sessions start at this isolation level; nil: the server's.
+    public var startIsolation: IsolationLevel?
     /// SSH routes: the SSH server that reaches the database, and the jump hosts on the way to it, first hop first.
     public var sshHost = SSHHop()
     public var jumpHosts: [SSHHop] = []
@@ -139,6 +146,9 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         startupSQL = try value(.startupSQL, defaults.startupSQL)
         databaseFilter = try value(.databaseFilter, defaults.databaseFilter)
         queryTimeout = try value(.queryTimeout, defaults.queryTimeout)
+        sharedQuerySession = try value(.sharedQuerySession, defaults.sharedQuerySession)
+        startsManual = try value(.startsManual, defaults.startsManual)
+        startIsolation = try container.decodeIfPresent(IsolationLevel.self, forKey: .startIsolation)
         sshHost = try value(.sshHost, defaults.sshHost)
         jumpHosts = try value(.jumpHosts, defaults.jumpHosts)
         proxy = try value(.proxy, defaults.proxy)
