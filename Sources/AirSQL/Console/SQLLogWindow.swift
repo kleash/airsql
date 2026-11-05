@@ -43,7 +43,7 @@ final class SQLLogViewController: NSViewController, NSSearchFieldDelegate {
         text.setAccessibilityIdentifier("sqlLog.text")
         text.usesFindBar = true
         text.isIncrementalSearchingEnabled = true
-        filter.placeholderString = "Filter: words a line contains"
+        filter.placeholderString = "Filter lines"
         filter.toolTip = "Type words to show only the lines that contain them"
         filter.setAccessibilityIdentifier("sqlLog.filter")
         filter.delegate = self

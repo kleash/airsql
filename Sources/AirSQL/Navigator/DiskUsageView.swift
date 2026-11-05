@@ -190,6 +190,7 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
         stopButton.toolTip = reading != nil ? "Stop reading sizes; what was read stays" : "Nothing is being read"
         back.isHidden = level == .server
         compareButton.title = compared == nil ? "Compare Selected" : "Show All"
+        compareButton.imagePosition = .imageOnly  // setting a title brings the text back
         let compareReason = reason(Commands.diskUsageCompare.action)
         compareButton.isEnabled = compareReason == nil
         compareButton.toolTip = compareReason ?? Commands.diskUsageCompare.tip

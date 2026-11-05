@@ -71,7 +71,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         filter.widthAnchor.constraint(equalToConstant: 180).isActive = true
         status.setContentHuggingPriority(.init(1), for: .horizontal)
         status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let bar = actionBar([refreshButton, killQuery, killConnection, interval, spinner, status, hideSleeping, filter, helpButton(.navigator)])
+        let bar = actionBar([refreshButton, killQuery, killConnection, interval, spinner, status, hideSleeping, filter, helpButton(.navigator)], spacing: Spacing.half)
         for (id, title, width) in Self.columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
