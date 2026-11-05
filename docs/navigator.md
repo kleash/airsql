@@ -51,7 +51,7 @@ Every change shows its SQL first ([Check SQL before it runs](sql-preview.md)); n
 - **Truncate…** deletes every row of the selected tables. It can't be rolled back.
 - **Rename…** gives a table or view a new name. Views and routines that use the old name aren't changed.
 - **Copy Table…** copies a table into the same or another database, with its rows or without, or only the rows where a
-  condition you type holds (for example `created_at >= '2026-01-01'`). Indexes come along; foreign keys don't.
+  condition you type holds (for example `created_at >= '2026-01-01'`). Untick columns to leave them out; the primary key always comes along, the other indexes unless you untick them, and foreign keys if you tick them.
 - **Bulk Table Editor…** moves the selected tables to another database, or changes their engine, or converts them and
   their text columns to another character set and collation.
 - **Maintenance** ▸ Analyze, Check, Optimize, Repair or Checksum runs on the selected tables and shows what the server
@@ -78,7 +78,8 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
 tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: the status
 bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
 matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
-Upper and lower case match as the column's collation says (most ignore case).
+Upper and lower case match as the column's collation says (most ignore case). The menu beside it chooses **Contains**, **Is exactly**, **Wildcards** (`%` and `_`) or a **Regular expression**, and
+**Match case** tells capitals from small letters whatever the column's collation.
 
 ## See what the server is running
 

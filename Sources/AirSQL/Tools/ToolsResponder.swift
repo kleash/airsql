@@ -41,6 +41,57 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         open({ CSVImportSheet(model: $0, connection: $1, options: $2) }, then: { ($0 as? CSVImportSheet)?.use(rows: rows, title: title) })
     }
 
+    @objc func flushHosts(_ sender: Any?) { flush("HOSTS", "the host cache") }
+    @objc func flushLogs(_ sender: Any?) { flush("LOGS", "the logs") }
+    @objc func flushPrivileges(_ sender: Any?) { flush("PRIVILEGES", "the privileges") }
+    @objc func flushTables(_ sender: Any?) { flush("TABLES", "the tables") }
+    @objc func flushStatus(_ sender: Any?) { flush("STATUS", "the status counters") }
+
+    /// FLUSH through the SQL preview, on the connection's own session: a read-only connection is refused there.
+    private func flush(_ what: String, _ words: String) {
+        guard let main, let saved = connection, let open = main.model.openConnection(saved.id) else { return }
+        var request = SQLPreviewRequest(change: ChangeSQL(title: "Flush \(words)", statements: ["FLUSH " + what], connection: saved.id),
+                                        heading: "Flush \(words) of \(saved.displayName)?", caption: "This acts on the whole server.")
+        request.actionTitle = "Flush"
+        NavigatorActions.confirmAndRun(request, on: open, window: main.window, refreshing: [])
+    }
+
+    /// FLUSH TABLES WITH READ LOCK holds only as long as its session: one of its own, kept while a sheet says the server
+    /// is locked, until Unlock.
+    @objc func flushReadLock(_ sender: Any?) {
+        guard let main, let window = main.window, let saved = connection, let open = main.model.openConnection(saved.id) else { return }
+        guard !AgentGuard.refuses("Only the person at the Mac can lock a server's tables.") else { return }
+        var request = SQLPreviewRequest(change: ChangeSQL(title: "Lock all tables", statements: ["FLUSH TABLES WITH READ LOCK"], connection: saved.id),
+                                        heading: "Lock every table of \(saved.displayName)?",
+                                        caption: "AirSQL holds the lock until you press Unlock, or quit.")
+        request.actionTitle = "Lock"
+        request.destructive = true
+        request.warnings = ["Nothing can write to this server until you unlock it, on any connection."]
+        let options = open.connection.options
+        SQLPreviewSheet.show(request, connection: saved, on: window) { result in
+            guard result.approved else { return }
+            Task {
+                let session = DBConnection(options: options, role: .tools)
+                do {
+                    _ = try await session.connect()
+                    _ = try await session.query("FLUSH TABLES WITH READ LOCK")
+                } catch {
+                    await session.close()
+                    return showError(error.localizedDescription, title: "Couldn't lock the tables", on: window)
+                }
+                let work = main.model.activity.start("Holding a read lock on \(saved.displayName)", connection: saved.id)
+                let alert = NSAlert()
+                alert.messageText = "Every table of \(saved.displayName) is locked for reading"
+                alert.informativeText = "Nothing can write to this server until you unlock it."
+                alert.addButton(withTitle: "Unlock").toolTip = "Release the lock, so the server takes writes again"
+                _ = await alert.beginSheetModal(for: window)
+                _ = try? await session.query("UNLOCK TABLES")
+                await session.close()
+                work.end()
+            }
+        }
+    }
+
     @objc func openInTerminal(_ sender: Any?) {
         guard let main, let window = main.window, let saved = main.activeConnection else { return }
         Task {
@@ -140,12 +191,18 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
         guard let main else { return (false, nil) }
         // Copy to Another Server only reads this connection: its sheet checks the one it writes to.
         let writes = [#selector(restoreDatabase(_:)), #selector(runSQLFile(_:)), #selector(importCSV(_:)), #selector(importClipboard(_:))]
+        let flushes = [#selector(flushHosts(_:)), #selector(flushLogs(_:)), #selector(flushPrivileges(_:)), #selector(flushTables(_:)),
+                       #selector(flushStatus(_:)), #selector(flushReadLock(_:))]
         if main.window?.attachedSheet != nil { return (false, "A sheet is open: answer it first") }
         guard let connection else {
             return (false, main.selectedConnections.count > 1 ? "Select only one connection" : "Select a connection in the sidebar first")
         }
         if connection.route != .direct, main.model.openConnection(connection.id) == nil {
             return (false, "Connect to \(connection.displayName) first: the client tools go through its SSH or proxy route")
+        }
+        if let action, flushes.contains(action) {
+            if main.model.openConnection(connection.id) == nil { return (false, "Connect to \(connection.displayName) first") }
+            if connection.readOnly { return (false, "\(connection.displayName) is read-only: turn that off in the connection's settings to flush") }
         }
         if let action, writes.contains(action), connection.readOnly {
             return (false, "\(connection.displayName) is read-only: turn that off in the connection's settings to write to it")

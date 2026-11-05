@@ -238,6 +238,12 @@ import AppKit
 
     // Tools
     @objc optional func exportDatabase(_ sender: Any?)
+    @objc optional func flushHosts(_ sender: Any?)
+    @objc optional func flushLogs(_ sender: Any?)
+    @objc optional func flushPrivileges(_ sender: Any?)
+    @objc optional func flushTables(_ sender: Any?)
+    @objc optional func flushStatus(_ sender: Any?)
+    @objc optional func flushReadLock(_ sender: Any?)
     @objc optional func restoreDatabase(_ sender: Any?)
     @objc optional func copyToServer(_ sender: Any?)
     @objc optional func compareDatabases(_ sender: Any?)
@@ -805,6 +811,18 @@ enum Commands {
                                  tip: "Run a dump file into a database with your mysql or mariadb client")
     static let copyToServer = Command("Copy to Another Server…", #selector(AirSQLActions.copyToServer(_:)),
                                       tip: "Copy databases or tables, with their rows, to another connection")
+    static let flushHosts = Command("Flush Hosts…", #selector(AirSQLActions.flushHosts(_:)),
+                                    tip: "Clear the server's host cache, which unblocks hosts it refused after failed connections")
+    static let flushLogs = Command("Flush Logs…", #selector(AirSQLActions.flushLogs(_:)),
+                                   tip: "Close and reopen the server's log files")
+    static let flushPrivileges = Command("Flush Privileges…", #selector(AirSQLActions.flushPrivileges(_:)),
+                                         tip: "Reload the grant tables, after changing them by hand")
+    static let flushTables = Command("Flush Tables…", #selector(AirSQLActions.flushTables(_:)),
+                                     tip: "Close the server's open tables and write their changes to disk")
+    static let flushStatus = Command("Flush Status…", #selector(AirSQLActions.flushStatus(_:)),
+                                     tip: "Reset the server's status counters")
+    static let flushReadLock = Command("Lock All Tables for Reading…", #selector(AirSQLActions.flushReadLock(_:)),
+                                       tip: "Stop every write on the server until you unlock it, for a consistent copy of its files")
     static let compare = Command("Compare…", #selector(AirSQLActions.compareDatabases(_:)),
                                  tip: "Compare two databases' structure and data, and make a script that syncs them")
     static let syncScript = Command("Sync Script…", #selector(AirSQLActions.showSyncScript(_:)),
@@ -915,7 +933,7 @@ enum Commands {
         killConnection, selectTop, editDatabase, hostDatabases, hostVariables, hostStatus, hostProcesses, hostCommands, editVariable, diskUsage, diskUsageUp, diskUsageCompare, copyList, exportList, erDiagram, bulkEdit, newView, newProcedure, newFunction, newTrigger, newEvent,
         connect, disconnect, editConnection, duplicateConnection, colour, deleteConnection, openInTerminal, newFolder,
         renameFolder, deleteFolder, moveToFolder,
-        export, restore, copyToServer, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
+        export, restore, copyToServer, flushHosts, flushLogs, flushPrivileges, flushTables, flushStatus, flushReadLock, compare, syncScript, exportReport, copySyncScript, leaveOutOfCompare, generateLiquibase,
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,

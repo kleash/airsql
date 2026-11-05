@@ -88,9 +88,13 @@ public enum NavigatorSQL {
     /// options but not foreign keys), then, given `columns` (the ones that aren't generated), its rows where `condition`
     /// holds.
     public static func copyTable(_ table: DatabaseObject, to database: String, name: String, columns: [String]?,
-                                 where condition: String?) -> [String] {
+                                 where condition: String?, droppingColumns: [String] = [], droppingIndexes: [String] = [],
+                                 foreignKeys: [SchemaForeignKey] = []) -> [String] {
         let target = SQLQuote.identifier(database, name)
         var statements = ["CREATE TABLE \(target) LIKE \(table.quoted)"]
+        // Indexes first: one on a dropped column would otherwise shrink or go, and be missing here.
+        let drops = droppingIndexes.map { "DROP INDEX " + SQLQuote.identifier($0) } + droppingColumns.map { "DROP COLUMN " + SQLQuote.identifier($0) }
+        if !drops.isEmpty { statements.append("ALTER TABLE \(target) " + drops.joined(separator: ", ")) }
         if let columns, !columns.isEmpty {
             let list = columns.map { SQLQuote.identifier($0) }.joined(separator: ", ")
             var insert = "INSERT INTO \(target) (\(list)) SELECT \(list) FROM \(table.quoted)"
@@ -98,6 +102,13 @@ public enum NavigatorSQL {
                 insert += " WHERE " + condition
             }
             statements.append(insert)
+        }
+        // After the rows, without the original's name: constraint names are unique in a database.
+        for key in foreignKeys {
+            statements.append("ALTER TABLE \(target) ADD FOREIGN KEY (" + key.columns.map { SQLQuote.identifier($0) }.joined(separator: ", ")
+                + ") REFERENCES " + SQLQuote.identifier(key.referencedDatabase, key.referencedTable) + " ("
+                + key.referencedColumns.map { SQLQuote.identifier($0) }.joined(separator: ", ") + ") ON DELETE " + key.onDelete
+                + " ON UPDATE " + key.onUpdate)
         }
         return statements
     }

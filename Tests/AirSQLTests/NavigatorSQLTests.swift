@@ -156,4 +156,29 @@ struct NavigatorSQLTests {
                 == "SELECT PARAMETER_MODE, PARAMETER_NAME, DTD_IDENTIFIER FROM information_schema.PARAMETERS WHERE SPECIFIC_SCHEMA = "
                 + "'it\\'s' AND SPECIFIC_NAME = 'f' AND ROUTINE_TYPE = 'FUNCTION' AND ORDINAL_POSITION > 0 ORDER BY ORDINAL_POSITION")
     }
+
+    /// Find Text's kinds of match, and Copy Table's choices in the order they can run.
+    @Test func findMatchesAsChosenAndCopyTableKeepsWhatIsTicked() {
+        let quoted = { (kind: NavigatorSQL.TextMatch.Kind, sensitive: Bool, text: String) in
+            NavigatorSQL.contains(text, columns: ["a"], noBackslashEscapes: false, match: .init(kind: kind, caseSensitive: sensitive))
+        }
+        #expect(quoted(.contains, false, "5%") == "`a` LIKE '%5!%%' ESCAPE '!'")
+        #expect(quoted(.exact, false, "it's") == #"`a` = 'it\'s'"# || quoted(.exact, false, "it's") == "`a` = 'it''s'")
+        #expect(quoted(.wildcards, false, "a%!") == "`a` LIKE 'a%!!' ESCAPE '!'")
+        #expect(quoted(.regex, true, "^a") == "CONVERT(`a` USING utf8mb4) COLLATE utf8mb4_bin REGEXP '^a'")
+        let orders = DatabaseObject(.table, "shop", "orders")
+        let key = SchemaForeignKey(name: "fk", columns: ["c"], referencedDatabase: "shop", referencedTable: "customers", referencedColumns: ["id"],
+                                   onUpdate: "RESTRICT", onDelete: "CASCADE")
+        #expect(NavigatorSQL.copyTable(orders, to: "shop", name: "o", columns: ["id", "c"], where: nil, droppingColumns: ["note"],
+                                       droppingIndexes: ["i"], foreignKeys: [key]) == [
+            "CREATE TABLE `shop`.`o` LIKE `shop`.`orders`",
+            "ALTER TABLE `shop`.`o` DROP INDEX `i`, DROP COLUMN `note`",
+            "INSERT INTO `shop`.`o` (`id`, `c`) SELECT `id`, `c` FROM `shop`.`orders`",
+            "ALTER TABLE `shop`.`o` ADD FOREIGN KEY (`c`) REFERENCES `shop`.`customers` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT",
+        ])
+        // A read-only connection refuses them whatever a menu let through.
+        for sql in ["FLUSH TABLES", "FLUSH PRIVILEGES", "FLUSH TABLES WITH READ LOCK"] {
+            #expect(StatementCheck.readOnlyRefusal(sql, on: "Shop", noBackslashEscapes: false) != nil)
+        }
+    }
 }

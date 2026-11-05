@@ -142,6 +142,16 @@ selected rows, or all of them, into a table of this connection or a new one. NUL
 
 AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.
 
+## Flush
+
+**Tools ▸ Flush** clears the server's host cache, closes and reopens its logs, reloads the grant tables, closes its open
+tables or resets its status counters, each after the SQL preview. They need the `RELOAD` privilege and are off on a
+read-only connection.
+
+**Lock All Tables for Reading…** stops every write on the server (`FLUSH TABLES WITH READ LOCK`), for a consistent copy of
+its files. AirSQL keeps the lock on a connection of its own while a sheet says so; **Unlock** releases it, and so does
+quitting. It is off for agents.
+
 ## Open the mysql command line in Terminal
 
 **Tools ▸ Open in Terminal** opens Terminal running `mysql` (or `mariadb`) on the connection, in its database. On a

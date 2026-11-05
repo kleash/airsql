@@ -46,16 +46,50 @@ extension NavigatorSQL {
         return pattern + "%"
     }
 
-    /// `col1` LIKE '%text%' ESCAPE '!' OR `col2` LIKE …: the rows of a table where any of `columns` contains `text`.
-    public static func contains(_ text: String, columns: [String], noBackslashEscapes: Bool) -> String {
-        let pattern = SQLQuote.string(containsPattern(text), noBackslashEscapes: noBackslashEscapes)
-        return columns.map { "\(SQLQuote.identifier($0)) LIKE \(pattern) ESCAPE '!'" }.joined(separator: " OR ")
+    /// How Find Text compares: a column's own collation decides case unless `caseSensitive`.
+    public struct TextMatch: Equatable, Sendable {
+        public enum Kind: Int, CaseIterable, Sendable {
+            case contains, exact, wildcards, regex
+
+            public var title: String {
+                switch self {
+                case .contains: return "Contains"
+                case .exact: return "Is exactly"
+                case .wildcards: return "Wildcards (% and _)"
+                case .regex: return "Regular expression"
+                }
+            }
+        }
+
+        public var kind = Kind.contains
+        public var caseSensitive = false
+
+        public init(kind: Kind = .contains, caseSensitive: Bool = false) {
+            self.kind = kind
+            self.caseSensitive = caseSensitive
+        }
+    }
+
+    /// `col1` LIKE '%text%' ESCAPE '!' OR `col2` LIKE …: the rows of a table where any of `columns` matches `text`. Exact
+    /// case compares as utf8mb4_bin, whatever the column's character set.
+    public static func contains(_ text: String, columns: [String], noBackslashEscapes: Bool, match: TextMatch = TextMatch()) -> String {
+        let quote = { SQLQuote.string($0, noBackslashEscapes: noBackslashEscapes) }
+        let test: String
+        switch match.kind {
+        case .contains: test = "LIKE \(quote(containsPattern(text))) ESCAPE '!'"
+        case .exact: test = "= " + quote(text)
+        case .wildcards: test = "LIKE \(quote(text.replacingOccurrences(of: "!", with: "!!"))) ESCAPE '!'"
+        case .regex: test = "REGEXP " + quote(text)
+        }
+        return columns.map {
+            (match.caseSensitive ? "CONVERT(\(SQLQuote.identifier($0)) USING utf8mb4) COLLATE utf8mb4_bin" : SQLQuote.identifier($0)) + " " + test
+        }.joined(separator: " OR ")
     }
 
     /// How many rows of `table` hold `text` in one of `columns`.
     public static func countContaining(_ text: String, in table: DatabaseObject, columns: [String],
-                                       noBackslashEscapes: Bool) -> String {
-        "SELECT COUNT(*) FROM \(table.quoted) WHERE " + contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes)
+                                       noBackslashEscapes: Bool, match: TextMatch = TextMatch()) -> String {
+        "SELECT COUNT(*) FROM \(table.quoted) WHERE " + contains(text, columns: columns, noBackslashEscapes: noBackslashEscapes, match: match)
     }
 
     /// Every connection to the server and what it runs (MariaDB adds the statement's id).

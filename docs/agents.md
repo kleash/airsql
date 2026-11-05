@@ -49,7 +49,7 @@ no agent can, whatever it asks.
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
 Whatever that would change waits for you:
 
-- Anything that would run on a server (Run in a query tab, Apply, a compare's sync, Restore, Copy, CSV import, Commit)
+- Anything that would run on a server (Run in a query tab, Apply, a compare's sync, Restore, Copy, Import, Commit)
   first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
   can only decline. Statements that AirSQL proves only read run without asking.
 - Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,

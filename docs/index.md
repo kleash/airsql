@@ -30,7 +30,7 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, and the ER
   diagram.
 - [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy
-  to another server; CSV import.
+  to another server; import from CSV, Excel, JSON and the clipboard, into a new table if you want.
 - [Compare two databases](compare.md): structure and data, side by side, and a sync script you review first; or two
   results, or a result with a table, row by row.
 - [AI agents](agents.md): let Claude Code, Gemini CLI or Claude Desktop read your schemas and run read-only queries, at

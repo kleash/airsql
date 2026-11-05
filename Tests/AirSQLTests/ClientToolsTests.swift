@@ -370,6 +370,20 @@ struct ClientToolsTests {
         #expect(some.builtInOnly?.contains("DEFINER") == true)
     }
 
+    @Test func csvTakesAnyQuoteAndSeparatorAndJoinsLines() {
+        let columns = [GridColumn(name: "a"), GridColumn(name: "b")]
+        var options = CopyOptions()
+        options.separator = "||"
+        options.quote = "'"
+        #expect(CopyWriter.text(.csv, columns: columns, rows: [["it's", "x||y"], [#"say "hi""#, nil]], table: "t", options: options)
+            == "'it''s'||'x||y'\n" + #"say "hi""# + "||NULL\n")
+        options.quote = ""
+        #expect(CopyWriter.text(.csv, columns: columns, rows: [["a'b", "x||y"]], table: "t", options: options) == "a'b||x||y\n")
+        options = CopyOptions()
+        options.joinLines = true
+        #expect(CopyWriter.text(.csv, columns: columns, rows: [["a\nb\r\nc", nil]], table: "t", options: options) == "a b c,NULL\n")
+    }
+
     @Test func theExportRemovesDefinersAndTheNextAutoIncrementOnly() {
         #expect(SQLExport.withoutDefiner("CREATE ALGORITHM=UNDEFINED DEFINER=`a`@`%` SQL SECURITY DEFINER VIEW `v` AS select 1")
             == "CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `v` AS select 1")

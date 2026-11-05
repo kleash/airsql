@@ -330,6 +330,48 @@ extension AppTests {
             #expect(!sheet.runButton.isEnabled && sheet.runButton.toolTip == "Choose the field at least one column takes")
         }
 
+        /// A folder of data files: one for each table, an empty table's with only its names, NULL as the format writes it.
+        @Test(.enabled(if: Lab.enabled, "AIRSQL_LAB=1 runs the lab tests"))
+        func tablesExportToAFileEach() async throws {
+            let options = ClientToolsLabTests.options(Lab.mariadb114)
+            let session = DBConnection(options: options, role: .tools)
+            _ = try await session.connect()
+            let target = "lane_transfer_files"
+            _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target))
+            _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+            _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(target, "a")) (id INT, note VARCHAR(9))")
+            _ = try await session.query("INSERT INTO \(SQLQuote.identifier(target, "a")) VALUES (1, 'x,y'), (2, NULL)")
+            _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(target, "empty")) (id INT)")
+            let tables = [(database: target, name: "a"), (database: target, name: "empty")]
+            let folder = URL(fileURLWithPath: try scratch()).appendingPathComponent("csv")
+            let bytes = try await TableFiles.export(tables, format: .csv, options: options, snapshot: true, to: folder, cancellation: Cancellation()) { _, _ in }
+            #expect(bytes > 0)
+            #expect(try String(contentsOf: folder.appendingPathComponent("a.csv"), encoding: .utf8) == "id,note\n1,\"x,y\"\n2,NULL\n")
+            #expect(try String(contentsOf: folder.appendingPathComponent("empty.csv"), encoding: .utf8) == "id\n")
+            let book = URL(fileURLWithPath: try scratch()).appendingPathComponent("xlsx")
+            _ = try await TableFiles.export(tables, format: nil, options: options, snapshot: false, to: book, cancellation: Cancellation()) { _, _ in }
+            #expect(try XLSXReader.rows(Data(contentsOf: book.appendingPathComponent("a.xlsx"))).first == ["id", "note"])
+            // A failure leaves no folder.
+            let gone = URL(fileURLWithPath: try scratch()).appendingPathComponent("gone")
+            await #expect(throws: AirSQLError.self) {
+                _ = try await TableFiles.export([(database: target, name: "missing")], format: .csv, options: options, snapshot: false, to: gone,
+                                                cancellation: Cancellation()) { _, _ in }
+            }
+            #expect(!FileManager.default.fileExists(atPath: gone.path))
+            // The lab's login may flush.
+            _ = try await session.query("FLUSH TABLES")
+            _ = try await session.query("DROP DATABASE " + SQLQuote.identifier(target))
+            await session.close()
+        }
+
+        /// Flush sits in the Tools menu: off until connected, and off on a read-only connection, saying why.
+        @Test func flushIsOffUntilItCanRun() async throws {
+            let (main, _) = Self.window()
+            let tools = try #require(sequence(first: main as NSResponder, next: \.nextResponder).lazy.compactMap { $0 as? ToolsResponder }.first)
+            #expect(tools.availability(#selector(ToolsResponder.flushTables(_:))).1 == "Connect to \(ToolFixtures.local.displayName) first")
+            #expect(NSApp.mainMenu?.item(withTitle: "Tools")?.submenu?.item(withTitle: "Flush")?.submenu?.item(withTitle: "Flush Tables…") != nil)
+        }
+
         /// What only AirSQL's own export does says so, offers the way out, and the data formats turn SQL's options off.
         @Test func theExportSheetFitsItsOptionsToTheChoice() async throws {
             let (main, harness) = Self.window()
