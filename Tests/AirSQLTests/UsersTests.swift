@@ -1,5 +1,7 @@
+import AppKit
 import Foundation
 import Testing
+@testable import AirSQL
 @testable import AirSQLCore
 
 @Suite struct UsersCoreTests {
@@ -256,5 +258,391 @@ import Testing
         #expect(AgentGate.isReadOnly(maria.showGrants(new), noBackslashEscapes: false))
         #expect(AgentGate.isReadOnly(UserSQL.privileges, noBackslashEscapes: false))
         #expect(AgentGate.isReadOnly(UserSQL.plugins, noBackslashEscapes: false))
+    }
+}
+
+/// Every statement against real servers, the shared lab left as it was. The lab's airsql login has every privilege.
+@Suite(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"), .serialized) struct UsersLabTests {
+    static let servers = [Lab.mariadb114, Lab.mysql84]
+
+    private func session(_ server: Lab.Server) async throws -> (DBConnection, UserSQL) {
+        let session = DBConnection(options: DBLab.options(server), role: .tools, log: DBLab.log)
+        try await session.connect()
+        return (session, UserSQL(mariaDB: server.flavor == .mariadb, noBackslashEscapes: session.noBackslashEscapes))
+    }
+
+    private func grants(_ account: ServerAccount, _ sql: UserSQL, _ session: DBConnection, _ privileges: [ServerPrivilege]) async throws -> AccountGrants {
+        AccountGrants(lines: try await session.rows(sql.showGrants(account)).compactMap { $0.first ?? nil }, privileges: privileges)
+    }
+
+    @Test(arguments: servers) func anAccountGoesThroughItsWholeLife(server: Lab.Server) async throws {
+        let (session, sql) = try await session(server)
+        var account = ServerAccount(user: "lane_users_life", host: "%")
+        let moved = { var other = account; other.host = "localhost"; return other }()
+        let role = ServerAccount(user: "lane_users_role", host: server.flavor == .mariadb ? "" : "%", isRole: true)
+        for statement in [sql.drop(account), sql.drop(moved), sql.drop(role)] { _ = try? await session.query(statement) }
+        let mariaDB = server.flavor == .mariadb
+        func read(_ wanted: String) async throws -> ServerAccount {
+            let rows = try await session.rows(UserSQL.accounts(mariaDB: mariaDB))
+            let roles = mariaDB ? nil : try await session.rows(UserSQL.grantedRoles)
+            return try #require(UserSQL.accounts(rows, roles: roles).first { $0.user == account.user && $0.host == wanted })
+        }
+
+        // Create, with every clause, and log in with what was typed.
+        account.plugin = mariaDB ? "ed25519" : "caching_sha2_password"
+        account.limits.queries = 500
+        account.limits.simultaneous = 3
+        account.tls.kind = .none
+        let password = "it's a \\ test"
+        _ = try await session.query(sql.create(account, password: password))
+        var read1 = try await read("%")
+        #expect(read1.plugin == account.plugin && read1.limits == account.limits && read1.hasPassword && !read1.locked && !read1.isRole)
+        var options = DBLab.options(server)
+        options.user = account.user
+        options.password = password
+        let login = DBConnection(options: options, role: .tools, log: DBLab.log)
+        _ = try await login.connect()
+        await login.close()
+
+        // Alter: the same method stays with a new password, then the rest.
+        var changed = read1
+        changed.limits.queries = 0
+        changed.limits.updates = 7
+        changed.locked = true
+        changed.expired = true
+        changed.tls.kind = .specified
+        changed.tls.cipher = "ECDHE-RSA-AES256-GCM-SHA384"
+        changed.tls.subject = "/CN=o'brien"
+        for statement in sql.alter(read1, to: changed, password: "second-Pass1") { _ = try await session.query(statement) }
+        read1 = try await read("%")
+        #expect(read1.plugin == account.plugin, "a new password doesn't move the account to another method")
+        #expect(read1.limits == changed.limits && read1.locked && read1.expired)
+        #expect(read1.tls == changed.tls)
+
+        // Privileges at every level, read back as they were ticked.
+        let privileges = UserSQL.privileges(try await session.rows(UserSQL.privileges))
+        #expect(privileges.count > 20 && !GrantLevel.database("fixture").offered(privileges).isEmpty)
+        let levels: [GrantLevel: Set<String>] = [
+            .global: ["PROCESS"], .database("fixture"): ["SELECT", "CREATE VIEW", "GRANT OPTION"], .database("lane\\_users\\_%"): ["SELECT"],
+            .table("fixture", "customers"): ["INSERT", "GRANT OPTION"], .column("fixture", "customers", "id"): ["SELECT", "UPDATE"],
+        ]
+        for statement in sql.changes(read1, from: [:], to: levels) { _ = try await session.query(statement) }
+        var held = try await grants(read1, sql, session, privileges)
+        #expect(held.levels == levels)
+        var fewer = levels
+        fewer[.global] = []
+        fewer[.database("fixture")] = ["SELECT"]
+        fewer[.column("fixture", "customers", "id")] = ["SELECT"]
+        for statement in sql.changes(read1, from: held.levels, to: fewer) { _ = try await session.query(statement) }
+        held = try await grants(read1, sql, session, privileges)
+        #expect(held.levels[.global] ?? [] == [])
+        #expect(held.levels[.database("fixture")] == ["SELECT"] && held.levels[.column("fixture", "customers", "id")] == ["SELECT"])
+
+        // Roles: granted, passed on, on at login, taken away.
+        _ = try await session.query(sql.create(role, password: nil))
+        let readRole = UserSQL.accounts(try await session.rows(UserSQL.accounts(mariaDB: mariaDB)),
+                                        roles: mariaDB ? nil : try await session.rows(UserSQL.grantedRoles)).first { $0.user == role.user }
+        #expect(readRole?.isRole == true)
+        var roleGrant = AccountGrants()
+        roleGrant.roles = [.init(user: role.user, host: role.host, admin: true)]
+        roleGrant.defaultRoles = [role.user]
+        for statement in sql.changes(read1, from: AccountGrants(), to: roleGrant) { _ = try await session.query(statement) }
+        held = try await grants(read1, sql, session, privileges)
+        #expect(held.roles == roleGrant.roles)
+        if !mariaDB { held.defaultRoles = Set(try await session.rows(sql.defaultRoles(read1)).compactMap { $0.first ?? nil }) }
+        #expect(held.defaultRoles == [role.user])
+        var noAdmin = roleGrant
+        noAdmin.roles[0].admin = false
+        noAdmin.defaultRoles = []
+        for statement in sql.changes(read1, from: held, to: noAdmin) { _ = try await session.query(statement) }
+        held = try await grants(read1, sql, session, privileges)
+        #expect(held.roles == noAdmin.roles)
+        for statement in sql.changes(read1, from: noAdmin, to: AccountGrants()) { _ = try await session.query(statement) }
+        #expect(try await grants(read1, sql, session, privileges).roles.isEmpty)
+
+        // Renamed, and gone.
+        var renamed = read1
+        renamed.host = "localhost"
+        for statement in sql.alter(read1, to: renamed, password: nil) { _ = try await session.query(statement) }
+        #expect(try await read("localhost").locked)
+        _ = try await session.query(sql.drop(renamed))
+        _ = try await session.query(sql.drop(role))
+        #expect(try await session.rows("SELECT COUNT(*) FROM mysql.user WHERE User LIKE 'lane\\_users\\_%'").first?.first == "0")
+        await session.close()
+    }
+
+    @Test(arguments: servers) func theAccountsListHoldsNoHash(server: Lab.Server) async throws {
+        let (session, _) = try await session(server)
+        let results = try await session.query(UserSQL.accounts(mariaDB: server.flavor == .mariadb))
+        let store = try #require(results.first?.rows)
+        for row in 0..<store.rowCount {
+            for column in 0..<store.columns.count { #expect(store.string(row, column)?.hasPrefix("*") != true) }
+        }
+        await session.close()
+    }
+}
+
+extension AppTests {
+    @MainActor @Suite struct UsersAppTests {
+        static let accounts: [ServerAccount] = {
+            var login = ServerAccount(user: "bob", host: "%")
+            login.plugin = "mysql_native_password"
+            login.hasPassword = true
+            login.limits.queries = 5
+            return [login, ServerAccount(user: "r", host: "", isRole: true)]
+        }()
+
+        private func opened(_ change: (inout SavedConnection) -> Void = { _ in }) async -> (AppModel, MainWindowController, AgentServer, OpenConnection, UsersContent) {
+            var saved = Fixtures.local
+            change(&saved)
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let open = await openReplayed(model, saved.id)
+            let users = UsersContent(open)
+            main.open(users, title: "Users", connection: saved.id)
+            _ = await eventually(timeout: 20) { users.list.note.contains("couldn't read") }  // a replay has no server
+            users.privileges = UsersCoreTests.privileges
+            users.show(Self.accounts)
+            return (model, main, harness, open, users)
+        }
+
+        private func select(_ users: UsersContent, _ row: Int = 0) {
+            users.list.table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        }
+
+        private func editor(_ main: MainWindowController) -> AccountEditor? { main.window?.attachedSheet?.windowController as? AccountEditor }
+
+        @Test func theListShowsAccountsWithoutSecretsAndSaysWhyItIsEmpty() async {
+            let (_, _, _, _, users) = await opened()
+            #expect(users.list.rows.map { $0.cells["user"] } == ["bob", "r"])
+            #expect(users.list.rows[0].cells["password"] == "Set" && users.list.rows[1].cells["kind"] == "Role")
+            #expect(users.list.rows[0].cells["limits"] == "5 / 0 / 0 / 0")
+            users.copyList(nil)
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("Name,Host,Kind,") == true)
+        }
+
+        @Test func everyWriteIsRefusedInReadOnlyProductionAndToAgents() async throws {
+            let (_, _, _, _, free) = await opened()
+            select(free)
+            #expect(free.newUserButton.isEnabled && free.editButton.isEnabled)
+            let refusals: [(inout SavedConnection) -> Void] = [{ $0.readOnly = true }, { $0.colour = .production }, { $0.safety = .production }]
+            for change in refusals {
+                let (_, main, _, _, users) = await opened(change)
+                select(users)
+                #expect(!users.newUserButton.isEnabled && !users.newRoleButton.isEnabled && !users.editButton.isEnabled)
+                #expect(users.editButton.toolTip?.contains("can't be changed") == true)
+                for command in [Commands.newUser, Commands.newRole, Commands.editUser, Commands.cloneUser, Commands.dropUser] {
+                    let item = command.item()
+                    #expect(!users.validateMenuItem(item) && item.toolTip?.contains("can't be changed") == true)
+                }
+                users.dropUser(nil)
+                #expect(main.window?.attachedSheet?.windowController as? AccountEditor == nil)
+                #expect((main.window?.attachedSheet.flatMap { find(NSTextView.self, id: "preview.sql", in: $0.contentView!) }) == nil, "no SQL to run")
+                if let sheet = main.window?.attachedSheet { main.window?.endSheet(sheet) }
+            }
+        }
+
+        @Test func anAgentsPressReachesNothing() async {
+            let (_, main, _, open, users) = await opened()
+            select(users)
+            await AgentGate.$agent.withValue("Claude Code") {
+                #expect(open.usersRefusal?.contains("Only the person") == true)
+                let notes = AgentGuard.Notes()
+                AgentGuard.$notes.withValue(notes) {
+                    users.newUser(nil)
+                    users.editUser(nil)
+                    users.cloneUser(nil)
+                    users.dropUser(nil)
+                    users.modifyGrants(on: .global)
+                    users.run(["DROP USER 'bob'@'%'"], title: "t", password: nil, warnings: [], on: main.window) {}
+                }
+                #expect(notes.refusal?.contains("Only the person") == true)
+            }
+            #expect(main.window?.attachedSheet == nil)
+            #expect(AgentServer.showsData(users.list.table) && AgentServer.showsData(users.grantsText), "who may log in stays with read access")
+        }
+
+        @Test func aNewLoginsPasswordIsMaskedOnThePreviewAndItsCopy() async throws {
+            let (_, main, harness, _, users) = await opened()
+            users.newUser(nil)
+            _ = await eventually(timeout: 5) { editor(main) != nil }
+            let form = try #require(editor(main))
+            let secret = "S3cret-pass'x"
+            form.user.stringValue = "lane_users_new"
+            form.password.stringValue = secret
+            form.repeated.stringValue = "other"
+            form.next(nil)
+            #expect(find(NSTextField.self, id: "users.problem", in: form.window!.contentView!)?.stringValue == "The two passwords aren't the same")
+            form.repeated.stringValue = secret
+            form.next(nil)
+            let sheet = try #require(form.window?.attachedSheet)
+            let shown = try #require(find(NSTextView.self, id: "preview.sql", in: sheet.contentView!))
+            #expect(shown.string.contains("<secret>") && !shown.string.contains("S3cret"))
+            #expect(find(NSButton.self, id: "preview.saveChangeset", in: sheet.contentView!) == nil, "a changelog is a file")
+            #expect(await call(harness, "press", ["id": "preview.copy"]).error == nil)
+            #expect(NSPasteboard.general.string(forType: .string)?.contains("S3cret") == false)
+            #expect(await call(harness, "press", ["id": "preview.cancel"]).error == nil)
+            let snapshot = await call(harness, "snapshot", [:])
+            #expect(!"\(snapshot.json)".contains("S3cret"), "a secure field shows dots")
+        }
+
+        @Test func generateFillsBothFieldsAndItsCopyIsConcealed() async throws {
+            let (_, main, _, _, users) = await opened()
+            users.newUser(nil)
+            _ = await eventually(timeout: 5) { editor(main) != nil }
+            let form = try #require(editor(main))
+            #expect(!form.copyPassword.isEnabled)
+            form.generatePassword(nil)
+            #expect(form.password.stringValue.count == 20 && form.password.stringValue == form.repeated.stringValue)
+            #expect(form.copyPassword.isEnabled)
+            form.copyGenerated(nil)
+            #expect(NSPasteboard.general.string(forType: .string) == form.password.stringValue)
+            #expect(NSPasteboard.general.types?.map(\.rawValue).contains("org.nspasteboard.ConcealedType") == true)
+            NSPasteboard.general.clearContents()
+            AgentGate.$agent.withValue("Claude Code") { form.copyGenerated(nil) }
+            #expect(NSPasteboard.general.string(forType: .string) == nil, "agents can't copy it")
+        }
+
+        @Test func theTreeHasAUsersRowAndModifyGrantsFollowsTheSelection() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            let open = await openReplayed(model, Fixtures.local.id)
+            main.sidebar.reload()
+            let outline = main.sidebar.outline
+            let connection = (0..<outline.numberOfRows).compactMap { outline.item(atRow: $0) as? SidebarNode }.first { $0.connectionID == open.id }
+            outline.expandItem(connection)
+            let row = try #require(treeRow(main, .users(open.id)))
+            main.sidebar.outline.selectRowIndexes(IndexSet(integer: row.row), byExtendingSelection: false)
+            main.sidebar.showSelectedObject()
+            #expect(main.selectedTab?.shown is UsersContent)
+            #expect(main.sidebar.treeMenu(main.sidebar.selectedNodes).items.map(\.title) == ["Users and Roles"])
+            main.showUsers(open)
+            #expect(main.tabs.count == 1, "the tab it has")
+            let database = NavigatorActions.reason(for: Commands.modifyGrants.action, objects: [], databases: ["d"], open: open, target: open, model: model)
+            #expect(database == nil, "\(database ?? "")")
+            let two = NavigatorActions.reason(for: Commands.modifyGrants.action, objects: [], databases: ["d", "e"], open: open, target: open, model: model)
+            #expect(two == "Select one database, table or routine first")
+        }
+    }
+
+    @MainActor @Suite(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh")) struct UsersAppLabTests {
+        @Test func aPersonMakesChangesAndDropsALoginAndThePasswordStaysOutOfTheLog() async throws {
+            let server = Lab.mariadb114
+            let folder = NSTemporaryDirectory() + UUID().uuidString
+            let log = SQLLog(fileURL: URL(fileURLWithPath: folder + "/SQL.log"))
+            let saved = SavedConnection(name: "Lab", host: "127.0.0.1", port: server.port!, user: Lab.airsql.user)
+            let model = testModel([saved])
+            let (main, harness) = appWindow(model)
+            let connection = Connection(options: DBLab.options(server), log: log)
+            try await connection.connect()
+            let open = model.attach(connection, to: saved.id) { $0 == "fixture" }
+            defer { model.detach(open.id) }
+            _ = await eventually(timeout: 60) { open.snapshot.server != nil && open.loading.isEmpty }
+            for name in ["lane_users_ui", "lane_users_clone"] {
+                _ = try? await open.run(["DROP USER IF EXISTS '\(name)'@'%'"], title: "Clean")
+            }
+            _ = try? await open.run(["DROP ROLE IF EXISTS lane_users_uirole"], title: "Clean")
+            let users = try #require(main.showUsers(open))
+            #expect(await eventually(timeout: 20) { users.list.rows.contains { $0.cells["user"] == "airsql" } })
+            let secret = "Lane's-S3cret\\pw"
+
+            func form() async throws -> AccountEditor {
+                _ = await eventually(timeout: 10) { main.window?.attachedSheet?.windowController is AccountEditor }
+                return try #require(main.window?.attachedSheet?.windowController as? AccountEditor)
+            }
+            func run(_ editor: AccountEditor) async throws {
+                editor.next(nil)
+                _ = await eventually(timeout: 5) { editor.window?.attachedSheet != nil }
+                let preview = try #require(editor.window?.attachedSheet)
+                #expect(find(NSTextView.self, id: "preview.sql", in: preview.contentView!)?.string.contains("S3cret") == false)
+                #expect(await call(harness, "press", ["id": "preview.run"]).error == nil)
+                #expect(await eventually(timeout: 20) { main.window?.attachedSheet == nil }, "it closes once it ran")
+            }
+            func select(_ name: String) async {
+                _ = await eventually(timeout: 20) { users.list.rows.contains { $0.cells["user"] == name } }
+                let index = users.list.rows.firstIndex { $0.cells["user"] == name } ?? 0
+                users.list.table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+            }
+
+            // A role, then a login with a password, a privilege and the role.
+            users.newRole(nil)
+            let role = try await form()
+            role.user.stringValue = "lane_users_uirole"
+            try await run(role)
+            await select("lane_users_uirole")
+            users.newUser(nil)
+            let new = try await form()
+            new.user.stringValue = "lane_users_ui"
+            new.password.stringValue = secret
+            new.repeated.stringValue = secret
+            new.tree.add(.database("fixture"))
+            new.tree.set("SELECT", on: .database("fixture"), true)
+            let row = try #require(new.roleRows.first { $0.role.user == "lane_users_uirole" })
+            row.granted.state = .on
+            row.isDefault.state = .on
+            try await run(new)
+            await select("lane_users_ui")
+            #expect(await eventually(timeout: 10) { users.grantsText.string.contains("`fixture`") })
+            #expect(users.grantsText.string.contains("<secret>"), "SHOW GRANTS' hash is masked: \(users.grantsText.string)")
+            #expect(users.grantsText.string.contains("SET DEFAULT ROLE"))
+            var options = DBLab.options(server)
+            options.user = "lane_users_ui"
+            options.password = secret
+            let login = DBConnection(options: options, role: .tools, log: log)
+            _ = try await login.connect()
+            await login.close()
+
+            // Edit: lock it, take the privilege away.
+            users.editUser(nil)
+            let edit = try await form()
+            #expect(edit.tree.ticked[.database("fixture")] == ["SELECT"])
+            edit.tree.set("SELECT", on: .database("fixture"), false)
+            try await run(edit)
+            await select("lane_users_ui")
+            #expect(await eventually(timeout: 10) { !users.grantsText.string.isEmpty && !users.grantsText.string.contains("`fixture`") })
+
+            // Clone: the grants come, the password doesn't.
+            users.cloneUser(nil)
+            let clone = try await form()
+            #expect(clone.user.stringValue.isEmpty && clone.password.stringValue.isEmpty)
+            clone.user.stringValue = "lane_users_clone"
+            clone.generatePassword(nil)
+            try await run(clone)
+            await select("lane_users_clone")
+            #expect(await eventually(timeout: 10) { users.grantsText.string.contains("lane_users_uirole") })
+
+            // A failure says so without the password, and the form stays.
+            users.newUser(nil)
+            let duplicate = try await form()
+            duplicate.user.stringValue = "lane_users_ui"
+            duplicate.password.stringValue = secret
+            duplicate.repeated.stringValue = secret
+            duplicate.next(nil)
+            _ = await eventually(timeout: 5) { duplicate.window?.attachedSheet != nil }
+            #expect(await call(harness, "press", ["id": "preview.run"]).error == nil)
+            _ = await eventually(timeout: 20) { (duplicate.window?.attachedSheet?.windowController as? SQLPreviewSheet) == nil && duplicate.window?.attachedSheet != nil }
+            let alert = try #require(duplicate.window?.attachedSheet)
+            #expect(!Self.text(in: alert.contentView!).contains("S3cret"))
+            duplicate.window?.endSheet(alert)
+            main.window?.endSheet(duplicate.window!)
+
+            // Drop asks for the name.
+            await select("lane_users_clone")
+            users.dropUser(nil)
+            #expect(await call(harness, "set", ["id": "preview.confirm", "value": "lane_users_clone"]).error == nil)
+            #expect(await call(harness, "press", ["id": "preview.run"]).error == nil)
+            #expect(await eventually(timeout: 20) { !users.list.rows.contains { $0.cells["user"] == "lane_users_clone" } })
+
+            _ = try await open.run(["DROP USER 'lane_users_ui'@'%'", "DROP ROLE lane_users_uirole"], title: "Clean")
+            users.release()
+            let written = try String(contentsOf: log.fileURL, encoding: .utf8)
+            #expect(written.contains("CREATE USER") && written.contains("<secret>"))
+            #expect(!written.contains("S3cret"), "the SQL log masks it")
+        }
+
+        private static func text(in view: NSView) -> String {
+            let own = (view as? NSTextField)?.stringValue ?? ""
+            return view.subviews.map(text).joined(separator: " ") + " " + own
+        }
     }
 }

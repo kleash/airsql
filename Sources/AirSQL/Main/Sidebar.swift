@@ -17,6 +17,8 @@ final class SidebarNode: NSObject {
         case part(UUID, DatabaseObject, TablePart)
         case detail(UUID, DatabaseObject, TablePart, String)
         case message(UUID, String)
+        /// Users and Roles, the last row of a connected connection's tree.
+        case users(UUID)
     }
 
     let kind: Kind
@@ -310,7 +312,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             switch node.kind {
             case .header: return nil
             case .folder(let id), .connection(let id), .database(let id, _), .category(let id, _, _), .object(let id, _),
-                 .part(let id, _, _), .detail(let id, _, _, _), .message(let id, _): return id
+                 .part(let id, _, _), .detail(let id, _, _, _), .message(let id, _), .users(let id): return id
             }
         }
     }
@@ -428,8 +430,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .database, .category, .object, .part, .detail:
             treeDoubleClicked(node)
-        case .message:
-            break
+        case .message, .users:
+            break  // a click already showed Users and Roles
         }
     }
 
@@ -441,7 +443,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         if nodes.allSatisfy({ $0.connectionID != nil }) {
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
                       Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
-                      Commands.compareRows, Commands.diskUsage, nil])
+                      Commands.compareRows, Commands.diskUsage, Commands.users, nil])
             menu.addItem(ConnectionMenus.colourMenu())
             menu.addItem(ConnectionMenus.moveMenu())
             menu.add([nil, Commands.deleteConnection])
@@ -509,7 +511,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             if let connection = model.connection(id) {
                 cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true)
             }
-        case .database, .category, .object, .part, .detail, .message:
+        case .database, .category, .object, .part, .detail, .message, .users:
             return treeCell(node, in: outlineView)
         }
         return cell

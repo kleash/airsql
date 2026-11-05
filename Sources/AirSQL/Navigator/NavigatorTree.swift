@@ -93,7 +93,7 @@ extension SidebarController {
             if !text.isEmpty { return [] }
             return [node(.message(id, open.loadError.map { "Couldn't read the schema: " + $0 } ?? "Loading the schema…"))]
         }
-        return snapshot.databases.compactMap { database in
+        let databases: [SidebarNode] = snapshot.databases.compactMap { database in
             let all = text.isEmpty || database.name.localizedCaseInsensitiveContains(text)
             let groups = groups(database).compactMap { kind, names -> SidebarNode? in
                 let shown = all ? names : names.filter { $0.localizedCaseInsensitiveContains(text) }
@@ -111,6 +111,7 @@ extension SidebarController {
             row.children = groups
             return row
         }
+        return text.isEmpty ? databases + [node(.users(id))] : databases
     }
 
     private func groups(_ database: SchemaDatabase) -> [(DatabaseObject.Kind, [String])] {
@@ -186,6 +187,9 @@ extension SidebarController {
             cell.show(node.detail?.isKey == true ? TreeIcon.primaryKey : TreeIcon.of(part), name, count: node.detail?.note ?? "", countGivesWay: true, busy: false,
                       tip: (node.detail?.about ?? name) + "\nDouble-click to open " + (part == .triggers ? "it" : "the table's structure")
                         + ", right-click for more")
+        case .users:
+            cell.show(TreeIcon.image("US", 0x6B7785), "Users and Roles", count: "", busy: false,
+                      tip: "The server's logins and roles: click to see them, right-click for more")
         default:
             break
         }
@@ -198,7 +202,7 @@ extension SidebarNode {
     var connectionOfTree: UUID? {
         switch kind {
         case .database(let id, _), .category(let id, _, _), .object(let id, _), .part(let id, _, _), .detail(let id, _, _, _),
-             .message(let id, _): return id
+             .message(let id, _), .users(let id): return id
         default: return nil
         }
     }
@@ -234,6 +238,7 @@ extension SidebarNode {
         case .object(_, let object): return object.name
         case .part(_, _, let part): return part.rawValue
         case .detail(_, _, _, let name): return name
+        case .users: return "Users and Roles"
         default: return nil
         }
     }

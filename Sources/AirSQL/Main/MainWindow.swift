@@ -504,7 +504,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// the toolbar's Run does.
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
         if [Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action,
-            Commands.hostDatabases.action].contains(action) { return sidebar }
+            Commands.hostDatabases.action, Commands.users.action, Commands.modifyGrants.action].contains(action) { return sidebar }
         // Disk Usage from the sidebar's focus goes there; a Disk Usage tab with the focus takes it first, to go into a row.
         if action == Commands.diskUsage.action, !(selectedTab?.shown is DiskUsageContent), !(selectedTab?.shown is HostContent) {
             return sidebar

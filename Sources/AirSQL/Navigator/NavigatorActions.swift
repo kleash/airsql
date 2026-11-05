@@ -79,8 +79,14 @@ enum NavigatorActions {
         case Commands.newDatabase.action?:
             return target == nil ? "Connect first: databases are created on a connected server" : writable(target)
         case Commands.findOnServer.action?, Commands.processList.action?, Commands.diskUsage.action?,
-             Commands.hostDatabases.action?:
+             Commands.hostDatabases.action?, Commands.users.action?:
             return target == nil ? "Connect first: this works on a connected server" : nil
+        case Commands.modifyGrants.action?:
+            if databases.count + objects.count != 1 { return "Select one database, table or routine first" }
+            if let object = objects.first, object.kind.isTableLike == false, ![.procedure, .function].contains(object.kind) {
+                return "Select one database, table or routine first"
+            }
+            return open?.usersRefusal
         default:
             return nil
         }
