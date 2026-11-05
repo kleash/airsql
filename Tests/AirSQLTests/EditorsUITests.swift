@@ -135,7 +135,7 @@ extension AppTests {
             let fixtures = ERDiagramTests()
             let long = String(repeating: "customer_loyalty_points_", count: 3).prefix(64)
             let view = ERDiagramView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
-            view.show(ERDiagram(fixtures.database([fixtures.table(String(long)), fixtures.table("orders", pointsAt: [String(long)])])))
+            view.show(ERDiagram(fixtures.database([fixtures.table(String(long)), fixtures.table("orders", pointsAt: [String(long)])])), layout: ERLayout(name: ""))
             let box = try #require(view.boxes.first { $0.table.name == long })
             let tip = view.view(view, stringForToolTip: 0, point: NSPoint(x: box.frame.midX, y: box.frame.midY), userData: nil)
             #expect(tip.hasPrefix(long + "\n"))
@@ -262,14 +262,15 @@ extension AppTests {
             let boxes = diagram.canvas.boxes
             let x = { (name: String) in boxes.first { $0.table.name == name }?.frame.minX ?? -1 }
             #expect(x("customers") >= 0 && x("customers") < x("orders") && x("orders") < x("order_lines"))
-            #expect(main.selectedTab?.title == "airsql_fixture · diagram" && diagram.exportMermaid.isEnabled)
+            #expect(main.selectedTab?.title == "airsql_fixture · diagram" && diagram.export.isEnabled)
             let box = try #require(boxes.first { $0.table.name == "orders" })
             let point = windowPoint(box.frame.insetBy(dx: 10, dy: 10), in: diagram.canvas)
 
             let reply = await call(harness, "click", ["x": point.0, "y": point.1])
             #expect(diagram.canvas.selected == "orders", "\(reply.error ?? "") at \(point); canvas \(diagram.canvas.convert(diagram.canvas.bounds, to: nil))")
             let menu = await call(harness, "click", ["x": point.0, "y": point.1, "button": "right"])
-            #expect(titles(menu["menu"]) == ["Open Structure", "Open Data", "Copy Name"])
+            #expect(titles(menu["menu"]) == ["Open Structure", "Open Data", "Copy Name", "Add Neighbours", "Remove from Diagram",
+                                             "New Diagram from Selection…"])
             diagram.copy(nil)
             #expect(NSPasteboard.general.string(forType: .string) == "`orders`")
             diagram.find.stringValue = "CUSTOM"
@@ -286,6 +287,63 @@ extension AppTests {
             _ = await call(harness, "click", ["x": point.0, "y": point.1, "count": 2])
             #expect(main.selectedTab?.title == "orders · structure")
             #expect(diagram.canvas.png().map { NSBitmapImageRep(data: $0)?.pixelsWide ?? 0 } == Int(diagram.canvas.bounds.width * 2))
+        }
+
+        @Test func aDiagramOfChosenTablesKeepsItsBoxesAndComesBack() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            let context = try await recordedEditorContext()
+            main.openERDiagram(database: database, tables: ["orders"], neighbours: true, context: context)
+            let diagram = try #require(main.selectedTab?.content as? ERDiagramController)
+            await ready { diagram.diagram == nil }
+            main.window?.layoutIfNeeded()
+            let name = diagram.layout.name
+            #expect(diagram.layouts.first?.tables == nil && diagram.layout.tables?.contains("orders") == true)
+            #expect(diagram.layout.tables?.contains("customers") == true && !(diagram.layout.tables?.contains("tags") ?? true))
+            #expect(diagram.canvas.boxes.count == diagram.layout.tables?.count)
+            #expect(diagram.addTable.numberOfItems > 1, "the tables not drawn are offered")
+
+            // Dragged with the mouse, the box stays where it was left; Undo takes it back.
+            let box = try #require(diagram.canvas.boxes.first { $0.table.name == "orders" })
+            let start = diagram.canvas.convert(NSPoint(x: box.frame.midX, y: box.frame.midY), to: nil)
+            func event(_ type: NSEvent.EventType, _ point: NSPoint) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0, windowNumber: main.window?.windowNumber ?? 0,
+                                   context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            diagram.canvas.mouseDown(with: event(.leftMouseDown, start))
+            diagram.canvas.mouseDragged(with: event(.leftMouseDragged, NSPoint(x: start.x + 30, y: start.y - 40)))
+            diagram.canvas.mouseUp(with: event(.leftMouseUp, NSPoint(x: start.x + 30, y: start.y - 40)))
+            let moved = try #require(diagram.layout.positions["orders"])
+            #expect(moved.x == box.frame.minX + 30 && moved.y == box.frame.minY + 40)
+            diagram.undo(nil)
+            #expect(diagram.layout.positions.isEmpty)
+            diagram.redo(nil)
+            #expect(diagram.canvas.boxes.first { $0.table.name == "orders" }?.frame.minY == CGFloat(moved.y))
+
+            // Taken off, added back by a drop, and what shows in a box.
+            diagram.canvas.selected = "customers"
+            diagram.removeFromDiagram(nil)
+            #expect(!diagram.canvas.boxes.contains { $0.table.name == "customers" })
+            diagram.add(["customers", "not_a_table"])
+            #expect(diagram.canvas.boxes.contains { $0.table.name == "customers" } && diagram.layout.tables?.contains("not_a_table") == false)
+            let item = Commands.detailNames.item()
+            diagram.showDetail(item)
+            #expect(diagram.canvas.boxes.allSatisfy { $0.shown.isEmpty && $0.more == 0 })
+            diagram.arrangeBoxes(Commands.arrangeGrid.item())
+            #expect(diagram.layout.positions.isEmpty && diagram.layout.arrangement == .grid)
+            for format in DiagramExport.allCases { #expect(diagram.exported(format)?.isEmpty == false) }
+
+            // Saved: a new tab on the database has it.
+            TableViewSettingsStore.shared.flush()
+            main.openERDiagram(database: database, context: context)
+            let again = try #require(main.selectedTab?.content as? ERDiagramController)
+            await ready { again.diagram == nil }
+            #expect(again.diagrams.itemTitles == [ERLayout.wholeDatabase, name] && again.diagrams.indexOfSelectedItem == 0)
+            again.diagrams.selectItem(at: 1)
+            again.diagramChosen(again.diagrams)
+            #expect(again.layout.arrangement == .grid && again.canvas.boxes.count == diagram.canvas.boxes.count)
+            again.deleteDiagram(nil)
+            #expect(again.layouts.count == 1 && again.layout.tables == nil)
         }
 
         @Test func everyEditorIsTidyAndSaysWhatItsControlsDo() async throws {

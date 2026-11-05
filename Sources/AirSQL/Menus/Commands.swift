@@ -935,7 +935,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ] + editorCommands
+    ] + editorCommands + schema
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {
@@ -974,6 +974,7 @@ enum Commands {
         "Decimal Places": "Round this number column's values to some decimal places, grouped by thousands",
         "Time Zone": displayZone.tip,
         "Maintenance": maintenance.tip,
+        "Diagram": "Make, arrange, show and export ER diagrams of chosen tables",
         "New Object": "Write a new view, procedure, function, trigger or event as its CREATE statement",
         "Colour": colour.tip,
         "Agents": "Let AI agents use AirSQL, see what they did, or turn them off",

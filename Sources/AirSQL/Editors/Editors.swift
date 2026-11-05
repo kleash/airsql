@@ -102,9 +102,9 @@ extension MainWindowController {
         }
     }
 
-    /// Shows the ER diagram of `database` (nil: the first database with tables).
-    func openERDiagram(database: String?, context: EditorContext) {
-        let diagram = ERDiagramController(context: context, database: database, activity: model.activity)
+    /// Shows the ER diagram of `database` (nil: the first database with tables), or a new one of `tables` there.
+    func openERDiagram(database: String?, tables: Set<String>? = nil, neighbours: Bool = false, context: EditorContext) {
+        let diagram = ERDiagramController(context: context, database: database, tables: tables, neighbours: neighbours, activity: model.activity)
         open(diagram, title: diagram.tabTitle, connection: context.connection.id)
     }
 
@@ -132,6 +132,23 @@ extension MainWindowController {
         openERDiagram(database: database, context: context)
     }
 
+    /// The tables selected in the tree, when they are all of one database.
+    private var treeTables: (database: String, names: Set<String>)? {
+        let tables = sidebar.treeSelection?.nodes.compactMap(\.object).filter { $0.kind == .table } ?? []
+        guard let database = tables.first?.database, tables.allSatisfy({ $0.database == database }) else { return nil }
+        return (database, Set(tables.map(\.name)))
+    }
+
+    @objc func showDiagramOfSelection(_ sender: Any?) {
+        guard let (context, _) = editorTarget, let tables = treeTables else { return }
+        openERDiagram(database: tables.database, tables: tables.names, context: context)
+    }
+
+    @objc func showDiagramOfNeighbours(_ sender: Any?) {
+        guard let (context, _) = editorTarget, let tables = treeTables else { return }
+        openERDiagram(database: tables.database, tables: tables.names, neighbours: true, context: context)
+    }
+
     @objc func createObject(_ sender: Any?) {
         // The kind: New Object's choice (by its tag), else that of what is selected in the tree (New…).
         let tag = (sender as? NSMenuItem)?.tag ?? 0
@@ -154,11 +171,15 @@ extension MainWindowController {
 
     /// Whether an editor command can run now, and why not (nil: not an editor command).
     func validateEditorItem(_ item: NSMenuItem) -> (enabled: Bool, reason: String?)? {
-        guard [Commands.createTable.action, Commands.erDiagram.action, Commands.createObject.action].contains(item.action) else {
+        guard [Commands.createTable.action, Commands.erDiagram.action, Commands.createObject.action, Commands.diagramOfSelection.action,
+               Commands.diagramOfNeighbours.action].contains(item.action) else {
             return nil
         }
         guard let connection = editorConnection else { return (false, "Choose a connection first") }
         guard let context = Editors.context(connection, in: model) else { return (false, "Connect to \(connection.displayName) first") }
+        if [Commands.diagramOfSelection.action, Commands.diagramOfNeighbours.action].contains(item.action), treeTables == nil {
+            return (false, "Select tables of one database in the tree first")
+        }
         if item.action == Commands.createObject.action, context.schema.snapshot.databases.isEmpty, connection.database.isEmpty {
             return (false, "The server has no database to create it in")
         }

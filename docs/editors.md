@@ -69,8 +69,28 @@ and each table sits right of the tables its foreign keys point at; lines go from
 at, virtual foreign keys you added in a table's rows included ([Virtual foreign keys](table-data.md#foreign-key-labels-and-virtual-foreign-keys)).
 Tables with no keys come last.
 
-Click a table to select it (the arrow keys move between tables), double-click it to open it in the table editor, and
-right-click it for **Open Structure**, **Open Data** and **Copy Name** (⌘C copies the selected table's name too), or the empty space to export. Pinch,
-⌘+ and ⌘− zoom, ⌘0 goes back to actual size and **Fit** shows the whole diagram; ⌘F goes to the find field, where typing
-part of a name selects that table and Return goes to the next. ⌘R reads the schema again. **Export Image…** saves the diagram as a PNG, and **Export
-Mermaid…** as Mermaid text, which many docs sites and wikis draw.
+Click a table to select it (⌘ or ⇧ click adds more; the arrow keys move between tables), double-click it to open it in the
+table editor, and right-click it for **Open Structure**, **Open Data**, **Copy Name** and the diagram's own commands (⌘C copies
+the selected table's name too), or the empty space to export. Pinch, ⌘+ and ⌘− zoom, ⌘0 goes back to actual size and **Fit** shows
+the whole diagram; ⌘F goes to the find field, where typing part of a name selects that table and Return goes to the next. ⌘R
+reads the schema again.
+
+### Boxes and saved diagrams
+
+Drag a box to move it, with any others selected; ⌥ and the arrow keys do the same from the keyboard. ⌘Z takes a move back. A
+diagram remembers where its boxes are: it is kept on this Mac, never on the server.
+
+A database can have several diagrams, chosen in **Diagram**. The first always shows every table.
+
+- **Diagram of Selected Tables** in a table's right-click menu in the tree makes a diagram of only those tables, and **Diagram
+  of Neighbours** adds every table that touches them by a foreign key.
+- **Add Table** adds one more, or drag tables onto the diagram from the tree. **Add Neighbours** adds what touches the selected
+  boxes (on the whole database's diagram it makes a new diagram of them), and **Remove from Diagram** takes boxes off; the tables
+  themselves aren't touched.
+- **New Diagram from Selection…** keeps the selected boxes, or all of them, under a name. **Database ▸ Diagram** also has Rename and
+  Delete.
+- **Arrange** lays the boxes out again, **Left to Right**, **Top to Bottom** or as a **Grid**, and forgets where you moved them.
+- **Show** chooses **All Columns**, **Keys Only** or **Names Only**, and turns **Comments** and **Virtual Keys** on or off.
+
+**Export** saves the diagram as a PNG, or as text for other tools: Mermaid, which many docs sites and wikis draw, PlantUML, Graphviz
+DOT, GraphML and draw.io (the last two keep where your boxes are). **Print Diagram…** fits it on one page.

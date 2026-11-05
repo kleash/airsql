@@ -13,5 +13,13 @@ extension MainMenu {
         let after = database.items.lastIndex { $0.action == Commands.createTable.action || $0.action == Commands.createObject.action }
         database.insertItem(newObject, at: after.map { $0 + 1 } ?? database.numberOfItems)
         if !listed(Commands.erDiagram) { database.add([Commands.erDiagram]) }
+        let at = database.items.firstIndex { $0.action == Commands.erDiagram.action }.map { $0 + 1 } ?? database.numberOfItems
+        let diagram = submenu("Diagram", ([Commands.diagramOfSelection, Commands.diagramOfNeighbours, nil, Commands.diagramNew, Commands.diagramRename,
+                                           Commands.diagramDelete, nil, Commands.diagramNeighbours, Commands.diagramRemove, nil]
+                                          + Commands.diagramArrange + [nil] + Commands.diagramDetail
+                                          + [Commands.diagramComments, Commands.diagramVirtualKeys, nil]
+                                          + Commands.diagramExports + [Commands.printDiagram])
+            .map { $0?.item() ?? .separator() })
+        database.insertItem(diagram, at: at)
     }
 }

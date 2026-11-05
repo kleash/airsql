@@ -113,7 +113,7 @@ extension SidebarController: NSMenuItemValidation {
             menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.copyName, Commands.copyPlainName,
                       Commands.copyCreate, nil, Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
-                      Commands.bulkEdit, Commands.compareWith, Commands.compareRows])
+                      Commands.bulkEdit, Commands.compareWith, Commands.compareRows, Commands.diagramOfSelection, Commands.diagramOfNeighbours])
             menu.addItem(NavigatorMenus.maintenance())
             menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.diskUsage, Commands.refresh])
         case .part:

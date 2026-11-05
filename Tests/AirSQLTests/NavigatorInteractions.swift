@@ -12,7 +12,7 @@ extension AppTests.InteractionTests {
         let procedure = DatabaseObject(.procedure, "airsql_fixture", "add_customer")
         let views = SidebarNode.Kind.category(id, "airsql_fixture", .view)
         let tableMenu = ["Open Data", "Open Structure", "Select Top 1000 Rows", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Generate SELECT",
-                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare", "Maintenance", "Truncate…", "Rename…", "Drop…", "Disk Usage", "Refresh"]
+                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare", "Diagram of Selected Tables", "Diagram of Neighbours", "Maintenance", "Truncate…", "Rename…", "Drop…", "Disk Usage", "Refresh"]
         let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Generate SELECT", "Generate INSERT",
                                           "Generate UPDATE", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Maintenance", "Truncate…",
                                           "Rename…", "Drop…", "Refresh"]
@@ -65,7 +65,7 @@ extension AppTests.InteractionTests {
                         if let tab = main.tabs.first(where: { $0.content is DatabaseViewController }) { main.select(tab) }
                         return opened
                     },
-                    menu: tableMenu.filter { !$0.hasPrefix("Compare") }, enabled: tableCommands.subtracting(["Compare With…"])),
+                    menu: tableMenu.filter { !$0.hasPrefix("Compare") && !$0.hasPrefix("Diagram") }, enabled: tableCommands.subtracting(["Compare With…"])),
             Surface(name: "Process list row",
                     place: { main, _ in
                         guard let open = main.model.openConnection(id) else { return nil }
