@@ -82,7 +82,10 @@ final class LocalHistorySheet: NSViewController, NSTableViewDataSource, NSTableV
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard versions.indices.contains(table.selectedRow) else { return }
         let lines = versions[table.selectedRow].text.components(separatedBy: "\n")
-        let different = Set(lines.difference(from: current.components(separatedBy: "\n")).insertions.map(\.offset))
+        let different = Set(lines.difference(from: current.components(separatedBy: "\n")).insertions.compactMap { change -> Int? in
+            if case .insert(let offset, _, _) = change { return offset }
+            return nil
+        })
         let shown = NSMutableAttributedString()
         let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
         for (index, line) in lines.enumerated() {
