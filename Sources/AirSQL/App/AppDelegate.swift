@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         self.model = model
         // Light or dark as chosen in Settings: before the window opens, and at once when it changes.
         observers.append(model.$data.map(\.settings.appearance).removeDuplicates().sink { NSApp.appearance = appAppearance($0) })
+        observers.append(model.$data.map(\.settings.keymap).removeDuplicates().sink { Keymap.apply($0) })
         let main = MainWindowController(model: model)
         self.main = main
         agents = AgentService(model: model, main: main)

@@ -1,4 +1,7 @@
+import AirSQLCore
 import AppKit
+
+private let f3 = String(UnicodeScalar(NSF3FunctionKey)!)
 
 /// The workspace's commands: the Files panel, scratch files and the list of consoles.
 extension Commands {
@@ -28,6 +31,22 @@ extension Commands {
     static let otherPane = Command("Go to Other Side", #selector(MainWindowController.goToOtherPane(_:)), "\\", [.command, .control],
                                    tip: "Move the focus to the other tab of a split")
 
-    static let workspaceCommands = [splitRight, showBeside, otherPane, filesPanel, attachFolder, detachFolder, newScratch, openFile, runFileOn, copyPath, trashScratch, consoleList,
+    static let toggleBookmark = Command("Toggle Bookmark", #selector(SQLEditorView.toggleBookmark(_:)), f3, [],
+                                        tip: "Mark the line at the cursor to come back to it, or take the mark off")
+    static let nextBookmark = Command("Next Bookmark", #selector(SQLEditorView.nextBookmark(_:)), f3, .option,
+                                      tip: "Go to the next line marked in this editor")
+    static let previousBookmark = Command("Previous Bookmark", #selector(SQLEditorView.previousBookmark(_:)), f3, [.option, .shift],
+                                          tip: "Go to the line marked before this one")
+
+    static let askAgent = Command("Explain This", #selector(ConsoleViewController.askAgent(_:)), tag: AgentRequest.explain.rawValue,
+                                  tip: "Copy a request for your agent to explain the selected SQL; the agent reads it through the gate")
+    static let askAgentFix = Command("Fix the Last Error", #selector(ConsoleViewController.askAgent(_:)), tag: AgentRequest.fix.rawValue,
+                                     tip: "Copy a request for your agent to say why the last run failed and how to fix it")
+    static let askAgentOptimise = Command("Make This Faster", #selector(ConsoleViewController.askAgent(_:)), tag: AgentRequest.optimise.rawValue,
+                                          tip: "Copy a request for your agent to suggest indexes or a rewrite")
+    static let askAgentWrite = Command("Write SQL…", #selector(ConsoleViewController.askAgent(_:)), tag: AgentRequest.write.rawValue,
+                                       tip: "Say what you want, and copy that as a request for your agent to write the SQL")
+
+    static let workspaceCommands = [askAgent, askAgentFix, askAgentOptimise, askAgentWrite, toggleBookmark, nextBookmark, previousBookmark, splitRight, showBeside, otherPane, filesPanel, attachFolder, detachFolder, newScratch, openFile, runFileOn, copyPath, trashScratch, consoleList,
                                     defaultConsole]
 }

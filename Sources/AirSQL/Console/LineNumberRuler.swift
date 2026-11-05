@@ -86,6 +86,10 @@ final class LineNumberRuler: NSRulerView {
             label.draw(at: NSPoint(x: ruleThickness - 10 - size.width, y: y + (fragment.height - size.height) / 2),
                        withAttributes: attributes)
             drawFoldTriangle(lineRange, y: y, height: fragment.height, font: font)
+            if editor.bookmarks.contains(lineRange.location) {
+                NSColor.accent.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 12, y: y + fragment.height / 2 - 3, width: 6, height: 6)).fill()
+            }
             if onRun != nil, let start = statementStart, NSLocationInRange(start, lineRange) {
                 let mark = NSAttributedString(string: "▶", attributes: [.font: NSFont.systemFont(ofSize: 9), .foregroundColor: NSColor.statusOK])
                 mark.draw(at: NSPoint(x: 2, y: y + (fragment.height - mark.size().height) / 2))

@@ -64,7 +64,7 @@ final class ResultsView: NSView, NSTextFieldDelegate {
     private let tabsScroll = NSScrollView()
     private let summary = label("", font: .systemFont(ofSize: 11.5), color: .quietText, truncates: true)
     private let spinner = NSProgressIndicator()
-    let cancelButton = AirSQL.button("Cancel", id: "console.cancel", tip: Commands.cancelQuery.tip + " (⌘.)", target: nil,
+    let cancelButton = AirSQL.button("Cancel", id: "console.cancel", tip: Commands.cancelQuery.tipWithShortcut, target: nil,
                                      action: Commands.cancelQuery.action)
     /// The Data Grid page of the help, while a result's rows are shown.
     let help = helpButton(.dataGrid)

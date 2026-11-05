@@ -64,6 +64,15 @@ Whatever that would change waits for you:
 **Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Safety tab) turns the
 asking off; what is yours alone stays yours.
 
+## Ask your agent from the editor
+
+**Query ▸ Ask an Agent** copies a request to paste into your agent: **Explain This**, **Fix the Last Error**, **Make This
+Faster** or **Write SQL…**. AirSQL has no AI of its own, and nothing leaves your Mac from here.
+
+The request names the tab and the selected lines and holds no SQL. The agent reads the tab with its usual tool, at the
+access the connection allows and with passwords masked, and proposes SQL in a new tab for you to run. A request can't give
+an agent any more than that. The items are off while agents are off or can't see the connection.
+
 ## See what agents did
 
 The agents' item in the status bar says what they're doing. Click it (or choose **Tools ▸ Agents ▸ Agent Activity**)

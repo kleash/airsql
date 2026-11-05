@@ -40,3 +40,12 @@ again for one tab. Right-click a tab and choose **Show Beside** to pair it with 
 
 The side with the focus has an accent line along its top, and the status bar and every command follow it. Showing another
 tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the focus across; closing either tab ends the split.
+
+## Your own shortcuts
+
+**Settings ▸ Keys** lists every command with its shortcut. Filter by name or key, then double-click a row and press the new
+keys, or use **Change…**, **Remove** and **Reset**. A shortcut another command has moves to this one, and the note says
+whose it was. Shortcuts macOS keeps for itself, and plain keys that would type in the editor, are refused.
+
+**Start from** replaces your changes with a set of shortcuts like DataGrip's or HeidiSQL's, or AirSQL's own. Menus and
+Help ▸ Keyboard Shortcuts follow at once. Agents can't change shortcuts.

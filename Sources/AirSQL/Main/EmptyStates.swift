@@ -55,7 +55,7 @@ func firstRunView() -> NSView {
     let intro = label("AirSQL works with MySQL and MariaDB servers on this Mac, on your network, or through SSH, jump hosts "
                       + "and proxies. Passwords stay in your Keychain.", font: .systemFont(ofSize: 13), color: .secondaryLabelColor,
                       wraps: true)
-    let add = button("Add Connection…", id: "firstRun.addConnection", tip: Commands.newConnection.tip + " (⌘N)",
+    let add = button("Add Connection…", id: "firstRun.addConnection", tip: Commands.newConnection.tipWithShortcut,
                      target: nil, action: Commands.newConnection.action, primary: true)
     add.keyEquivalent = "\r"
     let importing = button("Import Connections…", id: "firstRun.import", tip: Commands.importConnections.tip, target: nil,
@@ -117,7 +117,7 @@ func selectConnectionView() -> NSView {
     let title = label("Select a connection", font: .systemFont(ofSize: 15, weight: .semibold))
     let text = label("Select a connection in the sidebar to see its details, or double-click it to connect.",
                      font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
-    let add = button("New Connection…", id: "selectConnection.add", tip: Commands.newConnection.tip + " (⌘N)", target: nil,
+    let add = button("New Connection…", id: "selectConnection.add", tip: Commands.newConnection.tipWithShortcut, target: nil,
                      action: Commands.newConnection.action)
     let stack = NSStackView(views: [title, text, add])
     stack.orientation = .vertical
@@ -150,10 +150,10 @@ func summaryView(_ connection: SavedConnection, data: AirSQLData, state: Connect
     let connect = live
         ? button("Disconnect", id: "summary.disconnect", tip: (connected ? Commands.disconnect.tip : "Stop connecting")
                  + " (\(Commands.disconnect.shortcut))", target: nil, action: Commands.disconnect.action)
-        : button("Connect", id: "summary.connect", tip: Commands.connect.tip + " (⌘K)", target: nil, action: Commands.connect.action,
+        : button("Connect", id: "summary.connect", tip: Commands.connect.tipWithShortcut, target: nil, action: Commands.connect.action,
                  primary: true)
     let edit = button("Edit…", id: "summary.edit", tip: Commands.editConnection.tip, target: nil, action: Commands.editConnection.action)
-    let query = button("New Query", id: "summary.newQuery", tip: Commands.newQuery.tip + " (⌘T)", target: nil,
+    let query = button("New Query", id: "summary.newQuery", tip: Commands.newQuery.tipWithShortcut, target: nil,
                        action: Commands.newQuery.action, primary: live)
     (live ? query : connect).keyEquivalent = "\r"
     let buttons = NSStackView(views: [connect, edit, query])

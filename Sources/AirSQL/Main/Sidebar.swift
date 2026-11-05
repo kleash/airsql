@@ -109,7 +109,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         let root = SurfaceView(.side)
         root.setAccessibilityIdentifier("sidebar")
         filter.placeholderString = "Filter by name"
-        filter.toolTip = Commands.filterSidebar.tip + " (⌥⌘J)"
+        filter.toolTip = Commands.filterSidebar.tipWithShortcut
         filter.setAccessibilityIdentifier("sidebar.filter")
         filter.delegate = self
         filter.sendsSearchStringImmediately = true
@@ -187,14 +187,14 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         add.isBordered = false
         add.font = .systemFont(ofSize: 11.5)
         add.contentTintColor = .secondaryLabelColor
-        add.toolTip = Commands.newConnection.tip + " (⌘N)"
+        add.toolTip = Commands.newConnection.tipWithShortcut
         add.setAccessibilityIdentifier("sidebar.newConnection")
         add.translatesAutoresizingMaskIntoConstraints = false
         let processes = NSButton(title: "Processes", target: nil, action: Commands.processList.action)
         processes.isBordered = false
         processes.font = .systemFont(ofSize: 11.5)
         processes.contentTintColor = .secondaryLabelColor
-        processes.toolTip = Commands.processList.tip + " (⌥⌘P)"
+        processes.toolTip = Commands.processList.tipWithShortcut
         processes.setAccessibilityIdentifier("sidebar.processes")
         processes.translatesAutoresizingMaskIntoConstraints = false
         let filesButton = NSButton(image: NSImage(systemSymbolName: "folder", accessibilityDescription: "Files") ?? NSImage(), target: nil,

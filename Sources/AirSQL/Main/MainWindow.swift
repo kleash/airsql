@@ -419,7 +419,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return InfoPopover(id: "popover.agent", heading: "Agents", lines: [status], buttons: [off])
         }
         statusBar.agent.menuItems = { [Commands.agentActivity.item(), Commands.turnAgentsOff.item()] }
-        statusBar.sqlLog.toolTip = Commands.sqlLog.tip + " (⌥⌘L)"
+        statusBar.sqlLog.toolTip = Commands.sqlLog.tipWithShortcut
     }
 
     func updateStatus() {
@@ -444,7 +444,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         statusBar.sqlLog.isEnabled = canShowLog
         statusBar.sqlLog.attributedTitle = NSAttributedString(string: "SQL log", attributes: [
             .foregroundColor: canShowLog ? NSColor.accent : NSColor.tertiaryLabelColor, .font: NSFont.systemFont(ofSize: 11.5)])
-        statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tip + " (⌥⌘L)"
+        statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tipWithShortcut
             : "Nothing has been sent yet: the SQL log lists every statement once you connect"
     }
 

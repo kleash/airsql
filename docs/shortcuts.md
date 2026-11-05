@@ -171,6 +171,9 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Forward | ⌃⌘→ |
 | Recent Tabs… | ⌃⌘E |
 | Go to Statement… | ⌃⌘O |
+| Toggle Bookmark | F3 |
+| Next Bookmark | ⌥F3 |
+| Previous Bookmark | ⌥⇧F3 |
 | Split Right | ⌥⌘\ |
 | Go to Other Side | ⌃⌘\ |
 | Files | ⌥⌘4 |

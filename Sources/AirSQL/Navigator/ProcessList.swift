@@ -56,7 +56,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         let title = label("Processes", font: .systemFont(ofSize: 15, weight: .semibold))
         interval.target = self
         interval.action = #selector(intervalChosen)
-        let refreshButton = button("Refresh", id: "processes.refresh", tip: Commands.refresh.tip + " (⌘R)", target: self,
+        let refreshButton = button("Refresh", id: "processes.refresh", tip: Commands.refresh.tipWithShortcut, target: self,
                              action: #selector(refresh(_:)))
         spinner.style = .spinning
         spinner.controlSize = .small

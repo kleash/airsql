@@ -120,6 +120,12 @@ session of its own, so a long query in one tab leaves the others free.
 - **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
 
+### Bookmarks
+
+**Edit ▸ Bookmarks ▸ Toggle Bookmark** (F3) marks the line at the cursor with a dot beside its number, and the mark stays on
+that line as you edit around it. **Next Bookmark** (⌥F3) and **Previous Bookmark** (⌥⇧F3) go from one to the next. Marks
+last until the tab closes.
+
 ## Checks while you type
 
 AirSQL parses your SQL as you type and compares it with the schema it has read. Nothing is sent to the server, and it's

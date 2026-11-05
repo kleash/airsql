@@ -85,7 +85,7 @@ extension ConsoleViewController: NSMenuItemValidation {
             item.explain(enabled: connected, reason: "Connect first: names are looked up on a connected server")
             return connected
         }
-        let (enabled, reason) = verdict(for: item)
+        let (enabled, reason) = item.action == Commands.askAgent.action ? askAgentVerdict(item) : verdict(for: item)
         item.explain(enabled: enabled, reason: enabled ? nil : reason)
         return enabled
     }

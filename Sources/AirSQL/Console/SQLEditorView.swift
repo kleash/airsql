@@ -79,6 +79,8 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     static var copied: [String] = []
     /// What's folded away, as ranges of the text.
     var folds: [Range<Int>] = []
+    /// Where the lines marked with a bookmark start, in order (SQLEditorView+Bookmarks.swift).
+    var bookmarks: [Int] = []
     var cachedFoldRegions: [Range<Int>]?
     /// A template being filled in: the places of each of its fields, the last being where the cursor ends, and which one
     /// Tab has reached.

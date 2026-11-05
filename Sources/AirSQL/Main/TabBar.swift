@@ -110,7 +110,7 @@ final class TabBarView: NSView {
         plus.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New Query")
         plus.target = nil
         plus.action = Commands.newQuery.action
-        plus.toolTip = Commands.newQuery.tip + " (⌘T)"
+        plus.toolTip = Commands.newQuery.tipWithShortcut
         plus.setAccessibilityIdentifier("tabs.new")
         addSubview(plus)
         more.bezelStyle = .texturedRounded
@@ -260,7 +260,7 @@ final class TabButton: NSView {
             .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
         close.target = self
         close.action = #selector(closeClicked)
-        close.toolTip = Commands.closeTab.tip + " (⌘W)"
+        close.toolTip = Commands.closeTab.tipWithShortcut
         close.translatesAutoresizingMaskIntoConstraints = false
         close.setAccessibilityIdentifier("tab.close")
         dot.color = .secondaryLabelColor

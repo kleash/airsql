@@ -3,7 +3,7 @@ import AppKit
 
 /// The Settings window's panes, in their order (plan §2.4). Each lane keeps its own pane's file.
 enum SettingsPane: String, CaseIterable {
-    case general, editor, format, grid, connections, safety, agents, clientTools, liquibase
+    case general, editor, format, grid, keys, connections, safety, agents, clientTools, liquibase
 
     var title: String {
         switch self {
@@ -11,6 +11,7 @@ enum SettingsPane: String, CaseIterable {
         case .editor: return "Editor"
         case .format: return "Format"
         case .grid: return "Grid"
+        case .keys: return "Keys"
         case .connections: return "Connections"
         case .safety: return "Safety"
         case .agents: return "Agents"
@@ -25,6 +26,7 @@ enum SettingsPane: String, CaseIterable {
         case .editor: return "chevron.left.forwardslash.chevron.right"
         case .format: return "text.alignleft"
         case .grid: return "tablecells"
+        case .keys: return "keyboard"
         case .connections: return "network"
         case .safety: return "shield.lefthalf.filled"
         case .agents: return "sparkles"
@@ -39,6 +41,7 @@ enum SettingsPane: String, CaseIterable {
         case .editor: return "Show the SQL editor's settings"
         case .format: return "Show how Format SQL lays out SQL, with a preview"
         case .grid: return "Show the grid's settings: text size, rows per page, how NULL looks"
+        case .keys: return "Show every command's shortcut, and change them"
         case .connections: return "Show how connections load a server's schema"
         case .safety: return "Show what asks first before it changes data, and the limits agents work within"
         case .agents: return "Show whether AI agents may use AirSQL, and where their exports go"
@@ -54,6 +57,7 @@ enum SettingsPane: String, CaseIterable {
         case .editor: return EditorPane(model: model)
         case .format: return FormatPane(model: model)
         case .grid: return GridPane(model: model)
+        case .keys: return KeysPane(model: model)
         case .connections: return ConnectionsPane(model: model)
         case .safety: return SafetyPane(model: model)
         case .agents: return AgentsPane(model: model)

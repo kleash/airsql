@@ -520,6 +520,12 @@ session of its own, so a long query in one tab leaves the others free.
 - **View ▸ Bigger** (⌘+), **Smaller** (⌘−) and **Actual Size** change the text size for a moment; Settings ▸ Editor
   sets it for good.
 
+### Bookmarks
+
+**Edit ▸ Bookmarks ▸ Toggle Bookmark** (F3) marks the line at the cursor with a dot beside its number, and the mark stays on
+that line as you edit around it. **Next Bookmark** (⌥F3) and **Previous Bookmark** (⌥⇧F3) go from one to the next. Marks
+last until the tab closes.
+
 ## Checks while you type
 
 AirSQL parses your SQL as you type and compares it with the schema it has read. Nothing is sent to the server, and it's
@@ -1945,6 +1951,15 @@ Whatever that would change waits for you:
 **Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Safety tab) turns the
 asking off; what is yours alone stays yours.
 
+## Ask your agent from the editor
+
+**Query ▸ Ask an Agent** copies a request to paste into your agent: **Explain This**, **Fix the Last Error**, **Make This
+Faster** or **Write SQL…**. AirSQL has no AI of its own, and nothing leaves your Mac from here.
+
+The request names the tab and the selected lines and holds no SQL. The agent reads the tab with its usual tool, at the
+access the connection allows and with passwords masked, and proposes SQL in a new tab for you to run. A request can't give
+an agent any more than that. The items are off while agents are off or can't see the connection.
+
 ## See what agents did
 
 The agents' item in the status bar says what they're doing. Click it (or choose **Tools ▸ Agents ▸ Agent Activity**)
@@ -2165,6 +2180,15 @@ again for one tab. Right-click a tab and choose **Show Beside** to pair it with 
 The side with the focus has an accent line along its top, and the status bar and every command follow it. Showing another
 tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the focus across; closing either tab ends the split.
 
+## Your own shortcuts
+
+**Settings ▸ Keys** lists every command with its shortcut. Filter by name or key, then double-click a row and press the new
+keys, or use **Change…**, **Remove** and **Reset**. A shortcut another command has moves to this one, and the note says
+whose it was. Shortcuts macOS keeps for itself, and plain keys that would type in the editor, are refused.
+
+**Start from** replaces your changes with a set of shortcuts like DataGrip's or HeidiSQL's, or AirSQL's own. Menus and
+Help ▸ Keyboard Shortcuts follow at once. Agents can't change shortcuts.
+
 
 ---
 
@@ -2367,6 +2391,9 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Forward | ⌃⌘→ |
 | Recent Tabs… | ⌃⌘E |
 | Go to Statement… | ⌃⌘O |
+| Toggle Bookmark | F3 |
+| Next Bookmark | ⌥F3 |
+| Previous Bookmark | ⌥⇧F3 |
 | Split Right | ⌥⌘\ |
 | Go to Other Side | ⌃⌘\ |
 | Files | ⌥⌘4 |
