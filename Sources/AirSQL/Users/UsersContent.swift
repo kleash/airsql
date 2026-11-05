@@ -361,11 +361,11 @@ extension MainWindowController {
     /// The connection's Users tab: the one it has, else in the preview tab.
     @discardableResult
     func showUsers(_ open: OpenConnection) -> UsersContent? {
-        if let tab = tabs.first(where: { ($0.shown as? UsersContent)?.open === open }) {
-            select(tab)
-        } else {
-            preview(UsersContent(open), title: "Users", connection: open.id)
+        if let tab = model.allTabs.first(where: { ($0.shown as? UsersContent)?.open === open }) {
+            show(tab)
+            return tab.shown as? UsersContent
         }
+        preview(UsersContent(open), title: "Users", connection: open.id)
         return selectedTab?.shown as? UsersContent
     }
 }

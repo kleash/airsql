@@ -146,7 +146,7 @@ extension AppTests {
             disk.compareSelected(nil)
             #expect(disk.list.rows.count > kept.count)
 
-            disk.list.filter.stringValue = "^\(try #require(kept.first))$"
+            disk.list.filter.stringValue = "/^\(try #require(kept.first))$/"
             disk.list.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
             #expect(disk.list.rows.count == 1 && disk.list.caption.stringValue.hasPrefix("1 of "))
             disk.list.copyList(nil)

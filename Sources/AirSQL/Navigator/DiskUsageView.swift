@@ -342,8 +342,8 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
 extension MainWindowController {
     /// Shows `level` in the connection's Disk Usage tab, made the first time.
     func showDiskUsage(_ open: OpenConnection, level: DiskUsageContent.Level) {
-        if let tab = tabs.first(where: { ($0.content as? DiskUsageContent)?.open === open }), let content = tab.content as? DiskUsageContent {
-            select(tab)
+        if let tab = model.allTabs.first(where: { ($0.content as? DiskUsageContent)?.open === open }), let content = tab.content as? DiskUsageContent {
+            show(tab)
             content.go(level)
         } else {
             self.open(DiskUsageContent(open, level: level), title: "Disk Usage", connection: open.id)

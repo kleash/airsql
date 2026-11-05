@@ -13,7 +13,8 @@ final class FindInFilesContent: NSViewController, TabContent, NSTableViewDataSou
         var match: TextSearch.Match
     }
 
-    private weak var main: MainWindowController?
+    /// Whichever window has the tab now: it can move, and the window it opened in can close.
+    private var main: MainWindowController? { view.window?.windowController as? MainWindowController }
     let field = NSSearchField()
     let replacement = NSTextField()
     let table = ReturnTable()
@@ -28,12 +29,6 @@ final class FindInFilesContent: NSViewController, TabContent, NSTableViewDataSou
     /// Files bigger than this are left out: a dump isn't what's being looked for.
     private nonisolated static let largestFile = 20 << 20
 
-    init(main: MainWindowController) {
-        self.main = main
-        super.init(nibName: nil, bundle: nil)
-    }
-
-    required init?(coder: NSCoder) { fatalError("not used") }
 
     override func loadView() {
         let root = SurfaceView(.content)
@@ -215,8 +210,8 @@ final class FindInFilesContent: NSViewController, TabContent, NSTableViewDataSou
 
 extension MainWindowController {
     @objc func findInFiles(_ sender: Any?) {
-        if let tab = tabs.first(where: { $0.content is FindInFilesContent }) { return select(tab) }
-        let content = FindInFilesContent(main: self)
+        if let tab = model.allTabs.first(where: { $0.content is FindInFilesContent }) { return show(tab) }
+        let content = FindInFilesContent()
         open(content, title: "Find in Tabs and Files", connection: nil)
         window?.makeFirstResponder(content.field)
     }

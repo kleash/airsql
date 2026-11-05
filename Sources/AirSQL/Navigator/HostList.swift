@@ -30,7 +30,7 @@ final class SizeBar: NSView {
     }
 }
 
-/// A list of the host page and Disk Usage: a caption with the count, a filter (a word or a regular expression), columns
+/// A list of the host page and Disk Usage: a caption with the count, a filter (`NameFilter`), columns
 /// that sort and that the header's menu shows or hides, and Copy, Copy List and Export List. A click selects, a
 /// double-click or Return does `onOpen`, a right-click opens `onMenu`'s menu on the row under the pointer.
 @MainActor
@@ -93,7 +93,7 @@ final class HostList: NSViewController, NSTableViewDataSource, NSTableViewDelega
         root.setAccessibilityIdentifier(id)
         caption.setAccessibilityIdentifier(id + ".caption")
         filter.placeholderString = "Filter"
-        filter.toolTip = "Type a word or a regular expression to show only the rows that have it"
+        filter.toolTip = "Type a word, or a regular expression between slashes, to show only the rows that have it"
         filter.setAccessibilityIdentifier(id + ".filter")
         filter.delegate = self
         filter.sendsSearchStringImmediately = true

@@ -304,10 +304,10 @@ extension AgentService {
     /// The Agent tab of `connection`, made the first time and then reused, showing `call`'s statements when given.
     func showResults(_ connection: UUID, call: UUID? = nil) {
         guard let main else { return }
-        let existing = main.tabs.first { ($0.content as? AgentResultsContent)?.connection == connection }
+        let existing = model.allTabs.first { ($0.content as? AgentResultsContent)?.connection == connection }
         let content = existing?.content as? AgentResultsContent ?? AgentResultsContent(service: self, connection: connection)
-        if let existing { main.select(existing) } else { main.open(content, title: "Agent Results", connection: connection) }
-        main.showWindow(nil)
+        if let existing { main.show(existing) } else { main.open(content, title: "Agent Results", connection: connection) }
+        if model.windows.count == 1 { main.showWindow(nil) }  // the last window may be closed: it only hid
         if let call { content.select(call: call) }
     }
 }

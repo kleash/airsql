@@ -87,7 +87,8 @@ extension ReconWindowController {
     /// The whole sync script in a console tab of the target marked "sync script" (plan §2.9), to review. It never runs
     /// on its own: Run there brings this window back with the script in the SQL preview.
     @objc func showSyncScript(_ sender: Any?) {
-        guard let result, let window, let saved = comparedConnection, let main else { return }
+        // The window it was opened from may have closed since.
+        guard let result, let window, let saved = comparedConnection, let main = main ?? (NSApp.delegate as? AppDelegate)?.main else { return }
         let destructive = results.detail.includeDestructive
         if let why = nothingToSync(result, destructive: destructive) { return showError(why, title: "Nothing to sync", on: window) }
         let script = result.script(destructive: destructive).map { $0 + ";" }.joined(separator: "\n\n")

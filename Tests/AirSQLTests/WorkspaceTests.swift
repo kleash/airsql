@@ -366,6 +366,20 @@ extension AppTests {
             #expect(first.tabs.count == 1 && second.tabs.isEmpty)
         }
 
+        /// There's one Find in Tabs and Files, whichever window asks: the same goes for the host page, Users, Disk Usage and
+        /// the process list.
+        @Test func aTabThereIsOneOfShowsInTheWindowThatHasIt() throws {
+            let model = testModel()
+            let (first, _) = appWindow(model)
+            first.findInFiles(nil)
+            let other = FixtureContent("other")
+            first.open(other, title: "Other", connection: nil)
+            let second = first.anotherWindow()
+            keptWindows.append(second)
+            second.findInFiles(nil)
+            #expect(second.tabs.isEmpty && first.tabs.count == 2 && first.selectedTab?.content is FindInFilesContent)
+        }
+
         @Test func aTabMovesWithItsContentAndTheFirstWindowFollows() throws {
             let model = testModel()
             let (first, _) = appWindow(model)
