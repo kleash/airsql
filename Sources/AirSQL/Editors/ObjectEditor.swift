@@ -28,6 +28,7 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
     let note = label("", font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, truncates: true)
     let status = NSProgressIndicator()
     let overlay = EditorOverlay()
+    private(set) lazy var form = ObjectFormView(kind: kind)
 
     init(context: EditorContext, kind: ObjectKind, database: String, name: String?, table: String?, activity: ActivityCenter) {
         self.context = context
@@ -93,11 +94,21 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         let footer = NSStackView(views: [note])
         footer.edgeInsets = NSEdgeInsets(top: Spacing.half + 1, left: Spacing.double, bottom: Spacing.half + 1, right: Spacing.double)
 
-        let root = editorLayout(bar: bar, content: codeScroll, footer: footer)
+        form.onChange = { [weak self] text in
+            guard let self else { return }
+            self.code.replace(NSRange(location: 0, length: self.code.string.utf16.count), with: text)
+        }
+        let content = NSStackView(views: [form, Hairline(), codeScroll])
+        content.orientation = .vertical
+        content.spacing = 0
+        content.alignment = .width
+        form.setContentHuggingPriority(.required, for: .vertical)
+        content.subviews[1].heightAnchor.constraint(equalToConstant: 1).isActive = true
+        let root = editorLayout(bar: bar, content: content, footer: footer)
         root.addSubview(overlay)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            overlay.topAnchor.constraint(equalTo: codeScroll.topAnchor), overlay.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            overlay.topAnchor.constraint(equalTo: content.topAnchor), overlay.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             overlay.leadingAnchor.constraint(equalTo: root.leadingAnchor), overlay.trailingAnchor.constraint(equalTo: root.trailingAnchor),
         ])
         root.setAccessibilityIdentifier("objectEditor")
@@ -166,6 +177,8 @@ final class ObjectEditorController: NSViewController, TabContent, NSMenuItemVali
         runButton.isEnabled = runReason == nil
         runButton.toolTip = runReason ?? "Open a CALL or SELECT of it in a query tab: nothing runs until you do"
         code.isEditable = !isBusy
+        form.tables = context.schema.snapshot.database(database)?.tables.filter { $0.kind == .table }.map(\.name) ?? []
+        form.show(code.string, noBackslashEscapes: code.noBackslashEscapes, enabled: !isBusy)
         var notes: [String] = []
         if let mode = definition?.sqlMode { notes.append("sql_mode: " + (mode.isEmpty ? "none" : mode)) }
         if let zone = definition?.timeZone { notes.append("time zone: " + zone) }

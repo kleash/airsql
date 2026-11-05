@@ -100,6 +100,59 @@ struct EditorsLabTests {
         return column
     }
 
+    /// What a form makes of what the server shows runs, and the server then shows the same fields.
+    @Test(arguments: servers)
+    func formsWriteCodeTheServerTakes(_ lab: Lab.Server) async throws {
+        let session = try await connected(lab)
+        defer { Task { await session.close() } }
+        let database = Self.database
+        try await run(["DROP DATABASE IF EXISTS " + SQLQuote.identifier(database), "CREATE DATABASE " + SQLQuote.identifier(database),
+                       "USE " + SQLQuote.identifier(database), "CREATE TABLE t (id INT, name VARCHAR(10))",
+                       "CREATE PROCEDURE p(IN a INT, OUT b VARCHAR(10) CHARSET utf8mb4, INOUT c DECIMAL(5,2)) READS SQL DATA COMMENT 'it''s' BEGIN SELECT a; END",
+                       "CREATE FUNCTION f(a INT) RETURNS VARCHAR(20) CHARSET utf8mb4 DETERMINISTIC NO SQL SQL SECURITY INVOKER RETURN 'x'",
+                       "CREATE TRIGGER g BEFORE INSERT ON t FOR EACH ROW SET NEW.id = 1",
+                       "CREATE EVENT e ON SCHEDULE EVERY 2 HOUR STARTS '2031-01-01 00:00:00' ENDS '2032-01-01 00:00:00' ON COMPLETION PRESERVE DISABLE "
+                       + "COMMENT 'c' DO SELECT 1",
+                       "CREATE ALGORITHM=MERGE SQL SECURITY INVOKER VIEW v AS SELECT id FROM t WITH LOCAL CHECK OPTION"], on: session)
+        func code(_ kind: ObjectKind, _ name: String) async throws -> String {
+            try await ObjectDefinition.load(kind, database: database, name: name, from: session).code
+        }
+        func replace(_ kind: ObjectKind, _ name: String, _ text: String) async throws {
+            try await run(["DROP \(kind.keyword) \(name)", ObjectCode.settingDefiner(text, to: nil)], on: session)
+        }
+        for (kind, name) in [(ObjectKind.procedure, "p"), (.function, "f")] {
+            let shown = try await code(kind, name)
+            let form = try #require(RoutineForm(shown, noBackslashEscapes: false), "\(shown)")
+            try await replace(kind, name, form.code(noBackslashEscapes: false))
+            let back = try #require(RoutineForm(try await code(kind, name), noBackslashEscapes: false))
+            #expect(back == form || (back.parameters == form.parameters && back.comment == form.comment && back.returns == form.returns
+                                     && back.dataAccess == form.dataAccess && back.security == form.security), "\(kind)")
+            #expect(kind == .function ? form.deterministic && form.security == "INVOKER" && form.dataAccess == "NO SQL"
+                    : form.parameters.map(\.mode) == ["IN", "OUT", "INOUT"] && form.comment == "it's")
+        }
+        var trigger = try #require(TriggerForm(try await code(.trigger, "g"), noBackslashEscapes: false))
+        trigger.timing = "AFTER"
+        trigger.event = "DELETE"
+        trigger = try #require(TriggerForm(trigger.code().replacingOccurrences(of: "NEW.id = 1", with: "@a = 1"), noBackslashEscapes: false))
+        try await replace(.trigger, "g", trigger.code())
+        let firing = try #require(TriggerForm(try await code(.trigger, "g"), noBackslashEscapes: false))
+        #expect(firing.timing == "AFTER" && firing.event == "DELETE" && firing.table == "t")
+
+        let scheduleCode = try await code(.event, "e")
+        var event = try #require(EventForm(scheduleCode, noBackslashEscapes: false), "\(scheduleCode)")
+        #expect(event.every == "2" && event.unit == "HOUR" && event.preserve && event.state == "DISABLE" && event.comment == "c")
+        event.unit = "DAY"
+        try await replace(.event, "e", event.code(noBackslashEscapes: false))
+        let scheduled = try #require(EventForm(try await code(.event, "e"), noBackslashEscapes: false))
+        #expect(scheduled.unit == "DAY" && scheduled.starts == event.starts && scheduled.ends == event.ends)
+
+        var view = try #require(ViewForm(try await code(.view, "v"), noBackslashEscapes: false))
+        #expect(view.algorithm == "MERGE" && view.security == "INVOKER" && view.checkOption == "LOCAL")
+        view.checkOption = "CASCADED"
+        try await replace(.view, "v", view.code())
+        #expect(ViewForm(try await code(.view, "v"), noBackslashEscapes: false)?.checkOption == "CASCADED")
+    }
+
     @Test(arguments: servers)
     func partitionsAndIndexOptionsReachTheServerAndComeBack(_ lab: Lab.Server) async throws {
         let session = try await connected(lab)

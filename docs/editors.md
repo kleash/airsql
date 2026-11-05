@@ -55,7 +55,18 @@ connection of their own, and the editor reads the table back from the server.
 ## Views, procedures, functions, triggers and events
 
 Open one from the tree, or start a new one from **Database ▸ New Object**. The editor shows its CREATE statement, as the
-server keeps it, to edit as text.
+server keeps it, to edit as text, with its head as fields above it:
+
+- **Procedures and functions**: name, return type, data access, security, deterministic, comment, and the parameters, which **+**, **−**
+  and the arrows add, remove and reorder.
+- **Triggers**: name, before or after, insert, update or delete, and the table.
+- **Events**: name, enabled or disabled, whether it stays after its last run, comment, and the schedule: every so often, with when it
+  starts and ends, or once. A bare date and time gets its quotes; anything else is an expression.
+- **Views**: name, algorithm, security and check option.
+
+The fields and the code stay in step, and ⌘Z in the code takes a field's change back. The fields rewrite only the head, so the
+body stays as you typed it, though a comment between the head's clauses goes. When the head isn't one the form can read (it is still being typed, say),
+the fields turn off until it is.
 
 - **Runs as** chooses its DEFINER: the account it was created with, or you. Keeping another account's DEFINER needs the
   SET_USER_ID privilege on MySQL, or SET USER on MariaDB.

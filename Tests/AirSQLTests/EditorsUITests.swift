@@ -399,6 +399,41 @@ extension AppTests {
             #expect(console.editor.string.hasPrefix("ALTER TABLE `airsql_fixture`.`orders`") && editor.isEdited)
         }
 
+        @Test func aFormWritesToTheCodeAndFollowsIt() async throws {
+            let model = testModel([Fixtures.local])
+            let (main, _) = appWindow(model)
+            main.openObjectEditor(.procedure, name: "add_customer", database: database, context: try await recordedEditorContext())
+            let editor = try #require(main.selectedTab?.content as? ObjectEditorController)
+            await ready { editor.isBusy }
+            let form = editor.form
+            #expect(form.name.stringValue == "add_customer" && form.parameters.numberOfRows == 1)
+            form.add(nil)
+            #expect(editor.code.string.contains("(IN `p_name` VARCHAR(100), IN `p_2` INT)") && editor.applyButton.isEnabled)
+            form.moveParameterUp(nil)
+            #expect(editor.code.string.contains("(IN `p_2` INT, IN `p_name` VARCHAR(100))"))
+            form.deterministic.state = .on
+            form.edited(form.deterministic)
+            #expect(editor.code.string.contains(")\nDETERMINISTIC\nBEGIN\n"))
+            editor.code.undoManager?.undo()
+            #expect(!editor.code.string.contains("DETERMINISTIC"), "one undo takes a field's change back")
+
+            // What is typed in the code shows in the fields; code they can't read turns them off and says so.
+            editor.code.replace(NSRange(location: 0, length: editor.code.string.utf16.count), with: "CREATE PROCEDURE `other`()\nNO SQL\nBEGIN\nEND")
+            #expect(form.name.stringValue == "other" && form.parameters.numberOfRows == 0 && form.access.titleOfSelectedItem == "NO SQL")
+            editor.code.replace(NSRange(location: 0, length: editor.code.string.utf16.count), with: "CREATE PROCEDURE `other`(IN")
+            #expect(!form.name.isEnabled && !form.hint.isHidden)
+
+            // A new event starts readable, and Once at swaps the fields.
+            main.openObjectEditor(.event, name: nil, database: database, context: try await recordedEditorContext())
+            let event = try #require(main.selectedTab?.content as? ObjectEditorController)
+            await ready { event.isBusy }
+            #expect(event.form.every.stringValue == "1" && event.form.state.titleOfSelectedItem == "Disabled" && event.form.at.isHidden)
+            event.form.schedule.selectItem(at: 1)
+            event.form.at.stringValue = "2031-01-01 00:00:00"
+            event.form.edited(event.form.schedule)
+            #expect(event.code.string.contains("ON SCHEDULE AT '2031-01-01 00:00:00'") && !event.form.at.isHidden && event.form.every.isHidden)
+        }
+
         @Test func aRoutineRunsOnlyAsTheServerHasIt() async throws {
             let model = testModel([Fixtures.local])
             let (main, _) = appWindow(model)
