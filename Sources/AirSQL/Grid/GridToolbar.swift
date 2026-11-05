@@ -33,6 +33,18 @@ final class GridToolbar: NSView {
     private var stepOut: [Int] = []
     private let label: NSView?
     private let more = NSButton()
+    /// What the host puts at the start of the bar (a table tab's page switch).
+    var leadingView: NSView? {
+        didSet {
+            guard leadingView !== oldValue else { return }
+            oldValue.map { row.removeView($0); $0.removeFromSuperview() }
+            if let leadingView {
+                row.insertView(leadingView, at: 0, in: .leading)
+                row.setCustomSpacing(Spacing.double, after: leadingView)
+            }
+            needsLayout = true
+        }
+    }
     /// Those that don't fit now.
     private(set) var overflow: [Int] = []
 
@@ -120,6 +132,7 @@ final class GridToolbar: NSView {
             return target(action) != nil && !left.contains(action)
         }
         let insets = 2 * Spacing.unit + (label?.fittingSize.width ?? 0) + Spacing.double
+            + (leadingView.map { $0.fittingSize.width + Spacing.double } ?? 0)
         var out: [Int] = [], width = insets + buttons.indices.filter(wanted).reduce(0) { $0 + room[$1] }
         for index in stepOut where width > bounds.width && wanted(index) {
             if out.isEmpty { width += Self.buttonWidth + 2 }
@@ -266,4 +279,26 @@ extension NSButton {
         NSLayoutConstraint.activate([widthAnchor.constraint(equalToConstant: GridToolbar.buttonWidth), heightAnchor.constraint(equalToConstant: 22)])
         return self
     }
+}
+
+/// A row of `views` in a grid toolbar's look: the bar's colour, a line under it. For the screens with no grid.
+@MainActor
+func actionBar(_ views: [NSView]) -> NSView {
+    let bar = SurfaceView(.bar)
+    bar.translatesAutoresizingMaskIntoConstraints = false
+    let row = NSStackView(views: views)
+    row.spacing = 2
+    row.edgeInsets = NSEdgeInsets(top: 2, left: Spacing.unit, bottom: 2, right: Spacing.unit)
+    let hairline = Hairline(.softSeparator)
+    for view in [row, hairline] {
+        view.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(view)
+    }
+    NSLayoutConstraint.activate([
+        row.leadingAnchor.constraint(equalTo: bar.leadingAnchor), row.trailingAnchor.constraint(equalTo: bar.trailingAnchor),
+        row.topAnchor.constraint(equalTo: bar.topAnchor), row.bottomAnchor.constraint(equalTo: hairline.topAnchor),
+        hairline.leadingAnchor.constraint(equalTo: bar.leadingAnchor), hairline.trailingAnchor.constraint(equalTo: bar.trailingAnchor),
+        hairline.bottomAnchor.constraint(equalTo: bar.bottomAnchor), hairline.heightAnchor.constraint(equalToConstant: 1),
+    ])
+    return bar
 }

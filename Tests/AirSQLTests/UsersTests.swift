@@ -567,7 +567,7 @@ extension AppTests {
             main.showUsers(open)
             #expect(main.tabs.count == 1, "the tab it has")
             main.close(try #require(main.tabs.first))
-            #expect(await call(harness, "menu", ["path": "Database > Users and Roles"]).error == nil, "the menu bar reaches it")
+            #expect(await call(harness, "menu", ["path": "Database > Users > Users and Roles"]).error == nil, "the menu bar reaches it")
             #expect(main.selectedTab?.shown is UsersContent)
             let database = NavigatorActions.reason(for: Commands.modifyGrants.action, objects: [], databases: ["d"], open: open, target: open, model: model)
             #expect(database == nil, "\(database ?? "")")

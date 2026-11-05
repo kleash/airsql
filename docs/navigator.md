@@ -115,14 +115,14 @@ Double-click a match to go there. **Replace in Tabs** changes the tabs only, wit
 
 **Find Text on Server…** looks for a text in every text column of every table (or of one database), and lists the
 tables that hold it with how many rows. It reads each table in full, so it can take a while on a big server: choose **Stop at 1,000** or **Stop at 100,000** to
-stop counting a table early. The status bar shows how far it is, and **Stop** or Cancel ends it. Double-click a table in the list, or press Return, to see its
+stop counting a table early. The status bar shows how far it is, and the stop button or Cancel ends it. Double-click a table in the list, or press Return, to see its
 matching rows; right-click it to open all its rows or copy its name. A column's header sorts the list.
 Upper and lower case match as the column's collation says (most ignore case). The menu beside it chooses **Contains**, **Is exactly**, **Wildcards** (`%` and `_`) or a **Regular expression**, and
 **Match case** tells capitals from small letters whatever the column's collation.
 
 ## See what the server is running
 
-**Process List** (⌥⌘P, or **Processes** under the sidebar) lists every connection to the server and the statement it is
+**Process List** (⌥⌘P, or the button under the sidebar) lists every connection to the server and the statement it is
 running, refreshed every 5 seconds (choose another interval, or Off). Click a column's title to sort by it (Time starts
 with the longest running); type in **Filter** to keep the rows with those words, and tick **Hide Sleeping** to leave out
 idle connections. The selected process's whole statement shows under the list; double-click a row (or press Return) to
@@ -137,7 +137,7 @@ read-only connection too: they change no data.
 
 ## The host page
 
-Click a connected connection, or choose **Database ▸ Server Home**, for a page on the server. Its top line says what the
+Click a connected connection, or choose **Database ▸ Server ▸ Server Home**, for a page on the server. Its top line says what the
 server is, how you reach it and how long it has been up. A click on a row selects it; right-click for its menu.
 
 - **Databases**: each with its size, how many tables, views, routines, triggers and events it has, when it last changed
@@ -170,7 +170,7 @@ space.
   database's total counts it more than once.
 
 Reading a table's size makes the server open that table, so AirSQL reads one database at a time, on a session of its own.
-The status bar shows how far it is, and **Stop** or Cancel there ends it; what was read stays. The sizes then also show in
+The status bar shows how far it is, and the stop button or Cancel there ends it; what was read stays. The sizes then also show in
 the database view and the host page.
 
 InnoDB's sizes and row counts are estimates, and you see only what your login can see, and the databases the connection

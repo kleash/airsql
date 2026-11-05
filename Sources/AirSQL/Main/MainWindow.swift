@@ -423,7 +423,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         statusBar.setAccessory(selectedTab?.tabContent?.statusAccessory)
         let canShowLog = statusBar.sqlLog.commandTarget(Commands.sqlLog.action) != nil
         statusBar.sqlLog.isEnabled = canShowLog
-        statusBar.sqlLog.attributedTitle = NSAttributedString(string: "SQL log", attributes: [
+        statusBar.sqlLog.attributedTitle = NSAttributedString(string: "SQL Log", attributes: [
             .foregroundColor: canShowLog ? NSColor.accent : NSColor.tertiaryLabelColor, .font: NSFont.systemFont(ofSize: 11.5)])
         statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tip + " (⌥⌘L)"
             : "Nothing has been sent yet: the SQL log lists every statement once you connect"

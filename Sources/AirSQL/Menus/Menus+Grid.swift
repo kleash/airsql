@@ -15,21 +15,24 @@ extension MainMenu {
         let selectAll = menus.edit.items.firstIndex { $0.action == Commands.selectAll.action } ?? menus.edit.items.count - 1
         menus.edit.insertItem(Commands.extendSelection.item(), at: selectAll + 1)
         menus.edit.insertItem(Commands.shrinkSelection.item(), at: selectAll + 2)
+        func items(_ commands: [Command]) -> [NSMenuItem] { commands.map { $0.item() } }
         menus.data.add([Commands.addRow, Commands.duplicateRow, Commands.duplicateRowWithoutKeys, Commands.pasteAsNewRows,
-                        Commands.pasteWithFormat, Commands.deleteRows, nil,
-                        Commands.setNull, Commands.setDefault, Commands.setExpression])
-        menus.data.addItem(submenu("Insert Value", [], delegate: InsertValueMenu.shared))
-        menus.data.add([Commands.chooseReferencedRow, Commands.useAsLabel, Commands.addVirtualKey, Commands.removeVirtualKey])
+                        Commands.pasteWithFormat, Commands.deleteRows, Commands.moveRowsUp, Commands.moveRowsDown, nil])
+        menus.data.addItem(submenu("Set Value", items([Commands.setNull, Commands.setDefault, Commands.setExpression])
+                                   + [submenu("Insert Value", [], delegate: InsertValueMenu.shared)]))
+        menus.data.addItem(submenu("Foreign Keys", items([Commands.chooseReferencedRow, Commands.relatedRows, Commands.useAsLabel,
+                                                          Commands.addVirtualKey, Commands.removeVirtualKey])))
         menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
         menus.data.addItem(submenu("Quick Filter", QuickFilter.commands.map { $0.item() } + [.separator(), Commands.filterPrompt.item()]))
-        menus.data.add([Commands.filterByValues, Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending,
-                        Commands.addToSort, Commands.sortColumns, Commands.orderBy, Commands.clearSort, nil,
-                        Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn, Commands.hideOtherColumns, Commands.freeze,
-                        Commands.openURL, Commands.compareCells])
-        menus.data.addItem(GridViewer.displayMenu())
-        menus.data.add([nil, Commands.loadFullCell, Commands.loadMore, Commands.loadAll, Commands.countRows, nil, Commands.firstPage,
-                        Commands.previousPage, Commands.nextPage, Commands.lastPage])
-        menus.data.addItem(submenu("Rows per Page", TableDataController.pageSizeItems()))
+        menus.data.add([Commands.filterByValues, Commands.clearFilter])
+        menus.data.addItem(submenu("Sort", items([Commands.sortAscending, Commands.sortDescending, Commands.addToSort, Commands.sortColumns,
+                                                  Commands.orderBy, Commands.clearSort])))
+        menus.data.add([nil, Commands.goToRow, Commands.columnSummary])
+        menus.data.addItem(submenu("Columns", items([Commands.hideColumn, Commands.hideOtherColumns, Commands.freeze]) + [GridViewer.displayMenu()]))
+        menus.data.add([Commands.openURL, Commands.compareCells, nil, Commands.loadFullCell])
+        menus.data.addItem(submenu("Pages", items([Commands.loadMore, Commands.loadAll, Commands.countRows]) + [.separator()]
+                                   + items([Commands.firstPage, Commands.previousPage, Commands.nextPage, Commands.lastPage])
+                                   + [submenu("Rows per Page", TableDataController.pageSizeItems())]))
         menus.data.add([nil, Commands.copyTableQuery, Commands.openTableQuery, Commands.exportRows])
         let refresh = menus.view.items.firstIndex { $0.action == Commands.refresh.action } ?? menus.view.items.count - 1
         menus.view.insertItem(submenu("Refresh Every", TableDataController.autoRefreshItems()), at: refresh + 1)
@@ -50,7 +53,7 @@ extension MainMenu {
     }
 }
 
-/// Data ▸ Insert Value: the items for the focused cell's column of the table tab in front, made as the menu opens.
+/// Data ▸ Set Value ▸ Insert Value: the items for the focused cell's column of the table tab in front, made as the menu opens.
 @MainActor
 final class InsertValueMenu: NSObject, NSMenuDelegate {
     static let shared = InsertValueMenu()

@@ -55,7 +55,7 @@ func firstRunView() -> NSView {
     let intro = label("AirSQL works with MySQL and MariaDB servers on this Mac, on your network, or through SSH, jump hosts "
                       + "and proxies. Passwords stay in your Keychain.", font: .systemFont(ofSize: 13), color: .secondaryLabelColor,
                       wraps: true)
-    let add = button("Add Connection…", id: "firstRun.addConnection", tip: Commands.newConnection.tip + " (⌘N)",
+    let add = button("New Connection…", id: "firstRun.addConnection", tip: Commands.newConnection.tip + " (⌘N)",
                      target: nil, action: Commands.newConnection.action, primary: true)
     add.keyEquivalent = "\r"
     let importing = button("Import Connections…", id: "firstRun.import", tip: Commands.importConnections.tip, target: nil,
@@ -84,13 +84,13 @@ func firstRunView() -> NSView {
     tips.spacing = Spacing.unit
     let top = NSStackView(views: [symbol, title])
     top.spacing = 12
-    let stack = NSStackView(views: [top, intro, actions, Hairline(.softSeparator), agentsTitle, agentsText, agents,
-                                    Hairline(.softSeparator), tips, guide])
+    let stack = NSStackView(views: [top, intro, actions, Hairline(.softSeparator), tips, guide, Hairline(.softSeparator),
+                                    agentsTitle, agentsText, agents])
     stack.orientation = .vertical
     stack.alignment = .leading
     stack.spacing = 12
     stack.setCustomSpacing(Spacing.double, after: actions)
-    stack.setCustomSpacing(Spacing.double, after: agents)
+    stack.setCustomSpacing(Spacing.double, after: guide)
     for line in stack.arrangedSubviews where line is Hairline {
         line.heightAnchor.constraint(equalToConstant: 1).isActive = true
         line.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true

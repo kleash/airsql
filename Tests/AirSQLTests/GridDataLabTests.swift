@@ -535,7 +535,7 @@ extension AppTests {
             #expect(await ids() == ["1"] && tab.bar.filterText == "(`name` LIKE 'Ann%') AND `price` < 4.00", "\(lab)")
             tab.clearFilter(nil)
             _ = await ids()
-            #expect(await call(harness, "menu", ["path": "Data > Sort by Columns…"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Data > Sort > Sort by Columns…"]).error == nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             _ = await call(harness, "set", ["id": "sort.column.0", "value": "price"])
             _ = await call(harness, "set", ["id": "sort.direction.0", "value": "Descending"])

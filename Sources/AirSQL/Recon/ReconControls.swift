@@ -96,7 +96,7 @@ final class ReconSidePicker: NSObject, NSComboBoxDelegate {
 
     private func reload() {
         popup.removeAllItems()
-        popup.addItem(withTitle: "Choose a Connection")
+        popup.addItem(withTitle: "Connection")
         popup.lastItem?.isEnabled = false
         for saved in connections {
             popup.addItem(withTitle: saved.displayName)

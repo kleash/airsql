@@ -30,7 +30,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
     let summary = label("", font: .systemFont(ofSize: NSFont.smallSystemFontSize), color: .secondaryLabelColor, truncates: true)
     let overlay = EditorOverlay()
     let find = NSSearchField()
-    let fitButton = button("Fit", id: "erDiagram.fit", tip: "Zoom so that the whole diagram shows", target: nil, action: nil)
+    let fitButton = button("Fit", id: "erDiagram.fit", tip: "Zoom so that the whole diagram shows", target: nil, action: nil).onBar("arrow.up.left.and.arrow.down.right")
     let scroll = NSScrollView()
 
     /// `tables`: start a new diagram of these, with their neighbours if `neighbours`.
@@ -60,36 +60,25 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         databases.action = #selector(databaseChosen(_:))
         diagrams.target = self
         diagrams.action = #selector(diagramChosen(_:))
-        fill(arrange, "Arrange", id: "erDiagram.arrange", tip: "Lay the boxes out again: where you moved them is forgotten", Commands.diagramArrange)
-        fill(show, "Show", id: "erDiagram.show", tip: "Choose what each box shows",
+        fill(arrange, "Arrange", symbol: "rectangle.3.group", id: "erDiagram.arrange", tip: "Lay the boxes out again: where you moved them is forgotten", Commands.diagramArrange)
+        fill(show, "Show", symbol: "eye", id: "erDiagram.show", tip: "Choose what each box shows",
              Commands.diagramDetail + [nil, Commands.diagramComments, Commands.diagramVirtualKeys])
-        fill(export, "Export", id: "erDiagram.export", tip: "Save or print the diagram", Commands.diagramExports + [nil, Commands.printDiagram])
-        fill(addTable, "Add Table", id: "erDiagram.add", tip: "Add a table to this diagram; you can also drag tables here from the tree", [])
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        fill(export, "Export", symbol: "square.and.arrow.up", id: "erDiagram.export", tip: "Save or print the diagram", Commands.diagramExports + [nil, Commands.printDiagram])
+        fill(addTable, "Add Table", symbol: "plus", id: "erDiagram.add", tip: "Add a table to this diagram; you can also drag tables here from the tree", [])
         find.placeholderString = "Find a table"
         find.toolTip = "Type part of a table's name to select it and show it; Return goes to the next"
         find.setAccessibilityIdentifier("erDiagram.find")
         find.sendsSearchStringImmediately = true
         find.target = self
         find.action = #selector(findTable(_:))
-        find.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        find.controlSize = .small
+        find.widthAnchor.constraint(equalToConstant: 140).isActive = true
         fitButton.target = self
         fitButton.action = #selector(fitAll(_:))
-        let second = NSView()
-        second.setContentHuggingPriority(.init(1), for: .horizontal)
-        let tools = NSStackView(views: [find, fitButton, addTable, arrange, show, summary, second])
-        tools.spacing = Spacing.unit
-        tools.edgeInsets = NSEdgeInsets(top: 0, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
-        let top = NSStackView(views: [label("Database:"), databases, label("Diagram:"), diagrams, spacer, export, helpButton(.editors)])
-        top.spacing = Spacing.unit
-        top.alignment = .centerY
-        top.setCustomSpacing(Spacing.double, after: databases)
-        top.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
-        let bar = NSStackView(views: [top, tools])
-        bar.orientation = .vertical
-        bar.spacing = 0
-        bar.alignment = .width
+        for picker in [databases, diagrams] { picker.controlSize = .small }
+        summary.setContentHuggingPriority(.init(1), for: .horizontal)
+        summary.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let bar = actionBar([databases, diagrams, fitButton, addTable, arrange, show, export, summary, find, helpButton(.editors)])
         scroll.documentView = canvas
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
@@ -525,9 +514,17 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
     }
 
     /// A pull-down of commands, each sent to this tab. Its first item is its title.
-    private func fill(_ control: NSPopUpButton, _ title: String, id: String, tip: String, _ commands: [Command?]) {
+    private func fill(_ control: NSPopUpButton, _ title: String, symbol: String, id: String, tip: String, _ commands: [Command?]) {
         control.addItem(withTitle: title)
         control.toolTip = tip
+        // A pull-down's look on a bar: its symbol with the menu's arrow, no border.
+        control.isBordered = false
+        control.controlSize = .small
+        control.menu?.items.first?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
+        (control.cell as? NSPopUpButtonCell)?.imagePosition = .imageOnly
+        control.setAccessibilityLabel(title)
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.widthAnchor.constraint(equalToConstant: 38).isActive = true
         control.setAccessibilityIdentifier(id)
         for command in commands {
             let item = command?.item() ?? .separator()

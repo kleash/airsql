@@ -7,7 +7,7 @@ nav_order: 3
 
 ## Add your first connection
 
-Choose **File ▸ New Connection…** (⌘N), or **Add Connection…** on the first screen: the connection appears in the
+Choose **File ▸ New Connection…** (⌘N), or **New Connection…** on the first screen: the connection appears in the
 sidebar, and its summary shows where it goes and how it logs in.
 
 Passwords stay in your Keychain. A connection coloured **Production** starts with stricter safety checks

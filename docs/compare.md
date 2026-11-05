@@ -153,7 +153,7 @@ values: after running the script, compare again to copy their values. After a sy
 
 ## Compare two results, or a result with a table
 
-In a [console](console.md), **Compare With…** (a result tab's right-click menu, or **Query ▸ Compare With…**) compares
+In a [console](console.md), **Compare With…** (a result tab's right-click menu, or **Query ▸ Result ▸ Compare Result With…**) compares
 the result shown with another one, row by row:
 
 - **Compare with** offers the other result tabs of the window, this tab's nearest first (a result from another

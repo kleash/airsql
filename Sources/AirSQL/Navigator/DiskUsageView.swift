@@ -20,27 +20,27 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
                                + "databases this connection lists.", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     let summary = label("", font: .systemFont(ofSize: 11.5), truncates: true)
     private let spinner = NSProgressIndicator()
-    private(set) lazy var back = button("Back", id: "disk.back", tip: Commands.diskUsageUp.tip, target: self, action: #selector(goUp(_:)))
+    private(set) lazy var back = button("Back", id: "disk.back", tip: Commands.diskUsageUp.tip, target: self, action: #selector(goUp(_:))).onBar("chevron.left")
     private(set) lazy var refreshButton = button("Refresh", id: "disk.refresh", tip: Commands.refresh.tip + " (⌘R)", target: self,
-                                                 action: #selector(refresh(_:)))
-    private(set) lazy var stopButton = button("Stop", id: "disk.stop", tip: "Stop reading sizes; what was read stays", target: self,
-                                              action: #selector(stop(_:)))
+                                                 action: #selector(refresh(_:))).onBar("arrow.clockwise")
+    private(set) lazy var stopButton = button("Cancel", id: "disk.stop", tip: "Stop reading sizes; what was read stays", target: self,
+                                              action: #selector(stop(_:))).onBar("stop.fill")
     private(set) lazy var compareButton = button("Compare Selected", id: "disk.compare", tip: Commands.diskUsageCompare.tip, target: self,
-                                                 action: #selector(compareSelected(_:)))
-    private(set) lazy var optimizeButton = button("Optimize…", id: "disk.optimize", tip: "", target: self, action: #selector(optimize(_:)))
+                                                 action: #selector(compareSelected(_:))).onBar("arrow.left.arrow.right")
+    private(set) lazy var optimizeButton = button("Optimize…", id: "disk.optimize", tip: "", target: self, action: #selector(optimize(_:))).onBar("wand.and.stars")
     private(set) lazy var list = HostList(
         name: "Disk Usage",
         columns: [
-            .init(id: "name", title: "Name", width: 180, tip: "The database, table, index or partition"),
-            .init(id: "bar", title: "Space", width: 160, tip: "Data, indexes and free space, against the largest row", bar: true),
+            .init(id: "name", title: "Name", width: 160, tip: "The database, table, index or partition"),
+            .init(id: "bar", title: "Space", width: 120, tip: "Data, indexes and free space, against the largest row", bar: true),
             .init(id: "total", title: "Size", width: 72, numeric: true, tip: "Data plus indexes"),
             .init(id: "share", title: "Share", width: 56, numeric: true, tip: "Its part of the size of all the rows listed"),
             .init(id: "data", title: "Data", width: 72, numeric: true, tip: "Space its rows take"),
             .init(id: "index", title: "Indexes", width: 72, numeric: true, tip: "Space its indexes take"),
             .init(id: "free", title: "Free", width: 72, numeric: true,
                   tip: "Space kept but unused; Optimize can give it back (a shared tablespace shows it on every table)"),
-            .init(id: "rows", title: "Rows", width: 80, numeric: true, tip: "About how many rows (InnoDB estimates it)"),
-            .init(id: "detail", title: "Kind", width: 120, tip: "How many tables, the engine, or what it is"),
+            .init(id: "rows", title: "Rows", width: 70, numeric: true, tip: "About how many rows (InnoDB estimates it)"),
+            .init(id: "detail", title: "Kind", width: 100, tip: "How many tables, the engine, or what it is"),
         ],
         sort: NSSortDescriptor(key: "total", ascending: false),
         accessories: [back, compareButton, optimizeButton, refreshButton, stopButton])
@@ -68,7 +68,8 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
         let top = NSStackView(views: [heading, spinner, NSView(), help])
         top.spacing = Spacing.unit
         heading.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let texts = NSStackView(views: [top, notice, summary])
+        let figures = NSStackView(views: [summary, NSView(), sizeLegend()])
+        let texts = NSStackView(views: [top, notice, figures])
         texts.orientation = .vertical
         texts.alignment = .leading
         texts.spacing = Spacing.half
@@ -81,6 +82,7 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
         [texts, list.view].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             top.widthAnchor.constraint(equalTo: texts.widthAnchor),
+            figures.widthAnchor.constraint(equalTo: texts.widthAnchor),
             texts.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double),
             texts.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
             texts.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.double),
@@ -184,6 +186,7 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
         let reading = open.sizesProgress
         if reading != nil { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
         stopButton.isEnabled = reading != nil
+        stopButton.isHidden = reading == nil
         stopButton.toolTip = reading != nil ? "Stop reading sizes; what was read stays" : "Nothing is being read"
         back.isHidden = level == .server
         compareButton.title = compared == nil ? "Compare Selected" : "Show All"

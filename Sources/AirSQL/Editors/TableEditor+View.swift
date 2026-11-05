@@ -27,7 +27,10 @@ extension TableEditorController {
         discardButton.target = self
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let bar = NSStackView(views: [sections, spacer, status, discardButton, applyButton, helpButton(.editors)])
+        let help = helpButton(.editors)
+        // On a table tab they stand beside the Data, Structure, DDL switch, where the sections leave them room.
+        if inTab { barActions = [status, discardButton, applyButton, help] }
+        let bar = NSStackView(views: [sections, spacer] + (inTab ? [] : [status, discardButton, applyButton, help]))
         bar.spacing = Spacing.unit
         bar.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
 
@@ -149,7 +152,7 @@ extension TableEditorController {
     func updateSectionTitles() {
         let counts = [design.columns.count, design.indexes.count, design.foreignKeys.count, incoming.count,
                       design.checks.count + columnCheckRows.count, partitionList.count]
-        let names = ["Columns", "Indexes", "Foreign keys", "Used by", "Checks", "Partitions", "Options"]
+        let names = ["Columns", "Indexes", "Foreign Keys", "Used By", "Checks", "Partitions", "Options"]
         for (index, name) in names.enumerated() {
             let count = index < counts.count && counts[index] > 0 ? " · \(counts[index])" : ""
             sections.setLabel(name + count, forSegment: index)

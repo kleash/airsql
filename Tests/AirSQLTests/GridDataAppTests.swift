@@ -410,7 +410,7 @@ extension AppTests {
             await ready { tab.loading != nil }
 
             // Two columns, the second one descending.
-            #expect(await call(harness, "menu", ["path": "Data > Sort by Columns…"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Data > Sort > Sort by Columns…"]).error == nil)
             _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
             #expect(await call(harness, "set", ["id": "sort.column.0", "value": "region"]).error == nil)
             #expect(await call(harness, "press", ["id": "sort.add"]).error == nil)
@@ -424,11 +424,11 @@ extension AppTests {
 
             // Add to Sort keeps those and goes after them; a column already in the sort can't be added again.
             tab.grid.selection.select(GridPosition(row: 1, column: 1))
-            #expect(await call(harness, "menu", ["path": "Data > Add to Sort"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Data > Sort > Add to Sort"]).error == nil)
             await ready { tab.loading != nil }
             #expect(tab.grid.sortOrder.map(\.column) == [0, 2, 1])
             #expect(session.statements.last?.contains("ORDER BY `id` DESC, `region` ASC, `") == true, "\(session.statements.last ?? "")")
-            #expect(await call(harness, "menu", ["path": "Data > Add to Sort"]).error != nil)
+            #expect(await call(harness, "menu", ["path": "Data > Sort > Add to Sort"]).error != nil)
         }
 
         @Test func findAndReplaceInTheLoadedRows() async throws {
@@ -723,7 +723,7 @@ extension AppTests {
             #expect(await consoleTookTheFocus(main))
             window.makeFirstResponder(viewer.grid)
             // The bar shows only while a filter or a search is on; the results bar's ? opens the Data Grid page.
-            #expect(result.filterBar.isHidden && result.filterBar.scope.text == "Local · every row")
+            #expect(result.filterBar.isHidden && result.filterBar.scope.text == "Local · all rows")
             let console = try #require(main.selectedTab?.content as? ConsoleViewController)
             #expect(!console.results.help.isHidden && console.results.help.identifier?.rawValue == "help:" + HelpPage.dataGrid.rawValue)
             viewer.grid.selection.select(GridPosition(row: 1, column: 3))

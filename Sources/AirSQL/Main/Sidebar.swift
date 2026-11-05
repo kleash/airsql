@@ -167,7 +167,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         add.toolTip = Commands.newConnection.tip + " (⌘N)"
         add.setAccessibilityIdentifier("sidebar.newConnection")
         add.translatesAutoresizingMaskIntoConstraints = false
-        let processes = NSButton(title: "Processes", target: nil, action: Commands.processList.action)
+        let processes = NSButton(title: "Process List", target: nil, action: Commands.processList.action)
         processes.isBordered = false
         processes.font = .systemFont(ofSize: 11.5)
         processes.contentTintColor = .secondaryLabelColor

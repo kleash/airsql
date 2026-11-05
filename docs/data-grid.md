@@ -14,10 +14,11 @@ a column's summary. Loading, filtering, editing, copying and exporting a table's
 
 A table tab and a console result each have a row of buttons over the rows: the actions that are also in the menu bar, kept
 beside the work. The buttons act on the grid under them, wherever the focus is. Hold the pointer over one to see what it
-does, or why it's dimmed. A table's has Refresh, Refresh Every, Add Row, Duplicate Row, Delete Rows, Revert, Preview SQL
-and Apply; every grid has Find, the Column List, Sort by Columns, the Value Panel, Record View, Transpose, View As and
+does, or why it's dimmed. A table's has the Data, Structure, DDL switch, Refresh, Refresh Every, Add Row, Duplicate Row, Delete Rows and Apply; Revert
+and Preview SQL are on the bar that shows with pending changes. Every grid has Find, the Column List, Sort by Columns, the Value Panel, Record View, Transpose, View As and
 Chart. A console result adds Pin, Compare With and Export, and shows its editing buttons only when it can be edited. When
-the tab is narrow, the buttons at the end step out; the menu bar still has them.
+the tab is narrow, what doesn't fit moves to the **»** menu at the end of the row, the same at that width however you got there;
+Add Row, Delete Rows, Apply, Find and Sort stay longest.
 
 ## The header
 
@@ -50,8 +51,8 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **Edit ▸ Extend Selection** (⌥↑) grows the selection from the focused cell to its column, then its row, then
   everything; **Shrink Selection** (⌥↓) goes back the same way.
 - Hold ⇧ to scroll a mouse wheel across, and ⌥ to scroll five times as far.
-- **Data ▸ Hide Column** hides the selected columns. A column comes back where it was.
-- **Data ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
+- **Data ▸ Columns ▸ Hide Column** hides the selected columns. A column comes back where it was.
+- **Data ▸ Columns ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
 - Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
@@ -75,7 +76,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 
 ## Show a column another way
 
-**Data ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
+**Data ▸ Columns ▸ Display As** (also on a cell's right-click menu) changes how the selected columns look, not what they hold:
 copying and editing use the stored value.
 
 - Numbers: **Number with Grouping**; **Decimal Places ▸** rounds them (half up) to none, 1, 2, 3 or 4 decimal places,
@@ -97,7 +98,7 @@ you set in **Settings ▸ Grid ▸ Date format**, such as `dd/MM/yyyy HH:mm`.
 
 ## Other commands on cells and columns
 
-- **Data ▸ Hide Other Columns** keeps only the selected columns on show; **View ▸ Reset View** puts the columns, the sort
+- **Data ▸ Columns ▸ Hide Other Columns** keeps only the selected columns on show; **View ▸ Reset View** puts the columns, the sort
   and the filter back as they come.
 - **Data ▸ Open URL** opens a cell holding a web address in your browser.
 - **Data ▸ Compare Cells** opens a tab showing how two selected cells differ, line by line.

@@ -1,7 +1,7 @@
 import AirSQLCore
 import AppKit
 
-/// File ▸ Import from ~/.ssh/config…: the person picks the file (AirSQL reads nothing in ~/.ssh by itself), ticks its
+/// File ▸ Import from SSH Config…: the person picks the file (AirSQL reads nothing in ~/.ssh by itself), ticks its
 /// hosts, and gets a connection that tunnels through each.
 extension MainWindowController {
     @objc func importSSHConfig(_ sender: Any?) {

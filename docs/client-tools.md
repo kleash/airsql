@@ -137,7 +137,7 @@ and 0, and nested values go in as their JSON.
 
 ### Copy a result into a table
 
-Right-click a result ▸ **Copy Result to Table…** (or **Query ▸ Copy Result to Table…**) opens the same window with the
+Right-click a result ▸ **Copy Result to Table…** (or **Query ▸ Result ▸ Copy Result to Table…**) opens the same window with the
 selected rows, or all of them, into a table of this connection or a new one. NULLs, empty text and bytes stay apart.
 
 AirSQL sends the rows as `INSERT`s: `LOAD DATA LOCAL INFILE` stays off.

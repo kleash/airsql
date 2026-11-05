@@ -6,21 +6,18 @@ extension MainMenu {
     /// once. Until the navigator handles them for the object it is on, the main window does, for the active connection.
     static func addEditorItems(_ menus: Menus) {
         let database = menus.database
-        func listed(_ command: Command) -> Bool { database.items.contains { $0.action == command.action && $0.tag == command.tag } }
-        if !listed(Commands.createTable) { database.add([Commands.createTable]) }
-        let newObject = submenu("New Object", [Commands.newView, Commands.newProcedure, Commands.newFunction, Commands.newTrigger,
-                                               Commands.newEvent].map { $0.item() })
-        let after = database.items.lastIndex { $0.action == Commands.createTable.action || $0.action == Commands.createObject.action }
-        database.insertItem(newObject, at: after.map { $0 + 1 } ?? database.numberOfItems)
-        if !listed(Commands.erDiagram) { database.add([Commands.erDiagram]) }
-        let at = database.items.firstIndex { $0.action == Commands.erDiagram.action }.map { $0 + 1 } ?? database.numberOfItems
-        let diagram = submenu("Diagram", ([Commands.diagramOfSelection, Commands.diagramOfNeighbours, nil, Commands.diagramNew, Commands.diagramRename,
-                                           Commands.diagramDelete, nil, Commands.diagramNeighbours, Commands.diagramRemove, nil]
+        let newObject = submenu("New Object", ([Commands.createObject, nil, Commands.newView, Commands.newProcedure, Commands.newFunction,
+                                                Commands.newTrigger, Commands.newEvent] as [Command?]).map { $0?.item() ?? .separator() })
+        let after = database.items.firstIndex { $0.action == Commands.createTable.action }.map { $0 + 1 } ?? database.numberOfItems
+        database.insertItem(newObject, at: after)
+        let diagram = submenu("Diagram", ([Commands.erDiagram, Commands.diagramOfSelection, Commands.diagramOfNeighbours, nil, Commands.diagramNew,
+                                           Commands.diagramRename, Commands.diagramDelete, nil, Commands.diagramNeighbours, Commands.diagramRemove, nil]
                                           + Commands.diagramArrange + [nil] + Commands.diagramDetail
                                           + [Commands.diagramComments, Commands.diagramVirtualKeys, nil]
                                           + Commands.diagramExports + [Commands.printDiagram])
             .map { $0?.item() ?? .separator() })
-        database.insertItem(diagram, at: at)
-        database.add([nil, Commands.indexFromColumns, Commands.uniqueFromColumns])
+        // With the other views of the database, before the server's.
+        let server = database.items.firstIndex { $0.title == "Server" } ?? database.numberOfItems
+        database.insertItem(diagram, at: server - 1)
     }
 }

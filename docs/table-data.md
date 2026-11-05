@@ -20,7 +20,7 @@ there, and closing the tab asks about them.
   key order, so pages follow one another. A table with an AUTO_INCREMENT key opens newest first, until you sort it
   (**Settings ▸ Grid ▸ Open tables newest first**).
 - The status bar says how many rows are loaded and of how many: `1,000 of about 52,000 rows`. The total is the server's
-  estimate until you click **Count Exactly** (**Data ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
+  estimate until you click **Count Exactly** (**Data ▸ Pages ▸ Count Rows Exactly**), which runs `COUNT(*)` with the filter.
   An estimate below what has already loaded is left out (InnoDB's can say 0 of a million rows), and with no figure to go
   by, Load All and an unindexed sort ask first. After the count comes the time the rows were read: `· read 14:32`.
 - **Load More** (⌥⌘↓) loads the next page; **Load All** (⌥⇧⌘↓) loads every row that's left, in batches as they arrive.
@@ -45,10 +45,10 @@ there, and closing the tab asks about them.
 - **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds or a number you type (**Custom…**),
   until you choose **Off**. Pending changes stay.
 
-**Data ▸ Order By…** takes any ORDER BY, expressions included; a click on a header's sort control replaces it. On a
+**Data ▸ Sort ▸ Order By…** takes any ORDER BY, expressions included; a click on a header's sort control replaces it. On a
 read-only connection it's checked like a typed filter.
 
-**Data ▸ Copy Query** copies the SELECT the tab runs, with its filter and sort, and **Open Query in Console** opens it in
+**Data ▸ Copy Table's Query** copies the SELECT the tab runs, with its filter and sort, and **Open Table's Query in a Tab** opens it in
 a new query tab.
 
 ## Filter, search and sort
@@ -88,7 +88,7 @@ not) or **Local** (only the rows loaded so far, at once, with no query).
   **Column Summary…**, a click on one of a column's most frequent values adds it to the filter.
 - **Sort**: double-click a header, or click the arrow at its right, to sort by that column, ascending, then descending,
   then not at all. To sort by several columns, ⇧-click the next column's arrow (⌥ works too, and ⌥-double-click on a
-  header), or right-click its header for **Add to Sort**; each arrow shows its place in the order. **Data ▸ Sort by
+  header), or right-click its header for **Add to Sort**; each arrow shows its place in the order. **Data ▸ Sort ▸ Sort by
   Columns…** (or a header's menu) sets several at once: a line per
   column, each **Ascending** or **Descending**; the arrows move a column up or down the order, **Add Column** adds one
   and the minus takes it away. Rows sort on the server, and rows the sort leaves equal go in key order, so pages never
@@ -125,12 +125,12 @@ Nothing is written until you apply. Leaving a row writes nothing.
   - A foreign key shows the rows of the table it refers to, each as "label (key)", the label being that table's
     first text column, or the one you chose with **Use as Label** (below). They are searched on the server as you
     type, by label or by key, 100 at a time, so a big table is never listed whole. Return or a double click puts the
-    key in the cell. **Data ▸ Choose Referenced Row…** opens the same list.
+    key in the cell. **Data ▸ Foreign Keys ▸ Choose Referenced Row…** opens the same list.
 - **The value panel** (⇧↩) edits the selected cell too: ⌘↩ or clicking elsewhere keeps the text as a pending edit,
   Esc puts the cell's value back. A value the column refuses stays there, and the panel says why. Its **⋯** menu has
   **Format JSON** and **Compact JSON**, **Load from File…** (a file's bytes in a binary column, else its UTF-8 text)
   and **Save to File…**.
-- **Data ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
+- **Data ▸ Set Value ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
   `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
   or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
 - **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
@@ -150,7 +150,7 @@ Nothing is written until you apply. Leaving a row writes nothing.
   what separates the cells (lines of commas or semicolons without tabs may be CSV), the decimal mark (numbers such as
   `1,234`), and the order of day, month and year (dates such as `03/04/2026`). **Data ▸ Paste with Format…** always
   asks.
-- **Data ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
+- **Data ▸ Foreign Keys ▸ Related Rows** (⌃⌘↓) lists the row a foreign key cell points to and the rows of other tables that point to
   the selected row; choosing one opens that table filtered to them.
 
 ### Foreign key labels and virtual foreign keys

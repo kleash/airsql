@@ -30,6 +30,20 @@ final class SizeBar: NSView {
     }
 }
 
+/// The colours of a size bar, in words, for beside the bars.
+@MainActor
+func sizeLegend() -> NSTextField {
+    let legend = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor)
+    let text = NSMutableAttributedString()
+    for (name, colour) in [("Data", NSColor.controlAccentColor), ("Indexes", .systemTeal), ("Free", .tertiaryLabelColor)] {
+        text.append(NSAttributedString(string: "■ ", attributes: [.foregroundColor: colour, .font: legend.font as Any]))
+        text.append(NSAttributedString(string: name + "   ", attributes: [.foregroundColor: NSColor.secondaryLabelColor, .font: legend.font as Any]))
+    }
+    legend.attributedStringValue = text
+    legend.toolTip = "What each colour of a bar stands for"
+    return legend
+}
+
 /// A list of the host page and Disk Usage: a caption with the count, a filter (a word or a regular expression), columns
 /// that sort and that the header's menu shows or hides, and Copy, Copy List and Export List. A click selects, a
 /// double-click or Return does `onOpen`, a right-click opens `onMenu`'s menu on the row under the pointer.
@@ -92,23 +106,23 @@ final class HostList: NSViewController, NSTableViewDataSource, NSTableViewDelega
         let root = SurfaceView(.content)
         root.setAccessibilityIdentifier(id)
         caption.setAccessibilityIdentifier(id + ".caption")
-        filter.placeholderString = "Filter"
+        filter.placeholderString = "Filter rows"
+        filter.controlSize = .small
         filter.toolTip = "Type a word or a regular expression to show only the rows that have it"
         filter.setAccessibilityIdentifier(id + ".filter")
         filter.delegate = self
         filter.sendsSearchStringImmediately = true
-        filter.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        filter.widthAnchor.constraint(equalToConstant: 180).isActive = true
         caption.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let bar = NSStackView(views: [caption, NSView()] + accessories + [filter])
-        bar.spacing = Spacing.unit
-        bar.translatesAutoresizingMaskIntoConstraints = false
+        caption.setContentHuggingPriority(.init(1), for: .horizontal)
+        let bar = actionBar(accessories + [caption, filter])
         for column in columns {
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.id))
             tableColumn.title = column.title
             tableColumn.width = column.width
             tableColumn.minWidth = 40
             tableColumn.isHidden = column.hidden
-            tableColumn.headerToolTip = column.tip + "; click to sort by it, again to reverse"
+            tableColumn.headerToolTip = "Sort by this column, click again to reverse: " + column.tip
             tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.id, ascending: !column.numeric && !column.bar)
             if column.numeric { tableColumn.headerCell.alignment = .right }
             table.addTableColumn(tableColumn)
@@ -122,6 +136,7 @@ final class HostList: NSViewController, NSTableViewDataSource, NSTableViewDelega
         table.allowsMultipleSelection = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.centreText(rowHeight: 22)
+        table.themeHeader()
         table.dataSource = self
         table.delegate = self
         table.target = self
@@ -138,9 +153,9 @@ final class HostList: NSViewController, NSTableViewDataSource, NSTableViewDelega
         [bar, scroll].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             bar.topAnchor.constraint(equalTo: root.topAnchor),
-            bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
-            bar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.double),
-            scroll.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: Spacing.unit),
+            bar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            bar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: bar.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),

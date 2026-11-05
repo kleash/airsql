@@ -144,6 +144,8 @@ final class TableDataController: NSViewController, TabContent {
     /// The switch at the top (`TableDataController+Pages`), what it shows, and the pages other than Data, kept so a
     /// structure's edits outlast a look at the rows.
     let pageSwitch = NSSegmentedControl()
+    let pageBar = NSView()
+    var pageBarHeight: NSLayoutConstraint!
     let dataPage = NSView()
     let pageHolder = NSView()
     var page = TablePage.data

@@ -23,15 +23,16 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
     let properties = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
     private let holder = NSView()
+    private let legend = sizeLegend()
     let tabs = NSSegmentedControl()
     private lazy var readSizes = button("Read Sizes", id: "host.readSizes", tip: "Read the sizes of the selected databases, or of all of them",
-                                        target: self, action: #selector(refresh(_:)))
-    private(set) lazy var stopSizes = button("Stop", id: "host.stopSizes", tip: "Stop reading sizes; what was read stays", target: self,
-                                             action: #selector(stopReading(_:)))
+                                        target: self, action: #selector(refresh(_:))).onBar("arrow.clockwise")
+    private(set) lazy var stopSizes = button("Cancel", id: "host.stopSizes", tip: "Stop reading sizes; what was read stays", target: self,
+                                             action: #selector(stopReading(_:))).onBar("stop.fill")
     private lazy var diskUsage = button("Disk Usage", id: "host.diskUsage", tip: Commands.diskUsage.tip, target: nil,
-                                        action: Commands.diskUsage.action)
+                                        action: Commands.diskUsage.action).onBar("internaldrive")
     private(set) lazy var edit = button("Edit…", id: "host.editVariable", tip: Commands.editVariable.tip, target: self,
-                                        action: #selector(editVariable(_:)))
+                                        action: #selector(editVariable(_:))).onBar("pencil")
     private(set) lazy var databases = HostList(
         name: "Databases",
         columns: [
@@ -39,10 +40,10 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
             .init(id: "bar", title: "Space", width: 120, tip: "Its data, indexes and free space, against the largest", bar: true),
             .init(id: "size", title: "Size", width: 72, numeric: true, tip: "Its data plus its indexes, once read"),
             .init(id: "tables", title: "Tables", width: 54, numeric: true, tip: "How many tables and sequences"),
-            .init(id: "views", title: "Views", width: 54, numeric: true, tip: "How many views"),
+            .init(id: "views", title: "Views", width: 54, numeric: true, tip: "How many views", hidden: true),
             .init(id: "routines", title: "Routines", width: 60, numeric: true, tip: "How many procedures and functions"),
-            .init(id: "triggers", title: "Triggers", width: 60, numeric: true, tip: "How many triggers"),
-            .init(id: "events", title: "Events", width: 54, numeric: true, tip: "How many events"),
+            .init(id: "triggers", title: "Triggers", width: 60, numeric: true, tip: "How many triggers", hidden: true),
+            .init(id: "events", title: "Events", width: 54, numeric: true, tip: "How many events", hidden: true),
             .init(id: "updated", title: "Last Change", width: 130, tip: "When a table's rows last changed, where the engine keeps it"),
             .init(id: "collation", title: "Collation", width: 140, tip: "How its text compares and sorts by default"),
         ],
@@ -103,6 +104,7 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
         spinner.setAccessibilityLabel("Reading")
         tabs.segmentCount = Pane.allCases.count
         tabs.trackingMode = .selectOne
+        tabs.selectedSegmentBezelColor = .selectedSegment
         for page in Pane.allCases {
             tabs.setLabel(page.title, forSegment: page.rawValue)
             tabs.setToolTip(page.tip, forSegment: page.rawValue)
@@ -110,7 +112,7 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
         tabs.target = self
         tabs.action = #selector(paneChosen)
         tabs.setAccessibilityIdentifier("host.panes")
-        let top = NSStackView(views: [heading, spinner, NSView(), helpButton(.navigator)])
+        let top = NSStackView(views: [heading, spinner, NSView(), legend, helpButton(.navigator)])
         top.spacing = Spacing.unit
         let texts = NSStackView(views: [top, properties, tabs])
         texts.orientation = .vertical
@@ -151,6 +153,7 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
         self.pane = pane
         guard isViewLoaded else { return }
         tabs.selectedSegment = pane.rawValue
+        legend.isHidden = pane != .databases
         holder.subviews.forEach { $0.removeFromSuperview() }
         let content: NSViewController
         switch pane {
@@ -207,6 +210,7 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
         readSizes.isEnabled = progress == nil
         readSizes.toolTip = progress != nil ? "It is reading already" : "Read the sizes of the selected databases, or of all of them"
         stopSizes.isEnabled = progress != nil
+        stopSizes.isHidden = progress == nil
         stopSizes.toolTip = progress != nil ? "Stop reading sizes; what was read stays" : "Nothing is being read"
         if let progress {
             databases.note = "reading sizes: \(progress.database) (\(progress.done + 1) of \(progress.of))…"

@@ -43,6 +43,15 @@ extension AppTests {
             #expect(console.resultTabs[0].pinned)
         }
 
+        @Test func aColumnLeavesRoomForItsMarksAsTheyAreDrawn() async throws {
+            let (_, _, tab) = try await GridDataAppTests.tab()
+            let columns = try #require(tab.grid.source?.columns)
+            let marked = try #require(columns.first { !$0.marks.isEmpty && !$0.isKey })
+            var plain = marked
+            plain.marks = []
+            #expect(tab.grid.header.width(for: marked) - tab.grid.header.width(for: plain) > 13, "a symbol is wider than the 13 pt once guessed")
+        }
+
         @Test func aConsolesRowsGrowWithTheWindowAndAlwaysShow() async throws {
             let (main, _, console) = try await ConsoleAppTests.console()
             console.addResult(ConsoleFixtures.customers(rows: 50), title: "One", summary: "")

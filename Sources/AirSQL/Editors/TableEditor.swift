@@ -56,6 +56,10 @@ final class TableEditorController: NSViewController, TabContent, NSMenuItemValid
     let status = NSProgressIndicator()
     let overlay = EditorOverlay()
 
+    /// On a table tab's Structure page: its Revert, Apply and "?" go on the tab's bar (`barActions`), set before the view loads.
+    var inTab = false
+    var barActions: [NSView] = []
+
     init(context: EditorContext, database: String?, table: String?, activity: ActivityCenter) {
         self.context = context
         self.database = database

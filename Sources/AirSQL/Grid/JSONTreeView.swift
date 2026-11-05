@@ -48,7 +48,7 @@ final class JSONTreeView: NSScrollView, NSOutlineViewDataSource, NSOutlineViewDe
     }
 
     /// A right-click selects the row under the pointer, then offers to copy its value, or to open or close the whole
-    /// tree (Database ▸ Expand All and Collapse All too, while the tree has the focus).
+    /// tree (View ▸ Tree ▸ Expand All and Collapse All too, while the tree has the focus).
     override func menu(for event: NSEvent) -> NSMenu? {
         _ = outline.selectsRow(for: event)
         let menu = NSMenu(title: "JSON")

@@ -111,6 +111,7 @@ final class AccountEditor: NSWindowController, NSTextFieldDelegate {
         if let roles, !roles.isEmpty { tab("roles", "Roles", "Show the roles it takes on", rolesTab(roles, grants)) }
         sections.segmentCount = tips.count
         sections.trackingMode = .selectOne
+        sections.selectedSegmentBezelColor = .selectedSegment
         for (index, tip) in tips.enumerated() {
             sections.setLabel(tabs.tabViewItem(at: index).label, forSegment: index)
             sections.setToolTip(tip, forSegment: index)

@@ -1,22 +1,25 @@
 import AppKit
 
 extension MainMenu {
-    /// The SQL editor's commands: Edit ▸ Lines, Statements, Carets, Folding, and Comment Selection beside Comment Lines.
+    /// The SQL editor's commands: Edit ▸ SQL ▸ Lines, Statements, Carets, Folding, and Comment Selection beside Comment Lines.
     static func addSQLEditorItems(_ menus: Menus) {
-        menus.edit.addItem(submenu("Lines", [Commands.duplicateLine, Commands.deleteLine, Commands.moveLineUp, Commands.moveLineDown,
-                                             Commands.joinLines, Commands.sortLines, Commands.reverseLines].map { $0.item() }))
-        menus.edit.addItem(submenu("Statements", [Commands.nextStatement, Commands.previousStatement, Commands.selectStatement,
-                                                  Commands.moveStatementUp, Commands.moveStatementDown].map { $0.item() }))
-        menus.edit.addItem(submenu("Carets", [Commands.selectNextOccurrence, Commands.selectAllOccurrences, Commands.caretPerLine,
-                                              Commands.addCaretAbove, Commands.addCaretBelow, Commands.columnSelection].map { $0.item() }))
-        menus.edit.addItem(submenu("Folding", [Commands.foldHere, Commands.unfoldHere, Commands.foldAll, Commands.unfoldAll].map { $0.item() }))
-        menus.edit.addItem(submenu("Surround With", [], delegate: SurroundMenu.shared))
-        menus.edit.addItem(submenu("Paste from History", [], delegate: PasteHistoryMenu.shared))
-        menus.edit.add([Commands.blockComment, Commands.toggleCase, Commands.completeStatement])
+        func items(_ commands: [Command]) -> [NSMenuItem] { commands.map { $0.item() } }
+        menus.edit.add([nil])
+        menus.edit.addItem(submenu("SQL", items([Commands.toggleComment, Commands.blockComment, Commands.shiftRight, Commands.shiftLeft,
+                                                 Commands.toggleCase, Commands.completeStatement, Commands.goToLine]) + [.separator(),
+            submenu("Lines", items([Commands.duplicateLine, Commands.deleteLine, Commands.moveLineUp, Commands.moveLineDown,
+                                    Commands.joinLines, Commands.sortLines, Commands.reverseLines])),
+            submenu("Statements", items([Commands.nextStatement, Commands.previousStatement, Commands.selectStatement,
+                                         Commands.moveStatementUp, Commands.moveStatementDown])),
+            submenu("Carets", items([Commands.selectNextOccurrence, Commands.selectAllOccurrences, Commands.caretPerLine,
+                                     Commands.addCaretAbove, Commands.addCaretBelow, Commands.columnSelection])),
+            submenu("Folding", items([Commands.foldHere, Commands.unfoldHere, Commands.foldAll, Commands.unfoldAll])),
+            submenu("Surround With", [], delegate: SurroundMenu.shared),
+            submenu("Paste from History", [], delegate: PasteHistoryMenu.shared)]))
     }
 }
 
-/// Edit ▸ Surround With: the templates, and the person's snippets that hold `$SELECTION$`, made as the menu opens.
+/// Edit ▸ SQL ▸ Surround With: the templates, and the person's snippets that hold `$SELECTION$`, made as the menu opens.
 @MainActor
 final class SurroundMenu: NSObject, NSMenuDelegate {
     static let shared = SurroundMenu()
@@ -33,7 +36,7 @@ final class SurroundMenu: NSObject, NSMenuDelegate {
     }
 }
 
-/// Edit ▸ Paste from History: the editor's last copies, a line of each, made as the menu opens.
+/// Edit ▸ SQL ▸ Paste from History: the editor's last copies, a line of each, made as the menu opens.
 @MainActor
 final class PasteHistoryMenu: NSObject, NSMenuDelegate {
     static let shared = PasteHistoryMenu()

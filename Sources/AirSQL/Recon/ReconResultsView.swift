@@ -12,6 +12,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     /// The result's objects the filter and Hide Matching keep.
     private(set) var objects: [ReconObject] = []
     private var ordered: [ReconObject] = []
+    private let emptyNote = label("What differs lists here", font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
     private let split = NSSplitView()
     private lazy var filter = ListFilter("Filter Objects", id: "recon.filter", tip: "Type part of a name to show only those objects",
                                          list: list) { [weak self] in self?.arrange() }
@@ -53,6 +54,10 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         let scroll = NSScrollView()
         scroll.documentView = list
         scroll.hasVerticalScroller = true
+        emptyNote.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(emptyNote)
+        NSLayoutConstraint.activate([emptyNote.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+                                     emptyNote.centerYAnchor.constraint(equalTo: scroll.centerYAnchor)])
         split.isVertical = true
         split.dividerStyle = .thin
         split.autosaveName = layoutName("Compare split")
@@ -114,6 +119,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
         objects = ordered.filter { object in
             (hideMatching.state == .off || object.differs) && (text.isEmpty || GridFilter.matches(text, [object.name, object.targetName]))
         }
+        emptyNote.isHidden = !ordered.isEmpty
         list.reloadData()
         list.selectRowIndexes(IndexSet(objects.indices.filter { chosen.contains(Self.key(objects[$0])) }), byExtendingSelection: false)
     }

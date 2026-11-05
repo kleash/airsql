@@ -52,8 +52,9 @@ enum MainMenu {
         menus.edit.addItem(submenu("Find", [Commands.find, Commands.findAndReplace, Commands.findNext, Commands.findPrevious,
                                             Commands.useSelectionForFind].map { $0.item() }))
 
-        menus.view.add([Commands.toggleSidebar, Commands.filterSidebar, Commands.selectInTree, nil, Commands.focusSidebar, Commands.focusEditor, Commands.focusResults, nil, Commands.sqlLog, Commands.clearSQLLog,
-                        Commands.activity, Commands.cancelAll, nil, Commands.refresh])
+        menus.view.add([Commands.toggleSidebar, Commands.filterSidebar, Commands.selectInTree])
+        menus.view.addItem(submenu("Focus", [Commands.focusSidebar, Commands.focusEditor, Commands.focusResults].map { $0.item() }))
+        menus.view.add([nil, Commands.sqlLog, Commands.clearSQLLog, Commands.activity, Commands.cancelAll, nil, Commands.refresh])
 
         menus.query.add([Commands.runStatement, Commands.runAll, Commands.runAllF9, Commands.runStatementF9, Commands.explain,
                          Commands.cancelQuery, nil, Commands.commit, Commands.rollback])
@@ -136,10 +137,10 @@ final class OffReasons: NSObject, NSMenuDelegate {
     private static let inLists: [Selector: String] = [
         Commands.diskUsageUp.action: "Open Tools ▸ Disk Usage first", Commands.diskUsageCompare.action: "Open Tools ▸ Disk Usage first",
         Commands.copyList.action: "Open Disk Usage or Server Home first", Commands.exportList.action: "Open Disk Usage or Server Home first",
-        Commands.editVariable.action: "Open Database ▸ Server Home ▸ Variables first",
-        Commands.newUser.action: "Open Database ▸ Users and Roles first", Commands.newRole.action: "Open Database ▸ Users and Roles first",
-        Commands.editUser.action: "Open Database ▸ Users and Roles first", Commands.cloneUser.action: "Open Database ▸ Users and Roles first",
-        Commands.dropUser.action: "Open Database ▸ Users and Roles first",
+        Commands.editVariable.action: "Open Database ▸ Server ▸ Server Home ▸ Variables first",
+        Commands.newUser.action: "Open Database ▸ Users ▸ Users and Roles first", Commands.newRole.action: "Open Database ▸ Users ▸ Users and Roles first",
+        Commands.editUser.action: "Open Database ▸ Users ▸ Users and Roles first", Commands.cloneUser.action: "Open Database ▸ Users ▸ Users and Roles first",
+        Commands.dropUser.action: "Open Database ▸ Users ▸ Users and Roles first",
     ]
 
     /// Tells `menu` and its submenus, but not those that make their own items, or the system's.

@@ -62,7 +62,7 @@ extension AppTests {
             // New Database: a name, the server's character set and collation.
             let connectionRow = try #require(sidebarRow(main, "Lab \(server.name)"))
             _ = await call(harness, "click", ["x": connectionRow.0, "y": connectionRow.1])
-            #expect(await call(harness, "menu", ["path": "Database > New Database…"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Database > New Object > New Object Database…"]).error == nil)
             #expect(await sheet("New database"))
             #expect(await call(harness, "set", ["id": "newDatabase.name", "value": db, "in": "sheet"]).error == nil)
             _ = await call(harness, "press", ["title": "Create", "in": "sheet"])

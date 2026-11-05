@@ -141,7 +141,7 @@ extension AppTests {
         let viewer = content.viewer, grid = viewer.grid
         // Hide Column on the focused cell's column (created_3).
         grid.selection.select(GridPosition(row: 0, column: 3))
-        #expect(await call(harness, "menu", ["path": "Data > Hide Column"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Columns > Hide Column"]).error == nil)
         #expect(grid.columnCount == 299 && !grid.columnOrder.contains(3))
         let list = GridColumnList(viewer: viewer)
         _ = list.view
@@ -317,10 +317,10 @@ extension AppTests {
         grid.selection.select(GridPosition(row: 2, column: 9))
         // Words can't be shown as dates: the item says why.
         grid.selection.select(GridPosition(row: 2, column: 1))
-        let refused = await call(harness, "menu", ["path": "Data > Display As > Date from Unix Time (seconds)"])
+        let refused = await call(harness, "menu", ["path": "Data > Columns > Display As > Date from Unix Time (seconds)"])
         #expect(refused.error?.contains("Not for this column's type") == true, "\(refused.error ?? "")")
         grid.selection.select(GridPosition(row: 2, column: 9))
-        #expect(await call(harness, "menu", ["path": "Data > Display As > Date from Unix Time (seconds)"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Columns > Display As > Date from Unix Time (seconds)"]).error == nil)
         let seconds = try #require(source.value(2, 9).flatMap(Double.init))
         let expected = GridDisplay.unixTime.format(String(Int(seconds)), bytes: nil)!
         #expect(grid.source?.cell(2, 9) == .text(expected) && grid.source?.value(2, 9) == source.value(2, 9))
@@ -329,7 +329,7 @@ extension AppTests {
         let again = ViewerContent(FakeGridSource(rows: 5, columns: 10), key: key)
         #expect(again.viewer.displays[9] == .unixTime && again.viewer.grid.source?.columns[9].kind == .date)
         // As Stored takes it away.
-        #expect(await call(harness, "menu", ["path": "Data > Display As > As Stored"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Columns > Display As > As Stored"]).error == nil)
         #expect(grid.source?.cell(2, 9) == source.cell(2, 9) && content.viewer.displays.isEmpty)
     }
 
@@ -341,19 +341,19 @@ extension AppTests {
         let (_, harness, content) = viewerWindow(source, key: key)
         let grid = content.viewer.grid
         grid.selection.select(GridPosition(row: 2, column: 2))
-        #expect(await call(harness, "menu", ["path": "Data > Display As > Decimal Places > No Decimals"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Columns > Display As > Decimal Places > No Decimals"]).error == nil)
         #expect(grid.source?.cell(2, 2) == .text(GridDisplay.decimals0.format(source.value(2, 2), bytes: nil)!))
-        let refused = await call(harness, "menu", ["path": "Data > Display As > Time Zone > " + GridZone.utcToLocal.title])
+        let refused = await call(harness, "menu", ["path": "Data > Columns > Display As > Time Zone > " + GridZone.utcToLocal.title])
         #expect(refused.error?.contains("Only for DATETIME and TIMESTAMP columns") == true, "\(refused.error ?? "")")
         grid.selection.select(GridPosition(row: 2, column: 3))
-        #expect(await call(harness, "menu", ["path": "Data > Display As > Medium Date and Time"]).error == nil)
-        #expect(await call(harness, "menu", ["path": "Data > Display As > Time Zone > " + GridZone.utcToLocal.title]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Columns > Display As > Medium Date and Time"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Columns > Display As > Time Zone > " + GridZone.utcToLocal.title]).error == nil)
         let shown = GridDisplay.dateMedium.format(source.value(2, 3), bytes: nil, zone: .utcToLocal)
         #expect(shown != nil && grid.source?.cell(2, 3) == .text(shown!) && grid.source?.value(2, 3) == source.value(2, 3))
         #expect(grid.source?.columns[3].type == "datetime as medium date, UTC → this Mac's")
         let again = ViewerContent(FakeGridSource(rows: 5, columns: 10), key: key)
         #expect(again.viewer.displays == [2: .decimals0, 3: .dateMedium] && again.viewer.zones == [3: .utcToLocal])
-        #expect(await call(harness, "menu", ["path": "Data > Display As > Time Zone > As Stored"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Columns > Display As > Time Zone > As Stored"]).error == nil)
         #expect(content.viewer.zones.isEmpty)
     }
 

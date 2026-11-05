@@ -2,7 +2,7 @@ import AirSQLCore
 import AppKit
 
 extension MainMenu {
-    /// Lane L4 (the console): File ▸ Open…, Save, Save As…; Edit ▸ Comment Lines, Shift Right, Shift Left; View ▸ Query
+    /// Lane L4 (the console): File ▸ Open…, Save, Save As…; Edit ▸ SQL ▸ Comment Lines, Shift Right, Shift Left; View ▸ Query
     /// Helpers and the text size; Query ▸ Run Selection, Isolation Level, Format SQL, Query History, Profile and the
     /// result tabs' commands. Run, Run All, Explain, Cancel, Commit, Rollback, Transaction Mode and Change Connection…
     /// are P0's already.
@@ -17,28 +17,24 @@ extension MainMenu {
         insert(Commands.saveAs, after: Commands.save, in: menus.file)
         insert(Commands.localHistory, after: Commands.saveAs, in: menus.file)
 
-        menus.data.add([nil, Commands.moveRowsUp, Commands.moveRowsDown])
-        menus.edit.add([nil, Commands.toggleComment, Commands.shiftRight, Commands.shiftLeft, Commands.goToLine])
-
         menus.view.add([nil, Commands.helpers, Commands.wordWrap, Commands.bigger, Commands.smaller, Commands.actualSize])
 
         insert(Commands.runSelection, after: Commands.runStatement, in: menus.query)
-        insert(Commands.runSelectionWhole, after: Commands.runSelection, in: menus.query)
-        insert(Commands.runSubquery, after: Commands.runSelectionWhole, in: menus.query)
-        insert(Commands.runFromCaret, after: Commands.runSubquery, in: menus.query)
-        insert(Commands.runToFile, after: Commands.runFromCaret, in: menus.query)
+        let explain = menus.query.items.firstIndex { $0.action == Commands.explain.action } ?? menus.query.items.count - 1
+        menus.query.insertItem(submenu("Run Special", [Commands.runSelectionWhole, Commands.runSubquery, Commands.runFromCaret,
+                                                       Commands.runToFile].map { $0.item() }), at: explain)
         insert(Commands.explainAnalyze, after: Commands.explain, in: menus.query)
         let mode = menus.query.items.firstIndex { $0.title == "Transaction Mode" } ?? menus.query.items.count - 1
         menus.query.insertItem(submenu("Isolation Level", isolationItems()), at: mode + 1)
-        menus.query.add([nil, Commands.formatSQL, Commands.saveAsSnippet, Commands.history, Commands.sessions, Commands.profile, Commands.editAsTable, nil, Commands.keepResults, Commands.resultWindow, Commands.rerunResult,
-                         Commands.copyResultQuery, Commands.pinResult,
-                         Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, Commands.nextResult,
-                         Commands.previousResult, Commands.exportResult, Commands.copyResultToTable, Commands.compareResult])
+        menus.query.add([nil, Commands.formatSQL, Commands.saveAsSnippet, Commands.history, Commands.sessions, Commands.profile, Commands.editAsTable, nil])
+        menus.query.addItem(submenu("Result", [Commands.keepResults, Commands.resultWindow, Commands.rerunResult, Commands.copyResultQuery,
+                                               Commands.pinResult, Commands.renameResult, Commands.closeResult, Commands.closeOtherResults,
+                                               Commands.nextResult, Commands.previousResult, Commands.exportResult, Commands.copyResultToTable,
+                                               Commands.compareResult].map { $0.item() }))
         let code = submenu("Code", [Commands.showContextActions, Commands.goToDeclaration, Commands.findUsages, Commands.renameSymbol,
                                     Commands.quickDocumentation, Commands.parameterInfo, nil, Commands.nextProblem, Commands.previousProblem,
                                     Commands.showProblem, nil, Commands.previewAffectedRows].map { $0?.item() ?? .separator() })
         code.toolTip = "Find your way around the SQL at the cursor, and fix what's underlined"
-        menus.query.add([nil])
         menus.query.addItem(code)
     }
 

@@ -116,8 +116,7 @@ final class ReconWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         progressStrip.spacing = Spacing.unit
         progressStrip.edgeInsets = NSEdgeInsets(top: Spacing.half, left: Spacing.double, bottom: Spacing.half, right: Spacing.double)
         progressStrip.isHidden = true
-        let objects = NSStackView(views: [label("Objects", font: .systemFont(ofSize: 12, weight: .semibold), color: .secondaryLabelColor),
-                                          source.objects, label("→", font: .systemFont(ofSize: 15, weight: .medium), color: .secondaryLabelColor),
+        let objects = NSStackView(views: [source.objects, label("→", font: .systemFont(ofSize: 15, weight: .medium), color: .secondaryLabelColor),
                                           target.objects])
         objects.spacing = Spacing.double
         objects.edgeInsets = NSEdgeInsets(top: 0, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)

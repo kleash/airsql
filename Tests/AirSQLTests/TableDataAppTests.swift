@@ -37,13 +37,13 @@ extension AppTests {
         #expect(main.statusBar.accessory.arrangedSubviews.first === table.viewer.status)
 
         // Load More adds the next page with OFFSET.
-        let more = await call(harness, "menu", ["path": "Data > Load More"])
+        let more = await call(harness, "menu", ["path": "Data > Pages > Load More"])
         #expect(more.error == nil, "\(more.error ?? "")")
         _ = await eventually(timeout: 30) { table.loading == nil && source.rowCount == 2_000 }
         #expect(source.rowCount == 2_000 && source.cell(1_999, 0) == .text("2000"))
 
         // Count Rows Exactly replaces the estimate.
-        #expect(await call(harness, "menu", ["path": "Data > Count Rows Exactly"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Data > Pages > Count Rows Exactly"]).error == nil)
         _ = await eventually(timeout: 60) { table.total?.exact == true }
         #expect(table.viewer.status.rows.stringValue.hasPrefix("2,000 of 1,000,000 rows"))
     }

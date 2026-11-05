@@ -216,9 +216,19 @@ extension AppTests {
             let add = try #require(data.items.first { $0.action == Commands.addRow.action })
             OffReasons.shared.menuWillOpen(data)
             #expect(!add.isEnabled && add.toolTip == "Open a table or a query's result first")
-            let tools = try #require(bar.item(withTitle: "Tools")?.submenu)
-            OffReasons.shared.menuWillOpen(tools)
-            #expect(tools.items.first { $0.action == Commands.syncScript.action }?.toolTip == "Open Tools ▸ Compare… first")
+            let compare = try #require(bar.item(withTitle: "Tools")?.submenu?.item(withTitle: "In Compare")?.submenu)
+            OffReasons.shared.menuWillOpen(compare)
+            #expect(compare.items.first { $0.action == Commands.syncScript.action }?.toolTip == "Open Tools ▸ Compare… first")
+        }
+
+        /// A 13-inch laptop leaves about 860 pt under the menu bar; an item is at most 24 pt and a separator 12.
+        @Test func noMenuIsTallerThanALaptopsScreen() throws {
+            _ = NSApplication.shared
+            for item in MainMenu.build().items {
+                let shown = try #require(item.submenu).items.filter { !$0.isHidden }
+                let height = shown.reduce(0) { $0 + ($1.isSeparatorItem ? 12 : 24) }
+                #expect(height <= 860, "\(item.title): \(height) pt")
+            }
         }
     }
 }

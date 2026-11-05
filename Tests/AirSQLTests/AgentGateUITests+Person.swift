@@ -149,7 +149,7 @@ extension AppTests.AgentGateUITests {
         #expect(replaced.error?.contains("Replacing text in a production console") == true, "\(replaced.error ?? "let through")")
         #expect(console.editor.string == "SELECT 1")
         // So are the commands that change it: deleting a WHERE line changes what the person runs.
-        for (tool, arguments) in [("menu", ["path": "Edit > Lines > Delete Line"]), ("menu", ["path": "Edit > Comment Lines"]),
+        for (tool, arguments) in [("menu", ["path": "Edit > SQL > Lines > Delete Line"]), ("menu", ["path": "Edit > SQL > Comment Lines"]),
                                   ("menu", ["path": "Edit > Cut"]), ("key", ["combo": "ctrl+d"])] as [(String, [String: Any])] {
             console.editor.setSelectedRange(NSRange(location: 0, length: 3))
             main.window?.makeFirstResponder(console.editor)
@@ -164,8 +164,8 @@ extension AppTests.AgentGateUITests {
         #expect(killed.error?.contains("needs the person's OK") == true, "the text view's own: \(killed.error ?? "let through")")
         #expect(console.editor.string == "SELECT 1")
         // The person's own commands, and an agent's that only move the cursor, still work.
-        #expect(await agentCall(service, "menu", ["path": "Edit > Statements > Select Statement"]).error == nil)
-        #expect(await call(harness, "menu", ["path": "Edit > Lines > Duplicate Line"]).error == nil)
+        #expect(await agentCall(service, "menu", ["path": "Edit > SQL > Statements > Select Statement"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "Edit > SQL > Lines > Duplicate Line"]).error == nil)
         #expect(console.editor.string == "SELECT 1\nSELECT 1")
     }
 
