@@ -237,6 +237,8 @@ public struct AppSettings: Codable, Equatable {
     public var loadAllAsksAbove = 100_000
     /// Settings ▸ Grid: a console result with one row opens transposed (its columns down the left).
     public var transposeSingleRow = true
+    /// Settings ▸ Editor: the checks turned off, by `SQLInspections` code.
+    public var disabledInspections: [String] = []
 
     public init() {}
 
@@ -264,6 +266,7 @@ public struct AppSettings: Codable, Equatable {
         liquibase = try value(.liquibase, defaults.liquibase)
         loadAllAsksAbove = try value(.loadAllAsksAbove, defaults.loadAllAsksAbove)
         transposeSingleRow = try value(.transposeSingleRow, defaults.transposeSingleRow)
+        disabledInspections = try value(.disabledInspections, defaults.disabledInspections)
     }
 }
 

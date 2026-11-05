@@ -383,7 +383,7 @@ struct ResultSetSourceTests {
             "SELECT id FROM orders FOR UPDATE OF orders, customers", "SELECT id INTO @a FROM orders", "SELECT id INTO a, b FROM orders",
             "SELECT id, SUM(total) OVER w FROM orders WINDOW w AS (ORDER BY id), v AS (ORDER BY total)",
             "SELECT `order id` FROM `Order Details`", "SELECT `Order Details`.`order id` FROM `Order Details`",
-            "SELECT o.id FROM shop.orders o", "SELECT shop.orders.nope FROM shop.orders", "SELECT ID, Total FROM orders",
+            "SELECT o.id FROM shop.orders o", "SELECT shop.orders.id FROM shop.orders", "SELECT ID, Total FROM orders",
             "SELECT `year` FROM orders", "SELECT id FROM big_view", "SELECT nosuch_column FROM broken_view",
             "SELECT _rowid FROM orders",
             "UPDATE orders SET total = total + 1 WHERE id = 1 ORDER BY id LIMIT 1",
@@ -433,22 +433,26 @@ struct ResultSetSourceTests {
         #expect(SQLNameCheck.runsCode("call p()") && !SQLNameCheck.runsCode("SELECT 1"))
     }
 
-    @Test func silentForCTEsAndDerivedTables() {
-        #expect(found("WITH c AS (SELECT id FROM orders) SELECT id, nope FROM c") == [])
+    @Test func readsCTEsAndDerivedTables() {
+        #expect(found("WITH c AS (SELECT id FROM orders) SELECT id, nope FROM c") == ["nope"])
+        #expect(found("WITH c AS (SELECT * FROM orders) SELECT total, nope FROM c") == ["nope"])
+        #expect(found("SELECT d.nope FROM (SELECT id AS x FROM orders) d") == ["nope"])
+        #expect(found("SELECT * FROM orders WHERE id = (SELECT nope FROM (SELECT 1 AS x) d)") == ["nope"])
         #expect(found("WITH RECURSIVE c (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c) SELECT n FROM c") == [])
         #expect(found("SELECT * FROM orders WHERE id IN (WITH c AS (SELECT 1) SELECT * FROM c)") == [])
         #expect(found("SELECT d.x, x FROM (SELECT id AS x FROM orders) d") == [])
-        #expect(found("SELECT x, o.nope FROM orders o JOIN (SELECT 1 AS x) d ON 1") == [])
+        #expect(found("SELECT x, o.nope FROM orders o JOIN (SELECT 1 AS x) d ON 1") == ["nope"])
         #expect(found("SELECT j.a, a FROM orders, JSON_TABLE('[]', '$[*]' COLUMNS (a INT PATH '$')) j") == [])
         #expect(found("SELECT x FROM orders o, LATERAL (SELECT o.id AS x) l") == [])
         // Inside a derived table its own tables still count.
         #expect(found("SELECT * FROM (SELECT * FROM nosuch) d") == ["nosuch"])
     }
 
-    @Test func columnsWaitForEveryTableInTheStatement() {
+    @Test func aBareColumnWaitsForEveryTableItCouldBeIn() {
         #expect(found("SELECT nope FROM orders JOIN nosuch") == ["nosuch"])
-        #expect(found("SELECT o.nope FROM orders o JOIN nosuch n") == ["nosuch"])
-        #expect(found("SELECT nope FROM orders WHERE id IN (SELECT id FROM elsewhere.t)") == [])
+        #expect(found("SELECT o.nope FROM orders o JOIN nosuch n") == ["nope", "nosuch"])
+        #expect(found("SELECT nope FROM orders WHERE id IN (SELECT id FROM elsewhere.t)") == ["nope"])
+        #expect(found("SELECT 1 FROM orders WHERE id IN (SELECT nope FROM elsewhere.t)") == [])
         #expect(found("SELECT nope") == [])
         #expect(found("SELECT nope FROM DUAL") == [])
         // A correlated subquery reaches the outer table's columns.
@@ -457,17 +461,25 @@ struct ResultSetSourceTests {
 
     @Test func silentForStatementsItDoesNotUnderstand() {
         for sql in [
-            "SHOW TABLES FROM nosuch", "DESCRIBE nosuch", "EXPLAIN SELECT * FROM nosuch", "SET @a = nosuch", "TRUNCATE nosuch",
-            "CREATE VIEW v AS SELECT nope FROM nosuch", "DROP TABLE nosuch", "(SELECT * FROM nosuch)", "ANALYZE TABLE nosuch",
+            "SHOW TABLES FROM nosuch", "DESCRIBE nosuch", "SET @a = nosuch", "TRUNCATE nosuch",
+            "CREATE VIEW v AS SELECT nope FROM nosuch", "DROP TABLE nosuch", "ANALYZE TABLE nosuch",
             "LOAD DATA INFILE 'x' INTO TABLE nosuch", "/*!50001 SELECT * FROM nosuch */", "SELECT /*!40001 SQL_NO_CACHE */ * FROM nosuch",
             "SELECT * FROM nosuch WHERE a = 'open", "SELECT (1 FROM nosuch", "SELECT 1) FROM nosuch",
             "CREATE PROCEDURE p() BEGIN DECLARE a INT; SELECT a FROM orders; SELECT * FROM nosuch; END",
             "BEGIN NOT ATOMIC SELECT * FROM nosuch; END",
             "SELECT * FROM \"nosuch\" JOIN orders WHERE nope = 1",
-            "SELECT { fn NOW() }, nope FROM orders", "SELECT café, cafe FROM orders",
+            "SELECT café, cafe FROM orders",
         ] {
             #expect(found(sql) == [], "\(sql)")
         }
+    }
+
+    @Test func readsWhatsAroundAQuery() {
+        #expect(found("EXPLAIN SELECT * FROM nosuch") == ["nosuch"])
+        #expect(found("(SELECT * FROM nosuch)") == ["nosuch"])
+        #expect(found("SELECT shop.orders.nope FROM shop.orders") == ["nope"])
+        #expect(found("SELECT { fn NOW() }, nope FROM orders") == ["nope"])
+        #expect(found("SELECT COUNT(nope), SUM(o.nada) FROM orders o") == ["nope", "nada"])
     }
 
     @Test func followsTheServersCaseRule() {

@@ -33,6 +33,12 @@ extension MainMenu {
                          Commands.copyResultQuery, Commands.pinResult,
                          Commands.renameResult, Commands.closeResult, Commands.closeOtherResults, Commands.nextResult,
                          Commands.previousResult, Commands.exportResult, Commands.compareResult])
+        let code = submenu("Code", [Commands.showContextActions, Commands.goToDeclaration, Commands.findUsages, Commands.renameSymbol,
+                                    Commands.quickDocumentation, Commands.parameterInfo, nil, Commands.nextProblem, Commands.previousProblem,
+                                    Commands.showProblem, nil, Commands.previewAffectedRows].map { $0?.item() ?? .separator() })
+        code.toolTip = "Find your way around the SQL at the cursor, and fix what's underlined"
+        menus.query.add([nil])
+        menus.query.addItem(code)
     }
 
     /// One item per isolation level (the menu bar's and the toolbar's Tx pop-up), told apart by their tags.

@@ -199,7 +199,7 @@ public enum SQLCompletion {
     }
 
     /// Reserved since MySQL 8, where a bare `rank` is error 1064; keywords, not names, for the highlighter elsewhere.
-    private static let mysql8Reserved: Set<String> = [
+    static let mysql8Reserved: Set<String> = [
         "CUBE", "CUME_DIST", "DENSE_RANK", "EMPTY", "EXCEPT", "FIRST_VALUE", "FUNCTION", "GROUPING", "GROUPS", "JSON_TABLE", "LAG",
         "LAST_VALUE", "LATERAL", "LEAD", "MANUAL", "NTH_VALUE", "NTILE", "OF", "OVER", "PARALLEL", "PERCENT_RANK", "QUALIFY", "RANK",
         "RECURSIVE", "ROW", "ROWS", "ROW_NUMBER", "SYSTEM", "TABLESAMPLE", "WINDOW",

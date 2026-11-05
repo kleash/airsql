@@ -18,5 +18,22 @@ final class EditorPane: SettingsPaneController {
                                       [2, 3, 4, 8].map { ("\($0) spaces", $0) })])
         form.row("", [toggle("Indent with tabs", id: "settings.editorUsesTabs", tip: "Put in a tab character for Tab and indents instead of spaces",
                              \.editorUsesTabs)])
+        for (index, inspection) in SQLInspections.all.enumerated() {
+            form.row(index == 0 ? "Checks" : "", [inspectionToggle(inspection)])
+        }
+    }
+
+    private func inspectionToggle(_ inspection: SQLInspections.Inspection) -> NSButton {
+        let box = checkbox(inspection.title, id: "settings.inspection.\(inspection.code)", tip: "Underline this in the SQL editor while typing",
+                           on: !model.data.settings.disabledInspections.contains(inspection.code), target: self, action: #selector(inspectionChanged(_:)))
+        box.identifier = NSUserInterfaceItemIdentifier(inspection.code)
+        return box
+    }
+
+    @objc private func inspectionChanged(_ sender: NSButton) {
+        guard let code = sender.identifier?.rawValue else { return }
+        var disabled = Set(model.data.settings.disabledInspections)
+        if sender.state == .on { disabled.remove(code) } else { disabled.insert(code) }
+        model.data.settings.disabledInspections = disabled.sorted()
     }
 }

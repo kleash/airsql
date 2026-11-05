@@ -138,6 +138,7 @@ final class ConsoleViewController: NSViewController, TabContent {
             guard let self, let id = self.connectionID, !self.shared.ranCode else { return nil }
             return (Self.schemaCache(id)?.snapshot, self.database, self.shared.changedNames)
         }
+        wireInsight()
         split.isVertical = false
         split.dividerStyle = .thin
         split.autosaveName = layoutName("Console")

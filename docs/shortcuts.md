@@ -92,6 +92,16 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Go to Line… | ⌃G |
 | Move Up | ⇧⌘↑ |
 | Move Down | ⇧⌘↓ |
+| Fixes and Actions… | ⌥↩ |
+| Go to Declaration | ⌘B |
+| Find Usages… | ⌥F7 |
+| Rename Name… | ⇧F6 |
+| Quick Documentation | F1 |
+| Parameter Info | ⌥⌘I |
+| Next Problem | ⌥F2 |
+| Previous Problem | ⌥⇧F2 |
+| Show Problem | ⌃F1 |
+| Preview Rows to Change | ⌥⌘↩ |
 | Add Row | ⌘I |
 | Duplicate Row | ⌘D |
 | Duplicate Row Without Keys | ⇧⌘D |

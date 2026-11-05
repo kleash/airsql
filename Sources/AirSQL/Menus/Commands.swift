@@ -13,6 +13,17 @@ import AppKit
     @objc optional func showShortcuts(_ sender: Any?)
     @objc optional func showOfflineHelp(_ sender: Any?)
     @objc optional func showReleaseNotes(_ sender: Any?)
+    // Code (the SQL editor's understanding of what's written)
+    @objc optional func showContextActions(_ sender: Any?)
+    @objc optional func goToDeclaration(_ sender: Any?)
+    @objc optional func findUsages(_ sender: Any?)
+    @objc optional func renameSymbol(_ sender: Any?)
+    @objc optional func quickDocumentation(_ sender: Any?)
+    @objc optional func parameterInfo(_ sender: Any?)
+    @objc optional func nextProblem(_ sender: Any?)
+    @objc optional func previousProblem(_ sender: Any?)
+    @objc optional func showProblem(_ sender: Any?)
+    @objc optional func previewAffectedRows(_ sender: Any?)
     @objc optional func focusSidebar(_ sender: Any?)
     @objc optional func focusEditor(_ sender: Any?)
     @objc optional func focusResults(_ sender: Any?)
@@ -270,7 +281,9 @@ struct Command {
                                        String(UnicodeScalar(NSUpArrowFunctionKey)!): "↑",
                                        String(UnicodeScalar(NSLeftArrowFunctionKey)!): "←",
                                        String(UnicodeScalar(NSRightArrowFunctionKey)!): "→",
-                                       String(UnicodeScalar(NSF9FunctionKey)!): "F9", String(UnicodeScalar(NSF2FunctionKey)!): "F2"]
+                                       String(UnicodeScalar(NSF9FunctionKey)!): "F9", String(UnicodeScalar(NSF2FunctionKey)!): "F2",
+                                       String(UnicodeScalar(NSF1FunctionKey)!): "F1", String(UnicodeScalar(NSF6FunctionKey)!): "F6",
+                                       String(UnicodeScalar(NSF7FunctionKey)!): "F7"]
         return (flags.contains(.control) ? "⌃" : "") + (flags.contains(.option) ? "⌥" : "")
             + (flags.contains(.shift) ? "⇧" : "") + (flags.contains(.command) ? "⌘" : "") + (names[key] ?? key.uppercased())
     }
@@ -284,6 +297,9 @@ private let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
 private let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
 private let f9 = String(UnicodeScalar(NSF9FunctionKey)!)
 private let f2 = String(UnicodeScalar(NSF2FunctionKey)!)
+private let f1 = String(UnicodeScalar(NSF1FunctionKey)!)
+private let f6 = String(UnicodeScalar(NSF6FunctionKey)!)
+private let f7 = String(UnicodeScalar(NSF7FunctionKey)!)
 
 /// Every command, by menu: the shortcut map (no shortcut is taken twice, and none that macOS keeps for itself:
 /// `CommandsTests`). Settled for every lane in P0 (plan §2.4): ⌘↩ only runs; ⌘S saves a console's file and applies
@@ -769,6 +785,28 @@ enum Commands {
     static let agentGuide = Command("AI Agents", #selector(AirSQLActions.showAgentGuide(_:)),
                                     tip: "Open the page of AirSQL Help about letting Claude Code or Gemini CLI use AirSQL")
 
+    // Code: the SQL editor's understanding of what's written.
+    static let showContextActions = Command("Fixes and Actions…", #selector(AirSQLActions.showContextActions(_:)), "\r", .option,
+                                             tip: "Show what can be fixed or changed at the cursor in the SQL editor")
+    static let goToDeclaration = Command("Go to Declaration", #selector(AirSQLActions.goToDeclaration(_:)), "b",
+                                         tip: "Jump to where the alias or WITH query at the cursor is declared, or open its table")
+    static let findUsages = Command("Find Usages…", #selector(AirSQLActions.findUsages(_:)), f7, .option,
+                                    tip: "List every place in this text that means the name at the cursor")
+    static let renameSymbol = Command("Rename Name…", #selector(AirSQLActions.renameSymbol(_:)), f6, .shift,
+                                      tip: "Rename the name at the cursor in this text; a table or column gets its statement too")
+    static let quickDocumentation = Command("Quick Documentation", #selector(AirSQLActions.quickDocumentation(_:)), f1, [],
+                                            tip: "Show the columns, type or signature of the name at the cursor")
+    static let parameterInfo = Command("Parameter Info", #selector(AirSQLActions.parameterInfo(_:)), "i", [.command, .option],
+                                       tip: "Show what each argument of the call, or each value of the INSERT row, at the cursor is for")
+    static let nextProblem = Command("Next Problem", #selector(AirSQLActions.nextProblem(_:)), f2, .option,
+                                     tip: "Move to the next underlined problem in the SQL editor")
+    static let previousProblem = Command("Previous Problem", #selector(AirSQLActions.previousProblem(_:)), f2, [.option, .shift],
+                                         tip: "Move to the previous underlined problem in the SQL editor")
+    static let showProblem = Command("Show Problem", #selector(AirSQLActions.showProblem(_:)), f1, .control,
+                                     tip: "Say what's wrong with the underlined text at the cursor")
+    static let previewAffectedRows = Command("Preview Rows to Change", #selector(AirSQLActions.previewAffectedRows(_:)), "\r", [.command, .option],
+                                             tip: "Show the rows the UPDATE or DELETE at the cursor would touch, changing nothing")
+
     /// Every command above, for the checks (the tab commands once).
     static let all: [Command] = [
         about, settings, hide, hideOthers, showAll, quit,
@@ -784,6 +822,8 @@ enum Commands {
         isolation, formatSQL, history, sessions, localHistory, changeConnection, profile, saveAsChangeset, editAsTable, rerunResult, copyResultQuery, pinResult, renameResult, closeResult,
         closeOtherResults, nextResult, previousResult, exportResult, compareResult, toggleComment, shiftRight, shiftLeft, helpers,
         goToLine, wordWrap, moveRowsUp, moveRowsDown,
+        showContextActions, goToDeclaration, findUsages, renameSymbol, quickDocumentation, parameterInfo, nextProblem, previousProblem, showProblem,
+        previewAffectedRows,
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
