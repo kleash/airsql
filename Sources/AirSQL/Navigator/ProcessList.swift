@@ -5,7 +5,7 @@ import AppKit
 /// read on a session of its own. Kill Query and Kill Connection ask first and then check, on the same session, that the
 /// process still runs what the list showed before they stop it (plan §2.12: a click selects, a double-click shows the
 /// full query, a right-click opens Kill Query…, Kill Connection…, Copy Query, Explain). A header sorts, the filter and
-/// Hide Sleeping narrow what the last read found.
+/// Hide Sleeping narrow what the last read found. The selected process's statement shows in full under the list.
 @MainActor
 final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSource, NSTableViewDelegate, NSMenuItemValidation,
     NSSearchFieldDelegate {
@@ -22,6 +22,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
                                      target: self, action: #selector(arrange))
     private let status = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
+    let statement = NSTextView()
     private var session: DBConnection?
     private var refreshing: Task<Void, Never>?
     private var timer: Task<Void, Never>?
@@ -105,7 +106,22 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.translatesAutoresizingMaskIntoConstraints = false
-        [bar, narrow, scroll].forEach(root.addSubview)
+        statement.isEditable = false
+        statement.isRichText = false
+        statement.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        statement.drawsBackground = false
+        statement.textContainerInset = NSSize(width: Spacing.unit, height: Spacing.half)
+        statement.autoresizingMask = [.width]
+        statement.toolTip = "The selected process's statement in full"
+        statement.setAccessibilityIdentifier("processes.statement")
+        let statementScroll = NSScrollView()
+        statementScroll.documentView = statement
+        statementScroll.hasVerticalScroller = true
+        statementScroll.autohidesScrollers = true
+        statementScroll.drawsBackground = false
+        statementScroll.translatesAutoresizingMaskIntoConstraints = false
+        let line = Hairline()
+        [bar, narrow, scroll, line, statementScroll].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             bar.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double - 2),
             bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
@@ -116,7 +132,15 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             scroll.topAnchor.constraint(equalTo: narrow.bottomAnchor, constant: Spacing.unit),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            line.topAnchor.constraint(equalTo: scroll.bottomAnchor),
+            line.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            line.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            line.heightAnchor.constraint(equalToConstant: 1),
+            statementScroll.topAnchor.constraint(equalTo: line.bottomAnchor),
+            statementScroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            statementScroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            statementScroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            statementScroll.heightAnchor.constraint(equalToConstant: 72),
         ])
         view = root
         updateButtons()
@@ -131,6 +155,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             button.isEnabled = reason == nil
             button.toolTip = reason ?? command.tip
         }
+        statement.string = selected.count == 1 ? selected[0].info ?? "" : ""
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) { updateButtons() }

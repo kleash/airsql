@@ -1,28 +1,50 @@
 import AirSQLCore
 import AppKit
 
-/// The database view (scope "nav"): a database's tables with their rows, sizes, engine, collation and last update, from
+/// The database view (scope "nav"): a database's objects, its tables with their rows, sizes, engine, collation and last update, from
 /// the statistics read when it shows (and on Refresh). A click selects, a double-click opens the table's data, a
-/// right-click opens the table menu; ⌘ and ⇧ select several for the bulk commands; the headers sort.
+/// right-click opens the table menu; ⌘ and ⇧ select several for the bulk commands; the headers sort and their menu shows
+/// or hides columns.
 @MainActor
 final class DatabaseViewController: NSViewController, TabContent, NSTableViewDataSource, NSTableViewDelegate,
     NSMenuItemValidation, NSSearchFieldDelegate {
     let open: OpenConnection
     let database: String
+    /// A row: a table, view or sequence, or one of the database's other objects.
+    struct Listed: Hashable {
+        let name: String
+        let kind: DatabaseObject.Kind
+        var engine: String?
+        var comment = ""
+    }
+
     let table = DatabaseTableView()
-    private(set) var rows: [SchemaTable] = []
+    private(set) var rows: [Listed] = []
     private let caption = label("", font: .systemFont(ofSize: 11.5), color: .secondaryLabelColor, truncates: true)
     private let spinner = NSProgressIndicator()
     let filter = NSSearchField()
     private let empty = label("", font: .systemFont(ofSize: 13), color: .secondaryLabelColor, wraps: true)
     /// The columns share the view's width down to `minimum`, then it scrolls sideways.
     private static let columns: [(id: String, title: String, width: CGFloat, minimum: CGFloat, tip: String)] = [
-        ("name", "Name", 180, 120, "The table's name"), ("rows", "Rows", 80, 60, "About how many rows (InnoDB estimates it)"),
+        ("name", "Name", 180, 120, "The object's name"), ("type", "Type", 84, 78, "What kind of object it is"), ("rows", "Rows", 70, 60, "About how many rows (InnoDB estimates it)"),
+        ("bar", "Space", 100, 60, "Its data, indexes and free space, against the largest table"),
+        ("size", "Size", 72, 60, "Its data plus its indexes"),
         ("data", "Data", 72, 60, "Space its rows take"), ("index", "Indexes", 72, 60, "Space its indexes take"),
         ("engine", "Engine", 70, 60, "Its storage engine"), ("collation", "Collation", 140, 130, "How its text compares and sorts"),
         ("updated", "Updated", 140, 135, "When its rows last changed, by the server's clock, where the engine keeps it"),
-        ("comment", "Comment", 200, 80, "Its comment"),
+        ("comment", "Comment", 100, 80, "Its comment"),
+        ("free", "Free", 72, 60, "Space kept but unused, which Optimize can give back"),
+        ("average", "Average Row", 80, 60, "Its data divided by its rows"),
+        ("autoIncrement", "Auto Increment", 90, 60, "The next value of its AUTO_INCREMENT column"),
+        ("created", "Created", 140, 135, "When it was made, by the server's clock"),
+        ("format", "Row Format", 90, 60, "How its engine stores a row"),
+        ("options", "Options", 140, 80, "The options it was made with"),
     ]
+    /// Off until the person shows them from the header's menu.
+    private static let hiddenColumns: Set<String> = ["data", "index", "free", "average", "autoIncrement", "created", "format", "options"]
+    private static let numericColumns: Set<String> = ["rows", "bar", "size", "data", "index", "free", "average", "autoIncrement"]
+    /// Space of the largest table shown: what the bars are against.
+    private var largest = 1
 
     init(_ open: OpenConnection, _ database: String) {
         self.open = open
@@ -51,7 +73,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         filter.translatesAutoresizingMaskIntoConstraints = false
         empty.alignment = .center
         empty.menu = NSMenu(title: "Tables")
-        empty.menu?.add([Commands.createTable, Commands.refresh])
+        empty.menu?.add([Commands.createTable, Commands.diskUsage, Commands.refresh])
         empty.setAccessibilityIdentifier("database.empty")
         empty.translatesAutoresizingMaskIntoConstraints = false
         for column in Self.columns {
@@ -61,11 +83,13 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             tableColumn.minWidth = column.minimum
             tableColumn.headerToolTip = column.tip + "; click to sort by it"
             tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.id, ascending: true)
-            if ["rows", "data", "index"].contains(column.id) { tableColumn.headerCell.alignment = .right }
+            if Self.numericColumns.contains(column.id), column.id != "bar" { tableColumn.headerCell.alignment = .right }
+            tableColumn.isHidden = Self.hiddenColumns.contains(column.id)
             table.addTableColumn(tableColumn)
         }
         table.autosaveName = layoutName("Database tables")  // its widths and sort, for next time
         table.autosaveTableColumns = true
+        table.addColumnMenu(tip: "Show or hide this column")
         table.style = .fullWidth
         table.stripes = true
         table.allowsMultipleSelection = true
@@ -126,16 +150,17 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     /// Shows the cache's tables again, in the chosen order, keeping the selection.
     func reload() {
-        let selected = Set(table.selectedRowIndexes.compactMap { rows[safe: $0]?.name })
+        let selected = Set(table.selectedRowIndexes.compactMap { rows[safe: $0] })
         let found = open.snapshot.database(database)
         let text = filter.stringValue.trimmingCharacters(in: .whitespaces)
-        let all = found?.tables ?? []
+        let all = found.map(Self.objects) ?? []
         rows = sorted(text.isEmpty ? all : all.filter { $0.name.localizedCaseInsensitiveContains(text) }, found?.statistics ?? [:])
+        largest = max(1, rows.compactMap { Self.stats($0, found?.statistics ?? [:]) }.map(Self.space).max() ?? 1)
         table.reloadData()
-        table.selectRowIndexes(IndexSet(rows.indices.filter { selected.contains(rows[$0].name) }), byExtendingSelection: false)
+        table.selectRowIndexes(IndexSet(rows.indices.filter { selected.contains(rows[$0]) }), byExtendingSelection: false)
         let loading = open.loading.contains(.statistics(database))
         if loading { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
-        var parts = [(text.isEmpty ? "" : "\(rows.count) of ") + "\(all.count) table\(all.count == 1 ? "" : "s") and views"]
+        var parts = [(text.isEmpty ? "" : "\(rows.count) of ") + "\(all.count) object\(all.count == 1 ? "" : "s")"]
         if let found { parts.append(found.charset + " · " + found.collation) }
         if loading { parts.append("reading sizes…") } else if found?.statistics == nil, let error = open.loadError {
             parts.append("couldn't read sizes: " + error)
@@ -143,22 +168,52 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         caption.stringValue = found == nil ? "This database isn't on the server any more." : parts.joined(separator: " · ")
         caption.toolTip = caption.stringValue
         empty.stringValue = !rows.isEmpty || found == nil ? ""
-            : all.isEmpty ? "No tables yet. Right-click here and choose Create Table…." : "No table has “\(text)” in its name."
+            : all.isEmpty ? "No tables yet. Right-click here and choose Create Table…." : "Nothing has “\(text)” in its name."
         empty.isHidden = empty.stringValue.isEmpty
     }
 
-    private func sorted(_ tables: [SchemaTable], _ statistics: [String: TableStatistics]) -> [SchemaTable] {
+    /// All a table takes, free space included: what its bar is long for.
+    private static func space(_ stats: TableStatistics) -> Int { size(stats) + (stats.dataFree ?? 0) }
+
+    private static func size(_ stats: TableStatistics) -> Int { (stats.dataLength ?? 0) + (stats.indexLength ?? 0) }
+
+    private static func averageRow(_ stats: TableStatistics?) -> Int? {
+        guard let stats, let rows = stats.rows, rows > 0, let data = stats.dataLength else { return nil }
+        return data / rows
+    }
+
+    /// Everything in the database: its tables first, as the tree has them.
+    private static func objects(_ database: SchemaDatabase) -> [Listed] {
+        database.tables.map { table in
+            Listed(name: table.name, kind: table.kind == .view ? .view : table.kind == .sequence ? .sequence : .table,
+                   engine: table.engine, comment: table.comment)
+        }
+        + database.routines.map { Listed(name: $0.name, kind: $0.kind == .procedure ? .procedure : .function, comment: $0.comment) }
+        + database.triggers.map { Listed(name: $0.name, kind: .trigger) }
+        + database.events.map { Listed(name: $0.name, kind: .event, comment: $0.comment) }
+    }
+
+    /// Only tables have statistics; a routine may share a table's name.
+    private static func stats(_ row: Listed, _ statistics: [String: TableStatistics]) -> TableStatistics? {
+        row.kind.isTableLike ? statistics[row.name] : nil
+    }
+
+    private func sorted(_ tables: [Listed], _ statistics: [String: TableStatistics]) -> [Listed] {
         guard let sort = table.sortDescriptors.first, let key = sort.key else { return tables }
-        func value(_ table: SchemaTable) -> String { text(key, table, statistics[table.name]) }
-        func number(_ table: SchemaTable) -> Int {
-            let stats = statistics[table.name]
+        func value(_ table: Listed) -> String { text(key, table, Self.stats(table, statistics)) }
+        func number(_ table: Listed) -> Int {
+            let stats = Self.stats(table, statistics)
             switch key {
             case "rows": return stats?.rows ?? -1
             case "data": return stats?.dataLength ?? -1
-            default: return stats?.indexLength ?? -1
+            case "index": return stats?.indexLength ?? -1
+            case "free": return stats?.dataFree ?? -1
+            case "average": return Self.averageRow(stats) ?? -1
+            case "autoIncrement": return stats?.autoIncrement.map { Int(clamping: $0) } ?? -1
+            default: return stats.map(Self.size) ?? -1  // the bar and Size
             }
         }
-        let numeric = ["rows", "data", "index"].contains(key)
+        let numeric = Self.numericColumns.contains(key)
         return tables.sorted { first, second in
             let ordered = numeric ? number(first) < number(second)
                 : value(first).localizedStandardCompare(value(second)) == .orderedAscending
@@ -166,16 +221,20 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         }
     }
 
-    private func text(_ column: String, _ table: SchemaTable, _ stats: TableStatistics?) -> String {
-        let bytes = ByteCountFormatter()
-        bytes.countStyle = .file
-        bytes.allowsNonnumericFormatting = false  // 0 KB, not Zero KB
-        bytes.allowedUnits = [.useKB, .useMB, .useGB, .useTB]
+    private func text(_ column: String, _ table: Listed, _ stats: TableStatistics?) -> String {
         switch column {
         case "name": return table.name
+        case "type": return table.kind.noun
         case "rows": return table.kind == .view ? "view" : stats?.rows.map { $0.formatted() } ?? ""
-        case "data": return stats?.dataLength.map { bytes.string(fromByteCount: Int64($0)) } ?? ""
-        case "index": return stats?.indexLength.map { bytes.string(fromByteCount: Int64($0)) } ?? ""
+        case "data": return DiskUsage.size(stats?.dataLength)
+        case "index": return DiskUsage.size(stats?.indexLength)
+        case "size": return stats?.dataLength == nil && stats?.indexLength == nil ? "" : DiskUsage.size(stats.map(Self.size))
+        case "free": return DiskUsage.size(stats?.dataFree)
+        case "average": return DiskUsage.size(Self.averageRow(stats))
+        case "autoIncrement": return stats?.autoIncrement.map { $0.formatted() } ?? ""
+        case "created": return stats?.createTime ?? ""
+        case "format": return stats?.rowFormat ?? ""
+        case "options": return stats?.createOptions ?? ""
         case "engine": return table.engine ?? ""
         case "collation": return stats?.collation ?? ""
         case "updated": return stats?.updateTime ?? ""
@@ -185,9 +244,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     /// The selected tables, as the commands take them.
     var selectedObjects: [DatabaseObject] {
-        table.selectedRowIndexes.compactMap { rows[safe: $0] }.map { table in
-            DatabaseObject(table.kind == .view ? .view : table.kind == .sequence ? .sequence : .table, database, table.name)
-        }
+        table.selectedRowIndexes.compactMap { rows[safe: $0] }.map { DatabaseObject($0.kind, database, $0.name) }
     }
 
     // MARK: Table
@@ -196,15 +253,25 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let id = tableColumn?.identifier.rawValue, let schemaTable = rows[safe: row] else { return nil }
+        if id == "bar" {
+            let stats = Self.stats(schemaTable, open.snapshot.database(database)?.statistics ?? [:])
+            let bar = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("cell.bar"), owner: nil) as? SizeBar ?? SizeBar()
+            bar.identifier = NSUserInterfaceItemIdentifier("cell.bar")
+            bar.parts = SizeBar.Parts(data: Double(stats?.dataLength ?? 0) / Double(largest), index: Double(stats?.indexLength ?? 0) / Double(largest),
+                                      free: Double(stats?.dataFree ?? 0) / Double(largest))
+            bar.toolTip = stats.map { "\(DiskUsage.size($0.dataLength ?? 0)) data, \(DiskUsage.size($0.indexLength ?? 0)) indexes, "
+                + "\(DiskUsage.size($0.dataFree ?? 0)) free" }
+            return bar
+        }
         let field = (tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("cell." + id), owner: nil) as? NSTextField)
             ?? NSTextField(labelWithString: "")
         field.identifier = NSUserInterfaceItemIdentifier("cell." + id)
         field.lineBreakMode = .byTruncatingTail
-        let value = text(id, schemaTable, open.snapshot.database(database)?.statistics?[schemaTable.name])
+        let value = text(id, schemaTable, Self.stats(schemaTable, open.snapshot.database(database)?.statistics ?? [:]))
         field.stringValue = value
         field.toolTip = value.isEmpty ? nil : value
-        field.alignment = ["rows", "data", "index"].contains(id) ? .right : .left
-        field.font = ["rows", "data", "index"].contains(id) ? .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        field.alignment = Self.numericColumns.contains(id) ? .right : .left
+        field.font = Self.numericColumns.contains(id) ? .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
             : .systemFont(ofSize: 12, weight: id == "name" ? .medium : .regular)
         field.textColor = id == "name" ? .labelColor : .secondaryLabelColor
         return field
@@ -226,18 +293,37 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
     func contextMenu() -> NSMenu? {
         guard !selectedObjects.isEmpty else { return empty.menu }
         let menu = NSMenu(title: "Table")
-        menu.add([Commands.openData, Commands.openStructure, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, nil,
+        guard selectedObjects.allSatisfy(\.kind.isTableLike) else {
+            menu.add([Commands.openObject, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, nil, Commands.drop, nil, Commands.refresh])
+            return menu
+        }
+        menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.copyName, Commands.copyPlainName, Commands.copyCreate, nil,
                   Commands.generateSelect, Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable, Commands.bulkEdit])
         menu.addItem(NavigatorMenus.maintenance())
-        menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.refresh])
+        menu.add([nil, Commands.truncate, Commands.rename, Commands.drop, nil, Commands.diskUsage, Commands.refresh])
         return menu
     }
 
     // MARK: Commands
 
+    /// The selected table's indexes and partitions; with none or several selected, the database's tables.
+    @objc func showDiskUsage(_ sender: Any?) {
+        let one = selectedObjects.count == 1 ? selectedObjects[0] : nil
+        (view.window?.windowController as? MainWindowController)?.showDiskUsage(
+            open, level: one.map { .table($0.database, $0.name) } ?? .database(database))
+    }
+
     @objc func openData(_ sender: Any?) {
         guard let main = view.window?.windowController as? MainWindowController else { return }
-        for object in selectedObjects { main.openTableData(object, of: open) }
+        for object in selectedObjects {
+            if object.kind.isTableLike { main.openTableData(object, of: open) } else { main.openEditor(object, of: open) }
+        }
+    }
+
+    @objc func openObject(_ sender: Any?) { openStructure(sender) }
+
+    @objc func selectTop(_ sender: Any?) {
+        NavigatorActions.selectTop(selectedObjects, on: open, main: view.window?.windowController as? MainWindowController)
     }
 
     @objc func openStructure(_ sender: Any?) {
@@ -299,7 +385,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         let aliases = [Commands.renameF2.action: Commands.rename.action, Commands.copy.action: Commands.copyName.action]
-        let reason = item.action == Commands.refresh.action ? nil
+        let reason = [Commands.refresh.action, Commands.diskUsage.action].contains(item.action) ? nil
             : NavigatorActions.reason(for: item.action.flatMap { aliases[$0] } ?? item.action,
                                       objects: selectedObjects, databases: [], open: open, target: open, model: open.model)
         item.explain(enabled: reason == nil, reason: reason)

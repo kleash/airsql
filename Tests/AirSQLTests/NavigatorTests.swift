@@ -87,7 +87,7 @@ extension AppTests {
             let view = try #require(preview.shown as? DatabaseViewController)
             _ = await eventually(timeout: 10) { open.snapshot.database("airsql_fixture")?.statistics != nil && open.loading.isEmpty }
             view.reload()
-            #expect(view.rows.count == 8)
+            #expect(view.rows.filter(\.kind.isTableLike).count == 8)
             #expect(main.selectedTab?.title == "airsql_fixture")
             // A click on a table shows it in the same tab; a double-click gives it a tab of its own.
             let orders = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders"))))

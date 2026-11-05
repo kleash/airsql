@@ -164,12 +164,18 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `toolbar.explain`, `toolbar.transactionMode`, `toolbar.commit`, `toolbar.rollback`, `toolbar.cancel`.
 - **Sidebar**: `sidebar.filter`, `sidebar.connections` (select with `select pane=sidebar`), `sidebar.newConnection`,
   `sidebar.processes`. With nothing open: `firstRun.addConnection`, `firstRun.setUpAgents`; a connection's summary:
-  `summary.connect` (`summary.disconnect` once it is connecting or connected), `summary.newQuery`, `summary.edit`.
+  `summary.connect` (`summary.disconnect` while it is connecting), `summary.newQuery`, `summary.edit`; a connected one
+  shows its host page.
 - **Tabs**: `tabs`, `tabs.new`, each `tab` with `tab.close` (select with `select pane=tabs`), `tab.rename`.
 - **Navigator** (a connection's tree in the sidebar; double-click opens): a database `database.tables`; text views
   `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
   processes `processes.list`, `processes.refresh`, `processes.interval`, `processes.killQuery`,
-  `processes.killConnection`; sheets `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
+  `processes.killConnection`, `processes.statement`; the host page `host.panes`, `host.properties`, `host.readSizes`,
+  `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
+  `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
+  `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
+  Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; sheets
+  `newDatabase.name`, `rename.name`, `copyTable.name`, `copyTable.database`,
   `copyTable.where`, `copyTable.rows`, `bulk.database`, `bulk.engine`.
 - **Connection editor** (File ▸ New Connection, Connection ▸ Edit…; Save is the person's for what is theirs):
   `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and

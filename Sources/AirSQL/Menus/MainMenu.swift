@@ -131,6 +131,11 @@ final class OffReasons: NSObject, NSMenuDelegate {
     ]
     private static let inCompare: Set<Selector> = [Commands.syncScript.action, Commands.exportReport.action,
                                                    Commands.copySyncScript.action, Commands.leaveOutOfCompare.action]
+    private static let inLists: [Selector: String] = [
+        Commands.diskUsageUp.action: "Open Tools ▸ Disk Usage first", Commands.diskUsageCompare.action: "Open Tools ▸ Disk Usage first",
+        Commands.copyList.action: "Open Disk Usage or Server Home first", Commands.exportList.action: "Open Disk Usage or Server Home first",
+        Commands.editVariable.action: "Open Database ▸ Server Home ▸ Variables first",
+    ]
 
     /// Tells `menu` and its submenus, but not those that make their own items, or the system's.
     static func watch(_ menu: NSMenu) {
@@ -146,7 +151,7 @@ final class OffReasons: NSObject, NSMenuDelegate {
         while let parent = top.supermenu, parent.supermenu != nil { top = parent }
         for item in menu.items where !item.isEnabled {
             guard let action = item.action, NSApp.target(forAction: action, to: item.target, from: item) == nil else { continue }
-            let reason = Self.inCompare.contains(action) ? "Open Tools ▸ Compare… first" : Self.reasons[top.title]
+            let reason = Self.inCompare.contains(action) ? "Open Tools ▸ Compare… first" : Self.inLists[action] ?? Self.reasons[top.title]
             item.toolTip = reason ?? Commands.tip(for: item)
         }
     }
