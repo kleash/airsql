@@ -126,6 +126,7 @@ final class GridToolbar: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         validate()
+        setNeedsValidation()  // a tab's view can reach the window before its controller joins the chain
     }
 
     @objc private func pressed(_ sender: NSButton) {

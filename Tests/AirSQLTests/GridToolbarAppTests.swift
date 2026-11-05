@@ -29,6 +29,20 @@ extension AppTests {
             #expect(panel.contentTintColor == .accent)
         }
 
+        @Test func aConsolesResultReachesTheConsolesCommands() async throws {
+            let (main, _, console) = try await ConsoleAppTests.console()
+            console.addResult(ConsoleFixtures.customers(rows: 2), title: "One", summary: "")
+            console.selectResult(console.resultTabs[0])
+            main.window?.layoutIfNeeded()
+            let view = try #require(console.resultTabs[0].view as? ResultGridView)
+            view.toolbar.validate()
+            for command in [Commands.pinResult, Commands.exportResult, Commands.compareResult] {
+                #expect(view.toolbar.button(command)?.isHidden == false, "\(command.title)")
+            }
+            view.toolbar.button(Commands.pinResult)?.performClick(nil)
+            #expect(console.resultTabs[0].pinned)
+        }
+
         @Test func theFindButtonOpensTheFindBarFromAnywhere() async throws {
             let (main, _, tab) = try await GridDataAppTests.tab()
             main.window?.makeFirstResponder(main.sidebar.outline)
