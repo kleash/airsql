@@ -13,7 +13,7 @@ extension AppTests.InteractionTests {
         let views = SidebarNode.Kind.category(id, "airsql_fixture", .view)
         let tableMenu = ["Open Data", "Open Structure", "Select Top 1000 Rows", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…",
                          "Add to Favourites", "Find Where Used…", "New Column…", "New Index…", "New Foreign Key…", "Edit Comment…", "Generate SELECT",
-                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare", "Diagram of Selected Tables", "Diagram of Neighbours",
+                         "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare Two Selected", "Diagram of Selected Tables", "Diagram of Neighbours",
                          "Maintenance", "Truncate…", "Rename…", "Drop…", "Disk Usage", "Modify Grants…", "Refresh"]
         let treeOnly: Set<String> = ["Add to Favourites", "Find Where Used…", "New Column…", "New Index…", "New Foreign Key…", "Edit Comment…", "Open CREATE in Query Tab",
                                      "SQL Generator…", "Diagram of Selected Tables", "Diagram of Neighbours"]
@@ -36,7 +36,7 @@ extension AppTests.InteractionTests {
                         main.model.openConnection(id)?.currentDatabase == "airsql_fixture" && expanded(main, .database(id, "airsql_fixture"))
                     },
                     menu: ["New Query", "New Database…", "Create Table…", "Copy Name", "Copy Name Without Quotes", "Export…", "Restore…", "Generate Liquibase Changelog…", "SQL Generator…",
-                           "Compare With…", "Compare", "Disk Usage", "Modify Grants…", "Edit Database…", "Refresh", "Drop…"],
+                           "Compare With…", "Compare Two Selected", "Disk Usage", "Modify Grants…", "Edit Database…", "Refresh", "Drop…"],
                     enabled: ["New Query", "New Database…", "Create Table…", "Export…", "Restore…", "Compare With…", "Refresh", "Drop…"]),
             Surface(name: "Table or view in the tree",
                     place: { main, _ in treeRow(main, .object(id, orders))?.point },
@@ -47,14 +47,14 @@ extension AppTests.InteractionTests {
                     place: { main, _ in treeRow(main, .object(id, procedure))?.point },
                     clicked: { preview($0) is TextContent && $0.selectedTab?.title == "add_customer" },
                     doubleClicked: { main, _ in main.selectedTab?.content is ObjectEditorController },
-                    menu: ["Open", "Run…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Add to Favourites", "Find Where Used…", "Edit Comment…", "Compare With…", "Compare", "Modify Grants…", "Drop…", "Refresh"],
-                    enabled: ["Open", "Run…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Add to Favourites", "Find Where Used…", "Edit Comment…", "Compare With…", "Drop…", "Refresh"]),
+                    menu: ["Open Definition", "Run Routine…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Add to Favourites", "Find Where Used…", "Edit Comment…", "Compare With…", "Compare Two Selected", "Modify Grants…", "Drop…", "Refresh"],
+                    enabled: ["Open Definition", "Run Routine…", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…", "Add to Favourites", "Find Where Used…", "Edit Comment…", "Compare With…", "Drop…", "Refresh"]),
             Surface(name: "Folder or category in the tree",
                     place: { main, _ in treeRow(main, views)?.point },
                     clicked: { $0.sidebar.selectedNodes.map(\.kind) == [views] },
                     doubleClicked: { main, _ in expanded(main, views) },
-                    menu: ["New…", "Refresh", "Expand All", "Collapse All"],
-                    enabled: ["New…", "Refresh", "Expand All", "Collapse All"]),
+                    menu: ["New Object…", "Refresh", "Expand All", "Collapse All"],
+                    enabled: ["New Object…", "Refresh", "Expand All", "Collapse All"]),
             Surface(name: "Table in the database view",
                     place: { main, _ in
                         guard let open = main.model.openConnection(id) else { return nil }
@@ -89,8 +89,8 @@ extension AppTests.InteractionTests {
                         main.window?.endSheet(sheet)
                         return true
                     },
-                    menu: ["Kill Query…", "Kill Connection…", "Copy Query", "Explain"],
-                    enabled: ["Kill Query…", "Kill Connection…", "Copy Query", "Explain"]),
+                    menu: ["Kill Query…", "Kill Connection…", "Copy Process's Query", "Explain"],
+                    enabled: ["Kill Query…", "Kill Connection…", "Copy Process's Query", "Explain"]),
         ]
     }()
 }

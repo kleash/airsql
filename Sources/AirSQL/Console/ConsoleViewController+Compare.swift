@@ -1,7 +1,7 @@
 import AirSQLCore
 import AppKit
 
-/// Compare With… (the result tab's menu and Query ▸ Compare With…): the shown result against another result of this
+/// Compare With… (the result tab's menu and Query ▸ Result ▸ Compare Result With…): the shown result against another result of this
 /// window, or a table of its connection, matched on a key. The rows that differ open in a result tab of their own, in the
 /// grid as the compare window shows a table's (a `DiffSource`): the shown result is the first side.
 extension ConsoleViewController {

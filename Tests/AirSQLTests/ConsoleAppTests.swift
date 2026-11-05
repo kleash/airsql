@@ -148,7 +148,7 @@ extension AppTests {
             #expect(menu.error == nil, "\(menu.error ?? "")")
         }
 
-        /// Edit ▸ Lines and the commands around it: what each does to the text, the cursor, and that Undo takes it back.
+        /// Edit ▸ SQL ▸ Lines and the commands around it: what each does to the text, the cursor, and that Undo takes it back.
         @Test func lineCommands() async throws {
             let (_, _, console) = try await Self.console()
             let editor = try #require(console.editor)
@@ -678,13 +678,13 @@ extension AppTests {
             console.addResult(two, title: "Two", summary: "")
             console.selectResult(console.resultTabs[0])
             func shown() -> String? { console.selectedResult?.title }
-            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Query > Result > Show Next Result"]).error == nil)
             #expect(shown() == "Two")
-            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Query > Result > Show Next Result"]).error == nil)
             #expect(shown() == "Messages")
-            #expect(await call(harness, "menu", ["path": "Query > Show Next Result"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Query > Result > Show Next Result"]).error == nil)
             #expect(shown() == "One")
-            #expect(await call(harness, "menu", ["path": "Query > Show Previous Result"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Query > Result > Show Previous Result"]).error == nil)
             #expect(shown() == "Messages")
             let buttons = console.results.buttons
             #expect(buttons.map(\.closeButton.isHidden) == [false, false, true])
@@ -753,13 +753,13 @@ extension AppTests {
             #expect(await call(harness, "menu", ["path": "Query > Format SQL"]).error == nil)
             #expect(console.text == "SELECT a, `from`\nFROM t\nWHERE x = 'from' -- note")
             console.editor.selectAll(nil)
-            #expect(await call(harness, "menu", ["path": "Edit > Comment Lines"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Edit > SQL > Comment Lines"]).error == nil)
             #expect(console.text == "-- SELECT a, `from`\n-- FROM t\n-- WHERE x = 'from' -- note")
-            #expect(await call(harness, "menu", ["path": "Edit > Comment Lines"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Edit > SQL > Comment Lines"]).error == nil)
             #expect(console.text == "SELECT a, `from`\nFROM t\nWHERE x = 'from' -- note")
-            #expect(await call(harness, "menu", ["path": "Edit > Shift Right"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Edit > SQL > Shift Right"]).error == nil)
             #expect(console.text.hasPrefix("    SELECT") && console.text.contains("\n    FROM"))
-            #expect(await call(harness, "menu", ["path": "Edit > Shift Left"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Edit > SQL > Shift Left"]).error == nil)
             #expect(console.text.hasPrefix("SELECT"))
         }
 

@@ -406,7 +406,7 @@ enum Commands {
     /// is the grid's own (editing the cell, the grid lanes'), so the window leaves it alone there.
     static let renameF2 = Command("Rename", #selector(AirSQLActions.renameSelection(_:)), f2, [], hidden: true,
                                   tip: "Rename what is selected: a table, view or folder in the tree, else the tab (F2)")
-    static let revealInFinder = Command("Reveal in Finder", #selector(AirSQLActions.revealInFinder(_:)),
+    static let revealInFinder = Command("Show in Finder", #selector(AirSQLActions.revealInFinder(_:)),
                                         tip: "Show the tab's .sql file in Finder")
     static let runSQLFile = Command("Run SQL File…", #selector(AirSQLActions.runSQLFile(_:)),
                                     tip: "Run the statements of a .sql or .sql.gz file on this connection, with progress")
@@ -416,7 +416,7 @@ enum Commands {
                                          tip: "Load the rows on the clipboard into a table or a new one")
     static let copyResultToTable = Command("Copy Result to Table…", #selector(AirSQLActions.copyResultToTable(_:)),
                                            tip: "Copy this result's rows into a table or a new one")
-    static let importSSHConfig = Command("Import from ~/.ssh/config…", #selector(AirSQLActions.importSSHConfig(_:)),
+    static let importSSHConfig = Command("Import from SSH Config…", #selector(AirSQLActions.importSSHConfig(_:)),
                                          tip: "Make connections that tunnel through the SSH hosts in your ~/.ssh/config")
     static let importConnections = Command("Import Connections…", #selector(AirSQLActions.importConnections(_:)),
                                            tip: "Add connections from another app or an export file, without passwords")
@@ -453,7 +453,7 @@ enum Commands {
                                         tip: "Copy the name of the selected column")
     static let copyCreate = Command("Copy CREATE", #selector(AirSQLActions.copyCreateStatement(_:)), "C", [.command, .control],
                                     tip: "Copy the statement that creates the selected object")
-    static let copyQuery = Command("Copy Query", #selector(AirSQLActions.copyQuery(_:)),
+    static let copyQuery = Command("Copy Process's Query", #selector(AirSQLActions.copyQuery(_:)),
                                    tip: "Copy the full query the selected process is running")
     static let find = Command("Find…", #selector(NSResponder.performTextFinderAction(_:)), "f",
                               tag: NSTextFinder.Action.showFindInterface.rawValue,
@@ -593,16 +593,16 @@ enum Commands {
                                            tip: "Close every result tab but this one")
     static let exportResult = Command("Export Result…", #selector(AirSQLActions.exportResult(_:)),
                                       tip: "Save this result's rows to a CSV, JSON, SQL, Excel or other file")
-    static let compareResult = Command("Compare With…", #selector(AirSQLActions.compareResult(_:)),
+    static let compareResult = Command("Compare Result With…", #selector(AirSQLActions.compareResult(_:)),
                                        tip: "Compare this result with another result or a table, row by row")
     static let toggleComment = Command("Comment Lines", #selector(AirSQLActions.toggleComment(_:)), "/",
                                        tip: "Comment out the selected lines with --, or take the comment away")
     static let shiftRight = Command("Shift Right", #selector(AirSQLActions.indentLines(_:)), "]", tip: "Indent the selected lines")
     static let shiftLeft = Command("Shift Left", #selector(AirSQLActions.outdentLines(_:)), "[",
                                    tip: "Take one indent off the selected lines")
-    static let moveRowsUp = Command("Move Up", #selector(AirSQLActions.moveRowsUp(_:)), up, [.command, .control, .shift],
+    static let moveRowsUp = Command("Move Row Up", #selector(AirSQLActions.moveRowsUp(_:)), up, [.command, .control, .shift],
                                     tip: "Move the selected columns one place up in the table")
-    static let moveRowsDown = Command("Move Down", #selector(AirSQLActions.moveRowsDown(_:)), down, [.command, .control, .shift],
+    static let moveRowsDown = Command("Move Row Down", #selector(AirSQLActions.moveRowsDown(_:)), down, [.command, .control, .shift],
                                       tip: "Move the selected columns one place down in the table")
     static let goToLine = Command("Go to Line…", #selector(AirSQLActions.goToLine(_:)), "g", .control, tip: "Go to a line of the SQL by its number")
     static let wordWrap = Command("Word Wrap", #selector(AirSQLActions.toggleWordWrap(_:)),
@@ -697,9 +697,9 @@ enum Commands {
     static let lastPage = Command("Last Page", #selector(AirSQLActions.showLastPage(_:)),
                                   tip: "Count the rows, then show the table's last page")
     static let pageSize = Command("Rows per Page", #selector(AirSQLActions.setPageSize(_:)), tip: "Choose how many rows this tab loads at a time")
-    static let copyTableQuery = Command("Copy Query", #selector(AirSQLActions.copyTableQuery(_:)),
+    static let copyTableQuery = Command("Copy Table's Query", #selector(AirSQLActions.copyTableQuery(_:)),
                                         tip: "Copy the SELECT this tab runs, with its filter and sort")
-    static let openTableQuery = Command("Open Query in Console", #selector(AirSQLActions.openTableQuery(_:)),
+    static let openTableQuery = Command("Open Table's Query in a Tab", #selector(AirSQLActions.openTableQuery(_:)),
                                         tip: "Open the SELECT this tab runs, with its filter and sort, in a new query tab")
     static let orderBy = Command("Order By…", #selector(AirSQLActions.typeOrderBy(_:)), tip: "Type any ORDER BY for the table, expressions included")
     static let hideOtherColumns = Command("Hide Other Columns", #selector(AirSQLActions.hideOtherColumns(_:)),
@@ -733,13 +733,13 @@ enum Commands {
                                      tip: "Create a database with a character set and collation")
     static let createTable = Command("Create Table…", #selector(AirSQLActions.createTable(_:)), "n", [.command, .control],
                                      tip: "Design a new table: its columns, keys and options")
-    static let createObject = Command("New…", #selector(AirSQLActions.createObject(_:)),
+    static let createObject = Command("New Object…", #selector(AirSQLActions.createObject(_:)),
                                       tip: "Create another of what is selected in the tree: a table, view, routine, trigger or event")
     static let openData = Command("Open Data", #selector(AirSQLActions.openData(_:)), tip: "Open the table's rows in a tab of their own")
     static let openStructure = Command("Open Structure", #selector(AirSQLActions.openStructure(_:)), "o", [.command, .option],
                                        tip: "Open the table's columns, indexes and keys in the table editor")
-    static let openObject = Command("Open", #selector(AirSQLActions.openObject(_:)), tip: "Open the routine, trigger or event in its editor")
-    static let runRoutine = Command("Run…", #selector(AirSQLActions.runRoutine(_:)),
+    static let openObject = Command("Open Definition", #selector(AirSQLActions.openObject(_:)), tip: "Open the routine, trigger or event in its editor")
+    static let runRoutine = Command("Run Routine…", #selector(AirSQLActions.runRoutine(_:)),
                                     tip: "Put a CALL of the procedure, or a SELECT of the function, in a query tab to fill in")
     static let generateSelect = Command("Generate SELECT", #selector(AirSQLActions.generateSelect(_:)),
                                         tip: "Put a SELECT of this table's columns in a query tab")
@@ -872,7 +872,7 @@ enum Commands {
                                  tip: "Compare two servers, databases or objects, and make a script that syncs them")
     static let compareWith = Command("Compare With…", #selector(AirSQLActions.compareWith(_:)),
                                      tip: "Compare the selected connection, database or object with another you choose")
-    static let compareRows = Command("Compare", #selector(AirSQLActions.compareRows(_:)),
+    static let compareRows = Command("Compare Two Selected", #selector(AirSQLActions.compareRows(_:)),
                                      tip: "Compare the two selected connections, databases or objects with each other")
     static let backToServer = Command("Back to All Databases", #selector(AirSQLActions.backToServer(_:)),
                                       tip: "Go back to the server compare's list of databases")
@@ -948,7 +948,7 @@ enum Commands {
                                          tip: "Jump to where the alias or WITH query at the cursor is declared, or open its table")
     static let findUsages = Command("Find Usages…", #selector(AirSQLActions.findUsages(_:)), f7, .option,
                                     tip: "List every place in this text that means the name at the cursor")
-    static let renameSymbol = Command("Rename Name…", #selector(AirSQLActions.renameSymbol(_:)), f6, .shift,
+    static let renameSymbol = Command("Rename at Cursor…", #selector(AirSQLActions.renameSymbol(_:)), f6, .shift,
                                       tip: "Rename the name at the cursor in this text; a table or column gets its statement too")
     static let quickDocumentation = Command("Quick Documentation", #selector(AirSQLActions.quickDocumentation(_:)), f1, [],
                                             tip: "Show the columns, type or signature of the name at the cursor or the row selected in the tree")
@@ -1012,6 +1012,21 @@ enum Commands {
     /// Menu items that only open a submenu, by title.
     static let submenus: [String: String] = [
         "Server Home": "Show what the server holds and does: databases, variables, status, processes",
+        "Focus": "Put the keyboard in the sidebar, the editor or the results",
+        "Server": "Look after the server: its home page, variables and what it is running",
+        "Users": "Manage the server's logins, roles and grants",
+        "Generate": "Write a statement for the selected table in a new query tab",
+        "Go To": "Follow the name at the cursor or the selected object: its rows, its definition, what uses it",
+        "Table Parts": "Add a column, an index or a foreign key to the selected table",
+        "Set Value": "Set the selected cells to NULL, DEFAULT, an expression or a value the server works out",
+        "Foreign Keys": "Follow, choose and label what a foreign key points at, or add one AirSQL keeps for itself",
+        "Columns": "Hide, freeze and choose how the selected column shows",
+        "Pages": "Move through the table's rows a page at a time, or load more",
+        "Run Special": "Run in another way: as one statement, one subquery, from the cursor or into a file",
+        "Result": "Work with the result shown: pin it, rename it, run it again, export it or compare it",
+        "SQL": "Change the SQL in the editor: comments, lines, statements, carets and folding",
+        "In Compare": "The compare window's commands: its script, its report and moving between differences",
+        "In the List": "Disk Usage's and Server Home's commands for the list shown",
         "Flush": "Clear the server's caches, logs and counters, or lock its tables",
         "Move to Folder": "Put the selected connections in a folder",
         "Connect To": "Connect to a saved connection",

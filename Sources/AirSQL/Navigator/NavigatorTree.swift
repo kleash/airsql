@@ -44,7 +44,7 @@ enum TreeIcon {
         if let image = cache[letters] { return image }
         let image = NSImage(size: NSSize(width: 15, height: 15), flipped: false) { rect in
             NSColor.hex(colour).setFill()
-            NSBezierPath(roundedRect: rect, xRadius: Radius.cell, yRadius: Radius.cell).fill()
+            rect.fill()
             let text = NSAttributedString(string: letters, attributes: [
                 .font: NSFont.systemFont(ofSize: letters.count > 1 ? 7.5 : 8.5, weight: .bold), .foregroundColor: NSColor.white])
             let size = text.size()
@@ -394,9 +394,9 @@ final class TreeCell: NSTableCellView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard bar > 0 else { return }
-        let rect = NSRect(x: 0, y: 2, width: bounds.width * min(bar, 1), height: bounds.height - 4).intersection(bounds)
-        (backgroundStyle == .emphasized ? NSColor.onAccent : NSColor.accent).withAlphaComponent(0.14).setFill()
-        NSBezierPath(roundedRect: rect, xRadius: Radius.cell, yRadius: Radius.cell).fill()
+        let rect = NSRect(x: 0, y: 1, width: bounds.width * min(bar, 1), height: 2).intersection(bounds)
+        (backgroundStyle == .emphasized ? NSColor.onAccent : NSColor.accent).withAlphaComponent(0.5).setFill()
+        rect.fill()
     }
 
     override func mouseEntered(with event: NSEvent) {

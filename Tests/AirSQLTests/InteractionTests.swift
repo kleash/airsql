@@ -103,7 +103,7 @@ extension AppTests {
                             && main.model.states[Fixtures.production.id] == .connected(server: "MariaDB 11.8.3")
                     },
                     menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
-                           "Compare With…", "Compare", "Disk Usage", "Users and Roles", "Colour", "Move to Folder", "Move Up", "Move Down", "Databases Shown…", "Delete…"],
+                           "Compare With…", "Compare Two Selected", "Disk Usage", "Users and Roles", "Colour", "Move to Folder", "Move Up", "Move Down", "Databases Shown…", "Delete…"],
                     enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour",
                               "Move Up", "Move Down", "Databases Shown…", "Delete…"]),
             Surface(name: "Folder in the sidebar",
@@ -125,7 +125,7 @@ extension AppTests {
                     clicked: { $0.selectedTab?.title == "Query 1" && $0.contentKind == "tab" },
                     doubleClicked: { main, _ in tabButton(main, "Query 1").renameField != nil },
                     menu: ["Close Tab", "Close Other Tabs", "Close All Tabs", "Duplicate Tab", "Rename Tab…", "Pin Tab", "Move Tab to New Window",
-                           "Move Tab to Next Window", "Reveal in Finder",
+                           "Move Tab to Next Window", "Show in Finder",
                            "Change Connection…"],
                     enabled: ["Close Tab", "Close Other Tabs", "Close All Tabs", "Duplicate Tab", "Rename Tab…"]),
             Surface(name: "Result tab",
@@ -147,7 +147,7 @@ extension AppTests {
                         guard let console = main.selectedTab?.content as? ConsoleViewController else { return false }
                         return console.results.tabButton(for: console.resultTabs[0])?.renameField != nil
                     },
-                    menu: ["Run Result Again", "Copy Result's Query", "Open Result in Window", "Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Copy Result to Table…", "Compare With…"],
+                    menu: ["Run Result Again", "Copy Result's Query", "Open Result in Window", "Pin Result", "Rename Result…", "Close Result", "Close Other Results", "Export Result…", "Copy Result to Table…", "Compare Result With…"],
                     enabled: ["Pin Result", "Rename Result…", "Close Result", "Export Result…", "Copy Result to Table…"]),
             // region: a plain text cell (a foreign key's double-click opens its drop-down, an ENUM's its list).
             Surface(name: "Table rows: cell",

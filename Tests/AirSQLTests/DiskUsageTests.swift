@@ -178,7 +178,7 @@ extension AppTests {
             #expect(kinds.isSuperset(of: [.table, .view, .procedure, .trigger]))
             let routine = try #require(view.rows.firstIndex { $0.kind == .procedure })
             view.table.selectRowIndexes(IndexSet(integer: routine), byExtendingSelection: false)
-            #expect(view.contextMenu()?.items.map(\.title).contains("Open") == true)
+            #expect(view.contextMenu()?.items.map(\.title).contains("Open Definition") == true)
             #expect(view.contextMenu()?.items.map(\.title).contains("Truncate…") == false)
             let row = view.table.view(atColumn: view.table.column(withIdentifier: .init("type")), row: routine, makeIfNecessary: true)
             #expect((row as? NSTextField)?.stringValue == "procedure")

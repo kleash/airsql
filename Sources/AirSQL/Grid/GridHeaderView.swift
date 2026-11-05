@@ -45,7 +45,9 @@ final class GridHeaderView: NSView {
 
     /// The width a column needs for its header: the key marks, the longer of name and type, the sort control.
     func width(for column: GridColumn) -> CGFloat {
-        let name = (column.name as NSString).size(withAttributes: [.font: nameFont]).width + CGFloat(icons(column).count) * 13
+        // As `drawLabels` lays them out. Measured only when a column is sized, never while drawing; the symbols are cached.
+        let marks = icons(column).reduce(CGFloat(0)) { $0 + (symbol($1.0, size: grid.fontSize - 3, color: $1.1)?.size.width ?? 0) + 3 }
+        let name = (column.name as NSString).size(withAttributes: [.font: nameFont]).width + marks
         let type = (column.typeLine as NSString).size(withAttributes: [.font: typeFont]).width
         return ceil(max(name, type)) + 8 + 4 + Self.sortWidth + (funnels ? Self.funnelWidth : 0)
     }

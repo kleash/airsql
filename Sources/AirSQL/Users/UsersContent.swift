@@ -25,9 +25,9 @@ final class UsersContent: NSViewController, TabContent, NSMenuItemValidation {
     private let spinner = NSProgressIndicator()
     /// SHOW GRANTS of the selected account, with any password hash masked.
     let grantsText = NSTextView()
-    private(set) lazy var newUserButton = button("New User…", id: "users.new", tip: Commands.newUser.tip, target: self, action: #selector(newUser(_:)))
-    private(set) lazy var newRoleButton = button("New Role…", id: "users.newRole", tip: Commands.newRole.tip, target: self, action: #selector(newRole(_:)))
-    private(set) lazy var editButton = button("Edit…", id: "users.edit", tip: Commands.editUser.tip, target: self, action: #selector(editUser(_:)))
+    private(set) lazy var newUserButton = button("New User…", id: "users.new", tip: Commands.newUser.tip, target: self, action: #selector(newUser(_:))).onBar("person.badge.plus")
+    private(set) lazy var newRoleButton = button("New Role…", id: "users.newRole", tip: Commands.newRole.tip, target: self, action: #selector(newRole(_:))).onBar("person.2")
+    private(set) lazy var editButton = button("Edit…", id: "users.edit", tip: Commands.editUser.tip, target: self, action: #selector(editUser(_:))).onBar("pencil")
     private(set) lazy var list = HostList(
         name: "Users and Roles",
         columns: [
@@ -85,12 +85,17 @@ final class UsersContent: NSViewController, TabContent, NSMenuItemValidation {
         scroll.hasVerticalScroller = true
         scroll.translatesAutoresizingMaskIntoConstraints = false
         grantsText.isEditable = false
+        grantsText.backgroundColor = .content
         grantsText.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
         grantsText.textContainerInset = NSSize(width: Spacing.unit, height: Spacing.unit)
         grantsText.autoresizingMask = .width
         grantsText.toolTip = "What the selected account holds, in the server's words"
         grantsText.setAccessibilityIdentifier("users.grants")
-        [top, list.view, scroll].forEach(root.addSubview)
+        scroll.borderType = .noBorder
+        let grantsTitle = label("Grants", font: .systemFont(ofSize: 11.5, weight: .semibold), color: .secondaryLabelColor)
+        let grantsLine = Hairline()
+        for part in [grantsTitle, grantsLine] { part.translatesAutoresizingMaskIntoConstraints = false }
+        [top, list.view, grantsLine, grantsTitle, scroll].forEach(root.addSubview)
         NSLayoutConstraint.activate([
             top.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double),
             top.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
@@ -98,7 +103,12 @@ final class UsersContent: NSViewController, TabContent, NSMenuItemValidation {
             list.view.topAnchor.constraint(equalTo: top.bottomAnchor, constant: Spacing.unit),
             list.view.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             list.view.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: list.view.bottomAnchor),
+            grantsLine.topAnchor.constraint(equalTo: list.view.bottomAnchor),
+            grantsLine.leadingAnchor.constraint(equalTo: root.leadingAnchor), grantsLine.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            grantsLine.heightAnchor.constraint(equalToConstant: 1),
+            grantsTitle.topAnchor.constraint(equalTo: grantsLine.bottomAnchor, constant: Spacing.half),
+            grantsTitle.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
+            scroll.topAnchor.constraint(equalTo: grantsTitle.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
@@ -154,7 +164,7 @@ final class UsersContent: NSViewController, TabContent, NSMenuItemValidation {
             return HostList.Row(key: account.key, cells: [
                 "user": account.user, "host": account.host, "kind": account.isRole ? "Role" : "Login", "plugin": account.plugin,
                 "password": !account.takesPassword ? "" : account.hasPassword ? "Set" : "None", "state": state.joined(separator: ", "),
-                "limits": figures.allSatisfy { $0 == 0 } ? "" : figures.map(String.init).joined(separator: " / "),
+                "limits": zip(figures, ["queries/h", "updates/h", "logins/h", "at once"]).filter { $0.0 != 0 }.map { "\($0.0) \($0.1)" }.joined(separator: ", "),
                 "tls": ["", "Any", "X509", "Specified"][ServerAccount.TLS.Kind.allCases.firstIndex(of: account.tls.kind) ?? 0],
             ])
         })
@@ -171,7 +181,7 @@ final class UsersContent: NSViewController, TabContent, NSMenuItemValidation {
     private func selectionChanged() {
         updateButtons()
         readingGrants?.cancel()
-        grantsText.string = ""
+        grantsText.string = "Select an account to see what it holds."
         guard selected.count == 1, let account = selected.first else { return }
         readingGrants = Task { [weak self] in
             guard let self else { return }

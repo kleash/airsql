@@ -82,7 +82,7 @@ extension AppTests {
             first.pinned = true
             console.selectResult(first)
             let before = first.content.store?.string(0, 0)
-            #expect(await call(harness, "menu", ["path": "Query > Run Result Again"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "Query > Result > Run Result Again"]).error == nil)
             _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
             #expect(console.resultTabs.count == 2)
             let again = try #require(console.resultTabs.first)

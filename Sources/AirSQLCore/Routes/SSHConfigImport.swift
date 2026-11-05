@@ -1,6 +1,6 @@
 import Foundation
 
-/// The hosts of an ssh_config file the person picked (File ▸ Import from ~/.ssh/config…), for making connections that
+/// The hosts of an ssh_config file the person picked (File ▸ Import from SSH Config…), for making connections that
 /// tunnel through them. Only named hosts count: patterns (`*`, `?`, `!`) and Match blocks are settings, not hosts.
 public enum SSHConfigImport {
     /// A Host of the file and what it says about itself, for the import list.

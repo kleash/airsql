@@ -5,7 +5,7 @@ nav_order: 19
 
 # Users and roles
 
-**Users and Roles** lists a server's logins and roles and changes them. Open it from **Database ▸ Users and Roles**, from
+**Users and Roles** lists a server's logins and roles and changes them. Open it from **Database ▸ Users ▸ Users and Roles**, from
 a connection's right-click menu, or with a click on the **Users and Roles** row at the end of its tree.
 
 The list shows each account's name, host, kind, login method, whether it has a password (never what it is), whether it's

@@ -48,24 +48,40 @@ extension TableDataController {
             pageSwitch.setToolTip(page.command.tip + " (" + page.command.shortcut + ")", forSegment: page.rawValue)
         }
         pageSwitch.setEnabled(objectKind != .sequence, forSegment: TablePage.structure.rawValue)
-        let line = Hairline()
-        for part in [pageSwitch, line, dataPage, pageHolder] as [NSView] {
+        pageBar.translatesAutoresizingMaskIntoConstraints = false
+        pageBar.clipsToBounds = true
+        pageBarHeight = pageBar.heightAnchor.constraint(equalToConstant: 0)
+        for part in [pageBar, dataPage, pageHolder] as [NSView] {
             part.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(part)
         }
         NSLayoutConstraint.activate([
-            pageSwitch.topAnchor.constraint(equalTo: view.topAnchor, constant: Spacing.half),
-            pageSwitch.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Spacing.unit),
-            line.topAnchor.constraint(equalTo: pageSwitch.bottomAnchor, constant: Spacing.half),
-            line.leadingAnchor.constraint(equalTo: view.leadingAnchor), line.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            line.heightAnchor.constraint(equalToConstant: 1),
+            pageBar.topAnchor.constraint(equalTo: view.topAnchor), pageBarHeight,
+            pageBar.leadingAnchor.constraint(equalTo: view.leadingAnchor), pageBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         for part in [dataPage, pageHolder] {
             NSLayoutConstraint.activate([
-                part.topAnchor.constraint(equalTo: line.bottomAnchor), part.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+                part.topAnchor.constraint(equalTo: pageBar.bottomAnchor), part.bottomAnchor.constraint(equalTo: view.bottomAnchor),
                 part.leadingAnchor.constraint(equalTo: view.leadingAnchor), part.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             ])
         }
+        placeSwitch()
+    }
+
+    /// The switch stands at the start of the rows' toolbar; on the other pages, on a bar of its own, with what the page
+    /// wants beside it (`pageActions`).
+    private func placeSwitch() {
+        pageBarHeight.constant = page == .data ? 0 : 31
+        if page == .data {
+            pageBar.subviews.forEach { $0.removeFromSuperview() }
+            toolbar.leadingView = pageSwitch
+            return
+        }
+        toolbar.leadingView = nil
+        pageBar.subviews.forEach { $0.removeFromSuperview() }
+        let row = actionBar([pageSwitch, NSView()] + ((pages[page] as? TableEditorController)?.barActions ?? []), spacing: Spacing.unit)
+        pageBar.addSubview(row)
+        row.pin(to: pageBar)
     }
 
     /// What was chosen last, unless this object hasn't such a page.
@@ -95,6 +111,7 @@ extension TableDataController {
         dataPage.isHidden = page != .data
         pageHolder.isHidden = page == .data
         pages.values.forEach { $0.view.isHidden = true }
+        defer { placeSwitch() }
         if page == .data {
             view.window?.makeFirstResponder(grid)
             if rowsWaiting {
@@ -123,7 +140,9 @@ extension TableDataController {
         } else if objectKind == .view {
             content = ObjectEditorController(context: context, kind: .view, database: database, name: tableName, table: nil, activity: model.activity)
         } else {
-            content = TableEditorController(context: context, database: database, table: tableName, activity: model.activity)
+            let editor = TableEditorController(context: context, database: database, table: tableName, activity: model.activity)
+            editor.inTab = true
+            content = editor
         }
         pages[page] = content
         addChild(content)

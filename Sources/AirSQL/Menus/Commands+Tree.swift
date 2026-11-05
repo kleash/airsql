@@ -41,7 +41,7 @@ extension Commands {
 
     static let quickDefinition = Command("Quick Definition", #selector(SidebarController.quickDefinition(_:)), f1, .option,
                                          tip: "Peek at the CREATE statement of the row selected in the tree or the name at the cursor")
-    static let openNameData = Command("Open Data of Name", #selector(SidebarController.openNameData(_:)), f4, [],
+    static let openNameData = Command("Open Table at Cursor", #selector(SidebarController.openNameData(_:)), f4, [],
                                       tip: "Open the rows of the table at the cursor or selected, or a group of the tree as a list")
     static let goToDDL = Command("Go to DDL", #selector(SidebarController.goToDDL(_:)), "b", [.command, .option],
                                  tip: "Show the statement that makes the table or object selected, or the one at the cursor")

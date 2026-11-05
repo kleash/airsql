@@ -25,6 +25,8 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         [.init(Commands.pinResult, "pin"), .init(Commands.compareResult, "arrow.left.arrow.right"), .init(Commands.exportResult, "square.and.arrow.up")],
     ])
     private let bars = NSStackView()
+    /// The header and about three rows.
+    static let smallestViewer: CGFloat = 36 + 3 * 23
     /// Over the grid when there are no rows to show.
     let emptyNote = TableEmptyNote()
     /// Whether the find bar's Filter Rows was hiding rows at the last change.
@@ -129,6 +131,10 @@ final class ResultGridView: NSView, DataGridViewDelegate {
     func showToolbar() {
         bars.insertView(toolbar, at: 0, in: .top)
         toolbar.widthAnchor.constraint(equalTo: bars.widthAnchor).isActive = true
+        // However many bars show, and wherever the divider was left, rows show: the split gives way, the editor shrinks.
+        let rowsShow = viewer.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.smallestViewer)
+        rowsShow.priority = .defaultHigh
+        rowsShow.isActive = true
         viewer.toolbar = toolbar
         updateToolbarEditing()
     }

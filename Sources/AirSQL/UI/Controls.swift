@@ -337,10 +337,32 @@ final class ReturnTable: ContentTable {
 extension NSTableView {
     /// Rows `height` tall with their line of text in the middle: a label used as a cell draws at the top of its frame, so
     /// the height beyond a line goes to the space between rows.
+    /// Column headers in the bar's colour, as the grid's, not the system's black in Deep Water.
+    func themeHeader() {
+        for column in tableColumns {
+            let cell = BarHeaderCell(textCell: column.title)
+            cell.alignment = column.headerCell.alignment
+            cell.font = column.headerCell.font
+            column.headerCell = cell
+        }
+    }
+
     func centreText(rowHeight height: CGFloat) {
         rowSizeStyle = .custom
         rowHeight = 16
         intercellSpacing.height = height - rowHeight
+    }
+}
+
+private final class BarHeaderCell: NSTableHeaderCell {
+    override func draw(withFrame frame: NSRect, in view: NSView) {
+        let frame = frame.intersection(view.bounds)
+        NSColor.bar.solid.setFill()
+        frame.fill()
+        NSColor.softSeparator.setFill()
+        NSRect(x: frame.maxX - 1, y: frame.minY + 4, width: 1, height: frame.height - 8).fill()
+        NSRect(x: frame.minX, y: frame.maxY - 1, width: frame.width, height: 1).fill()
+        drawInterior(withFrame: frame.insetBy(dx: 0, dy: max(0, (frame.height - 18) / 2)), in: view)
     }
 }
 

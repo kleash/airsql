@@ -13,7 +13,7 @@ final class StatusBarView: NSView {
     let transaction = StatusItemView(id: "status.transaction", chip: .tinted(.statusWarning), keepsText: true)
     let activity = StatusItemView(id: "status.activity", spinner: true)
     let agent = StatusItemView(id: "status.agent", chip: .accent)
-    let sqlLog = NSButton(title: "SQL log", target: nil, action: Commands.sqlLog.action)
+    let sqlLog = NSButton(title: "SQL Log", target: nil, action: Commands.sqlLog.action)
     /// The tab's own items (`TabContent.statusAccessory`).
     let accessory = NSStackView()
     static let height: CGFloat = 26
@@ -29,10 +29,10 @@ final class StatusBarView: NSView {
         sqlLog.isBordered = false
         sqlLog.font = .systemFont(ofSize: 11.5)
         sqlLog.contentTintColor = .accent
-        sqlLog.attributedTitle = NSAttributedString(string: "SQL log", attributes: [.foregroundColor: NSColor.accent,
+        sqlLog.attributedTitle = NSAttributedString(string: "SQL Log", attributes: [.foregroundColor: NSColor.accent,
                                                                                     .font: NSFont.systemFont(ofSize: 11.5)])
         sqlLog.setAccessibilityIdentifier("status.sqlLog")
-        let logMenu = NSMenu(title: "SQL log")
+        let logMenu = NSMenu(title: "SQL Log")
         logMenu.add([Commands.sqlLog, Commands.clearSQLLog])
         sqlLog.menu = logMenu
         sqlLog.translatesAutoresizingMaskIntoConstraints = false

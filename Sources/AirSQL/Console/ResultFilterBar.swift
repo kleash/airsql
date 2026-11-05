@@ -7,7 +7,7 @@ import AppKit
 @MainActor
 final class ResultFilterBar: NSView, NSSearchFieldDelegate {
     weak var owner: ResultGridView?
-    let scope = ChipView("Local · every row", style: .neutral)
+    let scope = ChipView("Local · all rows", style: .neutral)
     let conditionsText = label("", font: .monospacedSystemFont(ofSize: 12, weight: .regular), truncates: true)
     let clearButton = NSButton()
     let searchField = NSSearchField()
@@ -81,7 +81,7 @@ final class ResultFilterBar: NSView, NSSearchFieldDelegate {
                 + "the column's collation, and LIKE ignores case and accents"
         }
         clearButton.isHidden = conditions.isEmpty && searchField.stringValue.isEmpty
-        scope.text = shown == total ? "Local · every row" : "Local · \(shown.formatted()) of \(total.formatted()) rows"
+        scope.text = shown == total ? "Local · all rows" : "Local · \(shown.formatted()) of \(total.formatted()) rows"
     }
 
     @objc private func clear(_ sender: Any?) { owner?.clearFilter(sender) }

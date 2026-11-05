@@ -170,8 +170,9 @@ final class ConsoleViewController: NSViewController, TabContent {
         editor.onFind = { [weak find] action in find?.perform(action) }
         split.addArrangedSubview(scroll)
         split.addArrangedSubview(results)
-        split.setHoldingPriority(.defaultLow - 1, forSubviewAt: 0)
-        split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 1)
+        // Equal: a change of the window's height is shared, so a bigger window shows more rows as well as more SQL.
+        split.setHoldingPriority(.defaultLow, forSubviewAt: 0)
+        split.setHoldingPriority(.defaultLow, forSubviewAt: 1)
         outer.isVertical = true
         outer.dividerStyle = .thin
         outer.addArrangedSubview(split)

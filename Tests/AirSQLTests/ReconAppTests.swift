@@ -590,7 +590,8 @@ extension AppTests {
             #expect(menu.items.map(\.title) == ["Copy", "Copy Sync Script", "Include in Sync Script", "Leave Out of Next Compare"])
             let menuBar = MainMenu.build()
             for item in menu.items {
-                #expect(menuBar.items.contains { $0.submenu?.items.contains { $0.action == item.action } == true }, "\(item.title)")
+                func holds(_ menu: NSMenu?) -> Bool { menu?.items.contains { $0.action == item.action || holds($0.submenu) } == true }
+                #expect(holds(menuBar), "\(item.title)")
             }
             window.leaveOutOfCompare(nil)
             #expect(window.options.choice("products").included == false)

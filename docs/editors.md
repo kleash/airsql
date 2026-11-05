@@ -54,7 +54,7 @@ connection of their own, and the editor reads the table back from the server.
 
 ## Views, procedures, functions, triggers and events
 
-Open one from the tree, or start a new one from **Database ▸ New Object**. The editor shows its CREATE statement, as the
+Open one from the tree, or start a new one from **Database ▸ New Object ▸ New Object**. The editor shows its CREATE statement, as the
 server keeps it, to edit as text, with its head as fields above it:
 
 - **Procedures and functions**: name, return type, data access, security, deterministic, comment, and the parameters, which **+**, **−**
@@ -83,7 +83,7 @@ the fields turn off until it is.
 
 ## The ER diagram
 
-**Database ▸ ER Diagram** draws a database's tables with their keys. Tables that point at nothing come first on the left,
+**Database ▸ Diagram ▸ ER Diagram** draws a database's tables with their keys. Tables that point at nothing come first on the left,
 and each table sits right of the tables its foreign keys point at; lines go from a key's column to the table it points
 at, virtual foreign keys you added in a table's rows included ([Virtual foreign keys](table-data.md#foreign-key-labels-and-virtual-foreign-keys)).
 Tables with no keys come last.

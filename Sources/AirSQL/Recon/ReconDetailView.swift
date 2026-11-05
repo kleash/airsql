@@ -165,12 +165,13 @@ final class ReconDetailView: NSObject {
             tabs.setEnabled(false, forSegment: segment)
             tabs.setToolTip("Compare first: then there is something to show", forSegment: segment)
         }
+        for control in [tabs, style, previous, next] as [NSView] { control.isHidden = true }
         structure.isHidden = true
         rowsHolder.isHidden = true
         message.stringValue = "Choose what to compare on each side, then Compare (⌘R). The script it makes changes the target "
             + "only when you run it."
         message.isHidden = false
-        scriptTitle.stringValue = "Sync script · review before running"
+        scriptTitle.stringValue = "Sync script · it shows here after a compare"
     }
 
     /// A server compare's pair: what it found, in words; its details open with the pair.
@@ -184,6 +185,7 @@ final class ReconDetailView: NSObject {
         ignoring.stringValue = ""
         ignoring.toolTip = nil
         for control in [style, previous, next, destructive] as [NSView] { control.isHidden = true }
+        tabs.isHidden = false
         message.isHidden = false
         scriptTitle.stringValue = "Sync script · each pair of databases has its own"
         text(script).string = ""
@@ -204,6 +206,7 @@ final class ReconDetailView: NSObject {
 
     func update() {
         guard let result else { return }
+        tabs.isHidden = false
         if result.isServer { return showPair(result) }
         tabs.setEnabled(true, forSegment: 0)
         tabs.setToolTip(Self.structureTip, forSegment: 0)

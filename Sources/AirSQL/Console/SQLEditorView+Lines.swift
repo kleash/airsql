@@ -1,7 +1,7 @@
 import AirSQLCore
 import AppKit
 
-/// Edit ▸ Lines and the commands on the selection or the word at the cursor. Each is one change that Undo takes back.
+/// Edit ▸ SQL ▸ Lines and the commands on the selection or the word at the cursor. Each is one change that Undo takes back.
 extension SQLEditorView {
     @objc func duplicateLine(_ sender: Any?) {
         let lines = selectedLines, selection = selectedRange()
@@ -113,14 +113,14 @@ extension SQLEditorView {
         ("CASE", "CASE WHEN $SELECTION$ THEN $value$ END$END$"), ("COALESCE", "COALESCE($SELECTION$, $value$)$END$"), ("Backticks", "`$SELECTION$`$END$"),
     ]
 
-    /// Edit ▸ Surround With ▸ a template (the item's represented body), around the selection or the word at the cursor.
+    /// Edit ▸ SQL ▸ Surround With ▸ a template (the item's represented body), around the selection or the word at the cursor.
     @objc func surroundWith(_ sender: Any?) {
         guard let body = (sender as? NSMenuItem)?.representedObject as? String else { return }
         let range = selectionOrWord
         insertTemplate(body, replacing: range, selection: (string as NSString).substring(with: range))
     }
 
-    /// Edit ▸ Paste from History ▸ one of the editor's last copies (the item's represented text).
+    /// Edit ▸ SQL ▸ Paste from History ▸ one of the editor's last copies (the item's represented text).
     @objc func pasteFromHistory(_ sender: Any?) {
         guard let text = (sender as? NSMenuItem)?.representedObject as? String else { return }
         replace(selectedRange(), with: text, select: NSRange(location: selectedRange().location + (text as NSString).length, length: 0))

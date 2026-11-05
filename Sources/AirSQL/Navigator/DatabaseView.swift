@@ -85,7 +85,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
             tableColumn.title = column.title
             tableColumn.width = column.width
             tableColumn.minWidth = column.minimum
-            tableColumn.headerToolTip = column.tip + "; click to sort by it"
+            tableColumn.headerToolTip = "Sort by this column: " + column.tip
             tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.id, ascending: true)
             if Self.numericColumns.contains(column.id), column.id != "bar" { tableColumn.headerCell.alignment = .right }
             tableColumn.isHidden = Self.hiddenColumns.contains(column.id)
@@ -94,6 +94,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         table.autosaveName = layoutName("Database tables")  // its widths and sort, for next time
         table.autosaveTableColumns = true
         table.addColumnMenu(tip: "Show or hide this column")
+        table.themeHeader()
         table.style = .fullWidth
         table.stripes = true
         table.allowsMultipleSelection = true
@@ -229,7 +230,7 @@ final class DatabaseViewController: NSViewController, TabContent, NSTableViewDat
         switch column {
         case "name": return table.name
         case "type": return table.kind.noun
-        case "rows": return table.kind == .view ? "view" : stats?.rows.map { $0.formatted() } ?? ""
+        case "rows": return table.kind == .view ? "" : stats?.rows.map { $0.formatted() } ?? ""
         case "data": return DiskUsage.size(stats?.dataLength)
         case "index": return DiskUsage.size(stats?.indexLength)
         case "size": return stats?.dataLength == nil && stats?.indexLength == nil ? "" : DiskUsage.size(stats.map(Self.size))

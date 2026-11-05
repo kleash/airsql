@@ -44,7 +44,7 @@ final class SQLLogViewController: NSViewController, NSSearchFieldDelegate, NSTex
         text.setAccessibilityIdentifier("sqlLog.text")
         text.usesFindBar = true
         text.isIncrementalSearchingEnabled = true
-        filter.placeholderString = "Filter: words a line contains"
+        filter.placeholderString = "Filter lines"
         filter.toolTip = "Type words to show only the lines that contain them"
         filter.setAccessibilityIdentifier("sqlLog.filter")
         filter.delegate = self
@@ -53,34 +53,47 @@ final class SQLLogViewController: NSViewController, NSSearchFieldDelegate, NSTex
                             action: #selector(revealLog(_:)))
         let clear = button("Clear Log…", id: "sqlLog.clear", tip: Commands.clearSQLLog.tip, target: self,
                            action: #selector(clearSQLLog(_:)))
-        var parts: [NSView] = [filter, status, NSView(), reveal, clear, helpButton(.sqlLog)]
-        if docked {
-            let window = button("Open in Window", id: "sqlLog.window", tip: "Show the log in a window of its own", target: self,
-                                action: #selector(openInWindow(_:)))
-            parts.insert(window, at: 3)
-            [reveal, clear, window].forEach { $0.controlSize = .small }
-        }
-        let bar = NSStackView(views: parts)
-        bar.spacing = Spacing.unit
-        let width = filter.widthAnchor.constraint(equalToConstant: 280)
-        width.priority = .defaultLow
-        width.isActive = true
-        filter.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
         let root = SurfaceView(.ground)
-        for view in [bar, scroll] {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            root.addSubview(view)
+        if docked {
+            // Docked it is all lines: its buttons stand in a strip beside them, the filter is in its window.
+            let window = button("Open in Window", id: "sqlLog.window", tip: "Show the log in a window of its own, with its filter", target: self,
+                                action: #selector(openInWindow(_:)))
+            let strip = NSStackView(views: [window.onBar("macwindow"), reveal.onBar("folder"), clear.onBar("trash")])
+            strip.orientation = .vertical
+            strip.spacing = 0
+            for part in [strip, scroll] as [NSView] {
+                part.translatesAutoresizingMaskIntoConstraints = false
+                root.addSubview(part)
+            }
+            NSLayoutConstraint.activate([
+                strip.topAnchor.constraint(equalTo: root.topAnchor, constant: 2),
+                strip.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.half),
+                scroll.topAnchor.constraint(equalTo: root.topAnchor),
+                scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+                scroll.trailingAnchor.constraint(equalTo: strip.leadingAnchor, constant: -Spacing.half),
+                scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            ])
+        } else {
+            let bar = NSStackView(views: [filter, status, NSView(), reveal, clear, helpButton(.sqlLog)])
+            bar.spacing = Spacing.unit
+            let width = filter.widthAnchor.constraint(equalToConstant: 280)
+            width.priority = .defaultLow
+            width.isActive = true
+            filter.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
+            for part in [bar, scroll] {
+                part.translatesAutoresizingMaskIntoConstraints = false
+                root.addSubview(part)
+            }
+            NSLayoutConstraint.activate([
+                bar.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+                bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
+                bar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
+                scroll.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: 10),
+                scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+                scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+                scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            ])
         }
-        let margin: CGFloat = docked ? 4 : 12
-        NSLayoutConstraint.activate([
-            bar.topAnchor.constraint(equalTo: root.topAnchor, constant: margin),
-            bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: docked ? Spacing.unit : 16),
-            bar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: docked ? -Spacing.unit : -16),
-            scroll.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: docked ? 4 : 10),
-            scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-        ])
         view = root
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {

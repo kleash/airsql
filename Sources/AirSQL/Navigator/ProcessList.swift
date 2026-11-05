@@ -27,9 +27,9 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     private var refreshing: Task<Void, Never>?
     private var timer: Task<Void, Never>?
     private let killQuery = button("Kill Query…", id: "processes.killQuery", tip: Commands.killQuery.tip, target: nil,
-                                   action: Commands.killQuery.action)
+                                   action: Commands.killQuery.action).onBar("xmark.octagon")
     private let killConnection = button("Kill Connection…", id: "processes.killConnection", tip: Commands.killConnection.tip,
-                                        target: nil, action: Commands.killConnection.action)
+                                        target: nil, action: Commands.killConnection.action).onBar("bolt.slash")
     static let intervals = [0, 2, 5, 10, 30]
     private static let columns: [(String, String, CGFloat)] = [("id", "Id", 60), ("user", "User", 96), ("host", "Host", 150),
         ("db", "Database", 100), ("command", "Command", 84), ("time", "Time", 64), ("state", "State", 150), ("info", "Query", 300)]
@@ -53,28 +53,25 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     override func loadView() {
         let root = SurfaceView(.content)
         root.setAccessibilityIdentifier("processes")
-        let title = label("Processes", font: .systemFont(ofSize: 15, weight: .semibold))
         interval.target = self
         interval.action = #selector(intervalChosen)
         let refreshButton = button("Refresh", id: "processes.refresh", tip: Commands.refresh.tipWithShortcut, target: self,
-                             action: #selector(refresh(_:)))
+                             action: #selector(refresh(_:))).onBar("arrow.clockwise")
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityLabel("Refreshing")
-        let bar = NSStackView(views: [title, spinner, NSView(), interval, refreshButton, killQuery, killConnection])
-        bar.spacing = Spacing.unit
-        bar.translatesAutoresizingMaskIntoConstraints = false
         status.setAccessibilityIdentifier("processes.status")
         filter.placeholderString = "Filter"
         filter.toolTip = "Type words to show only the processes that contain them"
         filter.setAccessibilityIdentifier("processes.filter")
         filter.delegate = self
         filter.sendsSearchStringImmediately = true
-        filter.widthAnchor.constraint(equalToConstant: 200).isActive = true
-        let narrow = NSStackView(views: [status, NSView(), hideSleeping, filter, helpButton(.navigator)])
-        narrow.spacing = Spacing.unit
-        narrow.translatesAutoresizingMaskIntoConstraints = false
+        filter.controlSize = .small
+        filter.widthAnchor.constraint(equalToConstant: 180).isActive = true
+        status.setContentHuggingPriority(.init(1), for: .horizontal)
+        status.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let bar = actionBar([refreshButton, killQuery, killConnection, interval, spinner, status, hideSleeping, filter, helpButton(.navigator)], spacing: Spacing.half)
         for (id, title, width) in Self.columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             column.title = title
@@ -83,7 +80,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
             if id == "id" || id == "time" { column.headerCell.alignment = .right }
             // Time starts with the longest running, the main reason to sort.
             column.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: id != "time")
-            column.headerToolTip = (Self.columnTips[id].map { $0 + ". " } ?? "") + "Click to sort by it, again to reverse"
+            column.headerToolTip = "Sort by this column, click again to reverse" + (Self.columnTips[id].map { ": " + $0 } ?? "")
             table.addTableColumn(column)
         }
         table.autosaveName = layoutName("Processes")  // its widths and sort, for next time
@@ -93,6 +90,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         table.allowsMultipleSelection = true
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.centreText(rowHeight: 24)
+        table.themeHeader()
         table.dataSource = self
         table.delegate = self
         table.target = self
@@ -121,15 +119,12 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
         statementScroll.drawsBackground = false
         statementScroll.translatesAutoresizingMaskIntoConstraints = false
         let line = Hairline()
-        [bar, narrow, scroll, line, statementScroll].forEach(root.addSubview)
+        [bar, scroll, line, statementScroll].forEach(root.addSubview)
         NSLayoutConstraint.activate([
-            bar.topAnchor.constraint(equalTo: root.topAnchor, constant: Spacing.double - 2),
-            bar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: Spacing.double),
-            bar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -Spacing.double),
-            narrow.topAnchor.constraint(equalTo: bar.bottomAnchor, constant: Spacing.half),
-            narrow.leadingAnchor.constraint(equalTo: bar.leadingAnchor),
-            narrow.trailingAnchor.constraint(equalTo: bar.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: narrow.bottomAnchor, constant: Spacing.unit),
+            bar.topAnchor.constraint(equalTo: root.topAnchor),
+            bar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            bar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: bar.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             line.topAnchor.constraint(equalTo: scroll.bottomAnchor),

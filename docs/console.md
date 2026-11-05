@@ -62,7 +62,7 @@ session of its own, so a long query in one tab leaves the others free.
 - **Snippets** keep SQL to use again. **Query ▸ Save as Snippet…** saves the selection or the statement, with a name, a
   folder and an abbreviation of your own. In the SQL, `$name$` is a field, `$END$` is where the cursor ends, `$SELECTION$`
   the selected text and `$$` a dollar. They're kept in AirSQL's settings on this Mac. A snippet with `$SELECTION$` is also in
-  **Edit ▸ Surround With**.
+  **Edit ▸ SQL ▸ Surround With**.
 - **View ▸ Query Helpers** shows beside the editor the columns of the tables the statement at the cursor names (or of the
   table selected in the tree, when it names none), the server's functions by kind, the keywords, your **Snippets** and the
   built-in ones, and the connection's **History** by day, each with a bar as long as it took. Double-click one to put it
@@ -83,29 +83,29 @@ session of its own, so a long query in one tab leaves the others free.
 - Text pasted inside a `'string'` is escaped so its quotes don't end the string; **Paste Without Formatting** keeps it as copied.
 - Return after `(` indents one level, and between `(` and `)` puts the `)` on a line of its own.
 - The `BEGIN` or `CASE` and `END` of a block are marked when the cursor is on one of them.
-- **Edit ▸ Surround With** wraps the selection or the word at the cursor in brackets, a subquery, `CASE`, `COALESCE` or backticks.
-- **Edit ▸ Paste from History** lists the last ten texts you copied or cut in an editor. They're kept in memory only, until you quit.
-- **Edit ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
+- **Edit ▸ SQL ▸ Surround With** wraps the selection or the word at the cursor in brackets, a subquery, `CASE`, `COALESCE` or backticks.
+- **Edit ▸ SQL ▸ Paste from History** lists the last ten texts you copied or cut in an editor. They're kept in memory only, until you quit.
+- **Edit ▸ SQL ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
-- **Edit ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
+- **Edit ▸ SQL ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
   (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
-- **Edit ▸ Lines** works on the selected lines, or the cursor's: **Duplicate Line** (⌃D), **Delete Line** (⌃⇧K), **Move Line Up** and
+- **Edit ▸ SQL ▸ Lines** works on the selected lines, or the cursor's: **Duplicate Line** (⌃D), **Delete Line** (⌃⇧K), **Move Line Up** and
   **Down** (⌥⇧↑, ⌥⇧↓), **Join Lines** (⌃⇧J; a line ending in a `--` comment, or a line break inside a string, stays), **Sort Lines** and
   **Reverse Lines**. ⌘C with nothing selected copies the line.
-- **Edit ▸ Statements** has **Next Statement** and **Previous Statement** (⌃⌥↓, ⌃⌥↑), **Select Statement** (⌃⌘A) and **Move Statement
+- **Edit ▸ SQL ▸ Statements** has **Next Statement** and **Previous Statement** (⌃⌥↓, ⌃⌥↑), **Select Statement** (⌃⌘A) and **Move Statement
   Up** and **Down** (⌃⇧↑, ⌃⇧↓). **Extend Selection** (⌥↑) grows the selection by syntax: the word, the list item or condition, the
   clause, the brackets, the statement, then everything; **Shrink Selection** (⌥↓) takes those steps back.
-- **Edit ▸ Comment Selection** (⌥⌘/) puts `/* */` around the selection, or takes it away. **Toggle Case** (⌃⇧U) puts the selection or
+- **Edit ▸ SQL ▸ Comment Selection** (⌥⌘/) puts `/* */` around the selection, or takes it away. **Toggle Case** (⌃⇧U) puts the selection or
   the word at the cursor in capitals, or in small letters. **Complete Statement** (⌃⇧↩) closes its brackets, adds its `;` and starts a
   new line.
-- **Edit ▸ Carets** lets you type in several places at once. **Select Next Occurrence** (⌥⌘G) selects the word at the cursor, then
+- **Edit ▸ SQL ▸ Carets** lets you type in several places at once. **Select Next Occurrence** (⌥⌘G) selects the word at the cursor, then
   adds a caret at each next place its text appears; **Select All Occurrences** (⌃⌘G) does them all. **Add Caret to Each Line** (⌃⇧G)
   puts one at the end of each selected line, **Add Caret Above** and **Below** (⌃⌥⇧↑, ⌃⌥⇧↓) one on the next line, and ⌥⇧-click one
   where you click. ⌥-drag selects a block, as does a plain drag in **Column Selection Mode** (⌘*), where ⇧↑ and ⇧↓ add carets too.
   Typing, deleting and moving happen at every caret. Copy takes a line from each, and Paste gives each caret its line when the
   counts match. Escape, or a click, goes back to one caret.
 - **Folding**: a triangle in the margin marks what can fold: a statement, brackets or a comment of several lines, or the lines between
-  `-- region` and `-- endregion`. Click it, or use **Edit ▸ Folding**: **Fold** and **Unfold** (⌃⌥←, ⌃⌥→), **Fold All** and **Unfold All**
+  `-- region` and `-- endregion`. Click it, or use **Edit ▸ SQL ▸ Folding**: **Fold** and **Unfold** (⌃⌥←, ⌃⌥→), **Fold All** and **Unfold All**
   (⌃⌥⇧←, ⌃⌥⇧→). The text stays whole: Run, Copy, Find and Save see all of it, and a click on **…**, moving the cursor into a fold, or an
   edit touching it opens it.
 - The cursor's line has a band and, when the text has several statements, the statement it's in has a light shade: that's what ⌘↩
@@ -178,10 +178,10 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
 |---|---|
 | The statement at the cursor, or the selected text | ⌘↩ (or ⌃F9) |
 | Only the selected text | Query ▸ Run Selection |
-| The selected text as it stands, not split on `;` | Query ▸ Run Selection as One Statement |
-| The smallest query in brackets around the cursor | Query ▸ Run Subquery |
-| The statement at the cursor and every one after it | Query ▸ Run from Cursor |
-| The rows of a SELECT, straight to a .csv, .tsv or .json file | Query ▸ Run to File… |
+| The selected text as it stands, not split on `;` | Query ▸ Run Special ▸ Run Selection as One Statement |
+| The smallest query in brackets around the cursor | Query ▸ Run Special ▸ Run Subquery |
+| The statement at the cursor and every one after it | Query ▸ Run Special ▸ Run from Cursor |
+| The rows of a SELECT, straight to a .csv, .tsv or .json file | Query ▸ Run Special ▸ Run to File… |
 | Every statement | ⇧⌘↩ (or F9) |
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
@@ -239,15 +239,15 @@ share the current database too.
 
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
-  tabs, unless you **pin** one (right-click it, or Query ▸ Pin Result); a result with edits not yet applied stays too.
-  A tab's ✕ closes it. **Query ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
+  tabs, unless you **pin** one (right-click it, or Query ▸ Result ▸ Pin Result); a result with edits not yet applied stays too.
+  A tab's ✕ closes it. **Query ▸ Result ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
   Messages included.
-- **Query ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
+- **Query ▸ Result ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
   which keeps its name and pin. **Copy Result's Query** copies the statement. **View ▸ Refresh Every** does it every few
   seconds, for a statement that only reads, until it fails or you choose Off.
 - **Open Result in Window** moves a result to a window of its own, to keep beside the query. Closing it with edits not
   applied asks first.
-- **Query ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
+- **Query ▸ Result ▸ Keep Results of Each Run** leaves the tab's earlier results in place at each run.
 - Double-click a result tab to rename it; right-click it to run it again, pin, rename or close it, export its rows, or compare it
   with another result or a table (**Compare With…**, see [Compare](compare.md#compare-two-results-or-a-result-with-a-table)).
   When more tabs are open than fit, scroll the tabs sideways.

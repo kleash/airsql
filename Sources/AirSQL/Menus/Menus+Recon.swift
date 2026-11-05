@@ -7,11 +7,11 @@ extension MainMenu {
         // After Compare…, for the compare window (elsewhere nothing answers them, so they are off).
         let tools = menus.tools
         let after = tools.items.firstIndex { $0.action == Commands.compare.action }.map { $0 + 1 } ?? tools.numberOfItems
-        for (offset, command) in [Commands.compareWith, Commands.compareRows, Commands.syncScript, Commands.exportReport,
-                                  Commands.copySyncScript, Commands.includeInSync, Commands.leaveOutOfCompare,
-                                  Commands.backToServer, Commands.nextDifference, Commands.previousDifference].enumerated() {
-            tools.insertItem(command.item(), at: after + offset)
-        }
+        tools.insertItem(Commands.compareWith.item(), at: after)
+        tools.insertItem(Commands.compareRows.item(), at: after + 1)
+        tools.insertItem(submenu("In Compare", [Commands.syncScript, Commands.exportReport, Commands.copySyncScript, Commands.includeInSync,
+                                                Commands.leaveOutOfCompare, Commands.backToServer, Commands.nextDifference,
+                                                Commands.previousDifference].map { $0.item() }), at: after + 2)
         // The console's statements as a changeset (LiquibaseResponder), with the console's other commands.
         let query = menus.query
         let profile = query.items.firstIndex { $0.action == Commands.profile.action }.map { $0 + 1 } ?? query.numberOfItems

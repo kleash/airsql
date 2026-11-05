@@ -11,9 +11,11 @@ server for.
 
 ## Where to read it
 
-While a server is connected, the log shows under the tabs. Drag its top edge to give it more room, and turn it off
-or on with **View ▸ SQL Log** (⌥⌘L). **Open in Window** gives it a window of its own; with nothing connected, ⌥⌘L opens that
-window. Select some SQL in it and right-click to open it in a new query tab.
+Click **SQL Log** at the right of the status bar, or choose **View ▸ SQL Log** (⌥⌘L), and while a server is connected the
+log shows under the tabs; the same again closes it. It starts closed, so the rows keep their room. Drag its top edge to
+give it more. The icons beside it open it in a window of its own, where you can filter it, show the file in Finder and
+clear it. With nothing connected, ⌥⌘L opens that window. Select some SQL in it and right-click to open it in a new query
+tab.
 
 ## Where it is
 

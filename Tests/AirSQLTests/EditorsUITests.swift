@@ -105,7 +105,7 @@ extension AppTests {
             let other = middle(4, 1)
             let menu = await call(harness, "click", ["x": other.0, "y": other.1, "button": "right"])
             #expect(list.selectedRow == 4, "a right-click selects the row it is on: \(menu.error ?? "")")
-            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Move Up", "Move Down", "Delete Rows", "New Index from Columns",
+            #expect(titles(menu["menu"]) == ["Add Row", "Duplicate Row", "Copy", "Paste", "Move Row Up", "Move Row Down", "Delete Rows", "New Index from Columns",
                                              "New Unique Index from Columns", "Add to Index"])
             // Paste waits for rows copied.
             #expect((menu["menu"] as? [[String: Any]])?.filter { $0["enabled"] as? Bool != true }.map { $0["title"] as? String } == ["Paste"])
@@ -366,7 +366,7 @@ extension AppTests {
             #expect(editor.incoming.contains { $0.table == "orders" })
             editor.showSection(.references)
             #expect(editor.list.numberOfRows == editor.incoming.count && !editor.addButton.isEnabled)
-            #expect(editor.sections.label(forSegment: TableEditorController.Section.references.rawValue)?.hasPrefix("Used by · ") == true)
+            #expect(editor.sections.label(forSegment: TableEditorController.Section.references.rawValue)?.hasPrefix("Used By · ") == true)
             editor.list.selectRowIndexes([0], byExtendingSelection: false)
             editor.deleteRows(nil)
             #expect(!editor.isEdited, "this list isn't the table's own to change")
@@ -561,8 +561,8 @@ extension AppTests {
             let bar = MainMenu.build()
             let database = try #require(bar.item(withTitle: "Database")?.submenu)
             #expect(database.items.filter { $0.action == Commands.createTable.action }.count == 1)
-            #expect(database.item(withTitle: "New Object")?.submenu?.items.map(\.title) == ["View…", "Procedure…", "Function…", "Trigger…",
-                                                                                            "Event…"])
+            #expect(database.item(withTitle: "New Object")?.submenu?.items.filter { !$0.isSeparatorItem }.map(\.title)
+                    == ["New Object…", "View…", "Procedure…", "Function…", "Trigger…", "Event…"])
             let model = testModel([Fixtures.local])
             let (main, harness) = appWindow(model)
             let connected = Editors.open
@@ -571,7 +571,7 @@ extension AppTests {
             main.sidebar.select([])
             #expect(await call(harness, "menu", ["path": "Database > Create Table…"]).error?.contains("Choose a connection first") == true)
             main.sidebar.select([Fixtures.local.id])
-            #expect(await call(harness, "menu", ["path": "Database > ER Diagram"]).error?.contains("Connect to Local MariaDB 11.8 first")
+            #expect(await call(harness, "menu", ["path": "Database > Diagram > ER Diagram"]).error?.contains("Connect to Local MariaDB 11.8 first")
                     == true)
             // Connected: each opens its tab (they then read the server through it).
             let context = try await recordedEditorContext()
@@ -580,7 +580,7 @@ extension AppTests {
             #expect(main.selectedTab?.title == "New table")
             _ = await call(harness, "menu", ["path": "Database > New Object > Trigger…"])
             #expect(main.selectedTab?.title == "New trigger")
-            _ = await call(harness, "menu", ["path": "Database > ER Diagram"])
+            _ = await call(harness, "menu", ["path": "Database > Diagram > ER Diagram"])
             #expect((main.selectedTab?.content as? ERDiagramController) != nil)
         }
     }

@@ -71,7 +71,7 @@ its own proxy) are used, after what the editor sets.
 
 ## Import hosts from ~/.ssh/config
 
-**File ▸ Import from ~/.ssh/config…** asks you to pick the file (it opens on `~/.ssh/config`), lists its hosts, and
+**File ▸ Import from SSH Config…** asks you to pick the file (it opens on `~/.ssh/config`), lists its hosts, and
 makes a connection for each one you tick: an SSH tunnel through that host to a database on `127.0.0.1:3306`, which
 you can then edit.
 

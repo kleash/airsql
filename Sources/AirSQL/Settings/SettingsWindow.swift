@@ -128,6 +128,37 @@ class SettingsPaneController: NSViewController {
 
     var helpPage: HelpPage { .settings }
 
+    /// Taller than this, a pane scrolls: its window doesn't resize, and would run off a laptop's screen.
+    static let tallest: CGFloat = 640
+
+    private func scrollForm(_ grid: NSView, _ help: NSView) {
+        let document = FlippedView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        grid.removeFromSuperview()
+        document.addSubview(grid)
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = document
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            view.heightAnchor.constraint(equalToConstant: Self.tallest),
+            scroll.topAnchor.constraint(equalTo: view.topAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: help.topAnchor, constant: -Spacing.unit),
+            document.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            document.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            document.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            grid.topAnchor.constraint(equalTo: document.topAnchor, constant: Spacing.triple),
+            grid.centerXAnchor.constraint(equalTo: document.centerXAnchor),
+            grid.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -Spacing.unit),
+        ])
+        view.layoutSubtreeIfNeeded()
+        preferredContentSize = NSSize(width: Self.width, height: Self.tallest)
+    }
+
     override func loadView() {
         build()
         let grid = form.finish()
@@ -150,6 +181,7 @@ class SettingsPaneController: NSViewController {
         view = root
         view.layoutSubtreeIfNeeded()
         preferredContentSize = view.fittingSize
+        if preferredContentSize.height > Self.tallest { scrollForm(grid, help) }
     }
 
     // MARK: Controls bound to the settings
