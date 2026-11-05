@@ -92,6 +92,9 @@ copying and editing use the stored value.
 **Detect from the Bytes** shows a 16-byte value as a UUID and readable bytes as text, and leaves the rest as stored. **UUID,
 Time First** reads a value stored with MySQL's `UUID_TO_BIN(x, 1)`.
 
+A spatial column can show as **Well-Known Text** (`POINT(1 2)`). Dates can also use **Settings' Date Format**, a pattern
+you set in **Settings ▸ Grid ▸ Date format**, such as `dd/MM/yyyy HH:mm`.
+
 ## Other commands on cells and columns
 
 - **Data ▸ Hide Other Columns** keeps only the selected columns on show; **View ▸ Reset View** puts the columns, the sort

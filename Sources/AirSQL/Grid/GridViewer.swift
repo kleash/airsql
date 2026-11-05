@@ -91,6 +91,13 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         status.update()
         NotificationCenter.default.addObserver(self, selector: #selector(gridSettingsChanged(_:)), name: .gridSettingsDidChange,
                                                object: nil)
+        if let settings = (NSApp.delegate as? AppDelegate)?.model?.data.settings { applyLook(settings) }
+    }
+
+    /// Settings ▸ Grid's font and date format.
+    private func applyLook(_ settings: AppSettings) {
+        if grid.fontFamily != settings.gridFontFamily { grid.fontFamily = settings.gridFontFamily }
+        GridDisplay.pattern = settings.gridDatePattern.isEmpty ? AppSettings().gridDatePattern : settings.gridDatePattern
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -107,6 +114,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         guard let settings = (notification.object as? AppModel)?.data.settings,
               let old = notification.userInfo?["old"] as? AppSettings else { return }
         grid.nullText = settings.nullText
+        applyLook(settings)
         if grid.fontSize == CGFloat(old.gridFontSize) { grid.fontSize = CGFloat(settings.gridFontSize) }
     }
 
@@ -246,8 +254,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             return item
         })
         return MainMenu.submenu("Display As", [item(.standard), .separator(), item(.grouped), decimals, item(.unixTime), item(.unixMillis),
-                                               .separator(), item(.dateShort), item(.dateMedium), item(.dateLong), zones, .separator(),
-                                               item(.detected), item(.uuid), item(.uuidSwapped), item(.hex), item(.text)])
+                                               .separator(), item(.dateShort), item(.dateMedium), item(.dateLong), item(.datePattern), zones, .separator(),
+                                               item(.detected), item(.uuid), item(.uuidSwapped), item(.hex), item(.text), item(.wkt)])
     }
 
     /// The host's rows or columns changed (a page arrived): shows them again.

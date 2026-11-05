@@ -138,6 +138,7 @@ import AppKit
     @objc optional func loadMore(_ sender: Any?)
     @objc optional func loadFullCell(_ sender: Any?)
     @objc optional func hideOtherColumns(_ sender: Any?)
+    @objc optional func typeOrderBy(_ sender: Any?)
     @objc optional func resetView(_ sender: Any?)
     @objc optional func openCellURL(_ sender: Any?)
     @objc optional func compareCells(_ sender: Any?)
@@ -601,6 +602,7 @@ enum Commands {
                                         tip: "Copy the SELECT this tab runs, with its filter and sort")
     static let openTableQuery = Command("Open Query in Console", #selector(AirSQLActions.openTableQuery(_:)),
                                         tip: "Open the SELECT this tab runs, with its filter and sort, in a new query tab")
+    static let orderBy = Command("Order By…", #selector(AirSQLActions.typeOrderBy(_:)), tip: "Type any ORDER BY for the table, expressions included")
     static let hideOtherColumns = Command("Hide Other Columns", #selector(AirSQLActions.hideOtherColumns(_:)),
                                           tip: "Keep only the selected columns on show")
     static let resetView = Command("Reset View", #selector(AirSQLActions.resetView(_:)),
@@ -791,7 +793,7 @@ enum Commands {
         addRow, duplicateRow, duplicateRowWithoutKeys, pasteAsNewRows, pasteWithFormat, deleteRows, setNull, setDefault, insertValue, apply, previewChanges, revert,
         filter, searchAllColumns, quickFilter, filterEquals, filterNotEquals, filterLess, filterGreater, filterStartsWith,
         filterEndsWith, filterContains, filterIn, filterNotIn, filterNull, filterNotNull, filterPrompt, filterByValues, clearFilter,
-        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, hideOtherColumns, resetView, openURL, compareCells, setExpression, firstPage, previousPage, nextPage, lastPage, pageSize, copyTableQuery, openTableQuery, loadFullCell, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
+        sortAscending, sortDescending, addToSort, sortColumns, clearSort, goToRow, chooseReferencedRow, useAsLabel, addVirtualKey, removeVirtualKey, relatedRows, columnSummary, orderBy, hideOtherColumns, resetView, openURL, compareCells, setExpression, firstPage, previousPage, nextPage, lastPage, pageSize, copyTableQuery, openTableQuery, loadFullCell, loadMore, loadAll, countRows, hideColumn, freeze, displayAs, displayZone,
         exportRows,
         newDatabase, createTable, createObject, openData, openStructure, openObject, runRoutine, generateSelect, generateInsert,
         generateUpdate, copyTable, maintenance, truncate, rename, drop, expandAll, collapseAll, findOnServer, processList, killQuery,
@@ -824,6 +826,7 @@ enum Commands {
         "Copy As": "Copy the selected cells as TSV, CSV, Markdown, JSON, SQL and more",
         "View As": viewAs.tip,
         "Refresh Every": autoRefresh.tip,
+        "Rows per Page": pageSize.tip,
         "Transaction Mode": autoCommit.tip,
         "Isolation Level": isolation.tip,
         "Insert Value": insertValue.tip,

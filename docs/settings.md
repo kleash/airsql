@@ -24,6 +24,8 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 - **Text size**: the grid's (12 pt at first), open grids' too. ⌘+, ⌘− and ⌘0 change it the same way for the grid with
   the focus; a grid made bigger or smaller keeps its size until ⌘0.
+- **Font**: the grid's font, or the system's.
+- **Date format**: the pattern Display As ▸ Settings' Date Format uses.
 - **Rows per page**: how many rows a table or result loads at a time (1,000 by default).
 - **Open tables newest first**: a table with an AUTO_INCREMENT key shows its newest rows first until you sort it (on by
   default).

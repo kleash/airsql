@@ -211,7 +211,9 @@ final class ResultGridView: NSView, DataGridViewDelegate {
         func values(_ row: Int) -> [String?] { order.map { rows.value(row, $0) } }
         let request = ExportRowsRequest(
             title: table.name == "table" ? "result" : table.name, columns: order.map { source.columns[$0] }, database: table.database,
-            table: table.name, noBackslashEscapes: viewer.noBackslashEscapes, hiddenColumns: source.columns.count - order.count, selectedCount: selected.count, selected: { selected.map(values) },
+            table: table.name, noBackslashEscapes: viewer.noBackslashEscapes, hiddenColumns: source.columns.count - order.count,
+            preview: { chosen in (chosen ? Array(selected.prefix(ExportRowsSheet.previewRows)) : Array(0..<min(ExportRowsSheet.previewRows, rows.rowCount))).map(values) },
+            selectedCount: selected.count, selected: { selected.map(values) },
             loadedCount: rows.rowCount, loaded: { (0..<rows.rowCount).map(values) }, all: nil)
         ExportRowsSheet.show(request, activity: ActivityCenter.shared, on: window)
     }

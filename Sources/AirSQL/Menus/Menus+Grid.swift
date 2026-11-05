@@ -23,7 +23,7 @@ extension MainMenu {
         menus.data.add([nil, Commands.apply, Commands.previewChanges, Commands.revert, nil, Commands.filter, Commands.searchAllColumns])
         menus.data.addItem(submenu("Quick Filter", QuickFilter.commands.map { $0.item() } + [.separator(), Commands.filterPrompt.item()]))
         menus.data.add([Commands.filterByValues, Commands.clearFilter, nil, Commands.sortAscending, Commands.sortDescending,
-                        Commands.addToSort, Commands.sortColumns, Commands.clearSort, nil,
+                        Commands.addToSort, Commands.sortColumns, Commands.orderBy, Commands.clearSort, nil,
                         Commands.goToRow, Commands.relatedRows, Commands.columnSummary, Commands.hideColumn, Commands.hideOtherColumns, Commands.freeze,
                         Commands.openURL, Commands.compareCells])
         menus.data.addItem(GridViewer.displayMenu())

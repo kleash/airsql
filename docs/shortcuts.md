@@ -106,6 +106,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Sort Descending | ⌃⌥⌘↓ |
 | Go to Row… | ⌘L |
 | Related Rows | ⌃⌘↓ |
+| Set Expression… | ⌃F2 |
 | Load More | ⌥⌘↓ |
 | Load All | ⌥⇧⌘↓ |
 | Create Table… | ⌃⌘N |

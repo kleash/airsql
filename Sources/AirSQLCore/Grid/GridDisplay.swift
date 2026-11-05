@@ -5,7 +5,7 @@ import Foundation
 /// to some decimal places, dates in the Mac's short, medium or long style. Only the look: copying and editing use the
 /// value itself.
 public enum GridDisplay: String, CaseIterable, Codable {
-    case standard, unixTime, unixMillis, grouped, uuid, hex, text, uuidSwapped, detected
+    case standard, unixTime, unixMillis, grouped, uuid, hex, text, uuidSwapped, detected, wkt, datePattern
     case decimals0, decimals1, decimals2, decimals3, decimals4
     case dateShort, dateMedium, dateLong
 
@@ -18,6 +18,8 @@ public enum GridDisplay: String, CaseIterable, Codable {
         case .uuid: return "UUID"
         case .uuidSwapped: return "UUID, Time First (UUID_TO_BIN(x, 1))"
         case .detected: return "Detect from the Bytes"
+        case .wkt: return "Well-Known Text"
+        case .datePattern: return "Settings' Date Format"
         case .hex: return "Hex"
         case .text: return "Text (UTF-8)"
         case .decimals0: return "No Decimals"
@@ -43,8 +45,9 @@ public enum GridDisplay: String, CaseIterable, Codable {
     public static func choices(for column: GridColumn) -> [GridDisplay] {
         switch column.kind {
         case .number: return [.standard, .grouped, .decimals0, .decimals1, .decimals2, .decimals3, .decimals4, .unixTime, .unixMillis]
-        case .binary: return [.standard, .detected, .uuid, .uuidSwapped, .hex, .text]
-        case .date where column.hasDate: return [.standard, .dateShort, .dateMedium, .dateLong]
+        case .binary:
+            return [.standard, .detected, .uuid, .uuidSwapped, .hex, .text] + (GridColumn.spatialTypes.contains { column.type.lowercased().hasPrefix($0) } ? [.wkt] : [])
+        case .date where column.hasDate: return [.standard, .dateShort, .dateMedium, .dateLong, .datePattern]
         default: return [.standard]
         }
     }
@@ -95,6 +98,8 @@ public enum GridDisplay: String, CaseIterable, Codable {
             return String(decoding: bytes, as: UTF8.self)
         case .dateShort, .dateMedium, .dateLong:
             return value.flatMap { Self.date($0, style: dateStyle, zone: zone) }
+        case .wkt: return bytes.flatMap(WellKnownText.init).map(\.text)
+        case .datePattern: return value.flatMap { Self.date($0, pattern: Self.pattern, zone: zone) }
         }
     }
 
@@ -118,11 +123,21 @@ public enum GridDisplay: String, CaseIterable, Codable {
         return formatter(style, hasTime: hasTime, in: to).string(from: date)
     }
 
+    /// Display As ▸ Settings' Date Format: its pattern (Settings ▸ Grid), in Unicode's letters ("dd/MM/yyyy HH:mm").
+    public static var pattern = "yyyy-MM-dd HH:mm:ss"
+
+    static func date(_ value: String, pattern: String, zone: GridZone) -> String? {
+        let main = String(value.prefix(19)), hasTime = main.count == 19
+        guard hasTime || main.count == 10, let date = formatter(nil, hasTime: hasTime, in: zone.zones.0).date(from: main) else { return nil }
+        let out = formatter(nil, hasTime: hasTime, in: zone.zones.1, pattern: pattern)
+        return out.string(from: date)
+    }
+
     /// Formatters by style, time and zone: making one takes longer than drawing a cell.
     private static var formatters: [String: DateFormatter] = [:]
 
-    private static func formatter(_ style: DateFormatter.Style?, hasTime: Bool, in zone: TimeZone) -> DateFormatter {
-        let key = "\(style.map { String($0.rawValue) } ?? "stored") \(hasTime) \(zone.identifier)"
+    private static func formatter(_ style: DateFormatter.Style?, hasTime: Bool, in zone: TimeZone, pattern: String? = nil) -> DateFormatter {
+        let key = "\(style.map { String($0.rawValue) } ?? "stored") \(hasTime) \(zone.identifier) \(pattern ?? "")"
         if let formatter = formatters[key] { return formatter }
         let formatter = DateFormatter()
         formatter.timeZone = zone
@@ -131,7 +146,7 @@ public enum GridDisplay: String, CaseIterable, Codable {
             formatter.timeStyle = !hasTime ? .none : style == .short ? .short : .medium
         } else {
             formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.dateFormat = hasTime ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd"
+            formatter.dateFormat = pattern ?? (hasTime ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd")
         }
         formatters[key] = formatter
         return formatter

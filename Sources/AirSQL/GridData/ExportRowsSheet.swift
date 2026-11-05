@@ -14,6 +14,8 @@ struct ExportRowsRequest {
     var hiddenColumns = 0
     /// Reads the selected or loaded rows' long values whole (a table's rows load them cut), then runs what's given.
     var readWhole: (_ loaded: Bool, _ then: @escaping () -> Void) -> Void = { $1() }
+    /// Up to `previewRows` of the selected or loaded rows, for the sheet's preview.
+    var preview: (_ selected: Bool) -> [[String?]] = { _ in [] }
     var selectedCount: Int
     var selected: () -> [[String?]]
     var loadedCount: Int
@@ -36,6 +38,10 @@ final class ExportRowsSheet: NSWindowController {
                                  tip: "Choose how NULL values are written in CSV, TSV, Markdown and HTML", target: nil, action: nil)
     private let crlf = checkbox("Windows line endings", id: "export.crlf", tip: "End lines with CR LF, as Windows apps expect",
                                 on: false, target: nil, action: nil)
+    private let separator = popup(["Comma", "Semicolon", "Tab", "Pipe"], selected: 0, id: "export.separator",
+                                  tip: "Choose what separates the values in CSV", target: nil, action: nil)
+    private let preview = label("", font: .monospacedSystemFont(ofSize: 11, weight: .regular), color: .secondaryLabelColor, truncates: false)
+    static let previewRows = 8
     private var copyButton: NSButton!
     private var retainUntilClosed: ExportRowsSheet?
     /// The formats in the pop-up: Excel last.
@@ -62,8 +68,10 @@ final class ExportRowsSheet: NSWindowController {
         window.title = "Export Rows of \(request.title)"
         window.backgroundColor = .ground
         super.init(window: window)
-        format.target = self
-        format.action = #selector(formatChanged(_:))
+        for control in [format, scope, headers, nullText, crlf, separator] as [NSControl] {
+            control.target = self
+            control.action = #selector(formatChanged(_:))
+        }
         window.contentView = makeContent()
         window.setContentSize(window.contentView!.fittingSize)
         formatChanged(nil)
@@ -78,6 +86,7 @@ final class ExportRowsSheet: NSWindowController {
         form.row("Format", [format])
         form.row("Options", [headers])
         form.row("NULL as", [nullText])
+        form.row("Separator", [separator])
         form.row("", [crlf])
         if request.hiddenColumns > 0 {
             let count = request.hiddenColumns
@@ -93,7 +102,13 @@ final class ExportRowsSheet: NSWindowController {
         save.keyEquivalent = "\r"
         let buttons = NSStackView(views: [helpButton(.tableData), NSView(), cancel, copyButton, save])
         buttons.spacing = Spacing.unit
-        let stack = NSStackView(views: [heading, form.finish(), buttons])
+        preview.setAccessibilityIdentifier("export.preview")
+        preview.lineBreakMode = .byClipping
+        preview.maximumNumberOfLines = Self.previewRows + 4
+        preview.toolTip = "The first rows, as they'll be written"
+        preview.widthAnchor.constraint(equalToConstant: 440).isActive = true
+        preview.heightAnchor.constraint(equalToConstant: 130).isActive = true
+        let stack = NSStackView(views: [heading, form.finish(), preview, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = Spacing.double
@@ -111,12 +126,20 @@ final class ExportRowsSheet: NSWindowController {
         copyButton.isEnabled = chosen != nil
         copyButton.toolTip = chosen == nil ? "Excel files can't go on the clipboard: export to a file instead"
             : "Put the rows on the clipboard in this format"
+        separator.isEnabled = chosen == .csv
+        separator.toolTip = chosen == .csv ? "Choose what separates the values in CSV" : "Only CSV has a choice of separator"
+        preview.stringValue = chosen.map { format in
+            // Long values are cut here only: the preview is for the shape of the file.
+            let rows = request.preview(scope.indexOfSelectedItem == 0).map { $0.map { $0.map { String($0.prefix(60)) } } }
+            return CopyWriter.text(format, columns: request.columns, rows: rows, database: request.database, table: request.table, options: options)
+        } ?? "Excel files have no text preview."
     }
 
     private var options: CopyOptions {
         var options = CopyOptions(headers: headers.state == .on, nullText: ["NULL", "\\N", ""][max(0, nullText.indexOfSelectedItem)])
         options.lineEnding = crlf.state == .on ? "\r\n" : "\n"
         options.noBackslashEscapes = request.noBackslashEscapes
+        options.separator = [",", ";", "\t", "|"][max(0, separator.indexOfSelectedItem)]
         return options
     }
 

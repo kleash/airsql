@@ -207,6 +207,9 @@ public struct AppSettings: Codable, Equatable {
     /// Settings ▸ Grid: the grid's font size, rows per page, and how NULL is shown.
     public var gridFontSize = 12.0
     public var rowsPerPage = 1_000
+    /// The grid's font family (empty: the system's) and Display As's date format.
+    public var gridFontFamily = ""
+    public var gridDatePattern = "yyyy-MM-dd HH:mm:ss"
     /// Tables with an AUTO_INCREMENT key open with their newest rows first, until sorted.
     public var newestFirst = true
     /// How much of a long value a table's page reads, in characters; the rest comes on demand. 0: all of it.
@@ -245,6 +248,8 @@ public struct AppSettings: Codable, Equatable {
         rowsPerPage = try value(.rowsPerPage, defaults.rowsPerPage)
         longValueLimit = try value(.longValueLimit, defaults.longValueLimit)
         newestFirst = try value(.newestFirst, defaults.newestFirst)
+        gridFontFamily = try value(.gridFontFamily, defaults.gridFontFamily)
+        gridDatePattern = try value(.gridDatePattern, defaults.gridDatePattern)
         nullText = try value(.nullText, defaults.nullText)
         detailsTableThreshold = try value(.detailsTableThreshold, defaults.detailsTableThreshold)
         agentsAllowed = try value(.agentsAllowed, defaults.agentsAllowed)

@@ -247,3 +247,36 @@ struct GridDisplayBytesTests {
         #expect(GridDisplay.detected.format("x", bytes: [0xFF, 0x00]) == nil)
     }
 }
+
+struct WellKnownTextTests {
+    func double(_ value: Double) -> [UInt8] { withUnsafeBytes(of: value.bitPattern.littleEndian, Array.init) }
+    func uint(_ value: UInt32) -> [UInt8] { withUnsafeBytes(of: value.littleEndian, Array.init) }
+    var srid: [UInt8] { [0, 0, 0, 0] }
+
+    func point(_ x: Double, _ y: Double) -> [UInt8] { [1] + uint(1) + double(x) + double(y) }
+
+    @Test func shapesReadAsText() throws {
+        #expect(WellKnownText(srid + point(1, 2.5))?.text == "POINT(1 2.5)")
+        let line = [1] + uint(2) + uint(2) + double(0) + double(0) + double(3) + double(4)
+        #expect(WellKnownText(srid + line)?.text == "LINESTRING(0 0, 3 4)")
+        let square = [1] + uint(3) + uint(1) + uint(2) + double(0) + double(0) + double(1) + double(1)
+        #expect(WellKnownText(srid + square)?.text == "POLYGON((0 0, 1 1))")
+        #expect(WellKnownText(srid + [1] + uint(4) + uint(2) + point(1, 2) + point(3, 4))?.text == "MULTIPOINT((1 2), (3 4))")
+        #expect(WellKnownText(srid + [1] + uint(7) + uint(1) + point(1, 2))?.text == "GEOMETRYCOLLECTION(POINT(1 2))")
+    }
+
+    @Test func bytesThatArentAShapeAreRefused() {
+        #expect(WellKnownText([1, 2]) == nil)
+        #expect(WellKnownText(srid + point(1, 2) + [9]) == nil)
+        #expect(WellKnownText(srid + [1] + uint(2) + uint(.max)) == nil)  // a count past the bytes
+        #expect(WellKnownText(srid + [1] + uint(99)) == nil)
+    }
+}
+
+struct OrderTextTests {
+    @Test func aTypedOrderByComesFirstAndCantSwallowTheRest() {
+        let source = TableDataSource(database: "shop", table: TableDataSourceTests.table())
+        source.orderText = "LENGTH(name) DESC -- longest"
+        #expect(source.pageSQL(offset: 0, limit: 5).hasSuffix("ORDER BY LENGTH(name) DESC -- longest\n, `id` ASC LIMIT 5"))
+    }
+}

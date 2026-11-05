@@ -39,6 +39,9 @@ session, a session of their own, so a long query in a query tab never holds them
 - **View ▸ Refresh** (⌘R) reads the table's columns and loads the rows shown again; **View ▸ Refresh Every** does it by itself every 5 to 60 seconds or a number you type (**Custom…**),
   until you choose **Off**. Pending changes stay.
 
+**Data ▸ Order By…** takes any ORDER BY, expressions included; a click on a header's sort control replaces it. On a
+read-only connection it's checked like a typed filter.
+
 **Data ▸ Copy Query** copies the SELECT the tab runs, with its filter and sort, and **Open Query in Console** opens it in
 a new query tab.
 
@@ -209,6 +212,7 @@ These work in a query's results too.
 - **Edit ▸ Copy As** ▸ TSV, CSV, Pipe-Separated, JSON, JSON Lines, Markdown, HTML Table, XML, Pretty Table, One Row, SQL INSERT, INSERT with many rows, INSERT IGNORE, REPLACE,
   UPDATE, DELETE or WHERE Clause. The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
   didn't copy; without a key, by every column copied. The one you choose becomes ⌘C's format.
+- The export sheet previews the first rows in the format chosen; CSV can use a comma, semicolon, tab or pipe.
 - **Data ▸ Export Rows…** (and a result tab's **Export Result…**) saves the selected rows, the loaded rows (with their
   pending changes) or every row of the table with its filter and sort, streamed from the server on a session of its own, as CSV, TSV, JSON, JSON Lines, SQL,
   Markdown, HTML, XML or an Excel workbook (.xlsx). Choose whether the column names come first, how NULL is written

@@ -116,9 +116,16 @@ final class DataGridView: NSView {
             header?.needsDisplay = true
         }
     }
+    /// Settings ▸ Grid's font family; empty: the system's.
+    var fontFamily = "" {
+        didSet {
+            styles = GridStyles(fontSize: fontSize, family: fontFamily)
+            reloadData()
+        }
+    }
     var fontSize: CGFloat = 12 {
         didSet {
-            styles = GridStyles(fontSize: fontSize)
+            styles = GridStyles(fontSize: fontSize, family: fontFamily)
             rowHeight = styles.rowHeight
             // In step with the text, so values measured or sized by hand still fit as they did.
             columnWidths = columnWidths.map { ceil($0 * fontSize / oldValue) }

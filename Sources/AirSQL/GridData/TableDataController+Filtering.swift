@@ -55,7 +55,7 @@ extension TableDataController {
     /// from column names. The notice says why (`problem`) until rows load again. A refused filter never stays the
     /// source's, so no statement of the tab (count, summary, export) sends it.
     func refusesOnReadOnly(_ source: TableDataSource) -> Bool {
-        guard context.connection.readOnly, !source.filter.isEmpty,
+        guard context.connection.readOnly, !source.filter.isEmpty || !source.orderText.isEmpty,
               let refusal = StatementCheck.readOnlyRefusal(source.pageSQL(offset: 0, limit: rowsPerPage),
                                                             on: context.connection.displayName,
                                                             noBackslashEscapes: noBackslashEscapes) else { return false }
@@ -274,6 +274,26 @@ extension TableDataController {
         if source?.localSort.isEmpty == false { setLocalSort([]) } else { setSort([]) }
     }
 
+    /// Order By…: any ORDER BY, expressions included; empty clears it. The header's sort replaces it.
+    @objc func typeOrderBy(_ sender: Any?) {
+        guard let source, let window = view.window else { return NSSound.beep() }
+        askText("Order By", message: "Type what goes after ORDER BY: columns or any expression", placeholder: "LENGTH(name) DESC, id", value: source.orderText,
+                action: "Sort", id: "tableData.orderBy", on: window) { [weak self] text in
+            guard let self, let source = self.source else { return }
+            var typed = text
+            if typed.lowercased().hasPrefix("order by ") { typed = String(typed.dropFirst(9)) }
+            let before = (source.orderText, source.sort)
+            source.orderText = typed.trimmingCharacters(in: CharacterSet(charactersIn: "; \n\t"))
+            source.sort = []
+            grid.sortOrder = []
+            if refusesOnReadOnly(source) {
+                (source.orderText, source.sort) = before
+                return updateBars()
+            }
+            reloadForFilter()
+        }
+    }
+
     /// Sort by Columns…: the columns, their directions and their order in a sheet; on the server, or with "Loaded rows
     /// only" here.
     @objc func sortColumns(_ sender: Any?) {
@@ -299,6 +319,7 @@ extension TableDataController {
         let indexed = Set(source.table.indexes.compactMap { $0.parts.first?.column })
         let unindexed = keys.map(\.column).filter { !indexed.contains($0) && !source.sort.map(\.column).contains($0) }
         let apply = { [weak self] in
+            source.orderText = ""
             source.sort = keys
             self?.grid.sortOrder = keys.compactMap { key in
                 source.columns.firstIndex { $0.name == key.column }.map { DataGridView.Sort(column: $0, ascending: key.ascending) }

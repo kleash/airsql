@@ -295,6 +295,33 @@ extension AppTests {
             #expect(tab.source?.cell(0, 2) == .placeholder("ƒ UPPER('eu')"))
         }
 
+        @Test func aTypedOrderByIsCheckedOnAReadOnlyConnection() async throws {
+            let (_, _, tab) = try await Tab.tab(readOnly: true)
+            let source = try #require(tab.source)
+            source.orderText = "(SELECT 1 FROM orders FOR UPDATE)"
+            #expect(tab.refusesOnReadOnly(source))
+            source.orderText = "LENGTH(region)"
+            #expect(!tab.refusesOnReadOnly(source))
+        }
+
+        @Test func aResultsHeaderHasFunnels() async throws {
+            let (main, _) = appWindow(testModel())
+            let view = ResultGridView(store: ConsoleFixtures.customers(rows: 2), nullText: "NULL", fontSize: 12)
+            main.window?.contentView = view
+            #expect(view.viewer.dataGridFiltersColumns(view.grid))
+        }
+
+        @Test func theExportSheetPreviewsAndChoosesASeparator() async throws {
+            let (main, _, tab) = try await Tab.tab()
+            tab.exportRows(nil)
+            await ready { main.window?.attachedSheet == nil }
+            let sheet = try #require(main.window?.attachedSheet)
+            let content = try #require(sheet.contentView)
+            let preview = try #require(find(NSTextField.self, id: "export.preview", in: content))
+            #expect(preview.stringValue.contains("EU"))
+            sheet.sheetParent?.endSheet(sheet)
+        }
+
         @Test func anExpressionIsRefusedOnAReadOnlyConnection() async throws {
             let (_, _, tab) = try await Tab.tab(readOnly: true)
             tab.grid.selection.select(GridPosition(row: 0, column: 2))

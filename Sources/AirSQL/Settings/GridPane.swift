@@ -7,6 +7,11 @@ final class GridPane: SettingsPaneController {
     override func build() {
         form.row("Text size", [choice(\.gridFontSize, id: "settings.gridFontSize",
                                       tip: "Choose the size of the grid's text (12 pt by default)", fontSizes)])
+        form.row("Font", [choice(\.gridFontFamily, id: "settings.gridFontFamily", tip: "Choose the grid's font, or the system's",
+                                 [(title: "System", value: "")] + NSFontManager.shared.availableFontFamilies.map { (title: $0, value: $0) })])
+        form.row("Date format", [text(\.gridDatePattern, id: "settings.gridDatePattern",
+                                      tip: "Type the pattern Display As ▸ Settings' Date Format uses, such as dd/MM/yyyy HH:mm",
+                                      placeholder: "yyyy-MM-dd HH:mm:ss", width: 180)])
         form.row("Rows per page", [number(\.rowsPerPage, id: "settings.rowsPerPage",
                                           tip: "Type how many rows a table or result loads at a time (1,000 by default)",
                                           range: 100...100_000, width: 90)],

@@ -21,7 +21,7 @@ extension TableDataController: NSMenuItemValidation {
                 + "\(source.shownLoadedRows.formatted()) of \(source.keptRows.formatted()) loaded rows"
         } else {
             bar.scope.style = .accent
-            let filtered = !source.filter.isEmpty, sorted = !source.sort.isEmpty
+            let filtered = !source.filter.isEmpty, sorted = !source.sort.isEmpty || !source.orderText.isEmpty
             bar.scope.text = "On server · " + (filtered && sorted ? "filtered, sorted" : filtered ? "filtered" : sorted ? "sorted" : "all rows")
         }
         bar.scope.toolTip = local ? "The search runs on the rows loaded so far; untick Loaded rows only to search every row"
@@ -160,7 +160,8 @@ extension TableDataController: NSMenuItemValidation {
             guard let column = viewer.focusedColumn else { return (false, "Select a cell or a column first") }
             let sorted = source.localSort.contains { $0.column == column } || source.sort.contains { $0.column == source.columns[column].name }
             return (!sorted, "This column is already in the sort")
-        case Commands.clearSort.action: return (!source.sort.isEmpty || !source.localSort.isEmpty, "The rows aren't sorted")
+        case Commands.clearSort.action:
+            return (!source.sort.isEmpty || !source.localSort.isEmpty || !source.orderText.isEmpty, "The rows aren't sorted")
         case Commands.sortColumns.action: return (!(grid.source is TransposedSource), "Leave Transpose or Record View first")
         case Commands.filterByValues.action: return (viewer.focusedColumn != nil, "Select a cell or a column first")
         case Commands.clearFilter.action:

@@ -17,9 +17,10 @@ struct GridStyles {
     /// From a row's top to the text's baseline.
     let baseline: CGFloat
 
-    init(fontSize: CGFloat) {
-        regular = .monospacedDigitSystemFont(ofSize: fontSize, weight: .regular)
-        key = .monospacedDigitSystemFont(ofSize: fontSize, weight: .semibold)
+    init(fontSize: CGFloat, family: String = "") {
+        let chosen = family.isEmpty ? nil : NSFontManager.shared.font(withFamily: family, traits: [], weight: 5, size: fontSize)
+        regular = chosen ?? .monospacedDigitSystemFont(ofSize: fontSize, weight: .regular)
+        key = chosen.map { NSFontManager.shared.convert($0, toHaveTrait: .boldFontMask) } ?? .monospacedDigitSystemFont(ofSize: fontSize, weight: .semibold)
         mono = .monospacedSystemFont(ofSize: max(8, fontSize - 1), weight: .regular)
         null = NSFont(descriptor: regular.fontDescriptor.withSymbolicTraits(.italic), size: fontSize) ?? regular
         rowHeight = ceil(fontSize + 11)

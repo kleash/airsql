@@ -28,6 +28,8 @@ public final class TableDataSource: GridSource {
     public static let shownLimit = 1_000
     /// The characters (bytes for binary) a long value's page reads; 0: every value whole. Settings ▸ Grid.
     public var cutLength = 0
+    /// An ORDER BY typed by hand, expressions and all, ahead of `sort` (empty: none).
+    public var orderText = ""
     /// The first row loaded, past the table's start (the pager).
     public var firstRow = 0
     /// With no sort, an AUTO_INCREMENT key's newest rows come first. Settings ▸ Grid.
@@ -75,8 +77,7 @@ public final class TableDataSource: GridSource {
         if ["tinyint", "smallint", "mediumint", "int", "integer", "bigint", "decimal", "numeric", "float", "double", "real"]
             .contains(type) { return .number }
         if ["date", "datetime", "timestamp", "time", "year"].contains(type) { return .date }
-        if type.hasSuffix("binary") || type.hasSuffix("blob") || ["geometry", "point", "linestring", "polygon", "multipoint",
-           "multilinestring", "multipolygon", "geometrycollection", "geomcollection", "vector"].contains(type) { return .binary }
+        if type.hasSuffix("binary") || type.hasSuffix("blob") || type == "vector" || GridColumn.spatialTypes.contains(type) { return .binary }
         return .text
     }
 
@@ -100,7 +101,10 @@ public final class TableDataSource: GridSource {
         let ties = (key ?? []).map { columns[$0].name }.filter { name in !sort.contains { $0.column == name } }
         let counting = key?.count == 1 && key.map { table.columns[$0[0]].autoIncrement } == true
         let order = sort + ties.map { TableViewSettings.SortKey(column: $0, ascending: sort.last?.ascending ?? !(newestFirst && counting)) }
-        if !order.isEmpty { sql += " ORDER BY " + GridSorting.orderBy(order) }
+        // A newline after typed SQL, so a -- comment can't swallow what follows.
+        let typed = orderText.isEmpty ? [] : [orderText + "\n"]
+        let clauses = typed + (order.isEmpty ? [] : [GridSorting.orderBy(order)])
+        if !clauses.isEmpty { sql += " ORDER BY " + clauses.joined(separator: ", ") }
         if let limit { sql += " LIMIT \(limit)" }
         if offset > 0 { sql += (limit == nil ? " LIMIT 18446744073709551615" : "") + " OFFSET \(offset)" }
         return sql
