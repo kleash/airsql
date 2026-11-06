@@ -942,6 +942,7 @@ extension AppTests {
             panel.history = { entries }
             panel.choice.selectedSegment = 4
             panel.reload()
+            #expect(panel.table.numberOfRows == 0, "the table never lists rows that have gone while the history loads")
             #expect(await eventually(timeout: 5) { panel.table.numberOfRows == 3 })
             panel.table.selectRowIndexes([2], byExtendingSelection: false)
             console.editor.setText("")

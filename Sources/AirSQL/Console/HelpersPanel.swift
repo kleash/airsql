@@ -137,6 +137,8 @@ final class HelpersPanel: NSView, NSTableViewDataSource, NSTableViewDelegate, NS
             if !builtIn.isEmpty { rows.append(.heading("Built In")) }
             rows += builtIn.map { .snippet($0, builtIn: true) }
         default:
+            // The rows are gone until it loads, and AppKit may lay the table out in that time: it must not list them.
+            table.reloadData()
             loadHistory(keep)
             return
         }
