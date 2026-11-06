@@ -20,16 +20,28 @@ private let vendorLibrary = URL(fileURLWithPath: #filePath).deletingLastPathComp
 func mcp(_ messages: [[String: Any]], support: String) async throws -> [[String: Any]] {
     let base = support + "/mcp-" + UUID().uuidString.prefix(8)
     let input = messages.map { AgentJSON.text($0) }.joined(separator: "\n") + "\n"
-    try input.write(toFile: base + ".in", atomically: true, encoding: .utf8)
     FileManager.default.createFile(atPath: base + ".out", contents: nil)
+    func written() -> [[String: Any]] {
+        let output = (try? String(contentsOfFile: base + ".out", encoding: .utf8)) ?? ""
+        return output.split(separator: "\n").compactMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any] }
+    }
+    let stdin = Pipe()
+    stdin.fileHandleForWriting.write(Data(input.utf8))
     let process = Process()
     process.executableURL = URL(fileURLWithPath: airsqlBinary)
     process.arguments = ["--mcp"]
     process.environment = TestEnvironment.environment.merging(["AIRSQL_SUPPORT_DIR": support,
                                                               "DYLD_LIBRARY_PATH": vendorLibrary]) { $1 }
-    process.standardInput = try FileHandle(forReadingFrom: URL(fileURLWithPath: base + ".in"))
+    process.standardInput = stdin
     process.standardOutput = try FileHandle(forWritingTo: URL(fileURLWithPath: base + ".out"))
     process.standardError = FileHandle.nullDevice
+    // Stdin stays open until every request has its reply, as a client's does: once it ends the bridge gives what is
+    // running 5 s, too little when all the suites start at once.
+    let requests = messages.filter { $0["id"] != nil }.count
+    Task {
+        _ = await eventually(timeout: 60) { written().filter { $0["id"] != nil }.count >= requests }
+        try? stdin.fileHandleForWriting.close()
+    }
     let status: Int32 = try await withCheckedThrowingContinuation { continuation in
         process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
         do { try process.run() } catch {
