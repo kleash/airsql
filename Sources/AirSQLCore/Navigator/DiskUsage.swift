@@ -129,7 +129,7 @@ public enum DiskUsage {
         }
         let all = names + sizes.keys.filter { !names.contains($0) && $0 != "GEN_CLUST_INDEX" }.sorted()
         return all.map { name in
-            name == "PRIMARY" ? DiskUsageRow(name: name, detail: "Index (holds the rows in InnoDB)", data: sizes[name])
+            name == "PRIMARY" ? DiskUsageRow(name: name, detail: "Index with rows", data: sizes[name])
                 : DiskUsageRow(name: name, detail: "Index", index: sizes[name])
         }
     }

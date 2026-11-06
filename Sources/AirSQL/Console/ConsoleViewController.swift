@@ -290,6 +290,7 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     func changeShared(_ change: (inout Shared) -> Void) {
         guard let id = connectionID else { return }
+        noticeLostSession()  // `shared` is empty for a session that's gone, so this write would wipe what it reports
         var value = shared
         change(&value)
         Self.shared[sessionKey] = value
@@ -351,6 +352,7 @@ final class ConsoleViewController: NSViewController, TabContent {
 
     var canRename: Bool { fileURL == nil }
     var isEdited: Bool { fileURL == nil ? !text.isEmpty : text != savedText }
+    var isBusy: Bool { running != nil }
     var canDuplicate: Bool { true }
 
     func duplicate() -> NSViewController? {

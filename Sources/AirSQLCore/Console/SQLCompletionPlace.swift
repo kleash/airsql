@@ -174,7 +174,7 @@ struct SQLCompletionPlace {
     private func tableList() -> [CompletionItem] {
         var tables = tableItems()
         if aliasFits {
-            let used = Set(sources.map { $0.name.lowercased() })
+            let used = Set(sources.map { $0.name.lowercased() }).subtracting([prefix.lowercased()])  // the word typed is a source until it is replaced
             tables = tables.map { item in
                 guard item.kind == .table || item.kind == .view, item.detail != "CTE" else { return item }
                 var aliased = item

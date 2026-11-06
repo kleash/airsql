@@ -160,7 +160,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     /// The footer's words for the cell shown.
     private var summary: String {
         if let placeholder { return placeholder + " · the server sets it when you apply" }
-        if loadFull != nil { return "Only the start of the value" }
+        if loadFull != nil { return "Only the start" }
         return value == nil ? "NULL" : describe()
     }
 

@@ -435,6 +435,7 @@ struct SQLCompletionTests {
         options.tableAlias = true
         #expect(try await suggest("SELECT * FROM order_li|", options: options).first?.text == "order_lines ol")
         #expect(try await suggest("SELECT * FROM orders o, cust|", options: options).first?.text == "customers c")
+        #expect(try await suggest("SELECT * FROM ol|", options: options).first?.text == "order_lines ol", "the word typed isn't a table in use")
         #expect(try await suggest("SELECT * FROM cust|  c2", options: options).first?.text == "customers", "it has one")
         #expect(try await suggest("DELETE FROM cust|", options: options).first?.text == "customers")
         #expect(try await suggest("INSERT INTO cust|", options: options).first?.text == "customers")

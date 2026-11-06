@@ -256,6 +256,9 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         onChange?()
     }
 
+    /// What the edits since the last colouring replaced, as it stands in the new text.
+    var editedSinceHighlight: Range<Int>?
+
     /// Past this many characters, colours and completion wait for a pause in the typing.
     static let longText = 150_000
 
@@ -268,13 +271,16 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         let text = storage.string
         let new = SQLLexer.tokens(text, noBackslashEscapes: noBackslashEscapes)
         let old = tokens, delta = (text as NSString).length - highlightedLength
+        // Replaced text comes in uncoloured, even when its tokens are the same as those it replaced.
+        let editStart = editedSinceHighlight?.lowerBound ?? .max, editEnd = editedSinceHighlight?.upperBound ?? 0
+        editedSinceHighlight = nil
         var prefix = 0
-        while prefix < old.count, prefix < new.count, old[prefix] == new[prefix] { prefix += 1 }
+        while prefix < old.count, prefix < new.count, old[prefix] == new[prefix], new[prefix].range.upperBound <= editStart { prefix += 1 }
         var suffix = 0
         while suffix < old.count - prefix, suffix < new.count - prefix {
             let a = old[old.count - 1 - suffix], b = new[new.count - 1 - suffix]
             guard a.kind == b.kind, a.isClosed == b.isClosed, a.range.lowerBound + delta == b.range.lowerBound,
-                  a.range.count == b.range.count else { break }
+                  a.range.count == b.range.count, b.range.lowerBound >= editEnd else { break }
             suffix += 1
         }
         tokens = new

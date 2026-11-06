@@ -74,6 +74,8 @@ extension SQLEditorView {
         // Now, while their ranges are right: the marks move with the text.
         clearMarks()
         clearUsageMarks()
+        let written = range.location..<(range.location + (replacementString?.utf16.count ?? range.length))
+        editedSinceHighlight = editedSinceHighlight.map { min($0.lowerBound, written.lowerBound)..<max($0.upperBound, written.upperBound) } ?? written
         if let replacementString, !templateFields.isEmpty { moveTemplateFields(range, replacementString.utf16.count - range.length) }
         return true
     }

@@ -39,6 +39,7 @@ enum InsightNote {
         stack.setAccessibilityIdentifier("console.insightNote")
         let holder = NSViewController()
         holder.view = stack
+        holder.preferredContentSize = stack.fittingSize  // left to itself it takes the heading's width and cuts the text
         let popover = NSPopover()
         popover.behavior = .transient
         popover.contentViewController = holder

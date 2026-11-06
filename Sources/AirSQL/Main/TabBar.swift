@@ -29,6 +29,7 @@ protocol TabContent: AnyObject {
 extension TabContent {
     var canRename: Bool { false }
     var isEdited: Bool { false }
+    var isBusy: Bool { false }
     var transactionBadge: String? { nil }
     var statusAccessory: NSView? { nil }
     var fileURL: URL? { nil }
@@ -243,6 +244,7 @@ final class TabButton: NSView {
     private let title = NSTextField(labelWithString: "")
     private let close = NSButton()
     private let dot = DotView(diameter: 6)
+    private let spinner = NSProgressIndicator()
     private var editor: RenameField?
     private var selected = false
     private var connection: SavedConnection?
@@ -269,7 +271,14 @@ final class TabButton: NSView {
         addSubview(title)
         addSubview(close)
         addSubview(dot)
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(spinner)
         NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: close.centerXAnchor), spinner.centerYAnchor.constraint(equalTo: close.centerYAnchor),
+            spinner.widthAnchor.constraint(equalToConstant: 12), spinner.heightAnchor.constraint(equalToConstant: 12),
             title.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             title.centerYAnchor.constraint(equalTo: centerYAnchor),
             close.leadingAnchor.constraint(greaterThanOrEqualTo: title.trailingAnchor, constant: 4),
@@ -296,13 +305,15 @@ final class TabButton: NSView {
         title.stringValue = tab.title + (namesConnection ? name.map { " · " + $0 } ?? "" : "")
         title.textColor = selected ? .labelColor : .secondaryLabelColor
         let edited = tab.tabContent?.isEdited ?? false
-        dot.isHidden = !edited || hovering
-        close.isHidden = edited && !hovering
+        let busy = tab.tabContent?.isBusy ?? false
+        dot.isHidden = !edited || hovering || busy
+        close.isHidden = (edited || busy) && !hovering
+        if busy && !hovering { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
         close.image = NSImage(systemSymbolName: tab.pinned ? "pin.fill" : "xmark", accessibilityDescription: tab.pinned ? "Unpin Tab" : "Close Tab")?
             .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
         close.toolTip = tab.pinned ? "Unpin this tab" : Commands.closeTab.tipWithShortcut
         let place = name.map { " on " + $0 + (connection?.marks.isEmpty == false ? " (\(connection?.marks ?? ""))" : "") } ?? ""
-        toolTip = tab.title + place + (edited ? " (unsaved)" : "") + ": click to show it, drag to move it, double-click to rename it, middle-click to close it, right-click for more"
+        toolTip = tab.title + place + (edited ? " (unsaved)" : "") + (busy ? " (running)" : "") + ": click to show it, drag to move it, double-click to rename it, middle-click to close it, right-click for more"
         setAccessibilityLabel(tab.title + place)
         setAccessibilityValue(selected ? 1 : 0)
         setAccessibilityHelp(toolTip)

@@ -19,7 +19,7 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
     private lazy var hideMatching = checkbox("Hide Matching", id: "recon.hideMatching", tip: "Show only the objects that differ",
                                              on: false, target: self, action: #selector(hideMatchingToggled(_:)))
     private let listBar = NSStackView()
-    private lazy var back = button(Commands.backToServer.title, id: "recon.back", tip: Commands.backToServer.tip, target: nil,
+    private lazy var back = button("All Databases", id: "recon.back", tip: Commands.backToServer.tip, target: nil,
                                    action: #selector(ReconWindowController.backToServer(_:)))
 
     /// The list's first width, wide enough for names, when nothing is remembered (the window calls it once laid out).
@@ -161,7 +161,8 @@ final class ReconResultsView: NSObject, NSTableViewDataSource, NSTableViewDelega
 
     private static func share(_ part: Int, of whole: Int) -> String {
         guard whole > 0 else { return "0%" }
-        let share = Double(part) / Double(whole) * 100
+        // Rows are fetched from both sides, so all of a table that differs is more than the rows checked.
+        let share = min(Double(part) / Double(whole) * 100, 100)
         return share > 0 && share < 0.1 ? "<0.1%" : String(format: share < 10 ? "%.1f%%" : "%.0f%%", share)
     }
 
@@ -248,7 +249,7 @@ final class ReconObjectCell: NSTableCellView {
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
         what.alignment = .right
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        // What differs takes at most 45% of the row; past that it gives way (its tooltip has it).
+        // What differs takes at most 30% of the row; past that it gives way (its tooltip has it).
         what.setContentCompressionResistancePriority(.defaultLow - 10, for: .horizontal)
         name.widthAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
         chip.label.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -257,9 +258,9 @@ final class ReconObjectCell: NSTableCellView {
         chip.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.chipWidth).isActive = true
         addSubview(stack)
         stack.pin(to: self, insets: NSEdgeInsets(top: 0, left: 2, bottom: 0, right: 6))
-        what.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.45).isActive = true
+        what.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.3).isActive = true
         whatMinimum = what.widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
-        whatMinimum.priority = .defaultLow + 5  // over the name's compression resistance, under the 45%
+        whatMinimum.priority = .defaultLow + 5  // over the name's compression resistance, under the 30%
         whatMinimum.isActive = true
         textField = name
     }

@@ -219,8 +219,8 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
             return partsNote ?? (tableRows.isEmpty ? "No indexes or partitions to show." : "indexes and partitions")
         }
         let left = unread.count
-        if case .server = level, left > 0 { return "\(left) not read yet: press Refresh" }
-        return ""
+        if case .server = level { return left > 0 ? "\(left) not read yet: press Refresh" : "databases" }
+        return "tables"
     }
 
     /// The tables selected at a database's level, or the table a table's level shows, as the commands take them.

@@ -56,6 +56,15 @@ public enum SQLInPaste {
             // A comma inside a cell or a line is the value's own (12 High St, Leeds), but for one that ends the line.
             values = trimmed.components(separatedBy: separators).map { $0.trimmingCharacters(in: .whitespaces) }
                 .map { $0.hasSuffix(",") ? String($0.dropLast()) : $0 }
+        } else if tokens.allSatisfy(\.isClosed) {
+            // CSV: a comma in quotes is the value's own.
+            var start = 0
+            values = []
+            for token in tokens where token.kind == .symbol && units[token.range.lowerBound] == comma {
+                values.append(text(start..<token.range.lowerBound))
+                start = token.range.upperBound
+            }
+            values.append(text(start..<units.count))
         } else {
             values = trimmed.components(separatedBy: ",")
         }

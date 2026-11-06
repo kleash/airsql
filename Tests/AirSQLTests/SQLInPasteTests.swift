@@ -32,6 +32,8 @@ import Testing
         #expect(pasted("1\n2", "WHERE x IN (|)") == "WHERE x IN ('1', '2')", "the column's type isn't known")
         #expect(pasted("12 High St, Leeds\n3 Low Rd, York", "WHERE x IN (|)") == "WHERE x IN ('12 High St, Leeds', '3 Low Rd, York')")
         #expect(pasted("é😀\nb", "WHERE é IN (|)") == "WHERE é IN ('é😀', 'b')")
+        #expect(pasted("\"a,b\",c", "WHERE x IN (|)") == "WHERE x IN (\"a,b\", 'c')", "a comma in quotes is the value's")
+        #expect(pasted("O'Brien, c", "WHERE x IN (|)") == "WHERE x IN ('O\\'Brien', 'c')", "an apostrophe isn't a quote")
     }
 
     @Test func escapingFollowsTheSession() {

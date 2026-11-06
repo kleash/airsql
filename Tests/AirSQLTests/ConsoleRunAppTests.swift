@@ -516,6 +516,17 @@ extension AppTests {
             _ = await call(harness, "wait", ["until": "idle", "timeout": 20])
             await write("INSERT INTO \(database).t VALUES (1), (2), (3);")
             #expect(console.transactionBadge?.hasPrefix("Transaction open · 3 changes") == true, "\(console.messagesView.messages.map(\.text))")
+            // Killed, and found by the next Run: the failed statement must not take the report with it.
+            let killed = try #require(console.session?.server?.threadID)
+            _ = try await admin.query("KILL \(killed)")
+            await write("INSERT INTO \(database).t VALUES (7);")
+            #expect(console.lostSession?.manual == true && console.lostSession?.transaction == true)
+            #expect(console.transactionBadge == "Transaction rolled back: the connection ended")
+            try await runIsStopped()
+            #expect(try await count() == "0")
+            await write("INSERT INTO \(database).t VALUES (1), (2), (3);")
+            #expect(console.transactionBadge?.hasPrefix("Transaction open · 3 changes") == true, "\(console.messagesView.messages.map(\.text))")
+
             let thread = try #require(console.session?.server?.threadID)
 
             // The session alone: killed, then noticed by keep-alive's ping.

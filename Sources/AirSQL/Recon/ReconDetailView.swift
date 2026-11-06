@@ -225,7 +225,9 @@ final class ReconDetailView: NSObject {
         structure.isHidden = showsData || object == nil
         rowsHolder.isHidden = !showsData || object == nil
         message.isHidden = true
-        scriptTitle.stringValue = "Sync script (makes \(result.target.name) match \(result.source.name)) · review before running"
+        let same = result.source.name == result.target.name  // one connection: its databases say which side is which
+        scriptTitle.stringValue = "Sync script (makes \(same ? result.target.database : result.target.name) match "
+            + "\(same ? result.source.database : result.source.name)) · review before running"
         guard let object else {
             message.stringValue = "Select one object to see what differs."
             message.isHidden = false
