@@ -342,7 +342,8 @@ extension AppTests {
             let context = EditorContext(connection: saved, sessions: connection, schema: schema)
             let tab = TableDataController(model: model, context: context, database: Self.database, table: "items")
             main.select(main.open(tab, title: "items", connection: saved.id))
-            await ready { tab.loading != nil || tab.source == nil }
+            // A full lab run keeps the servers busy for longer than `ready` waits, and Refresh does nothing while rows load.
+            _ = await eventually(timeout: 60) { tab.loading == nil && tab.source != nil }
             return (tab, session, connection, harness)
         }
 
@@ -358,8 +359,9 @@ extension AppTests {
             let items = SQLQuote.identifier(Self.database, "items")
             _ = try await session.query("ALTER TABLE \(items) ADD COLUMN extra INT NOT NULL DEFAULT 7, CHANGE name title VARCHAR(20)")
             tab.refresh(nil)
-            await ready { tab.source?.columns.count != 3 || tab.loading != nil }
-            #expect(tab.source?.columns.map(\.name) == ["id", "title", "extra"], "\(lab)")
+            _ = await eventually(timeout: 60) { tab.source?.columns.count == 3 && tab.loading == nil }
+            // Stops here if it didn't come: column 2 of the old source would stop the whole run.
+            try #require(tab.source?.columns.map(\.name) == ["id", "title", "extra"], "\(lab)")
             #expect(tab.viewer.source === tab.source && tab.source?.value(0, 2) == "7" && tab.problem == nil, "\(lab)")
             await finish(session, connection)
         }

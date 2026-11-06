@@ -672,7 +672,7 @@ final class TableDataController: NSViewController, TabContent {
 
     /// A table whose columns or keys changed since the tab read them, keeping the filter, the sort and pending changes
     /// (which name their key, so a changed key leaves them, and the old columns, until they are applied or reverted).
-    private func adopt(_ info: SchemaTable) {
+    func adopt(_ info: SchemaTable) {
         guard let old = source, info != old.table, old.changes.isEmpty || info.editingKey == old.table.editingKey else { return }
         let fresh = TableDataSource(database: database, table: info)
         let names = Set(fresh.columns.map(\.name))
@@ -684,6 +684,11 @@ final class TableDataController: NSViewController, TabContent {
         fresh.hiddenColumns = Set(old.hiddenColumns.compactMap { old.columns[$0].name }.compactMap { name in fresh.columns.firstIndex { $0.name == name } })
         fresh.changes = old.changes
         source = fresh
+        // Everything that holds a column by its index goes with the old columns: the grid comes back with the first rows
+        // (`finishLoading`), and until then no cell, menu or drawing can ask the new source about a column it hasn't.
+        viewer.show(nil)
+        (labelKeys, wantedLabels, sampledValues) = (nil, [:], [:])
+        findChanged()  // the search's tint reads the source it was made with
         editContext = nil
         grid.sortOrder = fresh.sort.compactMap { key in
             fresh.columns.firstIndex { $0.name == key.column }.map { DataGridView.Sort(column: $0, ascending: key.ascending) }

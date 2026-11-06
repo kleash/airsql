@@ -916,6 +916,67 @@ extension AppTests {
             #expect(opened.grid.rowCount == 3 && opened.problem == nil)
         }
 
+        /// The tab takes `info` as a Refresh does, and waits with the new rows in and the read after them (the estimate) held.
+        func refresh(_ tab: TableDataController, _ session: FakeTableSession, to info: SchemaTable) async {
+            session.hold = { $0.hasPrefix("SELECT TABLE_ROWS") }
+            tab.adopt(info)
+            tab.reloadRows()
+            await ready { session.held == nil }
+        }
+
+        @Test func aColumnGoneFromTheTableIsAskedForByNothing() async throws {
+            let session = FakeTableSession()
+            let (_, _, tab) = try await Self.tab(session: session)
+            let old = try #require(tab.source)
+            tab.grid.selection.select(GridPosition(row: 0, column: 5))
+            _ = tab.grid.cellSuffix?(0, 5)  // the labels' keys, by the old columns
+            var info = old.table
+            info.columns.removeLast()
+            session.columns.removeLast()
+            session.rows = session.rows.map { Array($0.dropLast()) }
+            await refresh(tab, session, to: info)
+            // The new rows are in and the grid has yet to show them: what its drawing and the menus reach mustn't trap.
+            #expect(tab.source !== old && tab.source?.loadedRows == 3 && tab.source?.columns.count == 5)
+            #expect(tab.viewer.source == nil && tab.viewer.focusedCell == nil)
+            #expect(tab.grid.cellSuffix?(0, 5) == nil && !tab.filtersOnCutValue)
+            _ = tab.validateMenuItem(Commands.loadFullCell.item())
+            _ = try await session.cancel(statement: nil)
+            await ready { tab.loading != nil }
+            #expect(tab.viewer.source === tab.source && tab.grid.columnCount == 5)
+        }
+
+        @Test func aSearchFollowsTheTableToItsNewColumns() async throws {
+            let session = FakeTableSession()
+            let (_, _, tab) = try await Self.tab(session: session)
+            let old = try #require(tab.source)
+            tab.search("EU", loadedOnly: true)
+            var info = old.table
+            info.columns.append(info.columns[2])
+            info.columns[6].name = "added"
+            session.columns.append(.init(name: "added", type: MYSQL_TYPE_STRING))
+            session.rows = session.rows.map { $0 + ["EU"] }
+            await refresh(tab, session, to: info)
+            _ = try await session.cancel(statement: nil)
+            await ready { tab.loading != nil }
+            // The tint, as a cell of the new column draws: it reads the new source, and the search goes on.
+            #expect(tab.viewer.source === tab.source && tab.grid.columnCount == 7)
+            #expect(tab.viewer.highlight?(0, 6) == true && tab.source?.localFilter != nil)
+        }
+
+        @Test func aPageOnItsWayKeepsItsColumns() async throws {
+            let session = FakeTableSession()
+            let (_, _, tab) = try await Self.tab(session: session)
+            let old = try #require(tab.source)
+            session.hold = { $0.hasPrefix("SELECT `id`") }
+            tab.loadMore(nil)
+            await ready { session.held == nil }
+            tab.refresh(nil)  // no: the source can't change under a page on its way
+            #expect(tab.source === old && tab.viewer.source === old)
+            _ = try await session.cancel(statement: nil)
+            await ready { tab.loading != nil }
+            #expect(tab.source === old && tab.viewer.source === old)
+        }
+
         @Test func viewsAreReadOnlyAndSayWhy() async throws {
             let (_, _, tab) = try await Self.tab("customer_emails", session: .emails())
             #expect(!tab.notice.isHidden && tab.notice.text.stringValue.hasPrefix("Read-only. A view has no key to address its rows"))
