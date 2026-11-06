@@ -266,7 +266,7 @@ Goal: few round trips, and agents that can never change anything without the per
   checks the database the file will write to.
 - **Recon (R6):** structure diff on normalised `SchemaCache` objects with ignore rules. Data diff by key, both sides
   with `time_zone = '+00:00'`, keys compared and chunked as `BINARY`; per chunk `COUNT(*)` and `SUM` of a 64-bit row
-  hash (`CONV(LEFT(MD5(<encoded row>),16),16,10)`), each column encoded with an ISNULL flag and its length so NULLs
+  hash (`CONV(LEFT(SHA2(<encoded row>, 256),16),16,10)`), each column encoded with an ISNULL flag and its length so NULLs
   and separators can't collide; differing chunks split recursively, then rows compared in the app (JSON and floats
   compared as values). Sync scripts: CREATE/ALTER ADD/INSERT/UPDATE by default; DROP, DELETE and narrowing ALTERs
   only when ticked, each marked as destructive in the script; renames asked as mappings first so they aren't DROP +

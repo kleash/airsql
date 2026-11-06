@@ -84,10 +84,11 @@ runs them one at a time. Compressed files are read through `/usr/bin/gzip`.
    (`--force`).
 3. **Restore** (or **Run**).
 
-Before anything runs, AirSQL reads the whole file for the statements that decide where it writes: `USE`,
-`CREATE DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED`. When the file switches to another database than the one you
-chose, drops a database, or sets GTID_PURGED, or when the database it writes to has tables already, the SQL preview
-sheet says so and asks first (Settings ▸ Safety ▸ *Ask before Restore…*). On a production connection it always asks.
+Before anything runs, AirSQL reads the whole file for the statements that decide where it writes: `USE`, `CREATE
+DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED` (which AirSQL's own dumps leave out). When the file switches to
+another database than the one you chose, drops a database, or sets GTID_PURGED, or when the database it writes to has
+tables already, the SQL preview sheet says so and asks first (Settings ▸ Safety ▸ *Ask before Restore…*). On a
+production connection it always asks.
 Progress is the share of the file read, so it is real for compressed files too.
 
 ## Copy to another server

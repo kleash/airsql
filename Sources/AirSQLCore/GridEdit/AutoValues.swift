@@ -163,7 +163,7 @@ public enum InsertValue: String, CaseIterable, Sendable {
         case .datetime, .timestamp: return "NOW() - INTERVAL FLOOR(RAND() * 315360000) SECOND"
         case .time: return "SEC_TO_TIME(FLOOR(RAND() * 86400))"
         case .year: return "YEAR(CURDATE()) - FLOOR(RAND() * 50)"
-        case .text(let characters, _): return "LEFT(MD5(RAND()), \(min(32, characters ?? 32)))"
+        case .text(let characters, _): return "LEFT(SHA2(RAND(), 256), \(min(32, characters ?? 32)))"
         case .binary(let bytes, _): return "LEFT(UNHEX(SHA2(RAND(), 256)), \(min(32, bytes)))"
         case .enumeration(let members), .set(let members):
             let quoted = members.map { SQLQuote.string($0, noBackslashEscapes: context.noBackslashEscapes) }

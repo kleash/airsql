@@ -110,7 +110,13 @@ public struct ToolCommand: Sendable {
         }
         if case .socket = options.endpoint {} else { args += tls }
         args.append("--default-character-set=utf8mb4")
-        if options.readOnly { args.append("--loose-init-command=SET SESSION TRANSACTION READ ONLY") }
+        // A tool from 8.0 on asks for a collation MySQL 5.7 doesn't know, and 5.7 answers in latin1: names turn into ?.
+        let names = server?.flavor == .mysql && server?.atLeast(8) == false
+        if options.readOnly {
+            args.append("--loose-init-command=SET " + (names ? "NAMES utf8mb4, SESSION transaction_read_only = 1" : "SESSION TRANSACTION READ ONLY"))
+        } else if names {
+            args.append("--loose-init-command=SET NAMES utf8mb4")
+        }
         return args
     }
 
@@ -192,6 +198,8 @@ public struct ToolCommand: Sendable {
         var args = [tool.path] + connection(optionFile: optionFile)
         if request.singleTransaction { args.append("--single-transaction") }
         if request.hexBlob { args.append("--hex-blob") }
+        // On a server with GTIDs the file would set GTID_PURGED, which fails when it goes back to that server.
+        if family == .mysql { args.append("--set-gtid-purged=OFF") }
         switch request.content {
         case .structureAndData: break
         case .structure: args.append("--no-data")

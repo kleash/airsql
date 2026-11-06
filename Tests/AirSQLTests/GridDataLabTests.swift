@@ -10,7 +10,7 @@ import Testing
 @Suite(.serialized, .enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
 struct GridDataLabTests {
     static let database = "lane_l3a_griddata"
-    static let servers = [Lab.mysql84, Lab.mariadb114]
+    static let servers = Lab.direct
     static let odd = "it's `odd`"
 
     func connected(_ server: Lab.Server) async throws -> DBConnection {
@@ -24,7 +24,7 @@ struct GridDataLabTests {
     func setUp(_ session: DBConnection) async throws -> SchemaSnapshot {
         let database = SQLQuote.identifier(Self.database)
         for statement in [
-            "DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database)",
+            "DROP DATABASE IF EXISTS \(database)", "CREATE DATABASE \(database) CHARACTER SET utf8mb4",  // 5.7's default is latin1
             "CREATE TABLE \(database).items (id INT AUTO_INCREMENT PRIMARY KEY, \(SQLQuote.identifier(Self.odd)) VARCHAR(100) NULL, "
                 + "price DECIMAL(10,2) NOT NULL DEFAULT 0, photo BLOB NULL, flags BIT(3) NULL) ENGINE=InnoDB",
             "INSERT INTO \(database).items VALUES (1, 'Ann', 1.50, X'00FF', b'101'), (2, 'Bob', 2.00, NULL, NULL), "

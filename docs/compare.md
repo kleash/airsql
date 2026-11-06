@@ -111,7 +111,7 @@ too.
 ## How the data compare stays fast
 
 Each server sums up the rows of a chunk of the table (10,000 rows by key order) as a row count and a total of 64-bit
-row hashes, computed from MD5. Only a chunk whose sums differ is looked at more closely: it is split into smaller
+row hashes, computed from SHA-256. Only a chunk whose sums differ is looked at more closely: it is split into smaller
 chunks, and for the small ones that still differ each row's key and hash come over, then only the rows that differ.
 A million identical rows are checked without fetching any.
 

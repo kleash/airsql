@@ -54,7 +54,7 @@ struct GridEditTests {
             (.random, "bigint unsigned", "FLOOR(RAND() * 9007199254740992)"), (.random, "tinyint(4)", "FLOOR(RAND() * 128)"),
             (.random, "tinyint(1)", "FLOOR(RAND() * 2)"), (.random, "bit(64)", "FLOOR(RAND() * 9007199254740992)"),
             (.random, "bit(3)", "FLOOR(RAND() * 8)"), (.random, "decimal(10,2)", "TRUNCATE(RAND() * 100000000, 2)"),
-            (.random, "decimal(5,5)", "TRUNCATE(RAND() * 1, 5)"), (.random, "varchar(10)", "LEFT(MD5(RAND()), 10)"),
+            (.random, "decimal(5,5)", "TRUNCATE(RAND() * 1, 5)"), (.random, "varchar(10)", "LEFT(SHA2(RAND(), 256), 10)"),
             (.random, "binary(16)", "LEFT(UNHEX(SHA2(RAND(), 256)), 16)"), (.random, "enum('a','it''s')", "ELT(1 + FLOOR(RAND() * 2), 'a', 'it\\'s')"),
             (.null, "int", "NULL"), (.default, "int", "DEFAULT"),
         ]

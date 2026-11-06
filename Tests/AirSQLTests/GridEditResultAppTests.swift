@@ -303,7 +303,7 @@ extension AppTests {
     /// send: a one-table result, an inner join (through the preview), and an outer join that stays read-only. Writes
     /// only in lane_r2_edit_<server>, dropped afterwards.
     @MainActor @Suite(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh")) struct GridEditResultAppLabTests {
-        @Test(arguments: [Lab.mariadb114, Lab.mariadb118, Lab.mysql84])
+        @Test(arguments: Lab.direct)
         func consoleResultsEditOnTheServer(_ lab: Lab.Server) async throws {
             let database = "lane_r2_edit_\(lab.name)", quoted = SQLQuote.identifier(database)
             let connection = Connection(options: DBLab.options(lab), log: DBLab.log)

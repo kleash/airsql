@@ -30,6 +30,12 @@ import Testing
         #expect(GrantLevel.column("shop", "t", "c").offered(Self.privileges) == ["INSERT", "REFERENCES", "SELECT", "UPDATE"])
     }
 
+    @Test func showGrantsKeepsTheCaseOfMySQL57sBareColumnNames() {
+        let grants = AccountGrants(lines: ["GRANT SELECT (id), update (Name) ON `fixture`.`customers` TO 'bob'@'%'"], privileges: Self.privileges)
+        #expect(grants.levels[.column("fixture", "customers", "id")] == ["SELECT"])
+        #expect(grants.levels[.column("fixture", "customers", "Name")] == ["UPDATE"])
+    }
+
     @Test func showGrantsReadsEveryLevelAsMariaDBWritesIt() {
         let grants = AccountGrants(lines: [
             "GRANT `lane_r` TO `bob`@`%` WITH ADMIN OPTION",
@@ -267,7 +273,7 @@ import Testing
 
 /// Every statement against real servers, the shared lab left as it was. The lab's airsql login has every privilege.
 @Suite(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"), .serialized) struct UsersLabTests {
-    static let servers = [Lab.mariadb114, Lab.mysql84]
+    static let servers = Lab.direct
 
     private func session(_ server: Lab.Server) async throws -> (DBConnection, UserSQL) {
         let session = DBConnection(options: DBLab.options(server), role: .tools, log: DBLab.log)
@@ -288,12 +294,13 @@ import Testing
         let mariaDB = server.flavor == .mariadb
         func read(_ wanted: String) async throws -> ServerAccount {
             let rows = try await session.rows(UserSQL.accounts(mariaDB: mariaDB))
-            let roles = mariaDB ? nil : try await session.rows(UserSQL.grantedRoles)
+            let roles = mariaDB || server.version.hasPrefix("5.") ? nil : try await session.rows(UserSQL.grantedRoles)
             return try #require(UserSQL.accounts(rows, roles: roles).first { $0.user == account.user && $0.host == wanted })
         }
 
         // Create, with every clause, and log in with what was typed.
-        account.plugin = mariaDB ? "ed25519" : "caching_sha2_password"
+        let roles = mariaDB || !server.version.hasPrefix("5.")  // MySQL 5.7 has neither roles nor caching_sha2_password
+        account.plugin = mariaDB ? "ed25519" : roles ? "caching_sha2_password" : "sha256_password"
         account.limits.queries = 500
         account.limits.simultaneous = 3
         account.tls.kind = .none
@@ -343,26 +350,28 @@ import Testing
         #expect(held.levels[.database("fixture")] == ["SELECT"] && held.levels[.column("fixture", "customers", "id")] == ["SELECT"])
 
         // Roles: granted, passed on, on at login, taken away.
-        _ = try await session.query(sql.create(role, password: nil))
-        let readRole = UserSQL.accounts(try await session.rows(UserSQL.accounts(mariaDB: mariaDB)),
-                                        roles: mariaDB ? nil : try await session.rows(UserSQL.grantedRoles)).first { $0.user == role.user }
-        #expect(readRole?.isRole == true)
-        var roleGrant = AccountGrants()
-        roleGrant.roles = [.init(user: role.user, host: role.host, admin: true)]
-        roleGrant.defaultRoles = [role.user]
-        for statement in sql.changes(read1, from: AccountGrants(), to: roleGrant) { _ = try await session.query(statement) }
-        held = try await grants(read1, sql, session, privileges)
-        #expect(held.roles == roleGrant.roles)
-        if !mariaDB { held.defaultRoles = Set(try await session.rows(sql.defaultRoles(read1)).compactMap { $0.first ?? nil }) }
-        #expect(held.defaultRoles == [role.user])
-        var noAdmin = roleGrant
-        noAdmin.roles[0].admin = false
-        noAdmin.defaultRoles = []
-        for statement in sql.changes(read1, from: held, to: noAdmin) { _ = try await session.query(statement) }
-        held = try await grants(read1, sql, session, privileges)
-        #expect(held.roles == noAdmin.roles)
-        for statement in sql.changes(read1, from: noAdmin, to: AccountGrants()) { _ = try await session.query(statement) }
-        #expect(try await grants(read1, sql, session, privileges).roles.isEmpty)
+        if roles {
+            _ = try await session.query(sql.create(role, password: nil))
+            let readRole = UserSQL.accounts(try await session.rows(UserSQL.accounts(mariaDB: mariaDB)),
+                                            roles: mariaDB ? nil : try await session.rows(UserSQL.grantedRoles)).first { $0.user == role.user }
+            #expect(readRole?.isRole == true)
+            var roleGrant = AccountGrants()
+            roleGrant.roles = [.init(user: role.user, host: role.host, admin: true)]
+            roleGrant.defaultRoles = [role.user]
+            for statement in sql.changes(read1, from: AccountGrants(), to: roleGrant) { _ = try await session.query(statement) }
+            held = try await grants(read1, sql, session, privileges)
+            #expect(held.roles == roleGrant.roles)
+            if !mariaDB { held.defaultRoles = Set(try await session.rows(sql.defaultRoles(read1)).compactMap { $0.first ?? nil }) }
+            #expect(held.defaultRoles == [role.user])
+            var noAdmin = roleGrant
+            noAdmin.roles[0].admin = false
+            noAdmin.defaultRoles = []
+            for statement in sql.changes(read1, from: held, to: noAdmin) { _ = try await session.query(statement) }
+            held = try await grants(read1, sql, session, privileges)
+            #expect(held.roles == noAdmin.roles)
+            for statement in sql.changes(read1, from: noAdmin, to: AccountGrants()) { _ = try await session.query(statement) }
+            #expect(try await grants(read1, sql, session, privileges).roles.isEmpty)
+        }
 
         // Renamed, and gone.
         var renamed = read1
@@ -370,7 +379,7 @@ import Testing
         for statement in sql.alter(read1, to: renamed, password: nil) { _ = try await session.query(statement) }
         #expect(try await read("localhost").locked)
         _ = try await session.query(sql.drop(renamed))
-        _ = try await session.query(sql.drop(role))
+        if roles { _ = try await session.query(sql.drop(role)) }
         #expect(try await session.rows("SELECT COUNT(*) FROM mysql.user WHERE User LIKE 'lane\\_users\\_%'").first?.first == "0")
         await session.close()
     }

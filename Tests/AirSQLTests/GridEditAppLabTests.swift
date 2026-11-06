@@ -9,7 +9,7 @@ extension AppTests {
     /// was typed (lab servers MariaDB 11.4 and 11.8, MySQL 8.4). Also Insert Value, the AUTO_INCREMENT key read back,
     /// and a pasted block. Writes only in lane_l3b_ui_<server>, dropped afterwards.
     @MainActor @Suite(.enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh")) struct GridEditAppLabTests {
-        nonisolated static let servers = [Lab.mariadb114, Lab.mariadb118, Lab.mysql84]
+        nonisolated static let servers = Lab.direct
 
         /// Typed text, and how the server shows it back (HEX for bytes, BIN for bits, +0 for ZEROFILL).
         static let values: [(column: String, typed: String, back: String)] = [

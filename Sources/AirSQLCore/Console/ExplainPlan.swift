@@ -4,8 +4,11 @@ import Foundation
 /// tree is MySQL's EXPLAIN FORMAT=TREE (8.0.16 and later), else EXPLAIN FORMAT=JSON (MariaDB, MySQL 5.7) flattened
 /// into indented lines.
 public enum ExplainPlan {
-    /// The statement that gives the plan as a table.
-    public static func tableSQL(_ sql: String) -> String { "EXPLAIN " + sql }
+    /// The statement that gives the plan as a table. A bare EXPLAIN on MySQL answers in its explain_format, TREE from 9.7
+    /// on; MariaDB has no FORMAT=TRADITIONAL.
+    public static func tableSQL(_ sql: String, server: ServerInfo? = nil) -> String {
+        (server?.flavor == .mysql ? "EXPLAIN FORMAT=TRADITIONAL " : "EXPLAIN ") + sql
+    }
 
     /// The statement that gives the plan as a tree or as JSON, and whether its answer is JSON to flatten.
     public static func treeSQL(_ sql: String, server: ServerInfo?) -> (sql: String, json: Bool) {

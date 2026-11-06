@@ -108,7 +108,7 @@ struct ReconLabTests {
 
     /// Values that hash alike under a careless encoding must differ; values each server writes differently but that
     /// are equal must not.
-    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    @Test(arguments: Lab.direct)
     func hashesTellEveryDifference(_ server: Lab.Server) async throws {
         let source = try await Self.session(server), target = try await Self.session(server)
         defer { Task { await source.close(); await target.close() } }
@@ -309,7 +309,7 @@ struct ReconLabTests {
 
     /// Hostile names and values go through every statement a compare and a sync write, on a target whose sql_mode has
     /// NO_BACKSLASH_ESCAPES, and come out the same.
-    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    @Test(arguments: Lab.direct)
     func hostileNamesAndValuesSurviveASync(_ server: Lab.Server) async throws {
         let source = try await Self.session(server), target = try await Self.session(server)
         defer { Task { await source.close(); await target.close() } }
@@ -359,7 +359,7 @@ struct ReconResultsLabTests {
         try #require(try await session.query(sql).first { $0.rows != nil }?.rows)
     }
 
-    @Test(arguments: [Lab.mariadb118, Lab.mysql84])
+    @Test(arguments: Lab.direct)
     func aResultComparesWithAnotherAndWithATable(_ server: Lab.Server) async throws {
         let session = try await ReconLabTests.session(server)
         let database = "lane_gridcompare_\(server.flavor == .mysql ? "mysql" : "mariadb")"

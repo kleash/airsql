@@ -13,7 +13,7 @@ struct ClientToolsLabTests {
 
     static func options(_ server: Lab.Server, password: String = Lab.airsql.password) -> ConnectOptions {
         ConnectOptions(name: "Lab " + server.name, host: "127.0.0.1", port: server.port ?? 3306, user: Lab.airsql.user,
-                       password: password, tls: TLSOptions(mode: .required))
+                       password: password, tls: TLSOptions(mode: server.offersTLS ? .required : .off))
     }
 
     /// A session on `server`, the tools of both kinds suited to it, or nil when this Mac has none.
@@ -31,10 +31,20 @@ struct ClientToolsLabTests {
     static func checksums(_ session: DBConnection, _ database: String) async throws -> [String] {
         let list = tables.map { SQLQuote.identifier(database, $0) }.joined(separator: ", ")
         let rows = try await session.query("CHECKSUM TABLE " + list).first?.rows
-        return (0..<(rows?.rowCount ?? 0)).map { "\(tables[$0]): " + (rows?.string($0, 1) ?? "NULL") }
+        var sums = (0..<(rows?.rowCount ?? 0)).map { "\(tables[$0]): " + (rows?.string($0, 1) ?? "NULL") }
+        // CHECKSUM TABLE changes on the same rows here, so the rows themselves: MySQL 5.7's of all_types from call to call,
+        // older MariaDB's of order_items (its generated column) when the table is opened again.
+        let server = session.server
+        let unsteady = server?.flavor == .mysql ? (server?.atLeast(8) == false ? "all_types" : nil)
+            : (server?.atLeast(11) == false ? "order_items" : nil)
+        if let unsteady, let index = tables.firstIndex(of: unsteady), index < sums.count {
+            let key = unsteady == "all_types" ? "id" : "order_id, line"
+            sums[index] = "\(unsteady): \(try await session.rows("SELECT * FROM " + SQLQuote.identifier(database, unsteady) + " ORDER BY " + key))"
+        }
+        return sums
     }
 
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func dumpThenRestoreGivesTheSameRows(_ server: Lab.Server) async throws {
         guard let (session, info, dump, client) = try await Self.setUp(server) else { return }
         let target = "lane_l6_roundtrip"
@@ -111,7 +121,7 @@ struct ClientToolsLabTests {
 
     /// A read-only connection's mysql, as Open in Terminal starts it, can't write: its session is READ ONLY. A dump
     /// still works.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func aReadOnlyConnectionsToolsOnlyRead(_ server: Lab.Server) async throws {
         guard let (session, info, dump, client) = try await Self.setUp(server) else { return }
         var options = Self.options(server)
@@ -132,7 +142,7 @@ struct ClientToolsLabTests {
     }
 
     /// AirSQL's own export, restored by the client, gives the same rows: every column type, both flavours.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func theBuiltInExportRestoresToTheSameRows(_ server: Lab.Server) async throws {
         guard let (session, info, _, client) = try await Self.setUp(server) else { return }
         let target = "lane_l6_builtin"
@@ -204,13 +214,13 @@ struct ClientToolsLabTests {
 
     /// Import CSV: mapped fields into their columns, empty fields as NULL, a column left out takes its default, and a
     /// record that fails leaves the table as it was.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func csvImportsIntoMappedColumnsOrNotAtAll(_ server: Lab.Server) async throws {
         let session = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
         _ = try await session.connect()
         let target = "lane_l6_csv"
         _ = try await session.query("DROP DATABASE IF EXISTS " + SQLQuote.identifier(target))
-        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target))
+        _ = try await session.query("CREATE DATABASE " + SQLQuote.identifier(target) + " CHARACTER SET utf8mb4")  // 5.7's default is latin1
         _ = try await session.query("CREATE TABLE \(SQLQuote.identifier(target, "people")) (id INT PRIMARY KEY, name VARCHAR(50) "
                                     + "NOT NULL, note TEXT NULL, country CHAR(2) NOT NULL DEFAULT 'NL')")
         let file = URL(fileURLWithPath: try scratch() + "/people.csv")
@@ -241,7 +251,7 @@ struct ClientToolsLabTests {
 
     /// The export's choices: rows as REPLACE, no DEFINER or AUTO_INCREMENT value, CREATE and DROP DATABASE, a transaction per
     /// table; then a file per object that restores, and text for the clipboard.
-    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    @Test(arguments: Lab.direct)
     func theBuiltInExportWritesWhatIsAsked(_ server: Lab.Server) async throws {
         let session = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
         _ = try await session.connect()
@@ -305,7 +315,7 @@ struct ClientToolsLabTests {
 
     /// A new table from a file, as the sheet makes it; then duplicates skipped or replaced, the table emptied in the same
     /// transaction, refused rows written to a file while the rest stay, and a result's NULLs and bytes kept apart.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func importMakesTheTableAndHandlesWhatItIsAskedTo(_ server: Lab.Server) async throws {
         let session = DBConnection(options: Self.options(server), role: .tools, log: Self.log)
         _ = try await session.connect()
@@ -379,7 +389,7 @@ struct ClientToolsLabTests {
 
     /// Run SQL File without client tools takes mysqldump's own output (executable comments, LOCK TABLES, DELIMITER around
     /// routines) to the same rows; and a dump of whole databases, which writes into its own, is flagged before it runs.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func theBuiltInRunnerRunsDumpsAndAHostileOneIsFlagged(_ server: Lab.Server) async throws {
         guard let (session, info, dump, _) = try await Self.setUp(server) else { return }
         let target = "lane_l6_run"

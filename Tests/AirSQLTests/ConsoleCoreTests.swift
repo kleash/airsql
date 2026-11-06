@@ -542,6 +542,9 @@ struct ExplainPlanTests {
         func server(_ flavor: ServerInfo.Flavor, _ number: Int) -> ServerInfo {
             ServerInfo(flavor: flavor, version: "", versionNumber: number, threadID: 1, tls: nil, certificate: nil)
         }
+        #expect(ExplainPlan.tableSQL("SELECT 1", server: server(.mysql, 90704)) == "EXPLAIN FORMAT=TRADITIONAL SELECT 1")
+        #expect(ExplainPlan.tableSQL("SELECT 1", server: server(.mariadb, 110809)) == "EXPLAIN SELECT 1")
+        #expect(ReadOnlyClassifier.classify("EXPLAIN FORMAT=TRADITIONAL SELECT 1", noBackslashEscapes: false) == .readOnly)
         #expect(!ExplainPlan.treeSQL("SELECT 1", server: server(.mysql, 80016)).json)
         #expect(ExplainPlan.treeSQL("SELECT 1", server: server(.mysql, 80015)).json)
         #expect(ExplainPlan.treeSQL("SELECT 1", server: server(.mariadb, 110809)).json)
