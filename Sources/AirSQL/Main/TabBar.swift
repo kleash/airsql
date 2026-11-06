@@ -310,6 +310,7 @@ final class TabButton: NSView {
         let busy = tab.tabContent?.isBusy ?? false
         dot.isHidden = !edited || hovering || busy
         close.isHidden = (edited || busy) && !hovering
+        spinner.isHidden = !busy || hovering  // it sits where the close button and the edited dot do
         if busy && !hovering { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }
         close.image = NSImage(systemSymbolName: tab.pinned ? "pin.fill" : "xmark", accessibilityDescription: tab.pinned ? "Unpin Tab" : "Close Tab")?
             .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
