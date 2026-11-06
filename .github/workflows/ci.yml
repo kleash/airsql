@@ -85,7 +85,10 @@ jobs:
           fi
 
       # With Xcode 26's Swift: these Command Line Tools lack Swift Testing's macro plugin ('TestingMacros').
+      # SWIFT_BACKTRACE: a test process that crashes prints where, symbolised; the runner keeps no crash report of it.
       - name: Tests (./test.sh)
+        env:
+          SWIFT_BACKTRACE: enable=yes,preset=full,threads=crashed,registers=none,images=none,color=no
         run: |
           export DEVELOPER_DIR=$XCODE26
           unset SDKROOT
