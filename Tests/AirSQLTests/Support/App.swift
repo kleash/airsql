@@ -36,6 +36,12 @@ func appWindow(_ model: AppModel, size: NSSize = MainWindowController.defaultSiz
     _ = NSApplication.shared
     _ = TestEnvironment.isolated
     useAppMenuBar()
+    // macOS 26 builds a toolbar with SwiftUI, whose graph has a limit: a run's thousands of live toolbars abort the process.
+    // Kept windows stay, but those of earlier tests (a test may have a few of its own) go without one.
+    for old in keptWindows.dropLast(12) where old.window?.toolbar != nil {
+        old.window?.orderOut(nil)
+        old.window?.toolbar = nil
+    }
     let main = MainWindowController(model: model)
     keptWindows.append(main)
     // Off the screen: placed after it is ordered in (ordering in moves a window back onto a screen).

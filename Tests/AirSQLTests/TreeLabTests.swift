@@ -55,7 +55,9 @@ struct TreeLabTests {
         #expect(try await session.rows("SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = '\(db)' AND TABLE_NAME = 'parent'").first?.first == "it's a parent")
         _ = try await session.query(NavigatorSQL.setComment("sweeps", of: routine, noBackslashEscapes: flag))
         #expect(try await session.rows("SELECT ROUTINE_COMMENT FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = '\(db)'").first?.first == "sweeps")
-        for (part, name) in [(TablePart.foreignKeys, "to_parent"), (.checks, "positive"), (.indexes, "by_n"), (.indexes, "PRIMARY")] {
+        // MySQL 5.7 reads CHECK and drops it: nothing there to drop.
+        let checks: [(TablePart, String)] = server.version.hasPrefix("5.") ? [] : [(.checks, "positive")]
+        for (part, name) in [(TablePart.foreignKeys, "to_parent")] + checks + [(.indexes, "by_n"), (.indexes, "PRIMARY")] {
             _ = try await session.query(try #require(NavigatorSQL.dropPart(part, name, of: child)))
         }
         // The index a foreign key made for itself stays when the key goes, as the server has it.
