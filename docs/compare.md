@@ -23,7 +23,7 @@ Both are in the **Tools** menu too.
 
 ## Run a compare
 
-1. Choose the **level** at the left: **Servers**, **Databases**, or **Objects**.
+1. Choose the **level** at the left: **Servers**, **Databases**, or **Objects** (two tables, or two other objects).
 2. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
    type its name), then at the third level an object from the list. The sync script makes the target like the source;
    **Swap** turns them around.

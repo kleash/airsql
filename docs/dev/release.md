@@ -13,10 +13,10 @@ A release is a tag `vX.Y.Z` whose `VERSION` says `X.Y.Z`, made as AirSCP's are (
 and the Homebrew cask in `kleash/homebrew-tap`. `.github/workflows/release.yml` does everything after the zip; the
 zip is made either on the Mac (`scripts/release-local.sh`) or in CI when the signing secrets exist.
 
-## 1.0.0: what only the owner can do
+## The first release: what only the owner did
 
-Everything else is ready (the dry run, `scripts/release-local.sh --adhoc`, passes). As of 2026-11-04 the repository
-has no Pages site, no secrets and no release, and `kleash/homebrew-tap` has no `Casks/airsql.rb`. In this order:
+Done for 1.0.0, and kept as the steps for a fresh repository; a later release needs "Before the tag" and "Release" below.
+In this order:
 
 1. **GitHub Pages**: Settings ▸ Pages ▸ Build and deployment ▸ Deploy from a branch ▸ `main`, `/docs` ▸ Save (or
    `gh api -X POST repos/kleash/airsql/pages -f 'source[branch]=main' -f 'source[path]=/docs'`). After the first
@@ -81,9 +81,11 @@ has no Pages site, no secrets and no release, and `kleash/homebrew-tap` has no `
 ## Before the tag
 
 1. `VERSION`, and the same version wherever `scripts/build-mcpb.sh` checks it (`mcpb/manifest.json`, the Claude Code
-   plugin's `plugin.json`).
+   plugin's `plugin.json`), and the bug form's placeholder (`.github/ISSUE_TEMPLATE/bug_report.yml`).
 2. `scripts/llms.sh` (CI fails while `docs/llms.txt` and `docs/llms-full.txt` are out of date).
-3. CI, CodeQL and Security green on `main`; the lab suites (`AIRSQL_LAB=1 ./test.sh`) green.
+3. CI, CodeQL and Security green on `main`; the lab suites (`AIRSQL_LAB=1 ./test.sh`) green, with every lab service up
+   and about 6 GB of Docker memory (`testenv/AGENT.md`). The README's pictures load from `main`, so new ones show only
+   after the merge.
 4. A dry run: `scripts/release-local.sh --adhoc` (below), then launch `build/AirSQL.app`.
 
 ## Release

@@ -1,5 +1,57 @@
 # From working client to daily driver
 
+## Status: what 1.0.2 shipped
+
+All six phases landed together in 1.0.2, on the `daily-driver` branch, not one release each as planned below. Decisions:
+a double-click on a table now opens it and toggles its parts; the Skips were reversed (`scope.html`); reconnecting at launch
+is opt-in and never for Production; a header sorts by its arrow, so a click still selects; no auto-save.
+
+**Shipped**
+
+- **Grid**: result toolbar, pager, long values cut at the server with Load Full Cell, hidden columns not fetched, export
+  preview, several-line rows.
+- **Sessions and running**: a session per query tab, lost-session handling, parameters, run to a file, Explain Analyze,
+  plan diagram and flame graph, a result in its own window, local history.
+- **Editor**: the parser, scopes, inspections, fixes and the Code menu; multiple carets, folding, line and statement
+  commands, Paste into `IN ()`, clipboard history; completion by abbreviation and context, templates, snippets, the rule-based
+  formatter with Settings ▸ Format.
+- **Server**: host page, Disk Usage, size bars, users and roles, editing variables, Modify Grants, the expired-password flow.
+- **Tree**: favourites, flat list, filters, Quick Open, Select in Tree, Quick Documentation, the Data, Structure, DDL
+  switch, the docked SQL log (closed at first, not on by default as Phase 2 said).
+- **Compare**: servers, databases and objects (a table is an object, by any name), from the tree too; ignore rules;
+  unified view.
+- **Schema and transfer**: saved ER diagrams and their exports, the SQL Generator, partitions, object forms, import into a
+  new table from CSV, Excel, JSON and the clipboard, export options, Flush.
+- **Workspace**: several windows, split tabs, Files panel, scratch files, keymap editor with presets, bookmarks, Ask an Agent.
+
+**Partial**
+
+- Text to SQL and the AI rows are a copied request to the person's own agent. The app has no AI of its own.
+- Procedures after CALL complete by name only; snippets live in settings, not .sql files; completion's ranking is
+  chosen-before counts in memory.
+- Replace works in tabs, not files; Rename doesn't rewrite usages elsewhere; Go to symbol has no columns or file symbols.
+- Compare includes or leaves out a whole object, not one change inside a table. Users shows one Users and Roles row in the
+  tree, without its accounts. Edit database changes the collation only. Custom CSV formats are a separator choice.
+
+**Not done**
+
+- Compare with a DDL file or VCS state; DDL data source; compare with the clipboard or two tabs (no text diff view yet).
+- Editor: colour schemes, Vim, indent guides, whitespace, right margin; formatter's AS, Qualify and Quotation rules
+  (they change tokens, so the proof fails), blank lines, reformat on save or paste, EditorConfig.
+- Grid: back and forward, hover preview, time zone picker, column statistics panel, editing a CSV file as a table.
+- Settings: syntax colours, schema cached on disk, CSV formats pane, shared SSH configs, Event Log, driver properties.
+- Workspace: Git rows, projects, in-app AI chat, cloud completion. Tree: subfolders, colours on any node.
+- Check for updates: not decided.
+
+**Not verified at the time of writing**
+
+- The last full lab run (run 3, 1,223 tests) was green. After the final fixes Docker ran out of memory and took three
+  servers down, so the last round has its affected tests passing, and needs one more full run.
+
+The rest of this page is the plan as written, kept for its reasons; `daily-driver-backlog.md` has every row.
+
+## The plan
+
 Why AirSQL still feels like a proof of concept next to DataGrip and HeidiSQL, and the plan to fix it. Researched in
 November 2026 against DataGrip 2026.2.4 (its bundled action list, settings, inspections and tips, plus use of the app on
 the lab) and HeidiSQL (the full source at master; not run). Every gap is in

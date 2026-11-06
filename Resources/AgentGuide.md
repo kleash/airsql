@@ -107,9 +107,10 @@ failure, and every reply after an action carries the sheet it opened, if any.
 - `press {id | title, in?}`: buttons, checkboxes, segments, links. A pop-up is chosen with `set`.
 - `set {id | title, value, in?}`: text fields, checkboxes (true or false), pop-ups and segments (the option's title),
   and the console's editor (`console.editor`: the whole text).
-- `select {pane: sidebar | tabs, names}` selects connections or a tab by name; without pane, rows of a list in the
-  frontmost sheet or window.
-- `type {text}` types where the cursor is; `key {combo}` presses keys as the keyboard does ("cmd+return", "escape").
+- `select {pane: sidebar | tabs, names, none?, in?}` selects connections or a tab by name; without pane, rows of a list in
+  the frontmost sheet or window. `none: true` selects nothing.
+- `type {text}` types where the cursor is; `key {combo}` presses keys as the keyboard does ("cmd+return", "escape"). The
+  menu-bar shortcuts follow the person's Settings ▸ Keys, so prefer `menu`.
 - `click {x, y, count?, button?, modifiers?, in?}`, `double_click {x, y}` (opens or edits), `right_click {x, y}`
   (answers with the menu it opens). Points come from `snapshot` frames or a scale-1 screenshot.
 - `wait {until: sheet | no_sheet | popover | idle | text, text?, timeout?}`: idle means nothing runs.
@@ -134,8 +135,8 @@ its own:
   list's Kill (the person's sheet) still works, as it changes no data.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
-  whether agents are allowed, which connections there are (none can be deleted for you), the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
-  rows per page, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
+  whether agents are allowed, which connections there are (none can be deleted for you), the client tools AirSQL runs, the shortcuts, and every other setting but the look (theme,
+  fonts and sizes, tab width and word wrap, rows per page, long values, the date format, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
   Ask before agents change anything is on. The Settings window is to look at.
 - **Files, the clipboard, trust:** you can't save a console's file, open a client in Terminal, start an export, save a Liquibase changelog, save
   or remember a password, trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or
@@ -150,10 +151,11 @@ its own:
   View As, charts, Column Summary and the status bar's figure), the filters a value goes into (`result.filter`,
   `tableData.where`, `values.list`, `quickFilter.value`), the process list and its selected statement (`processes.statement`), Export Rows' and Import's
   previews (`export.preview`, `csv.preview`), a table's note in the tree (`console.insightNote`), a compare's rows and sync script, the
-  console's Messages (`console.messages`: a server's error can quote a value), an EXPLAIN's tree (`console.planTree`)
-  and the SQL preview's statements (`preview.sql`) are covered in screenshots ("Hidden from agents") and left out of
+  console's Messages (`console.messages`: a server's error can quote a value), an EXPLAIN's steps in every view (`console.planTree`, `console.planOperations`, `console.planDiagram`, `console.planDetails`, `console.planRaw`), a pick-list's or filter's suggested values (`grid.set`, `grid.lookup`, `tableData.suggestions`),
+  who may log in (`list.usersandroles.table`, `users.grants`) and the SQL preview's statements (`preview.sql`) are covered in screenshots ("Hidden from agents") and left out of
   snapshots (`hidden`: no value, title or help; `set` still types into a hidden field). The SQL log's text
-  (`sqlLog.text`: every connection's statements) is hidden from you on every connection. A cell's right-click Quick
+  (`sqlLog.text`) and Query History's All connections list (`history.every`), which hold every connection's statements, are
+  hidden from you on every connection. A cell's right-click Quick
   Filter ▸ lists the Data menu's items for you (Equal to Selection…), never the value or the clipboard's text.
 
 The person can turn the asking off for a connection or for all (Settings ▸ Safety); person-only things stay theirs.
@@ -173,7 +175,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
   processes `processes.list`, `processes.refresh`, `processes.interval`, `processes.killQuery`,
   `processes.killConnection`, `processes.statement`; the host page `host.panes`, `host.properties`, `host.readSizes`,
-  `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
+  `host.stopSizes`, `host.diskUsage`, `host.editVariable` (its sheet `host.variable.scope`, `host.variable.value`), and its lists `list.databases.table`, `list.variables.table`,
   `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
   `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
   Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; Users and Roles
@@ -185,7 +187,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
   the person's `editor.colour`, `editor.host`, `editor.port`, `editor.socket`, `editor.user`, `editor.password`,
   `editor.askPassword`, `editor.route`, `editor.ssh`, `editor.addJump`, `editor.proxyKind`, `editor.proxyHost`,
-  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.clientPath`, `editor.dumpPath`, `editor.ownSafety`,
+  `editor.tlsMode`, `editor.readOnly`, `editor.reconnectAtLaunch`, `editor.sharedSession`, `editor.startsManual`, `editor.startIsolation`, `editor.queryTimeout`,
+  `editor.idleDisconnect`, `editor.timeZone`, `editor.startupSQL`, `editor.clientPath`, `editor.dumpPath`, `editor.ownSafety`,
   `editor.agentAccess`, `editor.sampleRows`; what the tools are `editor.clientFound`, `editor.dumpFound`, the route
   `editor.routePath`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
 - **Status bar**: `status.route`, `status.server`, `status.transaction`, `status.activity`, `status.agent`,
@@ -198,19 +201,20 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   tab of their own, a grid under the `grid.legend` line (added green, removed red, changed cells amber); find bar
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
   helpers `console.helpers`, `helpers.choice` (Columns, Functions, Keywords, Snippets, History), `helpers.filter`, `helpers.list`; the snippet sheet (Query ▸ Save as Snippet…) `snippet.name`, `snippet.abbreviation`, `snippet.folder`, `snippet.body`, `snippet.save`, `snippet.cancel`; completion `completion.list`;
-  history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
+  history sheet `history.search`, `history.list`, `history.preview`, `history.all`, `history.insert`, `history.clear`, `history.cancel`; the editor's corner `console.position`, `console.problemCount`; plan views `console.planOperations`, `console.planDiagram`, `console.planDetails`, `console.planRaw`;
+  Query ▸ Sessions… `sessions.list`; File ▸ Local History… `localHistory.list`, `localHistory.preview`, `localHistory.restore`, `localHistory.cancel`; Go to Line `goToLine.text`.
 - **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (Return or F2 opens it on the
   focused cell; a value its column refuses keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it
   was); the status bar's `grid.rows`,
   `grid.position`, `grid.figure`; the value panel `valuePanel` (`valuePanel.mode`, `valuePanel.text`, `valuePanel.tree`,
-  `valuePanel.image`, `valuePanel.actions`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
+  `valuePanel.image`, `valuePanel.actions`, `valuePanel.loadFull`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
   edit, Esc puts it back; Load from File… and Save to File… are the person's); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
   `grid.chart` (`chart.kind`, `chart.x`, `chart.y`); Column List `columnList.search`, `columnList.table`; Column
   Summary `columnSummary` (a `columnSummary.value` filters by it); Go to Row `goToRow.text`. A console result filters
   its own rows (Data ▸ Quick Filter, Filter by Values…, Sort by Columns…, Search All Columns): its bar
   `result.filterBar`, shown while a filter or search is on, has `result.scope`, `result.filter` (the conditions as SQL),
   `result.clearFilter` and `result.search` (Return searches).
-- **Table tab** (a table's rows: Database ▸ Open Definition Data or a double-click in the tree; a single click shows them in the
+- **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
   preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition:
   set it, then key `return` applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
   `tableData.busy`; the notice `tableData.notice` (`tableData.noticeText`, `tableData.preview`, `tableData.revert`,
@@ -245,6 +249,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
 - **Quick Open** (`quickOpen.field`, `quickOpen.list`, `quickOpen.open`): commands listed there are refused to agents; use the `menu` tool.
   Quick Documentation on a tree row leaves out the table's rows for an agent.
 - **Find in Tabs and Files**: `findFiles.text`, `findFiles.results`, `findFiles.status`; `findFiles.replace` is the person's.
+- **Files panel** (View ▸ Files): `sidebar.files`, `files.outline`, `files.attach`, `files.newScratch`; Run On opens Run SQL File…, whose Run asks the person.
+- **Restored tabs** (placeholders after a relaunch): `restored.what`, `restored.state`, `restored.open`, `restored.edit`, `restored.help`.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
@@ -253,7 +259,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `.collation`, `.rowFormat`, `.autoIncrement`, `.comment`), `tableEditor.sql`, `tableEditor.apply`,
   `tableEditor.partitions`, `tableEditor.partitionClause`, `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
   `objectEditor.definer`, `objectEditor.run`, `objectEditor.apply`, `objectEditor.revert`, and its fields, `objectForm.name` and the like. **ER diagram**: `erDiagram.database`,
-  `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`. **SQL Generator**: `generator.text`,
+  `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`, `erDiagram.find`, `erDiagram.fit`. **SQL Generator**: `generator.text`,
   `generator.copy`, `generator.console`, `generator.save`, `generator.layout`, and a box per option (`generator.indexes` and so on).
 - **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,
   `recon.source.object`, `recon.target.connection`, `recon.target.database`, `recon.target.object`, `recon.swap`,
@@ -287,7 +293,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `settings.completionTableAlias`, `settings.autoKeywordCase`; Format `settings.format.preset`, `settings.format.preview`, `settings.format.*`;
   Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.loadAllAsksAbove`, `settings.nullText`,
   `settings.transposeSingleRow`; Connections
-  `settings.detailsTableThreshold`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,
+  `settings.detailsTableThreshold`, `settings.schemaRefreshMinutes`; Keys `settings.keysFilter`, `settings.keys`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,
   `settings.agentAccessList`, `settings.agentExports`, `settings.copyMCPCommand`; Client Tools `settings.findTools`,
   `settings.toolsFound`.
 

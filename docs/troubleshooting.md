@@ -24,6 +24,8 @@ The message offers **Try Again**, **Edit Connection…** and this page.
 | The server doesn't offer TLS | Choose **Edit Connection…**, then in the TLS tab set TLS to **Off**, only for a server on this Mac or a network you trust end to end. |
 | The server asked for a login method AirSQL doesn't allow on this connection | A PAM or LDAP account: turn on its plain-text login for the connection, with TLS that proves the server. |
 | The server blocked this computer after too many failed connections | An administrator can unblock it (`FLUSH HOSTS`). |
+| The server has too many connections open | Close some query tabs (each has a session of its own), or turn on **Query tabs share one session** in the connection's Options. |
+| The password has expired | On a read-only or Production connection, change it with the server's own tools. Elsewhere AirSQL [asks for a new one](users.md#an-expired-password). |
 
 ## AirSQL asks about the server's certificate
 
@@ -33,7 +35,9 @@ choose **Cancel** and ask the server's administrator.
 ## "The connection to the server was lost"
 
 AirSQL doesn't reconnect by itself, because a quiet reconnect would lose an open transaction without telling you.
-Reconnect when you are ready. Changes you hadn't committed were rolled back by the server.
+Reconnect when you are ready. Changes you hadn't committed were rolled back by the server. A query tab that had a
+transaction open says how many rows went back, and runs nothing until you press **Open New Session**
+([Sessions](console.md#sessions)).
 
 ## macOS asks about the local network
 

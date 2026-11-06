@@ -55,5 +55,6 @@ until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes th
 ## Tips
 
 - Nothing is written to a database until you press Run or Apply.
+- Each query tab has its own session, so a long query in one leaves the others free. See [Sessions](console.md#sessions).
 - ⌘1 to ⌘9 show your tabs; ⇧⌘[ and ⇧⌘] step through them.
 - **Help ▸ Report a Problem** opens a form with your versions filled in.

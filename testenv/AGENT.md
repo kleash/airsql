@@ -15,8 +15,9 @@ testenv/down.sh                        # removes the lab: containers, networks, 
 
 `up.sh` is safe to run again: it builds what changed, starts what isn't running and waits until every server is
 healthy and every published port answers. It seeds three servers at a time: the whole lab takes about 1.5 GB of
-Docker's memory once running, and more while seeding. On a busy Docker, start only what a test needs. If Docker runs
-out of memory anyway, the kernel stops a lab server first, never another project's container (`oom_score_adj`).
+Docker's memory while idle and more while seeding, and a parallel `AIRSQL_LAB=1 ./test.sh` needs about 6 GB: give Docker
+that much first. On a busy Docker, start only what a test needs. If Docker runs out of memory anyway, the kernel stops a
+lab server first, never another project's container (`oom_score_adj`), and the suites then fail on lost connections.
 
 One lab serves every checkout of the repository, and only the main checkout (git's first worktree, the parent of
 `git rev-parse --git-common-dir`) starts it: in another worktree `up.sh` refuses, as it would make a new key and CA

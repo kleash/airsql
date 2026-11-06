@@ -15,13 +15,11 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## Editor
 
-- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways; on at first (**View ▸ Word Wrap** too).
-
 - **Font**: the SQL editor's, from the fonts whose letters are all one width (SF Mono at first).
-- **Tab width** and **Indent with tabs**: how wide a tab or an indent is, and whether Tab puts in a tab character or spaces.
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Text Size ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
-
+- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways; on at first (**View ▸ Word Wrap** too).
+- **Tab width** and **Indent with tabs**: how wide a tab or an indent is, and whether Tab puts in a tab character or spaces.
 - **Add an alias to a table**: completing a table after FROM or JOIN adds one, as `orders o`; on at first.
 - **Change keywords' case as you type**: a reserved word takes the case set in [Format](#format) once you finish it; off at first.
 - **Checks**: what the editor underlines while you type (see [Checks while you type](console.md#checks-while-you-type)).
@@ -56,6 +54,12 @@ of them after.
 - **Transpose results with one row**: a query result with a single row opens turned on its side, one line per
   column (on by default).
 
+## Keys
+
+Every command with its shortcut. Filter by name or key, then double-click a row and press the new keys, or use **Change…**,
+**Remove**, **Reset** and **Reset All**. **Start from** chooses a set of shortcuts. See
+[Your own shortcuts](workspace.md#your-own-shortcuts).
+
 ## Connections
 
 - **Load details up to … tables**: on a server with more tables than this, a database's columns, indexes and keys load
@@ -71,7 +75,7 @@ below, in its Safety tab), and a connection coloured Production starts with a st
 | Setting | Default | Production |
 |---|---|---|
 | Ask before UPDATE or DELETE without WHERE | on | on |
-| Ask before any write from the query tab | off | on |
+| Ask before any write from the console | off | on |
 | Show the SQL before the grid's Apply | off | on |
 | Ask before DROP or TRUNCATE (a database's name is always typed) | on | on, table names typed too |
 | Ask before restoring into a database that has tables | on | on |

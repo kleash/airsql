@@ -14,22 +14,24 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 
 - [Install AirSQL](install.md): with Homebrew or from the download.
 - [Getting started](getting-started.md): add a connection, find your way around the window.
-- [Settings](settings.md): the look, the editor and grid, connections, safety checks, agents, client tools and
-  Liquibase.
+- [Settings](settings.md): the look, the editor, Format, the grid, shortcuts, connections, safety checks, agents, client
+  tools and Liquibase.
 - [Check SQL before it runs](sql-preview.md): the sheet that shows every change first.
 - [Trust a server](trust-a-server.md): servers whose certificate macOS doesn't know.
 - [The SQL log](sql-log.md): every statement AirSQL sends, with passwords masked.
 - [Read-only queries](read-only-queries.md): what an agent's query, or a read-only connection, may run, and why one is
   refused.
-- [The SQL console](console.md): write and run SQL, results, transactions, history and the SQL log.
+- [The SQL console](console.md): write and run SQL, checks while you type, a session per tab, results, transactions,
+  plans and history.
 - [Connections and routes](connections.md): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
-- [Browse a server](navigator.md): the tree, the database view, table commands, find text and the process list.
+- [Browse a server](navigator.md): the tree, the database view, the host page, Disk Usage, table commands, find text and
+  the process list.
 - [Users and roles](users.md): list, add, change and drop logins and roles, their privileges, limits and passwords.
 - [A table's rows](table-data.md): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](data-grid.md): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
-- [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, and the ER
-  diagram.
+- [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, ER diagrams and
+  the SQL Generator.
 - [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy
   to another server; import from CSV, Excel, JSON and the clipboard, into a new table if you want.
 - [Compare](compare.md): servers, databases, tables and objects, structure and data, side by side, and a sync script you review first; or two

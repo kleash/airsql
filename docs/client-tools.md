@@ -59,6 +59,10 @@ or failed export never leaves half a file. When it is done, **Show in Finder** s
 statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
 consistent snapshot. Its files restore with `mysql` or with Run SQL File.
 
+MySQL's `mysqldump` runs with `--set-gtid-purged=OFF`, so a dump from a server with GTIDs goes back to that server
+without failing on `SET GTID_PURGED`. A replica built from such a dump needs its GTID position set by hand: add
+`--set-gtid-purged=ON` under the extra options if that's what the dump is for.
+
 ### What goes in the SQL
 
 - **Rows as** writes `INSERT`, `INSERT IGNORE`, `REPLACE`, or `DELETE` then `INSERT` for each table, and **at most … KB
@@ -85,7 +89,7 @@ runs them one at a time. Compressed files are read through `/usr/bin/gzip`.
 3. **Restore** (or **Run**).
 
 Before anything runs, AirSQL reads the whole file for the statements that decide where it writes: `USE`, `CREATE
-DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED` (which AirSQL's own dumps leave out). When the file switches to
+DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED` (which dumps made in AirSQL leave out). When the file switches to
 another database than the one you chose, drops a database, or sets GTID_PURGED, or when the database it writes to has
 tables already, the SQL preview sheet says so and asks first (Settings ▸ Safety ▸ *Ask before Restore…*). On a
 production connection it always asks.

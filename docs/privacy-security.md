@@ -30,7 +30,9 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
   use.
 - A server can't make AirSQL read files on your Mac (`LOAD DATA LOCAL INFILE` is off), and AirSQL sends one statement
   at a time.
-- A lost connection is reported, never quietly reconnected: that would lose an open transaction without a word.
+- A lost connection is reported, never quietly reconnected: that would lose an open transaction without a word. A query
+  tab that lost its session runs nothing until you open a new one. A connection connects at launch only if you tick that
+  for it, and a Production connection never does.
 
 ## Your data
 
@@ -40,11 +42,16 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
 - A **read-only** connection runs only what AirSQL can prove reads, on sessions the server keeps read-only
   ([Connections](connections.md#add-or-edit-a-connection)).
 
+- What you keep on this Mac stays there: query history, local history of files, scratch files, snippets, diagrams' layouts
+  and pending changes are in AirSQL's settings folder, and the [SQL log](sql-log.md) in `~/Library/Logs/AirSQL`.
+  A notification that a long query finished never shows the SQL.
+
 ## AI agents
 
 Agents can't use AirSQL until you allow them. Then each connection has its own access level, an agent's queries must
 pass the [read-only check](read-only-queries.md), and a change it asks for waits for your approval. Agents never see
-saved passwords.
+saved passwords. AirSQL has no AI of its own: **Ask an Agent** only copies a request, with no SQL in it, for you to paste
+to your agent.
 
 ## The app itself
 

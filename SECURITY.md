@@ -33,7 +33,10 @@ The latest release. Fixes ship as a new release (Homebrew: `brew upgrade --cask 
 - Login methods are restricted: plain-text ones (PAM, LDAP) only when the user turns them on and only over TLS that
   proves the server, and no login plugin is ever loaded from disk.
 - `LOAD DATA LOCAL INFILE` is off (and left out of the library), multi-statements are off, and a lost connection is
-  reported, never reconnected behind the user's back.
+  reported, never reconnected behind the user's back: a query tab that lost its session runs nothing until the user opens
+  a new one. Connecting at launch is opt-in per connection, and never for one coloured Production.
+- A password typed for a server account goes to the server and is kept nowhere else: the SQL preview, Copy SQL and the SQL
+  log show `<secret>`.
 - Routes (SSH tunnels, jump hosts, proxies) end in Unix sockets in a private folder, never TCP ports.
 - SQL is built only with quoting helpers. Nothing is written without Run or Apply, Apply checks the affected rows
   exactly, and destructive steps are opt-in and marked.

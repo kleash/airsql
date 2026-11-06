@@ -52,13 +52,13 @@ Whatever that would change waits for you:
 - Anything that would run on a server (Run in a query tab, Apply, a compare's sync, Restore, Copy, Import, Commit)
   first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
   can only decline. Statements that AirSQL proves only read run without asking.
-- Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,
+- Agents can't change Settings, shortcuts, agent access, a connection's colour, read-only switch, server, route, login, TLS,
   startup SQL or safety settings, nor save files, start an export, save a password, trust a certificate, paste from
   your clipboard, quit AirSQL or press a button marked destructive (Don't Save, Disconnect with a transaction open).
   Text an agent types into a query tab of a Production connection is shown to you first.
 - On connections whose agent access doesn't include reading, grids and results, the filters their values go into,
-  the tab's messages (a server's error can quote a value) and the SQL preview's statements are hidden from the
-  agent's snapshots and screenshots; the SQL log's text always is. A cell's right-click menu never shows an agent the
+  the tab's messages (a server's error can quote a value), query plans, server accounts and the SQL preview's statements are
+  hidden from the agent's snapshots and screenshots; the SQL log's text and Query History's **All connections** always are. A cell's right-click menu never shows an agent the
   cell's value or your clipboard's text.
 
 **Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Safety tab) turns the

@@ -120,6 +120,7 @@ tr.changed td.feat b::after { content: " · changed"; font: 11px var(--font-mono
 .seg button { font: 500 12px var(--font-mono); padding: 5px 8px; border: 0; border-right: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
 .seg button:last-child { border-right: 0; }
 .seg button[aria-checked="true"][data-t="1.0"] { background: var(--accent); color: #fff; }
+.seg button[aria-checked="true"][data-t="1.0.2"] { background: var(--accent); color: #fff; }
 .seg button[aria-checked="true"][data-t="1.x"] { background: var(--accent-soft); color: var(--accent); }
 .seg button[aria-checked="true"][data-t="Later"] { background: var(--later-soft); color: var(--later); }
 .seg button[aria-checked="true"][data-t="Skip"] { background: var(--ground); color: var(--ink); text-decoration: line-through; }
@@ -254,13 +255,14 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
   <h2 id="cat-h">Full feature catalogue</h2>
   <div class="legend">
     <span><b>Source:</b> <span class="src-badge">HeidiSQL</span> its feature · <span class="src-badge src-D">DataGrip</span> borrowed · <span class="src-badge src-A">AirSQL</span> new or from AirSCP</span>
-    <span><b>Release:</b> 1.0 · 1.x (soon after) · Later · Skip</span>
+    <span><b>Release:</b> 1.0 · 1.0.2 (built) · 1.x (soon after) · Later · Skip</span>
   </div>
   <div class="controls" role="toolbar" aria-label="Filter and export">
     <label for="q" class="mono" style="position:absolute;left:-9999px">Search features</label>
     <input id="q" type="search" placeholder="Search features, e.g. index, proxy, export">
     <button class="chip" data-f="all" aria-pressed="true" type="button">All</button>
     <button class="chip" data-f="1.0" aria-pressed="false" type="button">1.0</button>
+    <button class="chip" data-f="1.0.2" aria-pressed="false" type="button">1.0.2</button>
     <button class="chip" data-f="1.x" aria-pressed="false" type="button">1.x</button>
     <button class="chip" data-f="Later" aria-pressed="false" type="button">Later</button>
     <button class="chip" data-f="Skip" aria-pressed="false" type="button">Skip</button>
@@ -290,7 +292,7 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
 
 <footer>
   <p>Sources: heidisql.com and HeidiSQL's source (12.22, master 48aaabb), DataGrip 2026.2 help, release notes and user discussion, and AirSCP 1.4.0's agent guide and architecture notes. Details in docs/dev/research.md.</p>
-  <p>Prepared 2 November 2026.</p>
+  <p>Prepared 2 November 2026; rows built in 1.0.2 marked in November 2026.</p>
 </footer>
 </div>
 
@@ -326,8 +328,9 @@ const GROUPS = [
   ["Startup SQL per connection", "For example SET sql_mode or time_zone", "H", "1.0", "S"],
   ["Compressed protocol", "", "H", "1.0", "S"],
   ["Use a host, jump host or proxy saved in AirSCP", "Reads AirSCP's airscp.json", "A", "Skip", "S"],
-  ["Import sessions from HeidiSQL", "From HeidiSQL's exported settings file; helps people switch", "A", "1.0.1", "M"],
-  ["Connect from the command line or an airsql:// link", "HeidiSQL command-line switches", "H", "Later", "S"],
+  ["Import sessions from HeidiSQL", "From HeidiSQL's exported settings file; helps people switch", "A", "1.0", "M"],
+  ["Connect from the command line", "open -a AirSQL --args --connect <name>", "H", "1.0.2", "S"],
+  ["Connect from an airsql:// link", "", "H", "Later", "S"],
   ["Named pipes and Windows authentication", "Windows only", "H", "Skip", "S"],
   ["MS SQL, PostgreSQL, SQLite, Firebird, Interbase, Redshift, ProxySQL", "AirSQL is MariaDB and MySQL only", "H", "Skip", "L"]
  ]},
@@ -358,8 +361,8 @@ const GROUPS = [
  ]},
  { id: "recon", title: "Compare and reconcile", items: [
   ["Compare any two databases, on the same or different connections", "For example production against staging, or MySQL 8 against MariaDB; each side uses its own route", "A", "1.0", "S"],
-  ["Compare two servers: every database paired by name, one summary, any pair opened", "A new level above the database compare; same window and engine", "A", "1.1", "M"],
-  ["Compare any two tables or objects, by chosen names, in one database or two; from the tree too", "Compare With… on a row, Compare on two rows; the script writes only the target", "A", "1.1", "M"],
+  ["Compare two servers: every database paired by name, one summary, any pair opened", "A new level above the database compare; same window and engine", "A", "1.0.2", "M"],
+  ["Compare any two tables or objects, by chosen names, in one database or two; from the tree too", "Compare With… on a row, Compare on two rows; the script writes only the target", "A", "1.0.2", "M"],
   ["Structure compare (DDL): tables, columns, indexes, foreign keys, checks, views, routines, triggers, events", "Ignores noise you choose: AUTO_INCREMENT values, DEFINER, default collation, whitespace; maps MySQL and MariaDB type spellings", "D", "1.0", "L"],
   ["Data compare (DML) by primary or unique key: missing, extra and changed rows, down to the cell", "Row counts and chunked checksums on each server first, so only differing chunks are fetched", "A", "1.0", "L"],
   ["Structure and data in one run, with a summary: matching, different, only in source, only in target", "", "A", "1.0", "S"],
@@ -383,12 +386,12 @@ const GROUPS = [
   ["Filter the tree by name", "", "H", "1.0", "S"],
   ["Create and drop databases with charset and collation", "", "H", "1.0", "S"],
   ["Rename, empty (truncate) and drop tables", "Each asks first and shows the SQL", "H", "1.0", "S"],
-  ["Favourite objects", "Star at a row's edge; Favourites Only", "H", "1.0", "S"],
+  ["Favourite objects", "Star at a row's edge; Favourites Only", "H", "1.0.2", "S"],
   ["Copy a table to another database, with an optional WHERE", "", "H", "1.0", "M"],
   ["Bulk table editor: move to another database, change engine or collation", "", "H", "1.0", "M"],
   ["Maintenance: optimize, check, analyze, repair, checksum", "", "H", "1.0", "S"],
   ["Find text in every table of a server", "", "H", "1.0", "M"],
-  ["Quick Open: go to anything by fuzzy letters of its name, commands too", "", "D", "1.0", "M"]
+  ["Quick Open: go to anything by fuzzy letters of its name, commands too", "", "D", "1.0.2", "M"]
  ]},
  { id: "editor", title: "Table and object editors", items: [
   ["Columns: type, length, unsigned, null, default, auto increment, comment, collation, generated; reorder", "", "H", "1.0", "L"],
@@ -464,23 +467,39 @@ const GROUPS = [
   ["SQL log of every statement AirSQL sends", "", "H", "1.0", "S"],
   ["Run a .sql file inside the app, without client tools", "", "H", "1.0", "M"],
   ["Reformat SQL", "", "H", "1.0", "M"],
-  ["Snippets", "Saved SQL with fields, in the helpers panel, by abbreviation and Tab", "H", "1.x", "S"],
+  ["Snippets", "Saved SQL with fields, in the helpers panel, by abbreviation and Tab", "H", "1.0.2", "S"],
   ["Query helpers panel: columns, functions, keywords", "", "H", "1.0", "S"],
   ["EXPLAIN as a table and a plan view", "", "D", "1.0", "M"],
   ["Query profile (SHOW PROFILE, performance_schema)", "", "H", "1.0", "S"],
-  ["Bind parameters", "", "H", "Must", "S"]
+  ["Bind parameters", "?, :name and ${name}: asked before the statement runs", "H", "1.0.2", "S"]
  ]},
  { id: "server", title: "Server, users and data transfer", items: [
   ["Process list with Kill and auto-refresh", "", "H", "1.0", "S"],
-  ["Server variables, session and global, with edit", "Refused in read-only and Production", "H", "1.x", "S"],
-  ["Status counters and command statistics", "", "H", "1.x", "S"],
-  ["Host page: databases, variables, status, processes, commands", "Shown when a connection is clicked", "H", "1.x", "L"],
-  ["Disk Usage: server, database, table, with bars", "Read one database at a time, with Cancel", "H", "1.x", "M"],
-  ["User manager: accounts, hosts, privileges, roles, limits, login plugin", "Refused in read-only, Production and to agents; a typed password is masked and not kept", "H", "1.x", "L"],
+  ["Server variables, session and global, with edit", "Refused in read-only and Production", "H", "1.0.2", "S"],
+  ["Status counters and command statistics", "", "H", "1.0.2", "S"],
+  ["Host page: databases, variables, status, processes, commands", "Shown when a connection is clicked", "H", "1.0.2", "L"],
+  ["Disk Usage: server, database, table, with bars", "Read one database at a time, with Cancel", "H", "1.0.2", "M"],
+  ["User manager: accounts, hosts, privileges, roles, limits, login plugin", "Refused in read-only, Production and to agents; a typed password is masked and not kept", "H", "1.0.2", "L"],
   ["Import CSV with column mapping", "LOAD DATA LOCAL INFILE, or INSERTs when that is disabled", "H", "1.0", "M"],
   ["Built-in SQL export without client tools; copy straight to another server", "", "H", "1.0", "L"],
-  ["Insert files into BLOB or TEXT columns", "", "H", "Skip", "S"],
+  ["Insert files into BLOB or TEXT columns", "The value panel's Load from File…", "H", "1.0", "S"],
   ["Replication and binary log status", "", "A", "Skip", "M"]
+ ]},
+ { id: "daily", title: "The daily-driver work (1.0.2; every row in daily-driver-backlog.md)", items: [
+  ["A session per query tab", "Own transaction and current database; several tabs run at once; sharing one stays an option", "D", "1.0.2", "L"],
+  ["SQL parser, checks while you type, fixes", "For half-typed text; go to declaration, find usages, rename", "D", "1.0.2", "L"],
+  ["Multiple carets, folding, line and statement commands", "", "D", "1.0.2", "M"],
+  ["Formatter with rules, presets and a preview", "Settings ▸ Format; leaves the SQL alone when it can't prove the tokens stay", "D", "1.0.2", "M"],
+  ["Templates and postfix completion", "", "D", "1.0.2", "S"],
+  ["Result toolbar and pager", "", "D", "1.0.2", "S"],
+  ["Long values cut at the server, Load Full Cell", "Hidden columns aren't fetched", "D", "1.0.2", "M"],
+  ["Data, Structure and DDL as a switch on one tab", "", "D", "1.0.2", "S"],
+  ["SQL log docked under the window", "Closed at first", "H", "1.0.2", "S"],
+  ["Several main windows, split tabs, Files panel, scratch files", "", "D", "1.0.2", "M"],
+  ["Keymap editor with presets", "", "D", "1.0.2", "S"],
+  ["Saved ER diagrams of chosen tables, and their exports", "", "D", "1.0.2", "M"],
+  ["SQL Generator and a file per object", "", "D", "1.0.2", "S"],
+  ["Import into a new table from CSV, Excel, JSON and the clipboard", "", "H", "1.0.2", "M"]
  ]},
  { id: "app", title: "The app", items: [
   ["Native AppKit and SwiftUI, light and dark, Intel and Apple silicon", "", "A", "1.0", "M"],
@@ -492,7 +511,7 @@ const GROUPS = [
   ["Translations", "", "H", "Skip", "M"]
  ]}
 ];
-const TIERS = ["1.0", "1.x", "Later", "Skip"];
+const TIERS = ["1.0", "1.0.2", "1.x", "Later", "Skip"];
 const SRC = { H: "HeidiSQL", D: "DataGrip", A: "AirSQL" };
 const WEEKS = { S: 0.3, M: 1, L: 2.5 };
 const KEY = "airsql-scope-v3";
@@ -534,7 +553,7 @@ function render() {
 }
 
 function tiles() {
-  const c = { "1.0": 0, "1.x": 0, Later: 0, Skip: 0 }; let w = 0, changed = 0;
+  const c = { "1.0": 0, "1.0.2": 0, "1.x": 0, Later: 0, Skip: 0 }; let w = 0, changed = 0;
   GROUPS.forEach(g => g.items.forEach((it, i) => {
     const t = tierOf(g, i); c[t]++; if (t === "1.0") w += WEEKS[it[4]];
     if (choice[idOf(g, i)] && choice[idOf(g, i)] !== it[3]) changed++;
@@ -542,6 +561,7 @@ function tiles() {
   const tile = (n, label, col, note) => `<div class="tile" style="--c:${col}"><b>${n}</b><span>${label}</span>${note ? `<small>${note}</small>` : ""}</div>`;
   document.getElementById("tiles").innerHTML =
     tile(c["1.0"], "features in 1.0", "var(--accent)", `≈ ${Math.round(w)} weeks`) +
+    tile(c["1.0.2"], "built in 1.0.2", "var(--accent)") +
     tile(c["1.x"], "in 1.x, soon after", "var(--accent-soft)") +
     tile(c.Later, "later", "var(--later)") +
     tile(c.Skip, "skipped", "var(--skip)") +

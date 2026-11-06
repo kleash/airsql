@@ -25,15 +25,17 @@ one before, and a new file starts. It stays on your Mac: AirSQL sends it nowhere
 ## What a line says
 
 ```
-2026-11-03 14:03:12.345 [Shop production main:12] SELECT * FROM orders WHERE id = 7
+2026-11-03 14:03:12.345 [Shop production query:12] SELECT * FROM orders WHERE id = 7
 ```
 
 - the time;
 - the connection's name;
-- the session: **main** (query tabs), **data** (table tabs and their edits), **schema** (the navigator), **agent**
-  (AI agents), **tools** (client tools and compare), **cancel** (the short connection that stops a running statement);
+- the session: **query** (a query tab's own session), **main** (the connection's first session, which query tabs share
+  when the connection says so or the server has few connections left), **data** (table tabs and their edits), **schema**
+  (the navigator), **agent** (AI agents), **tools** (client tools and compare), **cancel** (the short connection that
+  stops a running statement);
 - the statement's number in that session. The server sees the same number in a comment at the start of the statement,
-  `/* airsql:main:12 */`, so you can find it in the server's process list.
+  `/* airsql:query:12 */`, so you can find it in the server's process list.
 
 Lines that start with `--` are AirSQL's own notes: connected (server version, thread, TLS), disconnected, connection
 lost, reconnected (and whether an open transaction was rolled back), the number of a statement's error, and

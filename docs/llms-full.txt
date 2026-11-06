@@ -21,22 +21,24 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 
 - [Install AirSQL](https://kleash.github.io/airsql/install.html): with Homebrew or from the download.
 - [Getting started](https://kleash.github.io/airsql/getting-started.html): add a connection, find your way around the window.
-- [Settings](https://kleash.github.io/airsql/settings.html): the look, the editor and grid, connections, safety checks, agents, client tools and
-  Liquibase.
+- [Settings](https://kleash.github.io/airsql/settings.html): the look, the editor, Format, the grid, shortcuts, connections, safety checks, agents, client
+  tools and Liquibase.
 - [Check SQL before it runs](https://kleash.github.io/airsql/sql-preview.html): the sheet that shows every change first.
 - [Trust a server](https://kleash.github.io/airsql/trust-a-server.html): servers whose certificate macOS doesn't know.
 - [The SQL log](https://kleash.github.io/airsql/sql-log.html): every statement AirSQL sends, with passwords masked.
 - [Read-only queries](https://kleash.github.io/airsql/read-only-queries.html): what an agent's query, or a read-only connection, may run, and why one is
   refused.
-- [The SQL console](https://kleash.github.io/airsql/console.html): write and run SQL, results, transactions, history and the SQL log.
+- [The SQL console](https://kleash.github.io/airsql/console.html): write and run SQL, checks while you type, a session per tab, results, transactions,
+  plans and history.
 - [Connections and routes](https://kleash.github.io/airsql/connections.html): add and edit connections, SSH tunnels, jump hosts, proxies and folders.
-- [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, table commands, find text and the process list.
+- [Browse a server](https://kleash.github.io/airsql/navigator.html): the tree, the database view, the host page, Disk Usage, table commands, find text and
+  the process list.
 - [Users and roles](https://kleash.github.io/airsql/users.html): list, add, change and drop logins and roles, their privileges, limits and passwords.
 - [A table's rows](https://kleash.github.io/airsql/table-data.html): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
-- [Change tables, views and routines](https://kleash.github.io/airsql/editors.html): the table editor, views and routines as CREATE code, and the ER
-  diagram.
+- [Change tables, views and routines](https://kleash.github.io/airsql/editors.html): the table editor, views and routines as CREATE code, ER diagrams and
+  the SQL Generator.
 - [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
   to another server; import from CSV, Excel, JSON and the clipboard, into a new table if you want.
 - [Compare](https://kleash.github.io/airsql/compare.html): servers, databases, tables and objects, structure and data, side by side, and a sync script you review first; or two
@@ -81,8 +83,8 @@ To check the download first, see [Check a download](https://kleash.github.io/air
 
 Drag AirSQL from Applications to the Bin (with Homebrew: `brew uninstall --cask airsql`). Your connections and settings
 stay in `~/Library/Application Support/AirSQL`, and saved passwords in your Keychain (the item named
-`com.kleash.airsql` in Keychain Access), until you delete them. `brew uninstall --zap --cask airsql` deletes the
-settings too.
+`com.kleash.airsql` in Keychain Access), and the SQL log in `~/Library/Logs/AirSQL`, until you delete them.
+`brew uninstall --zap --cask airsql` deletes the settings too.
 
 
 ---
@@ -141,6 +143,7 @@ until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes th
 ## Tips
 
 - Nothing is written to a database until you press Run or Apply.
+- Each query tab has its own session, so a long query in one leaves the others free. See [Sessions](https://kleash.github.io/airsql/console.html#sessions).
 - ⌘1 to ⌘9 show your tabs; ⇧⌘[ and ⇧⌘] step through them.
 - **Help ▸ Report a Problem** opens a form with your versions filled in.
 
@@ -161,13 +164,11 @@ Open **AirSQL ▸ Settings…** (⌘,). Changes are saved as you make them.
 
 ## Editor
 
-- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways; on at first (**View ▸ Word Wrap** too).
-
 - **Font**: the SQL editor's, from the fonts whose letters are all one width (SF Mono at first).
-- **Tab width** and **Indent with tabs**: how wide a tab or an indent is, and whether Tab puts in a tab character or spaces.
 - **Text size**: the SQL editor's (13 pt at first). **View ▸ Text Size ▸ Bigger** (⌘+) and **Smaller** (⌘−) change it for a
   moment; **Actual Size** (⌘0) goes back to this size.
-
+- **Wrap long lines**: wrap them at the editor's edge instead of scrolling sideways; on at first (**View ▸ Word Wrap** too).
+- **Tab width** and **Indent with tabs**: how wide a tab or an indent is, and whether Tab puts in a tab character or spaces.
 - **Add an alias to a table**: completing a table after FROM or JOIN adds one, as `orders o`; on at first.
 - **Change keywords' case as you type**: a reserved word takes the case set in [Format](#format) once you finish it; off at first.
 - **Checks**: what the editor underlines while you type (see [Checks while you type](https://kleash.github.io/airsql/console.html#checks-while-you-type)).
@@ -202,6 +203,12 @@ of them after.
 - **Transpose results with one row**: a query result with a single row opens turned on its side, one line per
   column (on by default).
 
+## Keys
+
+Every command with its shortcut. Filter by name or key, then double-click a row and press the new keys, or use **Change…**,
+**Remove**, **Reset** and **Reset All**. **Start from** chooses a set of shortcuts. See
+[Your own shortcuts](https://kleash.github.io/airsql/workspace.html#your-own-shortcuts).
+
 ## Connections
 
 - **Load details up to … tables**: on a server with more tables than this, a database's columns, indexes and keys load
@@ -217,7 +224,7 @@ below, in its Safety tab), and a connection coloured Production starts with a st
 | Setting | Default | Production |
 |---|---|---|
 | Ask before UPDATE or DELETE without WHERE | on | on |
-| Ask before any write from the query tab | off | on |
+| Ask before any write from the console | off | on |
 | Show the SQL before the grid's Apply | off | on |
 | Ask before DROP or TRUNCATE (a database's name is always typed) | on | on, table names typed too |
 | Ask before restoring into a database that has tables | on | on |
@@ -329,15 +336,17 @@ one before, and a new file starts. It stays on your Mac: AirSQL sends it nowhere
 ## What a line says
 
 ```
-2026-11-03 14:03:12.345 [Shop production main:12] SELECT * FROM orders WHERE id = 7
+2026-11-03 14:03:12.345 [Shop production query:12] SELECT * FROM orders WHERE id = 7
 ```
 
 - the time;
 - the connection's name;
-- the session: **main** (query tabs), **data** (table tabs and their edits), **schema** (the navigator), **agent**
-  (AI agents), **tools** (client tools and compare), **cancel** (the short connection that stops a running statement);
+- the session: **query** (a query tab's own session), **main** (the connection's first session, which query tabs share
+  when the connection says so or the server has few connections left), **data** (table tabs and their edits), **schema**
+  (the navigator), **agent** (AI agents), **tools** (client tools and compare), **cancel** (the short connection that
+  stops a running statement);
 - the statement's number in that session. The server sees the same number in a comment at the start of the statement,
-  `/* airsql:main:12 */`, so you can find it in the server's process list.
+  `/* airsql:query:12 */`, so you can find it in the server's process list.
 
 Lines that start with `--` are AirSQL's own notes: connected (server version, thread, TLS), disconnected, connection
 lost, reconnected (and whether an open transaction was rolled back), the number of a statement's error, and
@@ -1638,6 +1647,10 @@ or failed export never leaves half a file. When it is done, **Show in Finder** s
 statements, their rows as `INSERT`s (binary as hex), then views, routines, triggers and events, all read in one
 consistent snapshot. Its files restore with `mysql` or with Run SQL File.
 
+MySQL's `mysqldump` runs with `--set-gtid-purged=OFF`, so a dump from a server with GTIDs goes back to that server
+without failing on `SET GTID_PURGED`. A replica built from such a dump needs its GTID position set by hand: add
+`--set-gtid-purged=ON` under the extra options if that's what the dump is for.
+
 ### What goes in the SQL
 
 - **Rows as** writes `INSERT`, `INSERT IGNORE`, `REPLACE`, or `DELETE` then `INSERT` for each table, and **at most … KB
@@ -1664,7 +1677,7 @@ runs them one at a time. Compressed files are read through `/usr/bin/gzip`.
 3. **Restore** (or **Run**).
 
 Before anything runs, AirSQL reads the whole file for the statements that decide where it writes: `USE`, `CREATE
-DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED` (which AirSQL's own dumps leave out). When the file switches to
+DATABASE`, `DROP DATABASE`, and `SET GTID_PURGED` (which dumps made in AirSQL leave out). When the file switches to
 another database than the one you chose, drops a database, or sets GTID_PURGED, or when the database it writes to has
 tables already, the SQL preview sheet says so and asks first (Settings ▸ Safety ▸ *Ask before Restore…*). On a
 production connection it always asks.
@@ -1791,7 +1804,7 @@ Both are in the **Tools** menu too.
 
 ## Run a compare
 
-1. Choose the **level** at the left: **Servers**, **Databases**, or **Objects**.
+1. Choose the **level** at the left: **Servers**, **Databases**, or **Objects** (two tables, or two other objects).
 2. Choose the **source** on the left and the **target** on the right: a connection, then one of its databases (or
    type its name), then at the third level an object from the list. The sync script makes the target like the source;
    **Swap** turns them around.
@@ -2009,13 +2022,13 @@ Whatever that would change waits for you:
 - Anything that would run on a server (Run in a query tab, Apply, a compare's sync, Restore, Copy, Import, Commit)
   first shows the SQL preview sheet, marked **Asked by** and the agent's name. Only you can press its Run; the agent
   can only decline. Statements that AirSQL proves only read run without asking.
-- Agents can't change Settings, agent access, a connection's colour, read-only switch, server, route, login, TLS,
+- Agents can't change Settings, shortcuts, agent access, a connection's colour, read-only switch, server, route, login, TLS,
   startup SQL or safety settings, nor save files, start an export, save a password, trust a certificate, paste from
   your clipboard, quit AirSQL or press a button marked destructive (Don't Save, Disconnect with a transaction open).
   Text an agent types into a query tab of a Production connection is shown to you first.
 - On connections whose agent access doesn't include reading, grids and results, the filters their values go into,
-  the tab's messages (a server's error can quote a value) and the SQL preview's statements are hidden from the
-  agent's snapshots and screenshots; the SQL log's text always is. A cell's right-click menu never shows an agent the
+  the tab's messages (a server's error can quote a value), query plans, server accounts and the SQL preview's statements are
+  hidden from the agent's snapshots and screenshots; the SQL log's text and Query History's **All connections** always are. A cell's right-click menu never shows an agent the
   cell's value or your clipboard's text.
 
 **Settings ▸ Safety ▸ Ask before agents change anything** (on by default, per connection in its Safety tab) turns the
@@ -2526,7 +2539,9 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
   use.
 - A server can't make AirSQL read files on your Mac (`LOAD DATA LOCAL INFILE` is off), and AirSQL sends one statement
   at a time.
-- A lost connection is reported, never quietly reconnected: that would lose an open transaction without a word.
+- A lost connection is reported, never quietly reconnected: that would lose an open transaction without a word. A query
+  tab that lost its session runs nothing until you open a new one. A connection connects at launch only if you tick that
+  for it, and a Production connection never does.
 
 ## Your data
 
@@ -2536,11 +2551,16 @@ check for updates by itself (Homebrew does: `brew upgrade --cask airsql`). The H
 - A **read-only** connection runs only what AirSQL can prove reads, on sessions the server keeps read-only
   ([Connections](https://kleash.github.io/airsql/connections.html#add-or-edit-a-connection)).
 
+- What you keep on this Mac stays there: query history, local history of files, scratch files, snippets, diagrams' layouts
+  and pending changes are in AirSQL's settings folder, and the [SQL log](https://kleash.github.io/airsql/sql-log.html) in `~/Library/Logs/AirSQL`.
+  A notification that a long query finished never shows the SQL.
+
 ## AI agents
 
 Agents can't use AirSQL until you allow them. Then each connection has its own access level, an agent's queries must
 pass the [read-only check](https://kleash.github.io/airsql/read-only-queries.html), and a change it asks for waits for your approval. Agents never see
-saved passwords.
+saved passwords. AirSQL has no AI of its own: **Ask an Agent** only copies a request, with no SQL in it, for you to paste
+to your agent.
 
 ## The app itself
 
@@ -2586,6 +2606,8 @@ The message offers **Try Again**, **Edit Connection…** and this page.
 | The server doesn't offer TLS | Choose **Edit Connection…**, then in the TLS tab set TLS to **Off**, only for a server on this Mac or a network you trust end to end. |
 | The server asked for a login method AirSQL doesn't allow on this connection | A PAM or LDAP account: turn on its plain-text login for the connection, with TLS that proves the server. |
 | The server blocked this computer after too many failed connections | An administrator can unblock it (`FLUSH HOSTS`). |
+| The server has too many connections open | Close some query tabs (each has a session of its own), or turn on **Query tabs share one session** in the connection's Options. |
+| The password has expired | On a read-only or Production connection, change it with the server's own tools. Elsewhere AirSQL [asks for a new one](https://kleash.github.io/airsql/users.html#an-expired-password). |
 
 ## AirSQL asks about the server's certificate
 
@@ -2595,7 +2617,9 @@ choose **Cancel** and ask the server's administrator.
 ## "The connection to the server was lost"
 
 AirSQL doesn't reconnect by itself, because a quiet reconnect would lose an open transaction without telling you.
-Reconnect when you are ready. Changes you hadn't committed were rolled back by the server.
+Reconnect when you are ready. Changes you hadn't committed were rolled back by the server. A query tab that had a
+transaction open says how many rows went back, and runs nothing until you press **Open New Session**
+([Sessions](https://kleash.github.io/airsql/console.html#sessions)).
 
 ## macOS asks about the local network
 
@@ -2732,9 +2756,10 @@ failure, and every reply after an action carries the sheet it opened, if any.
 - `press {id | title, in?}`: buttons, checkboxes, segments, links. A pop-up is chosen with `set`.
 - `set {id | title, value, in?}`: text fields, checkboxes (true or false), pop-ups and segments (the option's title),
   and the console's editor (`console.editor`: the whole text).
-- `select {pane: sidebar | tabs, names}` selects connections or a tab by name; without pane, rows of a list in the
-  frontmost sheet or window.
-- `type {text}` types where the cursor is; `key {combo}` presses keys as the keyboard does ("cmd+return", "escape").
+- `select {pane: sidebar | tabs, names, none?, in?}` selects connections or a tab by name; without pane, rows of a list in
+  the frontmost sheet or window. `none: true` selects nothing.
+- `type {text}` types where the cursor is; `key {combo}` presses keys as the keyboard does ("cmd+return", "escape"). The
+  menu-bar shortcuts follow the person's Settings ▸ Keys, so prefer `menu`.
 - `click {x, y, count?, button?, modifiers?, in?}`, `double_click {x, y}` (opens or edits), `right_click {x, y}`
   (answers with the menu it opens). Points come from `snapshot` frames or a scale-1 screenshot.
 - `wait {until: sheet | no_sheet | popover | idle | text, text?, timeout?}`: idle means nothing runs.
@@ -2759,8 +2784,8 @@ its own:
   list's Kill (the person's sheet) still works, as it changes no data.
 - **The person's alone, even with approval:** agent access levels and sample rows, a connection's colour (production),
   read-only switch, server, route, login and safety settings, every Safety setting (this gate's switch among them),
-  whether agents are allowed, which connections there are (none can be deleted for you), the client tools AirSQL runs, and every other setting but the look (theme, font sizes,
-  rows per page, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
+  whether agents are allowed, which connections there are (none can be deleted for you), the client tools AirSQL runs, the shortcuts, and every other setting but the look (theme,
+  fonts and sizes, tab width and word wrap, rows per page, long values, the date format, the NULL text). Other saved data (names, folders, the look) is refused too while Settings ▸ Safety ▸
   Ask before agents change anything is on. The Settings window is to look at.
 - **Files, the clipboard, trust:** you can't save a console's file, open a client in Terminal, start an export, save a Liquibase changelog, save
   or remember a password, trust a certificate or SSH host key, or paste (the clipboard is the person's); use `type` or
@@ -2775,10 +2800,11 @@ its own:
   View As, charts, Column Summary and the status bar's figure), the filters a value goes into (`result.filter`,
   `tableData.where`, `values.list`, `quickFilter.value`), the process list and its selected statement (`processes.statement`), Export Rows' and Import's
   previews (`export.preview`, `csv.preview`), a table's note in the tree (`console.insightNote`), a compare's rows and sync script, the
-  console's Messages (`console.messages`: a server's error can quote a value), an EXPLAIN's tree (`console.planTree`)
-  and the SQL preview's statements (`preview.sql`) are covered in screenshots ("Hidden from agents") and left out of
+  console's Messages (`console.messages`: a server's error can quote a value), an EXPLAIN's steps in every view (`console.planTree`, `console.planOperations`, `console.planDiagram`, `console.planDetails`, `console.planRaw`), a pick-list's or filter's suggested values (`grid.set`, `grid.lookup`, `tableData.suggestions`),
+  who may log in (`list.usersandroles.table`, `users.grants`) and the SQL preview's statements (`preview.sql`) are covered in screenshots ("Hidden from agents") and left out of
   snapshots (`hidden`: no value, title or help; `set` still types into a hidden field). The SQL log's text
-  (`sqlLog.text`: every connection's statements) is hidden from you on every connection. A cell's right-click Quick
+  (`sqlLog.text`) and Query History's All connections list (`history.every`), which hold every connection's statements, are
+  hidden from you on every connection. A cell's right-click Quick
   Filter ▸ lists the Data menu's items for you (Equal to Selection…), never the value or the clipboard's text.
 
 The person can turn the asking off for a connection or for all (Settings ▸ Safety); person-only things stay theirs.
@@ -2798,7 +2824,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `navigator.text`; Find Text `find.text`, `find.scope`, `find.go`, `find.stop`, `find.results`, `find.status`;
   processes `processes.list`, `processes.refresh`, `processes.interval`, `processes.killQuery`,
   `processes.killConnection`, `processes.statement`; the host page `host.panes`, `host.properties`, `host.readSizes`,
-  `host.stopSizes`, `host.diskUsage`, `host.editVariable`, and its lists `list.databases.table`, `list.variables.table`,
+  `host.stopSizes`, `host.diskUsage`, `host.editVariable` (its sheet `host.variable.scope`, `host.variable.value`), and its lists `list.databases.table`, `list.variables.table`,
   `list.status.table`, `list.commandstatistics.table` (each with `.filter` and `.caption`); Disk Usage `disk.heading`,
   `disk.summary`, `disk.back`, `disk.refresh`, `disk.stop`, `disk.compare`, `disk.optimize`, `list.diskusage.table`.
   Edit Variable and Optimize wait for the person, and Read-only and Production refuse Edit Variable; Users and Roles
@@ -2810,7 +2836,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `editor.tabs`, `editor.name`, `editor.folder`, `editor.comment`, `editor.database`, `editor.databaseFilter`, and
   the person's `editor.colour`, `editor.host`, `editor.port`, `editor.socket`, `editor.user`, `editor.password`,
   `editor.askPassword`, `editor.route`, `editor.ssh`, `editor.addJump`, `editor.proxyKind`, `editor.proxyHost`,
-  `editor.tlsMode`, `editor.readOnly`, `editor.startupSQL`, `editor.clientPath`, `editor.dumpPath`, `editor.ownSafety`,
+  `editor.tlsMode`, `editor.readOnly`, `editor.reconnectAtLaunch`, `editor.sharedSession`, `editor.startsManual`, `editor.startIsolation`, `editor.queryTimeout`,
+  `editor.idleDisconnect`, `editor.timeZone`, `editor.startupSQL`, `editor.clientPath`, `editor.dumpPath`, `editor.ownSafety`,
   `editor.agentAccess`, `editor.sampleRows`; what the tools are `editor.clientFound`, `editor.dumpFound`, the route
   `editor.routePath`; `editor.test`, `editor.save`, `editor.saveAndConnect`, `editor.cancel`, `editor.status`.
 - **Status bar**: `status.route`, `status.server`, `status.transaction`, `status.activity`, `status.agent`,
@@ -2823,19 +2850,20 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   tab of their own, a grid under the `grid.legend` line (added green, removed red, changed cells amber); find bar
   `find.search`, `find.replace`, `find.matchCase`, `find.regex`, `find.replaceOne`, `find.replaceAll`, `find.done`;
   helpers `console.helpers`, `helpers.choice` (Columns, Functions, Keywords, Snippets, History), `helpers.filter`, `helpers.list`; the snippet sheet (Query ▸ Save as Snippet…) `snippet.name`, `snippet.abbreviation`, `snippet.folder`, `snippet.body`, `snippet.save`, `snippet.cancel`; completion `completion.list`;
-  history sheet `history.search`, `history.list`, `history.insert`, `history.clear`, `history.cancel`.
+  history sheet `history.search`, `history.list`, `history.preview`, `history.all`, `history.insert`, `history.clear`, `history.cancel`; the editor's corner `console.position`, `console.problemCount`; plan views `console.planOperations`, `console.planDiagram`, `console.planDetails`, `console.planRaw`;
+  Query ▸ Sessions… `sessions.list`; File ▸ Local History… `localHistory.list`, `localHistory.preview`, `localHistory.restore`, `localHistory.cancel`; Go to Line `goToLine.text`.
 - **Grid** (results, table data): `grid`, `grid.header`, `grid.rowNumbers`, `grid.editor` (Return or F2 opens it on the
   focused cell; a value its column refuses keeps it open, saying why in `grid.editor.problem`; Esc leaves the cell as it
   was); the status bar's `grid.rows`,
   `grid.position`, `grid.figure`; the value panel `valuePanel` (`valuePanel.mode`, `valuePanel.text`, `valuePanel.tree`,
-  `valuePanel.image`, `valuePanel.actions`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
+  `valuePanel.image`, `valuePanel.actions`, `valuePanel.loadFull`; in a table tab its text edits the selected cell: ⌘↩ keeps it as a pending
   edit, Esc puts it back; Load from File… and Save to File… are the person's); Record View `record.previous`, `record.next`, `record.close`; View As `grid.text`, `grid.tree`,
   `grid.chart` (`chart.kind`, `chart.x`, `chart.y`); Column List `columnList.search`, `columnList.table`; Column
   Summary `columnSummary` (a `columnSummary.value` filters by it); Go to Row `goToRow.text`. A console result filters
   its own rows (Data ▸ Quick Filter, Filter by Values…, Sort by Columns…, Search All Columns): its bar
   `result.filterBar`, shown while a filter or search is on, has `result.scope`, `result.filter` (the conditions as SQL),
   `result.clearFilter` and `result.search` (Return searches).
-- **Table tab** (a table's rows: Database ▸ Open Definition Data or a double-click in the tree; a single click shows them in the
+- **Table tab** (a table's rows: Database ▸ Open Data or a double-click in the tree; a single click shows them in the
   preview tab): `tableData`; its grid bar `tableData.scope` (where filtering runs), `tableData.where` (a WHERE condition:
   set it, then key `return` applies it), `tableData.recentFilters`, `tableData.clearFilter`, `tableData.search`, `tableData.loadedOnly`,
   `tableData.busy`; the notice `tableData.notice` (`tableData.noticeText`, `tableData.preview`, `tableData.revert`,
@@ -2870,6 +2898,8 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
 - **Quick Open** (`quickOpen.field`, `quickOpen.list`, `quickOpen.open`): commands listed there are refused to agents; use the `menu` tool.
   Quick Documentation on a tree row leaves out the table's rows for an agent.
 - **Find in Tabs and Files**: `findFiles.text`, `findFiles.results`, `findFiles.status`; `findFiles.replace` is the person's.
+- **Files panel** (View ▸ Files): `sidebar.files`, `files.outline`, `files.attach`, `files.newScratch`; Run On opens Run SQL File…, whose Run asks the person.
+- **Restored tabs** (placeholders after a relaunch): `restored.what`, `restored.state`, `restored.open`, `restored.edit`, `restored.help`.
 - **Agent tab** (View ▸ Agent Results: the statements agents ran on the connection and the rows they got):
   `agentResults`, `agentResults.list`, `agentResults.empty`, `agentResults.detail`, and the result grid `grid`.
 - **SQL preview sheet**: `preview.heading`, `preview.agent`, `preview.production`, `preview.warning`, `preview.sql`,
@@ -2878,7 +2908,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `.collation`, `.rowFormat`, `.autoIncrement`, `.comment`), `tableEditor.sql`, `tableEditor.apply`,
   `tableEditor.partitions`, `tableEditor.partitionClause`, `tableEditor.discard`, `editor.status`, `editor.retry`. **Object editor**: `objectEditor.code`,
   `objectEditor.definer`, `objectEditor.run`, `objectEditor.apply`, `objectEditor.revert`, and its fields, `objectForm.name` and the like. **ER diagram**: `erDiagram.database`,
-  `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`. **SQL Generator**: `generator.text`,
+  `erDiagram.diagram`, `erDiagram.canvas`, `erDiagram.add`, `erDiagram.arrange`, `erDiagram.show`, `erDiagram.export`, `erDiagram.find`, `erDiagram.fit`. **SQL Generator**: `generator.text`,
   `generator.copy`, `generator.console`, `generator.save`, `generator.layout`, and a box per option (`generator.indexes` and so on).
 - **Compare window**: `recon.level` (Servers, Databases, Objects), `recon.source.connection`, `recon.source.database`,
   `recon.source.object`, `recon.target.connection`, `recon.target.database`, `recon.target.object`, `recon.swap`,
@@ -2912,7 +2942,7 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
   `settings.completionTableAlias`, `settings.autoKeywordCase`; Format `settings.format.preset`, `settings.format.preview`, `settings.format.*`;
   Grid `settings.gridFontSize`, `settings.rowsPerPage`, `settings.loadAllAsksAbove`, `settings.nullText`,
   `settings.transposeSingleRow`; Connections
-  `settings.detailsTableThreshold`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,
+  `settings.detailsTableThreshold`, `settings.schemaRefreshMinutes`; Keys `settings.keysFilter`, `settings.keys`; Safety `settings.safety.*`; Agents `settings.agentsAllowed`,
   `settings.agentAccessList`, `settings.agentExports`, `settings.copyMCPCommand`; Client Tools `settings.findTools`,
   `settings.toolsFound`.
 

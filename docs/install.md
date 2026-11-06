@@ -27,5 +27,5 @@ To check the download first, see [Check a download](privacy-security.md#check-a-
 
 Drag AirSQL from Applications to the Bin (with Homebrew: `brew uninstall --cask airsql`). Your connections and settings
 stay in `~/Library/Application Support/AirSQL`, and saved passwords in your Keychain (the item named
-`com.kleash.airsql` in Keychain Access), until you delete them. `brew uninstall --zap --cask airsql` deletes the
-settings too.
+`com.kleash.airsql` in Keychain Access), and the SQL log in `~/Library/Logs/AirSQL`, until you delete them.
+`brew uninstall --zap --cask airsql` deletes the settings too.

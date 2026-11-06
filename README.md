@@ -21,32 +21,48 @@ AI agents that never change anything without you. Free and open source.</b></p>
 
 - **Every way in** ([Connections and routes](docs/connections.md)): direct or a socket, SSH tunnels (password, key,
   ssh-agent, 2FA, your `~/.ssh/config`), jump hosts, HTTP and SOCKS5 proxies, each ending in a private socket on your
-  Mac. TLS is checked against the server's real name, also through a tunnel. Folders, colours, read-only connections
-  and startup SQL.
+  Mac. TLS is checked against the server's real name, also through a tunnel. Folders, colours, read-only connections,
+  startup SQL, and imports from Sequel Ace, TablePlus, DBeaver, MySQL Workbench and HeidiSQL.
+- **A SQL editor that reads what you write** ([The SQL console](docs/console.md)): a parser for MySQL and MariaDB behind
+  completion that knows aliases, CTEs, subqueries and joins by foreign key; checks as you type against the schema, with
+  fixes (⌥↩); go to declaration, find usages and rename; a formatter with rules and presets that changes only layout
+  and the case you ask for. Multiple carets, folding, templates, snippets, line and statement commands, bookmarks and local history.
+- **A session per query tab**: each tab has its own transaction and current database, so a long query in one leaves the
+  others free. Query parameters, run to a file, EXPLAIN and EXPLAIN ANALYZE as a tree, a diagram and a flame graph,
+  profiles, history, result tabs, and a log of every statement AirSQL sends.
 - **A fast data grid with safe editing** ([A table's rows](docs/table-data.md), [Read the data in a grid](docs/data-grid.md)):
-  filter and sort on the server or in the loaded rows, search every column, quick filters and filter by values; an
-  editor for each type (dates, JSON, ENUM and SET, foreign keys with search), paste from a spreadsheet, undo. Nothing
-  is written until you Apply, and Apply checks that every change touched exactly the rows it should. Transpose, record
-  view, value panel, display formats (UUID, hex, numbers, dates, time zones), heatmaps, charts, column summary and
-  frozen columns; compare two results; copy and export as CSV, JSON, SQL, Markdown, HTML, XML or Excel.
-- **A SQL console** ([The SQL console](docs/console.md)) with completion, formatting, EXPLAIN as a plan, profiles,
-  history, transactions, query helpers, result tabs and a log of every statement AirSQL sends.
-- **A server at a glance** ([Browse a server](docs/navigator.md)): the tree and the database view; create, rename,
-  empty, copy and drop; a bulk table editor, maintenance, text found in every table, and the process list with Kill.
-- **Schema tools** ([Change tables, views and routines](docs/editors.md)): the table editor, with its ALTER shown as you
-  type (columns, indexes, foreign keys, checks, options), views and routines as CREATE code, and an ER diagram.
+  a toolbar and a pager beside the rows; filter and sort on the server or in the loaded rows, search every column, quick
+  filters and filter by values; an editor for each type (dates, JSON, ENUM and SET, foreign keys with search), paste
+  from a spreadsheet, undo. Long values are cut at the server and read whole when you ask, so a table of blobs opens at
+  once. Nothing is written until you Apply, and Apply checks that every change touched exactly the rows it should.
+  Transpose, record view, value panel, display formats, heatmaps, charts, column summary and frozen columns; compare two
+  results; copy and export as CSV, JSON, SQL, Markdown, HTML, XML or Excel.
+- **A server at a glance** ([Browse a server](docs/navigator.md)): a host page with databases and sizes, variables,
+  status, processes and command statistics; Disk Usage from the server down to a table's indexes and partitions; the
+  tree with favourites, filters and size bars, Quick Open for anything, and text found in every table.
+- **Users and roles** ([Users and roles](docs/users.md)): list, add, clone and drop logins and roles, with their
+  privileges at every level, limits, TLS requirements and passwords, the SQL shown first.
+- **Schema tools** ([Change tables, views and routines](docs/editors.md)): Data, Structure and DDL as a switch on one tab;
+  the table editor, with its ALTER shown as you type (columns, indexes, foreign keys, checks, partitions, options); views,
+  routines, triggers and events as CREATE code with a form for their head; ER diagrams of chosen tables that keep their
+  layout; a SQL Generator that writes a script, or a file per object.
 - **Client tools** ([Export, restore, copy and import](docs/client-tools.md)): your own `mysqldump` and `mysql`, with
   passwords kept off the command line, or AirSQL's own export and runner; Terminal over any route; copies to another
   server; import from CSV, Excel, JSON and the clipboard, into a new table if you want.
-- **Compare and reconcile** two servers, databases, tables or objects ([Compare](docs/compare.md)), structure and data, with a sync
-  script you review first and a report as HTML, CSV or Markdown; **Liquibase changesets**
+- **Compare and reconcile** ([Compare](docs/compare.md)): two servers, databases, tables or objects, structure and data,
+  with a sync script you review first and a report as HTML, CSV or Markdown; **Liquibase changesets**
   ([Liquibase changelogs](docs/liquibase.md)) of a schema or of any change.
 - **AI agents over MCP** ([AI agents](docs/agents.md)), at the level you set for each connection: their queries must
   pass a read-only check, their changes wait for your approval, you see what they ran, and they never see your
   passwords.
-- **A Mac app** ([Keyboard shortcuts](docs/shortcuts.md)): native AppKit, light and dark, right-click menus and a
-  shortcut for every common command, drag and drop, and no waiting on the network while you work. Apple silicon and
-  Intel, macOS 13.1 or later. No account.
+- **A Mac app** ([Keyboard shortcuts](docs/shortcuts.md), [Files and your workspace](docs/workspace.md)): native AppKit,
+  light and dark, right-click menus and a shortcut for every common command, shortcuts of your own, several windows,
+  split tabs, a Files panel for your scripts, and no waiting on the network while you work. Apple silicon and Intel,
+  macOS 13.1 or later. No account.
+
+It does MySQL and MariaDB only. It has no AI of its own (it works with the agent you already use), no version control, no
+built-in terminal and no update check (Homebrew does that). InnoDB's sizes and row counts are the server's estimates, and
+what a login can't read AirSQL can't show.
 
 ## Screenshots
 
