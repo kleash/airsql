@@ -14,7 +14,7 @@ extension MainWindowController {
     /// The focus moved to the other side: that tab is now the selected one.
     func followFocus() {
         guard let panes = splitPanes, let focus = window?.firstResponder as? NSView else { return }
-        guard let tab = [panes.left, panes.right].first(where: { $0 !== selectedTab && focus.isDescendant(of: $0.content.view) }) else { return }
+        guard let tab = [panes.left, panes.right].first(where: { (tab: Tab) in tab !== selectedTab && focus.isDescendant(of: tab.content.view) }) else { return }
         select(tab)
     }
 
