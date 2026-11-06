@@ -7,7 +7,7 @@ import Testing
 /// for a moment, to show the session's own guards.
 @Suite(.serialized, .enabled(if: Lab.enabled))
 struct AgentLabTests {
-    static let servers = [Lab.mariadb114, Lab.mysql84]
+    static let servers = Lab.direct
 
     /// A connection to `server`'s fixture as agents reach it.
     static func target(_ server: Lab.Server, _ access: AgentAccess, sampleRows: Bool = false,

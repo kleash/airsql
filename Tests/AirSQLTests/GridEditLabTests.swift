@@ -7,7 +7,7 @@ import Testing
 /// read-back and join rules hold on real schemas and result metadata. Writes only in lane_l3b_edit_<server>.
 @Suite(.serialized, .enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
 struct GridEditLabTests {
-    static let servers = [Lab.mariadb114, Lab.mysql84]
+    static let servers = Lab.direct
 
     static func connected(_ server: Lab.Server, role: DBConnection.Role) async throws -> DBConnection {
         let session = DBConnection(options: DBLab.options(server), role: role, log: DBLab.log)

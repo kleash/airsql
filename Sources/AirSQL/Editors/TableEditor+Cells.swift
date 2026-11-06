@@ -52,7 +52,8 @@ extension TableEditorController: NSComboBoxDataSource, NSMenuDelegate {
                 popup.isEnabled = popup.isEnabled && index.takesAlgorithm
                 return because(popup, "Full-text, spatial and vector indexes have one way to be stored")
             case "visible":
-                return because(check(index.visible, enabled: index.kind != .primary), "A primary key is always visible")
+                return because(check(index.visible, enabled: index.kind != .primary && server.hidesIndexes),
+                               server.hidesIndexes ? "A primary key is always visible" : "This server version can't hide an index")
             default: return text(index.comment, placeholder: "")
             }
         case .foreignKeys:

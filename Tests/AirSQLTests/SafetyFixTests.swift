@@ -183,6 +183,7 @@ extension AppTests {
             await answerNewSession(main, harness, console)
             #expect(session.autocommit == false, "\(console.messagesView.messages.map(\.text))")
             await connection.disconnect()
+            ConsoleViewController.shared[Fixtures.production.id] = nil  // else the next test's tab finds this lost session
         }
 
         /// Cancel while a tab's session opens has no statement to stop: what Explain Analyze would have run doesn't run.

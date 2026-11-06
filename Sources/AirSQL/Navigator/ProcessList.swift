@@ -333,7 +333,7 @@ final class ProcessListContent: NSViewController, TabContent, NSTableViewDataSou
     @objc func explain(_ sender: Any?) {
         guard let process = selected.first, process.info != nil, let main = view.window?.windowController as? MainWindowController,
               let session else { return }
-        let sql = session.server?.flavor == .mariadb ? "SHOW EXPLAIN FOR \(process.id)" : "EXPLAIN FOR CONNECTION \(process.id)"
+        let sql = session.server?.flavor == .mariadb ? "SHOW EXPLAIN FOR \(process.id)" : "EXPLAIN FORMAT=TRADITIONAL FOR CONNECTION \(process.id)"
         let content = TextContent(title: "Explain · process \(process.id)", caption: process.shownInfo ?? "") {
             guard let rows = try await session.query(sql).first?.rows else { return "" }
             let header = rows.columns.map(\.name).joined(separator: "   ")

@@ -63,7 +63,7 @@ struct LiquibaseLabTests {
         }
     }
 
-    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    @Test(arguments: Lab.direct)
     func fixtureRoundTripsThroughAChangelog(_ server: Lab.Server) async throws {
         let (url, outcome) = try await Self.changelog(server)
         #expect(outcome.changesets > 30 && outcome.rows > 50, "\(outcome)")
@@ -105,7 +105,7 @@ struct LiquibaseLabTests {
     /// A change written for NO_BACKSLASH_ESCAPES (Apply on such a session writes `C:\new` with a bare backslash), saved
     /// as a changeset, stores the same value on a session without it, as Liquibase's is, whatever its other modes; the
     /// session's own mode comes back after.
-    @Test(arguments: [Lab.mariadb114, Lab.mysql84])
+    @Test(arguments: Lab.direct)
     func aChangeWrittenWithoutBackslashEscapesStoresTheSameValue(_ server: Lab.Server) async throws {
         let session = try await ReconLabTests.session(server)
         defer { Task { await session.close() } }

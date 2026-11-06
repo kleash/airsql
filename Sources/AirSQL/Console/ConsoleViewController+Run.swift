@@ -388,7 +388,7 @@ extension ConsoleViewController {
     private func explain(_ run: ConsoleRun, on session: DBConnection) async {
         let statement = run.statements[0]
         if text == run.text { editor.flash(NSRange(statement.range)) }
-        let table = await ConsoleRunner.run(SQLStatement(sql: ExplainPlan.tableSQL(statement.sql)), in: run.text, on: session)
+        let table = await ConsoleRunner.run(SQLStatement(sql: ExplainPlan.tableSQL(statement.sql, server: session.server)), in: run.text, on: session)
         if let error = table.error { return planFailed(error, run: run, session: session) }
         let (sql, json) = ExplainPlan.treeSQL(statement.sql, server: session.server)
         let tree = (await runQuery(sql, on: session))?.first?.rows.flatMap { $0.rowCount > 0 ? $0.string(0, 0) : nil } ?? ""

@@ -172,8 +172,11 @@ extension AccountGrants {
         for line in lines {
             var lexer = SQLLexer(line, noBackslashEscapes: noBackslashEscapes)
             var tokens: [(kind: SQLToken.Kind, text: String)] = []
+            var inBrackets = false  // MySQL 5.7 writes a column's name bare there, in its own case
             while let token = lexer.next() {
-                tokens.append((token.kind, token.kind == .word ? lexer.upper(token.range) : lexer.string(token.range)))
+                let text = lexer.string(token.range)
+                if text == "(" || text == ")" { inBrackets = text == "(" }
+                tokens.append((token.kind, token.kind == .word && !inBrackets ? lexer.upper(token.range) : text))
             }
             let words = tokens.map(\.text)
             if words.starts(with: ["SET", "DEFAULT", "ROLE"]) {

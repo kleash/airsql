@@ -7,7 +7,7 @@ import Testing
 @Suite(.serialized, .enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
 struct EditorsLabTests {
     static let database = "lane_l5b_editors"
-    static let servers = [Lab.mysql84, Lab.mariadb114]
+    static let servers = Lab.direct
 
     func connected(_ server: Lab.Server) async throws -> DBConnection {
         let session = DBConnection(options: DBLab.options(server), role: .tools, log: DBLab.log)
@@ -163,7 +163,7 @@ struct EditorsLabTests {
         var table = TableDesign(name: "parts")
         table.columns = [column("id", "int"), column("day", "int")]
         var hidden = IndexDesign(name: "by_day", kind: .index, parts: [.init(column: "day")])
-        hidden.visible = false
+        hidden.visible = !server.hidesIndexes
         hidden.algorithm = "BTREE"
         table.indexes = [IndexDesign(name: "PRIMARY", kind: .primary, parts: [.init(column: "id"), .init(column: "day")]), hidden]
         table.options.engine = "InnoDB"
@@ -173,7 +173,7 @@ struct EditorsLabTests {
 
         var (back, _) = try await read("parts", on: session)
         #expect(back.options.partitioning?.hasPrefix("PARTITION BY RANGE") == true, "\(back.options.partitioning ?? "none")")
-        #expect(back.indexes.first { $0.name == "by_day" }?.visible == false)
+        #expect(back.indexes.first { $0.name == "by_day" }?.visible == !server.hidesIndexes)
         let listed = try await EditorQueries.partitions(Self.database, "parts", server: server, from: session)
         #expect(listed.map(\.name) == ["p0", "p1"] && listed[0].method == "RANGE" && listed[0].values == "10")
 
@@ -221,7 +221,7 @@ struct EditorsLabTests {
         var taxed = column("total_with_tax", "decimal(14,2)", null: true)
         taxed.generated = SchemaColumn.Generated(expression: "`total` * 1.21", stored: true)
         var hidden = column("hidden", "int", null: true, .null)
-        hidden.invisible = true
+        hidden.invisible = mariadb || server.atLeast(8, 0, 23)
         orders.columns = [orderID, column("customer_id", "int unsigned"),
                           column("status", "enum('paid')", .value("paid"), collation: text),
                           total, taxed, column("note", "varchar(50)", null: true, .value(hostile), collation: text, comment: hostile),
@@ -233,7 +233,9 @@ struct EditorsLabTests {
                                    referencedTable: "customers", referencedColumns: ["id"])
         key.onDelete = "RESTRICT"
         orders.foreignKeys = [key]
-        orders.checks = [CheckDesign(name: "total_positive", clause: "`total` >= 0")]
+        // MySQL before 8.0.16 reads CHECK and drops it.
+        let checks = mariadb || server.atLeast(8, 0, 16)
+        if checks { orders.checks = [CheckDesign(name: "total_positive", clause: "`total` >= 0")] }
         orders.options = TableOptions(engine: "InnoDB", collation: "utf8mb4_bin", comment: "Orders")
 
         for table in [customers, orders] {
@@ -251,10 +253,10 @@ struct EditorsLabTests {
         after.columns[after.columns.firstIndex { $0.name == "total" }!].type.length = "14,2"
         after.indexes[after.indexes.firstIndex { $0.name == "by_customer" }!].name = "customer"
         after.indexes.append(IndexDesign(name: "customer_currency", kind: .unique,
-                                         parts: [.init(column: "customer_id"), .init(column: "currency", prefixLength: 2, descending: true)]))
+                                         parts: [.init(column: "customer_id"), .init(column: "currency", prefixLength: 2, descending: mariadb ? server.atLeast(10, 8) : server.atLeast(8))]))
         after.foreignKeys[0].onDelete = "CASCADE"
-        after.checks[0].clause = "`total` > -1"
-        if !mariadb { after.checks.append(CheckDesign(name: "lax", clause: "`customer_id` > 0")) }
+        if checks { after.checks[0].clause = "`total` > -1" }
+        if !mariadb && checks { after.checks.append(CheckDesign(name: "lax", clause: "`customer_id` > 0")) }
         after.options.comment = hostile
         after.options.autoIncrement = 1000
         let statements = try after.statements(database: Self.database, from: before, server: server)
@@ -268,7 +270,7 @@ struct EditorsLabTests {
         var third = second
         third.removeColumn(at: third.columns.firstIndex { $0.name == "currency" }!)
         third.columns.swapAt(2, 3)
-        if !mariadb { third.checks[third.checks.firstIndex { $0.name == "lax" }!].enforced = false }
+        if !mariadb && checks { third.checks[third.checks.firstIndex { $0.name == "lax" }!].enforced = false }
         third.name = "orders2"
         third.options.autoIncrement = nil
         try await run(try third.statements(database: Self.database, from: second, server: server), on: session)

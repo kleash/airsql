@@ -44,6 +44,8 @@ enum Lab {
         let port: Int?
         let logins: [Login]
         var description: String { name }
+        /// The lab's older MariaDB servers have no certificate; MariaDB makes its own from 11.4 on.
+        var offersTLS: Bool { flavor == .mysql || version >= "11.4" }
     }
 
     static let mysql57 = Server(name: "mysql57", flavor: .mysql, version: "5.7.44", port: 44357, logins: [native, sha256])

@@ -93,7 +93,7 @@ struct ConsoleLabTests {
         // No aliases: both servers name tables by their alias in a plan.
         let sql = "SELECT customers.id, COUNT(orders.id) FROM fixture.customers JOIN fixture.orders "
             + "ON orders.customer_id = customers.id GROUP BY customers.id"
-        let table = await run(ExplainPlan.tableSQL(sql), on: session)
+        let table = await run(ExplainPlan.tableSQL(sql, server: session.server), on: session)
         #expect(table.error == nil && (table.results.first?.rows?.rowCount ?? 0) >= 2, "\(String(describing: table.error))")
         let (treeSQL, json) = ExplainPlan.treeSQL(sql, server: session.server)
         #expect(json == (flavor == "mariadb"))
@@ -138,10 +138,10 @@ struct ConsoleLabTests {
     }
 
     /// Query ▸ Profile: performance_schema on MySQL 8.4 (whose stages are off by default, so the statement's own figures),
-    /// SHOW PROFILE on MariaDB 11.4, and on MySQL 8.0, whose performance_schema the lab turns off, SHOW PROFILE saying so.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114, Lab.mysql80])
+    /// SHOW PROFILE on MariaDB, and on MySQL 8.0 and 9.7, whose performance_schema the lab turns off, SHOW PROFILE saying so.
+    @Test(arguments: Lab.direct)
     func profileReadsPerformanceSchemaOnMySQL8(_ server: Lab.Server) async throws {
-        let session = DBConnection(options: DBLab.options(server, tls: DBLab.required), role: .main, log: DBLab.log)
+        let session = DBConnection(options: DBLab.options(server, tls: server.offersTLS ? DBLab.required : TLSOptions(mode: .off)), role: .main, log: DBLab.log)
         try await session.connect()
         let profile = await QueryProfile.start(on: session)
         // A warning, so AirSQL's SHOW WARNINGS follows the statement, as in the console.
@@ -154,7 +154,7 @@ struct ConsoleLabTests {
             #expect(note?.contains("events_stages_history_long consumer is off") == true, "\(note ?? "")")
         } else {
             #expect(columns == ["Status", "Duration"] && (rows?.rowCount ?? 0) > 3, "\(columns)")
-            #expect(note == (server.name == "mysql80" ? "This profile comes from SHOW PROFILE, which MySQL has deprecated: "
+            #expect(note == (["mysql80", "mysql97"].contains(server.name) ? "This profile comes from SHOW PROFILE, which MySQL has deprecated: "
                 + "performance_schema is off on this server." : nil), "\(note ?? "")")
         }
         await session.close()

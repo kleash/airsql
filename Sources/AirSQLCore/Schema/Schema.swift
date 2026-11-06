@@ -37,6 +37,9 @@ public struct SchemaServer: Hashable {
         return !own.lexicographicallyPrecedes([major, minor, patch])
     }
 
+    /// It can keep an index from queries: MySQL 8's INVISIBLE, MariaDB 10.6's IGNORED.
+    public var hidesIndexes: Bool { flavour == .mysql ? atLeast(8) : atLeast(10, 6) }
+
     /// Database, table and trigger names compare without case (`lower_case_table_names` 1 or 2).
     var caselessNames: Bool { lowerCaseTableNames != 0 }
 }

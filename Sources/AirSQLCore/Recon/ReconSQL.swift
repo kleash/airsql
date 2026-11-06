@@ -41,17 +41,17 @@ struct ReconTableSQL {
         let value: String
         switch column.kind {
         case .text: value = "CONVERT(\(name) USING utf8mb4)"
-        case .longText, .json: value = "MD5(CONVERT(\(name) USING utf8mb4))"
-        case .blob: value = "MD5(\(name))"
+        case .longText, .json: value = "SHA2(CONVERT(\(name) USING utf8mb4), 256)"
+        case .blob: value = "SHA2(\(name), 256)"
         case .bit: value = "(\(name) + 0)"
         case .integer, .decimal, .float, .binary, .temporal: value = name
         }
         return "IFNULL(CONCAT('0', LENGTH(\(value)), ':', \(value)), '1')"
     }
 
-    /// A row's 64-bit hash, as BIGINT UNSIGNED.
+    /// A row's 64-bit hash, as BIGINT UNSIGNED. SHA2, as MySQL 9.7 has no MD5 or SHA1 of its own.
     var rowHash: String {
-        "CAST(CONV(LEFT(MD5(CONCAT(" + columns.map(Self.part).joined(separator: ", ") + ")), 16), 16, 10) AS UNSIGNED)"
+        "CAST(CONV(LEFT(SHA2(CONCAT(" + columns.map(Self.part).joined(separator: ", ") + "), 256), 16), 16, 10) AS UNSIGNED)"
     }
 
     private var keyList: String { key.map { SQLQuote.identifier($0.name) }.joined(separator: ", ") }

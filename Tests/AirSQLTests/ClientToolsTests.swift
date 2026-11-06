@@ -122,8 +122,8 @@ struct ClientToolsTests {
         let dump = mysql.dump(request, optionFile: "/private/f.cnf")
         #expect(dump == ["/opt/homebrew/bin/mysqldump", "--defaults-file=/private/f.cnf", "--protocol=TCP", "--host=db.example.com",
                          "--port=3307", "--ssl-mode=VERIFY_IDENTITY", "--ssl-ca=/certs/ca.pem", "--default-character-set=utf8mb4",
-                         "--single-transaction", "--hex-blob", "--routines", "--events", "--triggers", "--skip-add-drop-table",
-                         "--skip-comments", "--where=id > 5", "shop", "customers", "orders"])
+                         "--single-transaction", "--hex-blob", "--set-gtid-purged=OFF", "--routines", "--events", "--triggers",
+                         "--skip-add-drop-table", "--skip-comments", "--where=id > 5", "shop", "customers", "orders"])
         #expect(!dump.joined().contains("s3cret") && !dump.contains("app"))
         #expect(ToolCommand.display(dump, optionFile: "/private/f.cnf")
             .hasPrefix("/opt/homebrew/bin/mysqldump --defaults-file=‹private temporary file› --protocol=TCP"))
@@ -151,6 +151,17 @@ struct ClientToolsTests {
             == ["/opt/homebrew/bin/mysql", "--defaults-file=/f", "--protocol=SOCKET", "--socket=/tmp/mysql.sock",
                 "--default-character-set=utf8mb4", "--batch", "--force", "shop"])
         #expect(client.terminal(database: "", optionFile: "/f").last == "--default-character-set=utf8mb4")
+
+        #expect(!ToolCommand(tool: Self.tool("mariadb-dump", .mariadb, [11, 8, 3]), options: options, server: nil)
+            .dump(request, optionFile: "/f").contains("--set-gtid-purged=OFF"), "MariaDB's tools don't know it")
+
+        // MySQL 5.7 doesn't know the collation a newer tool asks for: its session says utf8mb4 itself, read-only or not.
+        let old = ToolCommand(tool: Self.tool("mysql", .mysql, [9, 6, 0]), options: options, server: Self.server(.mysql, 50744))
+        #expect(old.connection(optionFile: "/f").last == "--loose-init-command=SET NAMES utf8mb4")
+        var oldLocked = options
+        oldLocked.readOnly = true
+        #expect(ToolCommand(tool: Self.tool("mysql", .mysql, [9, 6, 0]), options: oldLocked, server: Self.server(.mysql, 50744))
+            .connection(optionFile: "/f").last == "--loose-init-command=SET NAMES utf8mb4, SESSION transaction_read_only = 1")
 
         // A read-only connection's tools run READ ONLY sessions: Terminal's mysql, and the dumps where they know how.
         options.readOnly = true

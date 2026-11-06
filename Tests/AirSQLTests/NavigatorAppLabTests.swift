@@ -170,7 +170,7 @@ extension AppTests {
             // Run…: the procedure's CALL, its parameters as the server lists them.
             let routine = try #require(treeRow(main, .object(open.id, DatabaseObject(.procedure, a, "twice"))))
             _ = await call(harness, "click", ["x": routine.point.0, "y": routine.point.1, "button": "right"])
-            #expect(await call(harness, "menu", ["path": "context > Run…"]).error == nil)
+            #expect(await call(harness, "menu", ["path": "context > Run Routine…"]).error == nil)
             #expect(await eventually(timeout: 10) { (main.selectedTab?.content as? ConsoleViewController) !== console })
             let routineConsole = try #require(main.selectedTab?.content as? ConsoleViewController)
             #expect(routineConsole.text == "CALL `\(a)`.`twice`(? /* p_in int(11) */, @`p_out`);\nSELECT @`p_out`;\n")

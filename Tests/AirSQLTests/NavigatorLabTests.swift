@@ -6,7 +6,7 @@ import Testing
 /// names and texts, and Kill stops only the statement the process list showed.
 @Suite(.serialized, .enabled(if: Lab.enabled, "Lab: AIRSQL_LAB=1 ./test.sh"))
 struct NavigatorLabTests {
-    static let servers = [Lab.mysql84, Lab.mysql97, Lab.mariadb114, Lab.mariadb105]
+    static let servers = Lab.direct
     static let database = "lane_l5a_nav"
     static let other = "lane_l5a_nav other`s"
 

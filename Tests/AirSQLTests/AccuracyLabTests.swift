@@ -93,7 +93,7 @@ struct AccuracyLabTests {
         #expect(try await session.rows(source.pageSQL(offset: 0, limit: nil)).count >= 1)
     }
 
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func loadMoreSaysWhenRowsMovedBetweenPages(_ server: Lab.Server) async throws {
         try await withDatabase(server, [
             "CREATE TABLE \(Self.quoted).p (id INT PRIMARY KEY)",
@@ -118,7 +118,7 @@ struct AccuracyLabTests {
 
     /// A CSV AirSQL wrote reads back as it was: NULL against the text NULL, bytes in a BLOB; a Windows-1252 file keeps
     /// its accents and says so; a value the server changed (non-strict) comes back as a warning.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func csvRoundTrips(_ server: Lab.Server) async throws {
         try await withDatabase(server, [
             "CREATE TABLE \(Self.quoted).c (id INT PRIMARY KEY, t VARCHAR(20) NULL, b BLOB NULL)",
@@ -152,7 +152,7 @@ struct AccuracyLabTests {
     }
 
     /// Replaying an export: the server refuses a value for a generated column.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func exportedInsertsSkipGeneratedColumnsAndRun(_ server: Lab.Server) async throws {
         try await withDatabase(server, [
             "CREATE TABLE \(Self.quoted).g (id INT PRIMARY KEY, a INT, twice INT AS (a * 2) STORED)",
@@ -171,7 +171,7 @@ struct AccuracyLabTests {
     }
 
     /// BIT, ENUM and geometry in Column Summary, and what LIKE reads, all on the server.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func summariesAndLikeReadWhatCellsShow(_ server: Lab.Server) async throws {
         try await withDatabase(server, [
             "CREATE TABLE \(Self.quoted).s (id INT PRIMARY KEY, b BIT(10) NULL, e ENUM('small','medium','it''s') NULL, "
@@ -201,7 +201,7 @@ struct AccuracyLabTests {
     }
 
     /// An UPDATE that changes nothing says so: the server counts it as matched.
-    @Test(arguments: [Lab.mysql84, Lab.mariadb114])
+    @Test(arguments: Lab.direct)
     func changedRowsAreNotMatchedRows(_ server: Lab.Server) async throws {
         try await withDatabase(server, [
             "CREATE TABLE \(Self.quoted).u (id INT PRIMARY KEY, a INT)", "INSERT INTO \(Self.quoted).u VALUES (1, 1), (2, 2)",
