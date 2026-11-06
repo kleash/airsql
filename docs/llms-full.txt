@@ -1294,7 +1294,7 @@ These work in a query's results too.
 
 - **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a query tab
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
-  whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
+  whole, as stored, whatever **Display As** shows. **View ▸ Grid ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, Pipe-Separated, JSON, JSON Lines, Markdown, HTML Table, XML, Pretty Table, One Row, SQL INSERT, INSERT with many rows, INSERT IGNORE, REPLACE,
   UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are
   left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you
@@ -1361,7 +1361,7 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 
 - **Data ▸ Go to Row…** (⌘L) goes to a row by its number, or to `column:row`, the column by its name or number:
   `email:120`.
-- **View ▸ Column List…** (⌘J) lists every column. Type to find one; Return (or a double-click) jumps to it; its box,
+- **View ▸ Grid ▸ Column List…** (⌘J) lists every column. Type to find one; Return (or a double-click) jumps to it; its box,
   or Space, shows or hides it; **Show All** brings back hidden columns.
 - **Edit ▸ Extend Selection** (⌥↑) grows the selection from the focused cell to its column, then its row, then
   everything; **Shrink Selection** (⌥↓) goes back the same way.
@@ -1381,11 +1381,11 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **View ▸ Value Panel** (⇧↩) opens the focused cell's whole value beside the grid, never shortened: as wrapped text,
   as a JSON tree, as hex, or as a picture when the bytes are an image. It follows the cell you select. A double-click
   on a cell you can't edit opens it too.
-- **View ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
-  (or **View ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
+- **View ▸ Grid ▸ Record View** (⌥⌘R) shows the focused row as a form, a line per column. **Previous** and **Next** above it
+  (or **View ▸ Grid ▸ Previous Record** ⌥⌘← and **Next Record** ⌥⌘→) move between rows; **Back to the Grid** returns. A double-click
   on a row's number opens it. In a table, its values can be edited there as in the grid. A filter or a sort on a
   query result shows the grid again, as does an Apply that deletes the row.
-- **View ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the toolbar) turns rows
+- **View ▸ Grid ▸ Transpose** (⌥⌘T, the grid's right-click menu, or the toolbar) turns rows
   into columns, with the column names down the left: handy for comparing a few wide rows. A query result with one row opens this way; **Settings ▸ Grid ▸ Transpose results with one row** turns
   that off. Transpose shows the first 1,000 rows.
 
@@ -1420,20 +1420,20 @@ you set in **Settings ▸ Grid ▸ Date format**, such as `dd/MM/yyyy HH:mm`.
 
 ## Colours
 
-- **View ▸ Heatmap** colours the selected number columns by value, pale for the smallest and strong for the largest.
+- **View ▸ Grid ▸ Heatmap** colours the selected number columns by value, pale for the smallest and strong for the largest.
   A column with negative and positive numbers is red below zero and green above; one of only 0 and 1 marks the 1s.
   With everything selected (⌘A), every number column gets one. Choose it again to take it away.
-- **View ▸ Highlight Equal Values** tints every cell holding the focused cell's value.
+- **View ▸ Grid ▸ Highlight Equal Values** tints every cell holding the focused cell's value.
 - What a colour marks is said too: with VoiceOver, a cell says **changed**, **added** or **removed** after its column's
   name, for pending changes and for a comparison's rows, and a compared cell's help gives the other side's value.
 
 ## Text, tree and charts
 
-- **View ▸ View As ▸ Text** shows the rows as text in the copy format (**Edit ▸ Copy As**: TSV at first, or CSV, JSON,
+- **View ▸ Grid ▸ View As ▸ Text** shows the rows as text in the copy format (**Edit ▸ Copy As**: TSV at first, or CSV, JSON,
   Markdown, SQL INSERT…), with the column names; **Tree** shows them as JSON, a row per item, with JSON columns opened
   up. **Table** goes back. Both show the first 10,000 rows. In a tree (here or in the value panel), double-click an
   object or array to open or close it; right-click to copy a value or to open or close every one.
-- **View ▸ Chart** draws the rows as a bar, line, area, pie, scatter or histogram chart of a number column, by another
+- **View ▸ Grid ▸ Chart** draws the rows as a bar, line, area, pie, scatter or histogram chart of a number column, by another
   column. Choose the kind and columns above the chart; point at it to read a value. Bars add up the values of each
   label and show the first 30 labels; a pie shows eight slices and puts the rest in **Other**. Lines, areas and points
   by a date column go in date order along a date axis; by a text column, along the row numbers. A chart covers the
@@ -2300,7 +2300,7 @@ AirSQL is built from the Mac's own controls wherever it can be, and labels the o
 
 Every command is in the menu bar, and **Help ▸ Keyboard Shortcuts** lists them all. ⌥⌘1, ⌥⌘2 and ⌥⌘3 go to the sidebar,
 the editor and the results; ⌃⇥ moves between tabs. To show, hide and find columns in a grid without the mouse, use
-**View ▸ Column List**.
+**View ▸ Grid ▸ Column List**.
 
 ## Motion and text size
 

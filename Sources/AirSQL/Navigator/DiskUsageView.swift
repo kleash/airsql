@@ -40,7 +40,7 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
             .init(id: "free", title: "Free", width: 72, numeric: true,
                   tip: "Space kept but unused; Optimize can give it back (a shared tablespace shows it on every table)"),
             .init(id: "rows", title: "Rows", width: 70, numeric: true, tip: "About how many rows (InnoDB estimates it)"),
-            .init(id: "detail", title: "Kind", width: 100, tip: "How many tables, the engine, or what it is"),
+            .init(id: "detail", title: "Kind", width: 124, tip: "How many tables, the engine, or what it is"),
         ],
         sort: NSSortDescriptor(key: "total", ascending: false),
         accessories: [back, compareButton, optimizeButton, refreshButton, stopButton])
@@ -130,8 +130,8 @@ final class DiskUsageContent: NSViewController, TabContent, NSMenuItemValidation
                 let quoting = session.noBackslashEscapes
                 let sizes = try? await session.rows(DiskUsage.indexSizesSQL(table, noBackslashEscapes: quoting))
                 if sizes == nil { note = "This login can't read mysql.innodb_index_stats, so indexes show no size" }
-                found = DiskUsage.indexes(names, sizes: sizes ?? [])
-                found += DiskUsage.partitions(try await session.rows(DiskUsage.partitionsSQL(table, noBackslashEscapes: quoting)))
+                found = DiskUsage.parts(indexes: DiskUsage.indexes(names, sizes: sizes ?? []),
+                                        partitions: DiskUsage.partitions(try await session.rows(DiskUsage.partitionsSQL(table, noBackslashEscapes: quoting))))
             } catch {
                 note = "Couldn't read its indexes and partitions: " + error.localizedDescription
             }

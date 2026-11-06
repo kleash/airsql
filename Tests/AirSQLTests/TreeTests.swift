@@ -558,11 +558,14 @@ struct TreeSearchTests {
 
     @Test func partsDropByTheirOwnSQL() {
         let table = DatabaseObject(.table, "d", "t")
-        #expect(NavigatorSQL.dropPart(.indexes, "PRIMARY", of: table) == "ALTER TABLE `d`.`t` DROP PRIMARY KEY")
-        #expect(NavigatorSQL.dropPart(.indexes, "i`x", of: table) == "ALTER TABLE `d`.`t` DROP INDEX `i``x`")
-        #expect(NavigatorSQL.dropPart(.foreignKeys, "f", of: table) == "ALTER TABLE `d`.`t` DROP FOREIGN KEY `f`")
-        #expect(NavigatorSQL.dropPart(.checks, "c", of: table) == "ALTER TABLE `d`.`t` DROP CONSTRAINT `c`")
-        #expect(NavigatorSQL.dropPart(.columns, "c", of: table) == nil)
+        #expect(NavigatorSQL.dropPart(.indexes, "PRIMARY", of: table, flavour: .mysql) == "ALTER TABLE `d`.`t` DROP PRIMARY KEY")
+        #expect(NavigatorSQL.dropPart(.indexes, "i`x", of: table, flavour: .mysql) == "ALTER TABLE `d`.`t` DROP INDEX `i``x`")
+        #expect(NavigatorSQL.dropPart(.foreignKeys, "f", of: table, flavour: .mysql) == "ALTER TABLE `d`.`t` DROP FOREIGN KEY `f`")
+        #expect(NavigatorSQL.dropPart(.checks, "c", of: table, flavour: .mysql) == "ALTER TABLE `d`.`t` DROP CHECK `c`")
+        #expect(NavigatorSQL.dropPart(.checks, "c", of: table, flavour: .mariadb) == "ALTER TABLE `d`.`t` DROP CONSTRAINT `c`")
+        #expect(SchemaServer(version: "5.7.44").keepsChecks == false && SchemaServer(version: "8.0.16").keepsChecks)
+        #expect(SchemaServer(version: "10.5.29-MariaDB").keepsChecks)
+        #expect(NavigatorSQL.dropPart(.columns, "c", of: table, flavour: .mysql) == nil)
         #expect(NavigatorSQL.setComment("it's", of: table, noBackslashEscapes: true) == "ALTER TABLE `d`.`t` COMMENT = 'it''s'")
         #expect(NavigatorSQL.setComment("x", of: DatabaseObject(.procedure, "d", "p"), noBackslashEscapes: true) == "ALTER PROCEDURE `d`.`p` COMMENT 'x'")
     }

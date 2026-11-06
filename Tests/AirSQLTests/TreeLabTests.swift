@@ -58,7 +58,7 @@ struct TreeLabTests {
         // MySQL 5.7 reads CHECK and drops it: nothing there to drop.
         let checks: [(TablePart, String)] = server.version.hasPrefix("5.") ? [] : [(.checks, "positive")]
         for (part, name) in [(TablePart.foreignKeys, "to_parent")] + checks + [(.indexes, "by_n"), (.indexes, "PRIMARY")] {
-            _ = try await session.query(try #require(NavigatorSQL.dropPart(part, name, of: child)))
+            _ = try await session.query(try #require(NavigatorSQL.dropPart(part, name, of: child, flavour: server.flavor == .mysql ? .mysql : .mariadb)))
         }
         // The index a foreign key made for itself stays when the key goes, as the server has it.
         let left = try #require(try await session.rows("SHOW CREATE TABLE \(child.quoted)").first?[1])

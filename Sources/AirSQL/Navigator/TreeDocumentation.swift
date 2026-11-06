@@ -181,8 +181,10 @@ extension NavigatorActions {
     /// Drops indexes, keys or checks from their tables: each statement shows first.
     static func dropParts(_ nodes: [SidebarNode], on open: OpenConnection, window: NSWindow?) {
         var statements: [String] = [], tables: [SchemaObject] = []
+        let flavour = open.snapshot.server?.flavour ?? .mysql
         for node in nodes {
-            guard case .detail(_, let table, let part, let name) = node.kind, let sql = NavigatorSQL.dropPart(part, name, of: table) else { continue }
+            guard case .detail(_, let table, let part, let name) = node.kind,
+                  let sql = NavigatorSQL.dropPart(part, name, of: table, flavour: flavour) else { continue }
             statements.append(sql)
             tables.append(table.schemaObject)
         }

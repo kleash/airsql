@@ -53,6 +53,9 @@ struct DiskUsageTests {
         #expect(indexes.map(\.name) == ["PRIMARY", "by_name"])
         #expect(indexes[0].data == 16_384 && indexes[0].index == nil && indexes[1].index == 32_768)
         #expect(DiskUsage.indexes(["a"], sizes: [])[0].total == nil, "a name stays when its size can't be read")
+        let partition = DiskUsageRow(name: "p1", detail: "Partition (RANGE)", data: 100, index: 10)
+        #expect(DiskUsage.parts(indexes: indexes, partitions: [partition]).compactMap(\.total) == [110], "a partition already holds the indexes' bytes")
+        #expect(DiskUsage.parts(indexes: indexes, partitions: []).map(\.total) == indexes.map(\.total))
     }
 
     @Test func variablesStandSideBySide() throws {
@@ -321,8 +324,8 @@ extension AppTests {
             disk.go(.table(Self.database, "parts"))
             #expect(await eventually(timeout: 20) { disk.tableRows.contains { $0.name == "p1" } })
             let rows = disk.tableRows
-            #expect(rows.first { $0.name == "PRIMARY" }?.data ?? 0 > 0, "the index sizes add up the partitions'")
-            #expect(rows.first { $0.name == "by_name" }?.index ?? 0 > 0)
+            #expect(rows.first { $0.name == "PRIMARY" }?.total == nil && rows.contains { $0.name == "by_name" }, "named: the partitions hold their bytes")
+            #expect(rows.first { $0.name == "p0" }?.total ?? 0 > 0)
             #expect(rows.first { $0.name == "p0" }?.detail == "Partition (HASH)")
             _ = try await open.connection.session(.schema).query("DROP DATABASE " + SQLQuote.identifier(Self.database))
         }

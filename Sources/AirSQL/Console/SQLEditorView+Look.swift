@@ -65,7 +65,7 @@ extension SQLEditorView {
     }
 
     /// Writes "Ln 3, Col 14" and what's selected in the corner.
-    func updatePosition() {
+    @objc func updatePosition() {
         let text = string as NSString, selection = selectedRange()
         guard selection.location <= text.length else { return }
         let lineStart = text.lineRange(for: NSRange(location: selection.location, length: 0)).location

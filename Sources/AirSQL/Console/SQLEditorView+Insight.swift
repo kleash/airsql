@@ -228,8 +228,11 @@ extension SQLEditorView {
             for range in found {
                 let line = text.lineRange(for: NSRange(location: range.lowerBound, length: 0))
                 let number = text.substring(to: line.location).components(separatedBy: "\n").count
-                let words = text.substring(with: line).trimmingCharacters(in: .whitespacesAndNewlines)
-                let item = NSMenuItem(title: "\(number): \(words.prefix(80))", action: #selector(self.goToUsage(_:)), keyEquivalent: "")
+                // From just before the use, with its column: several uses on one line must read differently.
+                let from = max(line.location, range.lowerBound - 20)
+                let words = text.substring(with: NSRange(location: from, length: NSMaxRange(line) - from)).trimmingCharacters(in: .whitespacesAndNewlines)
+                let place = "\(number):\(range.lowerBound - line.location + 1)"
+                let item = NSMenuItem(title: "\(place): \(from > line.location ? "…" : "")\(words.prefix(80))", action: #selector(self.goToUsage(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = NSValue(range: NSRange(range))
                 item.toolTip = "Go to this use"

@@ -220,7 +220,7 @@ These work in a query's results too.
 
 - **Edit ▸ Copy** (⌘C) copies the selected cells in the format last chosen in **Copy As** (TSV at first); in a query tab
   result with nothing selected, every row. **Copy with Headers** (⌥⌘C) puts the column names first. Values are copied
-  whole, as stored, whatever **Display As** shows. **View ▸ View As ▸ Text** shows the rows in the same format.
+  whole, as stored, whatever **Display As** shows. **View ▸ Grid ▸ View As ▸ Text** shows the rows in the same format.
 - **Edit ▸ Copy As** ▸ TSV, CSV, Pipe-Separated, JSON, JSON Lines, Markdown, HTML Table, XML, Pretty Table, One Row, SQL INSERT, INSERT with many rows, INSERT IGNORE, REPLACE,
   UPDATE, DELETE, WHERE Clause or IN List (the selected values, quoted and split by commas, to go in `IN (…)`; NULLs are
   left out). The SQL formats address rows by the key, and UPDATE and DELETE add any of it you

@@ -391,8 +391,9 @@ final class DataGridView: NSView {
 
     /// Redraws what a selection covers on screen (an old selection may reach past columns a reload took away).
     private func invalidate(_ selection: GridSelection) {
-        let visible = visibleRect
-        guard !visible.isEmpty, columnCount > 0 else { return }
+        // As far as the tiles go, not just what shows: a tile keeps what it drew past the edge, and a scroll brings it back.
+        let visible = visibleRect.insetBy(dx: -GridTiles.size.width, dy: -GridTiles.size.height)
+        guard !visibleRect.isEmpty, columnCount > 0 else { return }
         func column(_ index: Int) -> NSRect { columnRect(min(index, columnCount - 1)) }
         var dirty = NSRect.zero
         for area in selection.areas {

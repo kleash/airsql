@@ -122,9 +122,10 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
         position.backgroundColor = .content
         position.toolTip = "Shows the cursor's line and column, and how many characters are selected"
         position.setAccessibilityIdentifier("console.position")
-        // By its frame: a scroll view doesn't lay out what's added to it. It keeps to the corner as the view resizes.
-        position.autoresizingMask = scroll.isFlipped ? [.minXMargin, .minYMargin] : [.minXMargin, .maxYMargin]
+        // By its frame: a scroll view neither lays out nor autoresizes what's added to it, so it follows by hand.
         scroll.addSubview(position)
+        scroll.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(editor, selector: #selector(updatePosition), name: NSView.frameDidChangeNotification, object: scroll)
         return (scroll, editor)
     }
 

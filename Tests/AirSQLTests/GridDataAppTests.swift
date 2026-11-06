@@ -986,12 +986,12 @@ extension AppTests {
             for agent in [nil, "Claude Code · reading the schema"] {
                 model.agentStatus = agent
                 main.refresh()
-                for width in [1180.0, 900, 1800, 900, 1180] {
+                for width in [1224.0, 900, 1800, 900, 1224] {
                     main.window?.setFrame(NSRect(origin: NSPoint(x: -20000, y: -20000), size: NSSize(width: width, height: 720)), display: false)
                     main.window?.layoutIfNeeded()
                     let place = "\(Int(width)) pt\(agent == nil ? "" : " with the agents' chip")"
                     #expect(shown(kept), "\(place)")
-                    if width == 1800 || width == 1180 && agent == nil { #expect(shown(selection), "\(place)") }
+                    if width == 1800 || width == 1224 && agent == nil { #expect(shown(selection), "\(place)") }
                     let items = (kept + selection + [bar.route, bar.server, bar.agent, bar.sqlLog]).filter { shown([$0]) }
                         .map { $0.convert($0.bounds, to: bar) }.sorted { $0.minX < $1.minX }
                     #expect(zip(items, items.dropFirst()).allSatisfy { $0.maxX <= $1.minX + 0.5 }, "\(place): \(items)")

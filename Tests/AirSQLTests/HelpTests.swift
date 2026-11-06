@@ -226,7 +226,8 @@ extension AppTests {
             _ = NSApplication.shared
             for item in MainMenu.build().items {
                 let shown = try #require(item.submenu).items.filter { !$0.isHidden }
-                let height = shown.reduce(0) { $0 + ($1.isSeparatorItem ? 12 : 24) }
+                // As macOS 26 draws them, measured on the open menus: 24 a line, 11 a separator, 10 for the menu's ends.
+                let height = shown.reduce(10) { $0 + ($1.isSeparatorItem ? 11 : 24) }
                 #expect(height <= 860, "\(item.title): \(height) pt")
             }
         }

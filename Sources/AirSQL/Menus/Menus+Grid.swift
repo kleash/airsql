@@ -36,10 +36,10 @@ extension MainMenu {
         menus.data.add([nil, Commands.copyTableQuery, Commands.openTableQuery, Commands.exportRows])
         let refresh = menus.view.items.firstIndex { $0.action == Commands.refresh.action } ?? menus.view.items.count - 1
         menus.view.insertItem(submenu("Refresh Every", TableDataController.autoRefreshItems()), at: refresh + 1)
-        menus.view.add([nil, Commands.resetView, Commands.valuePanel, Commands.recordView, Commands.previousRecord, Commands.nextRecord,
-                        Commands.transpose, Commands.columnList, nil, Commands.heatmap, Commands.highlightEqual])
-        menus.view.addItem(submenu("View As", viewAsItems()))
-        menus.view.add([Commands.chart])
+        menus.view.add([nil, Commands.resetView, Commands.valuePanel])
+        // A submenu of their own: at one line each, View is taller than a 13-inch screen.
+        menus.view.addItem(submenu("Grid", [Commands.recordView, Commands.previousRecord, Commands.nextRecord, Commands.transpose, Commands.columnList].map { $0.item() }
+                                   + [.separator(), Commands.heatmap.item(), Commands.highlightEqual.item(), submenu("View As", viewAsItems()), Commands.chart.item()]))
     }
 
     /// View As's choices.

@@ -158,6 +158,9 @@ extension TableEditorController {
             sections.setLabel(name + count, forSegment: index)
             sections.setWidth(0, forSegment: index)
         }
+        sections.setEnabled(server.keepsChecks, forSegment: Section.checks.rawValue)
+        sections.setToolTip(server.keepsChecks ? nil : "\(server.versionString) ignores CHECK: it would drop the check without a word",
+                            forSegment: Section.checks.rawValue)
     }
 
     /// The SQL box: what Apply runs, why nothing would, or that nothing changed.

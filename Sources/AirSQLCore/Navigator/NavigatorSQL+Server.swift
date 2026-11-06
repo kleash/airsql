@@ -74,12 +74,13 @@ extension NavigatorSQL {
     }
 
     /// Drops an index, primary key, foreign key or check from its table.
-    public static func dropPart(_ part: TablePart, _ name: String, of table: DatabaseObject) -> String? {
+    public static func dropPart(_ part: TablePart, _ name: String, of table: DatabaseObject, flavour: SchemaServer.Flavour) -> String? {
         let what: String
         switch part {
         case .indexes: what = name == "PRIMARY" ? "PRIMARY KEY" : "INDEX " + SQLQuote.identifier(name)
         case .foreignKeys: what = "FOREIGN KEY " + SQLQuote.identifier(name)
-        case .checks: what = "CONSTRAINT " + SQLQuote.identifier(name)
+        // MySQL 8.0.16 to 8.0.18 know only DROP CHECK; MariaDB only DROP CONSTRAINT.
+        case .checks: what = (flavour == .mysql ? "CHECK " : "CONSTRAINT ") + SQLQuote.identifier(name)
         case .columns, .triggers: return nil
         }
         return "ALTER TABLE \(table.quoted) DROP " + what

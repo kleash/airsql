@@ -109,7 +109,7 @@ struct SchemaIntrospection {
     func checksSQL(_ scope: SchemaScope) -> [String] {
         switch server.flavour {
         case .mysql:
-            guard server.atLeast(8, 0, 16) else { return [] }
+            guard server.keepsChecks else { return [] }
             var database = scope
             if case .objects(let name, _) = scope { database = .databases([name]) }
             return ["SELECT CONSTRAINT_SCHEMA, CONSTRAINT_NAME, CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS"

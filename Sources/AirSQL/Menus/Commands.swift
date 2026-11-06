@@ -1013,6 +1013,7 @@ enum Commands {
     static let submenus: [String: String] = [
         "Server Home": "Show what the server holds and does: databases, variables, status, processes",
         "Focus": "Put the keyboard in the sidebar, the editor or the results",
+        "Grid": "Change how the grid shows its rows: a record at a time, turned, tinted, as text or as a chart",
         "Text Size": "Make the text bigger or smaller, or go back to its usual size",
         "Server": "Look after the server: its home page, variables and what it is running",
         "Users": "Manage the server's logins, roles and grants",

@@ -20,7 +20,7 @@ AirSQL is built from the Mac's own controls wherever it can be, and labels the o
 
 Every command is in the menu bar, and **Help ▸ Keyboard Shortcuts** lists them all. ⌥⌘1, ⌥⌘2 and ⌥⌘3 go to the sidebar,
 the editor and the results; ⌃⇥ moves between tabs. To show, hide and find columns in a grid without the mouse, use
-**View ▸ Column List**.
+**View ▸ Grid ▸ Column List**.
 
 ## Motion and text size
 

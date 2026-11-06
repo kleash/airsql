@@ -119,6 +119,12 @@ public enum DiskUsage {
             + " AND stat_name = 'size' GROUP BY index_name"
     }
 
+    /// What a table's level lists. A partition's size holds its share of the table's rows and every index, so beside
+    /// partitions the indexes are named without sizes: the same bytes would count twice.
+    public static func parts(indexes: [DiskUsageRow], partitions: [DiskUsageRow]) -> [DiskUsageRow] {
+        (partitions.isEmpty ? indexes : indexes.map { DiskUsageRow(name: $0.name, detail: $0.detail) }) + partitions
+    }
+
     /// Rows for the indexes named, with the sizes `rows` gave for them. InnoDB's clustered index is the table's data, so
     /// GEN_CLUST_INDEX, which isn't one anyone made, stays out, and the primary key's size counts as data.
     public static func indexes(_ names: [String], sizes rows: [[String?]]) -> [DiskUsageRow] {

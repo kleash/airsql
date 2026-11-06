@@ -21,6 +21,9 @@ public struct SchemaServer: Hashable {
     /// The session's sql_mode has NO_BACKSLASH_ESCAPES, so a backslash in a string literal is just a backslash.
     public var noBackslashEscapes: Bool
 
+    /// MySQL before 8.0.16 parses CHECK and ignores it.
+    public var keepsChecks: Bool { flavour != .mysql || atLeast(8, 0, 16) }
+
     public init(version: String, lowerCaseTableNames: Int = 0, sqlMode: String = "") {
         versionString = version
         // A MariaDB behind a replication-compatible handshake may say "5.5.5-10.5.29-MariaDB".
