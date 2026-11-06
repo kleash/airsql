@@ -516,7 +516,10 @@ extension AppTests {
         /// Every command title of the menu bar (submenus' items too), as the menus show them.
         private func menuBarCommands() -> Set<String> {
             func walk(_ menu: NSMenu) -> [String] {
-                menu.items.flatMap { item in [item.title] + (item.submenu.map(walk) ?? []) }
+                // An item that renames itself (Pin Result, Unpin Result) keeps the title of its last check, perhaps another test's.
+                menu.items.flatMap { item in
+                    [item.title] + Commands.all.filter { $0.action == item.action }.map(\.title) + (item.submenu.map(walk) ?? [])
+                }
             }
             return Set(NSApp.mainMenu.map(walk) ?? [])
         }

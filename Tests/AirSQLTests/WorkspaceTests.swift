@@ -319,7 +319,8 @@ extension AppTests {
             first.editor.setSelectedRange(NSRange(location: 0, length: 0))
             first.runStatement(nil)
             if main.window?.attachedSheet != nil { _ = await call(harness, "press", ["title": "Run"]) }
-            #expect(await eventually(timeout: 20) { first.running == nil && first.session?.inTransaction == true })
+            #expect(await eventually(timeout: 20) { first.running == nil && first.session?.inTransaction == true },
+                    "\(first.messagesView.messages.map(\.text))")
             #expect(second.session === first.session)
 
             let lines = window.unfinishedWork().filter { $0.hasPrefix("A transaction") }
@@ -341,6 +342,7 @@ extension AppTests {
             #expect(await eventually(timeout: 10) { first.session?.inTransaction == false })
             _ = try await setup.query("DROP DATABASE \(database)")
             await connection.disconnect()
+            ConsoleViewController.shared[Fixtures.production.id] = nil
         }
 
         @Test func quitAsksAboutEveryWindow() async throws {
