@@ -61,7 +61,8 @@ final class SQLGeneratorController: NSViewController, TabContent {
         }
         let spacer = NSView()
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
-        let actions = NSStackView(views: [summary, spacer, layouts, saveButton, consoleButton, copyButton, helpButton(.editors)])
+        rows[1].addArrangedSubview(summary)  // the buttons' row has no room for it at the window's minimum size
+        let actions = NSStackView(views: [spacer, layouts, saveButton, consoleButton, copyButton, helpButton(.editors)])
         actions.spacing = Spacing.unit
         actions.edgeInsets = NSEdgeInsets(top: Spacing.unit, left: Spacing.double, bottom: Spacing.unit, right: Spacing.double)
         let bar = NSStackView(views: rows + [actions])

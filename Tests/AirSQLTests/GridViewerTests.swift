@@ -267,7 +267,7 @@ extension AppTests {
         let viewer = content.viewer, grid = viewer.grid
         grid.columnOrder = [0, 2, 1, 3, 4, 5]
         grid.selection.select(GridPosition(row: 4, column: 1))
-        #expect(await call(harness, "menu", ["path": "View > Transpose"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Transpose"]).error == nil)
         let shown = try #require(grid.source as? TransposedSource)
         #expect(grid.rowCount == 6 && grid.columnCount == 31)
         #expect(shown.cell(1, 0) == .text("amount_2") && shown.cell(1, 5) == source.cell(4, 2))
@@ -285,7 +285,7 @@ extension AppTests {
         let (main, harness, content) = viewerWindow(source)
         let viewer = content.viewer, grid = viewer.grid
         grid.selection.select(GridPosition(row: 1, column: 2))
-        #expect(await call(harness, "menu", ["path": "View > Record View"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Record View"]).error == nil)
         // The values fill what the names leave.
         #expect(await eventually { grid.columnWidths.reduce(0, +) >= grid.scrollView.contentSize.width - 1 },
                 "\(grid.columnWidths) in \(grid.scrollView.contentSize.width)")
@@ -297,9 +297,9 @@ extension AppTests {
         #expect(viewer.record == 1 && grid.columnCount == 2 && grid.rowCount == 5)
         #expect(grid.source?.columns.map(\.name) == ["Column", "Value"] && grid.source?.cell(2, 1) == source.cell(1, 2))
         #expect(viewer.recordLabel.stringValue == "Row 2 of 3" && grid.selection.cursor == GridPosition(row: 2, column: 1))
-        #expect(await call(harness, "menu", ["path": "View > Next Record"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Next Record"]).error == nil)
         #expect(viewer.record == 2 && grid.source?.cell(2, 1) == source.cell(2, 2))
-        let last = await call(harness, "menu", ["path": "View > Next Record"])
+        let last = await call(harness, "menu", ["path": "View > Grid > Next Record"])
         #expect(last.error?.contains("There is no row after this one") == true)
         #expect(await call(harness, "press", ["id": "record.previous"]).error == nil)
         #expect(viewer.record == 1)
@@ -407,21 +407,21 @@ extension AppTests {
         let viewer = content.viewer, grid = viewer.grid
         // A word column can't have a heatmap.
         grid.selection.selectColumn(1)
-        let refused = await call(harness, "menu", ["path": "View > Heatmap"])
+        let refused = await call(harness, "menu", ["path": "View > Grid > Heatmap"])
         #expect(refused.error?.contains("Select a number column first") == true)
         grid.selection.selectColumn(9)
-        #expect(await call(harness, "menu", ["path": "View > Heatmap"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Heatmap"]).error == nil)
         let tint = try #require(grid.cellTint)
         let values = (0..<50).map { Double(source.value($0, 9)!)! }
         let low = values.firstIndex(of: values.min()!)!, high = values.firstIndex(of: values.max()!)!
         #expect(tint(low, 9)!.alphaComponent < tint(high, 9)!.alphaComponent)
         #expect(tint(low, 2) == nil)
         // Again: off.
-        #expect(await call(harness, "menu", ["path": "View > Heatmap"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Heatmap"]).error == nil)
         #expect(grid.cellTint == nil)
         // Equal values: the focused cell's value, wherever it is.
         grid.selection.select(GridPosition(row: 0, column: 5))
-        #expect(await call(harness, "menu", ["path": "View > Highlight Equal Values"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Highlight Equal Values"]).error == nil)
         let same = (1..<50).first { source.value($0, 5) == source.value(0, 5) }
         let other = (1..<50).first { source.value($0, 5) != source.value(0, 5) }
         if let same { #expect(grid.cellTint?(same, 5) != nil) }
@@ -438,19 +438,19 @@ extension AppTests {
         let format = GridCopy.format
         defer { GridCopy.format = format }
         GridCopy.format = .tsv
-        #expect(await call(harness, "menu", ["path": "View > View As > Text"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > View As > Text"]).error == nil)
         var text = try #require((viewer.presented as? NSScrollView)?.documentView as? NSTextView)
         #expect(viewer.presentation == .text && viewer.grid.containerView.isHidden)
         #expect(text.string.hasPrefix("id\tname_1\tamount_2\t") && text.string.contains("\n25\t"))
         GridCopy.format = .markdown
-        #expect(await call(harness, "menu", ["path": "View > View As > Text"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > View As > Text"]).error == nil)
         text = try #require((viewer.presented as? NSScrollView)?.documentView as? NSTextView)
         #expect(text.string.hasPrefix("| id | name_1 |"))
-        #expect(await call(harness, "menu", ["path": "View > View As > Tree"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > View As > Tree"]).error == nil)
         let tree = try #require(viewer.presented as? JSONTreeView)
         #expect(tree.tree?.children.count == 25 && tree.tree?.children[0].children[0].kind == .number)
         // Chart: a bar of the first number column that isn't the key, by the first text column.
-        #expect(await call(harness, "menu", ["path": "View > Chart"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Chart"]).error == nil)
         let chart = try #require(viewer.presented as? GridChartView)
         #expect(chart.spec.kind == .bar && chart.spec.y == "amount_2" && chart.spec.x == "name_1" && !chart.spec.points.isEmpty)
         chart.kind.selectItem(at: GridChart.Kind.histogram.rawValue)
@@ -471,7 +471,7 @@ extension AppTests {
         chart.update()
         #expect(!chart.spec.byDate && chart.spec.x == "Row")
         // Chart again: back to the grid.
-        #expect(await call(harness, "menu", ["path": "View > Chart"]).error == nil)
+        #expect(await call(harness, "menu", ["path": "View > Grid > Chart"]).error == nil)
         #expect(viewer.presentation == .table && viewer.presented == nil && !viewer.grid.containerView.isHidden)
     }
 

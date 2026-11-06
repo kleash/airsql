@@ -380,7 +380,8 @@ import Testing
         #expect(try await read("localhost").locked)
         _ = try await session.query(sql.drop(renamed))
         if roles { _ = try await session.query(sql.drop(role)) }
-        #expect(try await session.rows("SELECT COUNT(*) FROM mysql.user WHERE User LIKE 'lane\\_users\\_%'").first?.first == "0")
+        // Its own two by name: the app's tests make lane_users_* accounts on these servers at the same time.
+        #expect(try await session.rows("SELECT COUNT(*) FROM mysql.user WHERE User IN ('lane_users_life', 'lane_users_role')").first?.first == "0")
         await session.close()
     }
 

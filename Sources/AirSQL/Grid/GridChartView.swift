@@ -94,7 +94,7 @@ final class GridChartView: NSView {
     /// Draws the chart for the pop-ups' choices.
     func update() {
         guard let viewer, let source = viewer.source, !numbers.isEmpty, yColumn.indexOfSelectedItem >= 0 else {
-            empty.stringValue = "A chart needs a number column, and these rows have none. Choose View As ▸ Table to see them."
+            empty.stringValue = "A chart needs a number column, and these rows have none. Choose View ▸ Grid ▸ View As ▸ Table to see them."
             empty.isHidden = false
             hosting.isHidden = true
             return
