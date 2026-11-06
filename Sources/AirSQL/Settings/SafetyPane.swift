@@ -26,7 +26,7 @@ final class SafetyPane: SettingsPaneController {
         form.row("", [toggle("Ask before UPDATE or DELETE without WHERE", id: "settings.safety.unboundedWrite",
                              tip: Self.tip("unboundedWrite", "on by default"),
                              \.safety.askBeforeUnboundedWrite)])
-        form.row("", [toggle("Ask before any write from the console", id: "settings.safety.consoleWrite",
+        form.row("", [toggle("Ask before any write from a query tab", id: "settings.safety.consoleWrite",
                              tip: Self.tip("consoleWrite", "off by default"),
                              \.safety.askBeforeConsoleWrite)])
         form.row("", [toggle("Show the SQL before the grid's Apply", id: "settings.safety.previewApply",
