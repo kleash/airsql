@@ -322,6 +322,8 @@ final class ChipView: NSView {
 
     let label = NSTextField(labelWithString: "")
     var style: Style { didSet { needsDisplay = true; updateColors() } }
+    /// On a selected row its colours would sink into the selection's: it takes the selection's text colour.
+    var onSelection = false { didSet { needsDisplay = true; updateColors() } }
 
     init(_ text: String, style: Style) {
         self.style = style
@@ -356,11 +358,12 @@ final class ChipView: NSView {
         case .accent: hue = .accent
         case .neutral: hue = .secondaryLabelColor
         }
-        label.textColor = hue.asTextOnItsTint
+        label.textColor = onSelection ? .alternateSelectedControlTextColor : hue.asTextOnItsTint
     }
 
     /// The capsule's colour in `appearance`.
     func fill(in appearance: NSAppearance) -> NSColor {
+        if onSelection { return NSColor.alternateSelectedControlTextColor.withAlphaComponent(0.22) }
         switch style {
         case .tinted(let hue): return hue.withAlphaComponent(appearance.isDark ? 0.2 : 0.16)
         case .accent: return .accentFill

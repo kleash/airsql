@@ -267,6 +267,10 @@ final class ReconObjectCell: NSTableCellView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { chip.onSelection = backgroundStyle == .emphasized }
+    }
+
     func show(_ object: ReconObject, result: ReconResult) {
         let (text, style) = Self.chip(object)
         chip.text = text
