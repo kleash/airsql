@@ -138,7 +138,8 @@ extension AppTests {
             let fixture = try #require(main.sidebar.treeNodes[.database(id, "airsql_fixture")])
             outline.expandItem(fixture)
             func select(_ kind: SidebarNode.Kind) throws {
-                let row = outline.row(forItem: try #require(main.sidebar.treeNodes[kind]))
+                let node = try #require(main.sidebar.treeNodes[kind])
+                let row = outline.row(forItem: node)
                 outline.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
             }
             let new = Commands.createObject.item()

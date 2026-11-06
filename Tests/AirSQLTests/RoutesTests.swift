@@ -156,7 +156,7 @@ struct LocalServerTests {
         defer { close(server) }
         var address = sockaddr_un()
         address.sun_family = sa_family_t(AF_UNIX)
-        _ = withUnsafeMutableBytes(of: &address.sun_path) { path.utf8CString.withUnsafeBytes($0.copyMemory) }
+        withUnsafeMutableBytes(of: &address.sun_path) { path.utf8CString.withUnsafeBytes($0.copyMemory) }
         let bound = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(server, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
         }

@@ -494,7 +494,7 @@ extension AppTests {
         @Test func anAgentsPressReachesNothing() async {
             let (_, main, _, open, users) = await opened()
             select(users)
-            await AgentGate.$agent.withValue("Claude Code") {
+            AgentGate.$agent.withValue("Claude Code") {
                 #expect(open.usersRefusal?.contains("Only the person") == true)
                 let notes = AgentGuard.Notes()
                 AgentGuard.$notes.withValue(notes) {
