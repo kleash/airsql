@@ -62,9 +62,12 @@ extension AppTests {
                 main.window?.layoutIfNeeded()
                 return view.grid.scrollView.frame.height
             }
-            let start = height(MainWindowController.defaultSize)
+            let start = height(MainWindowController.minimumSize)
             let grown = height(NSSize(width: 1500, height: 950))
-            #expect(grown >= start + 90, "\(start) to \(grown): the results take their share")
+            // By what the window gained: AppKit holds it to the screen's height, and CI's screen is 1024 x 768.
+            let gained = (main.window?.frame.height ?? 0) - MainWindowController.minimumSize.height
+            #expect(gained >= 100)
+            #expect(grown >= start + gained * 0.35, "\(start) to \(grown) of \(gained): the results take their share")
             _ = height(MainWindowController.minimumSize)
             view.searchAllColumns(nil)
             view.filterBar.searchField.stringValue = "a"
