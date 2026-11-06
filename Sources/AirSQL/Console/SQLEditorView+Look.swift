@@ -77,9 +77,10 @@ extension SQLEditorView {
         guard let scroll = enclosingScrollView else { return }
         positionLabel.sizeToFit()
         let size = positionLabel.frame.size
-        // Above the sideways scroller wherever there can be one: it comes and goes after this runs.
-        let gap = 2 + (scroll.hasHorizontalScroller ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: scroll.scrollerStyle) : 0)
-        positionLabel.setFrameOrigin(NSPoint(x: scroll.bounds.maxX - size.width - 16, y: scroll.isFlipped ? scroll.bounds.maxY - size.height - gap : gap))
+        // Clear of both scrollers wherever there can be one: they come and go after this runs.
+        let scroller = NSScroller.scrollerWidth(for: .regular, scrollerStyle: scroll.scrollerStyle)
+        let gap = 2 + (scroll.hasHorizontalScroller ? scroller : 0), side = 4 + (scroll.hasVerticalScroller ? scroller : 0)
+        positionLabel.setFrameOrigin(NSPoint(x: scroll.bounds.maxX - size.width - side, y: scroll.isFlipped ? scroll.bounds.maxY - size.height - gap : gap))
     }
 
     // MARK: The name at the cursor

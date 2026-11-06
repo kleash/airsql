@@ -122,6 +122,7 @@ final class GridToolbar: NSView {
     override func layout() {
         super.layout()
         fit()
+        row.layoutSubtreeIfNeeded()  // what `fit` hid gives its room back now: the pager's words would touch » until the next pass
     }
 
     /// Shows what fits and leaves the rest to `more`. Only this and `validate` set the buttons' `isHidden`, from the width

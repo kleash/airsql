@@ -53,6 +53,7 @@ extension TableDataController: NSMenuItemValidation {
         }
         if source.firstRow > 0 { rows.stringValue = "Rows " + pageRange }
         pageLabel.stringValue = pageRange
+        toolbar.needsLayout = true  // its words' width counts in what fits
         rows.stringValue += readAt.map { " · read " + GridStatusView.time($0) } ?? ""
         rows.toolTip = known?.exact == false && source.hasMore ? "The server's estimate: Count Exactly counts the rows" : nil
         countLink.isHidden = total?.exact == true && total?.filter == source.filter || !source.hasMore
