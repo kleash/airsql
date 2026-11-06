@@ -130,7 +130,7 @@ extension AppTests {
                 tab.toolbar.validate()
             }
             func shown() -> [String] { Commands.all.filter { tab.toolbar.button($0)?.isHidden == false }.map(\.title) }
-            width(1180)
+            width(1224)
             #expect(tab.toolbar.overflow.isEmpty)
             let wide = shown()
             width(1000)
@@ -143,7 +143,7 @@ extension AppTests {
             #expect(tab.toolbar.overflowItems().allSatisfy { $0.target != nil })
             tab.toolbar.validate()
             #expect(shown() == narrow, "validating again changes nothing")
-            width(1180)
+            width(1224)
             #expect(shown() == wide && tab.toolbar.overflow.isEmpty)
             let (small, _, opened) = try await GridDataAppTests.tab(size: MainWindowController.minimumSize)
             small.window?.layoutIfNeeded()

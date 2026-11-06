@@ -234,7 +234,7 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
 
     private var isDelimited: Bool { source.map { $0.kind == .delimited && !isRows($0) } ?? true }
 
-    private var isNew: Bool { tableMenu.selectedItem != nil && tableMenu.selectedItem == tableMenu.lastItem }
+    private var isNew: Bool { tableMenu.indexOfSelectedItem == 0 }
 
     override func close() {
         let session = self.session
@@ -281,9 +281,10 @@ final class CSVImportSheet: ToolSheet, NSTextFieldDelegate, NSTextViewDelegate, 
         tableMenu.removeAllItems()
         tableMenu.addItems(withTitles: tables.map(\.name))
         for item in tableMenu.itemArray { item.toolTip = "Import into \(item.title)" }
-        if !tables.isEmpty { tableMenu.menu?.addItem(.separator()) }
-        tableMenu.menu?.addItem(withTitle: Self.newTable, action: nil, keyEquivalent: "").toolTip = "Make a new table from the file's columns"
-        tableMenu.selectItem(at: 0)
+        // First, so a database of hundreds of tables doesn't hide it past the menu's end.
+        if !tables.isEmpty { tableMenu.menu?.insertItem(.separator(), at: 0) }
+        tableMenu.menu?.insertItem(withTitle: Self.newTable, action: nil, keyEquivalent: "", at: 0).toolTip = "Make a new table from the file's columns"
+        tableMenu.selectItem(at: tables.isEmpty ? 0 : 2)
         tableChanged(nil)
     }
 

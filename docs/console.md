@@ -212,7 +212,8 @@ log and the history show the final SQL, and the read-only and safety checks see 
 ### Sessions
 
 Each query tab opens its own session the first time it runs something, and closes it when the tab closes. So each tab
-has its own transaction and current database, and several tabs can run at once; Cancel stops only the tab's own
+has its own transaction and current database, and several tabs can run at once, each with a spinner on its tab while it
+runs; Cancel stops only the tab's own
 statement. A temporary table belongs to one session, so another tab can't see it.
 
 To see temporary tables across tabs, turn on **Query tabs share one session** on the connection's Options tab. The

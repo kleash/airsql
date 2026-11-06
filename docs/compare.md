@@ -51,7 +51,7 @@ in turn with the same settings. The summary counts the pairs that match, differ 
 objects that differ across them. A pair that can't be read says why, and the others go on.
 
 Double-click a pair, or press Return, to open it: it shows as a compare of those two databases, with its list, its
-details and its sync script. **Back to All Databases** returns to the pairs, counting what you did there. A script
+details and its sync script. **All Databases** above the list returns to the pairs, counting what you did there. A script
 belongs to one pair, so **Sync Script…** needs a pair open. **Export Report…** at this level covers every pair.
 
 ## Two tables or objects

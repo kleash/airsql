@@ -225,6 +225,8 @@ final class HostContent: NSViewController, TabContent, NSMenuItemValidation {
         edit.isEnabled = reason == nil
         edit.toolTip = reason ?? Commands.editVariable.tip
         variables.note = editRefusal ?? "double-click one to change it"
+        status.note = "counters"
+        commands.note = "commands"
     }
 
     // MARK: Reading

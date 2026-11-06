@@ -113,7 +113,7 @@ final class QuickOpenSheet: NSWindowController, NSSearchFieldDelegate, NSTableVi
         table.reloadData()
         if !shown.isEmpty { table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false) }
         table.scrollRowToVisible(0)
-        status.stringValue = matches.isEmpty ? "Nothing has that name. Tables show here once their connection is open"
+        status.stringValue = matches.isEmpty ? "Nothing has that name; a closed connection shows no tables"
             : matches.count > shown.count ? "The first \(shown.count) of \(matches.count.formatted()): type more to narrow them"
             : "\(matches.count.formatted()) match\(matches.count == 1 ? "" : "es")"
         status.toolTip = status.stringValue

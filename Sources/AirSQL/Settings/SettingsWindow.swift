@@ -114,7 +114,7 @@ class SettingsPaneController: NSViewController {
     let model: AppModel
     let form = Form()
     private var bindings: [Binding] = []
-    static let width: CGFloat = 580
+    static let width: CGFloat = 740  // every pane's button in the toolbar, none behind its overflow
 
     init(model: AppModel) {
         self.model = model

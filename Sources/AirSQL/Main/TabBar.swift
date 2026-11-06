@@ -10,6 +10,8 @@ protocol TabContent: AnyObject {
     var canRename: Bool { get }
     /// The tab's unsaved dot: unsaved console text, pending grid edits.
     var isEdited: Bool { get }
+    /// Its spinner: a statement is running in it.
+    var isBusy: Bool { get }
     /// The status bar's transaction badge for this tab ("Transaction open · 2 changes"); nil: none.
     var transactionBadge: String? { get }
     /// What the status bar shows on its right for this tab (the grid's row counts and aggregates).

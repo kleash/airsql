@@ -249,7 +249,7 @@ final class ReconObjectCell: NSTableCellView {
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
         what.alignment = .right
         name.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        // What differs takes at most 30% of the row; past that it gives way (its tooltip has it).
+        // What differs takes at most 40% of the row; past that it gives way (its tooltip has it).
         what.setContentCompressionResistancePriority(.defaultLow - 10, for: .horizontal)
         name.widthAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
         chip.label.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -258,9 +258,9 @@ final class ReconObjectCell: NSTableCellView {
         chip.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.chipWidth).isActive = true
         addSubview(stack)
         stack.pin(to: self, insets: NSEdgeInsets(top: 0, left: 2, bottom: 0, right: 6))
-        what.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.3).isActive = true
+        what.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.4).isActive = true
         whatMinimum = what.widthAnchor.constraint(greaterThanOrEqualToConstant: 0)
-        whatMinimum.priority = .defaultLow + 5  // over the name's compression resistance, under the 30%
+        whatMinimum.priority = .defaultLow + 5  // over the name's compression resistance, under the 40%
         whatMinimum.isActive = true
         textField = name
     }

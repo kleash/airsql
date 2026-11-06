@@ -194,7 +194,7 @@ final class ERDiagramController: NSViewController, TabContent, NSMenuItemValidat
         addTable.toolTip = !absent.isEmpty ? "Add a table to this diagram; you can also drag tables here from the tree"
             : layout.tables == nil ? "This diagram shows every table already" : "Every table of the database is on this diagram"
         let tables = drawn.count
-        summary.stringValue = tables > 0 ? "\(tables) tables, \(diagram.links.count) foreign keys"
+        summary.stringValue = tables > 0 ? "\(tables) table\(tables == 1 ? "" : "s"), \(diagram.links.count) foreign key\(diagram.links.count == 1 ? "" : "s")"
             : layout.tables == nil ? "No tables here yet: choose another database, or add one with Database ▸ Create Table…"
             : "No tables on this diagram: add some with Add Table, or drag them here from the tree"
         summary.toolTip = summary.stringValue

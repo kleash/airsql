@@ -41,7 +41,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private var shownContent: NSView?
     private var observers: [AnyCancellable] = []
     nonisolated static let minimumSize = NSSize(width: 900, height: 560)
-    nonisolated static let defaultSize = NSSize(width: 1180, height: 720)
+    nonisolated static let defaultSize = NSSize(width: 1224, height: 720)
 
     init(model: AppModel) {
         self.model = model
@@ -79,7 +79,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         if let last = model.windows.last?.window { window.setFrameTopLeftPoint(last.cascadeTopLeft(from: .zero)) }
         if split.splitView.autosaveName == nil || UserDefaults.standard.object(forKey: "NSSplitView Subview Frames Sidebar") == nil {
             window.layoutIfNeeded()
-            split.splitView.setPosition(236, ofDividerAt: 0)
+            split.splitView.setPosition(280, ofDividerAt: 0)  // a table two levels down shows its name beside its size
         }
         sidebar.onSelect = { [weak self] in self?.sidebarSelectionChanged() }
         model.windows.append(self)
