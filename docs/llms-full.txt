@@ -2032,7 +2032,8 @@ write: every request is checked before it is sent, and refused if it would run J
 write (`$out`, `$merge`), uses a pipeline stage AirSQL hasn't vetted, or reaches MongoDB's own databases (admin,
 local, config) or `system` collections. Each runs with the time limit and document cap of Settings ▸ Safety, and on a
 replica set inside a transaction that is always cancelled, so even a write that got past the check is refused by the
-server. For more safety still, connect with a user that has only the `read` role.
+server. For more safety still, connect with a user that has only the `read` role. Documents, distinct values and sizes
+reach the agent as Extended JSON text, so a field's order and a number's type (`2.0` stays a double) are kept.
 
 ## Agents in AirSQL's windows
 
@@ -2967,9 +2968,9 @@ needs Schema + read, and the connection connected in AirSQL. `database` defaults
 Documents you send (`filter`, `projection`, `sort`, `collation`, a `hint` pattern, `pipeline`) are Extended JSON
 text, as strings: `"{\"status\": \"A\", \"total\": {\"$gt\": 10}}"`, with `$oid`, `$date`, `$numberLong`,
 `$numberDecimal` for the types JSON lacks. A string keeps the keys' order (a sort on two fields); an object is refused.
-Documents you get back (`mongo_find`, `mongo_aggregate`, `mongo_list_indexes`) are strings too, each one document's
-relaxed Extended JSON text, so their keys keep their order and a double keeps its `.0` (`{"b": 1, "a": 2.0}`): parse
-each one. Numbers are plain, other types `{"$oid": …}`, `{"$date": "2024-…Z"}`, `{"$numberDecimal": "…"}`; strings
+Documents you get back (`mongo_find`, `mongo_aggregate`, `mongo_list_indexes`, `mongo_stats`) are strings too, each
+one document's relaxed Extended JSON text, so their keys keep their order and a double keeps its `.0`
+(`{"b": 1, "a": 2.0}`): parse each one; so is each of `mongo_distinct`'s values (`2.0`, `"Paris"`). Numbers are plain, other types `{"$oid": …}`, `{"$date": "2024-…Z"}`, `{"$numberDecimal": "…"}`; strings
 longer than 2,000 characters are cut.
 
 - `mongo_find {connection, database?, collection, filter?, projection?, sort?, skip?, limit?, collation?, hint?}`:
