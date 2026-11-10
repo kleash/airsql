@@ -995,7 +995,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ] + editorCommands + treeCommands + schema + workspaceCommands + mongoCommands
+    ] + editorCommands + treeCommands + schema + workspaceCommands + mongoCommands + mongoTransferCommands
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {

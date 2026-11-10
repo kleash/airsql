@@ -52,3 +52,18 @@ final class CollectionMenu: NSObject, NSMenuItemValidation {
     @objc func countRows(_ sender: Any?) { tab?.countRows(sender) }
     @objc func showHistory(_ sender: Any?) { tab?.showHistory(sender) }
 }
+
+// MARK: Export and import (lane M5)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Export Documents… and Import Documents…, which act on the tree's collection or the tab in front.
+    static func addMongoTransferItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoTransferCommands {
+            let item = command.item()
+            item.target = MongoTransferMenu.shared
+            collection.addItem(item)
+        }
+    }
+}

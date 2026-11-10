@@ -21,3 +21,14 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
 }
+
+// MARK: Export and import (lane M5)
+
+extension Commands {
+    static let exportDocuments = Command("Export Documents…", #selector(MongoTransferMenu.exportDocuments(_:)),
+                                         tip: "Write the collection's documents, or what its tab finds, to Extended JSON or CSV")
+    static let importDocuments = Command("Import Documents…", #selector(MongoTransferMenu.importDocuments(_:)),
+                                         tip: "Insert the documents of an Extended JSON file into a collection")
+
+    static let mongoTransferCommands = [exportDocuments, importDocuments]
+}
