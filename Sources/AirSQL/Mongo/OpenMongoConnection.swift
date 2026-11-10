@@ -39,15 +39,20 @@ final class OpenMongoConnection {
 
     // MARK: The tree, read on the main session as it opens (mongo-plan, Tree): no stats for every collection at load
 
-    /// The databases (again).
+    /// The databases (again): the person's first, then MongoDB's own (admin, local, config).
     func load() {
         read("") { session in try await session.listDatabases() } done: { [weak self] found in
-            self?.databases = found.compactMap { info in
+            let all = found.compactMap { info -> (name: String, size: Int64?)? in
                 guard case .string(let name)? = info["name"] else { return nil }
                 return (name, info["sizeOnDisk"]?.integer)
             }
+            let (own, theirs) = (all.filter { !Self.isInternal($0.name) }, all.filter { Self.isInternal($0.name) })
+            self?.databases = own + theirs
         }
     }
+
+    /// admin, local and config: MongoDB's own, which the tree lists last and quieter.
+    static func isInternal(_ database: String) -> Bool { MongoAgentGuard.internalDatabases.contains(database.lowercased()) }
 
     /// A database's collections and its sizes (dbStats), the first time it opens or again.
     func loadDatabase(_ name: String, again: Bool = false) {
@@ -55,7 +60,8 @@ final class OpenMongoConnection {
         read(name) { session in
             (try await session.listCollections(database: name), try? await session.databaseStats(database: name))
         } done: { [weak self] found in
-            self?.collections[name] = found.0
+            // system.* (views, profile, buckets, js…) are the server's own, left out as Compass does.
+            self?.collections[name] = found.0.filter { !$0.name.hasPrefix("system.") }
             self?.stats[name] = found.1
         }
     }

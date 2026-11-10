@@ -171,7 +171,7 @@ final class OffReasons: NSObject, NSMenuDelegate {
 /// connection ask it first: the main window, the sidebar and the tools; `OffReasons` when nothing answers.
 @MainActor
 enum NotForMongo {
-    static let reason = "Not for MongoDB"
+    nonisolated static let reason = "Not for MongoDB"
     /// The menu bar's menus that are all SQL or MySQL's tools, but for Tools ▸ Agents.
     private static let menus: Set<String> = ["Query", "Database", "Tools"]
     /// SQL's commands elsewhere: in the File menu and the sidebar's menu.

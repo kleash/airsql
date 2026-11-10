@@ -131,6 +131,8 @@ struct AgentMongoToolTests {
         #expect((json["d"] as? [String: Any])?["$date"] as? String == "2024-02-29T12:34:56.789Z")
         #expect((json["s"] as? String)?.count == AgentFormat.cellLimit + 1)
         #expect(AgentJSON.text(json).contains("9007199254740993"))
+        // A reply's documents are their text: the keys' order and a whole double survive any JSON on the way.
+        #expect(AgentTarget.text(BSONDocument([(key: "b", value: .int32(1)), (key: "a", value: .double(2))])) == "{\"b\":1,\"a\":2.0}")
     }
 
     /// A connection's MongoDB settings are the person's, as the rest of how it connects is.

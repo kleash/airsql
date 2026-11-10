@@ -26,7 +26,12 @@ struct AgentMongoLabTests {
         return AgentTarget(saved: saved, safety: safety, database: "fixture", mongo: mongo)
     }
 
-    static func documents(_ reply: [String: Any]) -> [[String: Any]] { reply["documents"] as? [[String: Any]] ?? [] }
+    /// The documents of a reply: each is its Extended JSON text, in a string.
+    static func documents(_ reply: [String: Any]) -> [[String: Any]] {
+        (reply["documents"] as? [String] ?? []).compactMap {
+            try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]
+        }
+    }
 
     @Test(arguments: Server.allCases)
     func everyToolReadsTheFixture(_ server: Server) async throws {
@@ -40,7 +45,8 @@ struct AgentMongoLabTests {
         let long = try await target.mongo("mongo_find", ["collection": "all_types", "filter": "{\"type\": \"long\"}"])
         #expect((Self.documents(long).first?["value"] as? NSNumber)?.int64Value == 9007199254740993)
         let decimal = try await target.mongo("mongo_find", ["collection": "all_types", "filter": "{\"_id\": 16}"])
-        #expect(AgentJSON.text(decimal).contains("{\"$numberDecimal\":\"1234567890.123456789012345678901234\"}"))
+        #expect((decimal["documents"] as? [String])?.first?
+            .contains("{\"$numberDecimal\":\"1234567890.123456789012345678901234\"}") == true)
 
         let grouped = try await target.mongo("mongo_aggregate", ["collection": "many", "pipeline":
             "[{\"$match\": {\"n\": {\"$lt\": 100}}}, {\"$group\": {\"_id\": {\"$mod\": [\"$n\", 2]}, \"c\": {\"$sum\": 1}}}, "
@@ -58,8 +64,8 @@ struct AgentMongoLabTests {
         let kinds = Dictionary(collections.map { ($0["name"] as? String ?? "", $0["type"] as? String ?? "") }) { a, _ in a }
         #expect(kinds["all_types"] == "collection" && kinds["all_types_names"] == "view" && kinds["readings"] == "timeseries")
         #expect(!kinds.keys.contains { $0.hasPrefix("system.") })
-        let indexes = try await target.mongo("mongo_list_indexes", ["collection": "many"])["indexes"] as? [[String: Any]]
-        #expect(indexes?.first?["name"] as? String == "_id_")
+        let indexes = try await target.mongo("mongo_list_indexes", ["collection": "many"])["indexes"] as? [String]
+        #expect(indexes?.first?.contains("\"name\":\"_id_\"") == true)
         let stats = try await target.mongo("mongo_stats", ["collection": "many"])["stats"] as? [String: Any]
         #expect(stats?["count"] as? Int == 1000 && stats?["wiredTiger"] == nil)
         #expect((try await target.mongo("mongo_stats", [:])["stats"] as? [String: Any])?["collections"] != nil)
@@ -159,5 +165,30 @@ struct AgentMongoLabTests {
         task.cancel()
         await (try? await cancelled.mongo?.session(.agent))?.cancel()
         await #expect(throws: CancellationError.self) { try await task.value }
+    }
+}
+
+/// What an MCP client gets: a document's keys in their order and a whole double as a double, through the agent socket and
+/// `AirSQL --mcp`, both of which pass the reply through Foundation's JSON.
+@Suite(.enabled(if: MongoLab.enabled, "Mongo lab: AIRSQL_MONGO_LAB=1 ./test.sh --filter Mongo"))
+struct AgentMongoBridgeLabTests {
+    @Test func documentsKeepTheirKeysOrderAndDoublesThroughTheBridge() async throws {
+        let target = try await AgentMongoLabTests.target(.standalone)
+        defer { Task { await target.mongo?.close() } }
+        let support = try scratch()
+        let listener = try AgentListener(directory: URL(fileURLWithPath: support + "/agent")) { tool, arguments, _, _ in
+            do { return AgentReply.success(try await target.mongo(tool, arguments)) } catch { return AgentReply.failure(error) }
+        }
+        defer { listener.close() }
+        let pipeline = "[{\"$limit\": 1}, {\"$replaceWith\": {\"b\": {\"$literal\": 1}, \"a\": {\"$literal\": 2.0}}}]"
+        let messages = try await mcp([
+            request(1, "initialize", ["protocolVersion": "2025-06-18", "clientInfo": ["name": "test", "version": "1"]]),
+            request(2, "tools/call", ["name": "mongo_aggregate", "arguments": ["connection": "Mongo standalone",
+                                                                              "collection": "many", "pipeline": pipeline]]),
+        ], support: support)
+        let called = try #require(result(messages, 2))
+        let documents = (called["structuredContent"] as? [String: Any])?["documents"] as? [String]
+        #expect(documents == ["{\"b\":1,\"a\":2.0}"], "\(called)")
+        #expect(text(called).contains("\"{\\\"b\\\":1,\\\"a\\\":2.0}\""), "the same in the text")
     }
 }

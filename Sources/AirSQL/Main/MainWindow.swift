@@ -201,12 +201,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// View ▸ SQL Log: shows or hides the docked log; with nothing connected, its window.
     @objc func showSQLLog(_ sender: Any?) {
         guard !model.open.isEmpty else {
-            SQLLogWindowController.show()
+            SQLLogWindowController.show(title: logTitle)
             return
         }
         model.data.settings.tree.showsLog.toggle()
         model.windows.forEach { $0.updateLogDock() }
     }
+
+    /// The log's name here: MongoDB's commands aren't SQL (the same file, `SQLLog`).
+    var logTitle: String { activeConnection?.engine == .mongodb ? "Command Log" : "SQL Log" }
 
     // MARK: What is active
 
@@ -454,10 +457,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         statusBar.setAccessory(selectedTab?.tabContent?.statusAccessory)
         let canShowLog = statusBar.sqlLog.commandTarget(Commands.sqlLog.action) != nil
         statusBar.sqlLog.isEnabled = canShowLog
-        statusBar.sqlLog.attributedTitle = NSAttributedString(string: "SQL Log", attributes: [
+        statusBar.sqlLog.attributedTitle = NSAttributedString(string: logTitle, attributes: [
             .foregroundColor: canShowLog ? NSColor.accent : NSColor.tertiaryLabelColor, .font: NSFont.systemFont(ofSize: 11.5)])
-        statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tipWithShortcut
-            : "Nothing has been sent yet: the SQL log lists every statement once you connect"
+        statusBar.sqlLog.setAccessibilityLabel(logTitle)
+        let mongo = activeConnection?.engine == .mongodb
+        statusBar.sqlLog.toolTip = !canShowLog
+            ? "Nothing has been sent yet: " + (mongo ? "the command log lists every command" : "the SQL log lists every statement")
+                + " once you connect"
+            : mongo ? Commands.sqlLog.tipWithShortcut.replacingOccurrences(of: "statement", with: "command") : Commands.sqlLog.tipWithShortcut
     }
 
     // MARK: Commands

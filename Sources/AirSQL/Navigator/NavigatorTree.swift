@@ -427,9 +427,10 @@ final class TreeCell: NSTableCellView {
     @objc private func starClicked(_ sender: Any?) { onStar?() }
 
     /// `countGivesWay`: the count is words (a column's type), cut before the name rather than beside it. `bar`: how much
-    /// of the row its size fills. `onStar`: it can be a favourite.
+    /// of the row its size fills. `onStar`: it can be a favourite. `quiet`: the server's own, in a quieter colour.
     func show(_ image: NSImage, _ text: String, count value: String, countGivesWay: Bool = false, bold: Bool = false, busy: Bool,
-              bar: CGFloat = 0, comment note: String = "", favourite: Bool = false, onStar: (() -> Void)? = nil, tip: String) {
+              bar: CGFloat = 0, comment note: String = "", favourite: Bool = false, onStar: (() -> Void)? = nil, quiet: Bool = false,
+              tip: String) {
         self.bar = bar
         self.favourite = favourite
         self.onStar = onStar
@@ -440,7 +441,7 @@ final class TreeCell: NSTableCellView {
         icon.image = image
         name.stringValue = text
         name.font = .systemFont(ofSize: 13, weight: bold ? .semibold : .regular)
-        nameColour = .labelColor
+        nameColour = quiet ? .secondaryLabelColor : .labelColor
         colour()
         count.stringValue = value
         count.isHidden = value.isEmpty

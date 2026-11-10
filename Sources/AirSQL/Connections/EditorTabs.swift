@@ -105,7 +105,7 @@ extension ConnectionEditor {
         let form = Form()
         form.row("Server", [choice(\.engine, Engine.allCases.map { ($0.title, $0) }, id: "editor.engine",
                                    tip: "Choose whether the server is MySQL or MariaDB, or MongoDB") { [weak self] in self?.refreshTab() }],
-                 caption: draft.engine == .mongodb ? "Browse and query MongoDB's collections; editing documents is still being built." : nil)
+                 caption: draft.engine == .mongodb ? "Browse, query and edit MongoDB's collections." : nil)
         form.row("Name", [text(\.name, placeholder: draft.user.isEmpty ? "user@host" : draft.displayName, id: "editor.name",
                                tip: "Type the name the sidebar shows; empty: user@host")])
         let folders = [("None", UUID?.none)] + model.data.folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -311,11 +311,15 @@ extension ConnectionEditor {
     func agentsTab() -> NSView {
         let form = Form()
         form.row("Agent access", [choice(\.agentAccess, AgentAccess.allCases.map { ($0.title, $0) }, id: "editor.agentAccess",
-                                         tip: "Choose what AI agents may do with this connection")],
+                                         tip: "Choose what AI agents may do with this connection") { [weak self] in self?.refreshTab() }],
                  caption: "Schema: names and structure. Read: also read-only queries. Analytics: also larger results and "
                     + "exports to the agents' folder.")
         form.row("", [toggle("Agents may see sample rows", \.agentSampleRows, id: "editor.sampleRows",
                              tip: "Let agents see a few rows of a table with its structure (off by default)")])
+        // MongoDB has no read-only session: the login's own rights are the last guard (mongo-plan, Agents).
+        if draft.engine == .mongodb, draft.agentAccess.rank >= AgentAccess.schemaRead.rank {
+            form.row("", [caption("For agents, use a database login that can only read: AirSQL refuses writes, and such a login can't make any.")])
+        }
         if !model.data.settings.agentsAllowed {
             form.row("", [caption("Agents are off for every connection until you turn them on in Settings\u{A0}▸\u{A0}Agents.")])
         }

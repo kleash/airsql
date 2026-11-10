@@ -77,7 +77,7 @@ struct MongoAppTests {
 // MARK: The lab
 
     /// The standalone of the Mongo lab, connected in a window of its own; rows per page `pageSize`.
-    @MainActor private func mongoWindow(pageSize: Int = 100) async throws -> (MainWindowController, AgentServer, OpenMongoConnection) {
+    @MainActor func mongoWindow(pageSize: Int = 100) async throws -> (MainWindowController, AgentServer, OpenMongoConnection) {
         var solo = SavedConnection(name: "Mongo solo", host: "127.0.0.1", port: MongoLab.soloPort, user: MongoLab.airsql.user)
         solo.engine = .mongodb
         solo.tls.mode = .off
@@ -92,7 +92,7 @@ struct MongoAppTests {
     }
 
     /// Opens a tree row (the reads its arrow starts) and waits until what is under it has been read.
-    @MainActor private func open(_ item: MongoTreeItem, in main: MainWindowController, _ mongo: OpenMongoConnection) async throws -> SidebarNode {
+    @MainActor func open(_ item: MongoTreeItem, in main: MainWindowController, _ mongo: OpenMongoConnection) async throws -> SidebarNode {
         let node = try #require(main.sidebar.treeNodes[.mongo(mongo.saved.id, item)], "\(item)")
         main.sidebar.outline.expandItem(node)
         #expect(await eventually(timeout: 20) { !mongo.isLoading })
@@ -100,7 +100,7 @@ struct MongoAppTests {
     }
 
     /// Opens a collection in its own tab with a double-click on its row, and waits for its first documents.
-    @MainActor private func openTab(_ collection: String, in main: MainWindowController, _ mongo: OpenMongoConnection) async throws -> MongoCollectionController {
+    @MainActor func openTab(_ collection: String, in main: MainWindowController, _ mongo: OpenMongoConnection) async throws -> MongoCollectionController {
         let kind = SidebarNode.Kind.mongo(mongo.saved.id, MongoTreeItem(database: "fixture", collection: collection))
         #expect(main.sidebar.reveal(kind))
         main.sidebar.treeDoubleClicked(try #require(main.sidebar.treeNodes[kind]))
