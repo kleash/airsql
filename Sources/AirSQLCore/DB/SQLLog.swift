@@ -218,7 +218,7 @@ public final class SQLLog {
         return formatter
     }()
 
-    private func write(_ text: String, context: String) {
+    func write(_ text: String, context: String) {
         let line = Self.formatter.string(from: Date()) + " [\(context)] " + text + "\n"
         lock.lock()
         defer { lock.unlock() }

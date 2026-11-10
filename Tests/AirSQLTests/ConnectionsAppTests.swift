@@ -279,11 +279,12 @@ extension AppTests {
         #expect(model.connection(docs.id)?.engine == .mongodb)
     }
 
-    /// A MongoDB connection opens its route, then fails with the placeholder's words, never trying MySQL's login (which
-    /// would say it can't reach the server on this port, where nothing listens); SQL's commands say it isn't for them.
-    @Test func aMongoDBConnectionSaysItIsBeingBuilt() async throws {
+    /// A MongoDB connection logs in with MongoDB's driver, never MySQL's, and fails in its own words where nothing
+    /// listens; SQL's commands say it isn't for them.
+    @Test func aMongoDBConnectionFailsInItsOwnWords() async throws {
         var mongo = SavedConnection(name: "Documents", host: "127.0.0.1", port: 1, user: "root")
         mongo.engine = .mongodb
+        mongo.tls.mode = .off
         let model = testModel([mongo])
         let (main, harness) = appWindow(model)
         _ = await call(harness, "select", ["pane": "sidebar", "names": ["Documents"]])
@@ -293,7 +294,7 @@ extension AppTests {
         #expect(await call(harness, "menu", ["path": "Connection > Connect"]).error == nil)
         #expect(await eventually(timeout: 30) { main.window?.attachedSheet != nil })
         if case .failed(let reason)? = model.states[mongo.id] {
-            #expect(reason.hasPrefix("MongoDB support is being built"), "\(reason)")
+            #expect(reason == "Nothing answers at 127.0.0.1:1.", "\(reason)")
         } else {
             Issue.record("not failed: \(String(describing: model.states[mongo.id]))")
         }
