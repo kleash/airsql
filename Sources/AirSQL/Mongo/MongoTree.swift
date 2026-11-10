@@ -50,7 +50,7 @@ extension SidebarController {
             if row.children.isEmpty { row.children = [message("No collections yet")] }
             return row
         }
-        if rows.isEmpty, text.isEmpty { return [message("No databases: create one with a tool such as mongosh")] }
+        if rows.isEmpty, text.isEmpty { return [message("No databases: Data ▸ Collection ▸ Create Database… makes one")] }
         return rows
     }
 
@@ -142,9 +142,11 @@ extension SidebarController {
         if item.index != nil { return [Commands.collectionIndexes, Commands.copyName, nil, Commands.hideIndex, Commands.dropIndex, nil, Commands.refresh] }
         if item.collection != nil {
             return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.collectionIndexes, Commands.copyName,
-                    nil, Commands.createIndex, nil, Commands.refresh]
+                    nil, Commands.createIndex, Commands.editValidation, Commands.renameCollection, nil, Commands.createCollection,
+                    Commands.createView, nil, Commands.refresh, Commands.dropCollection]
         }
-        return [Commands.copyName, nil, Commands.refresh]
+        return [Commands.copyName, nil, Commands.createCollection, Commands.createView, Commands.createMongoDatabase, nil, Commands.refresh,
+                Commands.dropMongoDatabase]
     }
 
     /// Open Collection: each selected collection in its own tab; the preview of the same collection goes.
@@ -250,7 +252,7 @@ extension SidebarController {
         case Commands.copyName.action? where mongo, Commands.copy.action? where mongo:
             reason = nil
         default:
-            return nil
+            return validateMongoAdmin(item)
         }
         item.explain(enabled: reason == nil, reason: reason)
         return reason == nil

@@ -20,7 +20,7 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
-        + aggregationCommands + [editValue, removeField] + mongoIndexCommands
+        + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoAdminCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -66,4 +66,26 @@ extension Commands {
                                    tip: "Hide the selected index from the query planner, or show it again; it stays up to date")
 
     static let mongoIndexCommands = [collectionIndexes, createIndex, dropIndex, hideIndex]
+}
+
+// MARK: Collections, views and databases (lane P2-admin)
+
+extension Commands {
+    static let createCollection = Command("Create Collection…", #selector(SidebarController.createCollection(_:)),
+                                          tip: "Make a collection in the database: plain, capped, time-series or with rules")
+    static let createView = Command("Create View…", #selector(SidebarController.createView(_:)),
+                                    tip: "Make a read-only view of a collection through an aggregation pipeline")
+    static let createMongoDatabase = Command("Create Database…", #selector(SidebarController.createMongoDatabase(_:)),
+                                             tip: "Make a database with its first collection: MongoDB keeps no empty database")
+    static let renameCollection = Command("Rename Collection…", #selector(SidebarController.renameCollection(_:)),
+                                          tip: "Give the collection a new name in its database")
+    static let editValidation = Command("Validation Rules…", #selector(SidebarController.editValidation(_:)),
+                                        tip: "See and change the rules the collection's documents must follow")
+    static let dropCollection = Command("Drop Collection…", #selector(SidebarController.dropCollection(_:)),
+                                        tip: "Delete the collection with its documents and indexes, or the view")
+    static let dropMongoDatabase = Command("Drop Database…", #selector(SidebarController.dropMongoDatabase(_:)),
+                                           tip: "Delete the database with every collection and view in it")
+
+    static let mongoAdminCommands = [createCollection, createView, createMongoDatabase, renameCollection, editValidation,
+                                     dropCollection, dropMongoDatabase]
 }

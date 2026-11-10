@@ -2455,6 +2455,31 @@ In the sidebar, double-click an index to see it on its collection's Indexes page
 right-click a collection for **Create Index…**. On a read-only connection, a view or a time-series collection these
 commands are off, and say why.
 
+## Collections, views and databases
+
+Right-click a database or collection in the sidebar, or use **Data ▸ Collection** (for the tree's selection, or the
+collection tab in front). Each command asks what it needs, then shows its exact command (`create`, `drop`,
+`renameCollection`, `collMod`) before anything runs; **Cancel** in Activity stops it. The sidebar reads the
+database again afterwards, and the tab of a collection that was dropped or renamed says so.
+
+- **Create Collection…** takes its name. **More Options** makes it *capped* (a size in bytes and, if you like, a most
+  number of documents: the oldest go first), *time-series* (the time field, a meta field and the granularity) or
+  *clustered* (stored in `_id` order), and gives it a default collation and validation rules, in shell form.
+- **Create Database…** asks the database's name and its first collection's: MongoDB keeps no empty database.
+- **Create View…** takes its name, the collection or view it reads and an aggregation pipeline in shell form. A view
+  stores nothing: its pipeline runs each time it is read, and it is read-only.
+- **Rename Collection…** renames within the database. Ticking *Replace a collection that has this name* drops that
+  collection first: the preview marks it and asks you to type the name. Views and time-series collections can't be
+  renamed.
+- **Validation Rules…** shows the collection's validator (`$jsonSchema` or query operators) in shell form, with its
+  level (strict, moderate, off) and action (error, warn). **Check Existing Documents** counts the documents the rules
+  as typed would refuse, before you change anything; the preview repeats that count.
+- **Drop Collection…** (**Drop View…** for a view) and **Drop Database…** are marked as destructive. A database's
+  name is always typed first; a collection's on a Production connection (or one whose Safety settings ask for it).
+
+`admin`, `local` and `config` and `system.*` collections are MongoDB's own: these commands are off there, and say why.
+On a read-only connection every one of them is off.
+
 ## Export and import
 
 **Data ▸ Collection ▸ Export Documents…** writes the documents of the collection selected in the tree, or of the
