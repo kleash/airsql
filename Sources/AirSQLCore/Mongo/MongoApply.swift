@@ -21,6 +21,9 @@ public struct MongoChanges: Sendable {
     public private(set) var inserts: [BSONDocument] = []
     /// Documents to delete, as loaded: Apply deletes each only while it is still exactly so.
     public private(set) var deletes: [BSONDocument] = []
+    /// Whole documents to put in place of others with the same `_id` (a compare's reconcile): each only while the old
+    /// one is still exactly as compared.
+    public private(set) var replaces: [(old: BSONDocument, new: BSONDocument)] = []
 
     public init(database: String, collection: String, kind: MongoCollectionInfo.Kind) {
         self.database = database
@@ -28,7 +31,7 @@ public struct MongoChanges: Sendable {
         self.kind = kind
     }
 
-    public var isEmpty: Bool { edits.isEmpty && inserts.isEmpty && deletes.isEmpty }
+    public var isEmpty: Bool { edits.isEmpty && inserts.isEmpty && deletes.isEmpty && replaces.isEmpty }
 
     /// Sets the field at `path` of a loaded document to `new` (nil removes the field). A value of another type than the
     /// old one is refused unless `changingType`; null and missing have no type to keep. Setting the loaded value
@@ -88,9 +91,20 @@ public struct MongoChanges: Sendable {
         if !deletes.contains(where: { $0["_id"] == id }) { deletes.append(document) }
     }
 
-    /// The commands Apply runs, in order: deletes, then edits, then inserts.
+    /// Puts `new` in place of `old` (as read), which has the same `_id`.
+    public mutating func replace(_ old: BSONDocument, with new: BSONDocument) throws {
+        try checkWritable()
+        guard let id = old["_id"], new["_id"] == id else { throw refused("A document is replaced only by one with the same _id.") }
+        if Self.hasKeyNeedingCare(.document(new)) {
+            throw refused("A field name holds . or $, which AirSQL doesn't write. Rename the field.")
+        }
+        replaces.append((old, new))
+    }
+
+    /// The commands Apply runs, in order: deletes, then edits, then replaces, then inserts.
     public var steps: [MongoApplyStep] {
-        deletes.map { .delete($0) } + edits.map { .update(id: $0.id, edits: $0.edits) } + inserts.map { .insert($0) }
+        deletes.map { .delete($0) } + edits.map { .update(id: $0.id, edits: $0.edits) } + replaces.map { .replace(old: $0.old, new: $0.new) }
+            + inserts.map { .insert($0) }
     }
 
     /// What the Apply sheet lists: exactly the commands Apply sends, in shell form.
@@ -133,7 +147,9 @@ public struct MongoChanges: Sendable {
         let deleting = min(count, deletes.count), editing = min(count - deleting, edits.count)
         deletes.removeFirst(deleting)
         edits.removeFirst(editing)
-        inserts.removeFirst(min(count - deleting - editing, inserts.count))
+        let replacing = min(count - deleting - editing, replaces.count)
+        replaces.removeFirst(replacing)
+        inserts.removeFirst(min(count - deleting - editing - replacing, inserts.count))
     }
 
     /// `document` as Apply would leave it, its edits made (sub-documents made on the way, as `$set` does): the grid's.
@@ -243,6 +259,8 @@ public enum MongoApplyStep: Sendable {
     case insert(BSONDocument)
     /// Read the document back and check it is exactly as loaded, then `deleteOne({_id})`, deleting 1.
     case delete(BSONDocument)
+    /// Read the document back and check it is exactly `old`, then `replaceOne({_id}, new)`, matching 1.
+    case replace(old: BSONDocument, new: BSONDocument)
 
     /// Matching ignores the collection's collation: "a" never matches "A".
     static let simple = BSONDocument([("locale", .string("simple"))])
@@ -274,7 +292,7 @@ public enum MongoApplyStep: Sendable {
     var id: BSONValue? {
         switch self {
         case .update(let id, _): return id
-        case .insert(let document), .delete(let document): return document["_id"]
+        case .insert(let document), .delete(let document), .replace(let document, _): return document["_id"]
         }
     }
 
@@ -295,6 +313,10 @@ public enum MongoApplyStep: Sendable {
             let id = document["_id"] ?? .null
             return [read(id) + "  // must be exactly as loaded",
                     "\(target).deleteOne(\(BSONDocument([("_id", id)]).shellForm()), \(options))"]
+        case let .replace(old, new):
+            let id = old["_id"] ?? .null
+            return [read(id) + "  // must be exactly as compared",
+                    "\(target).replaceOne(\(BSONDocument([("_id", id)]).shellForm()), \(new.shellForm()), \(options))"]
         }
     }
 }
@@ -368,6 +390,7 @@ public enum MongoApply {
         case .update: return "Changing the document \(id)"
         case .insert: return "Inserting \(step.id == nil ? id : "the document " + id)"
         case .delete: return "Deleting the document \(id)"
+        case .replace: return "Replacing the document \(id)"
         }
     }
 
@@ -406,6 +429,11 @@ public enum MongoApply {
             guard try await current(id).typeExactEqual(loaded) else { throw AirSQLError(.other, changed) }
             try expect(try await session.deleteOne(database: database, collection: collection,
                                                    filter: BSONDocument([("_id", id)]), collation: MongoApplyStep.simple), "deleted")
+        case let .replace(old, new):
+            let id = old["_id"] ?? .null
+            guard try await current(id).typeExactEqual(old) else { throw AirSQLError(.other, changed) }
+            try expect(try await session.replaceOne(database: database, collection: collection, filter: BSONDocument([("_id", id)]),
+                                                    replacement: new, collation: MongoApplyStep.simple), "matched")
         }
     }
 }
