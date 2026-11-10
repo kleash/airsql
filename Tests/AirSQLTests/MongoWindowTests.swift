@@ -46,6 +46,23 @@ extension AppTests {
             #expect(main.toolbarController.databasePopup.toolTip != NotForMongo.reason)
         }
 
+        /// The log's link and window say Command Log on a MongoDB connection (the same file), SQL Log on MySQL's.
+        @Test func theLogIsTheCommandLogOnMongoDB() async throws {
+            let (main, harness, _) = await Self.window()
+            main.updateStatus()
+            #expect(main.statusBar.sqlLog.title == "Command Log")
+            #expect(main.statusBar.sqlLog.toolTip?.contains("every command") == true, "\(main.statusBar.sqlLog.toolTip ?? "")")
+            main.showSQLLog(nil)  // nothing is connected: the log's window
+            let window = try #require(NSApp.windows.first { $0.windowController is SQLLogWindowController && $0.isVisible })
+            #expect(window.title == "Command Log")
+            _ = await call(harness, "select", ["pane": "sidebar", "names": [Fixtures.production.name]])
+            main.updateStatus()
+            #expect(main.statusBar.sqlLog.title == "SQL Log")
+            main.showSQLLog(nil)
+            #expect(window.title == "SQL Log")
+            window.close()
+        }
+
         /// BSON null shows as mongosh writes it, `null`, still drawn and marked as null; a MySQL grid keeps its NULL.
         @Test func bsonNullShowsAsNull() throws {
             let source = MongoDocumentSource()

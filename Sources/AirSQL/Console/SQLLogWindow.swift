@@ -214,7 +214,9 @@ final class SQLLogViewController: NSViewController, NSSearchFieldDelegate, NSTex
         NSWorkspace.shared.activateFileViewerSelecting([log.fileURL])
     }
 
-    @objc private func openInWindow(_ sender: Any?) { SQLLogWindowController.show(log) }
+    @objc private func openInWindow(_ sender: Any?) {
+        SQLLogWindowController.show(log, title: (view.window?.windowController as? MainWindowController)?.logTitle ?? "SQL Log")
+    }
 
     /// Clear SQL Log: asks, then removes the log's files (the next statement starts a new one).
     @objc func clearSQLLog(_ sender: Any?) {
@@ -237,11 +239,12 @@ final class SQLLogWindowController: NSWindowController {
     var text: NSTextView { viewer.text }
     var lines: [String] { viewer.lines }
 
-    /// Shows the log's window, reading the log again.
+    /// Shows the log's window, reading the log again; `title`: "Command Log" from a MongoDB connection (the same file).
     @discardableResult
-    static func show(_ log: SQLLog = .shared) -> SQLLogWindowController {
+    static func show(_ log: SQLLog = .shared, title: String = "SQL Log") -> SQLLogWindowController {
         let controller = shown?.log === log ? shown! : SQLLogWindowController(log: log)
         shown = controller
+        controller.window?.title = title
         controller.showWindow(nil)
         controller.viewer.refresh()
         return controller
