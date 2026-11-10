@@ -441,6 +441,11 @@ public final class MongoSession: @unchecked Sendable {
             defer { bson_destroy(options) }
             var error = bson_error_t()
             bson_append_utf8(options, "comment", -1, tag, -1)
+            if let collation {
+                let made = try collation.bson()
+                defer { bson_destroy(made) }
+                bson_append_document(options, "collation", -1, made)
+            }
             if let transaction, !mongoc_client_session_append(transaction, options, &error) { throw MongoErrorMapping.map(error) }
             log(BSONDocument(logged.fields + [("comment", .string(tag))]), database: database)
             return try Self.withReply { reply in
