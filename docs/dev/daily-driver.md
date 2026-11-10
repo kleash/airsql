@@ -203,8 +203,8 @@ Low daily value, or against a rule. They stay listed so nothing's lost.
 
 ## Not doing
 
-Other engines (Oracle, SQL Server, Postgres, Mongo and the rest); JVM and IDE plumbing; VCS inside the app; a built-in
-terminal; DDL data sources. HeidiSQL's Windows-only features.
+Other engines (Oracle, SQL Server, Postgres and the rest; MongoDB moved to [mongo-plan.md](mongo-plan.md)); JVM and
+IDE plumbing; VCS inside the app; a built-in terminal; DDL data sources. HeidiSQL's Windows-only features.
 
 ## How far to trust this
 
