@@ -13,8 +13,9 @@ a few options. Passwords go in your Keychain, never in AirSQL's files.
 Choose **File ▸ New Connection…** (⌘N), or select a connection and choose **Connection ▸ Edit…**. The editor has six
 tabs:
 
-- **General**: the kind of server (MySQL or MariaDB, or MongoDB: browse and query its collections as [MongoDB
-  collections](mongodb.md) says, while editing them is still being built; its editor leaves out MySQL's own settings), a name, the sidebar folder, a colour (Production also turns on the strict safety checks), the host and
+- **General**: the kind of server (MySQL or MariaDB, or MongoDB: browse, query and edit its collections as [MongoDB
+  collections](mongodb.md) says; its editor leaves out MySQL's own settings), a name, the sidebar folder, a colour
+  (Production also turns on the strict safety checks), the host and
   port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.

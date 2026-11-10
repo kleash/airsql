@@ -17,6 +17,9 @@ give it more. The icons beside it open it in a window of its own, where you can 
 clear it. With nothing connected, ⌥⌘L opens that window. Select some SQL in it and right-click to open it in a new query
 tab.
 
+On a MongoDB connection the link says **Command Log**: the same log, where each command AirSQL sends to MongoDB is
+written in shell form.
+
 ## Where it is
 
 `~/Library/Logs/AirSQL/SQL.log`. Only you can read it (file mode 0600). At 10 MB it becomes `SQL.1.log`, replacing the

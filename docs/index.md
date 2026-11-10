@@ -1,12 +1,12 @@
 ---
 title: Home
 nav_order: 1
-description: Step-by-step help for AirSQL, the Mac app for MySQL and MariaDB.
+description: Step-by-step help for AirSQL, the Mac app for MySQL and MariaDB, and MongoDB.
 ---
 
 # AirSQL Help
 
-AirSQL is a Mac app for MySQL and MariaDB.
+AirSQL is a Mac app for MySQL and MariaDB, and MongoDB.
 
 ![The AirSQL window: saved connections and a shop database's tables on the left, its newest orders in the grid](assets/screenshots/main-light.png)
 
@@ -30,6 +30,8 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [A table's rows](table-data.md): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](data-grid.md): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
+- [MongoDB collections](mongodb.md): a MongoDB connection's databases and collections, their documents in a grid, the
+  query bar, JSON and a sampled schema.
 - [Change tables, views and routines](editors.md): the table editor, views and routines as CREATE code, ER diagrams and
   the SQL Generator.
 - [Export, restore, copy and import](client-tools.md): your mysqldump and mysql, or AirSQL's own export and runner; copy

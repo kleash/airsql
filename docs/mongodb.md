@@ -9,10 +9,17 @@ Once a MongoDB connection is connected (see [Connections and routes](connections
 under it. Open a database with its arrow or a double-click: AirSQL reads its collections and its size on disk (with its
 indexes) then, never every collection's figures at once. Collections show **C**, views **V** and time-series
 collections **TS**; views and time-series say *read-only*. A collection's arrow shows its indexes, with their keys.
+MongoDB's own databases (admin, config, local) come last, in a quieter colour, and the server's `system.` collections
+(`system.views`, `system.profile`, a time-series collection's buckets…) aren't listed, as in Compass.
 
 A click on a collection shows its documents in the preview tab; a double-click, Return or **Open Collection** (⌥⇧⌘O)
 opens them in a tab of their own. Right-click a row to open it, sample its schema, copy its name or read it again
 (**Refresh**, ⌘R).
+
+SQL's commands are for MySQL and MariaDB: on a MongoDB tab or connection they're off and say *Not for MongoDB*, in the
+menus and in the toolbar (the database, the transaction mode, Run All, Explain, Commit and Roll Back). The toolbar's
+**Run** and **Cancel** work on the collection tab. The log at the right of the status bar is the **Command Log** there:
+the same file as [the SQL log](sql-log.md), with every command AirSQL sends to MongoDB in shell form, passwords masked.
 
 ## The query bar
 
@@ -35,8 +42,9 @@ A click on a column's header sorts by that field on the server; ⇧-click adds i
 
 Each document is a row; each field a column, by its dotted path, in the order fields first appear (`_id` first). A
 column's header gives its type, or *mixed* and the types it holds. A field a document lacks is blank (its tooltip says
-*missing*), which differs from `null`. Right-click the header of a sub-document's column for **Expand Field**: its fields
-become columns of their own; on one of them, **Collapse Field** makes them one column again.
+*missing*), which differs from `null`, shown as mongosh writes it (Settings ▸ Grid's NULL text is for MySQL).
+Right-click the header of a sub-document's column for **Expand Field**: its fields become columns of their own; on one
+of them, **Collapse Field** makes them one column again.
 
 Documents load a batch at a time (Settings ▸ Grid's rows per page, and at most 4 MB): the next batch comes as you
 scroll to the end, or with **Load More** (⌥⌘↓). The status bar says how many are loaded, of about how many the
@@ -59,3 +67,9 @@ The switch over the grid shows the same documents another way:
   documents that have it.
 
 **Documents** (⌃⌥4) shows the grid again. Data ▸ Collection has every command of a collection tab.
+
+## Agents
+
+With agent access set to **Schema + read** or more, AI agents can find, aggregate, count and sample a MongoDB
+connection's documents, read-only: see [AI agents](agents.md#mongodb-connections). Its editor's Agents tab recommends
+connecting with a login that can only read (the `read` role), so the server itself refuses any write.

@@ -13,7 +13,7 @@ Source: https://kleash.github.io/airsql/
 
 # AirSQL Help
 
-AirSQL is a Mac app for MySQL and MariaDB.
+AirSQL is a Mac app for MySQL and MariaDB, and MongoDB.
 
 ![The AirSQL window: saved connections and a shop database's tables on the left, its newest orders in the grid](assets/screenshots/main-light.png)
 
@@ -37,6 +37,8 @@ More pictures: the [README](https://github.com/kleash/airsql#screenshots).
 - [A table's rows](https://kleash.github.io/airsql/table-data.html): load, filter, search, sort, edit, apply, copy and export a table's rows.
 - [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html): the status bar's figures, the value panel, Record View, Transpose, Display
   As, heatmaps, View As, charts and Column Summary, in a table's rows and a query's results.
+- [MongoDB collections](https://kleash.github.io/airsql/mongodb.html): a MongoDB connection's databases and collections, their documents in a grid, the
+  query bar, JSON and a sampled schema.
 - [Change tables, views and routines](https://kleash.github.io/airsql/editors.html): the table editor, views and routines as CREATE code, ER diagrams and
   the SQL Generator.
 - [Export, restore, copy and import](https://kleash.github.io/airsql/client-tools.html): your mysqldump and mysql, or AirSQL's own export and runner; copy
@@ -327,6 +329,9 @@ log shows under the tabs; the same again closes it. It starts closed, so the row
 give it more. The icons beside it open it in a window of its own, where you can filter it, show the file in Finder and
 clear it. With nothing connected, ⌥⌘L opens that window. Select some SQL in it and right-click to open it in a new query
 tab.
+
+On a MongoDB connection the link says **Command Log**: the same log, where each command AirSQL sends to MongoDB is
+written in shell form.
 
 ## Where it is
 
@@ -786,8 +791,9 @@ a few options. Passwords go in your Keychain, never in AirSQL's files.
 Choose **File ▸ New Connection…** (⌘N), or select a connection and choose **Connection ▸ Edit…**. The editor has six
 tabs:
 
-- **General**: the kind of server (MySQL or MariaDB, or MongoDB: browse and query its collections as [MongoDB
-  collections](https://kleash.github.io/airsql/mongodb.html) says, while editing them is still being built; its editor leaves out MySQL's own settings), a name, the sidebar folder, a colour (Production also turns on the strict safety checks), the host and
+- **General**: the kind of server (MySQL or MariaDB, or MongoDB: browse, query and edit its collections as [MongoDB
+  collections](https://kleash.github.io/airsql/mongodb.html) says; its editor leaves out MySQL's own settings), a name, the sidebar folder, a colour
+  (Production also turns on the strict safety checks), the host and
   port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
   you disconnect and never saved.
@@ -2313,10 +2319,17 @@ Once a MongoDB connection is connected (see [Connections and routes](https://kle
 under it. Open a database with its arrow or a double-click: AirSQL reads its collections and its size on disk (with its
 indexes) then, never every collection's figures at once. Collections show **C**, views **V** and time-series
 collections **TS**; views and time-series say *read-only*. A collection's arrow shows its indexes, with their keys.
+MongoDB's own databases (admin, config, local) come last, in a quieter colour, and the server's `system.` collections
+(`system.views`, `system.profile`, a time-series collection's buckets…) aren't listed, as in Compass.
 
 A click on a collection shows its documents in the preview tab; a double-click, Return or **Open Collection** (⌥⇧⌘O)
 opens them in a tab of their own. Right-click a row to open it, sample its schema, copy its name or read it again
 (**Refresh**, ⌘R).
+
+SQL's commands are for MySQL and MariaDB: on a MongoDB tab or connection they're off and say *Not for MongoDB*, in the
+menus and in the toolbar (the database, the transaction mode, Run All, Explain, Commit and Roll Back). The toolbar's
+**Run** and **Cancel** work on the collection tab. The log at the right of the status bar is the **Command Log** there:
+the same file as [the SQL log](https://kleash.github.io/airsql/sql-log.html), with every command AirSQL sends to MongoDB in shell form, passwords masked.
 
 ## The query bar
 
@@ -2339,8 +2352,9 @@ A click on a column's header sorts by that field on the server; ⇧-click adds i
 
 Each document is a row; each field a column, by its dotted path, in the order fields first appear (`_id` first). A
 column's header gives its type, or *mixed* and the types it holds. A field a document lacks is blank (its tooltip says
-*missing*), which differs from `null`. Right-click the header of a sub-document's column for **Expand Field**: its fields
-become columns of their own; on one of them, **Collapse Field** makes them one column again.
+*missing*), which differs from `null`, shown as mongosh writes it (Settings ▸ Grid's NULL text is for MySQL).
+Right-click the header of a sub-document's column for **Expand Field**: its fields become columns of their own; on one
+of them, **Collapse Field** makes them one column again.
 
 Documents load a batch at a time (Settings ▸ Grid's rows per page, and at most 4 MB): the next batch comes as you
 scroll to the end, or with **Load More** (⌥⌘↓). The status bar says how many are loaded, of about how many the
@@ -2363,6 +2377,12 @@ The switch over the grid shows the same documents another way:
   documents that have it.
 
 **Documents** (⌃⌥4) shows the grid again. Data ▸ Collection has every command of a collection tab.
+
+## Agents
+
+With agent access set to **Schema + read** or more, AI agents can find, aggregate, count and sample a MongoDB
+connection's documents, read-only: see [AI agents](https://kleash.github.io/airsql/agents.html#mongodb-connections). Its editor's Agents tab recommends
+connecting with a login that can only read (the `read` role), so the server itself refuses any write.
 
 
 ---
