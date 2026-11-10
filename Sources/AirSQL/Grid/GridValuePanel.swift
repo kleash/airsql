@@ -19,6 +19,9 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     let text = NSTextView()
     private let textScroll = NSScrollView()
     private let outlineScroll = JSONTreeView()
+    /// A MongoDB cell's sub-document or array, read from its BSON (`show`'s `bson`) rather than parsed as JSON.
+    private let bsonScroll = BSONTreeView()
+    private var bson: BSONValue?
     var outline: NSOutlineView { outlineScroll.outline }
     private let image = NSImageView()
     let footer = label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
@@ -100,11 +103,11 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         bottom.setViews([wrap, actions], in: .trailing)
         bottom.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 6, right: 8)
         for bar in [top, bottom] { bar.setHuggingPriority(.defaultHigh, for: .vertical) }
-        for view in [top, textScroll, outlineScroll, image, bottom] as [NSView] {
+        for view in [top, textScroll, outlineScroll, bsonScroll, image, bottom] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
-        for body in [textScroll, outlineScroll, image] as [NSView] {
+        for body in [textScroll, outlineScroll, bsonScroll, image] as [NSView] {
             NSLayoutConstraint.activate([
                 body.topAnchor.constraint(equalTo: top.bottomAnchor), body.bottomAnchor.constraint(equalTo: bottom.topAnchor),
                 body.leadingAnchor.constraint(equalTo: leadingAnchor), body.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -124,8 +127,10 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
 
     /// Shows a cell: `value` nil for NULL (or no cell when `column` is nil); `bytes` as the server sent them;
     /// `placeholder` what the server will put there at Apply.
-    /// `loadFull`: the value is only its start, and this reads the rest.
-    func show(column: GridColumn?, value: String?, bytes: [UInt8]?, placeholder: String? = nil, loadFull: (() -> Void)? = nil) {
+    /// `loadFull`: the value is only its start, and this reads the rest. `bson`: a MongoDB cell's value, whose
+    /// sub-document or array the tree shows.
+    func show(column: GridColumn?, value: String?, bytes: [UInt8]?, placeholder: String? = nil, loadFull: (() -> Void)? = nil,
+              bson: BSONValue? = nil) {
         edited = false
         self.loadFull = loadFull
         loadFullButton.isHidden = loadFull == nil
@@ -136,10 +141,14 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         title.stringValue = column.map { "Value · \($0.name)" } ?? "Value"
         title.toolTip = title.stringValue
         let first = value?.first(where: { !$0.isWhitespace })
-        tree = first == "{" || first == "[" ? value.flatMap(JSONNode.parse) : nil
+        switch bson {
+        case .document?, .array?: self.bson = bson
+        default: self.bson = nil
+        }
+        tree = self.bson == nil && (first == "{" || first == "[") ? value.flatMap(JSONNode.parse) : nil
         let picture = column?.kind == .binary ? self.bytes.flatMap { NSImage(data: Data($0)) } : nil
         image.image = picture
-        let fits: [Mode: Bool] = [.text: value != nil, .json: tree != nil, .hex: value != nil, .image: picture != nil]
+        let fits: [Mode: Bool] = [.text: value != nil, .json: tree != nil || self.bson != nil, .hex: value != nil, .image: picture != nil]
         let tips: [Mode: (on: String, off: String)] = [
             .text: ("Show the value as text", "This cell has no value"), .json: ("Show the value as a JSON tree", "The value isn't JSON"),
             .hex: ("Show the value's bytes in hexadecimal", "This cell has no value"),
@@ -149,7 +158,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
             modes.setEnabled(fits[item] == true, forSegment: item.rawValue)
             modes.setToolTip(fits[item] == true ? tips[item]?.on : tips[item]?.off, forSegment: item.rawValue)
         }
-        if let picked, fits[picked] == true { mode = picked } else { mode = picture != nil ? .image : tree != nil ? .json : .text }
+        if let picked, fits[picked] == true { mode = picked } else { mode = picture != nil ? .image : fits[.json] == true ? .json : .text }
         modes.selectedSegment = value == nil ? -1 : mode.rawValue
         footer.stringValue = column == nil ? "Select a cell to see its whole value here" : summary
         footer.toolTip = footer.stringValue
@@ -169,7 +178,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         // Text arrives as UTF-8, whatever the column's character set: these aren't the bytes on the server's disk.
         let size = "\(count.formatted()) byte\(count == 1 ? "" : "s")" + (column?.kind == .binary ? "" : " as UTF-8")
         switch mode {
-        case .json: return "Valid JSON · " + size
+        case .json: return (bson.map { "BSON " + $0.typeAlias } ?? "Valid JSON") + " · " + size
         case .image: return image.image.map { "\(Int($0.size.width)) × \(Int($0.size.height)) image · " + size } ?? size
         default:
             let characters = value?.count ?? 0
@@ -181,12 +190,13 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         text.isEditable = keep != nil && mode == .text
         textScroll.isHidden = !(mode == .text || mode == .hex) || value == nil && keep == nil
         outlineScroll.isHidden = mode != .json || tree == nil
+        bsonScroll.isHidden = mode != .json || bson == nil
         image.isHidden = mode != .image
         wrap.isHidden = mode != .text
         switch mode {
         case .text: text.string = value ?? ""
         case .hex: text.string = Self.hexDump(bytes ?? [])
-        case .json: outlineScroll.tree = tree
+        case .json: if let bson { bsonScroll.value = bson } else { outlineScroll.tree = tree }
         case .image: break
         }
         setWrap(mode == .text && wrap.state == .on)

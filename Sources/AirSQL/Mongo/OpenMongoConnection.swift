@@ -16,10 +16,96 @@ final class OpenMongoConnection {
         self.server = server
     }
 
+    /// The tree's databases with their size on disk (listDatabases), nil until read.
+    private(set) var databases: [(name: String, size: Int64?)]?
+    /// Each opened database's collections, views and time-series, and its dbStats.
+    private(set) var collections: [String: [MongoCollectionInfo]] = [:]
+    private(set) var stats: [String: BSONDocument] = [:]
+    /// Each opened collection's indexes, by "database.collection".
+    private(set) var indexes: [String: [BSONDocument]] = [:]
+    /// What went wrong reading the tree, by what was read ("" for the databases).
+    private(set) var loadErrors: [String: String] = [:]
+    /// What is being read now, by the same keys.
+    private(set) var loading: Set<String> = []
+    private var tasks: [String: Task<Void, Never>] = [:]
+
     /// Closes the sessions, then the route.
     func close() {
+        tasks.values.forEach { $0.cancel() }
+        tasks = [:]
         let connection = self.connection
         Task.detached { await connection.close() }
+    }
+
+    // MARK: The tree, read on the main session as it opens (mongo-plan, Tree): no stats for every collection at load
+
+    /// The databases (again).
+    func load() {
+        read("") { session in try await session.listDatabases() } done: { [weak self] found in
+            self?.databases = found.compactMap { info in
+                guard case .string(let name)? = info["name"] else { return nil }
+                return (name, info["sizeOnDisk"]?.integer)
+            }
+        }
+    }
+
+    /// A database's collections and its sizes (dbStats), the first time it opens or again.
+    func loadDatabase(_ name: String, again: Bool = false) {
+        guard again || collections[name] == nil, !loading.contains(name) || again else { return }
+        read(name) { session in
+            (try await session.listCollections(database: name), try? await session.databaseStats(database: name))
+        } done: { [weak self] found in
+            self?.collections[name] = found.0
+            self?.stats[name] = found.1
+        }
+    }
+
+    /// A collection's indexes, the first time it opens or again.
+    func loadIndexes(_ database: String, _ collection: String, again: Bool = false) {
+        let key = database + "." + collection
+        guard again || indexes[key] == nil, !loading.contains(key) || again else { return }
+        read(key) { session in try await session.listIndexes(database: database, collection: collection) } done: { [weak self] found in
+            self?.indexes[key] = found
+        }
+    }
+
+    /// Forgets what was read under a database (nil: everything) and reads it again.
+    func refresh(_ database: String? = nil) {
+        if let database {
+            indexes = indexes.filter { !$0.key.hasPrefix(database + ".") }
+            loadDatabase(database, again: true)
+        } else {
+            (collections, stats, indexes) = ([:], [:], [:])
+            load()
+        }
+    }
+
+    var isLoading: Bool { !loading.isEmpty }
+
+    private func read<T>(_ key: String, _ work: @escaping (MongoSession) async throws -> T, done: @escaping (T) -> Void) {
+        tasks[key]?.cancel()
+        loading.insert(key)
+        changed()
+        let connection = self.connection
+        tasks[key] = Task { [weak self] in
+            let result: Result<T, Error>
+            do { result = .success(try await work(connection.session(.main))) } catch { result = .failure(error) }
+            guard let self, !Task.isCancelled else { return }
+            switch result {
+            case .success(let value):
+                loadErrors[key] = nil
+                done(value)
+            case .failure(let error):
+                loadErrors[key] = error.localizedDescription
+            }
+            loading.remove(key)
+            tasks[key] = nil
+            changed()
+        }
+    }
+
+    private func changed() {
+        NotificationCenter.default.post(name: .openConnectionDidChange, object: self)
     }
 }
 

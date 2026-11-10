@@ -21,6 +21,8 @@ final class SidebarNode: NSObject {
         case message(UUID, String)
         /// Users and Roles, the last row of a connected connection's tree.
         case users(UUID)
+        /// A MongoDB connection's database, collection or index (`MongoTree`).
+        case mongo(UUID, MongoTreeItem)
     }
 
     let kind: Kind
@@ -243,6 +245,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         observers.append(model.$states.sink { [weak self] _ in
             DispatchQueue.main.async { self?.refreshRows() }
         })
+        observers.append(model.$openMongo.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.reload() }
+        })
         observers.append(model.$open.sink { [weak self] _ in
             DispatchQueue.main.async {
                 self?.reload()
@@ -308,7 +313,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         folders = newFolders
         connections = newConnections
         treeNodes = fresh
-        treeShown.formIntersection(model.open.keys)
+        treeShown.formIntersection(Set(model.open.keys).union(model.openMongo.keys))
         reloading = true
         outline.reloadData()
         outline.expandItem(header)
@@ -350,6 +355,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     }
 
     @objc private func openConnectionChanged(_ notification: Notification) {
+        if let mongo = notification.object as? OpenMongoConnection, model.openMongo[mongo.saved.id] === mongo { return reload() }
         guard let open = notification.object as? OpenConnection, model.open[open.id] === open else { return }
         reload()
     }
@@ -403,7 +409,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             switch node.kind {
             case .header: return nil
             case .folder(let id), .connection(let id), .database(let id, _), .category(let id, _, _), .object(let id, _),
-                 .part(let id, _, _), .detail(let id, _, _, _), .prefix(let id, _, _, _), .message(let id, _), .users(let id): return id
+                 .part(let id, _, _), .detail(let id, _, _, _), .prefix(let id, _, _, _), .message(let id, _), .users(let id),
+                 .mongo(let id, _): return id
             }
         }
     }
@@ -434,7 +441,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         }
         guard let node = row(), let id = node.connectionOfTree ?? node.connectionID else { return false }
         var above = [model.connection(id)?.folderID.flatMap { folders[$0] }, connections[id]]
-        if let database = node.database, kind != .database(id, database) {
+        if case .mongo(_, let item) = kind, item.collection != nil {
+            above += [treeNodes[.mongo(id, MongoTreeItem(database: item.database))],
+                      item.index == nil ? nil : treeNodes[.mongo(id, MongoTreeItem(database: item.database, collection: item.collection))]]
+        } else if let database = node.database, kind != .database(id, database) {
             above.append(treeNodes[.database(id, database)])
             if let object = node.object {
                 above.append(treeNodes[.category(id, database, object.kind)])
@@ -490,6 +500,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         switch node.kind {
         case .database(let id, let name): model.openConnection(id)?.loadDetails(name)
         case .object(let id, let object): model.openConnection(id)?.loadDetails(object.database)
+        case .mongo(let id, let item): mongoOpened(id, item)
         default: break
         }
     }
@@ -571,12 +582,12 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .connection(let id):
             // Connected, it opens and closes as the tree's rows do; else whatever connects implements Connect.
-            guard model.openConnection(id) != nil else {
+            guard model.openConnection(id) != nil || model.openMongo[id] != nil else {
                 outline.sendCommand(Commands.connect.action)
                 return
             }
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
-        case .database, .category, .object, .part, .detail, .prefix:
+        case .database, .category, .object, .part, .detail, .prefix, .mongo:
             treeDoubleClicked(node)
         case .message, .users:
             break  // a click already showed Users and Roles
@@ -658,10 +669,11 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             cell.showFolder(folder?.name ?? "", count: node.children.count)
         case .connection(let id):
             if let connection = model.connection(id) {
-                cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true)
+                cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true
+                    || model.openMongo[id]?.loading.contains("") == true)
                 if let shown = shownDatabases(id) { cell.showDatabases(shown) }
             }
-        case .database, .category, .object, .part, .detail, .prefix, .message, .users:
+        case .database, .category, .object, .part, .detail, .prefix, .message, .users, .mongo:
             return treeCell(node, in: outlineView)
         }
         return cell
