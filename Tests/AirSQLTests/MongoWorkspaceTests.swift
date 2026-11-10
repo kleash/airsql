@@ -108,10 +108,10 @@ extension AppTests {
     }
 }
 
-/// Liveness (mongo-plan, Phase 2): the route's ssh ending is reported, its planned restart for a new member is not, and
-/// the keep-alive's `hello` fails once the route is gone.
+/// Sessions (mongo-plan, Phase 2): the route's ssh ending is reported, its planned restart for a new member is not, and
+/// the keep-alive's `hello` fails once the route is gone; reads follow the read preference.
 @Suite(.serialized, .enabled(if: MongoLab.enabled, "Mongo lab: AIRSQL_MONGO_LAB=1 ./test.sh --filter Mongo"))
-struct MongoLivenessLabTests {
+struct MongoSessionLabTests {
     final class Exits: @unchecked Sendable {
         private let lock = NSLock()
         private var _messages: [String] = []
@@ -161,6 +161,32 @@ struct MongoLivenessLabTests {
         connection.route.close()
         #expect(await !connection.isAlive())
         await connection.close()
+    }
+
+    /// readPreference in the connection string sends reads to a secondary, which the cursor names; writes and a
+    /// transaction's reads stay on the primary.
+    @Test func readsFollowTheReadPreference() async throws {
+        let scratch = "lane_mongo_p2int_rp"
+        let secondary = try connection(MongoLab.allSeeds + "&readPreference=secondary", route: .proxy)
+        let server = try await secondary.connect()
+        let data = try await secondary.session(.data)
+        let cursor = try await data.find(database: "fixture", collection: "many", MongoFind(limit: 3))
+        #expect(try await cursor.next().count == 3)
+        let member = try #require(cursor.secondary)
+        #expect(MongoLab.members.contains { member.hasPrefix($0) } && member != server.primary, "\(member)")
+        #expect(try await data.count(database: "fixture", collection: "many") == 1000)
+        #expect(try await data.distinct(database: "fixture", collection: "all_types", key: "type").count == 19)
+        try await data.insertOne(database: scratch, collection: "rp", BSONDocument([("_id", .int32(1))]))
+        try await data.startTransaction()
+        #expect(try await data.find(database: scratch, collection: "rp").secondary == nil)
+        try await data.abortTransaction()
+        _ = try await data.command(BSONDocument([("dropDatabase", .int32(1))]), database: scratch)
+        await secondary.close()
+
+        let primary = try connection(MongoLab.allSeeds, route: .proxy)
+        try await primary.connect()
+        #expect(try await primary.session(.data).find(database: "fixture", collection: "many").secondary == nil)
+        await primary.close()
     }
 }
 
