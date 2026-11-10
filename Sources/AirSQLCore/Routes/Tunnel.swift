@@ -4,11 +4,15 @@ import Darwin
 import Foundation
 
 /// An SSH route's end on this Mac: one ssh that forwards a private Unix socket to the database through the connection's
-/// SSH hosts, `ssh -F <its ssh_config> -N -L <socket>:<database>:<port> <SSH host>` (`SSHConfig`). Prompts (passwords,
+/// SSH hosts, `ssh -F <its ssh_config> -N -L <socket>:<database>:<port> <SSH host>` (`SSHConfig`), or one socket per
+/// server it is given (a MongoDB replica set's members). Prompts (passwords,
 /// host keys, codes) come through askpass; the progress, hop by hop, from ssh's "Authenticated to" notes. Closing it
 /// ends ssh and the jump hosts' ssh with it; ssh ending by itself (the network went away) is reported to `onExit`.
 public final class Tunnel: @unchecked Sendable {
-    public let socket: String
+    /// The first forward's socket: the database's.
+    public var socket: String { sockets[0] }
+    /// One per forward, in the order `open` got them.
+    public let sockets: [String]
     let configPath: String
     private let lock = NSLock()
     private var pid: pid_t = 0
@@ -27,8 +31,8 @@ public final class Tunnel: @unchecked Sendable {
     /// Variables for the ssh it runs, over this app's environment (tests: a scratch HOME, no agent).
     public static var environmentOverrides: [String: String] = [:]
 
-    private init(socket: String, configPath: String) {
-        self.socket = socket
+    private init(sockets: [String], configPath: String) {
+        self.sockets = sockets
         self.configPath = configPath
     }
 
@@ -36,22 +40,28 @@ public final class Tunnel: @unchecked Sendable {
 
     /// Starts ssh for `connection` and waits until its socket is there (every hop logged in), or ssh has ended (the error
     /// says why). `proxySocket`: the relay to the first hop (SSH + proxy). `progress` gets "SSH to <hop> (1 of 2)" as
-    /// each hop is reached, on a background thread. Cancelling the task ends ssh.
+    /// each hop is reached, on a background thread. Cancelling the task ends ssh. `forwards`: the servers to reach, each
+    /// on a socket of its own, in place of the connection's host and port; `name` tells this ssh's files from those of
+    /// another ssh of the same connection.
     public static func open(_ connection: SavedConnection, askpass: AskpassServer, proxySocket: String? = nil,
+                            forwards: [(host: String, port: Int)]? = nil, name: String = "",
                             progress: @escaping (String) -> Void) async throws -> Tunnel {
         if let problem = SSHConfig.problem(with: connection) { throw AirSQLError(.other, problem) }
         let hops = connection.sshHops
         guard !hops.isEmpty else { throw AirSQLError(.other, "This connection's route has no SSH host.") }
         try RouteFolder.prepare()
-        let base = RouteFolder.base(for: connection.id)
-        let tunnel = Tunnel(socket: base + ".sock", configPath: base + ".ssh_config")
+        let base = RouteFolder.base(for: connection.id) + name
+        let targets = forwards ?? [(connection.host, connection.port ?? 3306)]
+        let tunnel = Tunnel(sockets: targets.indices.map { base + ($0 == 0 ? "" : "-\($0)") + ".sock" },
+                            configPath: base + ".ssh_config")
         try SSHConfig.text(for: connection, proxySocket: proxySocket).write(toFile: tunnel.configPath, atomically: true,
                                                                             encoding: .utf8)
         chmod(tunnel.configPath, 0o600)
-        unlink(tunnel.socket)
-        let database = connection.host.contains(":") ? "[\(connection.host)]" : connection.host
-        let argv = ["/usr/bin/ssh", "-F", tunnel.configPath, "-N", "-L", "\(tunnel.socket):\(database):\(connection.port ?? 3306)",
-                    "--", hops[hops.count - 1].host]
+        tunnel.sockets.forEach { unlink($0) }
+        let forwarding = zip(tunnel.sockets, targets).flatMap { socket, target in
+            ["-L", "\(socket):\(target.host.contains(":") ? "[\(target.host)]" : target.host):\(target.port)"]
+        }
+        let argv = ["/usr/bin/ssh", "-F", tunnel.configPath, "-N"] + forwarding + ["--", hops[hops.count - 1].host]
         var environment = ProcessInfo.processInfo.environment.merging(askpass.environment(for: connection.id.uuidString)) { $1 }
         environment.merge(environmentOverrides) { $1 }
         if environment["LC_ALL"] == nil && environment["LC_CTYPE"] == nil && environment["LANG"] == nil {
@@ -78,8 +88,10 @@ public final class Tunnel: @unchecked Sendable {
                 tunnel.close()
                 throw ErrorMapping.ssh(errors, status: status)
             }
-            var info = stat()
-            if lstat(tunnel.socket, &info) == 0, info.st_mode & S_IFMT == S_IFSOCK {
+            if tunnel.sockets.allSatisfy({ path in
+                var info = stat()
+                return lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFSOCK
+            }) {
                 tunnel.lock.locked { tunnel.ready = true }
                 return tunnel
             }
@@ -94,7 +106,7 @@ public final class Tunnel: @unchecked Sendable {
             return self.pid
         }
         if pid > 0 { kill(-pid, SIGTERM) }
-        unlink(socket)
+        sockets.forEach { unlink($0) }
         unlink(configPath)
     }
 

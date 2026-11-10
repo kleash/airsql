@@ -42,6 +42,55 @@ one with TLS from the lab CA, behind the existing bastion, jump host and proxies
 a failover followed, TLS verified against each member's name with Keychain trust; and Atlas by `mongodb+srv` through a
 proxy route works. Otherwise we know which fallback ships (`directConnection=true` to one member, said in the UI).
 
+### Results (go)
+
+`AIRSQL_MONGO_LAB=1 ./test.sh --filter MongoSpikeTests`: 12 tests, all green against the Mongo lab (`testenv/mongo`,
+MongoDB 7.0.45: 8.0 and later don't run on Docker Desktop's Linux 7.0 kernel, SERVER-121912). Code:
+`Sources/AirSQLCore/Mongo/` (`MongoConnection`, `MongoRoute`), `scripts/build-mongoc.sh`, `Sources/CMongoC`.
+
+- **Library**: mongo-c-driver 2.5.8 over OpenSSL 3.5.9 (build-mariadb.sh's pins, checked by the script), linked from
+  the static builds into one universal `libmongoc2.dylib` (libbson inside, `@rpath`) that exports only `bson_*`,
+  `mongoc_*` and AirSQL's helper: its OpenSSL is hidden, so it can't meet libmariadb's exported copy (the script checks
+  with nm, and that only libSystem, libz and libresolv are linked). No SASL, Snappy, zstd, AWS login, client-side
+  encryption or shared-memory counters. About 1.5 minutes to build, cached by the script's hash in `vendor/mongoc`.
+- **Every connection through the stream initiator** (standalone and Direct too): the route's socket for the host the
+  driver names, or TCP; then `mongoc_stream_tls_new_with_hostname` with the member's own name (SNI too).
+- **SSH: (c) won.** One ssh with a `-L` per member; `connect` first looks at the replica set through the seeds' forwards
+  with a throwaway client, then restarts ssh once with every member. Logins: 1 when the connection string names every
+  member, 2 with one seed; (b), an ssh per member, took 3 either way (both connected in 0.2-0.5 s on the lab), so it
+  was dropped. A member added later restarts ssh again, dropping the other members' sockets once (the driver
+  reconnects): not tested. Jump hosts, and a proxy then the bastion then the jump host, work the same way.
+  Proxy only: a `ProxyRelay` per member.
+- **Trust**: the driver's own checks are off (`weak_cert_validation`, which also skips its OCSP stapling check and
+  responder requests: no network call outside the route). Right after each handshake, before the driver sends
+  anything, `TLSCheck` (SecTrust: the Mac's roots and trust settings, the CA file, or the pin; MySQL's semantics) checks
+  the peer chain against the member's name. The chain comes from `airsql_mongoc_peer_chain`, a small C helper built into
+  the library against the driver's private headers (this version's). Another member's name, localhost and 127.0.0.1
+  fail; a pin connects without the CA. The lab showed why per-member names matter: proxies with stale DNS handed
+  rs2's connection for rs1, and the check refused it. SecTrust may still fetch intermediates from the Mac directly,
+  as for MySQL today.
+- **A dead member** (paused: it takes connections, never answers) costs `connectTimeoutMS` on each full scan, as the
+  single-threaded client waits for every member: 2.05 s at 2000, 10.06 s at the default 10000. Cancel closes the route
+  under the driver, which gives up within 0.2 s (proxy and ssh).
+- **Cancel of a running op**: `comment` tag, then `currentOp` and `killOp` on the member running it over a second,
+  `directConnection` client: the find ended with 11601 (Interrupted) about 0.1 s after the kill. `maxTimeMS` gives 50.
+- **(f)** Inside a transaction the server refuses both `$out` and `$merge` with 263 (OperationNotSupportedInTransaction);
+  reads work. The aborted-transaction guard holds; the BSON walk stays the first guard.
+- **(g)** SCRAM-SHA-256 (an account that has only it) works. The driver checks `authMechanism` against the login while
+  it parses, so user and password go into the connection string in memory (never `uri`, a log or argv; the driver's
+  log is off). `mongodb+srv` is looked up on the Mac (libresolv), and the host it gives
+  (`test3.test.build.10gen.cc`, a public record of the drivers' tests) is asked of the initiator, so it goes through
+  the route. **Unproven**: Atlas end to end (public CA chain, TXT options, SNI routing), which the lab can't reach.
+- **(h)** After `replSetStepDown` the same client wrote to the new primary on its first try (retryable writes), in
+  0.5 s, without reconnecting.
+
+For later phases: M1 starts from `MongoConnection` (its `withClient` gives the raw client; Foundation's JSON in it is a
+shortcut for the BSON lane's type). Keep `connectTimeoutMS` short (a dead member costs it every scan, and the
+single-threaded client rescans each minute); the connection editor should ask for every member (one login, not two);
+X.509 client certificates need `pem_file` in the initiator's TLS options; the lab runs MongoDB 7.0 until 8.x runs on
+Docker Desktop's kernel. Integrator: `release-local.sh`, `sbom.sh`, NOTICE and `Resources/Licenses` (Apache 2.0 and
+the driver's THIRD_PARTY_NOTICES), CI's and CodeQL's caches, CLAUDE.md's "one C dependency".
+
 ## Phase 1: the MVP ("I can close Compass")
 
 - **Connections**: engine picker; paste `mongodb://`/`mongodb+srv://`; SCRAM; TLS; replica sets and SRV over every route.
