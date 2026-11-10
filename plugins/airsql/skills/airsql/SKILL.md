@@ -14,7 +14,8 @@ access level they chose, and never change anything.
 3. Answer with `run_queries` (several statements per call, small `max_rows`), `explain` and `profile`.
 4. On a MongoDB connection (`engine: mongodb` in `context`), use the `mongo_` tools instead: `mongo_list_databases`,
    `mongo_list_collections`, `mongo_schema_sample` for a collection's shape, then `mongo_find`, `mongo_aggregate`,
-   `mongo_count`, `mongo_distinct`. Documents and pipelines are Extended JSON text, passed as strings.
+   `mongo_count`, `mongo_distinct`. Documents and pipelines are Extended JSON text in strings,
+   both ways: the documents and indexes you get back are strings too, to parse.
 5. Never try to write. To change data or structure, write the SQL and call `open_in_console` with a clear title, tell
    the person what it does, and after they run it, `read_console`.
 

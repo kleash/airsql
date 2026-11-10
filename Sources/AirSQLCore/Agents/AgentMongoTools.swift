@@ -181,7 +181,7 @@ extension AgentTarget {
             case let .listIndexes(db, collection):
                 let indexes = try await session.listIndexes(database: db, collection: collection)
                 reply.merge(["database": db, "collection": collection,
-                             "indexes": indexes.prefix(checked.documentCap).map { Self.json(.document($0)) }]) { $1 }
+                             "indexes": indexes.prefix(checked.documentCap).map(Self.text)]) { $1 }
             case let .stats(db, collection):
                 var stats = try await collection == nil ? session.databaseStats(database: db)
                     : session.collectionStats(database: db, collection: collection ?? "")
@@ -226,7 +226,7 @@ extension AgentTarget {
         let stopped = !cursor.isExhausted
         await cursor.close()
         let documents = try raw.prefix(wanted).map { try BSONDocument(bytes: $0) }
-        return ["documents": documents.map { json(.document($0)) }, "count": documents.count,
+        return ["documents": documents.map(text), "count": documents.count,
                 "capped": raw.count > wanted || stopped || raw.count >= cap]
     }
 
@@ -244,6 +244,11 @@ extension AgentTarget {
             return entry
         }
     }
+
+    /// A document for a reply: its relaxed Extended JSON text in a string, exactly as written. As JSON objects it would
+    /// pass through Foundation's JSON on the way (the socket, the bridge), which loses the keys' order and a whole
+    /// double's `.0`. Long strings cut as `AgentFormat` cuts cells.
+    static func text(_ document: BSONDocument) -> String { cut(.document(document)).extendedJSON(.relaxed) }
 
     /// A value for a reply: relaxed Extended JSON as JSON, long strings cut as `AgentFormat` cuts cells.
     static func json(_ value: BSONValue) -> Any {

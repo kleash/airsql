@@ -2818,8 +2818,10 @@ needs Schema + read, and the connection connected in AirSQL. `database` defaults
 Documents you send (`filter`, `projection`, `sort`, `collation`, a `hint` pattern, `pipeline`) are Extended JSON
 text, as strings: `"{\"status\": \"A\", \"total\": {\"$gt\": 10}}"`, with `$oid`, `$date`, `$numberLong`,
 `$numberDecimal` for the types JSON lacks. A string keeps the keys' order (a sort on two fields); an object is refused.
-Documents you get back are relaxed Extended JSON (numbers plain, `{"$oid": …}`, `{"$date": "2024-…Z"}`,
-`{"$numberDecimal": "…"}`); strings longer than 2,000 characters are cut.
+Documents you get back (`mongo_find`, `mongo_aggregate`, `mongo_list_indexes`) are strings too, each one document's
+relaxed Extended JSON text, so their keys keep their order and a double keeps its `.0` (`{"b": 1, "a": 2.0}`): parse
+each one. Numbers are plain, other types `{"$oid": …}`, `{"$date": "2024-…Z"}`, `{"$numberDecimal": "…"}`; strings
+longer than 2,000 characters are cut.
 
 - `mongo_find {connection, database?, collection, filter?, projection?, sort?, skip?, limit?, collation?, hint?}`:
   200 documents unless `limit` says more (0: the row cap), at most the row cap and 1 MB of documents; `capped: true`
@@ -2831,7 +2833,7 @@ Documents you get back are relaxed Extended JSON (numbers plain, `{"$oid": …}`
 - `mongo_list_databases {connection}`: name, sizeOnDisk, empty; never admin, local or config.
 - `mongo_list_collections {connection, database?}`: name, type (`collection`, `view`, `timeseries`) and options (a
   view's `viewOn` and pipeline, a validator); never `system.*`.
-- `mongo_list_indexes {connection, database?, collection}`: each index as the server describes it.
+- `mongo_list_indexes {connection, database?, collection}`: each index as the server describes it, as text.
 - `mongo_stats {connection, database?, collection?}`: a collection's storage stats (count, size, avgObjSize,
   storageSize, totalIndexSize, indexSizes), or the database's dbStats without a collection.
 - `mongo_schema_sample {connection, database?, collection, size?}`: `$sample` of `size` documents (200, at most the

@@ -92,7 +92,7 @@ public enum AgentTools {
     ] + ui
 
     /// The MongoDB tools (`AgentTarget.mongo`): typed reads on a MongoDB connection with Schema + read access. Documents
-    /// are Extended JSON text in strings, which keep their keys' order.
+    /// are Extended JSON text in strings, both ways: they keep their keys' order and their types.
     static let mongo: [[String: Any]] = {
         let database = string("The database (default: the connection's own)")
         let collection = string("The collection or view")
@@ -100,7 +100,8 @@ public enum AgentTools {
         let place: [String: Any] = ["connection": connection, "database": database, "collection": collection]
         let found: [String: Any] = ["connection": string("The connection"), "database": string("The database"),
                                     "collection": string("The collection"),
-                                    "documents": arrayOf("The documents, as relaxed Extended JSON"),
+                                    "documents": strings("The documents, each its relaxed Extended JSON text (keys in "
+                                                         + "order, doubles as 1.0)"),
                                     "count": integer("How many documents the reply has"),
                                     "capped": boolean("There may be more than the reply has")]
         let refusals = " $where, $function, $accumulator, $out and $merge are refused anywhere; so are the admin, local and "
@@ -148,7 +149,8 @@ public enum AgentTools {
             tool("mongo_list_indexes", "A MongoDB collection's indexes as the server describes them (key, name, unique, "
                  + "partialFilterExpression, …). Needs Schema + read access.",
                  place, required: ["connection", "collection"],
-                 output: ["connection": string("The connection"), "indexes": arrayOf("One per index")],
+                 output: ["connection": string("The connection"),
+                          "indexes": strings("One per index: its relaxed Extended JSON text, keys in order")],
                  outputRequired: ["connection", "indexes"]),
             tool("mongo_stats", "Sizes and counts: a collection's storage stats, or the database's (dbStats) without a "
                  + "collection. Needs Schema + read access.",
