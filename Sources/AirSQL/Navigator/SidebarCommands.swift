@@ -476,6 +476,7 @@ extension SidebarController: NSMenuItemValidation {
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if NotForMongo.applies(item, main?.activeConnection) { return false }
         let selection = treeSelection
         var reason: String?
         switch item.action {

@@ -641,6 +641,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if NotForMongo.applies(item, activeConnection) { return false }
         let connections = targetConnections
         var enabled = true, reason: String?
         switch item.action {

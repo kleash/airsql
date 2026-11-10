@@ -248,6 +248,7 @@ final class Connector {
         do {
             try Task.checkCancellation()
             step("Logging in to \(saved.host.isEmpty ? saved.socket : saved.host)")
+            if saved.engine == .mongodb { try await logInMongo(saved, route: route) }
             let (connection, server) = try await logIn(&saved, password: password, routeSocket: route.socket, on: window)
             return (connection, server, route)
         } catch {

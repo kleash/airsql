@@ -51,7 +51,7 @@ public final class Tunnel: @unchecked Sendable {
         guard !hops.isEmpty else { throw AirSQLError(.other, "This connection's route has no SSH host.") }
         try RouteFolder.prepare()
         let base = RouteFolder.base(for: connection.id) + name
-        let targets = forwards ?? [(connection.host, connection.port ?? 3306)]
+        let targets = forwards ?? [(connection.host, connection.port ?? connection.engine.defaultPort)]
         let tunnel = Tunnel(sockets: targets.indices.map { base + ($0 == 0 ? "" : "-\($0)") + ".sock" },
                             configPath: base + ".ssh_config")
         try SSHConfig.text(for: connection, proxySocket: proxySocket).write(toFile: tunnel.configPath, atomically: true,

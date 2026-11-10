@@ -247,6 +247,61 @@ extension AppTests {
         #expect(main.validateMenuItem(item) == false)
     }
 
+    /// MongoDB in the editor: its port, and none of MySQL's own settings (cleartext login, compression, time zone,
+    /// isolation, startup SQL, client tools); back to MySQL they come back.
+    @Test func theEditorLeavesOutMySQLsSettingsForMongoDB() async throws {
+        let docs = SavedConnection(name: "Docs", host: "db.example.com", user: "app")
+        let model = testModel([docs])
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Docs"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let sheet = try #require(await editor(main))
+        let window = try #require(sheet.window)
+        #expect(await call(harness, "set", ["id": "editor.engine", "value": "MongoDB"]).error == nil)
+        #expect(sheet.draft.engine == .mongodb)
+        #expect(find(NSTextField.self, id: "editor.port", in: window.contentView!)?.placeholderString == "27017")
+        #expect(await call(harness, "press", ["title": "TLS"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.tlsMode", "value": "Encrypt, check the certificate"]).error == nil)
+        #expect(find(NSButton.self, id: "editor.cleartext", in: window.contentView!) == nil)
+        #expect(await call(harness, "press", ["title": "Options"]).error == nil)
+        for id in ["editor.compress", "editor.timeZone", "editor.startIsolation", "editor.startupSQL", "editor.clientPath", "editor.dumpPath"] {
+            #expect(find(NSView.self, id: id, in: window.contentView!) == nil, "\(id)")
+        }
+        #expect(find(NSView.self, id: "editor.readOnly", in: window.contentView!) != nil)
+        #expect(await call(harness, "press", ["title": "General"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.engine", "value": "MySQL or MariaDB"]).error == nil)
+        #expect(await call(harness, "press", ["title": "Options"]).error == nil)
+        #expect(find(NSView.self, id: "editor.compress", in: window.contentView!) != nil)
+        #expect(await call(harness, "press", ["title": "General"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.engine", "value": "MongoDB"]).error == nil)
+        #expect(await call(harness, "press", ["id": "editor.save"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(model.connection(docs.id)?.engine == .mongodb)
+    }
+
+    /// A MongoDB connection opens its route, then fails with the placeholder's words, never trying MySQL's login (which
+    /// would say it can't reach the server on this port, where nothing listens); SQL's commands say it isn't for them.
+    @Test func aMongoDBConnectionSaysItIsBeingBuilt() async throws {
+        var mongo = SavedConnection(name: "Documents", host: "127.0.0.1", port: 1, user: "root")
+        mongo.engine = .mongodb
+        let model = testModel([mongo])
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Documents"]])
+        let newQuery = Commands.newQuery.item()
+        #expect(main.validateMenuItem(newQuery) == false && newQuery.toolTip == NotForMongo.reason)
+        #expect(main.validateMenuItem(Commands.connect.item()))
+        #expect(await call(harness, "menu", ["path": "Connection > Connect"]).error == nil)
+        #expect(await eventually(timeout: 30) { main.window?.attachedSheet != nil })
+        if case .failed(let reason)? = model.states[mongo.id] {
+            #expect(reason.hasPrefix("MongoDB support is being built"), "\(reason)")
+        } else {
+            Issue.record("not failed: \(String(describing: model.states[mongo.id]))")
+        }
+        #expect(model.open[mongo.id] == nil && model.openMongo[mongo.id] == nil && model.activity.isIdle)
+        _ = await call(harness, "press", ["title": "Close"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
     @Test func foldersAreMadeRenamedAndDeleted() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)
