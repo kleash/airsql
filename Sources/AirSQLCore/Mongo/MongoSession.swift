@@ -163,13 +163,18 @@ public final class MongoSession: @unchecked Sendable {
         try await worker.perform { [self] in try commandHere(command, database: database) }
     }
 
-    private func commandHere(_ command: BSONDocument, database: String) throws -> BSONDocument {
-        try withCommand(command, database: database) { reply, _, _ in try BSONDocument(bson: reply) }
+    private func commandHere(_ command: BSONDocument, database: String, logged: Bool = true) throws -> BSONDocument {
+        try withCommand(command, database: database, logged: logged) { reply, _, _ in try BSONDocument(bson: reply) }
+    }
+
+    /// The keep-alive: `hello`, left out of the command log, which it would fill once a minute.
+    public func ping() async throws {
+        _ = try await worker.perform { [self] in try commandHere(BSONDocument([("hello", .int32(1))]), database: "admin", logged: false) }
     }
 
     /// On the session's thread: tags `command` (a read's or a command's), logs it, sends it to the server chosen here,
     /// and gives `body` the reply, that server's id and the tag.
-    private func withCommand<T>(_ command: BSONDocument, database: String,
+    private func withCommand<T>(_ command: BSONDocument, database: String, logged: Bool = true,
                                 _ body: (UnsafeMutablePointer<bson_t>, UInt32, String) throws -> T) throws -> T {
         let client = try current()
         var command = command
@@ -179,7 +184,7 @@ public final class MongoSession: @unchecked Sendable {
         let sent = try command.bson()
         let options = try self.options(server: server.id)
         defer { [sent, options].forEach { bson_destroy($0) } }
-        log(command, database: database)
+        if logged { log(command, database: database) }
         return try Self.withReply { reply in
             var error = bson_error_t()
             try sending(tag, server: server.name) {

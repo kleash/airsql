@@ -164,8 +164,10 @@ final class Connector {
                 activity.end()
                 sheets[id] = nil
                 model.states[id] = .connected(server: server.summary)
-                model.attach(mongo: OpenMongoConnection(saved: saved, connection: connection, server: server), to: id)
+                let mongo = OpenMongoConnection(saved: saved, connection: connection, server: server)
+                model.attach(mongo: mongo, to: id)
                 saveRemembered(id)
+                watch(mongo, id: id)
                 return
             }
             let (connection, server, route) = try await establish(&saved, on: window, step: step)
@@ -375,6 +377,29 @@ final class Connector {
                 }
             }
         }
+    }
+
+    /// `watch` for MongoDB: the route's ssh ending, or the main session's `hello` failing, is a drop. Nothing is kept to
+    /// reconnect: the sessions and the route close, the tabs keep what they show and their pending changes, and Connect
+    /// makes new ones.
+    private func watch(_ mongo: OpenMongoConnection, id: UUID) {
+        mongo.connection.route.onExit = { [weak self, weak mongo] error in
+            DispatchQueue.main.async { self?.dropped(id, mongo, error.message) }
+        }
+        mongo.keepAlive = Timer.scheduledTimer(withTimeInterval: Self.keepAliveInterval, repeats: true) { [weak self, weak mongo] _ in
+            MainActor.assumeIsolated {
+                guard let mongo else { return }
+                Task { [weak self] in
+                    if await !mongo.connection.isAlive() { self?.dropped(id, mongo, AirSQLError.disconnected.message) }
+                }
+            }
+        }
+    }
+
+    func dropped(_ id: UUID, _ mongo: OpenMongoConnection?, _ message: String) {
+        guard let mongo, model.openMongo[id] === mongo else { return }
+        model.detach(id)
+        model.states[id] = .failed(message)
     }
 
     /// Disconnects a connection idle for its `idleDisconnectMinutes`, never with work open: a statement running, a

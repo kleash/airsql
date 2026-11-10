@@ -28,9 +28,12 @@ final class OpenMongoConnection {
     /// What is being read now, by the same keys.
     private(set) var loading: Set<String> = []
     private var tasks: [String: Task<Void, Never>] = [:]
+    /// The connector's keep-alive (`Connector.watch`), stopped by `close`.
+    var keepAlive: Timer?
 
     /// Closes the sessions, then the route.
     func close() {
+        keepAlive?.invalidate()
         tasks.values.forEach { $0.cancel() }
         tasks = [:]
         let connection = self.connection

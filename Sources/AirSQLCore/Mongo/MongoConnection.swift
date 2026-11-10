@@ -104,6 +104,14 @@ public final class MongoConnection: @unchecked Sendable {
         }
     }
 
+    /// The keep-alive: whether the main session still reaches a server. A failed `hello` is tried once more: the route's
+    /// new ssh for a new member cuts the connections the old one carried, and the driver makes them again.
+    public func isAlive() async -> Bool {
+        guard let main = try? await session(.main) else { return false }
+        if (try? await main.ping()) != nil { return true }
+        return (try? await main.ping()) != nil
+    }
+
     /// Closes the session of `role` in `slot` (the tab that had it closed); the next `session` call opens a new one.
     public func closeSession(_ role: MongoSession.Role, slot: String) async {
         let task = lock.locked { opening.removeValue(forKey: role.rawValue + ":" + slot) }
