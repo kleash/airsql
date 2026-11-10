@@ -4,9 +4,10 @@ import AppKit
 /// A MongoDB collection's documents in a tab (mongo-plan, Collection tab): the query bar, then three pages — the
 /// documents in the grid (`MongoDocumentSource` in a `GridViewer`: the status bar's figures, the value panel with a
 /// document's tree, Record View, Column Summary, charts, copying), the loaded documents as Extended JSON, and the
-/// Schema of a sample. Documents come from a cursor on the connection's data session, a byte-bounded batch at a time:
-/// the first with Run, the next as the grid scrolls to its end (or Load More). Every read runs off the main thread with
-/// a spinner, and Cancel (⌘.) ends it on the server. Read-only for now.
+/// Schema of a sample. Documents come from a cursor on the tab's own data session, a byte-bounded batch at a time: the
+/// first with Run, the next as the grid scrolls to its end (or Load More). Every read runs off the main thread with a
+/// spinner, and Cancel (⌘.) ends it on the server. Edits, new documents and deletes wait as pending changes
+/// (`MongoChanges`) until Apply (`+Editing`).
 @MainActor
 final class MongoCollectionController: NSViewController, TabContent, DataGridViewDelegate, NSMenuItemValidation, NSMenuDelegate {
     enum Page: Int, CaseIterable {
@@ -22,7 +23,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     var name: String { info.name }
     let viewer = GridViewer(source: nil)
     var grid: DataGridView { viewer.grid }
-    private(set) var source = MongoDocumentSource()
+    var source = MongoDocumentSource()
     let bar = MongoQueryBar()
     let notice = TableDataNotice()
     let emptyNote = TableEmptyNote()
@@ -43,38 +44,53 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     private lazy var moreLink = link("Load More", Commands.loadMore, id: "mongo.loadMore", tip: "Read the next batch of documents")
     private(set) var page = Page.documents
     /// The open find's cursor: what Load More reads from.
-    private var cursor: MongoCursor?
+    var cursor: MongoCursor?
     /// The read under way (one at a time), and its line in Activity.
-    private(set) var loading: Task<Void, Never>?
+    var loading: Task<Void, Never>?
     private var activity: Activity?
     /// The reads started, which tells a read a newer one took over.
     private var reads = 0
     private var jsonTask: Task<Void, Never>?
     /// What went wrong last, until the next read works.
-    private(set) var problem: String?
+    var problem: String?
     /// How many documents the find gives: the server's estimate (no filter), or counted.
-    private(set) var total: (count: Int64, exact: Bool)?
+    var total: (count: Int64, exact: Bool)?
     /// The query whose documents show.
     private(set) var shown = MongoQueryText()
     /// The collection's queries run and kept, newest first.
     private(set) var history: [MongoQueryHistory.Entry] = []
+    /// The tab's own data session (`MongoConnection.session(_:slot:)`): its Cancel and Apply touch no other tab's work.
+    let slot = UUID().uuidString
+    /// The changes waiting for Apply, and the ones before each change for Undo (and after, for Redo).
+    var changes: MongoChanges
+    var undone: [MongoChanges] = [], redone: [MongoChanges] = []
+    /// Apply is running: the changes stay as they are until it reports.
+    var isApplying = false
 
     init(model: AppModel, connection: UUID, database: String, collection: MongoCollectionInfo) {
         self.model = model
         connectionID = connection
         self.database = database
         info = collection
+        changes = MongoChanges(database: database, collection: collection.name, kind: collection.kind)
         super.init(nibName: nil, bundle: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    // Text being typed undoes itself, and ⌘⌫ deletes in it: those go on past this tab while a field has the keyboard.
+    override func responds(to selector: Selector!) -> Bool {
+        if [Commands.undo.action, Commands.redo.action, Commands.deleteRows.action].contains(selector),
+           isViewLoaded, view.window?.firstResponder is NSTextView { return false }
+        return super.responds(to: selector)
+    }
 
     func shows(_ connection: UUID, _ database: String, _ collection: String) -> Bool {
         connectionID == connection && self.database == database && name == collection
     }
 
     /// The connection's sessions now (a new connect makes new ones).
-    private var connection: MongoConnection? { model.openMongo[connectionID]?.connection }
+    var connection: MongoConnection? { model.openMongo[connectionID]?.connection }
 
     /// A batch: Settings ▸ Grid's rows per page, and at most 4 MB of documents.
     private var batch: Int { max(1, model.data.settings.rowsPerPage) }
@@ -86,7 +102,14 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         viewer.viewKey = GridViewer.ViewKey(connection: connectionID, database: database, table: name)
         viewer.copyTable = (database, name)
         viewer.filterByValue = { [weak self] column, value in self?.filter(column, by: value) }
-        viewer.whyReadOnly = { _, _ in "editing documents comes with a later version; copy them or read them in the value panel" }
+        viewer.whyReadOnly = { [weak self] row, column in self?.whyReadOnly(row, column) }
+        viewer.keepValue = { [weak self] row, column, text in self?.keep(text, row: row, column: column) }
+        notice.preview.title = "Preview Commands…"
+        notice.preview.toolTip = "Show the commands Apply would run, without running them"
+        notice.apply.toolTip = "Show the commands, then write the pending changes to the server"
+        emptyNote.add.title = "Insert Document"
+        emptyNote.add.toolTip = "Add a new document; it is written when you apply the changes"
+        emptyNote.add.target = self
         viewer.toolbar = toolbar
         viewer.didPresent = { [weak self] in self?.updateBars() }
         for (index, link) in [countLink, moreLink].enumerated() { viewer.status.insertView(link, at: index + 1, in: .trailing) }
@@ -161,6 +184,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     /// Run (⌘↩, Return in a field): the find the query bar describes, from its first batch; a field it can't read says
     /// why under the fields, and nothing runs.
     func run() {
+        guard changes.isEmpty else { return askToDiscard { [weak self] in self?.run() } }
         let text = bar.query
         let find: MongoFind
         do {
@@ -175,7 +199,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         let read = begin("Finding documents in \(name)")
         loading = Task { [self] in
             do {
-                let session = try await connection.session(.data)
+                let session = try await connection.session(.data, slot: slot)
                 let found = try await session.find(database: database, collection: name, find)
                 let first = try await found.next(maxCount: batch)
                 if Task.isCancelled { await found.close() }
@@ -234,7 +258,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         let read = begin("Counting the documents of \(name)")
         loading = Task { [self] in
             do {
-                var counted = try await connection.session(.data).count(database: database, collection: name, filter: find.filter,
+                var counted = try await connection.session(.data, slot: slot).count(database: database, collection: name, filter: find.filter,
                                                                         maxTimeMS: find.maxTimeMS)
                 if let skip = find.skip { counted = max(0, counted - skip) }
                 if let limit = find.limit, limit > 0 { counted = min(counted, limit) }
@@ -256,7 +280,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         schemaView.busy = true
         loading = Task { [self] in
             do {
-                let session = try await connection.session(.data)
+                let session = try await connection.session(.data, slot: slot)
                 let cursor = try await session.aggregate(database: database, collection: name,
                                                          pipeline: [BSONDocument([("$sample", .document(BSONDocument([("size", .int32(Int32(size)))])))])])
                 var documents: [[UInt8]] = []
@@ -281,7 +305,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     }
 
     /// The spinner, the tab's busy mark, and a line in Activity whose Cancel ends the read on the server.
-    private func begin(_ title: String) -> Int {
+    func begin(_ title: String) -> Int {
         reads += 1
         activity = model.activity.start(title, connection: connectionID) { [weak self] in self?.stop() }
         bar.busy = true
@@ -291,7 +315,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     }
 
     /// The end of read number `read`, unless a newer one took its place (a Run while it was reading).
-    private func endRead(_ read: Int) {
+    func endRead(_ read: Int) {
         guard read == reads else { return }
         activity?.end()
         activity = nil
@@ -301,13 +325,11 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
     }
 
-    /// Cancel: the read stops waiting, and the server ends what it runs for the data session.
-    /// shortcut: the data session is the connection's, so this ends whatever runs on it then, which may be another
-    /// collection tab's read queued ahead; a tag per read if that ever bites.
+    /// Cancel: the read stops waiting, and the server ends what the tab's data session runs.
     private func stop() {
         guard let task = loading else { return }
         task.cancel()
-        if let connection { Task { try? await connection.session(.data).cancel() } }
+        if let connection { Task { [slot] in try? await connection.session(.data, slot: slot).cancel() } }
     }
 
     /// A new find replaces the old one: its read stops and its cursor ends on the server.
@@ -328,15 +350,27 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
 
     /// Stops reading for good (the tab closed, or the preview moved on).
     func close() {
-        stopReading()
+        let reading = loading != nil, old = cursor
+        loading?.cancel()
+        (loading, cursor) = (nil, nil)
+        activity?.end()
+        activity = nil
         jsonTask?.cancel()
+        // In order: the server ends the read, then the tab's session closes (a cancel after it would open another).
+        guard let connection else { return }
+        Task { [slot] in
+            if reading { await (try? await connection.session(.data, slot: slot))?.cancel() }
+            await old?.close()
+            await connection.closeSession(.data, slot: slot)
+        }
     }
 
     // MARK: Showing
 
     /// The documents in the grid again, with the columns as they were left; `keepingPlace`: where it was scrolled and
     /// what was selected stay (a new batch brought new columns).
-    private func showSource(keepingPlace: Bool = false) {
+    func showSource(keepingPlace: Bool = false) {
+        source.changes = changes
         let origin = grid.scrollView.contentView.bounds.origin, selection = grid.selection
         viewer.show(source)
         grid.sortOrder = sortShown
@@ -358,8 +392,14 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     }
 
     func updateBars() {
-        notice.show(.problem, problem)
-        let loaded = source.rowCount, more = cursor?.isExhausted == false
+        if let problem {
+            notice.show(.problem, problem)
+        } else if !changes.isEmpty {
+            notice.show(.pending, pendingSummary)
+        } else {
+            notice.show(.readOnly, editingOff.map { "Read-only. " + $0 + "." })
+        }
+        let loaded = source.loadedCount, more = cursor?.isExhausted == false
         let rows = viewer.status.rows
         let noun = { (count: Int64) in count == 1 ? "document" : "documents" }
         if shown.isEmpty && loaded == 0 && loading != nil {
@@ -378,13 +418,14 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         emptyNote.isHidden = loaded > 0 || loading != nil || problem != nil || viewer.presentation != .table
         emptyNote.text.stringValue = filtered ? "No documents match the filter." : "\(name) has no documents."
         emptyNote.clear.isHidden = !filtered
+        emptyNote.add.isHidden = editingOff != nil
         viewer.status.update()
         toolbar.setNeedsValidation()
     }
 
     /// The loaded documents as relaxed Extended JSON, laid out off the main thread.
     private func showJSON() {
-        let documents = (0..<source.rowCount).map(source.bytes)
+        let documents = (0..<source.loadedCount).map(source.bytes)
         jsonTask?.cancel()
         jsonTask = Task { [weak self] in
             let text = await Task.detached { () -> String in
@@ -545,9 +586,10 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         case Commands.copyDocuments.action?:
             reason = viewer.selectedRows().isEmpty ? "Select rows first" : nil
         default:
-            break
+            reason = editingReason(item)
         }
         item.explain(enabled: reason == nil, reason: reason)
+        if reason == nil, let action = item.action, let tip = Self.editingTips[action] { item.toolTip = tip }
         return reason == nil
     }
 
@@ -638,6 +680,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             menu.addItem(item)
         } else {
             menu.add([Commands.copyDocuments])
+            addEditingItems(to: menu)
         }
         return menu
     }
@@ -645,6 +688,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     // MARK: TabContent
 
     var isBusy: Bool { loading != nil }
+    var isEdited: Bool { !changes.isEmpty }
     var statusAccessory: NSView? { page == .documents ? viewer.status : nil }
 
     var reopen: ((MainWindowController) -> Void)? {
@@ -653,7 +697,14 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     }
 
     func shouldClose(_ answer: @escaping (Bool) -> Void) {
-        close()
-        answer(true)
+        guard !isApplying else {
+            NSSound.beep()  // Apply's report must reach the person: the tab stays until it has run
+            return answer(false)
+        }
+        let closes = { [weak self] in
+            self?.close()
+            answer(true)
+        }
+        changes.isEmpty ? closes() : askToDiscard(closes, staying: { answer(false) })
     }
 }

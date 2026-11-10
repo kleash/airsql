@@ -104,6 +104,8 @@ final class MongoExplainWindow: NSWindowController, NSWindowDelegate {
     static var open: [MongoExplainWindow] = []
     private var task: Task<Void, Never>?
     private var session: MongoSession?
+    private weak var sessionOf: MongoConnection?
+    private let slot = UUID().uuidString
     private var activity: Activity?
     private(set) var explainView: MongoExplainView?
     private(set) var problem: String?
@@ -147,8 +149,9 @@ final class MongoExplainWindow: NSWindowController, NSWindowDelegate {
         activity = model.activity.start("Explaining the find on \(collection)", connection: id) { [weak self] in self?.stop() }
         task = Task { [self] in
             do {
-                let session = try await connection.ownSession(.data)
+                let session = try await connection.session(.data, slot: slot)
                 self.session = session
+                sessionOf = connection
                 try Task.checkCancellation()
                 let answer = try await session.explain(database: database, collection: collection, find)
                 try Task.checkCancellation()
@@ -173,8 +176,8 @@ final class MongoExplainWindow: NSWindowController, NSWindowDelegate {
         activity?.end()
         activity = nil
         task = nil
-        if let session { Task { await session.close() } }
         session = nil
+        if let connection = sessionOf { Task { [slot] in await connection.closeSession(.data, slot: slot) } }
     }
 
     func windowWillClose(_ notification: Notification) {

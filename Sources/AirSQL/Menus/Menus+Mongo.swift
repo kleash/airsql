@@ -77,3 +77,30 @@ extension MainMenu {
         }
     }
 }
+
+// MARK: Editing documents (lane M3-app)
+
+extension MainMenu {
+    /// Data ▸ Collection's editing items: Edit Value… and Remove Field, then the grid's commands under a collection's
+    /// names, which reach only the collection tab in front (`CollectionMenu`).
+    static func addMongoEditItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in [Commands.editValue, Commands.removeField] { collection.addItem(command.item()) }
+        for command in [Commands.addRow, Commands.duplicateRow, Commands.deleteRows, Commands.revert, Commands.apply] {
+            let item = command.item()
+            item.title = MongoCollectionController.editingTitles[command.action] ?? command.title
+            item.toolTip = MongoCollectionController.editingTips[command.action] ?? command.tip
+            item.target = CollectionMenu.shared
+            collection.addItem(item)
+        }
+    }
+}
+
+extension CollectionMenu {
+    @objc func addRow(_ sender: Any?) { tab?.addRow(sender) }
+    @objc func duplicateRow(_ sender: Any?) { tab?.duplicateRow(sender) }
+    @objc func deleteRows(_ sender: Any?) { tab?.deleteRows(sender) }
+    @objc func revertChanges(_ sender: Any?) { tab?.revertChanges(sender) }
+    @objc func applyChanges(_ sender: Any?) { tab?.applyChanges(sender) }
+}

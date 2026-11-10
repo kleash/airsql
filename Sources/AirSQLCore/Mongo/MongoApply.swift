@@ -106,6 +106,93 @@ public struct MongoChanges: Sendable {
 
     private func refused(_ reason: String) -> AirSQLError { AirSQLError(.readOnly, reason) }
 
+    // MARK: Taking changes back, and showing them
+
+    /// Takes back a loaded document's edits and its delete.
+    public mutating func revert(_ id: BSONValue) {
+        edits.removeAll { $0.id == id }
+        deletes.removeAll { $0["_id"] == id }
+    }
+
+    /// Takes back the new documents at these places in `inserts`.
+    public mutating func removeInserts(_ offsets: [Int]) {
+        for offset in Set(offsets).sorted(by: >) where inserts.indices.contains(offset) { inserts.remove(at: offset) }
+    }
+
+    /// Puts `document` in place of the new document at `offset` (edited again before Apply).
+    public mutating func replaceInsert(_ offset: Int, with document: BSONDocument) throws {
+        if Self.hasKeyNeedingCare(.document(document)) {
+            throw refused("A field name holds . or $, which AirSQL doesn't write. Rename the field.")
+        }
+        inserts[offset] = document
+    }
+
+    /// Forgets the first `count` steps: those a stopped Apply left applied on a standalone, so that the rest can be
+    /// applied later without running them twice.
+    public mutating func dropApplied(_ count: Int) {
+        let deleting = min(count, deletes.count), editing = min(count - deleting, edits.count)
+        deletes.removeFirst(deleting)
+        edits.removeFirst(editing)
+        inserts.removeFirst(min(count - deleting - editing, inserts.count))
+    }
+
+    /// `document` as Apply would leave it, its edits made (sub-documents made on the way, as `$set` does): the grid's.
+    public func applied(to document: BSONDocument) -> BSONDocument {
+        guard let id = document["_id"], let fields = edits.first(where: { $0.id == id })?.edits else { return document }
+        var result = document
+        for edit in fields { Self.set(edit.path[...], edit.new, in: &result) }
+        return result
+    }
+
+    private static func set(_ path: ArraySlice<String>, _ value: BSONValue?, in document: inout BSONDocument) {
+        guard let key = path.first else { return }
+        let index = document.fields.firstIndex { $0.key == key }
+        guard path.count > 1 else {
+            switch (index, value) {
+            case let (i?, new?): document.fields[i].value = new
+            case let (nil, new?): document.fields.append((key, new))
+            case let (i?, nil): document.fields.remove(at: i)
+            case (nil, nil): break
+            }
+            return
+        }
+        var inner = BSONDocument()
+        if let index, case .document(let found) = document.fields[index].value { inner = found } else if value == nil { return }
+        set(path.dropFirst(), value, in: &inner)
+        if let index { document.fields[index].value = .document(inner) } else { document.fields.append((key, .document(inner))) }
+    }
+
+    /// What `text` (shell form) means typed over `old`: a value of `old`'s type wherever the text reads as one — 5 over
+    /// NumberLong(1) is NumberLong(5), words over a string are that string, an ISO date over a date is that date, 24 hex
+    /// digits over an ObjectId are that ObjectId — else the value as typed, which `edit` refuses as another type unless
+    /// the type is being changed. Null typed is null; over null or a missing field the value is as typed.
+    public static func value(_ text: String, keeping old: BSONValue?) throws -> BSONValue {
+        let typed = Result { try BSONValue(shellForm: text) }
+        let parsed = try? typed.get()
+        if let parsed, parsed.typeByte == old?.typeByte || parsed == .null { return parsed }
+        let plain = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var number: String?, words = plain
+        switch parsed {
+        case .int32(let n)?: number = String(n)
+        case .int64(let n)?: number = String(n)
+        case .double(let d)?: number = BSONValue.doubleText(d)
+        case .decimal128(let d)?: number = d.description
+        case .string(let typedWords)?: words = typedWords
+        default: break
+        }
+        switch old {
+        case .string?: return .string(text)
+        case .int32?: if let n = Int32(plain) ?? number.flatMap({ Int32($0) }) { return .int32(n) }
+        case .int64?: if let n = Int64(plain) ?? number.flatMap({ Int64($0) }) { return .int64(n) }
+        case .double?: if let d = Double(plain) ?? number.flatMap({ Double($0) }) { return .double(d) }
+        case .decimal128?: if let d = BSONDecimal128(plain) ?? number.flatMap({ BSONDecimal128($0) }) { return .decimal128(d) }
+        case .datetime?: if let date = try? BSONValue(shellForm: "ISODate(\(BSONValue.string(words).shellForm()))") { return date }
+        case .objectId?: if let id = BSONObjectId(hex: words) { return .objectId(id) }
+        default: break
+        }
+        return try typed.get()
+    }
+
     // MARK: Paths
 
     enum Lookup: Equatable {
@@ -128,6 +215,12 @@ public struct MongoChanges: Sendable {
             }
         }
         return .missing
+    }
+
+    /// The value at `path` of `document`; nil when it is missing or lies past an array or a plain value.
+    public static func value(at path: [String], in document: BSONDocument) -> BSONValue? {
+        if case .value(let value) = lookup(path, in: document) { return value }
+        return nil
     }
 
     static func hasKeyNeedingCare(_ value: BSONValue) -> Bool {

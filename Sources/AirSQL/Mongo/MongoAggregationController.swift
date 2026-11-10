@@ -42,6 +42,8 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     /// The tab's own session, made on first use; `sessionOf` is the connection it belongs to (a reconnect makes another).
     private var session: MongoSession?
     private weak var sessionOf: MongoConnection?
+    /// Its slot among the connection's sessions (`MongoConnection.session(_:slot:)`), so a disconnect closes it too.
+    private let slot = UUID().uuidString
     private var cursor: MongoCursor?
     /// The read under way (one at a time), and its line in Activity.
     private(set) var loading: Task<Void, Never>?
@@ -353,7 +355,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         if let session, sessionOf === connection { return session }
         if let old = session { Task { await old.close() } }
         session = nil
-        let made = try await connection.ownSession(.data)
+        let made = try await connection.session(.data, slot: slot)
         session = made
         sessionOf = connection
         return made
@@ -386,9 +388,8 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     /// Stops for good (the tab closed): the read, the cursor and the session.
     func close() {
         stopReading()
-        let old = session
         session = nil
-        if let old { Task { await old.close() } }
+        if let connection = sessionOf { Task { [slot] in await connection.closeSession(.data, slot: slot) } }
     }
 
     // MARK: Showing

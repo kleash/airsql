@@ -213,6 +213,23 @@ public struct BSONObjectId: Hashable, Sendable {
 
     public var hex: String { bytes.map { String(format: "%02x", $0) }.joined() }
 
+    /// A new ObjectId, as a driver makes one: seconds since 1970, 5 random bytes for this process, then a counter.
+    public static func generate() -> BSONObjectId {
+        let seconds = UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970))
+        let count = counter.next()
+        let time = withUnsafeBytes(of: seconds.bigEndian, Array.init)
+        let next = withUnsafeBytes(of: count.bigEndian, Array.init).suffix(3)
+        return BSONObjectId(bytes: time + processPart + next)!
+    }
+
+    private static let processPart = (0..<5).map { _ in UInt8.random(in: 0...255) }
+    private static let counter = Counter()
+    private final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = UInt32.random(in: 0...0xFFFFFF)
+        func next() -> UInt32 { lock.locked { value &+= 1; return value } }
+    }
+
     static func bytes(hex: String) -> [UInt8]? {
         var bytes: [UInt8] = []
         var high: UInt8?

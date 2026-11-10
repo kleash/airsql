@@ -42,3 +42,12 @@ extension Commands {
 
     static let mongoTransferCommands = [exportDocuments, importDocuments]
 }
+
+// MARK: Editing documents (lane M3-app). Insert, duplicate, delete, revert and Apply are the grid's commands, which a
+// collection tab answers under its own titles.
+extension Commands {
+    static let editValue = Command("Edit Value…", #selector(MongoCollectionController.editValue(_:)),
+                                   tip: "Edit the selected field in shell form, or change its type; a new document opens whole")
+    static let removeField = Command("Remove Field", #selector(MongoCollectionController.removeField(_:)),
+                                     tip: "Remove the selected fields from their documents, as a pending change")
+}
