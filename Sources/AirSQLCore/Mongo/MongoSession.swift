@@ -629,9 +629,21 @@ public final class MongoSession: @unchecked Sendable {
 
         var options = mongoc_ssl_opt_get_default().pointee
         options.weak_cert_validation = true  // TLSCheck below checks instead (and no OCSP request leaves the route)
+        // The client certificate (X.509 login, or a server that asks for one): its key in the same PEM file, as the
+        // driver reads both from one file (mongosh's --tlsCertificateKeyFile).
+        let tls = connection.tls
+        if let key = tls.keyFile, !key.isEmpty, key != tls.certFile {
+            mongoc_stream_destroy(base)
+            throw AirSQLError(.tls, "MongoDB takes the client certificate and its key in one PEM file: choose that file as the "
+                              + "TLS tab's Certificate and leave Key empty.")
+        }
+        let pem = tls.certFile.flatMap { $0.isEmpty ? nil : strdup($0) }
+        defer { free(pem) }
+        options.pem_file = UnsafePointer(pem)
         guard let stream = mongoc_stream_tls_new_with_hostname(base, host, &options, 1) else {
             mongoc_stream_destroy(base)
-            throw AirSQLError(.tls, "AirSQL couldn't set up TLS to \(host).")
+            throw AirSQLError(.tls, "AirSQL couldn't set up TLS to \(host)" + (pem == nil ? "." : ": check that the client "
+                                                                                 + "certificate's file holds it and its key, in PEM."))
         }
         var error = bson_error_t()
         guard mongoc_stream_tls_handshake_block(stream, host, Int32(timeout), &error) else {

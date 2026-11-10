@@ -190,6 +190,69 @@ struct MongoSessionLabTests {
     }
 }
 
+/// X.509 logins (mongo-plan, Phase 2): the connection string says MONGODB-X509 and the client certificate goes to TLS.
+struct MongoX509Tests {
+    @Test func anX509LoginIsInTheAddressBothWays() throws {
+        var saved = SavedConnection(name: "Certs")
+        saved.engine = .mongodb
+        _ = saved.apply(try MongoURI("mongodb://db1:27017/?tls=true&authMechanism=MONGODB-X509&tlsCertificateKeyFile=%2Ftmp%2Fme.pem"
+                                     + "&authSource=%24external"))
+        #expect(saved.mongoX509 && saved.tls.certFile == "/tmp/me.pem" && saved.mongoOptions.isEmpty)
+        let uri = saved.mongoURI
+        #expect(uri.option("authMechanism") == "MONGODB-X509" && uri.option("authSource") == nil && uri.option("tls") == "true")
+        saved.mongoX509 = false
+        #expect(saved.mongoURI.option("authMechanism") == nil && saved.mongoURI.option("authSource") == "$external")
+    }
+
+    /// The lab CA's client certificate (CN=airsql-lab-client) logs in to the replica set as $external's user of that
+    /// name, made for the test and dropped after.
+    @Test(.enabled(if: MongoLab.enabled)) func theClientCertificateLogsIn() async throws {
+        let pem = TestEnvironment.root + "/mongo-x509-\(UUID().uuidString).pem"
+        try (String(contentsOfFile: Lab.clientCertificate, encoding: .utf8) + String(contentsOfFile: Lab.clientKey, encoding: .utf8))
+            .write(toFile: pem, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: pem) }
+        var saved = SavedConnection(name: "Mongo X.509", host: MongoLab.members[0], port: 27017, route: .proxy)
+        saved.engine = .mongodb
+        saved.mongoHosts = MongoLab.members.dropFirst().map { $0 + ":27017" }
+        saved.replicaSet = "rs0"
+        saved.mongoX509 = true
+        saved.tls = TLSOptions(mode: .verifyIdentity, caFile: Lab.caFile, certFile: pem)
+        saved.proxy = ProxySettings(kind: .socks5, host: "127.0.0.1", port: Lab.socksProxy.port, user: Lab.socksProxy.user)
+        func connection(user: String?, password: String?, tls: TLSOptions) -> MongoConnection {
+            MongoConnection(uri: user == nil ? saved.mongoURI.string : MongoLab.allSeeds, user: user, password: password, tls: tls,
+                            route: MongoRoute(saved, proxyPassword: Lab.socksProxy.password), name: saved.name)
+        }
+        let admin = connection(user: MongoLab.airsql.user, password: MongoLab.airsql.password, tls: MongoLab.tls)
+        try await admin.connect()
+        let external = try await admin.session(.main)
+        let subject = "CN=airsql-lab-client"
+        _ = try? await external.command(BSONDocument([("createUser", .string(subject)),
+                                                      ("roles", .array([.document(BSONDocument([("role", .string("read")),
+                                                                                                ("db", .string("fixture"))]))]))]),
+                                        database: "$external")
+        var failure: Error?
+        do {
+            let x509 = connection(user: nil, password: nil, tls: saved.tls)
+            try await x509.connect()
+            let status = try await x509.session(.main).command(BSONDocument([("connectionStatus", .int32(1))]), database: "admin")
+            let users: BSONValue? = if case .document(let auth)? = status["authInfo"] { auth["authenticatedUsers"] } else { nil }
+            #expect(users == .array([.document(BSONDocument([("user", .string(subject)), ("db", .string("$external"))]))]), "\(status)")
+            #expect(try await x509.session(.data).estimatedCount(database: "fixture", collection: "many") == 1000)
+            await x509.close()
+            // Its key in a file of its own: refused before anything is sent, with what to do.
+            let apart = connection(user: nil, password: nil, tls: TLSOptions(mode: .verifyIdentity, caFile: Lab.caFile,
+                                                                              certFile: Lab.clientCertificate, keyFile: Lab.clientKey))
+            await #expect { try await apart.connect() } throws: { ($0 as? AirSQLError)?.message.contains("one PEM file") == true }
+            await apart.close()
+        } catch {
+            failure = error
+        }
+        _ = try? await external.command(BSONDocument([("dropUser", .string(subject))]), database: "$external")
+        await admin.close()
+        if let failure { throw failure }
+    }
+}
+
 /// Waits until `body` gives a value (10 s at most).
 @MainActor private func eventuallyValue<T>(_ body: @escaping () -> T?) async throws -> T {
     _ = await eventually(timeout: 10) { body() != nil }

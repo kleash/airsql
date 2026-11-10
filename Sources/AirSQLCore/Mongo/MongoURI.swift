@@ -133,7 +133,8 @@ extension SavedConnection {
         authSource = ""
         replicaSet = ""
         directConnection = false
-        var useTLS = uri.srv, invalidCertificates = false, invalidHostnames = false, caFile: String?
+        mongoX509 = false
+        var useTLS = uri.srv, invalidCertificates = false, invalidHostnames = false, caFile: String?, certFile: String?
         var rest: [(key: String, value: String)] = []
         for (key, value) in uri.options {
             let on = value.lowercased() == "true"
@@ -145,11 +146,13 @@ extension SavedConnection {
             case "tlsinsecure", "tlsallowinvalidcertificates": invalidCertificates = on
             case "tlsallowinvalidhostnames": invalidHostnames = on
             case "tlscafile": caFile = value
+            case "tlscertificatekeyfile": certFile = value
+            case "authmechanism" where value.uppercased() == "MONGODB-X509": mongoX509 = true
             default: rest.append((key, value))
             }
         }
         tls = TLSOptions(mode: !useTLS ? .off : invalidCertificates ? .required : invalidHostnames ? .verifyCA : .verifyIdentity,
-                         caFile: caFile)
+                         caFile: caFile, certFile: certFile)
         mongoOptions = MongoURI.query(rest)
         return uri.password
     }
@@ -162,7 +165,8 @@ extension SavedConnection {
         uri.hosts = [MongoURI.join(host, mongoSRV ? nil : port)] + mongoHosts
         uri.database = database
         if tls.mode != .off || mongoSRV { uri.options.append(("tls", tls.mode != .off ? "true" : "false")) }
-        if !authSource.isEmpty { uri.options.append(("authSource", authSource)) }
+        if mongoX509 { uri.options.append(("authMechanism", "MONGODB-X509")) }
+        if !authSource.isEmpty && !mongoX509 { uri.options.append(("authSource", authSource)) }  // X.509's is $external
         if !replicaSet.isEmpty { uri.options.append(("replicaSet", replicaSet)) }
         if directConnection { uri.options.append(("directConnection", "true")) }
         uri.options += (try? MongoURI("mongodb://x/?" + mongoOptions))?.options ?? []
