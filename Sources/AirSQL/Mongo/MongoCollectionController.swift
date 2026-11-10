@@ -503,6 +503,8 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     // MARK: Commands
 
     @objc func runStatement(_ sender: Any?) { run() }
+    /// Query ▸ Explain (⌥⌘E): the find's plan, measured, in a window of its own.
+    @objc func explain(_ sender: Any?) { _ = MongoExplainWindow.explain(self) }
     /// Refresh (⌘R): the find again, or on the Schema page a new sample.
     @objc func refresh(_ sender: Any?) {
         guard loading == nil else { return }
@@ -574,6 +576,10 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             }
         case Commands.cancelQuery.action?:
             reason = activity?.canCancel == true ? nil : "Nothing is being read now"
+        case Commands.explain.action?:
+            item.explain(enabled: true, reason: nil)
+            item.toolTip = "Run the query bar's find with executionStats and show how the server ran it"
+            return true
         case Commands.clearFilter.action?:
             reason = bar.filter.stringValue.isEmpty ? "There is no filter to clear" : nil
         case Commands.collectionDocuments.action?:

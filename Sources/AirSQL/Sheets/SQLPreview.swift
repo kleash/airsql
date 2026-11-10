@@ -25,6 +25,8 @@ struct SQLPreviewRequest {
     var accessory: NSView?
     /// Shows "Save as Liquibase changeset": the caller saves the change once it has run, when the box is ticked.
     var offersChangeset = false
+    /// MongoDB's commands in shell form, not SQL: shown plain, and copied as "Copy Commands".
+    var shellCommands = false
     /// Shows "Open in Query Tab": the SQL goes to a new tab on `change`'s connection and nothing runs.
     var offersConsole = false
     /// The session's NO_BACKSLASH_ESCAPES (`DBConnection.noBackslashEscapes`), as `SQLQuote.string` wrote the SQL: it
@@ -169,8 +171,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
         text.isSelectable = true
         text.drawsBackground = false
         let font = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
-        text.textStorage?.setAttributedString(Self.coloured(shownSQL, font: font,
-                                                            noBackslashEscapes: request.noBackslashEscapes))
+        text.textStorage?.setAttributedString(request.shellCommands
+            ? NSAttributedString(string: shownSQL, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+            : Self.coloured(shownSQL, font: font, noBackslashEscapes: request.noBackslashEscapes))
         text.textContainerInset = NSSize(width: 6, height: 6)
         text.setAccessibilityIdentifier("preview.sql")
         text.toolTip = "The statements that will run, in this order"
@@ -257,7 +260,9 @@ final class SQLPreviewSheet: NSWindowController, NSTextFieldDelegate {
 
     private func buttons() -> NSView {
         let help = helpButton(.sqlPreview)
-        let copy = button("Copy SQL", id: "preview.copy", tip: "Copy the statements, to keep them or run them elsewhere",
+        let copy = button(request.shellCommands ? "Copy Commands" : "Copy SQL", id: "preview.copy",
+                          tip: request.shellCommands ? "Copy the commands, to keep them or run them in mongosh"
+                              : "Copy the statements, to keep them or run them elsewhere",
                           target: self, action: #selector(copySQL(_:)))
         let console = button("Open in Query Tab", id: "preview.console", tip: "Close this and put the statements in a new query tab: nothing runs until you do",
                              target: self, action: #selector(openInConsole(_:)))

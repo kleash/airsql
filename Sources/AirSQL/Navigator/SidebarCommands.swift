@@ -115,6 +115,14 @@ extension SidebarController: NSMenuItemValidation {
         switch nodes[0].kind {
         case .mongo(_, let item):
             menu.add(Self.mongoMenu(item))
+            // Export and Import act on the selected collection (Import also on a database) through their own target.
+            let transfer = item.index != nil ? [] : item.collection != nil ? Commands.mongoTransferCommands : [Commands.importDocuments]
+            if !transfer.isEmpty { menu.addItem(.separator()) }
+            for command in transfer {
+                let entry = command.item()
+                entry.target = MongoTransferMenu.shared
+                menu.addItem(entry)
+            }
         case .database:
             menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
                       Commands.export, Commands.restore,

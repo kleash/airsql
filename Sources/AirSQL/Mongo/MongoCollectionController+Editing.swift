@@ -277,6 +277,7 @@ extension MongoCollectionController {
                                 + "the changes before it stay applied."]
         }
         request.destructive = !changes.deletes.isEmpty
+        request.shellCommands = true
         SQLPreviewSheet.show(request, connection: open.saved, on: window) { [weak self] result in
             if result.approved { self?.runApply(atomic: atomic) }
         }

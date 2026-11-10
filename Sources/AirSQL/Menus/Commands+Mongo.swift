@@ -20,7 +20,7 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
-        + aggregationCommands
+        + aggregationCommands + [editValue, removeField]
 }
 
 // MARK: Aggregation (lane M4-app)
