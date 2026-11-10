@@ -142,6 +142,7 @@ final class Connector {
         droppedOpens = [:]
         for connected in open.values { connected.route.close() }
         open = [:]
+        for mongo in model.openMongo.values { mongo.connection.route.close() }
         askpass?.close()
     }
 
@@ -156,6 +157,17 @@ final class Connector {
             model.states[id] = .connecting(step: text)
         }
         do {
+            if saved.engine == .mongodb {
+                let (connection, server) = try await establishMongo(&saved, on: window, step: step)
+                guard connecting[id]?.activity === activity else { return await connection.close() }
+                connecting[id] = nil
+                activity.end()
+                sheets[id] = nil
+                model.states[id] = .connected(server: server.summary)
+                model.attach(mongo: OpenMongoConnection(saved: saved, connection: connection, server: server), to: id)
+                saveRemembered(id)
+                return
+            }
             let (connection, server, route) = try await establish(&saved, on: window, step: step)
             guard connecting[id]?.activity === activity else {
                 await connection.disconnect()
@@ -231,6 +243,37 @@ final class Connector {
     /// asked). A pinned certificate and the user name typed at a prompt end up in `saved`.
     func establish(_ saved: inout SavedConnection, password: String? = nil, proxyPassword: String? = nil, on window: NSWindow?,
                    step: @escaping (String) -> Void) async throws -> (Connection, ServerInfo, OpenRoute) {
+        try await withRoutePrompts(saved, proxyPassword: proxyPassword, on: window) { proxy, server in
+            let route = try await OpenRoute.open(saved, proxyPassword: proxy, askpass: { [server] in
+                guard let server else { throw AirSQLError(.other, "No askpass for this route.") }
+                return server
+            }, progress: { text in DispatchQueue.main.async { step(text) } })
+            do {
+                try Task.checkCancellation()
+                step("Logging in to \(saved.host.isEmpty ? saved.socket : saved.host)")
+                let (connection, server) = try await logIn(&saved, password: password, routeSocket: route.socket, on: window)
+                return (connection, server, route)
+            } catch {
+                route.close()
+                throw route.relay?.lastError ?? error  // the proxy's reason: the driver only saw the connection close
+            }
+        }
+    }
+
+    /// `establish` for MongoDB: its route opens a forward or relay per server as the driver asks for each
+    /// (`logInMongo`).
+    func establishMongo(_ saved: inout SavedConnection, password: String? = nil, proxyPassword: String? = nil,
+                        on window: NSWindow?, step: @escaping (String) -> Void) async throws -> (MongoConnection, MongoServerInfo) {
+        try await withRoutePrompts(saved, proxyPassword: proxyPassword, on: window) { proxy, server in
+            step("Logging in to \(saved.host)")
+            return try await logInMongo(&saved, password: password, proxyPassword: proxy, askpass: server, on: window)
+        }
+    }
+
+    /// Runs `body` with the proxy's password and, on an SSH route, the askpass server that shows ssh's prompts on
+    /// `window`.
+    private func withRoutePrompts<T>(_ saved: SavedConnection, proxyPassword: String?, on window: NSWindow?,
+                                     _ body: (_ proxy: String, _ askpass: AskpassServer?) async throws -> T) async throws -> T {
         let usesProxy = saved.route == .proxy || saved.route == .sshProxy
         let proxy = usesProxy ? try await self.proxyPassword(saved, typed: proxyPassword, on: window) : ""
         let id = saved.id.uuidString
@@ -241,20 +284,7 @@ final class Connector {
             server?.setHandler(sshPrompts(for: saved, on: window), for: id)
         }
         defer { server?.setHandler(nil, for: id) }
-        let route = try await OpenRoute.open(saved, proxyPassword: proxy, askpass: { [server] in
-            guard let server else { throw AirSQLError(.other, "No askpass for this route.") }
-            return server
-        }, progress: { text in DispatchQueue.main.async { step(text) } })
-        do {
-            try Task.checkCancellation()
-            step("Logging in to \(saved.host.isEmpty ? saved.socket : saved.host)")
-            if saved.engine == .mongodb { try await logInMongo(saved, route: route) }
-            let (connection, server) = try await logIn(&saved, password: password, routeSocket: route.socket, on: window)
-            return (connection, server, route)
-        } catch {
-            route.close()
-            throw route.relay?.lastError ?? error  // the proxy's reason: the driver only saw the connection close
-        }
+        return try await body(proxy, server)
     }
 
     /// Test Connection: connects `draft` as the editor has it, then disconnects. The server's description, and the
@@ -266,6 +296,12 @@ final class Connector {
         defer {
             remembered[draft.id] = nil
             closePrompts(draft.id)
+        }
+        if draft.engine == .mongodb {
+            let (connection, server) = try await establishMongo(&tested, password: password, proxyPassword: proxyPassword,
+                                                                on: window, step: step)
+            await connection.close()
+            return (server.summary + (tested.tls.mode == .off ? ", no TLS" : ", TLS"), tested)
         }
         let (connection, server, route) = try await establish(&tested, password: password, proxyPassword: proxyPassword,
                                                              on: window, step: step)

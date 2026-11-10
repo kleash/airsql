@@ -125,6 +125,18 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var favourites: [DatabaseObject] = []
     /// Its place in its list, once moved by hand; nil: by name.
     public var position: Int?
+    /// MongoDB (`MongoURI`): the other servers the connection string names after `host` and `port` ("host:port").
+    public var mongoHosts: [String] = []
+    /// MongoDB: `host` is a DNS SRV name (mongodb+srv://), which names the servers.
+    public var mongoSRV = false
+    /// MongoDB: the database the login is checked in; empty: `database`, else admin.
+    public var authSource = ""
+    /// MongoDB: the replica set's name.
+    public var replicaSet = ""
+    /// MongoDB: only the server named, never the replica set's other members.
+    public var directConnection = false
+    /// MongoDB: the connection string's other options, as written there ("readPreference=secondary&w=majority").
+    public var mongoOptions = ""
 
     public init(id: UUID = UUID(), name: String = "", host: String = "", port: Int? = nil, user: String = "",
                 colour: ConnectionColour = .none, route: Route = .direct) {
@@ -182,6 +194,12 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         timeZone = try value(.timeZone, defaults.timeZone)
         lastDatabase = try value(.lastDatabase, defaults.lastDatabase)
         idleDisconnectMinutes = try value(.idleDisconnectMinutes, defaults.idleDisconnectMinutes)
+        mongoHosts = try value(.mongoHosts, defaults.mongoHosts)
+        mongoSRV = try value(.mongoSRV, defaults.mongoSRV)
+        authSource = try value(.authSource, defaults.authSource)
+        replicaSet = try value(.replicaSet, defaults.replicaSet)
+        directConnection = try value(.directConnection, defaults.directConnection)
+        mongoOptions = try value(.mongoOptions, defaults.mongoOptions)
     }
 
     /// The name, else user@host:port (or the socket).
