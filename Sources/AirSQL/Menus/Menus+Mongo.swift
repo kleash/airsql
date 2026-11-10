@@ -20,6 +20,7 @@ extension MainMenu {
             Commands.collectionSchema.item(), Commands.expandField.item(), .separator(), Commands.copyDocuments.item(),
         ]))
         addAggregationItems(menus)
+        addMongoIndexItems(menus)
     }
 }
 
@@ -103,4 +104,16 @@ extension CollectionMenu {
     @objc func deleteRows(_ sender: Any?) { tab?.deleteRows(sender) }
     @objc func revertChanges(_ sender: Any?) { tab?.revertChanges(sender) }
     @objc func applyChanges(_ sender: Any?) { tab?.applyChanges(sender) }
+}
+
+// MARK: Indexes (lane M-index)
+
+extension MainMenu {
+    /// Data ▸ Collection's index items, after the pages: the Indexes page, then Create, Drop and Hide, for the tab in front
+    /// or the tree's collection or index.
+    static func addMongoIndexItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoIndexCommands { collection.addItem(command.item()) }
+    }
 }

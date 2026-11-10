@@ -347,7 +347,7 @@ public final class MongoSession: @unchecked Sendable {
         try await command(BSONDocument([("explain", .document(inner)), ("verbosity", .string("executionStats"))]), database: database)
     }
 
-    private func all(_ cursor: MongoCursor) async throws -> [BSONDocument] {
+    func all(_ cursor: MongoCursor) async throws -> [BSONDocument] {
         var found: [BSONDocument] = []
         while !cursor.isExhausted {
             found += try await cursor.next(maxCount: 1000).map { try BSONDocument(bytes: $0) }
@@ -448,15 +448,11 @@ public final class MongoSession: @unchecked Sendable {
     /// Creates an index on `keys` ({field: 1}); `options` such as name, unique, partialFilterExpression.
     public func createIndex(database: String, collection: String, keys: BSONDocument,
                             options: BSONDocument = BSONDocument()) async throws {
-        let index = BSONDocument([("key", .document(keys))] + options.fields)
-        let named = index["name"] != nil ? index
-            : BSONDocument(index.fields + [("name", .string(keys.fields.map { "\($0.key)_\($0.value.indexNamePart)" }.joined(separator: "_")))])
-        _ = try await command(BSONDocument([("createIndexes", .string(collection)), ("indexes", .array([.document(named)]))]),
-                              database: database)
+        _ = try await command(MongoIndex.createCommand(collection: collection, keys: keys, options: options), database: database)
     }
 
     public func dropIndex(database: String, collection: String, name: String) async throws {
-        _ = try await command(BSONDocument([("dropIndexes", .string(collection)), ("index", .string(name))]), database: database)
+        _ = try await command(MongoIndex.dropCommand(collection: collection, name: name), database: database)
     }
 
     /// A write through the driver's collection helpers, which retry once after a network error (retryable writes) and
@@ -827,7 +823,7 @@ extension BSONValue {
     }
 
     /// How an index's name shows a key's direction or kind: 1, -1, "text", "2dsphere".
-    fileprivate var indexNamePart: String {
+    var indexNamePart: String {
         switch self {
         case .string(let text): return text
         default: return integer.map(String.init) ?? shellForm()

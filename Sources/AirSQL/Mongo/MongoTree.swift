@@ -71,7 +71,8 @@ extension SidebarController {
             let keys = info?["key"]?.shellForm() ?? ""
             let unique = info?["unique"] == .bool(true)
             cell.show(TreeIcon.image("I", 0x2E9E5B), index, count: keys, countGivesWay: true, busy: false,
-                      tip: "\(index), an index of \(collection) on \(keys)\(unique ? ", unique" : ""): right-click to copy its name")
+                      tip: "\(index), an index of \(collection) on \(keys)\(unique ? ", unique" : ""): double-click to see it with its "
+                        + "size and use, right-click to drop or hide it")
         } else if let collection = item.collection {
             let info = mongoInfo(mongo.saved.id, item)
             let kind = info?.kind ?? .collection
@@ -125,18 +126,24 @@ extension SidebarController {
         return true
     }
 
-    /// A double-click opens or closes a database, and opens a collection in a tab of its own (in place of its preview).
+    /// A double-click opens or closes a database, opens a collection in a tab of its own (in place of its preview), and
+    /// an index on its collection tab's Indexes page.
     func mongoDoubleClicked(_ node: SidebarNode, _ item: MongoTreeItem) {
         if item.collection == nil {
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         } else if item.index == nil {
             openCollection(nil)
+        } else {
+            _ = indexesTab()
         }
     }
 
     static func mongoMenu(_ item: MongoTreeItem) -> [Command?] {
-        if item.index != nil { return [Commands.copyName, nil, Commands.refresh] }
-        if item.collection != nil { return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.copyName, nil, Commands.refresh] }
+        if item.index != nil { return [Commands.collectionIndexes, Commands.copyName, nil, Commands.hideIndex, Commands.dropIndex, nil, Commands.refresh] }
+        if item.collection != nil {
+            return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.collectionIndexes, Commands.copyName,
+                    nil, Commands.createIndex, nil, Commands.refresh]
+        }
         return [Commands.copyName, nil, Commands.refresh]
     }
 
@@ -155,12 +162,49 @@ extension SidebarController {
         }
     }
 
-    /// Schema from the tree: the collection's tab on its Schema page.
+    /// Schema or Indexes from the tree: the collection's tab on that page.
     @objc func showCollectionPage(_ sender: Any?) {
+        if (sender as? NSMenuItem)?.tag == MongoCollectionController.Page.indexes.rawValue {
+            _ = indexesTab()
+            return
+        }
         openCollection(sender)
         guard let tag = (sender as? NSMenuItem)?.tag, let page = MongoCollectionController.Page(rawValue: tag),
               let content = main?.selectedTab?.content as? MongoCollectionController else { return }
         content.show(page)
+    }
+
+    // MARK: Indexes
+
+    /// The selected collection's or index's tab, on its Indexes page with the index selected; the tab does the index
+    /// commands, so the tree's run exactly as the page's.
+    private func indexesTab() -> (tab: MongoCollectionController, index: MongoIndex?)? {
+        guard let main, let (open, items) = mongoSelection, items.count == 1, let collection = items[0].collection else { return nil }
+        let item = items[0]
+        main.openCollection(mongoInfo(open.saved.id, item) ?? MongoCollectionInfo(name: collection, kind: .collection),
+                            database: item.database, connection: open.saved.id)
+        guard let tab = main.selectedTab?.content as? MongoCollectionController else { return nil }
+        tab.indexesView.wanted = item.index
+        tab.show(.indexes)
+        return (tab, selectedIndex)
+    }
+
+    /// The selected index row, as the tree last read it.
+    private var selectedIndex: MongoIndex? {
+        guard let (open, items) = mongoSelection, items.count == 1, let collection = items[0].collection, let name = items[0].index else { return nil }
+        return open.indexes[items[0].database + "." + collection]?.first { $0["name"] == .string(name) }.map(MongoIndex.init)
+    }
+
+    @objc func createIndex(_ sender: Any?) { indexesTab()?.tab.createIndex(sender) }
+
+    @objc func dropIndex(_ sender: Any?) {
+        guard let (tab, index) = indexesTab(), let index else { return NSSound.beep() }
+        tab.drop(index)
+    }
+
+    @objc func toggleIndexHidden(_ sender: Any?) {
+        guard let (tab, index) = indexesTab(), let index else { return NSSound.beep() }
+        tab.setHidden(index)
     }
 
     /// Refresh on MongoDB rows or connections: what is under them is read again. False when the selection isn't MongoDB's.
@@ -181,8 +225,26 @@ extension SidebarController {
         let mongo = mongoSelection != nil
         let reason: String?
         switch item.action {
+        case Commands.collectionSchema.action? where item.tag == MongoCollectionController.Page.indexes.rawValue:
+            reason = mongoSelection?.items.count == 1 && mongoSelection?.items[0].collection != nil ? nil
+                : "Select one collection or index of a connected MongoDB server in the tree first"
         case Commands.openCollection.action?, Commands.collectionSchema.action?:
             reason = selectedCollections.isEmpty ? "Select a collection of a connected MongoDB server in the tree first" : nil
+        case Commands.createIndex.action?:
+            if let (open, items) = mongoSelection, items.count == 1, items[0].collection != nil {
+                reason = MongoCollectionController.indexesOff(model.connection(open.saved.id), mongoInfo(open.saved.id, items[0])?.kind ?? .collection)
+            } else {
+                reason = "Select one collection of a connected MongoDB server in the tree first"
+            }
+        case Commands.dropIndex.action?, Commands.hideIndex.action?:
+            let hide = item.action == Commands.hideIndex.action, index = selectedIndex
+            if hide { item.title = index?.isHidden == true ? "Unhide Index…" : Commands.hideIndex.title }
+            if let (open, items) = mongoSelection, index != nil {
+                reason = MongoCollectionController.indexesOff(model.connection(open.saved.id), mongoInfo(open.saved.id, items[0])?.kind ?? .collection)
+                    ?? MongoCollectionController.whyNot(index, hide: hide)
+            } else {
+                reason = "Select one index of a connected MongoDB server in the tree first"
+            }
         case Commands.refresh.action? where mongo || selectedConnectionIDs.contains { model.openMongo[$0] != nil }:
             reason = nil
         case Commands.copyName.action? where mongo, Commands.copy.action? where mongo:
