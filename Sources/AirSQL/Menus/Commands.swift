@@ -423,7 +423,7 @@ enum Commands {
     static let exportConnections = Command("Export Connections…", #selector(AirSQLActions.exportConnections(_:)),
                                            tip: "Save the selected connections, or all of them, to a file, without passwords")
     static let newConnectionFromURL = Command("New Connection from URL…", #selector(AirSQLActions.newConnectionFromURL(_:)),
-                                              tip: "Make a connection from a mysql:// address")
+                                              tip: "Make a connection from a mysql:// or mongodb:// address")
 
     // MARK: Edit
     static let undo = Command("Undo", sel("undo:"), "z", tip: "Undo the last change")

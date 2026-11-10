@@ -796,7 +796,8 @@ tabs:
   (Production also turns on the strict safety checks), the host and
   port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
-  you disconnect and never saved.
+  you disconnect and never saved. A MongoDB connection has its own fields here: see [Connect to
+  MongoDB](https://kleash.github.io/airsql/mongodb.html#connect-to-mongodb).
 - **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
   servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Encrypt, check certificate and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
@@ -857,15 +858,17 @@ you can then edit.
 
 ## Import and export connections
 
-- **File ▸ New Connection from URL…** takes a `mysql://user@host:3306/database` address (or `mariadb://`), from the
-  clipboard when it holds one, and opens the connection's settings to check before you save.
+- **File ▸ New Connection from URL…** takes a `mysql://user@host:3306/database` address (or `mariadb://`, or a
+  MongoDB `mongodb://` or `mongodb+srv://` address), from the clipboard when it holds one, and opens the connection's
+  settings to check before you save.
 - **File ▸ Import Connections…** reads the saved connections of Sequel Ace, TablePlus, DBeaver or MySQL Workbench when
   they are on this Mac, or a file you choose: an AirSQL export, one of those apps' files, or HeidiSQL's exported
   settings. It lists the MySQL and MariaDB connections with ticks; one that is already here starts unticked.
 - **File ▸ Export Connections…** saves the selected connections, or all of them, to a file for another Mac or a
   colleague.
 
-Passwords never come along: an export has none, an import doesn't read them, and a password in a URL is left out.
+Passwords never come along: an export has none, an import doesn't read them, and a password in a MySQL URL is left
+out (a MongoDB address's goes to your Keychain when you save).
 AirSQL asks for each when you connect. An imported AirSQL file also leaves out what would run by itself: the client
 programs chosen, startup SQL and agent access. TLS starts strict, except for a server on this Mac.
 
@@ -2330,6 +2333,28 @@ SQL's commands are for MySQL and MariaDB: on a MongoDB tab or connection they're
 menus and in the toolbar (the database, the transaction mode, Run All, Explain, Commit and Roll Back). The toolbar's
 **Run** and **Cancel** work on the collection tab. The log at the right of the status bar is the **Command Log** there:
 the same file as [the SQL log](https://kleash.github.io/airsql/sql-log.html), with every command AirSQL sends to MongoDB in shell form, passwords masked.
+
+## Connect to MongoDB
+
+Choose **File ▸ New Connection…** and set **Server** to MongoDB, or choose **File ▸ New Connection from URL…** with a
+`mongodb://` or `mongodb+srv://` address. In the editor's General tab, **Paste Address** fills the fields from the
+address on the clipboard and says what it understood; a password in it goes to your Keychain when you save, never
+into AirSQL's files. **Copy Address** copies the connection's address with its user but never its password, for
+mongosh or Compass.
+
+- **Host** and **Port**: the first server. **Other members**: the replica set's others, as `host:port` separated by
+  commas (optional: the driver finds them from any one).
+- **DNS seed list (mongodb+srv)**: for Atlas and other `mongodb+srv://` addresses: one host name without a port, and
+  DNS lists the servers. TLS turns on with it.
+- **Replica set**: its name, such as `rs0`. **Direct connection**: only the server named, never the other members
+  (for one secondary on its own).
+- **Auth source**: the database the user is defined in; empty, the database above, else `admin`.
+- **Options**: the address's other options as they follow its `?`, such as `readPreference=secondary&w=majority`,
+  `appName` or `retryWrites`.
+
+A new connection starts with TLS checking the certificate and host name, except for a server on this Mac. A pasted
+`mongodb://` address without `tls=true` turns TLS off, and the editor says the connection isn't encrypted. The TLS tab's
+CA certificate is how a private authority (such as a replica set's own) is trusted. Every route works, as for MySQL.
 
 ## The query bar
 

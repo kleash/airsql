@@ -114,12 +114,30 @@ extension ConnectionEditor {
         form.row("Colour", [choice(\.colour, ConnectionColour.allCases.map { ($0.title, $0) }, id: "editor.colour",
                                    tip: "Mark the connection with a colour; Production also turns on stricter safety")],
                  caption: "Production starts with the strict safety checks and agent access Off.")
-        let host = text(\.host, placeholder: draft.route == .direct ? "127.0.0.1" : "as the SSH host or proxy reaches it",
-                        id: "editor.host", tip: "Type the server's host name or address; TLS checks the certificate against it")
-        form.row(draft.route == .direct ? "Host" : "Database host",
-                 [host, label("Port"), number(\.port, placeholder: String(draft.engine.defaultPort), id: "editor.port",
-                                                    tip: "Type the server's port (\(draft.engine.defaultPort) by default)")],
+        let mongo = draft.engine == .mongodb
+        if mongo {
+            form.row("Address", [button("Paste Address", id: "editor.pasteAddress", tip: "Fill the fields from the mongodb:// "
+                                        + "or mongodb+srv:// address on the clipboard", target: self, action: #selector(pasteMongoAddress(_:))),
+                                 button("Copy Address", id: "editor.copyAddress", tip: "Copy this connection's mongodb:// address, "
+                                        + "without its password, for mongosh or Compass", target: self, action: #selector(copyMongoAddress(_:)))],
+                     caption: "A password in a pasted address goes to your Keychain on Save.")
+        }
+        let srv = mongo && draft.mongoSRV
+        let host = text(\.host, placeholder: srv ? "cluster0.example.mongodb.net"
+                            : draft.route == .direct ? "127.0.0.1" : "as the SSH host or proxy reaches it", id: "editor.host",
+                        tip: srv ? "Type the cluster's DNS name, which lists its servers" : mongo
+                            ? "Type the first server's host name or address; TLS checks the certificate against it"
+                            : "Type the server's host name or address; TLS checks the certificate against it")
+        let port = number(\.port, placeholder: String(draft.engine.defaultPort), id: "editor.port",
+                          tip: "Type the server's port (\(draft.engine.defaultPort) by default)")
+        if srv {
+            port.isEnabled = false
+            port.placeholderString = ""
+            port.toolTip = "Off with a DNS seed list: DNS gives each server's port"
+        }
+        form.row(draft.route == .direct ? "Host" : "Database host", [host, label("Port"), port],
                  caption: draft.route == .direct ? nil : "As the last SSH host or the proxy reaches it, often 127.0.0.1 or a private address.")
+        if mongo { mongoServerRows(form) }
         if draft.route == .direct && draft.engine == .mysql {
             form.row("Socket", [text(\.socket, placeholder: "none: TCP", id: "editor.socket",
                                      tip: "Type the path of a server's own socket on this Mac (Homebrew, MAMP, DBngin)"),
@@ -143,9 +161,52 @@ extension ConnectionEditor {
         form.row("Password", [password, ask])
         form.row("Database", [text(\.database, placeholder: "none", id: "editor.database",
                                    tip: "Type the database to make current after connecting")])
+        if mongo { mongoLoginRows(form) }
         form.row("Comment", [text(\.comment, placeholder: "what it is for, who to ask", id: "editor.comment",
                                   tip: "Type a note the connection's summary shows")])
         return content(form)
+    }
+
+    /// MongoDB's servers: a DNS seed list, the replica set's other members, its name, and Direct connection.
+    private func mongoServerRows(_ form: Form) {
+        form.row("", [toggle("DNS seed list (mongodb+srv)", \.mongoSRV, id: "editor.mongoSRV",
+                             tip: "Look the servers up in DNS from the host name, as Atlas's mongodb+srv:// addresses do") { [weak self] in
+            guard let self else { return }
+            if self.draft.mongoSRV {
+                (self.draft.port, self.draft.mongoHosts, self.draft.directConnection) = (nil, [], false)
+                if self.draft.tls.mode == .off { self.draft.tls.mode = .verifyIdentity }
+            }
+            self.refreshTab()
+        }], caption: "One host name, no port: DNS lists the servers. TLS turns on.")
+        guard !draft.mongoSRV else {
+            form.row("Replica set", [text(\.replicaSet, placeholder: "the one DNS names", id: "editor.replicaSet",
+                                          tip: "Type the replica set's name; empty: the one DNS names", width: 200)])
+            return
+        }
+        let members = textField(draft.mongoHosts.joined(separator: ", "), placeholder: "none", id: "editor.mongoHosts",
+                                tip: "Type the replica set's other members as host:port, separated by commas; optional, as the "
+                                    + "driver finds them from any one")
+        members.widthAnchor.constraint(greaterThanOrEqualToConstant: 300).isActive = true
+        bind(members) { [weak self] in
+            self?.draft.mongoHosts = members.stringValue.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init)
+        }
+        form.row("Other members", [members])
+        form.row("Replica set", [text(\.replicaSet, placeholder: "none", id: "editor.replicaSet",
+                                      tip: "Type the replica set's name, such as rs0; empty: whatever the servers say", width: 200),
+                                 toggle("Direct connection", \.directConnection, id: "editor.directConnection",
+                                        tip: "Talk only to the server named, never the replica set's other members, such as "
+                                            + "one secondary on its own")])
+    }
+
+    /// MongoDB's login database and the address's other options.
+    private func mongoLoginRows(_ form: Form) {
+        form.row("Auth source", [text(\.authSource, placeholder: draft.database.isEmpty ? "admin" : draft.database,
+                                      id: "editor.authSource", tip: "Type the database the user is defined in; empty: the "
+                                        + "database above, else admin", width: 200)])
+        form.row("Options", [text(\.mongoOptions, placeholder: "none", id: "editor.mongoOptions",
+                                  tip: "Type the address's other options as key=value&…, such as readPreference=secondary, "
+                                    + "appName=reports, retryWrites=false or w=majority")],
+                 caption: "As after an address's ?, such as readPreference=secondary&w=majority.")
     }
 
     // MARK: TLS

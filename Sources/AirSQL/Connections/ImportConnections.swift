@@ -4,24 +4,34 @@ import AppKit
 /// File ▸ New Connection from URL…, Import Connections… and Export Connections…: connections in and out of AirSQL,
 /// never with their passwords.
 extension MainWindowController {
-    /// Asks for a `mysql://` address (the clipboard's, when it holds one) and opens the editor on it, unsaved.
+    /// Asks for a `mysql://` or `mongodb://` address (the clipboard's, when it holds one) and opens the editor on it,
+    /// unsaved.
     @objc func newConnectionFromURL(_ sender: Any?) {
         guard let window, window.attachedSheet == nil else { return }
         let copied = NSPasteboard.general.string(forType: .string) ?? ""
-        let field = textField(ConnectionImport.connection(fromURL: copied) == nil ? "" : copied, placeholder: "mysql://user@host:3306/database",
-                              id: "import.url", tip: "Type or paste the connection's mysql:// or mariadb:// address")
+        let known = ConnectionImport.connection(fromURL: copied) != nil || (try? MongoURI(copied)) != nil
+        let field = textField(known ? copied : "", placeholder: "mysql://user@host:3306/database",
+                              id: "import.url", tip: "Type or paste the connection's mysql://, mariadb://, mongodb:// or "
+                                + "mongodb+srv:// address")
         field.translatesAutoresizingMaskIntoConstraints = true
         field.frame.size = NSSize(width: 360, height: 22)
         let alert = NSAlert()
         alert.messageText = "New connection from a URL"
-        alert.informativeText = "AirSQL opens the connection's settings to check before saving. A password in the address is "
-            + "left out: AirSQL asks for it when you connect."
+        alert.informativeText = "AirSQL opens the connection's settings to check before saving. A password in a MySQL "
+            + "address is left out: AirSQL asks for it when you connect. A MongoDB address's goes to your Keychain when you save."
         alert.accessoryView = field
         alert.addButton(withTitle: "Continue").toolTip = "Open the connection's settings with this address"
         alert.addButton(withTitle: "Cancel").toolTip = "Make no connection"
         alert.window.initialFirstResponder = field
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }
+            if field.stringValue.trimmingCharacters(in: .whitespaces).lowercased().hasPrefix("mongodb") {
+                var connection = SavedConnection()
+                connection.engine = .mongodb
+                connection.folderID = self.sidebar.selectedFolderID
+                self.edit(connection, isNew: true)?.applyMongoAddress(field.stringValue)
+                return
+            }
             guard var connection = ConnectionImport.connection(fromURL: field.stringValue) else {
                 return showError("That isn't a mysql:// or mariadb:// address with a host, such as "
                                  + "mysql://user@host:3306/database.", title: "Nothing to import", on: window)
