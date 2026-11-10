@@ -42,7 +42,7 @@ env:
   TAG: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
 
 jobs:
-  # No release ships with a known vulnerability in Connector/C or OpenSSL: the same scan as pull requests, first.
+  # No release ships with a known vulnerability in the libraries inside the app: the same scan as pull requests, first.
   scan:
     uses: ./.github/workflows/security.yml
     permissions:
@@ -84,7 +84,7 @@ jobs:
           [ -n "$sdk" ] || { echo "::error::no macOS 26 SDK in the Command Line Tools"; exit 1; }
           echo "SDKROOT=$sdk" >> "$GITHUB_ENV"
 
-      # With the signing secrets: build, sign and notarize here. No cache: libmariadb is built from its pinned sources.
+      # With the signing secrets: build, sign and notarize here. No cache: the libraries are built from their pinned sources.
       - name: Sign and notarize (scripts/release-local.sh)
         if: env.HAS_SIGNING == 'true'
         env:
@@ -119,7 +119,7 @@ jobs:
           (cd build && shasum -a 256 "AirSQL-$VERSION.zip" > "AirSQL-$VERSION.zip.sha256")
 
       # This version, universal, notarized (so Developer ID signed with the hardened runtime), and it starts: under
-      # library validation it loads libmariadb only when the library has the app's team.
+      # library validation it loads libmariadb and libmongoc2 only when they have the app's team.
       - name: Check the app in the zip
         run: |
           rm -rf "$RUNNER_TEMP/check" && mkdir "$RUNNER_TEMP/check"
@@ -127,7 +127,8 @@ jobs:
           app=$RUNNER_TEMP/check/AirSQL.app
           [ "$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")" = "$VERSION" ] \
             || { echo "::error::the app in the zip isn't version $VERSION"; exit 1; }
-          for file in "$app/Contents/MacOS/AirSQL" "$app/Contents/Frameworks/libmariadb.3.dylib"; do
+          for file in "$app/Contents/MacOS/AirSQL" "$app/Contents/Frameworks/libmariadb.3.dylib" \
+            "$app/Contents/Frameworks/libmongoc2.dylib"; do
             [ "$(lipo -archs "$file")" = "x86_64 arm64" ] || { echo "::error::$file isn't universal"; exit 1; }
           done
           codesign --verify --deep --strict --verbose=2 "$app"

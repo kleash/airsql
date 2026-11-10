@@ -44,7 +44,7 @@ The latest release. Fixes ship as a new release (Homebrew: `brew upgrade --cask 
   read-only check that refuses when in doubt, and every change waits for the user's approval, behind a gate that fails
   closed.
 - Release builds are signed with a Developer ID and use the hardened runtime, whose library validation loads only
-  libraries signed by the same team (the bundled libmariadb is), and are notarized by Apple.
+  libraries signed by the same team (the bundled libmariadb and libmongoc2 are), and are notarized by Apple.
 
 More, in plain words: [Privacy and security](https://kleash.github.io/airsql/privacy-security.html).
 
@@ -55,9 +55,9 @@ The results are public, and the badges in the README show the latest ones.
 - **CodeQL** checks AirSQL's own Swift and C code for security bugs (the `security-extended` queries): on every change
   to `main` and every pull request.
 - **Security**, on every change to `main`, every pull request and before every release: the software bill of materials
-  (`scripts/sbom.sh`, attached to every release) lists the code AirSQL ships, MariaDB Connector/C and OpenSSL at their
-  pinned versions, and OSV-Scanner checks it against the OSV database (osv.dev); gitleaks looks for secrets in every
-  commit. A known vulnerability fails the scan until the library is upgraded.
+  (`scripts/sbom.sh`, attached to every release) lists the code AirSQL ships, MariaDB Connector/C, OpenSSL and the
+  MongoDB C Driver at their pinned versions, and OSV-Scanner checks it against the OSV database (osv.dev); gitleaks
+  looks for secrets in every commit. A known vulnerability fails the scan until the library is upgraded.
 - **OpenSSF Scorecard** rates the project's supply-chain practices. Every GitHub Action is pinned to a commit and every
   downloaded tool to its SHA-256, and each workflow job gets only the permissions it needs.
 
@@ -66,5 +66,5 @@ The results are public, and the badges in the README show the latest ones.
 Anything that lets someone other than the user read passwords, reach a database, change data without the user's Run,
 Apply or approval, or drive AirSQL: the Keychain use, the routes and their sockets, TLS verification, the client tools'
 private files, the SQL quoting and the read-only check, the agent socket and MCP bridge, and the release packages. Bugs
-in MariaDB Connector/C, OpenSSL, OpenSSH or the database servers themselves belong to those projects, but tell us too if
-AirSQL is affected.
+in MariaDB Connector/C, the MongoDB C Driver, OpenSSL, OpenSSH or the database servers themselves belong to those
+projects, but tell us too if AirSQL is affected.
