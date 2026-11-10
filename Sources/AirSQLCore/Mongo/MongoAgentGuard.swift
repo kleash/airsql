@@ -131,7 +131,7 @@ public enum MongoAgentGuard {
     // MARK: Names
 
     /// MongoDB's own databases, which hold users, roles, the oplog and the cluster's settings.
-    static let internalDatabases: Set<String> = ["admin", "local", "config"]
+    public static let internalDatabases: Set<String> = ["admin", "local", "config"]
 
     static func checkDatabase(_ db: String) throws {
         // The characters MongoDB refuses in a database's name on any platform, and its 64-byte limit.

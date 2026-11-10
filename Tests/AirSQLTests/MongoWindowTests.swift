@@ -1,4 +1,5 @@
-// MongoDB in the main window around a collection tab: the toolbar's SQL controls say "Not for MongoDB".
+// MongoDB in the main window around a collection tab: the toolbar's SQL controls say "Not for MongoDB"; the tree hides
+// system.* collections and lists MongoDB's own databases last (the Mongo lab, AIRSQL_MONGO_LAB=1).
 import AppKit
 import Foundation
 import Testing
@@ -43,6 +44,27 @@ extension AppTests {
             toolbar.validateVisibleItems()
             #expect(button(.commit)?.toolTip == "No transaction is open in this tab")
             #expect(main.toolbarController.databasePopup.toolTip != NotForMongo.reason)
+        }
+
+        /// The tree leaves out system.* collections (the fixture's view and time-series make system.views and
+        /// system.buckets.readings), and lists admin, config and local after the person's databases, quieter.
+        @Test(.enabled(if: MongoLab.enabled)) func theTreeHidesSystemCollectionsAndListsMongoDBsOwnLast() async throws {
+            let (main, harness, mongo) = try await mongoWindow()
+            let names = mongo.databases?.map(\.name) ?? []
+            let own = names.drop(while: { !["admin", "config", "local"].contains($0) })
+            #expect(names.contains("fixture") && Set(own) == ["admin", "config", "local"], "\(names)")
+            let fixture = try await open(MongoTreeItem(database: "fixture"), in: main, mongo)
+            #expect(fixture.children.compactMap(\.name).contains("readings"))
+            #expect(!fixture.children.compactMap(\.name).contains { $0.hasPrefix("system.") } && mongo.collections["fixture"]?
+                .contains { $0.name.hasPrefix("system.") } == false)
+            let admin = try #require(main.sidebar.treeNodes[.mongo(mongo.saved.id, MongoTreeItem(database: "admin"))])
+            let cell = try #require(main.sidebar.outline.view(atColumn: 0, row: main.sidebar.outline.row(forItem: admin),
+                                                              makeIfNecessary: true) as? TreeCell)
+            #expect(cell.toolTip?.hasPrefix("admin, MongoDB's own database") == true, "\(cell.toolTip ?? "")")
+            #expect(cell.textField?.textColor == .secondaryLabelColor)
+            main.sidebar.select([mongo.saved.id])
+            let disconnect = await call(harness, "menu", ["path": "Connection > Disconnect"])
+            #expect(disconnect.error == nil, "\(disconnect.error ?? "")")
         }
     }
 }

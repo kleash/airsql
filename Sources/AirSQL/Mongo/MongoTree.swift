@@ -88,9 +88,10 @@ extension SidebarController {
             let stats = mongo.stats[item.database]
             let size = stats.flatMap { $0["totalSize"]?.integer ?? (($0["storageSize"]?.integer ?? 0) + ($0["indexSize"]?.integer ?? 0)) }
             let collections = mongo.collections[item.database]?.count
+            let own = OpenMongoConnection.isInternal(item.database)
             cell.show(TreeIcon.database, item.database, count: size.map { shortSize(Int($0)) } ?? collections.map(String.init) ?? "",
-                      busy: mongo.loading.contains(item.database),
-                      tip: "\(item.database)" + (size.map { ", " + shortSize(Int($0)) + " on disk with its indexes" } ?? "")
+                      busy: mongo.loading.contains(item.database), quiet: own,
+                      tip: "\(item.database)" + (own ? ", MongoDB's own database" : "") + (size.map { ", " + shortSize(Int($0)) + " on disk with its indexes" } ?? "")
                         + (collections.map { ", \($0) collection\($0 == 1 ? "" : "s") and views" } ?? "")
                         + ": double-click or click its arrow to see its collections, right-click for more")
         }
