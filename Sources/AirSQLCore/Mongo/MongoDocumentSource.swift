@@ -51,30 +51,7 @@ public final class MongoDocumentSource: GridSource {
     /// A cell's BSON value (the value panel, editing); nil when the document has no such field.
     public func bsonValue(_ row: Int, _ column: Int) -> BSONValue? {
         decodes += 1
-        return Self.value(at: paths[column], in: documents[row])
-    }
-
-    /// Decodes only the value at a path: the lengths lead to its element, which is read as a one-field document.
-    /// (`BSONDocument.value(at:in:)` checks every string it passes, which is seconds for a cell beside a 16 MB one.)
-    static func value(at path: [String], in b: [UInt8]) -> BSONValue? {
-        var (start, end) = (0, b.count)
-        for (depth, key) in path.enumerated() {
-            var hit: (type: UInt8, element: Int, at: Int, end: Int)?
-            elements(b, start, end) { name, type, element, at, valueEnd in
-                guard name == key else { return true }
-                hit = (type, element, at, valueEnd)
-                return false
-            }
-            guard let hit else { return nil }
-            if depth == path.count - 1 {
-                let size = UInt32(hit.end - hit.element + 5)
-                let one = (0..<4).map { UInt8(truncatingIfNeeded: size >> (8 * $0)) } + b[hit.element..<hit.end] + [0]
-                return (try? BSONDocument(bytes: one))?.fields.first?.value
-            }
-            guard hit.type == 0x03 else { return nil }
-            (start, end) = (hit.at, hit.end)
-        }
-        return nil
+        return try? BSONDocument.value(at: paths[column], in: documents[row]) ?? nil
     }
 
     /// A sub-document column, which `setExpanded` can turn into its fields' columns.
@@ -131,7 +108,8 @@ public final class MongoDocumentSource: GridSource {
 
     /// Records each field's path and type, recursing into sub-documents (not arrays).
     private func scan(_ b: [UInt8], _ start: Int, _ end: Int, parent: String, depth: Int) {
-        Self.elements(b, start, end) { name, type, _, at, valueEnd in
+        // Bytes it can't read stop the scan quietly: their fields then show as missing.
+        _ = try? BSONReader(b: b).elements(at: start, end: end) { name, type, at, valueEnd in
             let path = parent.isEmpty ? name : parent + "\0" + name
             if known.insert(path).inserted { children[parent, default: []].append(name) }
             types[path, default: [:]][type, default: 0] += 1
@@ -195,42 +173,4 @@ public final class MongoDocumentSource: GridSource {
         0x0F: "javascriptWithScope", 0x10: "int", 0x11: "timestamp", 0x12: "long", 0x13: "decimal", 0xFF: "minKey",
         0x7F: "maxKey",
     ]
-
-    /// Each element of the document in `b[start..<end]`: its key, type byte, start and value's bounds, from the lengths
-    /// alone (no value is decoded), until `each` returns false. Stops quietly at bytes it can't read: their fields then
-    /// show as missing.
-    static func elements(_ b: [UInt8], _ start: Int, _ end: Int, _ each: (String, UInt8, Int, Int, Int) -> Bool) {
-        func int32(_ i: Int, _ limit: Int) -> Int? {
-            guard i >= 0, i + 4 <= limit else { return nil }
-            return Int(Int32(bitPattern: UInt32(b[i]) | UInt32(b[i + 1]) << 8 | UInt32(b[i + 2]) << 16 | UInt32(b[i + 3]) << 24))
-        }
-        guard let n = int32(start, end), n >= 5, n <= end - start else { return }
-        let last = start + n - 1
-        var i = start + 4
-        while i < last {
-            let type = b[i]
-            guard let zero = b[(i + 1)..<last].firstIndex(of: 0) else { return }
-            let at = zero + 1
-            let size: Int?
-            switch type {
-            case 0x01, 0x09, 0x11, 0x12: size = 8
-            case 0x10: size = 4
-            case 0x13: size = 16
-            case 0x07: size = 12
-            case 0x08: size = 1
-            case 0x06, 0x0A, 0xFF, 0x7F: size = 0
-            case 0x02, 0x0D, 0x0E: size = int32(at, last).map { $0 + 4 }
-            case 0x03, 0x04, 0x0F: size = int32(at, last)
-            case 0x05: size = int32(at, last).map { $0 + 5 }
-            case 0x0C: size = int32(at, last).map { $0 + 16 }
-            case 0x0B:
-                let pattern = b[at..<last].firstIndex(of: 0)
-                size = pattern.flatMap { p in b[(p + 1)..<last].firstIndex(of: 0).map { $0 + 1 - at } }
-            default: size = nil
-            }
-            guard let size, size >= 0, size <= last - at else { return }
-            guard each(String(decoding: b[(i + 1)..<zero], as: UTF8.self), type, i, at, at + size) else { return }
-            i = at + size
-        }
-    }
 }
