@@ -124,13 +124,38 @@ the driver's THIRD_PARTY_NOTICES), CI's and CodeQL's caches, CLAUDE.md's "one C 
   The UI recommends a read-only database user for agents.
 - **Command log**: every command sent, secrets redacted.
 
-## Phase 2
+## Phase 1: status
 
-Compare and reconcile by `_id` (plus indexes and validators); host page and Disk Usage (`serverStatus`, `currentOp` with
-kill); validation editor; users and roles; mongosh, mongodump and mongorestore over routes (they need
-`directConnection` and can't check the name over a socket; mongosh takes passwords only in argv or a prompt); aggregation
-extras (run to a stage, templates, saved pipelines); CSV import; hide/unhide; read preference; X.509, AWS IAM, OIDC;
-change-stream tail.
+Built and merged on `mongo`: connections (hosts, `mongodb+srv`, replica set, auth source, options, Paste and Copy
+Address), the tree, the collection tab (grid, query bar, history, JSON, Schema, Indexes with create/drop/hide), safe
+editing with Apply, the aggregation tab with explain, export/import, agents' read-only tools, per-tab sessions, the
+Command Log. The Fable 5.2 review of Phase 1 found two holes, both fixed with tests: a pipeline ending in `$out`/`$merge`
+ran without asking (now refused on read-only connections and previewed otherwise), and Cancel failed for a login without
+the `inprog` privilege (now `$ownOps`).
+
+## Phase 2 (cut after the Fable 5.2 review)
+
+**Integrator first:** `MongoSession`'s cursor and write helpers internal so lanes add `MongoSession+<Lane>.swift`;
+liveness (a dropped tunnel or server is reported, sessions closed, pending edits kept, nothing re-run; `MongoRoute`'s
+planned ssh restart for a new member is not a drop); a command and menu slot per lane; restoring Mongo tabs after a
+relaunch; Quick Open and Select in Tree for collections; X.509 client certificates; read preference; the value panel's
+`null`; agents' `distinct`/`stats` keeping doubles.
+
+**Then five lanes in parallel:**
+
+- **admin**: create, drop and rename collections, databases and views; the validation editor (`collMod`).
+- **bulk**: Update Many and Delete Many with a matched-count preview through the Apply sheet; CSV import.
+- **host**: a host page (`serverStatus`, replica-set members and lag), operations with kill (own operations by default,
+  others when the login may), Disk Usage.
+- **compare**: two collections or clusters by `_id`, plus indexes and validators; reconcile writes only through
+  `MongoApply` (inserts and replaces by default, deletes opt-in and marked, a read-only target refused); a merge of
+  `_id`-sorted streams only for single-type `_id`s, `$in` lookups otherwise; "ignore key order".
+- **aggregate**: run to a stage, saved pipelines, export a result, Save as View, Open mongosh in Terminal over the route
+  (the user only, so mongosh prompts; never a password on argv).
+
+**Later:** mongodump/mongorestore (through a 0600 `--config` file), AWS IAM (libmongoc built without it today),
+change-stream tail, users and roles. **Dropped:** OIDC (its browser flow needs a loopback TCP listener), aggregation
+templates (saved pipelines cover them).
 
 ## Not doing
 
