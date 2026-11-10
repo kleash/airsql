@@ -19,6 +19,16 @@ extension MainMenu {
             shared(Commands.history, "Query History"), .separator(), Commands.collectionDocuments.item(), Commands.collectionJSON.item(),
             Commands.collectionSchema.item(), Commands.expandField.item(), .separator(), Commands.copyDocuments.item(),
         ]))
+        addAggregationItems(menus)
+    }
+}
+
+// MARK: Aggregation (lane M4-app)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ New Aggregation, after Open Collection: for the collection of the tab in front, else the tree's.
+    static func addAggregationItems(_ menus: Menus) {
+        menus.data.items.last?.submenu?.insertItem(Commands.newAggregation.item(), at: 1)
     }
 }
 

@@ -101,6 +101,20 @@ public final class MongoConnection: @unchecked Sendable {
         }
     }
 
+    /// A session of `role` for one caller alone (an aggregation tab's), so that its Cancel ends only that caller's
+    /// work; the caller closes it.
+    public func ownSession(_ role: MongoSession.Role) async throws -> MongoSession {
+        guard !lock.locked({ closed }) else { throw AirSQLError.disconnected }
+        let session = MongoSession(connection: self, role: role, uri: uri)
+        do {
+            try await session.open()
+        } catch {
+            await session.close()
+            throw error
+        }
+        return session
+    }
+
     /// The connection string to `server` ("host:port") alone, for Cancel's side session on the member running an
     /// operation: same login and options, `directConnection`.
     func direct(to server: String) throws -> String {

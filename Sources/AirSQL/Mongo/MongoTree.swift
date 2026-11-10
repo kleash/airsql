@@ -135,7 +135,7 @@ extension SidebarController {
 
     static func mongoMenu(_ item: MongoTreeItem) -> [Command?] {
         if item.index != nil { return [Commands.copyName, nil, Commands.refresh] }
-        if item.collection != nil { return [Commands.openCollection, Commands.collectionSchema, Commands.copyName, nil, Commands.refresh] }
+        if item.collection != nil { return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.copyName, nil, Commands.refresh] }
         return [Commands.copyName, nil, Commands.refresh]
     }
 

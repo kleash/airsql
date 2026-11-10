@@ -332,8 +332,10 @@ public final class MongoSession: @unchecked Sendable {
     }
 
     /// The plan of an aggregation with executionStats: the pipeline runs to measure it, without its $out or $merge.
-    public func explain(database: String, collection: String, pipeline: [BSONDocument], maxTimeMS: Int? = nil) async throws -> BSONDocument {
-        try await explain(Self.aggregateCommand(collection: collection, pipeline: pipeline, maxTimeMS: maxTimeMS), database: database)
+    public func explain(database: String, collection: String, pipeline: [BSONDocument], maxTimeMS: Int? = nil,
+                        collation: BSONDocument? = nil) async throws -> BSONDocument {
+        try await explain(Self.aggregateCommand(collection: collection, pipeline: pipeline, maxTimeMS: maxTimeMS, collation: collation),
+                          database: database)
     }
 
     private func explain(_ inner: BSONDocument, database: String) async throws -> BSONDocument {

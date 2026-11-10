@@ -20,6 +20,16 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
+        + aggregationCommands
+}
+
+// MARK: Aggregation (lane M4-app)
+
+extension Commands {
+    static let newAggregation = Command("New Aggregation", #selector(SidebarController.newAggregation(_:)), "a", [.command, .option],
+                                        tip: "Open a tab that runs and explains an aggregation pipeline on the collection")
+
+    static let aggregationCommands = [newAggregation]
 }
 
 // MARK: Export and import (lane M5)

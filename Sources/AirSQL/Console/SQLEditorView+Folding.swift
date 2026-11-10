@@ -67,7 +67,7 @@ extension SQLEditorView: NSLayoutManagerDelegate, NSTextStorageDelegate {
     var foldRegions: [Range<Int>] {
         guard (string as NSString).length <= Self.longText else { return [] }
         if let cachedFoldRegions { return cachedFoldRegions }
-        let found = SQLFolding.regions(in: string, noBackslashEscapes: noBackslashEscapes)
+        let found = otherLanguage?.folds(string) ?? SQLFolding.regions(in: string, noBackslashEscapes: noBackslashEscapes)
         cachedFoldRegions = found
         return found
     }
