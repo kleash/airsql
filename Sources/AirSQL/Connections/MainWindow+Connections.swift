@@ -75,8 +75,10 @@ extension MainWindowController {
 
     /// The editor sheet on `connection` (on `sheetWindow`, else this window; at `tab`); Save keeps it (and selects it),
     /// Save and Connect connects too.
-    func edit(_ connection: SavedConnection, isNew: Bool, on sheetWindow: NSWindow? = nil, tab: ConnectionEditor.Tab = .general) {
-        guard let window = sheetWindow ?? window else { return }
+    @discardableResult
+    func edit(_ connection: SavedConnection, isNew: Bool, on sheetWindow: NSWindow? = nil,
+              tab: ConnectionEditor.Tab = .general) -> ConnectionEditor? {
+        guard let window = sheetWindow ?? window else { return nil }
         let editor = ConnectionEditor.show(connection, isNew: isNew, model: model, on: window) { [weak self] saved, connect in
             guard let self else { return }
             self.sidebar.reload()
@@ -85,6 +87,7 @@ extension MainWindowController {
             if connect { self.model.connector.connect(saved.id, on: self.window) }
         }
         if tab != .general { editor.show(tab) }
+        return editor
     }
 
     // MARK: Folders

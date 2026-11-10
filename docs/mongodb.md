@@ -21,6 +21,28 @@ menus and in the toolbar (the database, the transaction mode, Run All, Explain, 
 **Run** and **Cancel** work on the collection tab. The log at the right of the status bar is the **Command Log** there:
 the same file as [the SQL log](sql-log.md), with every command AirSQL sends to MongoDB in shell form, passwords masked.
 
+## Connect to MongoDB
+
+Choose **File ▸ New Connection…** and set **Server** to MongoDB, or choose **File ▸ New Connection from URL…** with a
+`mongodb://` or `mongodb+srv://` address. In the editor's General tab, **Paste Address** fills the fields from the
+address on the clipboard and says what it understood; a password in it goes to your Keychain when you save, never
+into AirSQL's files. **Copy Address** copies the connection's address with its user but never its password, for
+mongosh or Compass.
+
+- **Host** and **Port**: the first server. **Other members**: the replica set's others, as `host:port` separated by
+  commas (optional: the driver finds them from any one).
+- **DNS seed list (mongodb+srv)**: for Atlas and other `mongodb+srv://` addresses: one host name without a port, and
+  DNS lists the servers. TLS turns on with it.
+- **Replica set**: its name, such as `rs0`. **Direct connection**: only the server named, never the other members
+  (for one secondary on its own).
+- **Auth source**: the database the user is defined in; empty, the database above, else `admin`.
+- **Options**: the address's other options as they follow its `?`, such as `readPreference=secondary&w=majority`,
+  `appName` or `retryWrites`.
+
+A new connection starts with TLS checking the certificate and host name, except for a server on this Mac. A pasted
+`mongodb://` address without `tls=true` turns TLS off, and the editor says the connection isn't encrypted. The TLS tab's
+CA certificate is how a private authority (such as a replica set's own) is trusted. Every route works, as for MySQL.
+
 ## The query bar
 
 Each field takes shell form, as mongosh writes it: `{ age: { $gt: 30 } }`, `ObjectId("…")`, `ISODate("…")`,

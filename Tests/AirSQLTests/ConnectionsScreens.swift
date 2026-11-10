@@ -32,6 +32,16 @@ enum ConnectionsScreens {
         try await look(try await shown(), "editor-safety-own")
         await dismiss()
 
+        // MongoDB's General tab: new, then filled from a pasted mongodb+srv:// address.
+        var docs = SavedConnection()
+        docs.engine = .mongodb
+        let mongo = ConnectionEditor.show(docs, isNew: true, model: main.model, on: window) { _, _ in }
+        try await look(try await shown(), "editor-mongodb")
+        mongo.applyMongoAddress("mongodb+srv://reports:secret@cluster0.example.mongodb.net/sales?authSource=admin"
+                                + "&readPreference=secondary&appName=reports")
+        try await look(try await shown(), "editor-mongodb-srv")
+        await dismiss()
+
         showTrust(server: "db.example.com", fingerprint: certificateFingerprint,
                   details: ["Issued to db.example.com by Example Private CA", "Valid from 1 Jan 2026 until 1 Jan 2028"],
                   on: window) { _ in }
