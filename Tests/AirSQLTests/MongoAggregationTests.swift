@@ -44,7 +44,7 @@ struct MongoAggregationTests {
 // MARK: The lab
 
 /// The standalone of the Mongo lab, connected in a window of its own, with the fixture database open.
-@MainActor private func aggregationWindow(pageSize: Int = 100) async throws -> (MainWindowController, AgentServer, OpenMongoConnection) {
+@MainActor func aggregationWindow(pageSize: Int = 100) async throws -> (MainWindowController, AgentServer, OpenMongoConnection) {
     var solo = SavedConnection(name: "Mongo pipelines", host: "127.0.0.1", port: MongoLab.soloPort, user: MongoLab.airsql.user)
     solo.engine = .mongodb
     solo.tls.mode = .off
@@ -63,7 +63,7 @@ struct MongoAggregationTests {
 }
 
 /// A new aggregation tab on `collection`, from Data ▸ Collection with the collection selected in the tree; its first run done.
-@MainActor private func openAggregation(_ collection: String, _ main: MainWindowController, _ harness: AgentServer,
+@MainActor func openAggregation(_ collection: String, _ main: MainWindowController, _ harness: AgentServer,
                                         _ mongo: OpenMongoConnection) async throws -> MongoAggregationController {
     #expect(main.sidebar.reveal(.mongo(mongo.saved.id, MongoTreeItem(database: "fixture", collection: collection))))
     main.window?.makeFirstResponder(main.sidebar.outline)
@@ -76,7 +76,7 @@ struct MongoAggregationTests {
     return tab
 }
 
-@MainActor private func run(_ tab: MongoAggregationController, _ text: String, explain: Bool = false) async {
+@MainActor func run(_ tab: MongoAggregationController, _ text: String, explain: Bool = false) async {
     tab.editor.string = text
     if explain { tab.explain() } else { tab.run() }
     #expect(await eventually(timeout: 30) { tab.loading == nil })

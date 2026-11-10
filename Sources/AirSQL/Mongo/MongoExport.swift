@@ -10,6 +10,10 @@ struct MongoCollectionRef {
     let kind: MongoCollectionInfo.Kind
     /// The tab's query, which Export can write instead of every document.
     var query: MongoQueryText?
+    /// An aggregation tab's pipeline and collation, whose documents Export writes; `refusal` says why it can't.
+    var pipeline: [BSONDocument]?
+    var collation: BSONDocument?
+    var refusal: String?
 }
 
 /// What Export Documents… writes (mongo-plan, Export): every document of a collection, or what its tab's query finds,
@@ -47,11 +51,11 @@ enum MongoExport {
         }
     }
 
-    /// Writes what `find` gives to `url` through a hidden file beside it, which takes `url`'s name only once every document
+    /// Writes what `find` gives (or `pipeline`, with `find`'s collation) to `url` through a hidden file beside it, which takes `url`'s name only once every document
     /// is written: a failed or cancelled export leaves the file that was there (or none). `progress` gets the count after
     /// each batch. How many were written.
-    static func write(_ session: MongoSession, database: String, collection: String, find: MongoFind, format: Format, to url: URL,
-                      stop: StopFlag, progress: @escaping @Sendable (Int) -> Void) async throws -> Int {
+    static func write(_ session: MongoSession, database: String, collection: String, find: MongoFind, pipeline: [BSONDocument]? = nil,
+                      format: Format, to url: URL, stop: StopFlag, progress: @escaping @Sendable (Int) -> Void) async throws -> Int {
         let partial = url.deletingLastPathComponent().appendingPathComponent("." + url.lastPathComponent + ".airsql-partial")
         guard FileManager.default.createFile(atPath: partial.path, contents: nil, attributes: [.posixPermissions: 0o644]) else {
             throw CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: url.path])
@@ -62,7 +66,11 @@ enum MongoExport {
         defer { try? file.close() }
         var encoder = Encoder(format)
         try file.write(contentsOf: Data(encoder.header().utf8))
-        let cursor = try await session.find(database: database, collection: collection, find)
+        let cursor = if let pipeline {
+            try await session.aggregate(database: database, collection: collection, pipeline: pipeline, collation: find.collation)
+        } else {
+            try await session.find(database: database, collection: collection, find)
+        }
         var count = 0
         do {
             while !cursor.isExhausted {
@@ -107,6 +115,12 @@ final class MongoTransferMenu: NSObject, NSMenuItemValidation {
             let kind = item.collection.flatMap { _ in sidebar.mongoInfo(open.saved.id, item)?.kind } ?? .collection
             return MongoCollectionRef(open: open, database: item.database, collection: item.collection ?? "", kind: kind)
         }
+        if let tab = main.selectedTab?.shown as? MongoAggregationController, let open = main.model.openMongo[tab.connectionID] {
+            let (stages, collation, refusal) = tab.exportPipeline()
+            var ref = MongoCollectionRef(open: open, database: tab.database, collection: tab.collection, kind: .collection)
+            (ref.pipeline, ref.collation, ref.refusal) = (stages, collation, refusal)
+            return ref
+        }
         guard let tab = main.selectedTab?.shown as? MongoCollectionController, let open = main.model.openMongo[tab.connectionID] else { return nil }
         return MongoCollectionRef(open: open, database: tab.database, collection: tab.name, kind: tab.info.kind, query: tab.shown)
     }
@@ -118,6 +132,10 @@ final class MongoTransferMenu: NSObject, NSMenuItemValidation {
             reason = "Select a MongoDB collection in the tree, or open one in a tab"
         } else if item.action == Commands.exportDocuments.action, ref?.collection.isEmpty == true {
             reason = "Select a collection, not a database"
+        } else if item.action == Commands.exportDocuments.action, let refusal = ref?.refusal {
+            reason = refusal
+        } else if item.action == Commands.importDocuments.action, ref?.pipeline != nil {
+            reason = "Open the collection, or select it in the tree, to import into it"
         } else if item.action == Commands.importDocuments.action, let ref {
             reason = MongoImportSheet.refusal(ref)
         }
@@ -126,7 +144,7 @@ final class MongoTransferMenu: NSObject, NSMenuItemValidation {
     }
 
     @objc func exportDocuments(_ sender: Any?) {
-        guard let main, let window = main.window, let ref = target(in: main), !ref.collection.isEmpty else { return }
+        guard let main, let window = main.window, let ref = target(in: main), !ref.collection.isEmpty, ref.refusal == nil else { return }
         MongoExportSheet.show(ref, activity: main.model.activity, on: window)
     }
 

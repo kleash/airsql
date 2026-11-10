@@ -155,3 +155,102 @@ public enum MongoPipeline {
         return start + text.prefix(column - 1).utf16.count
     }
 }
+
+// MARK: Writing stages, views and saved pipelines (lane P2-aggregate)
+
+extension MongoPipeline {
+    /// `$out` or `$merge` when a stage writes to a collection: such a pipeline runs only after a preview, and never on a
+    /// read-only connection, in a view or in an export.
+    public static func writingStage(_ stages: [BSONDocument]) -> String? {
+        stages.compactMap(\.keys.first).first { $0 == "$out" || $0 == "$merge" }
+    }
+
+    /// Save as View's command: a view named `name` on `collection` that gives what `stages` give, with their collation.
+    public static func viewCommand(_ name: String, on collection: String, _ stages: [BSONDocument],
+                                   collation: BSONDocument? = nil) -> BSONDocument {
+        BSONDocument([("create", .string(name)), ("viewOn", .string(collection)), ("pipeline", .array(stages.map { .document($0) }))]
+                     + (collation.map { [("collation", .document($0))] } ?? []))
+    }
+}
+
+extension MongoSession {
+    /// Runs Save as View's `create` command (`MongoPipeline.viewCommand`) on `database`.
+    public func saveView(_ command: BSONDocument, database: String) async throws {
+        _ = try await self.command(command, database: database)
+    }
+}
+
+/// The pipelines kept by name for each collection (Save Pipeline…), beside the query history (`MongoQueryHistory`): in
+/// MongoHistory/<connection>.pipelines.json (0600), read and written on a queue of their own.
+public final class MongoSavedPipelines: @unchecked Sendable {
+    public struct Entry: Codable, Equatable, Sendable {
+        public var database: String
+        public var collection: String
+        public var name: String
+        /// The editor's text, as it was saved.
+        public var text: String
+    }
+
+    public static let shared = MongoSavedPipelines(directory: MongoQueryHistory.shared.directory)
+
+    public let directory: URL
+    private let queue = DispatchQueue(label: "com.kleash.airsql.mongo-pipelines")
+
+    public init(directory: URL) { self.directory = directory }
+
+    func file(_ connection: UUID) -> URL { directory.appendingPathComponent(connection.uuidString + ".pipelines.json") }
+
+    /// The collection's pipelines by name.
+    public func entries(_ connection: UUID, database: String, collection: String) async -> [Entry] {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                continuation.resume(returning: read(connection).filter { $0.database == database && $0.collection == collection }
+                    .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
+            }
+        }
+    }
+
+    /// Keeps `text` as `name`, replacing a pipeline of that name.
+    public func save(_ name: String, text: String, connection: UUID, database: String, collection: String) {
+        change(connection, database, collection) { mine in
+            mine.removeAll { $0.name == name }
+            mine.append(Entry(database: database, collection: collection, name: name, text: text))
+        }
+    }
+
+    /// Renames a pipeline; one already called `new` is replaced.
+    public func rename(_ old: String, to new: String, connection: UUID, database: String, collection: String) {
+        change(connection, database, collection) { mine in
+            guard old != new, mine.contains(where: { $0.name == old }) else { return }
+            mine.removeAll { $0.name == new }
+            if let index = mine.firstIndex(where: { $0.name == old }) { mine[index].name = new }
+        }
+    }
+
+    public func delete(_ name: String, connection: UUID, database: String, collection: String) {
+        change(connection, database, collection) { mine in mine.removeAll { $0.name == name } }
+    }
+
+    /// Waits for the writes asked for so far (tests).
+    public func flush() { queue.sync {} }
+
+    /// `body` changes the collection's pipelines; the others stay as they are.
+    private func change(_ connection: UUID, _ database: String, _ collection: String, _ body: @escaping (inout [Entry]) -> Void) {
+        queue.async { [self] in
+            var all = read(connection)
+            var mine = all.filter { $0.database == database && $0.collection == collection }
+            all.removeAll { $0.database == database && $0.collection == collection }
+            body(&mine)
+            guard let data = try? JSONEncoder().encode(all + mine) else { return }
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            let url = file(connection)
+            try? data.write(to: url, options: .atomic)
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        }
+    }
+
+    private func read(_ connection: UUID) -> [Entry] {
+        guard let data = try? Data(contentsOf: file(connection)) else { return [] }
+        return (try? JSONDecoder().decode([Entry].self, from: data)) ?? []
+    }
+}

@@ -29,7 +29,28 @@ extension Commands {
     static let newAggregation = Command("New Aggregation", #selector(SidebarController.newAggregation(_:)), "a", [.command, .option],
                                         tip: "Open a tab that runs and explains an aggregation pipeline on the collection")
 
-    static let aggregationCommands = [newAggregation]
+    static let aggregationCommands = [newAggregation] + pipelineCommands
+}
+
+// MARK: Pipelines (lane P2-aggregate)
+
+extension Commands {
+    static let runToStage = Command("Run to Here", #selector(MongoAggregationController.runToStage(_:)), "\r", [.control, .command],
+                                    tip: "Run the pipeline up to the stage at the caret and show what that stage gives")
+    static let countStages = Command("Count Each Stage", #selector(MongoAggregationController.countStages(_:)),
+                                     tip: "Count the documents each stage gives, running the pipeline once per stage")
+    static let savePipeline = Command("Save Pipeline…", #selector(MongoAggregationController.savePipeline(_:)),
+                                      tip: "Keep the pipeline under a name, to open it again in this collection")
+    static let renamePipeline = Command("Rename Saved Pipeline…", #selector(MongoAggregationController.renamePipeline(_:)),
+                                        tip: "Give the saved pipeline open in this tab another name")
+    static let deletePipeline = Command("Delete Saved Pipeline…", #selector(MongoAggregationController.deletePipeline(_:)),
+                                        tip: "Forget the saved pipeline open in this tab; the editor keeps its text")
+    static let saveAsView = Command("Save as View…", #selector(MongoAggregationController.saveAsView(_:)),
+                                    tip: "Make a view on the collection that gives what the pipeline gives; the command shows first")
+    static let openMongosh = Command("Open mongosh in Terminal", #selector(MongoShellMenu.openMongosh(_:)),
+                                     tip: "Open your own mongosh in Terminal on this connection, through its route")
+
+    static let pipelineCommands = [runToStage, countStages, savePipeline, renamePipeline, deletePipeline, saveAsView, openMongosh]
 }
 
 // MARK: Export and import (lane M5)

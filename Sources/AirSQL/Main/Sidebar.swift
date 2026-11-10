@@ -607,6 +607,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             menu.addItem(ConnectionMenus.moveMenu())
             menu.add([Commands.moveConnectionUp, Commands.moveConnectionDown, Commands.databasesShown])
             menu.add([nil, Commands.deleteConnection])
+            MongoShellMenu.replaceTerminal(in: menu, connections: nodes.compactMap { $0.connectionID.flatMap(model.connection) })
         } else if nodes.allSatisfy({ $0.connectionOfTree != nil }) {
             return treeMenu(nodes)
         } else {

@@ -30,6 +30,9 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     private(set) var explainView: MongoExplainView?
     private(set) lazy var toolbar = GridToolbar(grid: grid, groups: [
         [.init(Commands.runStatement, "play"), .init(Commands.explain, "list.bullet.indent"), .init(Commands.cancelQuery, "stop.circle")],
+        [.init(Commands.runToStage, "forward.end", menu: { [weak self] in self?.stageItems() ?? [] }),
+         .init(Commands.savePipeline, "bookmark", menu: { [weak self] in self?.savedItems() ?? [] }),
+         .init(Commands.exportDocuments, "square.and.arrow.up")],
         GridToolbar.Item.viewItems,
     ], trailing: [.init(Commands.loadMore, "arrow.down.to.line", stays: true)])
     private lazy var moreLink: NSButton = {
@@ -51,6 +54,16 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     private var reads = 0
     /// What went wrong last, until the next read works.
     private(set) var problem: String?
+    /// What the grid shows when it isn't the whole pipeline's documents (Run to Here), or each stage's count.
+    private(set) var info: String?
+    /// How many stages gave the documents shown (Run to Here: fewer than the pipeline's), and the text they came from.
+    private var shownStages: (count: Int, key: String)?
+    /// The documents each stage gives (by its number from 1), for the text and collation in `countsOf`.
+    private(set) var counts: [Int: Int64] = [:]
+    private var countsOf = ""
+    /// The collection's saved pipelines, and the one open in the tab.
+    private(set) var saved: [MongoSavedPipelines.Entry] = []
+    private(set) var savedName: String?
 
     /// Stage names offered at a stage's start.
     static let stageNames = ["$addFields", "$bucket", "$bucketAuto", "$count", "$densify", "$documents", "$facet", "$fill", "$geoNear",
@@ -175,6 +188,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         ])
         self.view = view
         updateBars()
+        loadSaved()
         run()
     }
 
@@ -261,11 +275,23 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         whenWritesAllowed(stages) { [self] in run(stages, options) }
     }
 
+    /// Run to Here: the stages up to the one at the caret (or `stage`), that stage's documents in the grid.
+    func run(through stage: Int? = nil) {
+        guard let (stages, options) = parsed(), let found = try? MongoPipeline.stages(in: editor.string), !found.isEmpty else { return }
+        let last = min(stage ?? Self.stage(at: editor.selectedRange().location, in: found), found.count - 1)
+        let prefix = Array(stages.prefix(last + 1))
+        whenWritesAllowed(prefix) { [self] in run(prefix, options) }
+    }
+
+    /// The stage the caret is in, or the last that starts before it (the first when it is before them all).
+    static func stage(at caret: Int, in stages: [MongoPipeline.Stage]) -> Int {
+        stages.lastIndex { $0.range.lowerBound <= caret } ?? 0
+    }
+
     /// A pipeline ending in $out or $merge writes a collection: refused on a read-only connection, otherwise run only
     /// once the person has seen it in the preview sheet, as any other change.
     private func whenWritesAllowed(_ stages: [BSONDocument], then go: @escaping () -> Void) {
-        let writes = stages.compactMap { $0.keys.first }.filter { $0 == "$out" || $0 == "$merge" }
-        guard let stage = writes.first else { return go() }
+        guard let stage = MongoPipeline.writingStage(stages) else { return go() }
         guard let open = model.openMongo[connectionID], let window = view.window else { return }
         if model.connection(connectionID)?.readOnly == true {
             return fail("\(stage) writes to a collection, and this connection is read-only.")
@@ -286,6 +312,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     private func run(_ stages: [BSONDocument], _ options: MongoFind) {
         stopReading()
         let (database, collection, batch) = (self.database, self.collection, self.batch)
+        let shown = (count: stages.count, key: countsKey)
         read("Running a pipeline on \(collection)") { [self] session in
             let found = try await session.aggregate(database: database, collection: collection, pipeline: stages,
                                                     maxTimeMS: options.maxTimeMS, collation: options.collation)
@@ -296,6 +323,9 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             source = MongoDocumentSource()
             source.append(first)
             viewer.show(source)
+            shownStages = shown
+            info = nil
+            noteCount()
             show(.documents)
         } cancelled: { [self] in
             problem = "Cancelled, so these aren't the documents the pipeline gives. Run (⌘↩) runs it again."
@@ -320,6 +350,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             } else {
                 viewer.reloadData()
             }
+            noteCount()
         } cancelled: { [self] in
             self.cursor = nil  // its getMore was ended on the server
             problem = "Cancelled: Run (⌘↩) runs the pipeline again to read past these."
@@ -446,7 +477,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     @objc private func pageSwitched(_ sender: NSSegmentedControl) { show(Page(rawValue: sender.selectedSegment) ?? .documents) }
 
     func updateBars() {
-        notice.show(.problem, problem)
+        notice.show(problem == nil ? .readOnly : .problem, problem ?? info ?? partInfo)
         let loaded = source.rowCount, more = cursor?.isExhausted == false
         viewer.status.rows.stringValue = loading != nil && loaded == 0 ? "Running…"
             : "\(loaded.formatted()) document\(loaded == 1 ? "" : "s")\(more ? " loaded" : "")"
@@ -478,7 +509,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         case Commands.cancelQuery.action?:
             reason = activity?.canCancel == true ? nil : "Nothing is running now"
         default:
-            break
+            reason = pipelineReason(item.action)
         }
         item.explain(enabled: reason == nil, reason: reason)
         return reason == nil
@@ -501,6 +532,247 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     func shouldClose(_ answer: @escaping (Bool) -> Void) {
         close()
         answer(true)
+    }
+}
+
+// MARK: Run to Here, each stage's count, saved pipelines, Save as View and Export (lane P2-aggregate)
+
+extension MongoAggregationController {
+    /// What counts and Run to Here's note belong to: the pipeline's text and its collation.
+    private var countsKey: String { editor.string + "\u{0}" + collation.stringValue }
+
+    /// Once every document the grid shows is loaded, their number is the count of its last stage.
+    private func noteCount() {
+        guard let shownStages, cursor?.isExhausted != false else { return }
+        if countsOf != shownStages.key { (counts, countsOf) = ([:], shownStages.key) }
+        counts[shownStages.count] = Int64(source.rowCount)
+    }
+
+    /// How many documents stage `number` (from 1) gives, while the pipeline is the one counted.
+    func count(ofStage number: Int) -> Int64? { countsOf == countsKey ? counts[number] : nil }
+
+    /// Run to Here's note: which stage the grid shows, when it isn't the last.
+    private var partInfo: String? {
+        guard let shownStages, shownStages.key == countsKey, let stages = try? MongoPipeline.stages(in: editor.string),
+              shownStages.count < stages.count else { return nil }
+        return "These are the documents stage \(shownStages.count) of \(stages.count) (\(stages[shownStages.count - 1].name)) gives. "
+            + "Run (⌘↩) runs the whole pipeline."
+    }
+
+    /// Count Each Stage: a $count after each stage in turn (the stages before a $out or $merge), on the tab's session.
+    func countStages() {
+        guard loading == nil, let (stages, options) = parsed() else { return }
+        let counted = Array(stages.prefix { MongoPipeline.writingStage([$0]) == nil })
+        guard !counted.isEmpty else { return fail("There's no stage to count before \(MongoPipeline.writingStage(stages) ?? "")") }
+        let (database, collection, key) = (self.database, self.collection, countsKey)
+        read("Counting each stage's documents on \(collection)") { [self] session in
+            for number in 1...counted.count {
+                let found = try await session.aggregate(database: database, collection: collection,
+                                                        pipeline: counted.prefix(number) + [BSONDocument([("$count", .string("n"))])],
+                                                        maxTimeMS: options.maxTimeMS, collation: options.collation)
+                let first = try await found.next(maxCount: 1)
+                await found.close()
+                try Task.checkCancellation()
+                if countsOf != key { (counts, countsOf) = ([:], key) }
+                counts[number] = try first.first.map { try BSONDocument(bytes: $0)["n"]?.integer ?? 0 } ?? 0
+            }
+            info = "Documents after each stage: " + counted.indices.map { "\($0 + 1) \(counted[$0].keys.first ?? "") "
+                + (counts[$0 + 1] ?? 0).formatted() }.joined(separator: "  →  ")
+        } cancelled: { [self] in
+            problem = "Cancelled: not every stage was counted."
+        } failed: { [self] error in
+            problem = "The stages weren't counted: " + error.localizedDescription
+        }
+    }
+
+    /// The Run to Here button's menu: each stage with its count when known, to run up to it.
+    func stageItems() -> [NSMenuItem] {
+        var items: [NSMenuItem] = []
+        let stages = (try? MongoPipeline.stages(in: editor.string)) ?? []
+        for (index, stage) in stages.enumerated() {
+            let count = count(ofStage: index + 1).map { "  —  \($0.formatted()) document\($0 == 1 ? "" : "s")" } ?? ""
+            let item = NSMenuItem(title: "\(index + 1)  \(stage.name)\(count)", action: #selector(runStageItem(_:)), keyEquivalent: "")
+            item.tag = index
+            item.target = self
+            item.toolTip = "Run the stages up to this \(stage.name) and show the documents it gives"
+            items.append(item)
+        }
+        return items + [.separator(), Commands.runToStage.item(), Commands.countStages.item()]
+    }
+
+    @objc private func runStageItem(_ sender: NSMenuItem) { run(through: sender.tag) }
+
+    // MARK: Saved pipelines
+
+    func loadSaved() {
+        let (id, database, collection) = (connectionID, database, collection)
+        Task { [weak self] in self?.saved = await MongoSavedPipelines.shared.entries(id, database: database, collection: collection) }
+    }
+
+    /// The Save Pipeline button's menu: Save, the collection's saved pipelines to open, then Rename, Delete and Save as View.
+    func savedItems() -> [NSMenuItem] {
+        var items = [Commands.savePipeline.item(), .separator()]
+        for entry in saved {
+            let item = NSMenuItem(title: entry.name, action: #selector(openSaved(_:)), keyEquivalent: "")
+            item.representedObject = entry.name
+            item.target = self
+            item.state = entry.name == savedName ? .on : .off
+            item.toolTip = "Put this saved pipeline in the editor and run it"
+            items.append(item)
+        }
+        if saved.isEmpty {
+            let none = NSMenuItem(title: "No saved pipelines for \(collection) yet", action: nil, keyEquivalent: "")
+            none.toolTip = "Save Pipeline… keeps the pipeline in the editor under a name"
+            items.append(none)
+        }
+        return items + [.separator(), Commands.renamePipeline.item(), Commands.deletePipeline.item(), .separator(), Commands.saveAsView.item()]
+    }
+
+    @objc private func openSaved(_ sender: NSMenuItem) {
+        guard let entry = saved.first(where: { $0.name == sender.representedObject as? String }) else { return }
+        open(entry)
+    }
+
+    /// A saved pipeline in the editor, run.
+    func open(_ entry: MongoSavedPipelines.Entry) {
+        editor.string = entry.text
+        savedName = entry.name
+        run()
+    }
+
+    @objc func savePipeline(_ sender: Any?) {
+        guard let window = view.window else { return }
+        askText("Save Pipeline", message: "Name this pipeline of \(collection); one saved under the same name is replaced",
+                placeholder: "Name", value: savedName ?? "", action: "Save", id: "aggregate.pipelineName", on: window) { [weak self] name in
+            if !name.isEmpty { self?.save(as: name) }
+        }
+    }
+
+    func save(as name: String) {
+        MongoSavedPipelines.shared.save(name, text: editor.string, connection: connectionID, database: database, collection: collection)
+        savedName = name
+        loadSaved()
+    }
+
+    @objc func renamePipeline(_ sender: Any?) {
+        guard let window = view.window, let old = savedName else { return }
+        askText("Rename Saved Pipeline", message: "A new name for “\(old)”; a pipeline saved under that name is replaced",
+                placeholder: "Name", value: old, action: "Rename", id: "aggregate.pipelineName", on: window) { [weak self] name in
+            if !name.isEmpty { self?.rename(old, to: name) }
+        }
+    }
+
+    func rename(_ old: String, to name: String) {
+        MongoSavedPipelines.shared.rename(old, to: name, connection: connectionID, database: database, collection: collection)
+        savedName = name
+        loadSaved()
+    }
+
+    @objc func deletePipeline(_ sender: Any?) {
+        guard let window = view.window, let name = savedName else { return }
+        let alert = NSAlert()
+        alert.messageText = "Delete the saved pipeline “\(name)”?"
+        alert.informativeText = "The editor keeps its text: Save Pipeline… keeps it again."
+        let delete = alert.addButton(withTitle: "Delete")
+        delete.hasDestructiveAction = true
+        delete.toolTip = "Forget this saved pipeline"
+        alert.addButton(withTitle: "Cancel").toolTip = "Keep the saved pipeline"
+        alert.beginSheetModal(for: window) { [weak self] response in
+            if response == .alertFirstButtonReturn { self?.deleteSaved(name) }
+        }
+    }
+
+    func deleteSaved(_ name: String) {
+        MongoSavedPipelines.shared.delete(name, connection: connectionID, database: database, collection: collection)
+        savedName = nil
+        loadSaved()
+    }
+
+    // MARK: Save as View
+
+    /// Save as View…: a name, then the `create` command in the preview sheet, then the view made on the tab's session.
+    @objc func saveAsView(_ sender: Any?) {
+        guard let (stages, options) = parsed(), let window = view.window, let open = model.openMongo[connectionID] else { return }
+        if let reason = viewRefusal(stages) { return fail(reason) }
+        askText("Save as View", message: "Name the view of \(collection) that gives what this pipeline gives", placeholder: "View name",
+                action: "Continue", id: "aggregate.viewName", on: window) { [weak self] name in
+            guard let self, !name.isEmpty else { return }
+            let command = MongoPipeline.viewCommand(name, on: collection, stages, collation: options.collation)
+            var request = SQLPreviewRequest(
+                change: ChangeSQL(title: "Save a pipeline as a view", statements: [MongoIndex.shellForm(command, database: database)],
+                                  connection: connectionID),
+                heading: "Make the view \(name) in \(database)?",
+                caption: "A view runs this pipeline on \(collection) each time it is read; it keeps no documents of its own.")
+            request.actionTitle = "Create"
+            request.shellCommands = true
+            SQLPreviewSheet.show(request, connection: open.saved, on: window) { [weak self] result in
+                if result.approved { self?.createView(command, name: name) }
+            }
+        }
+    }
+
+    /// Why the pipeline can't be saved as a view now.
+    func viewRefusal(_ stages: [BSONDocument]) -> String? {
+        if model.connection(connectionID)?.readOnly == true {
+            return "This connection is read-only: turn that off in the connection's settings to make a view."
+        }
+        if let stage = MongoPipeline.writingStage(stages) { return "\(stage) writes to a collection, so a view can't run it: remove that stage first." }
+        return nil
+    }
+
+    private func createView(_ command: BSONDocument, name: String) {
+        let database = self.database
+        read("Making the view \(name)") { [self] session in
+            try await session.saveView(command, database: database)
+            info = "Made the view \(name) in \(database)."
+            model.openMongo[connectionID]?.loadDatabase(database, again: true)
+        } cancelled: { [self] in
+            problem = "Cancelled: refresh the tree to see whether the view was made."
+        } failed: { [self] error in
+            problem = "The view wasn't made: " + error.localizedDescription
+        }
+    }
+
+    // MARK: Export and the commands' state
+
+    @objc func runToStage(_ sender: Any?) { run(through: nil) }
+    @objc func countStages(_ sender: Any?) { countStages() }
+    /// Export Documents… from the tab's toolbar: for this tab's window, whichever is in front.
+    @objc func exportDocuments(_ sender: Any?) {
+        guard let window = view.window, let main = window.windowController as? MainWindowController,
+              let ref = MongoTransferMenu.shared.target(in: main), ref.refusal == nil else { return NSSound.beep() }
+        MongoExportSheet.show(ref, activity: model.activity, on: window)
+    }
+
+    /// The pipeline Export Documents… writes the documents of, or why it can't.
+    func exportPipeline() -> (stages: [BSONDocument], collation: BSONDocument?, refusal: String?) {
+        guard let stages = try? MongoPipeline.stages(in: editor.string).map(\.document),
+              let options = try? MongoQueryText(collation: collation.stringValue).find() else {
+            return ([], nil, "Fix the pipeline first: Run (⌘↩) shows what's wrong")
+        }
+        if let stage = MongoPipeline.writingStage(stages) {
+            return (stages, nil, "The pipeline writes with \(stage), and Export only reads: remove that stage first")
+        }
+        return (stages, options.collation, nil)
+    }
+
+    func pipelineReason(_ action: Selector?) -> String? {
+        let wait = loading != nil ? "Wait for the read under way, or cancel it (⌘.)" : nil
+        switch action {
+        case Commands.runToStage.action?:
+            guard let stages = try? MongoPipeline.stages(in: editor.string) else { return "Fix the pipeline first: Run (⌘↩) shows what's wrong" }
+            return stages.isEmpty ? "Type a stage first" : nil
+        case Commands.countStages.action?:
+            return wait ?? pipelineReason(Commands.runToStage.action)
+        case Commands.renamePipeline.action?, Commands.deletePipeline.action?:
+            return savedName == nil ? "Open a saved pipeline first, from the Save Pipeline button's menu" : nil
+        case Commands.saveAsView.action?:
+            return wait ?? (model.connection(connectionID)?.readOnly == true ? "This connection is read-only" : nil)
+        case Commands.exportDocuments.action?:
+            return exportPipeline().refusal
+        default:
+            return nil
+        }
     }
 }
 
