@@ -118,6 +118,10 @@ final class AgentService {
                     }
                 }
                 if tool == "run_queries" { keep(structured, kept.rows, call: call, client: client, connection: target.saved.id) }
+            case _ where AgentTarget.mongoTools.contains(tool):
+                structured = try await reading(tool, try self.target(arguments), progress: progress) { target, _ in
+                    try await target.mongo(tool, arguments)
+                }
             case "open_in_console": structured = try openInConsole(arguments)
             case "read_console": structured = try readConsole(arguments)
             case _ where Self.uiTools.contains(tool):
@@ -156,7 +160,10 @@ final class AgentService {
         let task = Task { try await work(target, reporting) }
         let activity = model.activity.start("Agent: \(tool) on \(target.saved.displayName)", connection: target.saved.id) {
             task.cancel()
-            Task { _ = try? await target.connection?.session(.agent).cancel() }
+            Task {
+                _ = try? await target.connection?.session(.agent).cancel()
+                await (try? await target.mongo?.session(.agent))?.cancel()
+            }
         }
         running.append(activity)
         defer {
@@ -192,7 +199,8 @@ final class AgentService {
     func target(_ saved: SavedConnection) -> AgentTarget {
         let open = model.openConnection(saved.id)
         return AgentTarget(saved: saved, safety: model.data.safety(for: saved), connection: open?.connection,
-                           schema: open?.schema, database: database(of: saved))
+                           schema: open?.schema, database: database(of: saved),
+                           mongo: model.openMongo[saved.id]?.connection)
     }
 
     /// The database a connection's statements run in: the active console tab's, else the navigator's current one (the

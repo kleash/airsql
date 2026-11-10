@@ -9,8 +9,8 @@ public enum AgentTools {
     private static let database = string("The database the statements run in (default: the connection's current one)")
 
     public static let list: [[String: Any]] = [
-        tool("context", "Start here: the connections you may use (name, id, access level, MySQL or MariaDB and version, "
-             + "current database, schema hash, row cap and timeout), the person's active connection and the open console "
+        tool("context", "Start here: the connections you may use (name, id, access level, engine (MySQL or MariaDB, or "
+             + "MongoDB) and version, current database, schema hash, row cap and timeout), the person's active connection and the open console "
              + "tabs. Connections whose agent access is Off are not listed.",
              [:], output: ["connections": arrayOf("Connections you may use"), "hiddenConnections": integer("How many are Off"),
                            "active": object("The person's active connection and database"),
@@ -74,6 +74,7 @@ public enum AgentTools {
               "format": choice(["traditional", "json"], "traditional (default) or json")], required: ["connection", "sql"],
              output: ["connection": string("The connection"), "columns": strings("Columns of the plan"),
                       "rows": arrayOf("The plan's rows")], outputRequired: ["connection", "columns", "rows"]),
+    ] + mongo + [
         tool("open_in_console", "Puts SQL into a new console tab for the person to read, edit and run. It never runs it: "
              + "this is how to propose a change. Then read_console shows what they ran and its result.",
              ["sql": string("The SQL"), "title": string("The tab's title"), "connection": connection], required: ["sql"],
@@ -89,6 +90,82 @@ public enum AgentTools {
              + "(none: the overview and the list). Works even when AirSQL isn't running.",
              ["topic": string("A topic")]),
     ] + ui
+
+    /// The MongoDB tools (`AgentTarget.mongo`): typed reads on a MongoDB connection with Schema + read access. Documents
+    /// are Extended JSON text in strings, which keep their keys' order.
+    static let mongo: [[String: Any]] = {
+        let database = string("The database (default: the connection's own)")
+        let collection = string("The collection or view")
+        let filter = string("A query document as Extended JSON text, such as {\"status\": \"A\"} (default: every document)")
+        let place: [String: Any] = ["connection": connection, "database": database, "collection": collection]
+        let found: [String: Any] = ["connection": string("The connection"), "database": string("The database"),
+                                    "collection": string("The collection"),
+                                    "documents": arrayOf("The documents, as relaxed Extended JSON"),
+                                    "count": integer("How many documents the reply has"),
+                                    "capped": boolean("There may be more than the reply has")]
+        let refusals = " $where, $function, $accumulator, $out and $merge are refused anywhere; so are the admin, local and "
+            + "config databases and system.* collections. Needs Schema + read access on a MongoDB connection."
+        return [
+            tool("mongo_find", "Finds documents in a MongoDB collection, read-only, within the connection's row cap and "
+                 + "timeout: 200 documents unless limit says more (up to the row cap)." + refusals,
+                 place.merging(["filter": filter, "projection": string("Fields to return, as Extended JSON text"),
+                                "sort": string("The order, as Extended JSON text: {\"a\": 1, \"b\": -1}"),
+                                "skip": integer("Documents to skip"), "limit": integer("At most this many (default 200)"),
+                                "collation": string("A collation document, as Extended JSON text"),
+                                "hint": string("An index's name, or its key pattern as Extended JSON text")]) { $1 },
+                 required: ["connection", "collection"], output: found, outputRequired: ["connection", "documents", "capped"]),
+            tool("mongo_aggregate", "Runs a read-only aggregation pipeline on a MongoDB collection. Stages on an allow-list "
+                 + "only ($match, $project, $group, $sort, $lookup and $unionWith in the same database, $facet, …); the row "
+                 + "cap is added as a last $limit." + refusals,
+                 place.merging(["pipeline": string("The stages: Extended JSON text of an array, such as "
+                                                   + "[{\"$match\": {}}, {\"$group\": {\"_id\": \"$k\", \"n\": {\"$sum\": 1}}}]"),
+                                "max_documents": integer("At most this many (default 200)"),
+                                "collation": string("A collation document, as Extended JSON text"),
+                                "hint": string("An index's name, or its key pattern as Extended JSON text")]) { $1 },
+                 required: ["connection", "collection", "pipeline"], output: found,
+                 outputRequired: ["connection", "documents", "capped"]),
+            tool("mongo_count", "Counts the documents of a MongoDB collection that match a filter." + refusals,
+                 place.merging(["filter": filter]) { $1 }, required: ["connection", "collection"],
+                 output: ["connection": string("The connection"), "count": integer("Matching documents")],
+                 outputRequired: ["connection", "count"]),
+            tool("mongo_distinct", "The distinct values of a field (a dotted path) among a MongoDB collection's documents "
+                 + "that match a filter, up to the row cap." + refusals,
+                 place.merging(["key": string("The field, such as address.city"), "filter": filter]) { $1 },
+                 required: ["connection", "collection", "key"],
+                 output: ["connection": string("The connection"), "values": arrayOf("The values, as relaxed Extended JSON"),
+                          "capped": boolean("There were more than the row cap")],
+                 outputRequired: ["connection", "values", "capped"]),
+            tool("mongo_list_databases", "The databases of a MongoDB connection with their sizes, without MongoDB's own "
+                 + "(admin, local, config). Needs Schema + read access.",
+                 ["connection": connection], required: ["connection"],
+                 output: ["connection": string("The connection"), "databases": arrayOf("name, sizeOnDisk, empty")],
+                 outputRequired: ["connection", "databases"]),
+            tool("mongo_list_collections", "The collections, views and time series of a MongoDB database, with their "
+                 + "options (a view's pipeline, a validator), without system.* ones. Needs Schema + read access.",
+                 ["connection": connection, "database": database], required: ["connection"],
+                 output: ["connection": string("The connection"), "collections": arrayOf("name, type, options")],
+                 outputRequired: ["connection", "collections"]),
+            tool("mongo_list_indexes", "A MongoDB collection's indexes as the server describes them (key, name, unique, "
+                 + "partialFilterExpression, …). Needs Schema + read access.",
+                 place, required: ["connection", "collection"],
+                 output: ["connection": string("The connection"), "indexes": arrayOf("One per index")],
+                 outputRequired: ["connection", "indexes"]),
+            tool("mongo_stats", "Sizes and counts: a collection's storage stats, or the database's (dbStats) without a "
+                 + "collection. Needs Schema + read access.",
+                 ["connection": connection, "database": database, "collection": string("The collection (default: the database's)")],
+                 required: ["connection"], output: ["connection": string("The connection"), "stats": object("The figures")],
+                 outputRequired: ["connection", "stats"]),
+            tool("mongo_schema_sample", "What a random sample ($sample) of a MongoDB collection's documents holds, per "
+                 + "dotted path (items of arrays under path.[]): how often present, missing and null, the types and their "
+                 + "counts, distinct values, the most common values and the range of numbers and dates. size: how many "
+                 + "documents (default 200, up to the row cap). Needs Schema + read access.",
+                 place.merging(["size": integer("Documents to sample (default 200)")]) { $1 },
+                 required: ["connection", "collection"],
+                 output: ["connection": string("The connection"), "documents": integer("Documents sampled"),
+                          "fields": arrayOf("Per path: path, present, missing, nulls, types, distinct, top, min, max")],
+                 outputRequired: ["connection", "documents", "fields"]),
+        ]
+    }()
 
     /// Driving AirSQL's windows as the person does (plan §2.8). Whatever would change data, structure, files or settings
     /// waits for the person at the Mac, or is theirs alone. Replies are JSON as text (screenshot: a PNG), isError on
