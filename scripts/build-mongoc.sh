@@ -41,7 +41,9 @@ lib_name=libmongoc2.dylib
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 unset PKG_CONFIG_PATH PKG_CONFIG_LIBDIR CMAKE_PREFIX_PATH CPATH C_INCLUDE_PATH LIBRARY_PATH LDFLAGS CFLAGS CPPFLAGS
 hash=$(shasum -a 256 scripts/build-mongoc.sh | cut -d' ' -f1)
-base=${AIRSQL_VENDOR_CACHE:-$(dirname "$PWD")/airsql-vendor-cache}
+# Next to the main checkout, also from a worktree (.claude/worktrees/<name>), so every worktree shares it.
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$PWD/.git")
+base=${AIRSQL_VENDOR_CACHE:-$(dirname "$(dirname "$common")")/airsql-vendor-cache}
 cache=$base/mongoc-$hash
 step() { echo "build-mongoc: $*"; }
 
@@ -97,8 +99,9 @@ sed -i '' '/^set(CMAKE_C_VISIBILITY_PRESET hidden)$/d' "$mongoc_src/src/libbson/
     { echo "build-mongoc: libbson's visibility setting moved; update this script." >&2; exit 1; }
 
 # AirSQL's helper, linked into the library: the certificates the server sent on a TLS stream, so AirSQL checks them
-# with SecTrust against the member's name (Sources/AirSQLCore/Mongo/MongoTrust.swift), as TLSCheck does for MySQL. The
-# stream's TLS state is private to the driver; this builds against the driver's own private headers of this version.
+# with SecTrust against the member's name (peerChain in Sources/AirSQLCore/Mongo/MongoConnection.swift), as TLSCheck
+# does for MySQL. The stream's TLS state is private to the driver; this builds against the driver's own private headers
+# of this version.
 cat > "$work/src/airsql_mongoc.c" <<'EOF'
 #include <mongoc/mongoc.h>
 #include <openssl/ssl.h>
@@ -108,7 +111,8 @@ cat > "$work/src/airsql_mongoc.c" <<'EOF'
 #include "mongoc-stream-tls-openssl-private.h"
 
 /* Fills `ders` and `lengths` with up to `max` certificates (DER, malloc'd: free each) the server sent on `stream`'s
-   TLS, its own first; returns how many, or -1 when the stream has no finished TLS. */
+   TLS, its own first; returns how many (those filled before memory ran out), or -1 when the stream has no finished
+   TLS. */
 __attribute__((visibility("default"))) int
 airsql_mongoc_peer_chain(mongoc_stream_t *stream, unsigned char **ders, int *lengths, int max)
 {
@@ -129,9 +133,15 @@ airsql_mongoc_peer_chain(mongoc_stream_t *stream, unsigned char **ders, int *len
       if (length <= 0) {
          continue;
       }
-      ders[count] = malloc((size_t)length);
-      memcpy(ders[count], der, (size_t)length);
+      unsigned char *copy = malloc((size_t)length);
+      if (copy) {
+         memcpy(copy, der, (size_t)length);
+      }
       OPENSSL_free(der);
+      if (!copy) {
+         break;
+      }
+      ders[count] = copy;
       lengths[count++] = length;
    }
    return count;
