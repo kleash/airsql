@@ -1,6 +1,6 @@
 # Builds and tests AirSQL on a GitHub-hosted Mac (Apple silicon) for every push to main and every pull request: libmariadb
-# (scripts/build-mariadb.sh, cached by its hash), the debug build without warnings, the Swift Testing suite, and the
-# universal app with its signature checked. The lab (AIRSQL_LAB=1, Docker) isn't here: it runs on the maintainer's Mac.
+# and libmongoc2 (scripts/build-mariadb.sh and build-mongoc.sh, cached by their hashes), the debug build without
+# warnings, the Swift Testing suite, and the universal app with its signature checked. The lab (AIRSQL_LAB=1, Docker) isn't here: it runs on the maintainer's Mac.
 name: CI
 
 # Runs on pull requests and when one merges into main (the badge shows main), and by hand.
@@ -75,6 +75,24 @@ jobs:
           path: vendor/out
           key: mariadb-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build-mariadb.sh') }}
 
+      - name: Restore libmongoc2
+        id: mongoc
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vendor/mongoc
+          key: mongoc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build-mongoc.sh') }}
+
+      - name: Build libmongoc2 (only when the cache missed)
+        if: steps.mongoc.outputs.cache-hit != 'true'
+        run: scripts/build-mongoc.sh
+
+      - name: Save libmongoc2
+        if: steps.mongoc.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vendor/mongoc
+          key: mongoc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build-mongoc.sh') }}
+
       - name: swift build (no warnings)
         run: |
           mkdir -p build
@@ -97,12 +115,13 @@ jobs:
       - name: App, universal (./build.sh)
         run: ./build.sh
 
-      # The universal app and its library, signed inside out, and the bundle's own libmariadb loads (an @rpath or
-      # signature mistake would stop the app before it prints).
-      - name: The app is universal, signed, and loads its libmariadb
+      # The universal app and its libraries, signed inside out, and the bundle's own libmariadb and libmongoc2 load (an
+      # @rpath or signature mistake would stop the app before it prints).
+      - name: The app is universal, signed, and loads its libmariadb and libmongoc2
         run: |
           app=build/AirSQL.app
-          for file in "$app/Contents/MacOS/AirSQL" "$app/Contents/Frameworks/libmariadb.3.dylib"; do
+          for file in "$app/Contents/MacOS/AirSQL" "$app/Contents/Frameworks/libmariadb.3.dylib" \
+            "$app/Contents/Frameworks/libmongoc2.dylib"; do
             for arch in arm64 x86_64; do
               lipo "$file" -verify_arch "$arch" || { echo "::error::$file has no $arch slice"; exit 1; }
             done
@@ -110,3 +129,4 @@ jobs:
           codesign --verify --deep --strict "$app"
           "$app/Contents/MacOS/AirSQL" --version | tee build/version.txt
           grep -q 'MariaDB Connector/C 3\.4\.' build/version.txt || { echo "::error::the app doesn't report libmariadb 3.4"; exit 1; }
+          grep -q 'libmongoc 2\.' build/version.txt || { echo "::error::the app doesn't report libmongoc 2"; exit 1; }
