@@ -142,7 +142,7 @@ extension SidebarController {
         if item.index != nil { return [Commands.collectionIndexes, Commands.copyName, nil, Commands.hideIndex, Commands.dropIndex, nil, Commands.refresh] }
         if item.collection != nil {
             return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.collectionIndexes, Commands.copyName,
-                    nil, Commands.createIndex, nil, Commands.refresh]
+                    nil, Commands.createIndex, Commands.compareCollection, nil, Commands.refresh]
         }
         return [Commands.copyName, nil, Commands.refresh]
     }
@@ -228,6 +228,9 @@ extension SidebarController {
         case Commands.collectionSchema.action? where item.tag == MongoCollectionController.Page.indexes.rawValue:
             reason = mongoSelection?.items.count == 1 && mongoSelection?.items[0].collection != nil ? nil
                 : "Select one collection or index of a connected MongoDB server in the tree first"
+        case Commands.compareCollection.action?:
+            reason = mongoSelection?.items.count == 1 && selectedCollections.count == 1 ? nil
+                : "Select one collection of a connected MongoDB server in the tree first"
         case Commands.openCollection.action?, Commands.collectionSchema.action?:
             reason = selectedCollections.isEmpty ? "Select a collection of a connected MongoDB server in the tree first" : nil
         case Commands.createIndex.action?:

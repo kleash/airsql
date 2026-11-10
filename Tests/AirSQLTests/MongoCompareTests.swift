@@ -1,9 +1,12 @@
 // Compare and reconcile two MongoDB collections (docs/dev/mongo-plan.md, Phase 2 compare): where two documents differ
 // (types, key order, ignored paths, arrays), indexes matched by keys, the reconcile's changes; then, against the Mongo
 // lab (AIRSQL_MONGO_LAB=1) on the standalone and the replica set and from one to the other, every kind of difference,
-// the sorted merge and the $in lookups, 20,000 documents, and a reconcile that applies exactly and stops at a change.
+// the sorted merge and the $in lookups, 20,000 documents, and a reconcile that applies exactly and stops at a change;
+// the compare window from the tree, its list and preview, a read-only target refused, and its pictures.
+import AppKit
 import Foundation
 import Testing
+@testable import AirSQL
 @testable import AirSQLCore
 
 private func doc(_ fields: KeyValuePairs<String, BSONValue>) -> BSONDocument {
@@ -248,5 +251,126 @@ struct MongoCompareLabTests {
             #expect(await MongoApply.run(changes, on: target, atomic: atomic).outcome == .applied)
             #expect(try await !compare(source, target).differs)
         }
+    }
+}
+
+// MARK: The window
+
+private let compareDatabase = "lane_mongo_compare_ui"
+
+/// The lab's standalone connected in a main window, with `a` and `b` in the scratch database, and the compare window
+    /// opened from `a`'s row in the tree with `b` as its target, compared.
+@MainActor func compareWindow() async throws -> (MainWindowController, AgentServer, OpenMongoConnection, MongoCompareWindowController) {
+        let (main, harness, mongo) = try await mongoWindow()
+        let session = try await mongo.connection.session(.main), db = compareDatabase
+        _ = try await session.command(doc(["dropDatabase": .int32(1)]), database: db)
+    let base = (1...6).map { doc(["_id": .int32(Int32($0)), "name": .string("item \($0)"), "price": .int32(Int32($0 * 10)),
+                                     "tags": .array([.string("a"), .string("b")])]) }
+        _ = try await session.insertMany(database: db, collection: "a", base)
+        _ = try await session.insertMany(database: db, collection: "b", [doc(["_id": .int32(1), "name": .string("item 1"), "price": .int64(10),
+                                                                             "tags": .array([.string("a"), .string("b")])]),
+                                                                        doc(["_id": .int32(2), "price": .int32(20), "name": .string("item 2"),
+                                                                             "tags": .array([.string("a"), .string("b")])]),
+                                                                        doc(["_id": .int32(3), "name": .string("item 3"), "price": .int32(30),
+                                                                             "tags": .array([.string("a"), .string("c")])])]
+                                                                 + base[3...4] + [doc(["_id": .int32(9), "name": .string("old")])])
+        try await session.createIndex(database: db, collection: "b", keys: doc(["name": .int32(1)]), options: doc(["unique": .bool(true)]))
+        mongo.refresh()
+        #expect(await eventually(timeout: 20) { mongo.databases?.contains { $0.name == db } == true })
+        _ = try await open(MongoTreeItem(database: db), in: main, mongo)
+        let item = MongoTreeItem(database: db, collection: "a")
+        #expect(SidebarController.mongoMenu(item).contains { $0?.action == Commands.compareCollection.action })
+        #expect(main.sidebar.reveal(.mongo(mongo.saved.id, item)))
+        main.sidebar.compareCollection(nil)
+        let compare = try #require(NSApp.windows.compactMap { $0.windowController as? MongoCompareWindowController }.last)
+        keptWindows.append(compare)
+        #expect(compare.source.collectionName == "a" && compare.target.databaseName == db && compare.compareBlocked != nil)
+        compare.target.collection.stringValue = "b"
+        compare.update()
+        #expect(compare.compareBlocked == nil)
+        compare.refresh(nil)
+        #expect(await eventually(timeout: 30) { compare.result != nil && !compare.isRunning })
+        return (main, harness, mongo, compare)
+}
+
+private func sheetTexts(in view: NSView) -> [String] {
+    ((view as? NSTextField).map { [$0.stringValue] } ?? []) + ((view as? NSTextView).map { [$0.string] } ?? [])
+        + view.subviews.flatMap(sheetTexts(in:))
+}
+
+private func sheetButton(_ id: String, in view: NSView) -> NSButton? {
+    if let button = view as? NSButton, button.accessibilityIdentifier() == id { return button }
+    return view.subviews.lazy.compactMap { sheetButton(id, in: $0) }.first
+}
+
+extension AppTests {
+    @Test(.enabled(if: MongoLab.enabled)) func theCompareWindowListsDifferencesAndPreviewsReconcile() async throws {
+        let (_, _, mongo, compare) = try await compareWindow()
+        let result = try #require(compare.result)
+        #expect(result.count(.onlyInSource) == 1 && result.count(.onlyInTarget) == 1 && result.count(.different) == 3 && result.count(.same) == 2)
+        // Same is hidden until its chip is on.
+        #expect(compare.shown.count == 5 && compare.list.numberOfRows == 5 && !compare.shown.contains { $0.status == .same })
+        #expect(compare.chips.label(forSegment: 3) == "Same 2")
+        #expect(compare.indexList.numberOfRows == 2)
+        // The first difference side by side, its differing line marked.
+        compare.list.selectRowIndexes([0], byExtendingSelection: false)
+        #expect(compare.pathsLabel.stringValue == "Differs at price" && compare.targetText.string.contains("price: NumberLong(10)"))
+        // Deletes are off: the preview inserts and replaces only.
+        #expect(compare.reconcileBlocked == nil)
+        compare.reconcile(nil)
+        let sheet = try #require(compare.window?.attachedSheet)
+        let text = sheetTexts(in: sheet.contentView!).joined(separator: "\n")
+        #expect(text.contains("1 insert, 3 replaces") && text.contains("replaceOne({ _id: 2 }") && !text.contains("deleteOne"))
+        sheetButton("preview.cancel", in: sheet.contentView!)?.performClick(nil)
+        #expect(await eventually(timeout: 10) { compare.window?.attachedSheet == nil })
+        // A read-only target is refused.
+        var saved = mongo.saved
+        saved.readOnly = true
+        compare.model.save(saved)
+        #expect(compare.reconcileBlocked?.contains("read-only") == true)
+        saved.readOnly = false
+        compare.model.save(saved)
+        // Approved, it applies through MongoApply, then compares again: the two match but for the extra document.
+        compare.reconcile(nil)
+        let again = try #require(compare.window?.attachedSheet)
+        sheetButton("preview.run", in: again.contentView!)?.performClick(nil)
+        #expect(await eventually(timeout: 30) { compare.reconciling == nil && !compare.isRunning
+            && compare.result?.count(.different) == 0 && compare.result?.count(.onlyInSource) == 0 })
+        #expect(compare.result?.count(.onlyInTarget) == 1)
+        if let alert = compare.window?.attachedSheet { compare.window?.endSheet(alert) }
+        _ = try await mongo.connection.session(.main).command(doc(["dropDatabase": .int32(1)]), database: compareDatabase)
+        compare.close()
+    }
+}
+
+extension AppTests.MongoScreenshotTests {
+    @Test func compareWindowAndReconcilePreview() async throws {
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            let (main, _, mongo, compare) = try await compareWindow()
+            // A harness that sees the compare window too.
+            let shown = compare.window
+            let harness = AgentServer(main: main, model: compare.model, windows: { [shown].compactMap { $0 } })
+            compare.window?.appearance = NSAppearance(named: appearance)
+            compare.window?.setFrame(NSRect(origin: NSPoint(x: 40, y: 40), size: MongoCompareWindowController.defaultSize), display: true)
+            compare.list.selectRowIndexes([0], byExtendingSelection: false)
+            compare.window?.orderFront(nil)
+            try await shot(harness, "window:\(compare.window?.title ?? "")", "mongo-compare-\(suffix)")
+            compare.showPage(1)
+            try await shot(harness, "window:\(compare.window?.title ?? "")", "mongo-compare-indexes-\(suffix)")
+            compare.showPage(0)
+            compare.deletes.state = .on
+            compare.reconcile(nil)
+            try await shot(harness, "sheet", "mongo-compare-reconcile-\(suffix)")
+            if let sheet = compare.window?.attachedSheet { sheetButton("preview.cancel", in: sheet.contentView!)?.performClick(nil) }
+            _ = try await mongo.connection.session(.main).command(doc(["dropDatabase": .int32(1)]), database: compareDatabase)
+            compare.close()
+        }
+    }
+
+    private func shot(_ harness: AgentServer, _ target: String, _ name: String) async throws {
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let reply = await call(harness, "screenshot", ["target": target, "scale": 2])
+        let image = try #require(reply.image, "\(name): \(reply.error ?? "")")
+        try #require(image.representation(using: .png, properties: [:])).write(to: AppTests.ScreenshotTests.folder.appendingPathComponent(name + ".png"))
     }
 }
