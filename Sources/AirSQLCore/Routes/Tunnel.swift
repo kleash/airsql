@@ -50,7 +50,8 @@ public final class Tunnel: @unchecked Sendable {
         chmod(tunnel.configPath, 0o600)
         unlink(tunnel.socket)
         let database = connection.host.contains(":") ? "[\(connection.host)]" : connection.host
-        let argv = ["/usr/bin/ssh", "-F", tunnel.configPath, "-N", "-L", "\(tunnel.socket):\(database):\(connection.port ?? 3306)",
+        let port = connection.port ?? connection.engine.defaultPort
+        let argv = ["/usr/bin/ssh", "-F", tunnel.configPath, "-N", "-L", "\(tunnel.socket):\(database):\(port)",
                     "--", hops[hops.count - 1].host]
         var environment = ProcessInfo.processInfo.environment.merging(askpass.environment(for: connection.id.uuidString)) { $1 }
         environment.merge(environmentOverrides) { $1 }

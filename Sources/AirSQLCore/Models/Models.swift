@@ -2,6 +2,15 @@
 import Foundation
 import os
 
+/// The kind of server a connection is to: MySQL or MariaDB (the default), or MongoDB (mongo-plan.md, decision 4).
+public enum Engine: String, Codable, CaseIterable {
+    case mysql, mongodb
+
+    public var title: String { self == .mysql ? "MySQL or MariaDB" : "MongoDB" }
+    /// The port a connection with none uses.
+    public var defaultPort: Int { self == .mysql ? 3306 : 27017 }
+}
+
 /// The colour that marks a connection: a dot in the sidebar, the strip under the toolbar and the active tab's edge.
 /// Production also starts with the strict safety preset and agent access Off.
 public enum ConnectionColour: String, Codable, CaseIterable {
@@ -52,13 +61,14 @@ public enum AgentAccess: String, Codable, CaseIterable {
 public struct SavedConnection: Codable, Identifiable, Hashable {
     public var id = UUID()
     public var name = ""
+    public var engine = Engine.mysql
     public var folderID: UUID?
     public var colour = ConnectionColour.none
     public var comment = ""
     public var route = Route.direct
     /// The database server's host name or address as typed: TLS is verified against it, whatever the route.
     public var host = ""
-    /// nil: 3306.
+    /// nil: the engine's (`Engine.defaultPort`).
     public var port: Int?
     /// The server's own Unix socket (Direct to a local server); empty: TCP to host and port.
     public var socket = ""
@@ -136,6 +146,8 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         let defaults = SavedConnection()
         id = try value(.id, defaults.id)
         name = try value(.name, defaults.name)
+        // An engine this version doesn't know (a newer AirSQL's) reads as the default rather than losing the file.
+        engine = (try? container.decodeIfPresent(Engine.self, forKey: .engine)) ?? defaults.engine
         folderID = try container.decodeIfPresent(UUID.self, forKey: .folderID)
         colour = try value(.colour, defaults.colour)
         comment = try value(.comment, defaults.comment)

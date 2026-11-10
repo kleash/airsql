@@ -739,6 +739,7 @@ final class SidebarCell: NSTableCellView {
     private let shield = NSImageView()
     private let state = NSImageView()
     private let lock = NSImageView()
+    private let mongo = NSImageView()
     private let badge = NSTextField(labelWithString: "")
     private let icon = NSImageView()
     private let spinner = NSProgressIndicator()
@@ -769,12 +770,16 @@ final class SidebarCell: NSTableCellView {
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
         lock.contentTintColor = .secondaryLabelColor
         lock.toolTip = "Read-only: AirSQL refuses writes on this connection"
+        mongo.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: "MongoDB")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        mongo.contentTintColor = .secondaryLabelColor
+        mongo.toolTip = "MongoDB: this connection is to a MongoDB server"
         icon.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityLabel("Loading the schema")
-        let stack = NSStackView(views: [icon, dot, name, lock, shield, spinner, state, badge])
+        let stack = NSStackView(views: [icon, dot, mongo, name, lock, shield, spinner, state, badge])
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
@@ -806,6 +811,7 @@ final class SidebarCell: NSTableCellView {
         colour()
         shield.isHidden = !connection.hasCustomSafety
         lock.isHidden = !connection.readOnly
+        mongo.isHidden = connection.engine != .mongodb
         badge.isHidden = false
         badge.stringValue = (connection.isProduction ? "PROD · " : "") + connection.routeBadge
         // Each state its own shape, not only its own colour.
@@ -833,7 +839,7 @@ final class SidebarCell: NSTableCellView {
             : connection.host + (connection.port.map { ":\($0)" } ?? "")
         toolTip = name.stringValue + (where_.isEmpty ? "" : " — " + where_) + " · " + connection.routeBadge
             + (connection.marks.isEmpty ? "" : " · " + connection.marks) + ": " + next + ", right-click for more"
-        setAccessibilityLabel([name.stringValue, connection.marks, status].filter { !$0.isEmpty }.joined(separator: ", "))
+        setAccessibilityLabel([name.stringValue, connection.engine == .mongodb ? "MongoDB" : "", connection.marks, status].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
     /// Adds how many of the server's databases the tree shows, when not all ("3 of 12").
@@ -850,6 +856,7 @@ final class SidebarCell: NSTableCellView {
         nameColour = .labelColor
         colour()
         shield.isHidden = true
+        mongo.isHidden = true
         lock.isHidden = true
         state.isHidden = true
         badge.isHidden = false
@@ -866,6 +873,7 @@ final class SidebarCell: NSTableCellView {
         nameColour = .quietText
         colour()
         shield.isHidden = true
+        mongo.isHidden = true
         lock.isHidden = true
         state.isHidden = true
         badge.isHidden = true

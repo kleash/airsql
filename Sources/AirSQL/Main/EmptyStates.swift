@@ -161,7 +161,7 @@ func summaryView(_ connection: SavedConnection, data: AirSQLData, state: Connect
 
     let form = Form()
     let server = connection.route == .direct && !connection.socket.isEmpty ? connection.socket
-        : connection.host.isEmpty ? "Not set" : connection.host + ":" + String(connection.port ?? 3306)
+        : connection.host.isEmpty ? "Not set" : connection.host + ":" + String(connection.port ?? connection.engine.defaultPort)
     form.row(connection.route == .direct && !connection.socket.isEmpty ? "Socket" : "Server", [value(server)])
     form.row("User", [value(connection.user.isEmpty ? "Not set" : connection.user
                            + (connection.askPassword ? " (password asked at each connect)" : ""))])

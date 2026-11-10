@@ -37,6 +37,8 @@ final class AppModel: ObservableObject {
     @Published var states: [UUID: ConnectionState] = [:]
     /// The connected connections: their sessions and schema caches (`attach`, `detach`).
     @Published var open: [UUID: OpenConnection] = [:]
+    /// The connected MongoDB connections, keyed as `open` (`attach(mongo:)`, `detach`).
+    @Published var openMongo: [UUID: OpenMongoConnection] = [:]
     /// What the status bar's agent chip says ("Claude Code · reading schema"); nil hides it. Set by agent access.
     @Published var agentStatus: String?
     let activity: ActivityCenter

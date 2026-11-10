@@ -103,6 +103,9 @@ extension ConnectionEditor {
 
     func generalTab() -> NSView {
         let form = Form()
+        form.row("Server", [choice(\.engine, Engine.allCases.map { ($0.title, $0) }, id: "editor.engine",
+                                   tip: "Choose whether the server is MySQL or MariaDB, or MongoDB") { [weak self] in self?.refreshTab() }],
+                 caption: draft.engine == .mongodb ? "MongoDB support is being built: such a connection can be saved, not used yet." : nil)
         form.row("Name", [text(\.name, placeholder: draft.user.isEmpty ? "user@host" : draft.displayName, id: "editor.name",
                                tip: "Type the name the sidebar shows; empty: user@host")])
         let folders = [("None", UUID?.none)] + model.data.folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -114,9 +117,10 @@ extension ConnectionEditor {
         let host = text(\.host, placeholder: draft.route == .direct ? "127.0.0.1" : "as the SSH host or proxy reaches it",
                         id: "editor.host", tip: "Type the server's host name or address; TLS checks the certificate against it")
         form.row(draft.route == .direct ? "Host" : "Database host",
-                 [host, label("Port"), number(\.port, placeholder: "3306", id: "editor.port", tip: "Type the server's port (3306 by default)")],
+                 [host, label("Port"), number(\.port, placeholder: String(draft.engine.defaultPort), id: "editor.port",
+                                                    tip: "Type the server's port (\(draft.engine.defaultPort) by default)")],
                  caption: draft.route == .direct ? nil : "As the last SSH host or the proxy reaches it, often 127.0.0.1 or a private address.")
-        if draft.route == .direct {
+        if draft.route == .direct && draft.engine == .mysql {
             form.row("Socket", [text(\.socket, placeholder: "none: TCP", id: "editor.socket",
                                      tip: "Type the path of a server's own socket on this Mac (Homebrew, MAMP, DBngin)"),
                                 button("Find", id: "editor.findSocket", tip: "Look for a server's socket in the usual places on "
@@ -178,6 +182,7 @@ extension ConnectionEditor {
             views.append(forget)
         }
         form.row("Trusted", views, caption: "The fingerprint of the certificate you trusted for this server, if any.")
+        guard draft.engine == .mysql else { return content(form) }
         form.row("", [toggle("PAM or LDAP login", \.cleartextLogin, id: "editor.cleartext",
                              tip: "Allow the plain-text login PAM and LDAP accounts need, only over TLS that proves the server")],
                  caption: "Such logins send the password as plain text, so AirSQL allows them only when TLS proves the server.")
@@ -196,8 +201,11 @@ extension ConnectionEditor {
                                   : "Connect this connection each time AirSQL opens")
         atLaunch.isEnabled = !production
         form.row("", [atLaunch], caption: production ? "Not for a Production connection: it connects only when you ask." : nil)
-        form.row("", [toggle("Compress traffic", \.compress, id: "editor.compress",
-                             tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
+        let mysql = draft.engine == .mysql
+        if mysql {
+            form.row("", [toggle("Compress traffic", \.compress, id: "editor.compress",
+                                 tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
+        }
         let timeout = textField(draft.queryTimeout == 0 ? "" : String(draft.queryTimeout), placeholder: "none",
                                 id: "editor.queryTimeout", tip: "Type how many seconds a statement may run before it is "
                                     + "cancelled; empty: no limit", width: 64)
@@ -218,20 +226,26 @@ extension ConnectionEditor {
         }
         form.row("Disconnect after", [idle, label("idle minutes", color: .secondaryLabelColor)],
                  caption: "Never with a transaction, edits or a running statement open.")
-        form.row("Time zone", [text(\.timeZone, placeholder: "the server's", id: "editor.timeZone",
-                                    tip: "Type the time zone sessions use, such as +00:00 or Europe/Paris; empty: the server's", width: 180)])
+        if mysql {
+            form.row("Time zone", [text(\.timeZone, placeholder: "the server's", id: "editor.timeZone",
+                                        tip: "Type the time zone sessions use, such as +00:00 or Europe/Paris; empty: the server's", width: 180)])
+        }
         form.row("", [toggle("Query tabs share one session", \.sharedQuerySession, id: "editor.sharedSession",
                              tip: "Run every query tab on one session, with one transaction and database, so they see each "
                                 + "other's temporary tables")],
                  caption: "Off, each query tab has a session of its own and can run while the others do.")
         form.row("", [toggle("Start query tabs in Manual Commit", \.startsManual, id: "editor.startsManual",
                              tip: "Start each new session with Auto-commit off, so changes wait for Commit")])
-        let levels: [(String, IsolationLevel?)] = [("Server's default", nil)] + IsolationLevel.allCases.map { ($0.title, $0) }
-        form.row("Isolation level", [choice(\.startIsolation, levels, id: "editor.startIsolation",
-                                            tip: "Choose the isolation level new query sessions start at")])
+        if mysql {
+            let levels: [(String, IsolationLevel?)] = [("Server's default", nil)] + IsolationLevel.allCases.map { ($0.title, $0) }
+            form.row("Isolation level", [choice(\.startIsolation, levels, id: "editor.startIsolation",
+                                                tip: "Choose the isolation level new query sessions start at")])
+        }
         form.row("Databases shown", [text(\.databaseFilter, placeholder: "all", id: "editor.databaseFilter",
                                           tip: "Type the databases to show, separated by commas; * and ? match any text")],
                  caption: "For example: shop, reports_*. The others stay on the server, out of the way.")
+        // Compression, the time zone, the isolation level, startup SQL and the client tools are MySQL's own.
+        guard mysql else { return content(form) }
         let sql = NSTextView()
         sql.string = draft.startupSQL
         sql.backgroundColor = .content

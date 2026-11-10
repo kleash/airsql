@@ -164,6 +164,22 @@ struct ModelsTests {
         #expect(!older.reconnectAtLaunch)
     }
 
+    /// A MongoDB connection keeps its engine and port 27017; files without the key, or with an engine only a newer
+    /// version knows, load as MySQL. Only the person may change it.
+    @Test func theEngineRoundTripsAndOlderFilesAreMySQL() throws {
+        var mongo = SavedConnection(name: "docs", host: "db.example.com")
+        mongo.engine = .mongodb
+        let back = try JSONDecoder().decode(SavedConnection.self, from: JSONEncoder().encode(mongo))
+        #expect(back == mongo && back.engine == .mongodb && back.engine.defaultPort == 27017)
+        let older = try JSONDecoder().decode(SavedConnection.self, from: Data(#"{"name":"old"}"#.utf8))
+        #expect(older.engine == .mysql && older.engine.defaultPort == 3306)
+        let newer = try JSONDecoder().decode(SavedConnection.self, from: Data(#"{"name":"new","engine":"later"}"#.utf8))
+        #expect(newer.name == "new" && newer.engine == .mysql)
+        var mysql = mongo
+        mysql.engine = .mysql
+        #expect(AgentGate.personOnlyChange(from: AirSQLData(connections: [mysql]), to: AirSQLData(connections: [mongo])) != nil)
+    }
+
     @Test func aTimeZoneGoesToTheSessions() {
         var saved = SavedConnection(name: "dev")
         #expect(saved.connectOptions(password: "", routeSocket: nil).timeZone == nil)
