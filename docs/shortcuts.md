@@ -180,6 +180,11 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Files | ⌥⌘4 |
 | New Scratch File | ⌥⇧⌘N |
 | Consoles… | ⇧⌘J |
+| Open Collection | ⌥⇧⌘O |
+| Documents | ⌃⌥4 |
+| JSON | ⌃⌥5 |
+| Schema | ⌃⌥6 |
+| Copy Documents | ⌥⇧⌘C |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
 HeidiSQL. ⌘1 to ⌘9 show the window's first nine tabs (Tab 1 above is the first). Commit and Roll Back have no shortcut,

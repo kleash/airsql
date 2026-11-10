@@ -105,7 +105,7 @@ extension ConnectionEditor {
         let form = Form()
         form.row("Server", [choice(\.engine, Engine.allCases.map { ($0.title, $0) }, id: "editor.engine",
                                    tip: "Choose whether the server is MySQL or MariaDB, or MongoDB") { [weak self] in self?.refreshTab() }],
-                 caption: draft.engine == .mongodb ? "MongoDB connects; browsing and editing its collections are still being built." : nil)
+                 caption: draft.engine == .mongodb ? "Browse and query MongoDB's collections; editing documents is still being built." : nil)
         form.row("Name", [text(\.name, placeholder: draft.user.isEmpty ? "user@host" : draft.displayName, id: "editor.name",
                                tip: "Type the name the sidebar shows; empty: user@host")])
         let folders = [("None", UUID?.none)] + model.data.folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }

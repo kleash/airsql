@@ -8,6 +8,7 @@ extension SidebarNode {
         case .database(_, let name): return SQLQuote.identifier(name)
         case .object(_, let object): return SQLQuote.identifier(object.name)
         case .detail(_, _, _, let name): return SQLQuote.identifier(name)
+        case .mongo: return name  // MongoDB's names are never quoted
         default: return nil
         }
     }
@@ -62,6 +63,7 @@ extension SidebarController: NSMenuItemValidation {
         if let main, selectedConnectionIDs.count == 1, selectedNodes.count == 1, let open = model.openConnection(selectedConnectionIDs[0]) {
             return main.showHost(open)
         }
+        if showMongoSelection() { return }
         guard let main, let (open, nodes) = treeSelection, nodes.count == 1 else { return }
         switch nodes[0].kind {
         case .database(_, let name):
@@ -100,6 +102,8 @@ extension SidebarController: NSMenuItemValidation {
         case .detail(let id, let object, let part, let name):
             guard let open = model.openConnection(id) else { return }
             main?.openEditor(part == .triggers ? DatabaseObject(.trigger, object.database, name) : object, of: open)
+        case .mongo(_, let item):
+            mongoDoubleClicked(node, item)
         default:
             break
         }
@@ -109,6 +113,8 @@ extension SidebarController: NSMenuItemValidation {
     func treeMenu(_ nodes: [SidebarNode]) -> NSMenu {
         let menu = NSMenu(title: "Navigator")
         switch nodes[0].kind {
+        case .mongo(_, let item):
+            menu.add(Self.mongoMenu(item))
         case .database:
             menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
                       Commands.export, Commands.restore,
@@ -214,6 +220,7 @@ extension SidebarController: NSMenuItemValidation {
     }
 
     @objc func refresh(_ sender: Any?) {
+        if refreshMongo() { return }
         if let (open, nodes) = treeSelection {
             let databases = Set(nodes.compactMap(\.database))
             let objects = nodes.compactMap(\.object)
@@ -476,6 +483,7 @@ extension SidebarController: NSMenuItemValidation {
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if let enabled = validateMongo(item) { return enabled }
         if NotForMongo.applies(item, main?.activeConnection) { return false }
         let selection = treeSelection
         var reason: String?

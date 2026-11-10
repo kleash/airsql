@@ -90,6 +90,7 @@ extension SidebarController {
     /// only the objects whose names match it, in the databases and groups that have them (a database whose name matches
     /// keeps everything). View ▸ Tree's choices apply on top.
     func tree(_ id: UUID, matching text: String, node: (SidebarNode.Kind) -> SidebarNode) -> [SidebarNode] {
+        if let mongo = model.openMongo[id] { return mongoTree(mongo, matching: text, node: node) }
         guard let open = model.openConnection(id) else { return [] }
         let snapshot = open.snapshot
         guard snapshot.server != nil else {
@@ -202,7 +203,11 @@ extension SidebarController {
         let cell = (outlineView.makeView(withIdentifier: TreeCell.identifier, owner: nil) as? TreeCell) ?? TreeCell()
         // A message shows without its connection's schema (the filter's "nothing matches" has none).
         if case .message(let id, let text) = node.kind {
-            cell.showMessage(text, busy: model.openConnection(id)?.loading.contains(.schema) ?? false)
+            cell.showMessage(text, busy: model.openConnection(id)?.loading.contains(.schema) ?? model.openMongo[id]?.isLoading ?? false)
+            return cell
+        }
+        if case .mongo(let id, let item) = node.kind {
+            if let mongo = model.openMongo[id] { showMongo(item, of: mongo, in: cell) }
             return cell
         }
         guard let id = node.connectionOfTree, let open = model.openConnection(id) else { return cell }
@@ -273,7 +278,7 @@ extension SidebarNode {
     var connectionOfTree: UUID? {
         switch kind {
         case .database(let id, _), .category(let id, _, _), .object(let id, _), .part(let id, _, _), .detail(let id, _, _, _),
-             .prefix(let id, _, _, _), .message(let id, _), .users(let id): return id
+             .prefix(let id, _, _, _), .message(let id, _), .users(let id), .mongo(let id, _): return id
         default: return nil
         }
     }
@@ -286,6 +291,7 @@ extension SidebarNode {
         switch kind {
         case .database(_, let name), .category(_, let name, _), .prefix(_, let name, _, _): return name
         case .object(_, let object), .part(_, let object, _), .detail(_, let object, _, _): return object.database
+        case .mongo(_, let item): return item.database
         default: return nil
         }
     }
@@ -314,6 +320,7 @@ extension SidebarNode {
         case .part(_, _, let part): return part.rawValue
         case .detail(_, _, _, let name): return name
         case .users: return "Users and Roles"
+        case .mongo(_, let item): return item.index ?? item.collection ?? item.database
         default: return nil
         }
     }
