@@ -29,7 +29,16 @@ public final class MongoDocumentSource: GridSource {
 
     public init() {}
 
-    public var rowCount: Int { documents.count }
+    /// The documents loaded, then the new ones waiting for Apply.
+    public var rowCount: Int { documents.count + (changes?.inserts.count ?? 0) }
+    public var loadedCount: Int { documents.count }
+
+    /// Changes waiting for Apply, drawn over the documents: edited fields show their new value (marked), documents to
+    /// delete are marked, and the new ones follow the loaded ones.
+    public var changes: MongoChanges? { didSet { findChanged() } }
+    /// The loaded rows with edits, as Apply would leave them, and the paths edited.
+    private var edited: [Int: (document: BSONDocument, paths: [[String]])] = [:]
+    private var deleted: Set<Int> = []
 
     /// Adds a page of documents (each one's whole BSON bytes) after the loaded ones; true when it brought new columns (the
     /// headers' types and "missing in" counts may change with any page).
@@ -42,8 +51,35 @@ public final class MongoDocumentSource: GridSource {
         return rebuild()
     }
 
-    /// The document behind a row, decoded whole; nil when its bytes can't be read.
-    public func document(_ row: Int) -> BSONDocument? { try? BSONDocument(bytes: documents[row]) }
+    /// The document behind a row as loaded (a new one as it will be inserted), decoded whole; nil when its bytes can't
+    /// be read.
+    public func document(_ row: Int) -> BSONDocument? {
+        guard row < documents.count else { return changes?.inserts[row - documents.count] }
+        return try? BSONDocument(bytes: documents[row])
+    }
+
+    /// The row of the loaded document with this `_id`.
+    public func row(of id: BSONValue) -> Int? {
+        documents.indices.first { ((try? BSONDocument.value(at: ["_id"], in: documents[$0])) ?? nil) == id }
+    }
+
+    private func findChanged() {
+        cache.removeAll()
+        (edited, deleted) = ([:], [])
+        guard let changes else { return }
+        for (id, fields) in changes.edits {
+            guard let row = row(of: id), let loaded = document(row) else { continue }
+            edited[row] = (changes.applied(to: loaded), fields.map(\.path))
+        }
+        deleted = Set(changes.deletes.compactMap { $0["_id"].flatMap(row(of:)) })
+    }
+
+    public func mark(_ row: Int, _ column: Int) -> GridMark {
+        if row >= documents.count { return .inserted }
+        if deleted.contains(row) { return .deleted }
+        let path = paths[column]
+        return edited[row]?.paths.contains { $0.starts(with: path) || path.starts(with: $0) } == true ? .edited : .none
+    }
 
     /// The document's bytes as the server sent them.
     public func bytes(_ row: Int) -> [UInt8] { documents[row] }
@@ -51,6 +87,9 @@ public final class MongoDocumentSource: GridSource {
     /// A cell's BSON value (the value panel, editing); nil when the document has no such field.
     public func bsonValue(_ row: Int, _ column: Int) -> BSONValue? {
         decodes += 1
+        if let shown = row < documents.count ? edited[row]?.document : changes?.inserts[row - documents.count] {
+            return MongoChanges.value(at: paths[column], in: shown)
+        }
         return try? BSONDocument.value(at: paths[column], in: documents[row]) ?? nil
     }
 

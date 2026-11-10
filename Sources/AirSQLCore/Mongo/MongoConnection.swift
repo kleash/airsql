@@ -18,7 +18,8 @@ public final class MongoConnection: @unchecked Sendable {
     private var _tls: TLSOptions
     private var _certificates: [String: TLSCertificate] = [:]
     private var _server: MongoServerInfo?
-    private var opening: [MongoSession.Role: Task<MongoSession, Error>] = [:]
+    /// By role and slot ("data" and "data:<tab>").
+    private var opening: [String: Task<MongoSession, Error>] = [:]
     private var closed = false
 
     public init(uri: String, user: String? = nil, password: String? = nil, tls: TLSOptions = TLSOptions(), route: MongoRoute,
@@ -74,12 +75,14 @@ public final class MongoConnection: @unchecked Sendable {
     }
 
     /// The session for `role`, opened on first use (main first: `connect`). Callers asking at the same time share one
-    /// connect; a connect that failed is tried again by the next call.
-    public func session(_ role: MongoSession.Role) async throws -> MongoSession {
+    /// connect; a connect that failed is tried again by the next call. A `slot` is a session of its own for that role
+    /// (a collection tab's data session, so that its Cancel and Apply touch no other tab's), closed by `closeSession`.
+    public func session(_ role: MongoSession.Role, slot: String = "") async throws -> MongoSession {
         precondition(role != .cancel, "Cancel opens its own")
+        let key = slot.isEmpty ? role.rawValue : role.rawValue + ":" + slot
         let task: Task<MongoSession, Error> = try lock.locked {
             guard !closed else { throw AirSQLError.disconnected }
-            if let task = opening[role] { return task }
+            if let task = opening[key] { return task }
             let task = Task { [self] in
                 let session = MongoSession(connection: self, role: role, uri: uri)
                 do {
@@ -90,15 +93,21 @@ public final class MongoConnection: @unchecked Sendable {
                 }
                 return session
             }
-            opening[role] = task
+            opening[key] = task
             return task
         }
         do {
             return try await task.value
         } catch {
-            lock.locked { if opening[role] == task { opening[role] = nil } }
+            lock.locked { if opening[key] == task { opening[key] = nil } }
             throw error
         }
+    }
+
+    /// Closes the session of `role` in `slot` (the tab that had it closed); the next `session` call opens a new one.
+    public func closeSession(_ role: MongoSession.Role, slot: String) async {
+        let task = lock.locked { opening.removeValue(forKey: role.rawValue + ":" + slot) }
+        await (try? task?.value)?.close()
     }
 
     /// The connection string to `server` ("host:port") alone, for Cancel's side session on the member running an

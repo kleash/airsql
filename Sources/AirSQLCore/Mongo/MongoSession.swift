@@ -30,6 +30,8 @@ public final class MongoSession: @unchecked Sendable {
     private var client: OpaquePointer?
     private var transaction: OpaquePointer?
     private var number = 0
+    /// Cursors not destroyed yet: `close` destroys them before their client, as the driver requires.
+    private var cursors: Set<OpaquePointer> = []
 
     private static let setUp: Void = {
         mongoc_init()
@@ -142,6 +144,8 @@ public final class MongoSession: @unchecked Sendable {
     /// Destroys the client (its sockets) and an open transaction, which the server then aborts.
     public func close() async {
         try? await worker.perform { [self] in
+            cursors.forEach { mongoc_cursor_destroy($0) }
+            cursors = []
             if let transaction { mongoc_client_session_destroy(transaction) }
             if let client { mongoc_client_destroy(client) }
             transaction = nil
@@ -196,6 +200,7 @@ public final class MongoSession: @unchecked Sendable {
                 guard let made = mongoc_cursor_new_from_command_reply_with_opts(client, bson_copy(reply), options) else {
                     throw AirSQLError(.other, "The server's reply had no cursor.")
                 }
+                cursors.insert(made)
                 return MongoCursor(session: self, cursor: made, tag: tag)
             }
         }
@@ -519,6 +524,7 @@ public final class MongoSession: @unchecked Sendable {
     fileprivate func next(_ cursor: MongoCursor, maxCount: Int, maxBytes: Int) async throws -> [[UInt8]] {
         try await worker.perform { [self] in
             guard let pointer = cursor.pointer else { return [] }
+            guard cursors.contains(pointer) else { throw AirSQLError.disconnected }  // the session closed under it
             mongoc_cursor_set_batch_size(pointer, UInt32(clamping: maxCount))
             var found: [[UInt8]] = [], bytes = 0
             var document: UnsafePointer<bson_t>?
@@ -547,7 +553,10 @@ public final class MongoSession: @unchecked Sendable {
 
     /// Destroys the cursor, which ends it on the server (killCursors) when it has more.
     fileprivate func close(_ pointer: OpaquePointer) {
-        worker.submit { mongoc_cursor_destroy(pointer) }
+        worker.submit { [self] in
+            // Gone already when the session closed first.
+            if cursors.remove(pointer) != nil { mongoc_cursor_destroy(pointer) }
+        }
     }
 
     // MARK: The stream initiator
