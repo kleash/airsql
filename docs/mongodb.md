@@ -59,3 +59,24 @@ The switch over the grid shows the same documents another way:
   documents that have it.
 
 **Documents** (⌃⌥4) shows the grid again. Data ▸ Collection has every command of a collection tab.
+
+## Aggregation
+
+**New Aggregation** (⌥⌘A, in a collection's right-click menu and Data ▸ Collection) opens a tab with a pipeline editor
+over the documents it gives. Type the stages in shell form, as an array or one after another:
+`[{ $match: { status: "paid" } }, { $group: { _id: "$customer", total: { $sum: "$amount" } } }]`. Each stage of
+several lines folds on its own; typing `$` at a stage's start offers the stage names, and inside a stage the field
+names of the documents loaded (with `$` before them, as an expression names a field). A mistake is underlined where it
+is, and Run says which stage, line and column.
+
+**Run** (⌘↩) runs the pipeline; its documents load a batch at a time, with **Load More** (⌥⌘↓), and show in the same
+grid as a collection's. **Collation** and **Max Time** above the editor apply to the whole pipeline. **Cancel** (⌘.)
+stops it on the server: the tab has a session of its own, so it stops only this tab's work, and closing the tab closes
+the session.
+
+**Explain** (⌥⌘E) runs the pipeline with `executionStats` and shows how the server ran it: what makes it slow first
+(a scan of the whole collection, a sort in memory, many more documents read than returned), then its steps with the
+documents each returned and its time, as a diagram, a flame graph, indented **Text**, or the server's own answer. Explain
+runs the pipeline to measure it, so a slow pipeline is slow here too.
+
+A collection tab's find can be explained the same way: its plan opens in a window of its own.

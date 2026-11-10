@@ -29,6 +29,9 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     private var unclosed: [SQLProblem] = [] { didSet { if unclosed != oldValue { underlineProblems() } } }
     /// What the check for unknown names reads, as of now; nil: it stays silent (an object editor, no connection).
     var nameContext: (() -> (snapshot: SchemaSnapshot?, database: String?, changed: Set<String>)?)?
+    /// Text in another language (a MongoDB pipeline): its own problems and folds take the place of SQL's checks and
+    /// folds, and no word takes the keyword case.
+    var otherLanguage: (problems: (String) -> [SQLProblem], folds: (String) -> [Range<Int>])?
     /// What `SQLInspections` said, as of the last pause in the typing.
     var inspected: [SQLProblem] = [] { didSet { if inspected != oldValue { underlineProblems() } } }
     /// The text changed since `unclosed` and `inspected` were made: their places, and so their fixes, are out of date.
@@ -324,6 +327,12 @@ final class SQLEditorView: NSTextView, NSViewToolTipOwner {
     }
 
     @objc func check() {
+        if let otherLanguage {
+            unclosed = []
+            inspected = otherLanguage.problems(string)
+            problemsOutOfDate = false
+            return
+        }
         let text = string, noBackslashEscapes = noBackslashEscapes
         unclosed = ConsoleScript.unclosed(in: text, noBackslashEscapes: noBackslashEscapes)
         inspect(text, noBackslashEscapes: noBackslashEscapes)

@@ -79,7 +79,7 @@ extension SQLEditorView {
     // shortcut: not with several carets, whose text isn't coloured (so not lexed) until all have typed; do it if asked.
     private func applyKeywordCase(before end: Int) {
         let settings = Self.settings()
-        guard settings.autoKeywordCase, settings.formatStyle.keywords != .keep, !applyingCarets, extraCarets.isEmpty, end > 0 else { return }
+        guard otherLanguage == nil, settings.autoKeywordCase, settings.formatStyle.keywords != .keep, !applyingCarets, extraCarets.isEmpty, end > 0 else { return }
         let text = self.string as NSString
         var start = end
         while start > 0, SQLLexer.isNameChar(text.character(at: start - 1)) { start -= 1 }
