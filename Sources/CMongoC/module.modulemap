@@ -1,0 +1,8 @@
+// libmongoc with libbson, the MongoDB client library scripts/build-mongoc.sh builds into vendor/mongoc (paths are
+// relative to this file; Package.swift adds its include folder, which the headers' own includes need).
+module CMongoC [system] {
+    header "../../vendor/mongoc/universal/include/mongoc/mongoc.h"
+    header "airsql_mongoc.h"
+    link "mongoc2"
+    export *
+}

@@ -8,12 +8,14 @@ import Testing
 
 private final class Marker {}
 
-/// The debug build of AirSQL, with the libmariadb the tests use (the app finds it in its bundle).
+/// The debug build of AirSQL, with the libmariadb and libmongoc2 the tests use (the app finds them in its bundle).
 private var airsqlBinary: String {
     Bundle(for: Marker.self).bundleURL.deletingLastPathComponent().appendingPathComponent("AirSQL").path
 }
-private let vendorLibrary = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-    .deletingLastPathComponent().appendingPathComponent("vendor/out/universal/lib").path
+private let vendorLibrary = ["vendor/out/universal/lib", "vendor/mongoc/universal/lib"].map {
+    URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent($0).path
+}.joined(separator: ":")
 
 /// Runs `AirSQL --mcp` with these messages on stdin (which then ends), its settings folder `support`; the messages it
 /// wrote, in order.

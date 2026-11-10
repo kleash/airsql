@@ -23,7 +23,8 @@ enum RouteTesting {
         let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let binary = Bundle(for: RoutesMarker.self).bundleURL.deletingLastPathComponent().appendingPathComponent("AirSQL").path
-        let library = repository.appendingPathComponent("vendor/out/universal/lib").path
+        let library = ["vendor/out/universal/lib", "vendor/mongoc/universal/lib"]
+            .map { repository.appendingPathComponent($0).path }.joined(separator: ":")
         try? "#!/bin/sh\nDYLD_LIBRARY_PATH='\(library)' exec '\(binary)' \"$@\"\n"
             .write(toFile: askpassHelper, atomically: true, encoding: .utf8)
         chmod(askpassHelper, 0o755)
