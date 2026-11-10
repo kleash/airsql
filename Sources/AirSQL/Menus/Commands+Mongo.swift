@@ -20,7 +20,7 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
-        + aggregationCommands + [editValue, removeField]
+        + aggregationCommands + [editValue, removeField] + mongoIndexCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -50,4 +50,20 @@ extension Commands {
                                    tip: "Edit the selected field in shell form, or change its type; a new document opens whole")
     static let removeField = Command("Remove Field", #selector(MongoCollectionController.removeField(_:)),
                                      tip: "Remove the selected fields from their documents, as a pending change")
+}
+
+// MARK: Indexes (lane M-index)
+
+extension Commands {
+    static let collectionIndexes = Command("Indexes", #selector(MongoCollectionController.showCollectionPage(_:)), "7", [.control, .option],
+                                           tag: MongoCollectionController.Page.indexes.rawValue,
+                                           tip: "Show the collection's indexes with their sizes and how often each is used")
+    static let createIndex = Command("Create Index…", #selector(MongoCollectionController.createIndex(_:)),
+                                     tip: "Make a new index on the collection; its command shows before it runs")
+    static let dropIndex = Command("Drop Index…", #selector(MongoCollectionController.dropIndex(_:)),
+                                   tip: "Delete the selected index; its command shows before it runs")
+    static let hideIndex = Command("Hide Index…", #selector(MongoCollectionController.toggleIndexHidden(_:)),
+                                   tip: "Hide the selected index from the query planner, or show it again; it stays up to date")
+
+    static let mongoIndexCommands = [collectionIndexes, createIndex, dropIndex, hideIndex]
 }

@@ -120,6 +120,28 @@ The switch over the grid shows the same documents another way:
 
 **Documents** (⌃⌥4) shows the grid again. Data ▸ Collection has every command of a collection tab.
 
+## Indexes
+
+**Indexes** (⌃⌥7) lists the collection's indexes: each one's name, keys, options (unique, sparse, TTL, partial filter,
+collation, hidden, and text, 2dsphere, hashed or wildcard), its size on disk (`$collStats`) and how often it has been
+used (`$indexStats`). Use is counted by each server on its own, from when it last started or the index was made: the
+caption names the server that answered, and **Since** says from when. An index still being built says *(building)*.
+**Refresh** (⌘R) reads them again.
+
+- **Create Index…** takes the keys in shell form (`{ field: 1, other: -1 }`, `{ body: "text" }`), an optional name
+  (else made from the keys, as mongosh does) and options: Unique, Sparse, Hidden, Expire After (seconds, for a TTL
+  index), a partial filter and a collation. **Preview…** shows the exact `createIndexes` command; **Create** runs it,
+  with **Cancel** (⌘.) while it builds. A unique index over documents that share their keys isn't made, and the message
+  names the first duplicate the server found.
+- **Drop Index…** shows the `dropIndexes` command, marked as destructive; on a Production connection (or one whose
+  Safety settings ask for it) you type the index's name first. The `_id` index can't be dropped.
+- **Hide Index…** (or **Unhide Index…**) shows the `collMod` command that hides the index from the query planner, or
+  shows it again; a hidden index is still kept up to date, so unhiding it is instant.
+
+In the sidebar, double-click an index to see it on its collection's Indexes page; right-click it to hide or drop it, or
+right-click a collection for **Create Index…**. On a read-only connection, a view or a time-series collection these
+commands are off, and say why.
+
 ## Export and import
 
 **Data ▸ Collection ▸ Export Documents…** writes the documents of the collection selected in the tree, or of the

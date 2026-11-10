@@ -11,9 +11,11 @@ import AppKit
 @MainActor
 final class MongoCollectionController: NSViewController, TabContent, DataGridViewDelegate, NSMenuItemValidation, NSMenuDelegate {
     enum Page: Int, CaseIterable {
-        case documents, json, schema
+        case documents, json, schema, indexes
 
-        var command: Command { [Commands.collectionDocuments, Commands.collectionJSON, Commands.collectionSchema][rawValue] }
+        var command: Command {
+            [Commands.collectionDocuments, Commands.collectionJSON, Commands.collectionSchema, Commands.collectionIndexes][rawValue]
+        }
     }
 
     let model: AppModel
@@ -34,6 +36,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     let jsonScroll = NSTextView.scrollableTextView()
     var jsonView: NSTextView { jsonScroll.documentView as! NSTextView }
     let schemaView = MongoSchemaView()
+    let indexesView = MongoIndexesView()
     private(set) lazy var toolbar = GridToolbar(grid: grid, groups: [
         [.init(Commands.refresh, "arrow.clockwise"), .init(Commands.cancelQuery, "stop.circle")],
         [.init(Commands.expandField, "arrow.up.left.and.arrow.down.right"), .init(Commands.copyDocuments, "doc.on.doc")],
@@ -49,7 +52,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     var loading: Task<Void, Never>?
     private var activity: Activity?
     /// The reads started, which tells a read a newer one took over.
-    private var reads = 0
+    private(set) var reads = 0
     private var jsonTask: Task<Void, Never>?
     /// What went wrong last, until the next read works.
     var problem: String?
@@ -131,6 +134,9 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         jsonView.layoutManager?.allowsNonContiguousLayout = true
         schemaView.sample = { [weak self] size in self?.sample(size) }
         schemaView.choose = { [weak self] path in self?.findHaving(path) }
+        for button in [indexesView.createButton, indexesView.dropButton, indexesView.hideButton] { button.target = self }
+        indexesView.table.menu?.items.forEach { $0.target = self }
+        indexesView.selectionChanged = { [weak self] in self?.updateIndexButtons() }
         pageSwitch.segmentCount = Page.allCases.count
         pageSwitch.trackingMode = .selectOne
         pageSwitch.controlSize = .small
@@ -154,7 +160,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         top.orientation = .vertical
         top.spacing = 0
         for part in top.arrangedSubviews { part.widthAnchor.constraint(equalTo: top.widthAnchor).isActive = true }
-        for part in [top, pageBar, dataPage, jsonScroll, schemaView] as [NSView] {
+        for part in [top, pageBar, dataPage, jsonScroll, schemaView, indexesView] as [NSView] {
             part.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(part)
         }
@@ -166,7 +172,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             pageBar.topAnchor.constraint(equalTo: top.bottomAnchor), pageBarHeight,
             pageBar.leadingAnchor.constraint(equalTo: view.leadingAnchor), pageBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
-        for part in [dataPage, jsonScroll, schemaView] as [NSView] {
+        for part in [dataPage, jsonScroll, schemaView, indexesView] as [NSView] {
             NSLayoutConstraint.activate([
                 part.topAnchor.constraint(equalTo: pageBar.bottomAnchor), part.bottomAnchor.constraint(equalTo: view.bottomAnchor),
                 part.leadingAnchor.constraint(equalTo: view.leadingAnchor), part.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -421,6 +427,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         emptyNote.add.isHidden = editingOff != nil
         viewer.status.update()
         toolbar.setNeedsValidation()
+        updateIndexButtons()
     }
 
     /// The loaded documents as relaxed Extended JSON, laid out off the main thread.
@@ -448,6 +455,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         dataPage.isHidden = page != .documents
         jsonScroll.isHidden = page != .json
         schemaView.isHidden = page != .schema
+        indexesView.isHidden = page != .indexes
         // On the grid's toolbar on Documents; on a bar of its own on the others.
         pageBar.subviews.forEach { $0.removeFromSuperview() }
         pageBarHeight.constant = page == .documents ? 0 : 31
@@ -462,6 +470,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         }
         if page == .json { showJSON() }
         if page == .schema, schemaView.schema == nil, loading == nil { sample(schemaView.sampleSize) }
+        if page == .indexes { loadIndexes() }
         updateBars()
         NotificationCenter.default.post(name: .tabContentDidChange, object: self)
     }
@@ -505,10 +514,10 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     @objc func runStatement(_ sender: Any?) { run() }
     /// Query ▸ Explain (⌥⌘E): the find's plan, measured, in a window of its own.
     @objc func explain(_ sender: Any?) { _ = MongoExplainWindow.explain(self) }
-    /// Refresh (⌘R): the find again, or on the Schema page a new sample.
+    /// Refresh (⌘R): the find again, or on the Schema page a new sample, on the Indexes page the indexes.
     @objc func refresh(_ sender: Any?) {
         guard loading == nil else { return }
-        if page == .schema { sample(schemaView.sampleSize) } else { run() }
+        if page == .schema { sample(schemaView.sampleSize) } else if page == .indexes { loadIndexes() } else { run() }
     }
     @objc func cancelQuery(_ sender: Any?) { activity?.cancel() }
     @objc func loadMore(_ sender: Any?) { loadMore() }
@@ -591,6 +600,10 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             reason = toggle == nil ? "Select a column that holds sub-documents, or one of their fields" : nil
         case Commands.copyDocuments.action?:
             reason = viewer.selectedRows().isEmpty ? "Select rows first" : nil
+        case Commands.createIndex.action?, Commands.dropIndex.action?, Commands.hideIndex.action?:
+            var title = Commands.hideIndex.title
+            reason = indexReason(item.action, title: &title)
+            if item.action == Commands.hideIndex.action { item.title = title }
         default:
             reason = editingReason(item)
         }
