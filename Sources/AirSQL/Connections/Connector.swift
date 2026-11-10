@@ -65,7 +65,7 @@ final class Connector {
 
     /// Connects `id` unless it is connected or connecting; prompts and the Trust sheet show on `window`.
     func connect(_ id: UUID, on window: NSWindow?) {
-        guard let saved = model.connection(id), open[id] == nil, connecting[id] == nil else { return }
+        guard let saved = model.connection(id), open[id] == nil, model.openMongo[id] == nil, connecting[id] == nil else { return }
         let activity = model.activity.start("Connecting to \(saved.displayName)", connection: id) { [weak self] in
             self?.cancel(id)
         }

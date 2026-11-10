@@ -17,15 +17,21 @@ extension Tab {
             return editor.name.map { SavedPlace(kind: kind, database: editor.database, object: $0) }
         case is ProcessListContent:
             return SavedPlace(kind: .processes)
+        case let collection as MongoCollectionController:
+            return SavedPlace(kind: .collection, database: collection.database, object: collection.name, query: collection.bar.query,
+                              page: collection.page.rawValue)
+        case let aggregation as MongoAggregationController:
+            return SavedPlace(kind: .aggregation, database: aggregation.database, object: aggregation.collection,
+                              text: aggregation.editor.string)
         default:
             return nil
         }
     }
 }
 
-/// A table, structure or process-list tab back after a relaunch. AirSQL never connects by itself, so the tab says what
-/// it was until the person presses its button, which connects the normal way (prompts, Trust sheet, error sheet) and
-/// puts the real tab in its place.
+/// A table, structure, process-list, MongoDB collection or pipeline tab back after a relaunch. AirSQL never connects by
+/// itself, so the tab says what it was until the person presses its button, which connects the normal way (prompts,
+/// Trust sheet, error sheet) and puts the real tab in its place.
 @MainActor
 final class RestoredTabContent: NSViewController, TabContent {
     let place: SavedPlace
@@ -80,6 +86,8 @@ final class RestoredTabContent: NSViewController, TabContent {
         // A moment later: both publish before the value changes, and a connect attaches right after its state.
         observers.append(model.$states.sink { [weak self] _ in DispatchQueue.main.async { self?.update() } })
         observers.append(model.$data.sink { [weak self] _ in DispatchQueue.main.async { self?.update() } })
+        // A MongoDB collection waits for its database's collections to be read (`load`).
+        observers.append(NotificationCenter.default.publisher(for: .openConnectionDidChange).sink { [weak self] _ in self?.update() })
         update()
     }
 
@@ -90,12 +98,16 @@ final class RestoredTabContent: NSViewController, TabContent {
         case .structure: return "The structure of \(name) in \(database)"
         case .processes: return "The server's process list"
         case .view, .procedure, .function, .trigger, .event: return "The \(place.kind.rawValue) \(name) in \(database)"
+        case .collection: return "The documents of \(name) in \(database)"
+        case .aggregation: return "A pipeline on \(name) in \(database)"
         }
     }
 
+    private var connected: Bool { model.openConnection(connectionID) != nil || model.openMongo[connectionID] != nil }
+
     private func update() {
         guard let saved = model.connection(connectionID) else { return }
-        let connected = model.openConnection(connectionID) != nil
+        let connected = self.connected
         let current = model.states[connectionID]
         var failed = false, connecting = false
         if case .failed? = current { failed = true }
@@ -118,13 +130,11 @@ final class RestoredTabContent: NSViewController, TabContent {
 
     /// Loads the real tab; if one on the same thing was opened meanwhile, that one shows and this tab goes.
     private func load() {
+        if let main, let mongo = model.openMongo[connectionID] { return loadMongo(mongo, in: main) }
         guard let main, let opened = model.openConnection(connectionID),
               let context = Editors.context(model.connection(connectionID), in: model) else { return }
         wanted = false
-        if let tab = main.tabs.first(where: { $0.connectionID == connectionID && !($0.shown is Self) && $0.place == place }),
-           let mine = main.tabs.first(where: { $0.shown === self }) {
-            return main.close(mine) { main.select(tab) }
-        }
+        if showsOpenedTab(in: main) { return }
         let content: NSViewController
         switch place.kind {
         case .table:
@@ -138,13 +148,47 @@ final class RestoredTabContent: NSViewController, TabContent {
             guard let kind = ObjectKind(rawValue: place.kind.rawValue) else { return }
             content = ObjectEditorController(context: context, kind: kind, database: place.database ?? "", name: place.object,
                                              table: nil, activity: model.activity)
+        case .collection, .aggregation:
+            return
         }
         main.replace(self, with: content)
     }
 
+    /// If a tab on the same thing was opened meanwhile, that one shows and this tab goes.
+    private func showsOpenedTab(in main: MainWindowController) -> Bool {
+        guard let tab = main.tabs.first(where: { $0.connectionID == connectionID && !($0.shown is Self) && $0.place == place }),
+              let mine = main.tabs.first(where: { $0.shown === self }) else { return false }
+        main.close(mine) { main.select(tab) }
+        return true
+    }
+
+    /// A MongoDB collection tab with its query bar and page, which then finds its documents, or a pipeline tab with its
+    /// pipeline, which waits for Run.
+    private func loadMongo(_ mongo: OpenMongoConnection, in main: MainWindowController) {
+        let database = place.database ?? "", name = place.object ?? ""
+        // A view or time-series collection is read-only: its kind comes from the database's listing, read first.
+        let listed = mongo.collections[database] ?? (mongo.loadErrors[database] == nil ? nil : [])
+        if place.kind == .collection, listed == nil { return mongo.loadDatabase(database) }
+        wanted = false
+        if showsOpenedTab(in: main) { return }
+        if place.kind == .collection {
+            let info = listed?.first { $0.name == name } ?? MongoCollectionInfo(name: name, kind: .collection)
+            let content = MongoCollectionController(model: model, connection: connectionID, database: database, collection: info)
+            if let query = place.query { content.bar.query = query }
+            main.replace(self, with: content)
+            _ = content.view
+            if let page = place.page.flatMap(MongoCollectionController.Page.init), page != .documents { content.show(page) }
+        } else {
+            let content = MongoAggregationController(model: model, connection: connectionID, database: database, collection: name)
+            main.replace(self, with: content)
+            _ = content.view
+            if let text = place.text { content.editor.string = text }
+        }
+    }
+
     @objc private func openTab(_ sender: Any?) {
         wanted = true
-        if model.openConnection(connectionID) == nil { model.connector.connect(connectionID, on: main?.window) }
+        if !connected { model.connector.connect(connectionID, on: main?.window) }
         update()
     }
 
