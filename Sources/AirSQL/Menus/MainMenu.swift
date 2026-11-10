@@ -99,6 +99,7 @@ enum MainMenu {
         addReconItems(menus)
         addWorkspaceItems(menus)
         addMongoItems(menus)
+        addMongoEditItems(menus)
 
         // Last in View, as on every Mac.
         menus.view.add([nil, Commands.customizeToolbar, Commands.fullScreen])

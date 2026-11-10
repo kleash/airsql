@@ -2350,7 +2350,37 @@ server.
 Everything in [Read the data in a grid](https://kleash.github.io/airsql/data-grid.html) works here: the status bar's figures, Record View, Column Summary
 (click a value to find the documents that hold it), charts. The value panel (⇧↩) shows a sub-document or an array as a
 tree, opened a level at a time. ⌘C copies cells in shell form; **Copy Documents** (⌥⇧⌘C) copies the selected rows'
-documents as Extended JSON, one per line. Documents are read-only for now.
+documents as Extended JSON, one per line.
+
+## Editing documents
+
+Nothing is written until you apply. Double-click a cell, or press Return, to edit a field; Return keeps the new value
+as a pending change, Esc cancels. Type in shell form, as the cell shows it: the field **keeps its type**, so `5` typed
+over `NumberLong(1)` is `NumberLong(5)`, plain words over a string are that string, an ISO date over a date is that date
+and 24 hex digits over an ObjectId are that ObjectId. Text that can't be read as the field's type is refused, with why.
+To change a field's type, use **Edit Value…** (Data ▸ Collection, or the cell's menu): its Type pop-up keeps the type or
+changes it to the one you choose. Edit Value… and the value panel also take a long value, a whole array or a
+sub-document. **Remove Field** removes the selected fields.
+
+**Insert Document** (⌘I) takes a new document in shell form; without an `_id` it gets a new ObjectId. **Duplicate
+Document** (⌘D) adds a copy of each selected document with a new ObjectId, and **Delete Documents** (⌘⌫) marks them
+for deletion. Pending changes show in the grid's colours (edited, new, to delete) and in the bar over it; **Revert**
+(⌥⌘Z) takes back the selected documents' changes, **Revert All** every one, and ⌘Z undoes one change at a time.
+
+Some things stay read-only, and say why when you try: views and time-series collections, `_id` (it is how a document is
+found), fields whose names hold `.` or `$`, deprecated types, and fields inside an array (edit the array as one value).
+With a **Project** set, nothing is edited: Apply compares whole documents, so clear Project and run the query again.
+
+**Apply** (⌘S) lists the exact commands first. Each document is read back and must still be exactly as you loaded it,
+types included; then `updateOne` names its `_id` and the old values, and must match one document (`deleteOne` likewise).
+On a replica set or a sharded cluster the changes run in one transaction: all of them or none. A standalone server has
+no transactions, and the sheet says so before you run: if a change fails, the ones before it stay applied. When Apply
+stops, it says which document and why (someone else changed it, a duplicate `_id`…), and the changes not applied stay
+pending, to fix or revert. If the connection fails before the server answers, AirSQL can't tell whether the change was
+made: it says so and never sends it again; Refresh (⌘R) shows what the server holds. After Apply, the changed documents
+are read back into the grid.
+
+Running another query, closing the tab, disconnecting or quitting with changes not applied asks first.
 
 ## JSON and Schema
 

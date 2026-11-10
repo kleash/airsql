@@ -14,6 +14,11 @@ extension MainWindowController {
             if let table = tab.shown as? TableDataController, table.inTransaction, model.data.safety(for: table.context.connection).warnOnClose {
                 lines.append("A transaction in “\(tab.title)” on \(table.context.connection.displayName), not committed: it is rolled back")
             }
+            if let collection = tab.shown as? MongoCollectionController, collection.isEdited {
+                let count = collection.changes.steps.count
+                lines.append("\(collection.name) on \(model.connection(collection.connectionID)?.displayName ?? ""): \(count.formatted()) "
+                             + "pending change\(count == 1 ? "" : "s"), not applied: they are discarded")
+            }
             if let table = tab.shown as? TableDataController, let changes = table.source?.changes, !changes.isEmpty,
                model.data.safety(for: table.context.connection).warnOnClose {
                 let count = changes.rowCount
