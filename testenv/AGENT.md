@@ -110,7 +110,7 @@ cache and a 512 MB limit per server). MongoDB 7.0: 8.0 and later don't run on Do
 
 ```sh
 testenv/mongo/up.sh                                       # airsql-lab's hops first (testenv/up.sh), then this lab
-AIRSQL_MONGO_LAB=1 ./test.sh --filter MongoSpikeTests     # the tests that use it
+AIRSQL_MONGO_LAB=1 ./test.sh --filter Mongo              # the tests that use it
 testenv/mongo/down.sh                                     # removes this lab only
 ```
 

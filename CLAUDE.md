@@ -80,7 +80,7 @@ swift build              # debug build: must have 0 warnings (run the app from b
 AIRSQL_LAB=1 ./test.sh   # + the lab suites, on the lab as it runs; when some of it doesn't, testenv/up.sh starts it,
                          # in the main checkout only: worktrees share that lab and its key and CA (testenv/AGENT.md).
                          # About 30 minutes. Every lab service must be up: suites loop over all nine servers
-AIRSQL_MONGO_LAB=1 ./test.sh --filter MongoSpikeTests   # the MongoDB lab (testenv/mongo/up.sh; testenv/AGENT.md)
+AIRSQL_MONGO_LAB=1 ./test.sh --filter Mongo            # the MongoDB lab (testenv/mongo/up.sh; testenv/AGENT.md)
 AIRSQL_SCREENSHOTS=1 ./test.sh --filter ScreenshotTests   # light and dark pictures of each screen, in build/screenshots
 AIRSQL_SCREENSHOTS=1 ./test.sh --filter GridScreenshotTests   # the grid's light and dark pictures, in build/screenshots
 AIRSQL_GRID_FPS=1 ./test.sh -c release -Xswiftc -enable-testing --filter GridFrameRateTests
