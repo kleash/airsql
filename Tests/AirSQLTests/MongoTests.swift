@@ -320,6 +320,21 @@ struct MongoLabTests {
         }
     }
 
+    /// Cancel works for a login that may only read (the one AirSQL recommends for agents): it finds its own operation.
+    @Test func cancelWorksForALoginThatOnlyReads() async throws {
+        let connection = try connection(Self.solo, route: .direct, login: Lab.Login(user: "reader", password: "reader-pass"))
+        try await connection.connect()
+        let data = try await connection.session(.data)
+        let slow = MongoFind(filter: document(["$where": .string("sleep(20) || true")]))
+        let started = Date()
+        let running = Task { try await data.find(database: "fixture", collection: "many", slow).next() }
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        await data.cancel()
+        await #expect { _ = try await running.value } throws: { ($0 as? AirSQLError)?.kind == .cancelled }
+        #expect(Date().timeIntervalSince(started) < 5)
+        await connection.close()
+    }
+
     /// Batches stop at a count or at a size, whichever comes first, and the cursor reads on with getMore.
     @Test func findReadsInBatchesBoundedByCountAndBytes() async throws {
         let connection = try connection(Self.solo, route: .direct)

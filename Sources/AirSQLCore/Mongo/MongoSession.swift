@@ -129,7 +129,9 @@ public final class MongoSession: @unchecked Sendable {
     func killOperations(tagged tag: String) async throws -> Int {
         let filter: BSONValue = .array([.document(BSONDocument([("command.comment", .string(tag))])),
                                         .document(BSONDocument([("cursor.originatingCommand.comment", .string(tag))]))])
-        let reply = try await command(BSONDocument([("currentOp", .int32(1)), ("$all", .bool(true)), ("$or", filter)]),
+        // $ownOps: a login without the inprog privilege (a read-only one) may still list and end its own operations.
+        let reply = try await command(BSONDocument([("currentOp", .int32(1)), ("$all", .bool(true)), ("$ownOps", .bool(true)),
+                                                    ("$or", filter)]),
                                       database: "admin")
         guard case .array(let ops)? = reply["inprog"] else { return 0 }
         var ended = 0

@@ -258,6 +258,32 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     /// Run (⌘↩): the pipeline from its first batch.
     func run() {
         guard let (stages, options) = parsed() else { return }
+        whenWritesAllowed(stages) { [self] in run(stages, options) }
+    }
+
+    /// A pipeline ending in $out or $merge writes a collection: refused on a read-only connection, otherwise run only
+    /// once the person has seen it in the preview sheet, as any other change.
+    private func whenWritesAllowed(_ stages: [BSONDocument], then go: @escaping () -> Void) {
+        let writes = stages.compactMap { $0.keys.first }.filter { $0 == "$out" || $0 == "$merge" }
+        guard let stage = writes.first else { return go() }
+        guard let open = model.openMongo[connectionID], let window = view.window else { return }
+        if model.connection(connectionID)?.readOnly == true {
+            return fail("\(stage) writes to a collection, and this connection is read-only.")
+        }
+        var request = SQLPreviewRequest(
+            change: ChangeSQL(title: "Run a pipeline that writes", statements: [MongoPipeline.text(stages)], connection: connectionID),
+            heading: "Run a pipeline that writes with \(stage)?",
+            caption: "\(stage) writes the pipeline's documents into a collection"
+                + (stage == "$out" ? ", replacing everything in it." : ", merging them into it."))
+        request.actionTitle = "Run"
+        request.destructive = true
+        request.shellCommands = true
+        SQLPreviewSheet.show(request, connection: open.saved, on: window) { result in
+            if result.approved { go() }
+        }
+    }
+
+    private func run(_ stages: [BSONDocument], _ options: MongoFind) {
         stopReading()
         let (database, collection, batch) = (self.database, self.collection, self.batch)
         read("Running a pipeline on \(collection)") { [self] session in
@@ -306,6 +332,11 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     /// Explain (⌥⌘E): the pipeline run with executionStats, its plan shown.
     func explain() {
         guard let (stages, options) = parsed() else { return }
+        // executionStats runs the pipeline, so a writing one is asked about as Run asks.
+        whenWritesAllowed(stages) { [self] in explain(stages, options) }
+    }
+
+    private func explain(_ stages: [BSONDocument], _ options: MongoFind) {
         stopReading()
         let (database, collection) = (self.database, self.collection)
         read("Explaining a pipeline on \(collection)") { [self] session in

@@ -190,3 +190,35 @@ extension AppTests {
         }
     }
 }
+
+extension AppTests {
+    /// A pipeline ending in $out or $merge writes: a read-only connection refuses it, and otherwise nothing runs until
+    /// the preview sheet is approved (Run and Explain alike, since executionStats runs it).
+    @Test(.enabled(if: MongoLab.enabled)) func aWritingPipelineIsRefusedOrPreviewedFirst() async throws {
+        let (main, harness, mongo) = try await aggregationWindow()
+        let tab = try await openAggregation("many", main, harness, mongo)
+        let target = "agg_out_\(UUID().uuidString.prefix(8))"
+        let session = try await mongo.connection.session(.main)
+        func written() async throws -> Bool {
+            try await session.listCollections(database: "fixture").contains { $0.name == target }
+        }
+
+        let index = try #require(tab.model.data.connections.firstIndex { $0.id == mongo.saved.id })
+        tab.model.data.connections[index].readOnly = true
+        for explain in [false, true] {
+            tab.editor.string = "[{ $match: {} }, { $out: \"\(target)\" }]"
+            if explain { tab.explain() } else { tab.run() }
+            #expect(tab.problem == "$out writes to a collection, and this connection is read-only.", "\(tab.problem ?? "")")
+            #expect(main.window?.attachedSheet == nil)
+        }
+
+        tab.model.data.connections[index].readOnly = false
+        tab.editor.string = "[{ $match: {} }, { $merge: { into: \"\(target)\" } }]"
+        tab.run()
+        #expect(await eventually(timeout: 5) { main.window?.attachedSheet?.windowController is SQLPreviewSheet })
+        #expect(try await !written())
+        #expect(await call(harness, "press", ["id": "preview.cancel"]).error == nil)
+        #expect(await eventually(timeout: 5) { main.window?.attachedSheet == nil })
+        #expect(try await !written())
+    }
+}
