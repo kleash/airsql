@@ -51,7 +51,7 @@ extension BSONDocument {
     }
 }
 
-private struct BSONReader {
+struct BSONReader {
     let b: [UInt8]
 
     func fail(_ message: String, _ at: Int) -> BSONError { BSONError("\(message) (at byte \(at))") }
@@ -81,6 +81,14 @@ private struct BSONReader {
     func cstring(at i: Int, end: Int, _ what: String) throws -> (String, Int) {
         guard i <= end, let zero = b[i..<end].firstIndex(of: 0) else { throw fail("\(what) has no terminating NUL", i) }
         return (try utf8(i, zero), zero + 1)
+    }
+
+    /// Where a string ends, from its length alone: skipping needn't check UTF-8, which is seconds for a 16 MB string.
+    func stringEnd(at i: Int, end: Int) throws -> Int {
+        let n = try int32(at: i, end: end, "a string's length")
+        guard n >= 1, n <= end - i - 4 else { throw fail("A string's length (\(n)) doesn't fit", i) }
+        guard b[i + 4 + n - 1] == 0 else { throw fail("A string doesn't end with NUL", i) }
+        return i + 4 + n
     }
 
     func string(at i: Int, end: Int) throws -> (String, Int) {
@@ -119,9 +127,9 @@ private struct BSONReader {
         case 0x07: return try fixed(12, "an ObjectId")
         case 0x08: return try fixed(1, "a boolean")
         case 0x06, 0x0A, 0xFF, 0x7F: return i
-        case 0x02, 0x0D, 0x0E: return try string(at: i, end: end).1
+        case 0x02, 0x0D, 0x0E: return try stringEnd(at: i, end: end)
         case 0x0C:
-            let next = try string(at: i, end: end).1
+            let next = try stringEnd(at: i, end: end)
             try need(12, at: next, end: end, "a DBPointer's ObjectId")
             return next + 12
         case 0x03, 0x04, 0x0F:
