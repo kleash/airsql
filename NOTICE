@@ -32,6 +32,16 @@ example ad hoc:
     codesign --force --sign - AirSQL.app/Contents/Frameworks/libmariadb.3.dylib
     codesign --force --sign - AirSQL.app
 
+The app also includes a second dynamic library, AirSQL.app/Contents/Frameworks/libmongoc2.dylib, which
+scripts/build-mongoc.sh builds the same way from pinned, checksummed source releases:
+
+- The MongoDB C Driver, mongo-c-driver (https://github.com/mongodb/mongo-c-driver): libmongoc and libbson, the MongoDB
+  client library. Copyright MongoDB, Inc. Licensed under the Apache License, Version 2.0. It contains third-party code
+  under other permissive licences, among them utf8proc (MIT), listed in its THIRD_PARTY_NOTICES.
+- OpenSSL, as above: its own copy, linked in statically and hidden inside the library.
+
 The licence texts ship in the app (AirSQL.app/Contents/Resources/Licenses) and are in this repository under
 Resources/Licenses: MariaDB-Connector-C-LICENSE.txt (Connector/C's COPYING.LIB, the LGPL version 2.1), LGPL-3.0.txt and
-GPL-3.0.txt (the LGPL version 3 and the GPL it builds on), and OpenSSL-LICENSE.txt.
+GPL-3.0.txt (the LGPL version 3 and the GPL it builds on), OpenSSL-LICENSE.txt, mongo-c-driver-LICENSE.txt (the
+driver's COPYING, the Apache License 2.0), and the notices for the code the driver contains:
+mongo-c-driver-THIRD_PARTY_NOTICES.txt (utf8proc's licence among them) and libbson-THIRD_PARTY_NOTICES.txt.
