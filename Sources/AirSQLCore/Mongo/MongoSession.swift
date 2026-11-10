@@ -193,7 +193,7 @@ public final class MongoSession: @unchecked Sendable {
 
     /// A command that answers with a cursor (find, aggregate, listCollections, listIndexes): its first batch and the
     /// rest through getMore.
-    private func cursor(_ command: BSONDocument, database: String) async throws -> MongoCursor {
+    func cursor(_ command: BSONDocument, database: String) async throws -> MongoCursor {
         try await worker.perform { [self] in
             try withCommand(command, database: database) { reply, server, tag in
                 let options = try self.options(server: server)
@@ -345,7 +345,7 @@ public final class MongoSession: @unchecked Sendable {
                           database: database)
     }
 
-    private func explain(_ inner: BSONDocument, database: String) async throws -> BSONDocument {
+    func explain(_ inner: BSONDocument, database: String) async throws -> BSONDocument {
         try await command(BSONDocument([("explain", .document(inner)), ("verbosity", .string("executionStats"))]), database: database)
     }
 
@@ -459,7 +459,7 @@ public final class MongoSession: @unchecked Sendable {
 
     /// A write through the driver's collection helpers, which retry once after a network error (retryable writes) and
     /// turn write errors into errors; logged as the command it sends. The reply's `count`.
-    private func write(_ logged: BSONDocument, database: String, collection: String, count: String,
+    func write(_ logged: BSONDocument, database: String, collection: String, count: String,
                        collation: BSONDocument? = nil,
                        _ body: @escaping (OpaquePointer, UnsafeMutablePointer<bson_t>, UnsafeMutablePointer<bson_t>,
                                           UnsafeMutablePointer<bson_error_t>) throws -> Bool) async throws -> Int64 {
