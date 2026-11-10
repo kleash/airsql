@@ -1,7 +1,7 @@
 # AirSQL for Claude Code
 
 This plugin adds AirSQL's MCP server to Claude Code, and a skill that tells Claude when to use it. AirSQL is a native
-Mac app for MySQL and MariaDB; its server (`AirSQL --mcp`) talks to the AirSQL running on your Mac.
+Mac app for MySQL, MariaDB and MongoDB; its server (`AirSQL --mcp`) talks to the AirSQL running on your Mac.
 
 ```sh
 claude plugin marketplace add kleash/airsql

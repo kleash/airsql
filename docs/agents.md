@@ -44,6 +44,16 @@ no agent can, whatever it asks.
 - To change something, an agent puts the SQL into a query tab. Nothing runs until you press Run.
 - For more safety still, connect with a database user that can only read.
 
+## MongoDB connections
+
+On a MongoDB connection with **Schema + read** (or analytics), agents get tools of their own: find, aggregate, count,
+distinct, the lists of databases, collections and indexes, sizes, and a summary of a sample of documents. They can't
+write: every request is checked before it is sent, and refused if it would run JavaScript (`$where`, `$function`) or
+write (`$out`, `$merge`), uses a pipeline stage AirSQL hasn't vetted, or reaches MongoDB's own databases (admin,
+local, config) or `system` collections. Each runs with the time limit and document cap of Settings ▸ Safety, and on a
+replica set inside a transaction that is always cancelled, so even a write that got past the check is refused by the
+server. For more safety still, connect with a user that has only the `read` role.
+
 ## Agents in AirSQL's windows
 
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
