@@ -114,7 +114,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     @objc private func gridSettingsChanged(_ notification: Notification) {
         guard let settings = (notification.object as? AppModel)?.data.settings,
               let old = notification.userInfo?["old"] as? AppSettings else { return }
-        grid.nullText = settings.nullText
+        grid.nullText = source is MongoDocumentSource ? MongoDocumentSource.nullText : settings.nullText
         applyLook(settings)
         if grid.fontSize == CGFloat(old.gridFontSize) { grid.fontSize = CGFloat(settings.gridFontSize) }
     }
@@ -171,6 +171,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             zones = [:]
         }
         displayed = source.map(display)
+        if source is MongoDocumentSource { grid.nullText = MongoDocumentSource.nullText }
         heat = [:]
         updateTint()
         grid.source = displayed

@@ -46,6 +46,19 @@ extension AppTests {
             #expect(main.toolbarController.databasePopup.toolTip != NotForMongo.reason)
         }
 
+        /// BSON null shows as mongosh writes it, `null`, still drawn and marked as null; a MySQL grid keeps its NULL.
+        @Test func bsonNullShowsAsNull() throws {
+            let source = MongoDocumentSource()
+            source.append([try BSONDocument([(key: "_id", value: .int32(1)), (key: "v", value: .null)]).bytes(),
+                           try BSONDocument([(key: "_id", value: .int32(2)), (key: "v", value: .int32(3))]).bytes()])
+            let viewer = GridViewer(source: nil)
+            let sqlNull = viewer.grid.nullText
+            viewer.show(source)
+            #expect(viewer.grid.nullText == "null" && source.cell(0, 1) == .null && source.value(0, 1) == nil)
+            #expect(source.columns[1].marks.contains(.nullable) && source.columns[1].type == "int")
+            #expect(GridViewer(source: nil).grid.nullText == sqlNull && sqlNull == "NULL")
+        }
+
         /// The tree leaves out system.* collections (the fixture's view and time-series make system.views and
         /// system.buckets.readings), and lists admin, config and local after the person's databases, quieter.
         @Test(.enabled(if: MongoLab.enabled)) func theTreeHidesSystemCollectionsAndListsMongoDBsOwnLast() async throws {

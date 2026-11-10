@@ -11,6 +11,8 @@ public final class MongoDocumentSource: GridSource {
     public private(set) var columns: [GridColumn] = []
     /// Each column's path, keys from the top: ["address", "city"] is `address.city`.
     public private(set) var paths: [[String]] = []
+    /// How the grid shows BSON null: mongosh's word, not SQL's NULL (Settings ▸ Grid's text is for MySQL).
+    public static let nullText = "null"
     /// The most characters a cell shows (never cut: `_id`).
     static let shownLimit = 1_000
     /// Cells decoded so far, for the tests: only those asked for are.
