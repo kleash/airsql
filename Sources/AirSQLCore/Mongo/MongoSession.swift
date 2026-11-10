@@ -378,6 +378,33 @@ public final class MongoSession: @unchecked Sendable {
         }
     }
 
+    /// An import's insert: `ordered` stops at the first document the server refuses, unordered tries every one. How many
+    /// went in, and each refused document's index in `documents` with why; anything else (a lost connection) throws.
+    public func insertMany(database: String, collection: String, _ documents: [BSONDocument],
+                           ordered: Bool) async throws -> (inserted: Int64, refused: [(index: Int, error: AirSQLError)]) {
+        let logged = BSONDocument([("insert", .string(collection)), ("documents", .array(documents.map { .document($0) })),
+                                   ("ordered", .bool(ordered))])
+        var refused: [(index: Int, error: AirSQLError)] = []
+        let inserted = try await write(logged, database: database, collection: collection, count: "insertedCount") { target, options, reply, error in
+            let made = try documents.map { try $0.bson() }
+            defer { made.forEach { bson_destroy($0) } }
+            var pointers = made.map { UnsafePointer($0) as UnsafePointer<bson_t>? }
+            bson_append_bool(options, "ordered", -1, ordered)
+            if mongoc_collection_insert_many(target, &pointers, made.count, options, reply, error) { return true }
+            // Write errors come with the reply's insertedCount: counted here, not thrown. A write concern error isn't one.
+            guard case .array(let errors)? = (try? BSONDocument(bson: reply))?["writeErrors"], !errors.isEmpty else { return false }
+            refused = errors.compactMap { entry in
+                guard case .document(let e) = entry, let index = e["index"]?.integer, let code = e["code"]?.integer else { return nil }
+                let message: String
+                if case .string(let text)? = e["errmsg"] { message = text } else { message = "" }
+                return (Int(index), MongoErrorMapping.map(domain: MONGOC_ERROR_SERVER.rawValue, code: UInt32(truncatingIfNeeded: code),
+                                                          message: message))
+            }
+            return true
+        }
+        return (inserted, refused)
+    }
+
     /// Changes the one document `filter` matches (Apply's filter names its _id and old values) with `update`'s
     /// operators; matched and modified counts, which Apply checks.
     public func updateOne(database: String, collection: String, filter: BSONDocument, update: BSONDocument,
