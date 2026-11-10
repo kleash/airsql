@@ -195,6 +195,7 @@ extension MainWindowController {
                 self.sidebarSelectionChanged()
                 self.sidebar.outline.sendCommand(Commands.connect.action)
             })
+            if let mongo = model.openMongo[connection.id] { items += mongoItems(mongo) }
             guard let open = model.openConnection(connection.id) else { continue }
             for database in open.snapshot.databases {
                 let place = database.name + " on " + connection.displayName
@@ -216,6 +217,21 @@ extension MainWindowController {
             }
         }
         return items
+    }
+
+    /// A MongoDB connection's databases, and the collections and views the tree has read.
+    private func mongoItems(_ mongo: OpenMongoConnection) -> [QuickOpenSheet.Item] {
+        let id = mongo.saved.id, name = mongo.saved.displayName
+        return (mongo.databases ?? []).flatMap { database -> [QuickOpenSheet.Item] in
+            let place = database.name + " on " + name
+            return [.init(name: database.name, place: "Database on " + name) { [weak self] in
+                self?.sidebar.reveal(.mongo(id, MongoTreeItem(database: database.name)), showing: true)
+            }] + (mongo.collections[database.name] ?? []).map { info in
+                .init(name: info.name, place: (info.kind == .view ? "View in " : "") + place) { [weak self] in
+                    self?.openCollection(info, database: database.name, connection: id)
+                }
+            }
+        }
     }
 
     /// Recent files, then those the Files panel has listed.

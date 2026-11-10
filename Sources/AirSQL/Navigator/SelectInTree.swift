@@ -11,11 +11,27 @@ extension Tab {
         if kind == .table, let table = open.snapshot.table(database, name) { kind = DatabaseObject.Kind(rawValue: table.kind.rawValue) ?? .table }
         return .object(open.id, DatabaseObject(kind, database, name))
     }
+
+    /// A MongoDB collection or aggregation tab's collection in the tree.
+    var mongoTreeItem: MongoTreeItem? {
+        if let collection = shown as? MongoCollectionController { return MongoTreeItem(database: collection.database, collection: collection.name) }
+        if let aggregation = shown as? MongoAggregationController {
+            return MongoTreeItem(database: aggregation.database, collection: aggregation.collection)
+        }
+        return nil
+    }
 }
 
 extension MainWindowController {
     /// Select in Tree: the tab's table or object; in a query tab, the name at the cursor, else the tab's database.
     @objc func selectInTree(_ sender: Any?) {
+        if let id = selectedTab?.connectionID, let mongo = model.openMongo[id] {
+            guard let item = selectedTab?.mongoTreeItem else { return reveal(.connection(id), sender) }
+            // Its database's collections may not be read yet: the database then, which reads them as it opens.
+            mongo.loadDatabase(item.database)
+            if sidebar.reveal(.mongo(id, item)) { return focusSidebar(sender) }
+            return reveal(.mongo(id, MongoTreeItem(database: item.database)), sender)
+        }
         guard let tab = selectedTab, let open = model.openConnection(tab.connectionID) else { return }
         guard let console = tab.shown as? ConsoleViewController else {
             return reveal(tab.treeRow(in: open), sender)
