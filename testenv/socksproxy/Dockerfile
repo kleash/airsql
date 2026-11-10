@@ -1,6 +1,6 @@
 # Ported from AirSCP 1.4.0 testenv/socksproxy/Dockerfile.
 # AirSQL lab "socksproxy": a SOCKS5 proxy (Dante) that wants user airsql / password airsql-proxy, a system user here,
-# and only CONNECTs to ports 22 and 3306 on the inner network, as the HTTP proxies do.
+# and only CONNECTs to ports 22, 3306 and 27017 on the inner network, as the HTTP proxies do.
 FROM alpine:latest@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 RUN apk add --no-cache dante-server \
@@ -21,6 +21,7 @@ user.unprivileged: nobody
 client pass { from: 0.0.0.0/0 to: 0.0.0.0/0 }
 socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 port = 22 command: connect }
 socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 port = 3306 command: connect }
+socks pass { from: 0.0.0.0/0 to: 0.0.0.0/0 port = 27017 command: connect }
 EOF2
 
 EXPOSE 1080

@@ -1,6 +1,6 @@
 # Ported from AirSCP 1.4.0 testenv/digestproxy/Dockerfile.
 # AirSQL lab "digestproxy": squid asking for Digest login only (no Basic), user airsql / password airsql-proxy, and
-# only CONNECTs to ports 22 and 3306 (the inner network's SSH hosts and databases, by service name).
+# only CONNECTs to ports 22, 3306 and 27017 (the inner network's SSH hosts and databases, by service name).
 FROM alpine:latest@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 RUN apk add --no-cache squid
@@ -17,7 +17,7 @@ auth_param digest program /usr/lib/squid/digest_file_auth /etc/squid/digest_pass
 auth_param digest realm airsql-lab
 auth_param digest children 2
 acl authed proxy_auth REQUIRED
-acl lab_ports port 22 3306
+acl lab_ports port 22 3306 27017
 acl CONNECT method CONNECT
 http_access deny CONNECT !lab_ports
 http_access allow CONNECT authed

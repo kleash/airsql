@@ -1,0 +1,55 @@
+# AirSQL's MongoDB lab (Compose project airsql-mongo-lab): a standalone mongod and a three-member replica set with TLS
+# from the lab CA. Start it with testenv/mongo/up.sh, remove it with testenv/mongo/down.sh; testenv/AGENT.md says how
+# to use it. It needs airsql-lab's bastion, jump host and proxies (testenv/up.sh): its servers join that lab's
+# internal network "inner", so they answer only through those hops, and the standalone also on 127.0.0.1:44370.
+name: airsql-mongo-lab
+
+# Small caches: the lab shares Docker's memory with other projects. oom_score_adj as in airsql-lab. MongoDB 7.0: 8.0, 8.3
+# and 9.0 refuse to start on Docker Desktop's Linux 7.0 kernel, and 8.2 crashes on it within minutes (SERVER-121912:
+# their tcmalloc and the kernel's rseq). Move up when MongoDB fixes that.
+x-mongod: &mongod
+  image: mongo:7.0.45@sha256:8bb4442761a63a8dda452744082cdac9644b429807eb977b42324a63cef59ca4
+  mem_limit: 512m
+  oom_score_adj: 1000
+  networks: [inner]
+
+# A replica-set member: the keyfile (members' own login) and its certificate (lab CA, for its own name) are copied
+# where mongod, which runs as "mongodb", may own them. TLS is required; clients need no certificate of their own.
+x-member: &member
+  <<: *mongod
+  volumes: ["../.certs:/tls:ro"]
+  entrypoint:
+    - bash
+    - -c
+    - >-
+      install -o mongodb -g mongodb -m 400 /tls/mongo-keyfile /tmp/keyfile &&
+      cat /tls/$$HOSTNAME.pem /tls/$$HOSTNAME-key.pem > /tmp/server.pem && chown mongodb /tmp/server.pem &&
+      exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/keyfile --wiredTigerCacheSizeGB 0.25
+      --tlsMode requireTLS --tlsCertificateKeyFile /tmp/server.pem --tlsCAFile /tls/ca.pem
+      --tlsAllowConnectionsWithoutCertificates
+
+services:
+  # Seeded by the image's first start (seed/: the fixture and the logins). No TLS.
+  mongo-solo:
+    <<: *mongod
+    hostname: mongo-solo
+    environment: {MONGO_INITDB_ROOT_USERNAME: root, MONGO_INITDB_ROOT_PASSWORD: airsql-root}
+    volumes: ["./seed:/docker-entrypoint-initdb.d:ro"]
+    command: [--wiredTigerCacheSizeGB, "0.25"]
+    ports: ["127.0.0.1:44370:27017"]
+    networks: [inner, solo]
+
+  # The replica set rs0, initiated and seeded by up.sh.
+  mongo-rs1:
+    <<: *member
+    hostname: mongo-rs1
+  mongo-rs2:
+    <<: *member
+    hostname: mongo-rs2
+  mongo-rs3:
+    <<: *member
+    hostname: mongo-rs3
+
+networks:
+  inner: {external: true, name: airsql-lab_inner}
+  solo: {}

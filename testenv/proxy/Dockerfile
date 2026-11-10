@@ -1,6 +1,6 @@
 # Ported from AirSCP 1.4.0 testenv/proxy/Dockerfile.
 # AirSQL lab "proxy": tinyproxy, an HTTP proxy that wants user airsql / password airsql-proxy (Basic) and only
-# CONNECTs to port 22 (the bastion and the jump host) and 3306 (the inner network's databases), by service name.
+# CONNECTs to port 22 (the bastion and the jump host), 3306 and 27017 (the inner network's databases), by service name.
 FROM alpine:latest@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 RUN apk add --no-cache tinyproxy
@@ -20,6 +20,7 @@ Allow 192.168.0.0/16
 BasicAuth airsql airsql-proxy
 ConnectPort 22
 ConnectPort 3306
+ConnectPort 27017
 DisableViaHeader Yes
 EOF
 
