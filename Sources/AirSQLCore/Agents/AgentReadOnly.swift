@@ -93,7 +93,7 @@ public enum AgentReadOnly {
         }
     }
 
-    private static let turns = Turns()
+    static let turns = Turns()
 
     /// One holder at a time per session; the others wait their turn, in order.
     final class Turns: @unchecked Sendable {

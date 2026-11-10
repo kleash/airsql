@@ -41,10 +41,15 @@ extension AgentService {
             var entry: [String: Any] = [
                 "connection": saved.displayName, "id": saved.id.uuidString, "colour": saved.colour.rawValue,
                 "access": saved.agentAccess.rawValue, "accessTitle": saved.agentAccess.title,
-                "sampleRows": saved.agentSampleRows, "readOnly": saved.readOnly, "connected": target.connection != nil,
+                "sampleRows": saved.agentSampleRows, "readOnly": saved.readOnly, "connected": target.connection != nil || target.mongo != nil,
                 "rowCap": target.rowCap, "timeoutSeconds": target.timeout,
             ]
             if let database = target.database { entry["database"] = database }
+            entry["engine"] = saved.engine.rawValue
+            if let server = target.mongo?.server {
+                entry["version"] = server.version
+                entry["topology"] = server.summary
+            }
             if let snapshot = target.schema?.snapshot, let server = snapshot.server {
                 entry["flavour"] = server.flavour.rawValue
                 entry["version"] = server.versionString
@@ -172,6 +177,7 @@ extension AgentService {
         case "open_in_console": return "open_in_console · “\(arguments["title"] as? String ?? "From an agent")”"
         case "read_console": return "read_console" + ((arguments["tab"] as? String).map { " · " + $0 } ?? "")
         case "resources/read": return "schema resource · " + (arguments["uri"] as? String ?? "")
+        case _ where tool.hasPrefix("mongo_"): return tool + " · " + Self.shellForm(tool, arguments)
         case "menu": return "menu · " + (arguments["path"] as? String ?? "")
         case "press", "set": return tool + " · " + (arguments["id"] as? String ?? arguments["title"] as? String ?? "")
         case "key": return "key · " + (arguments["combo"] as? String ?? "")
@@ -181,6 +187,31 @@ extension AgentService {
         case "click", "double_click", "right_click":
             return tool + " · \((arguments["x"] as? NSNumber)?.intValue ?? 0), \((arguments["y"] as? NSNumber)?.intValue ?? 0)"
         default: return tool + connection
+        }
+    }
+
+    /// A MongoDB call as the shell would write it, short: `fixture.orders.find({status: "A"})`.
+    static func shellForm(_ tool: String, _ arguments: [String: Any]) -> String {
+        func shell(_ key: String) -> String {
+            guard let text = arguments[key] as? String else { return "" }
+            let value = (try? BSONDocument(extendedJSON: "{\"v\":" + text + "\n}"))?["v"]
+            return value?.shellForm(maxLength: 60) ?? String(text.prefix(60))
+        }
+        let database = arguments["database"] as? String ?? ""
+        let namespace = [database, arguments["collection"] as? String ?? ""].filter { !$0.isEmpty }.joined(separator: ".")
+        switch tool {
+        case "mongo_find": return namespace + ".find(" + shell("filter") + ")"
+        case "mongo_aggregate": return namespace + ".aggregate(" + shell("pipeline") + ")"
+        case "mongo_count": return namespace + ".countDocuments(" + shell("filter") + ")"
+        case "mongo_distinct":
+            return namespace + ".distinct(" + BSONValue.string(arguments["key"] as? String ?? "").shellForm()
+                + (shell("filter").isEmpty ? "" : ", " + shell("filter")) + ")"
+        case "mongo_list_databases": return "show dbs"
+        case "mongo_list_collections": return database + " · show collections"
+        case "mongo_list_indexes": return namespace + ".getIndexes()"
+        case "mongo_stats": return namespace + ".stats()"
+        case "mongo_schema_sample": return namespace + " · schema sample"
+        default: return namespace
         }
     }
 
@@ -197,6 +228,12 @@ extension AgentService {
         case "describe": return "\((reply["objects"] as? [Any])?.count ?? 0) objects"
         case "profile", "search_columns": return "\((reply["columns"] as? [Any])?.count ?? 0) columns"
         case "context": return "\((reply["connections"] as? [Any])?.count ?? 0) connections"
+        case "mongo_find", "mongo_aggregate":
+            let count = reply["count"] as? Int ?? 0
+            return "\(count) document\(count == 1 ? "" : "s")" + (reply["capped"] as? Bool == true ? ", capped" : "")
+        case "mongo_count": return "\(reply["count"] as? Int ?? 0) documents"
+        case "mongo_distinct": return "\(reply["count"] as? Int ?? 0) values"
+        case "mongo_schema_sample": return "\((reply["fields"] as? [Any])?.count ?? 0) fields"
         default: return "done"
         }
     }
