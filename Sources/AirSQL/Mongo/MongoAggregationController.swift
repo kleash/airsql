@@ -65,12 +65,6 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     private(set) var saved: [MongoSavedPipelines.Entry] = []
     private(set) var savedName: String?
 
-    /// Stage names offered at a stage's start.
-    static let stageNames = ["$addFields", "$bucket", "$bucketAuto", "$count", "$densify", "$documents", "$facet", "$fill", "$geoNear",
-                             "$graphLookup", "$group", "$indexStats", "$limit", "$lookup", "$match", "$merge", "$out", "$project",
-                             "$redact", "$replaceRoot", "$replaceWith", "$sample", "$set", "$setWindowFields", "$skip", "$sort",
-                             "$sortByCount", "$unionWith", "$unset", "$unwind"]
-
     init(model: AppModel, connection: UUID, database: String, collection: String) {
         self.model = model
         connectionID = connection
@@ -258,7 +252,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         let paths = Array(NSOrderedSet(array: source.paths.map { $0.joined(separator: ".") })) as? [String] ?? []
         let items: [CompletionItem]
         if depth <= 1 {
-            items = Self.stageNames.map { CompletionItem(kind: .keyword, text: $0, label: $0, detail: "stage") }
+            items = MongoWords.stages.map(\.name).sorted().map { CompletionItem(kind: .keyword, text: $0, label: $0, detail: "stage") }
         } else if typed.hasPrefix("$") {
             items = paths.map { CompletionItem(kind: .column, text: "$" + $0, label: "$" + $0, detail: "field") }
         } else {
