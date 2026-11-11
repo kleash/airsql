@@ -24,6 +24,7 @@ extension MainMenu {
         addMongoBulkItems(menus)
         addMongoAdminItems(menus)
         addMongoHostItems(menus)
+        addMongoCompareItems(menus)
     }
 }
 
@@ -186,5 +187,26 @@ extension MainMenu {
                                                 Commands.mongoDiskUsage].map { $0.item() } + [.separator(), Commands.killOperation.item()])
         server.toolTip = "Show a MongoDB server's figures, members, operations and disk usage"
         menus.connection.addItem(server)
+    }
+}
+
+// MARK: Compare (lane P2-compare)
+
+extension MainMenu {
+    /// Data ▸ Collection's compare items, last: Compare With… for the tree's collection, Reconcile… for the compare
+    /// window in front.
+    static func addMongoCompareItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoCompareCommands { collection.addItem(command.item()) }
+    }
+}
+
+extension SidebarController {
+    /// Compare With… on a collection: it is the source; the target starts on its database, its collection to choose.
+    @objc func compareCollection(_ sender: Any?) {
+        guard let (open, items) = mongoSelection, items.count == 1, let collection = items[0].collection, items[0].index == nil
+        else { return NSSound.beep() }
+        MongoCompareWindowController.show(model: model, source: (open.saved, items[0].database, collection))
     }
 }

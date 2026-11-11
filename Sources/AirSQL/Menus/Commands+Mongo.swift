@@ -20,7 +20,7 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
-        + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands
+        + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -137,4 +137,15 @@ extension Commands {
                                        tip: "Stop the selected operations on the server (asks first)")
 
     static let mongoHostCommands = [mongoServer, mongoMembers, mongoOperations, mongoDiskUsage, killOperation]
+}
+
+// MARK: Compare (lane P2-compare)
+
+extension Commands {
+    static let compareCollection = Command("Compare With…", #selector(SidebarController.compareCollection(_:)),
+                                           tip: "Compare the collection's documents, indexes and options with another collection's")
+    static let reconcileCollection = Command("Reconcile…", #selector(MongoCompareWindowController.reconcile(_:)),
+                                             tip: "Make the target's documents match the source's; the commands show before they run")
+
+    static let mongoCompareCommands = [compareCollection, reconcileCollection]
 }

@@ -142,8 +142,8 @@ extension SidebarController {
         if item.index != nil { return [Commands.collectionIndexes, Commands.copyName, nil, Commands.hideIndex, Commands.dropIndex, nil, Commands.refresh] }
         if item.collection != nil {
             return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.collectionIndexes, Commands.copyName,
-                    nil, Commands.createIndex, Commands.editValidation, Commands.renameCollection, nil, Commands.createCollection,
-                    Commands.createView, nil, Commands.refresh, Commands.dropCollection]
+                    nil, Commands.createIndex, Commands.compareCollection, Commands.editValidation, Commands.renameCollection, nil,
+                    Commands.createCollection, Commands.createView, nil, Commands.refresh, Commands.dropCollection]
         }
         return [Commands.copyName, nil, Commands.createCollection, Commands.createView, Commands.createMongoDatabase, nil,
                 Commands.mongoDiskUsage, nil, Commands.refresh, Commands.dropMongoDatabase]
@@ -263,6 +263,9 @@ extension SidebarController {
         case Commands.collectionSchema.action? where item.tag == MongoCollectionController.Page.indexes.rawValue:
             reason = mongoSelection?.items.count == 1 && mongoSelection?.items[0].collection != nil ? nil
                 : "Select one collection or index of a connected MongoDB server in the tree first"
+        case Commands.compareCollection.action?:
+            reason = mongoSelection?.items.count == 1 && selectedCollections.count == 1 ? nil
+                : "Select one collection of a connected MongoDB server in the tree first"
         case Commands.openCollection.action?, Commands.collectionSchema.action?:
             reason = selectedCollections.isEmpty ? "Select a collection of a connected MongoDB server in the tree first" : nil
         case Commands.createIndex.action?:

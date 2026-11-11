@@ -2623,6 +2623,35 @@ space their documents and indexes take on disk, the free space kept for reuse, t
 document count. Views take no space and aren't listed. Right-click any of these lists for **Copy List** and **Export
 List…**, which copy or save it as CSV.
 
+## Compare and reconcile
+
+Right-click a collection and choose **Compare With…** (also in Data ▸ Collection) to compare it with another
+collection: in the same database, another one, or on another connection (a standalone with a replica set, say). The
+collection you started from is the **source**; choose the target's connection, database and collection (a connection
+that isn't connected connects when you choose it), then **Compare** (⌘R). **Cancel** (⌘.) stops it on the server.
+Nothing is written while comparing.
+
+Documents are matched by `_id`, exactly: `1`, `NumberLong(1)` and `1.0` are three different `_id`s. When every `_id` on
+both sides is of one type (ObjectId, string, int or long), both collections are read in `_id` order and merged;
+otherwise each batch of the source is looked up in the target, then the target's leftovers in the source (the summary
+says which). Two documents are the same only when every value has the same type and value and the fields are in the
+same order. **Ignore Key Order** counts fields in another order as the same; **Ignore fields** leaves paths out
+(`updatedAt, meta.seen`; `items.price` covers every item's price).
+
+The chips filter the list: **Only in Source**, **Only in Target**, **Different** and **Same** (off at first). Select a
+document to see both sides, the lines that differ marked, and where they differ above (*(field order)* when only the
+order does). **Indexes and Options** lists the two collections' indexes, matched by their keys, and their options (the
+validator, its level and action, a collation) side by side. A compare lists at most 10,000 differences; past that it
+says so, and the counts still cover every document.
+
+**Reconcile…** makes the target's documents match the source's, through the same Apply as editing: tick what it does,
+**Insert Missing** and **Replace Different** (on), and **Delete Extra** (off, marked destructive). The sheet shows every
+command first; each target document is read back and must still be exactly as compared, or Reconcile stops there, so a
+change made meanwhile is never overwritten. On a replica set it all runs in one transaction; on a standalone the
+changes before a failure stay, and the report says how many. A replace writes the source's document whole, ignored
+fields included. A read-only connection, a view or a time-series target can't be reconciled; on a Production
+connection you type the collection's name first. Indexes and options aren't changed: the compare only shows them.
+
 ## Agents
 
 With agent access set to **Schema + read** or more, AI agents can find, aggregate, count and sample a MongoDB
