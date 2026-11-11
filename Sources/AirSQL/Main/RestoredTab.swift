@@ -23,6 +23,8 @@ extension Tab {
         case let aggregation as MongoAggregationController:
             return SavedPlace(kind: .aggregation, database: aggregation.database, object: aggregation.collection,
                               text: aggregation.editor.string)
+        case let watch as MongoWatchController:
+            return SavedPlace(kind: .watch, database: watch.database, object: watch.collection, text: watch.filter.stringValue)
         default:
             return nil
         }
@@ -100,6 +102,7 @@ final class RestoredTabContent: NSViewController, TabContent {
         case .view, .procedure, .function, .trigger, .event: return "The \(place.kind.rawValue) \(name) in \(database)"
         case .collection: return "The documents of \(name) in \(database)"
         case .aggregation: return "A pipeline on \(name) in \(database)"
+        case .watch: return place.object == nil ? "The changes in \(database)" : "The changes to \(name) in \(database)"
         }
     }
 
@@ -148,7 +151,7 @@ final class RestoredTabContent: NSViewController, TabContent {
             guard let kind = ObjectKind(rawValue: place.kind.rawValue) else { return }
             content = ObjectEditorController(context: context, kind: kind, database: place.database ?? "", name: place.object,
                                              table: nil, activity: model.activity)
-        case .collection, .aggregation:
+        case .collection, .aggregation, .watch:
             return
         }
         main.replace(self, with: content)
@@ -178,6 +181,12 @@ final class RestoredTabContent: NSViewController, TabContent {
             main.replace(self, with: content)
             _ = content.view
             if let page = place.page.flatMap(MongoCollectionController.Page.init), page != .documents { content.show(page) }
+        } else if place.kind == .watch {
+            // It waits for Start: a relaunch never watches by itself.
+            let content = MongoWatchController(model: model, connection: connectionID, database: database, collection: place.object)
+            content.startsOnOpen = false
+            content.filter.stringValue = place.text ?? ""
+            main.replace(self, with: content)
         } else {
             let content = MongoAggregationController(model: model, connection: connectionID, database: database, collection: name)
             main.replace(self, with: content)

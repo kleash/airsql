@@ -21,6 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands
+        + mongoWatchCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -148,4 +149,13 @@ extension Commands {
                                              tip: "Make the target's documents match the source's; the commands show before they run")
 
     static let mongoCompareCommands = [compareCollection, reconcileCollection]
+}
+
+// MARK: Watch Changes (lane P4-watch)
+
+extension Commands {
+    static let watchChanges = Command("Watch Changes", #selector(SidebarController.watchChanges(_:)),
+                                      tip: "Open a tab that shows the collection's or database's changes as they happen")
+
+    static let mongoWatchCommands = [watchChanges]
 }

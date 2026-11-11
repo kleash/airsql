@@ -25,6 +25,7 @@ extension MainMenu {
         addMongoAdminItems(menus)
         addMongoHostItems(menus)
         addMongoCompareItems(menus)
+        addMongoWatchItems(menus)
     }
 }
 
@@ -208,5 +209,17 @@ extension SidebarController {
         guard let (open, items) = mongoSelection, items.count == 1, let collection = items[0].collection, items[0].index == nil
         else { return NSSound.beep() }
         MongoCompareWindowController.show(model: model, source: (open.saved, items[0].database, collection))
+    }
+}
+
+// MARK: Watch Changes (lane P4-watch)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Watch Changes, after New Aggregation: for the tree's collection or database, or the collection
+    /// tab in front.
+    static func addMongoWatchItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let after = collection.items.firstIndex(where: { $0.action == Commands.newAggregation.action }) else { return }
+        collection.insertItem(Commands.watchChanges.item(), at: after + 1)
     }
 }

@@ -18,11 +18,11 @@ public final class MongoSession: @unchecked Sendable {
     public let role: Role
     let connection: MongoConnection
     private let uri: String
-    private let worker: Worker
+    let worker: Worker
     /// Tags this session's commands apart from every other's: "airsql:main:1a2b3c4d:12".
     private let tagPrefix: String
-    private let lock = NSLock()
-    private var routeError: AirSQLError?
+    let lock = NSLock()
+    var routeError: AirSQLError?
     /// The command on the wire: its tag and its server, for `cancel`.
     private var running: (tag: String, server: String)?
     private var _inTransaction = false
@@ -32,6 +32,8 @@ public final class MongoSession: @unchecked Sendable {
     private var number = 0
     /// Cursors not destroyed yet: `close` destroys them before their client, as the driver requires.
     private var cursors: Set<OpaquePointer> = []
+    /// Change streams not destroyed yet (`watch`), for the same reason.
+    var streams: Set<OpaquePointer> = []
 
     private static let setUp: Void = {
         mongoc_init()
@@ -148,6 +150,8 @@ public final class MongoSession: @unchecked Sendable {
         try? await worker.perform { [self] in
             cursors.forEach { mongoc_cursor_destroy($0) }
             cursors = []
+            streams.forEach { mongoc_change_stream_destroy($0) }
+            streams = []
             if let transaction { mongoc_client_session_destroy(transaction) }
             if let client { mongoc_client_destroy(client) }
             transaction = nil
@@ -241,12 +245,12 @@ public final class MongoSession: @unchecked Sendable {
         return try body()
     }
 
-    private func nextTag() -> String {
+    func nextTag() -> String {
         number += 1
         return "\(tagPrefix):\(number)"
     }
 
-    private func log(_ command: BSONDocument, database: String) {
+    func log(_ command: BSONDocument, database: String) {
         connection.log.write("\(database): " + MongoLog.line(command), context: "\(connection.name) \(role.rawValue):\(number)")
     }
 
@@ -265,7 +269,7 @@ public final class MongoSession: @unchecked Sendable {
                 String(cString: mongoc_server_description_type(server)) == "RSSecondary")
     }
 
-    private func current() throws -> OpaquePointer {
+    func current() throws -> OpaquePointer {
         guard let client else { throw AirSQLError.disconnected }
         return client
     }

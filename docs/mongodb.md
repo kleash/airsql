@@ -363,3 +363,24 @@ connection you type the collection's name first. Indexes and options aren't chan
 With agent access set to **Schema + read** or more, AI agents can find, aggregate, count and sample a MongoDB
 connection's documents, read-only: see [AI agents](agents.md#mongodb-connections). Its editor's Agents tab recommends
 connecting with a login that can only read (the `read` role), so the server itself refuses any write.
+
+## Watch Changes
+
+**Watch Changes** (in a collection's or a database's right-click menu, and Data ▸ Collection) opens a tab that shows
+the changes made to that collection, or to every collection of that database, as they happen: each insert, update,
+replace and delete is a row, newest first, with the server's own fields (`operationType`, `documentKey`, `ns`,
+`updateDescription`, `clusterTime`…) as columns. It needs a replica set or a sharded cluster (a mongos): on a
+standalone, a view, a time-series collection or MongoDB's own databases the command is off and says why.
+
+The tab watches from the moment it opens. **Filter** keeps only the changes that match, as a filter on the change events
+in the query bar's form (`{ operationType: "delete" }`, `{ "fullDocument.status": "paid" }`). An update shows only
+what changed; **Look Up Full Document** (off at first) also shows the whole document as it is now, which the server
+reads again for each update. Change the filter or the tick box while stopped.
+
+**Stop** ends the watch; **Start** continues after the last change shown, so the changes made meanwhile come first. If
+the server no longer has them all (its oplog has moved on), the tab says so and watches from now. A failover is
+followed: the watch carries on from the new primary without losing a change. A dropped connection or an error the
+server can't resume from stops the watch and says why; it never starts again by itself, and a tab that comes back after
+a relaunch waits for Start. The tab keeps the newest 10,000 changes, and at most 32 MB of them; the status bar says
+how many older ones went. It reads on a session of its own, closed with the tab. Watching only reads: nothing is
+written.

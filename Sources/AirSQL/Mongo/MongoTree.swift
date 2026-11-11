@@ -141,11 +141,11 @@ extension SidebarController {
     static func mongoMenu(_ item: MongoTreeItem) -> [Command?] {
         if item.index != nil { return [Commands.collectionIndexes, Commands.copyName, nil, Commands.hideIndex, Commands.dropIndex, nil, Commands.refresh] }
         if item.collection != nil {
-            return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.collectionIndexes, Commands.copyName,
+            return [Commands.openCollection, Commands.newAggregation, Commands.watchChanges, Commands.collectionSchema, Commands.collectionIndexes, Commands.copyName,
                     nil, Commands.createIndex, Commands.compareCollection, Commands.editValidation, Commands.renameCollection, nil,
                     Commands.createCollection, Commands.createView, nil, Commands.refresh, Commands.dropCollection]
         }
-        return [Commands.copyName, nil, Commands.createCollection, Commands.createView, Commands.createMongoDatabase, nil,
+        return [Commands.watchChanges, Commands.copyName, nil, Commands.createCollection, Commands.createView, Commands.createMongoDatabase, nil,
                 Commands.mongoDiskUsage, nil, Commands.refresh, Commands.dropMongoDatabase]
     }
 
@@ -288,6 +288,8 @@ extension SidebarController {
             } else {
                 reason = "Select one index of a connected MongoDB server in the tree first"
             }
+        case Commands.watchChanges.action?:
+            reason = watchReason
         case Commands.mongoServer.action?, Commands.mongoDiskUsage.action?:
             reason = mongoTarget == nil ? "Select or open a connected MongoDB server first" : nil
         case Commands.refresh.action? where mongo || selectedConnectionIDs.contains { model.openMongo[$0] != nil }:
