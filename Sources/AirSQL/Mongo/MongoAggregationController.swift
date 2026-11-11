@@ -51,7 +51,9 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     /// The read under way (one at a time), and its line in Activity.
     private(set) var loading: Task<Void, Never>?
     private var activity: Activity?
-    private var reads = 0
+    private(set) var reads = 0
+    /// Set before the view loads: the agent whose mongo_open made the tab, which then waits for Run.
+    var proposedBy: String?
     /// What went wrong last, until the next read works.
     private(set) var problem: String?
     /// What the grid shows when it isn't the whole pipeline's documents (Run to Here), or each stage's count.
@@ -144,7 +146,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         optionsBar.addSubview(options)
         options.pin(to: optionsBar)
 
-        let results = NSStackView(views: [toolbar, notice, viewer])
+        let results = NSStackView(views: (proposedBy.map { [AgentProposalBar(agent: $0)] } ?? []) + [toolbar, notice, viewer])
         results.orientation = .vertical
         results.spacing = 0
         for part in results.arrangedSubviews { part.widthAnchor.constraint(equalTo: results.widthAnchor).isActive = true }
@@ -183,7 +185,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         self.view = view
         updateBars()
         loadSaved()
-        run()
+        if proposedBy == nil { run() }
     }
 
     private var placedDivider = false

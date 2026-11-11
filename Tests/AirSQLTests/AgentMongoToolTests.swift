@@ -187,3 +187,37 @@ extension AppTests {
         #expect(service.events.filter(\.failed).count == 3)
     }
 }
+
+/// mongo_open's checks without a server, and how a MongoDB tab's text reaches read_console.
+struct AgentMongoOpenToolTests {
+    static func error(_ arguments: [String: Any], _ target: AgentTarget = AgentMongoToolTests.target()) -> String {
+        do {
+            _ = try target.mongoProposal(arguments)
+            return "opened"
+        } catch {
+            return AgentReply.message(error)
+        }
+    }
+
+    @Test func mongoOpenChecksEverythingBeforeTheConnection() {
+        #expect(Self.error(["collection": "orders", "filter": "{\"status\": \"A\"}"]).contains("isn't connected"))
+        #expect(Self.error(["collection": "orders", "pipeline": "[{\"$merge\": {\"into\": \"x\"}}]"]).contains("isn't connected"),
+                "a write may be proposed: Run asks the person")
+        #expect(Self.error(["collection": "system.users"]).contains("Refused: collection: system.users"))
+        #expect(Self.error(["database": "config", "collection": "x"]).contains("Refused: db: config"))
+        #expect(Self.error(["collection": "orders", "filter": "{bad"]).contains("filter isn't Extended JSON"))
+        #expect(Self.error(["collection": "orders", "pipeline": "{}"]).contains("an array of stages"))
+        #expect(Self.error(["collection": "orders", "pipeline": "[]", "sort": "{}"]).contains("not both"))
+        #expect(Self.error(["collection": "orders", "limit": -1]).contains("whole number"))
+        #expect(Self.error(["filter": "{}"]).contains("needs collection"))
+        #expect(Self.error(["collection": "orders"], AgentMongoToolTests.target(.schema)).contains("needs Schema + read"))
+        #expect(Self.error(["collection": "orders"], AgentMongoToolTests.target(engine: .mysql)).contains("use the SQL tools"))
+    }
+
+    @Test func aTabsTextIsRedactedAsTheCommandLogIs() {
+        #expect(AgentTarget.mongoRedacted("{ status: \"A\" }") == "{ status: \"A\" }", "untouched without a secret's name")
+        #expect(AgentTarget.mongoRedacted("{ user: \"a\", pwd: \"S3cret\" }") == "{ user: \"a\", pwd: \"<secret>\" }")
+        #expect(AgentTarget.mongoRedacted("[{ $match: { password: \"S3cret\" } }]").contains("<secret>"))
+        #expect(!AgentTarget.mongoRedacted("{ password: \"S3cret\"").contains("S3cret"), "half-typed: left out whole")
+    }
+}

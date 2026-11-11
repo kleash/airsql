@@ -388,3 +388,85 @@ extension AgentTarget {
         }
     }
 }
+
+// MARK: mongo_open (lane: agent control)
+
+/// What mongo_open puts in a new tab: a find's fields, or a pipeline, in shell form as the person types them.
+public struct MongoProposal: Sendable {
+    public var database: String
+    public var collection: String
+    /// The find's fields; for a pipeline, only its collation.
+    public var query: MongoQueryText
+    /// The pipeline as the aggregation tab's editor shows it; nil for a find.
+    public var pipeline: String?
+}
+
+extension AgentTarget {
+    /// mongo_open's arguments, checked: Schema + read on a connected MongoDB connection, a namespace agents may read,
+    /// and documents that parse. Nothing is sent to the server; what may run is the person's to decide (Run, and its
+    /// preview for a $merge or $out), so the stages aren't checked as the read tools' are.
+    public func mongoProposal(_ arguments: [String: Any]) throws -> MongoProposal {
+        try require(.schemaRead, engine: .mongodb)
+        func given(_ key: String) -> Bool { arguments[key] != nil && !(arguments[key] is NSNull) }
+        func text(_ key: String) -> String? {
+            (arguments[key] as? String).flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        }
+        guard let database = text("database") ?? self.database else {
+            throw AirSQLError(.other, "mongo_open needs database: the connection has no current one.")
+        }
+        guard let collection = text("collection") else { throw AirSQLError(.other, "mongo_open needs collection.") }
+        do {
+            try MongoAgentGuard.checkNamespace(database, collection)
+        } catch let refusal as MongoAgentRefusal {
+            throw AirSQLError(.readOnly, "Refused: \(refusal).")
+        }
+        func shell(_ key: String) throws -> String { try Self.extendedJSON(arguments[key], key)?.shellForm() ?? "" }
+        func count(_ key: String) throws -> String {
+            guard given(key) else { return "" }
+            guard let number = arguments[key] as? NSNumber, number.doubleValue >= 0, number.doubleValue == number.doubleValue.rounded()
+            else { throw AirSQLError(.other, "\(key) is a whole number, 0 or more.") }
+            return String(number.int64Value)
+        }
+        var query = MongoQueryText(collation: try shell("collation"))
+        if given("pipeline") {
+            let find = ["filter", "projection", "sort", "skip", "limit"].filter(given)
+            guard find.isEmpty else {
+                throw AirSQLError(.other, "Pass pipeline or the find's \(find.joined(separator: ", ")), not both.")
+            }
+            let pipeline = MongoPipeline.text(try Self.pipeline(arguments["pipeline"]))
+            guard mongo != nil else { throw notConnected }
+            return MongoProposal(database: database, collection: collection, query: query, pipeline: pipeline)
+        }
+        query.filter = try shell("filter")
+        query.projection = try shell("projection")
+        query.sort = try shell("sort")
+        query.skip = try count("skip")
+        query.limit = try count("limit")
+        guard mongo != nil else { throw notConnected }
+        return MongoProposal(database: database, collection: collection, query: query)
+    }
+
+    /// A value for read_console: its relaxed Extended JSON text, long strings cut, as mongo_find gives it.
+    public static func mongoText(_ value: BSONValue) -> String { text(value) }
+
+    /// Documents for read_console, as mongo_find gives them and within its byte budget; capped: some were left out.
+    public static func mongoTexts(_ documents: [BSONDocument]) -> (texts: [String], capped: Bool) {
+        var texts: [String] = [], bytes = 0
+        for document in documents {
+            let text = text(document)
+            bytes += text.utf8.count
+            if bytes > mongoReplyBytes { return (texts, true) }
+            texts.append(text)
+        }
+        return (texts, false)
+    }
+
+    /// A query bar's field or a pipeline as an agent may read it (read_console): as the command log has it, with the
+    /// values of fields named as secrets replaced. Text that names one but doesn't parse is left out whole.
+    public static func mongoRedacted(_ text: String) -> String {
+        let lower = text.lowercased()
+        guard MongoLog.secretFields.contains(where: { lower.contains($0) }) else { return text }
+        guard let value = try? BSONValue(shellForm: text) else { return "<hidden: it names a secret field>" }
+        return MongoLog.redacted(BSONDocument([("v", value)]))["v"]?.shellForm(pretty: text.contains("\n")) ?? ""
+    }
+}

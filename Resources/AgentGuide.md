@@ -124,7 +124,7 @@ allow-list (`$match`, `$project`, `$addFields`, `$set`, `$unset`, `$group`, `$so
 databases and `system.*` collections; a negative skip or limit. Every command carries `maxTimeMS` (the timeout), and
 a watchdog stops one that runs on. On a replica set or a mongos the reads run inside a transaction that is always
 aborted, so even a write that got past the check is refused by the server; there, `$collStats` and `$indexStats`
-stages fail (use `mongo_stats`). To change data, describe the change to the person: there is no tool that writes.
+stages fail (use `mongo_stats`). To change data, propose it with `mongo_open`: there is no tool that writes.
 
 `mongo_find` and `mongo_aggregate` take `to_file: true` (Schema + read + analytics): the documents, up to the row
 cap, go to a new file in AirSQL's agent export folder, one relaxed Extended JSON document a line (`.jsonl`, nothing
@@ -167,7 +167,21 @@ refused and capped as `mongo_find` and `mongo_aggregate` are; Schema + read.
 
 ### mongo_open
 
-Not in this build yet: describe the query to the person instead.
+`mongo_open {connection, database?, collection, filter?, projection?, sort?, skip?, limit?, collation?}` or
+`{connection, database?, collection, pipeline, collation?}`, each with `title?`: puts a find into a new collection tab's
+query bar, or a pipeline into a new aggregation tab, in shell form, and answers `{tab, title, connection, kind}`. The
+tab is titled `<title or collection> · proposed by <you>` and says so; nothing runs and nothing is read until the
+person presses Run. This is how to propose a query to look at, or a change: a pipeline with `$merge` or `$out` may be
+proposed, and Run then shows it to the person first (on a read-only connection it refuses). Documents are Extended JSON
+text, as for `mongo_find`; one that doesn't parse is refused with where and why. The admin, local and config databases
+and `system.*` collections are refused. Needs Schema + read, and the connection connected.
+
+`context` lists MongoDB tabs among `consoleTabs` with `kind` (`collection` or `aggregation`), `database` and
+`collection`; `activeTab` is the one in front. `read_console {tab?}` on one gives its `query` (the bar's fields) or
+its `pipeline` and `options`, `text` (the filter or the pipeline), and `run`: `state` (`not run`, `running`, `done`,
+`failed`, `cancelled`), `error`, `documentsLoaded`. With Schema + read it adds `selectedIds` and the first 50
+documents loaded (`documents`, as `mongo_find` gives them); with Schema only, `selectedCount` and no documents. Values
+of fields named like secrets (`pwd`, `password`, …) are replaced, as in AirSQL's command log.
 
 ## resources
 

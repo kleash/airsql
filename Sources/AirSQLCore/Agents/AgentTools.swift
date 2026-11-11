@@ -11,10 +11,12 @@ public enum AgentTools {
     public static let list: [[String: Any]] = [
         tool("context", "Start here: the connections you may use (name, id, access level, engine (MySQL or MariaDB, or "
              + "MongoDB) and version, current database, schema hash, row cap and timeout), the person's active connection and the open console "
-             + "tabs. Connections whose agent access is Off are not listed.",
+             + "tabs, MongoDB collection and pipeline tabs among them (kind, database, collection), with activeTab the one in "
+             + "front. Connections whose agent access is Off are not listed.",
              [:], output: ["connections": arrayOf("Connections you may use"), "hiddenConnections": integer("How many are Off"),
                            "active": object("The person's active connection and database"),
-                           "consoleTabs": arrayOf("Open console tabs")], outputRequired: ["connections"]),
+                           "consoleTabs": arrayOf("Open console tabs"),
+                           "activeTab": string("The tab in front, when it is one of consoleTabs")], outputRequired: ["connections"]),
         tool("get_schema", "A connection's schema in one call. compact (default): per database, one line per table or view "
              + "with its columns (type, PK, NULL, default, auto-increment), indexes and foreign keys. ddl: CREATE statements. "
              + "Databases too big for one reply come as names only: ask for them by name. Each database has a hash: pass the "
@@ -81,10 +83,20 @@ public enum AgentTools {
              output: ["tab": string("The tab's id"), "title": string("The tab's title"), "connection": string("The connection")],
              outputRequired: ["tab", "title"], readOnly: false),
         tool("read_console", "A console tab: its text, and what the person last ran in it with the result or error (rows "
-             + "only with Schema + read access). tab: an id or title from context (default: the active console tab).",
+             + "only with Schema + read access). A MongoDB tab: its query bar's fields (query) or its pipeline and options, "
+             + "the last run's state (not run, running, done, failed, cancelled) and documents loaded; with Schema + read "
+             + "access the selected documents' _ids and the first 50 documents loaded, as mongo_find gives them. tab: an id "
+             + "or title from context (default: the active console tab).",
              ["tab": string("The tab's id or title")],
              output: ["tab": string("The tab's id"), "title": string("The tab's title"), "connection": string("The connection"),
-                      "text": string("The editor's text"), "run": object("What was run last, with its result or error")],
+                      "text": string("The editor's text (a MongoDB tab: its filter or pipeline)"),
+                      "run": object("What was run last, with its result or error"),
+                      "kind": string("A MongoDB tab's: collection or aggregation"), "database": string("A MongoDB tab's database"),
+                      "collection": string("A MongoDB tab's collection"), "query": object("A collection tab's query bar fields"),
+                      "pipeline": string("A pipeline tab's pipeline"), "options": object("A pipeline tab's collation and maxTimeMS"),
+                      "selectedIds": strings("The selected documents' _ids, as Extended JSON text"),
+                      "documents": strings("The first documents loaded, each its relaxed Extended JSON text"),
+                      "capped": boolean("More documents are loaded than the reply has")],
              outputRequired: ["tab", "title", "text"]),
         tool("guide", "How to use AirSQL as an agent: the tools, access levels, read-only rules and recipes. topic: a section "
              + "(none: the overview and the list). Works even when AirSQL isn't running.",
@@ -219,7 +231,25 @@ public enum AgentTools {
              outputRequired: ["connection", "scan", "warnings", "plan"]),
     ]
     /// mongo_open: a find or a pipeline put in a new tab for the person, never run (lane: agent control).
-    static let mongoOpenTool: [[String: Any]] = []
+    static let mongoOpenTool: [[String: Any]] = [
+        tool("mongo_open", "Puts a find (filter, projection, sort, skip, limit, collation) or an aggregation pipeline into "
+             + "a new MongoDB tab for the person to read, edit and run, marked as proposed by you. Nothing runs and nothing "
+             + "is read until they press Run: this is how to propose a query or a change ($merge and $out may be proposed; "
+             + "Run asks the person first, and refuses on a read-only connection). Documents are Extended JSON text, as in "
+             + "mongo_find. The admin, local and config databases and system.* collections are refused. Then read_console "
+             + "shows the tab and what they ran. Needs Schema + read access on a MongoDB connection.",
+             ["connection": connection, "database": string("The database (default: the connection's own)"),
+              "collection": string("The collection or view"),
+              "filter": string("A query document as Extended JSON text"), "projection": string("Fields to return, as Extended JSON text"),
+              "sort": string("The order, as Extended JSON text"), "skip": integer("Documents to skip"),
+              "limit": integer("At most this many"), "collation": string("A collation document, as Extended JSON text"),
+              "pipeline": string("Instead of a find: the stages, Extended JSON text of an array"),
+              "title": string("The tab's title (default: the collection's name)")],
+             required: ["connection", "collection"],
+             output: ["tab": string("The tab's id"), "title": string("The tab's title"), "connection": string("The connection"),
+                      "kind": string("collection (a find) or aggregation (a pipeline)")],
+             outputRequired: ["tab", "title"], readOnly: false),
+    ]
 
     /// Driving AirSQL's windows as the person does (plan §2.8). Whatever would change data, structure, files or settings
     /// waits for the person at the Mac, or is theirs alone. Replies are JSON as text (screenshot: a PNG), isError on

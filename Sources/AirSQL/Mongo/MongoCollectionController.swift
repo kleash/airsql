@@ -69,6 +69,8 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     var undone: [MongoChanges] = [], redone: [MongoChanges] = []
     /// Apply is running: the changes stay as they are until it reports.
     var isApplying = false
+    /// Set before the view loads: the agent whose mongo_open made the tab, which then waits for Run.
+    var proposedBy: String?
 
     init(model: AppModel, connection: UUID, database: String, collection: MongoCollectionInfo) {
         self.model = model
@@ -156,7 +158,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         viewer.setContentHuggingPriority(.defaultLow, for: .vertical)
         dataPage.addSubview(rows)
         rows.pin(to: dataPage)
-        let top = NSStackView(views: [bar, notice])
+        let top = NSStackView(views: (proposedBy.map { [AgentProposalBar(agent: $0)] } ?? []) + [bar, notice])
         top.orientation = .vertical
         top.spacing = 0
         for part in top.arrangedSubviews { part.widthAnchor.constraint(equalTo: top.widthAnchor).isActive = true }
@@ -182,7 +184,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         show(.documents)
         updateBars()
         loadHistory()
-        run()
+        if proposedBy == nil { run() }
     }
 
     // MARK: Reading
@@ -426,7 +428,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         countLink.isHidden = !more || total?.exact == true
         moreLink.isHidden = !more
         let filtered = !shown.filter.trimmingCharacters(in: .whitespaces).isEmpty
-        emptyNote.isHidden = loaded > 0 || loading != nil || problem != nil || viewer.presentation != .table
+        emptyNote.isHidden = loaded > 0 || loading != nil || problem != nil || viewer.presentation != .table || reads == 0
         emptyNote.text.stringValue = filtered ? "No documents match the filter." : "\(name) has no documents."
         emptyNote.clear.isHidden = !filtered
         emptyNote.add.isHidden = editingOff != nil

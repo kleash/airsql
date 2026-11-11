@@ -62,7 +62,11 @@ extension AgentService {
                                     "consoleTabs": consoleTabs().map { tab, _, saved in
                                         ["tab": tab.id.uuidString, "title": tab.title,
                                          "connection": saved?.displayName ?? NSNull()] as [String: Any]
-                                    }]
+                                    } + mongoTabs().map(Self.entry)]
+        if let front = main?.selectedTab,
+           consoleTabs().contains(where: { $0.0 === front }) || mongoTabs().contains(where: { $0.0 === front }) {
+            reply["activeTab"] = front.id.uuidString
+        }
         if let active = main?.activeConnection, active.agentAccess != .off {
             reply["active"] = ["connection": active.displayName, "id": active.id.uuidString,
                                "database": database(of: active) ?? NSNull()] as [String: Any]
@@ -100,6 +104,10 @@ extension AgentService {
     func readConsole(_ arguments: [String: Any]) throws -> [String: Any] {
         let tabs = consoleTabs()
         let wanted = (arguments["tab"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+        let mongo = mongoTabs()
+        let mongoFound = wanted.isEmpty ? mongo.first { $0.0 === main?.selectedTab }
+            : mongo.first { $0.0.id.uuidString.caseInsensitiveCompare(wanted) == .orderedSame } ?? mongo.first { $0.0.title == wanted }
+        if let (tab, content, saved) = mongoFound { return readMongo(tab, content, saved) }
         let found = wanted.isEmpty ? tabs.first { $0.0 === main?.selectedTab } ?? tabs.last
             : tabs.first { $0.0.id.uuidString.caseInsensitiveCompare(wanted) == .orderedSame } ?? tabs.first { $0.0.title == wanted }
         guard let (tab, console, saved) = found else {
@@ -211,6 +219,8 @@ extension AgentService {
         case "mongo_list_indexes": return namespace + ".getIndexes()"
         case "mongo_stats": return namespace + ".stats()"
         case "mongo_schema_sample": return namespace + " · schema sample"
+        case "mongo_open":
+            return namespace + (arguments["pipeline"] == nil ? ".find(" + shell("filter") : ".aggregate(" + shell("pipeline")) + ") · proposed"
         default: return namespace
         }
     }

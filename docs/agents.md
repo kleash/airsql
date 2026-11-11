@@ -63,6 +63,12 @@ When a query names a field not in the collection's sample, or compares a date wi
 names the nearest field; a server's error says which stage and which word it didn't know. With **Schema + read +
 analytics**, finds and pipelines can go to a file in the agent export folder (Settings ▸ Agents), never elsewhere.
 
+To propose a query or a change, an agent opens a new collection tab with the query bar filled in, or a pipeline tab,
+titled "… · proposed by" the agent and with a note that says so (**Dismiss** hides it). Nothing runs, and nothing is
+read, until you press Run; a pipeline that writes (`$merge`, `$out`) still shows you its preview first, and is refused
+on a read-only connection. The agent can read what a MongoDB tab holds and how its last run went; the documents
+loaded in it only when the connection allows Schema + read.
+
 ## Agents in AirSQL's windows
 
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
