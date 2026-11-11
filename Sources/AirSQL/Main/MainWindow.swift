@@ -708,7 +708,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = window?.attachedSheet == nil
             reason = "A sheet is open: answer it first"
         case Commands.selectInTree.action?:
-            enabled = model.openConnection(selectedTab?.connectionID) != nil
+            enabled = model.openConnection(selectedTab?.connectionID) != nil || selectedTab?.connectionID.map { model.openMongo[$0] != nil } == true
             reason = "The tab shown has no connected server, so nothing of it is in the tree"
         case Commands.reopenClosedTab.action?:
             enabled = closedTabs.contains { $0.connection == nil || model.connection($0.connection) != nil }

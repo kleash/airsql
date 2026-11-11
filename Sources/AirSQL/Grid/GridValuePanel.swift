@@ -22,6 +22,8 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     /// A MongoDB cell's sub-document or array, read from its BSON (`show`'s `bson`) rather than parsed as JSON.
     private let bsonScroll = BSONTreeView()
     private var bson: BSONValue?
+    /// The cell is MongoDB's null, which the footer names as MongoDB does.
+    private var bsonNull = false
     var outline: NSOutlineView { outlineScroll.outline }
     private let image = NSImageView()
     let footer = label("", font: .systemFont(ofSize: 11), color: .secondaryLabelColor, truncates: true)
@@ -145,6 +147,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
         case .document?, .array?: self.bson = bson
         default: self.bson = nil
         }
+        bsonNull = bson == .null
         tree = self.bson == nil && (first == "{" || first == "[") ? value.flatMap(JSONNode.parse) : nil
         let picture = column?.kind == .binary ? self.bytes.flatMap { NSImage(data: Data($0)) } : nil
         image.image = picture
@@ -170,7 +173,7 @@ final class GridValuePanel: NSView, NSTextViewDelegate {
     private var summary: String {
         if let placeholder { return placeholder + " · the server sets it when you apply" }
         if loadFull != nil { return "Only the start" }
-        return value == nil ? "NULL" : describe()
+        return value == nil ? (bsonNull ? "null" : "NULL") : describe()
     }
 
     private func describe() -> String {

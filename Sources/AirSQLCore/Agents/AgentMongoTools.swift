@@ -162,7 +162,7 @@ extension AgentTarget {
                 let values = try await session.distinct(database: db, collection: collection, key: key, filter: filter,
                                                         maxTimeMS: time)
                 reply.merge(["database": db, "collection": collection, "key": key,
-                             "values": values.prefix(checked.documentCap).map(Self.json),
+                             "values": values.prefix(checked.documentCap).map(Self.text),
                              "count": min(values.count, checked.documentCap), "capped": values.count > checked.documentCap]) { $1 }
             case .listDatabases:
                 let databases = try await session.listDatabases().filter {
@@ -187,7 +187,7 @@ extension AgentTarget {
                     : session.collectionStats(database: db, collection: collection ?? "")
                 // The storage engine's own figures are long and say little to an agent.
                 stats.fields.removeAll { ["wiredTiger", "indexDetails", "$clusterTime", "operationTime"].contains($0.key) }
-                reply.merge(["database": db, "stats": Self.json(.document(stats))]) { $1 }
+                reply.merge(["database": db, "stats": Self.text(stats)]) { $1 }
                 if let collection { reply["collection"] = collection }
             case let .schemaSample(db, collection, size):
                 let sample = BSONDocument([("$sample", .document(BSONDocument([("size", .int64(Int64(size)))])))])
@@ -248,7 +248,8 @@ extension AgentTarget {
     /// A document for a reply: its relaxed Extended JSON text in a string, exactly as written. As JSON objects it would
     /// pass through Foundation's JSON on the way (the socket, the bridge), which loses the keys' order and a whole
     /// double's `.0`. Long strings cut as `AgentFormat` cuts cells.
-    static func text(_ document: BSONDocument) -> String { cut(.document(document)).extendedJSON(.relaxed) }
+    static func text(_ document: BSONDocument) -> String { text(.document(document)) }
+    static func text(_ value: BSONValue) -> String { cut(value).extendedJSON(.relaxed) }
 
     /// A value for a reply: relaxed Extended JSON as JSON, long strings cut as `AgentFormat` cuts cells.
     static func json(_ value: BSONValue) -> Any {

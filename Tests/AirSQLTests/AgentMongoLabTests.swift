@@ -66,9 +66,17 @@ struct AgentMongoLabTests {
         #expect(!kinds.keys.contains { $0.hasPrefix("system.") })
         let indexes = try await target.mongo("mongo_list_indexes", ["collection": "many"])["indexes"] as? [String]
         #expect(indexes?.first?.contains("\"name\":\"_id_\"") == true)
-        let stats = try await target.mongo("mongo_stats", ["collection": "many"])["stats"] as? [String: Any]
-        #expect(stats?["count"] as? Int == 1000 && stats?["wiredTiger"] == nil)
-        #expect((try await target.mongo("mongo_stats", [:])["stats"] as? [String: Any])?["collections"] != nil)
+        let stats = try await target.mongo("mongo_stats", ["collection": "many"])["stats"] as? String ?? ""
+        #expect(stats.contains("\"count\":1000") && !stats.contains("wiredTiger"), "\(stats)")
+        // Doubles stay exact: stats and distinct values are Extended JSON text too, never values through a JSON step.
+        let database = try await target.mongo("mongo_stats", [:])["stats"] as? String ?? ""
+        #expect(database.contains("\"collections\":") && database.contains("\"ok\":1.0"), "\(database)")
+        let data = try await #require(target.mongo).session(.data)
+        let scratch = "lane_mongo_p2int_\(server.rawValue)"
+        _ = try await data.insertMany(database: scratch, collection: "doubles", [2, 3].map { BSONDocument([("d", .double($0))]) })
+        let doubles = try await target.mongo("mongo_distinct", ["database": scratch, "collection": "doubles", "key": "d"])
+        _ = try await data.command(BSONDocument([("dropDatabase", .int32(1))]), database: scratch)
+        #expect(doubles["values"] as? [String] == ["2.0", "3.0"], "\(doubles)")
         let sample = try await target.mongo("mongo_schema_sample", ["collection": "all_types", "size": 50])
         let fields = sample["fields"] as? [[String: Any]] ?? []
         #expect(sample["documents"] as? Int == 19 && fields.contains { $0["path"] as? String == "value" })

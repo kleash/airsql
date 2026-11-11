@@ -52,7 +52,8 @@ write: every request is checked before it is sent, and refused if it would run J
 write (`$out`, `$merge`), uses a pipeline stage AirSQL hasn't vetted, or reaches MongoDB's own databases (admin,
 local, config) or `system` collections. Each runs with the time limit and document cap of Settings ▸ Safety, and on a
 replica set inside a transaction that is always cancelled, so even a write that got past the check is refused by the
-server. For more safety still, connect with a user that has only the `read` role.
+server. For more safety still, connect with a user that has only the `read` role. Documents, distinct values and sizes
+reach the agent as Extended JSON text, so a field's order and a number's type (`2.0` stays a double) are kept.
 
 ## Agents in AirSQL's windows
 

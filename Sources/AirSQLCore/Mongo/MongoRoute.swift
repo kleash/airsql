@@ -11,7 +11,7 @@ public final class MongoRoute: @unchecked Sendable {
     private let saved: SavedConnection
     private let proxyPassword: String
     private let askpass: AskpassServer?
-    private let base: String
+    let base: String
     private let lock = NSLock()
     /// "host:port" of every server asked for, in order: a server's place here names its socket.
     private var servers: [String] = []
@@ -26,11 +26,19 @@ public final class MongoRoute: @unchecked Sendable {
     private var closed = false
     private var discovering = false
     private var _logins = 0
+    private var _onExit: ((AirSQLError) -> Void)?
 
     /// ssh starts so far: each logs in to every SSH host of the route (a one-time code is asked each time).
     public var logins: Int { lock.locked { _logins } }
     /// "host:port" of each server the driver asked for, in order.
     public var requested: [String] { lock.locked { servers } }
+
+    /// Called once, on a background thread, when the route's ssh ends by itself (`Tunnel.onExit`): the route dropped. Its
+    /// planned restart for a new member isn't that.
+    public var onExit: ((AirSQLError) -> Void)? {
+        get { lock.locked { _onExit } }
+        set { lock.locked { _onExit = newValue } }
+    }
 
     /// `askpass`: where ssh's prompts go (SSH routes only); `proxyPassword`: the proxy's ("" without a user).
     public init(_ saved: SavedConnection, proxyPassword: String = "", askpass: AskpassServer? = nil) {
@@ -140,6 +148,8 @@ public final class MongoRoute: @unchecked Sendable {
             guard !closed else { return false }
             self.tunnel = tunnel
             _logins += 1
+            // The tunnel this one replaces was closed first, which it doesn't report.
+            tunnel.onExit = { [weak self] error in self?.onExit?(error) }
             sockets = Dictionary(zip(all, tunnel.sockets).map { ("\($0.host):\($0.port)", $1) }, uniquingKeysWith: { $1 })
             return true
         }

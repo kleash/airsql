@@ -133,7 +133,7 @@ public enum AgentTools {
                  + "that match a filter, up to the row cap." + refusals,
                  place.merging(["key": string("The field, such as address.city"), "filter": filter]) { $1 },
                  required: ["connection", "collection", "key"],
-                 output: ["connection": string("The connection"), "values": arrayOf("The values, as relaxed Extended JSON"),
+                 output: ["connection": string("The connection"), "values": strings("One per value: its relaxed Extended JSON text"),
                           "capped": boolean("There were more than the row cap")],
                  outputRequired: ["connection", "values", "capped"]),
             tool("mongo_list_databases", "The databases of a MongoDB connection with their sizes, without MongoDB's own "
@@ -155,7 +155,8 @@ public enum AgentTools {
             tool("mongo_stats", "Sizes and counts: a collection's storage stats, or the database's (dbStats) without a "
                  + "collection. Needs Schema + read access.",
                  ["connection": connection, "database": database, "collection": string("The collection (default: the database's)")],
-                 required: ["connection"], output: ["connection": string("The connection"), "stats": object("The figures")],
+                 required: ["connection"], output: ["connection": string("The connection"),
+                                                         "stats": string("The figures: their relaxed Extended JSON text")],
                  outputRequired: ["connection", "stats"]),
             tool("mongo_schema_sample", "What a random sample ($sample) of a MongoDB collection's documents holds, per "
                  + "dotted path (items of arrays under path.[]): how often present, missing and null, the types and their "

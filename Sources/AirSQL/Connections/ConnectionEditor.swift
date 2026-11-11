@@ -258,6 +258,9 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         } catch {
             return (error as? AirSQLError)?.message ?? error.localizedDescription
         }
+        if draft.mongoX509, draft.tls.mode == .off || (draft.tls.certFile ?? "").isEmpty {
+            return "An X.509 login needs TLS and a client certificate: choose them in the TLS tab."
+        }
         return draft.directConnection && !draft.mongoHosts.isEmpty
             ? "Direct connection talks to one server: untick it, or empty Other members in the General tab." : nil
     }

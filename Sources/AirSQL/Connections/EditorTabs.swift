@@ -153,8 +153,9 @@ extension ConnectionEditor {
         password.setAccessibilityIdentifier("editor.password")
         password.translatesAutoresizingMaskIntoConstraints = false
         password.widthAnchor.constraint(equalToConstant: 200).isActive = true
-        password.isEnabled = !draft.askPassword
+        password.isEnabled = !draft.askPassword && !(mongo && draft.mongoX509)
         if draft.askPassword { password.toolTip = "Off while Ask at each connect is ticked: nothing is saved" }
+        if mongo && draft.mongoX509 { password.toolTip = "Not used: the client certificate in the TLS tab logs in" }
         bind(password) { [weak self] in self?.password = password.stringValue }
         let ask = toggle("Ask at each connect", \.askPassword, id: "editor.askPassword",
                          tip: "Ask for the user and password at each connect and never save them") { [weak self] in self?.refreshTab() }
@@ -198,11 +199,18 @@ extension ConnectionEditor {
                                             + "one secondary on its own")])
     }
 
-    /// MongoDB's login database and the address's other options.
+    /// MongoDB's login method and database, and the address's other options.
     private func mongoLoginRows(_ form: Form) {
-        form.row("Auth source", [text(\.authSource, placeholder: draft.database.isEmpty ? "admin" : draft.database,
-                                      id: "editor.authSource", tip: "Type the database the user is defined in; empty: the "
-                                        + "database above, else admin", width: 200)])
+        form.row("Log in with", [choice(\.mongoX509, [("Password (SCRAM)", false), ("X.509 certificate", true)], id: "editor.mongoLogin",
+                                        tip: "Choose how the user proves who it is: its password, or the client certificate "
+                                            + "chosen in the TLS tab") { [weak self] in self?.refreshTab() }],
+                 caption: draft.mongoX509 ? "The TLS tab's client certificate logs in; the user is optional (the certificate's "
+                    + "subject) and the password isn't used." : nil)
+        if !draft.mongoX509 {  // X.509's users are in $external
+            form.row("Auth source", [text(\.authSource, placeholder: draft.database.isEmpty ? "admin" : draft.database,
+                                          id: "editor.authSource", tip: "Type the database the user is defined in; empty: the "
+                                            + "database above, else admin", width: 200)])
+        }
         form.row("Options", [text(\.mongoOptions, placeholder: "none", id: "editor.mongoOptions",
                                   tip: "Type the address's other options as key=value&…, such as readPreference=secondary, "
                                     + "appName=reports, retryWrites=false or w=majority")],
@@ -226,10 +234,17 @@ extension ConnectionEditor {
         guard draft.tls.mode != .off else { return content(form) }
         form.row("CA certificate", file(\.tls.caFile, placeholder: "macOS's own", id: "editor.caFile",
                                         tip: "Choose the PEM file of a private certificate authority to trust besides the Mac's"))
-        form.row("Certificate", file(\.tls.certFile, placeholder: "none", id: "editor.certFile",
-                                     tip: "Choose your client certificate (PEM), for a server that asks for one"))
-        form.row("Key", file(\.tls.keyFile, placeholder: "none", id: "editor.keyFile",
-                             tip: "Choose the client certificate's key (PEM)"))
+        if draft.engine == .mongodb {
+            form.row("Certificate", file(\.tls.certFile, placeholder: "none", id: "editor.certFile",
+                                         tip: "Choose your client certificate with its key in one PEM file, for an X.509 login "
+                                            + "or a server that asks for one"),
+                     caption: "One file with both, as mongosh's --tlsCertificateKeyFile takes it.")
+        } else {
+            form.row("Certificate", file(\.tls.certFile, placeholder: "none", id: "editor.certFile",
+                                         tip: "Choose your client certificate (PEM), for a server that asks for one"))
+            form.row("Key", file(\.tls.keyFile, placeholder: "none", id: "editor.keyFile",
+                                 tip: "Choose the client certificate's key (PEM)"))
+        }
         let pinned = draft.tls.pinnedFingerprint.map(fingerprintField) ?? label("None", color: .secondaryLabelColor)
         pinned.setAccessibilityIdentifier("editor.pinned")
         var views: [NSView] = [pinned]

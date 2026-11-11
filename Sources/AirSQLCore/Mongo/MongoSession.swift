@@ -159,35 +159,46 @@ public final class MongoSession: @unchecked Sendable {
     // MARK: Commands
 
     /// Runs `command` on `database` and returns the reply. Internal: agents and the UI get the typed methods only.
-    func command(_ command: BSONDocument, database: String) async throws -> BSONDocument {
-        try await worker.perform { [self] in try commandHere(command, database: database) }
+    /// `reading`: a read, sent where the connection string's readPreference says.
+    func command(_ command: BSONDocument, database: String, reading: Bool = false) async throws -> BSONDocument {
+        try await worker.perform { [self] in try commandHere(command, database: database, reading: reading) }
     }
 
-    private func commandHere(_ command: BSONDocument, database: String) throws -> BSONDocument {
-        try withCommand(command, database: database) { reply, _, _ in try BSONDocument(bson: reply) }
+    private func commandHere(_ command: BSONDocument, database: String, reading: Bool = false,
+                             logged: Bool = true) throws -> BSONDocument {
+        try withCommand(command, database: database, reading: reading, logged: logged) { reply, _, _ in try BSONDocument(bson: reply) }
+    }
+
+    /// The keep-alive: `hello`, left out of the command log, which it would fill once a minute.
+    public func ping() async throws {
+        _ = try await worker.perform { [self] in try commandHere(BSONDocument([("hello", .int32(1))]), database: "admin", logged: false) }
     }
 
     /// On the session's thread: tags `command` (a read's or a command's), logs it, sends it to the server chosen here,
-    /// and gives `body` the reply, that server's id and the tag.
-    private func withCommand<T>(_ command: BSONDocument, database: String,
-                                _ body: (UnsafeMutablePointer<bson_t>, UInt32, String) throws -> T) throws -> T {
+    /// and gives `body` the reply, that server and the tag. A read goes where the connection string's readPreference
+    /// says, except in a transaction (the primary).
+    private func withCommand<T>(_ command: BSONDocument, database: String, reading: Bool = false, logged: Bool = true,
+                                _ body: (UnsafeMutablePointer<bson_t>, Server, String) throws -> T) throws -> T {
         let client = try current()
         var command = command
         let tag = nextTag()
         if command["comment"] == nil { command.fields.append(("comment", .string(tag))) }
-        let server = try select(client, forWrites: false)
+        let preference = reading && transaction == nil ? mongoc_client_get_read_prefs(client) : nil
+        let server = try select(client, forWrites: false, preference: preference)
         let sent = try command.bson()
         let options = try self.options(server: server.id)
         defer { [sent, options].forEach { bson_destroy($0) } }
-        log(command, database: database)
+        if logged { log(command, database: database) }
         return try Self.withReply { reply in
             var error = bson_error_t()
             try sending(tag, server: server.name) {
-                guard mongoc_client_read_write_command_with_opts(client, database, sent, nil, options, reply, &error) else {
+                let done = preference.map { mongoc_client_read_command_with_opts(client, database, sent, $0, options, reply, &error) }
+                    ?? mongoc_client_read_write_command_with_opts(client, database, sent, nil, options, reply, &error)
+                guard done else {
                     throw lock.locked { routeError } ?? MongoErrorMapping.map(error, reply: reply)
                 }
             }
-            return try body(reply, server.id, tag)
+            return try body(reply, server, tag)
         }
     }
 
@@ -195,15 +206,15 @@ public final class MongoSession: @unchecked Sendable {
     /// rest through getMore.
     func cursor(_ command: BSONDocument, database: String) async throws -> MongoCursor {
         try await worker.perform { [self] in
-            try withCommand(command, database: database) { reply, server, tag in
-                let options = try self.options(server: server)
+            try withCommand(command, database: database, reading: true) { reply, server, tag in
+                let options = try self.options(server: server.id)
                 defer { bson_destroy(options) }
                 // It takes the copy and destroys it.
                 guard let made = mongoc_cursor_new_from_command_reply_with_opts(client, bson_copy(reply), options) else {
                     throw AirSQLError(.other, "The server's reply had no cursor.")
                 }
                 cursors.insert(made)
-                return MongoCursor(session: self, cursor: made, tag: tag)
+                return MongoCursor(session: self, cursor: made, tag: tag, secondary: server.secondary ? server.name : nil)
             }
         }
     }
@@ -239,15 +250,19 @@ public final class MongoSession: @unchecked Sendable {
         connection.log.write("\(database): " + MongoLog.line(command), context: "\(connection.name) \(role.rawValue):\(number)")
     }
 
-    /// The primary, or a member that can answer reads; its id and "host:port".
-    private func select(_ client: OpaquePointer, forWrites: Bool) throws -> (id: UInt32, name: String) {
+    /// A server chosen for a command: its id, "host:port", and whether it is a replica set's secondary.
+    typealias Server = (id: UInt32, name: String, secondary: Bool)
+
+    /// The primary, or the member `preference` (a read preference) chooses.
+    private func select(_ client: OpaquePointer, forWrites: Bool, preference: OpaquePointer? = nil) throws -> Server {
         var error = bson_error_t()
         lock.locked { routeError = nil }
-        guard let server = mongoc_client_select_server(client, forWrites, nil, &error) else {
+        guard let server = mongoc_client_select_server(client, forWrites, preference, &error) else {
             throw lock.locked { routeError } ?? MongoErrorMapping.map(error)
         }
         defer { mongoc_server_description_destroy(server) }
-        return (mongoc_server_description_id(server), Self.text(mongoc_server_description_host(server)!.pointee.host_and_port))
+        return (mongoc_server_description_id(server), Self.text(mongoc_server_description_host(server)!.pointee.host_and_port),
+                String(cString: mongoc_server_description_type(server)) == "RSSecondary")
     }
 
     private func current() throws -> OpaquePointer {
@@ -280,7 +295,7 @@ public final class MongoSession: @unchecked Sendable {
 
     /// The collection's document count from its metadata: fast, and maybe a little off after an unclean shutdown.
     public func estimatedCount(database: String, collection: String) async throws -> Int64 {
-        try await command(BSONDocument([("count", .string(collection))]), database: database)["n"]?.integer ?? 0
+        try await command(BSONDocument([("count", .string(collection))]), database: database, reading: true)["n"]?.integer ?? 0
     }
 
     /// The distinct values of `key` (a dotted path) among the documents matching `filter`.
@@ -289,7 +304,9 @@ public final class MongoSession: @unchecked Sendable {
         var fields: [(key: String, value: BSONValue)] = [("distinct", .string(collection)), ("key", .string(key)),
                                                          ("query", .document(filter))]
         if let maxTimeMS { fields.append(("maxTimeMS", .int64(Int64(maxTimeMS)))) }
-        guard case .array(let values)? = try await command(BSONDocument(fields), database: database)["values"] else { return [] }
+        guard case .array(let values)? = try await command(BSONDocument(fields), database: database, reading: true)["values"] else {
+            return []
+        }
         return values
     }
 
@@ -612,9 +629,21 @@ public final class MongoSession: @unchecked Sendable {
 
         var options = mongoc_ssl_opt_get_default().pointee
         options.weak_cert_validation = true  // TLSCheck below checks instead (and no OCSP request leaves the route)
+        // The client certificate (X.509 login, or a server that asks for one): its key in the same PEM file, as the
+        // driver reads both from one file (mongosh's --tlsCertificateKeyFile).
+        let tls = connection.tls
+        if let key = tls.keyFile, !key.isEmpty, key != tls.certFile {
+            mongoc_stream_destroy(base)
+            throw AirSQLError(.tls, "MongoDB takes the client certificate and its key in one PEM file: choose that file as the "
+                              + "TLS tab's Certificate and leave Key empty.")
+        }
+        let pem = tls.certFile.flatMap { $0.isEmpty ? nil : strdup($0) }
+        defer { free(pem) }
+        options.pem_file = UnsafePointer(pem)
         guard let stream = mongoc_stream_tls_new_with_hostname(base, host, &options, 1) else {
             mongoc_stream_destroy(base)
-            throw AirSQLError(.tls, "AirSQL couldn't set up TLS to \(host).")
+            throw AirSQLError(.tls, "AirSQL couldn't set up TLS to \(host)" + (pem == nil ? "." : ": check that the client "
+                                                                                 + "certificate's file holds it and its key, in PEM."))
         }
         var error = bson_error_t()
         guard mongoc_stream_tls_handshake_block(stream, host, Int32(timeout), &error) else {
@@ -750,12 +779,15 @@ public struct MongoFind: Sendable {
 public final class MongoCursor: @unchecked Sendable {
     private let session: MongoSession
     let tag: String
+    /// The member that answered, "host:port", when it is a secondary (the connection string's readPreference chose it).
+    public let secondary: String?
     private let lock = NSLock()
     private var _pointer: OpaquePointer?
 
-    fileprivate init(session: MongoSession, cursor: OpaquePointer, tag: String) {
+    fileprivate init(session: MongoSession, cursor: OpaquePointer, tag: String, secondary: String?) {
         self.session = session
         self.tag = tag
+        self.secondary = secondary
         _pointer = cursor
     }
 

@@ -480,7 +480,10 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         notice.show(problem == nil ? .readOnly : .problem, problem ?? info ?? partInfo)
         let loaded = source.rowCount, more = cursor?.isExhausted == false
         viewer.status.rows.stringValue = loading != nil && loaded == 0 ? "Running…"
-            : "\(loaded.formatted()) document\(loaded == 1 ? "" : "s")\(more ? " loaded" : "")"
+            : "\(loaded.formatted()) document\(loaded == 1 ? "" : "s")\(more ? " loaded" : "")" + (cursor?.secondary.map { " · from \($0)" } ?? "")
+        viewer.status.rows.toolTip = cursor?.secondary.map {
+            "Read from \($0), a secondary, as the connection's readPreference asks: it may lag the primary"
+        }
         moreLink.isHidden = !more
         viewer.status.update()
         toolbar.setNeedsValidation()

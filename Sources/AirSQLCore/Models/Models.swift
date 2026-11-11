@@ -137,6 +137,8 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var directConnection = false
     /// MongoDB: the connection string's other options, as written there ("readPreference=secondary&w=majority").
     public var mongoOptions = ""
+    /// MongoDB: log in with the TLS tab's client certificate (MONGODB-X509) instead of a password.
+    public var mongoX509 = false
 
     public init(id: UUID = UUID(), name: String = "", host: String = "", port: Int? = nil, user: String = "",
                 colour: ConnectionColour = .none, route: Route = .direct) {
@@ -200,6 +202,7 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         replicaSet = try value(.replicaSet, defaults.replicaSet)
         directConnection = try value(.directConnection, defaults.directConnection)
         mongoOptions = try value(.mongoOptions, defaults.mongoOptions)
+        mongoX509 = try value(.mongoX509, defaults.mongoX509)
     }
 
     /// The name, else user@host:port (or the socket).

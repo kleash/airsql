@@ -2032,7 +2032,8 @@ write: every request is checked before it is sent, and refused if it would run J
 write (`$out`, `$merge`), uses a pipeline stage AirSQL hasn't vetted, or reaches MongoDB's own databases (admin,
 local, config) or `system` collections. Each runs with the time limit and document cap of Settings ▸ Safety, and on a
 replica set inside a transaction that is always cancelled, so even a write that got past the check is refused by the
-server. For more safety still, connect with a user that has only the `read` role.
+server. For more safety still, connect with a user that has only the `read` role. Documents, distinct values and sizes
+reach the agent as Extended JSON text, so a field's order and a number's type (`2.0` stays a double) are kept.
 
 ## Agents in AirSQL's windows
 
@@ -2348,13 +2349,27 @@ mongosh or Compass.
   DNS lists the servers. TLS turns on with it.
 - **Replica set**: its name, such as `rs0`. **Direct connection**: only the server named, never the other members
   (for one secondary on its own).
+- **Log in with**: **Password (SCRAM)**, or **X.509 certificate**: the TLS tab's **Certificate** (one PEM file with
+  the certificate and its key, as mongosh's `--tlsCertificateKeyFile` takes it) logs in as the user in `$external`
+  its subject names; the user is optional and no password is asked.
 - **Auth source**: the database the user is defined in; empty, the database above, else `admin`.
 - **Options**: the address's other options as they follow its `?`, such as `readPreference=secondary&w=majority`,
-  `appName` or `retryWrites`.
+  `appName` or `retryWrites`. With a `readPreference`, finds, aggregations, counts and distinct values go to the
+  member it chooses, and the status bar names a secondary that answered (it may lag the primary); writes, Apply and
+  agents' reads stay on the primary.
 
 A new connection starts with TLS checking the certificate and host name, except for a server on this Mac. A pasted
 `mongodb://` address without `tls=true` turns TLS off, and the editor says the connection isn't encrypted. The TLS tab's
 CA certificate is how a private authority (such as a replica set's own) is trusted. Every route works, as for MySQL.
+
+A connection that drops (its SSH tunnel ends, or the server stops answering the check AirSQL makes every minute) is
+marked in the sidebar with why, as a MySQL one is: its sessions close, nothing is run again, and the tabs keep what
+they show and their pending changes. Double-click the connection to connect again, then Apply. Quick Open (⌘P) finds
+the databases and the collections the tree has read, and **Select in Tree** (⇧⌘L) shows a collection or pipeline
+tab's collection there.
+
+After a relaunch, collection tabs come back with their query bar and page, and pipeline tabs with their pipeline, as
+placeholders: nothing connects until you press **Connect and Open**.
 
 ## The query bar
 
@@ -3071,9 +3086,9 @@ needs Schema + read, and the connection connected in AirSQL. `database` defaults
 Documents you send (`filter`, `projection`, `sort`, `collation`, a `hint` pattern, `pipeline`) are Extended JSON
 text, as strings: `"{\"status\": \"A\", \"total\": {\"$gt\": 10}}"`, with `$oid`, `$date`, `$numberLong`,
 `$numberDecimal` for the types JSON lacks. A string keeps the keys' order (a sort on two fields); an object is refused.
-Documents you get back (`mongo_find`, `mongo_aggregate`, `mongo_list_indexes`) are strings too, each one document's
-relaxed Extended JSON text, so their keys keep their order and a double keeps its `.0` (`{"b": 1, "a": 2.0}`): parse
-each one. Numbers are plain, other types `{"$oid": …}`, `{"$date": "2024-…Z"}`, `{"$numberDecimal": "…"}`; strings
+Documents you get back (`mongo_find`, `mongo_aggregate`, `mongo_list_indexes`, `mongo_stats`) are strings too, each
+one document's relaxed Extended JSON text, so their keys keep their order and a double keeps its `.0`
+(`{"b": 1, "a": 2.0}`): parse each one; so is each of `mongo_distinct`'s values (`2.0`, `"Paris"`). Numbers are plain, other types `{"$oid": …}`, `{"$date": "2024-…Z"}`, `{"$numberDecimal": "…"}`; strings
 longer than 2,000 characters are cut.
 
 - `mongo_find {connection, database?, collection, filter?, projection?, sort?, skip?, limit?, collation?, hint?}`:

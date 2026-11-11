@@ -265,7 +265,11 @@ extension MongoCollectionController {
     @objc func applyChanges(_ sender: Any?) {
         viewer.valuePanel?.keepValue(nil)
         guard grid.endEditing(commit: true), viewer.valuePanel?.edited != true else { return }
-        guard !changes.isEmpty, loading == nil, let window = view.window, let open = model.openMongo[connectionID] else { return NSSound.beep() }
+        guard !changes.isEmpty, loading == nil, let window = view.window else { return NSSound.beep() }
+        guard let open = model.openMongo[connectionID] else {
+            return showError("The changes are kept: connect again (double-click the connection in the sidebar), then Apply.",
+                             title: "\(model.connection(connectionID)?.displayName ?? "The server") isn't connected", on: window)
+        }
         let atomic = MongoApply.isAtomic(open.server), count = changes.steps.count
         var request = SQLPreviewRequest(
             change: ChangeSQL(title: "Apply changes to \(name)", statements: [changes.preview.joined(separator: "\n")], connection: connectionID),
@@ -397,6 +401,7 @@ extension MongoCollectionController {
             return changed ? nil : "The selected documents have no pending changes"
         case Commands.apply.action?, Commands.save.action?, Commands.previewChanges.action?:
             if changes.isEmpty { return "No changes are pending" }
+            if connection == nil { return "Connect again to apply them: they are kept" }
             return isApplying ? "Apply is under way" : loading != nil ? "Wait for the read under way, or cancel it (⌘.)" : nil
         case Commands.undo.action?: return undone.isEmpty || isApplying ? "Nothing to undo" : nil
         case Commands.redo.action?: return redone.isEmpty || isApplying ? "Nothing to redo" : nil

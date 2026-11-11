@@ -418,6 +418,10 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             rows.stringValue = "\(loaded.formatted()) \(noun(Int64(loaded))) loaded"
         }
         rows.toolTip = total?.exact == false ? "The collection's count from its metadata: Count Exactly counts the documents" : nil
+        if let member = cursor?.secondary {
+            rows.stringValue += " · from \(member)"
+            rows.toolTip = "Read from \(member), a secondary, as the connection's readPreference asks: it may lag the primary"
+        }
         countLink.isHidden = !more || total?.exact == true
         moreLink.isHidden = !more
         let filtered = !shown.filter.trimmingCharacters(in: .whitespaces).isEmpty

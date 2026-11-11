@@ -35,13 +35,27 @@ mongosh or Compass.
   DNS lists the servers. TLS turns on with it.
 - **Replica set**: its name, such as `rs0`. **Direct connection**: only the server named, never the other members
   (for one secondary on its own).
+- **Log in with**: **Password (SCRAM)**, or **X.509 certificate**: the TLS tab's **Certificate** (one PEM file with
+  the certificate and its key, as mongosh's `--tlsCertificateKeyFile` takes it) logs in as the user in `$external`
+  its subject names; the user is optional and no password is asked.
 - **Auth source**: the database the user is defined in; empty, the database above, else `admin`.
 - **Options**: the address's other options as they follow its `?`, such as `readPreference=secondary&w=majority`,
-  `appName` or `retryWrites`.
+  `appName` or `retryWrites`. With a `readPreference`, finds, aggregations, counts and distinct values go to the
+  member it chooses, and the status bar names a secondary that answered (it may lag the primary); writes, Apply and
+  agents' reads stay on the primary.
 
 A new connection starts with TLS checking the certificate and host name, except for a server on this Mac. A pasted
 `mongodb://` address without `tls=true` turns TLS off, and the editor says the connection isn't encrypted. The TLS tab's
 CA certificate is how a private authority (such as a replica set's own) is trusted. Every route works, as for MySQL.
+
+A connection that drops (its SSH tunnel ends, or the server stops answering the check AirSQL makes every minute) is
+marked in the sidebar with why, as a MySQL one is: its sessions close, nothing is run again, and the tabs keep what
+they show and their pending changes. Double-click the connection to connect again, then Apply. Quick Open (⌘P) finds
+the databases and the collections the tree has read, and **Select in Tree** (⇧⌘L) shows a collection or pipeline
+tab's collection there.
+
+After a relaunch, collection tabs come back with their query bar and page, and pipeline tabs with their pipeline, as
+placeholders: nothing connects until you press **Connect and Open**.
 
 ## The query bar
 

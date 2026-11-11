@@ -28,9 +28,12 @@ final class OpenMongoConnection {
     /// What is being read now, by the same keys.
     private(set) var loading: Set<String> = []
     private var tasks: [String: Task<Void, Never>] = [:]
+    /// The connector's keep-alive (`Connector.watch`), stopped by `close`.
+    var keepAlive: Timer?
 
     /// Closes the sessions, then the route.
     func close() {
+        keepAlive?.invalidate()
         tasks.values.forEach { $0.cancel() }
         tasks = [:]
         let connection = self.connection
@@ -127,7 +130,14 @@ extension Connector {
                                          tls: saved.tls, route: route, name: saved.displayName)
         var trusted = false
         do {
-            if let typed { connection.password = typed } else { connection.password = try await databasePassword(&saved, on: window, retry: false) }
+            // An X.509 login has no password: the client certificate logs in.
+            if saved.mongoX509 {
+                connection.password = nil
+            } else if let typed {
+                connection.password = typed
+            } else {
+                connection.password = try await databasePassword(&saved, on: window, retry: false)
+            }
             connection.user = saved.user.isEmpty ? nil : saved.user
             while true {
                 do {
@@ -153,7 +163,7 @@ extension Connector {
                             stored.tls.pinnedFingerprint = certificate.fingerprint
                             model.save(stored)
                         }
-                    case .authFailed:
+                    case .authFailed where !saved.mongoX509:
                         connection.password = try await databasePassword(&saved, on: window, retry: true)
                         connection.user = saved.user.isEmpty ? nil : saved.user
                     default:
