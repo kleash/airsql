@@ -99,11 +99,12 @@ final class MongoWatchController: NSViewController, TabContent, DataGridViewDele
     /// Start: a change stream from now, or after the last event seen; the events it gives go to the top of the grid.
     func start() {
         guard watching == nil else { return }
+        // Copies taken first: an older compiler reads a closure's name as the later local otherwise.
+        let (database, collection, lookUp) = (database, collection, lookUp.state == .on)
         guard let connection, let open = model.openMongo[connectionID] else {
             return fail("Connect to the server again to watch its changes.")
         }
-        let kind = collection.flatMap { name in open.collections[database]?.first { $0.name == name }?.kind }
-        if let reason = open.watchRefusal(database, collection == nil ? nil : kind) {
+        if let reason = open.watchRefusal(database, collection.flatMap { name in open.collections[database]?.first { $0.name == name }?.kind }) {
             return fail(reason)
         }
         let pipeline: [BSONDocument]
@@ -113,7 +114,6 @@ final class MongoWatchController: NSViewController, TabContent, DataGridViewDele
             view.window?.makeFirstResponder(filter)
             return fail("\(error)")
         }
-        let (database, collection, lookUp) = (database, collection, lookUp.state == .on)
         problem = nil
         info = nil
         watching = Task { [self] in
