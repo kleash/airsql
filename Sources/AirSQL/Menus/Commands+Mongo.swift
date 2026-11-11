@@ -21,7 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands + mongoUsersCommands
-        + mongoWatchCommands
+        + mongoWatchCommands + mongoDumpCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -177,4 +177,15 @@ extension Commands {
                                       tip: "Open a tab that shows the collection's or database's changes as they happen")
 
     static let mongoWatchCommands = [watchChanges]
+}
+
+// MARK: Dump and restore (lane P4-dump)
+
+extension Commands {
+    static let mongoDump = Command("Dump with mongodump…", #selector(MongoDumpMenu.dumpMongo(_:)),
+                                   tip: "Write a database or a collection to one .archive.gz file with your own mongodump")
+    static let mongoRestore = Command("Restore with mongorestore…", #selector(MongoDumpMenu.restoreMongo(_:)),
+                                      tip: "Write an .archive.gz file's databases into the server with your own mongorestore; it asks first")
+
+    static let mongoDumpCommands = [mongoDump, mongoRestore]
 }

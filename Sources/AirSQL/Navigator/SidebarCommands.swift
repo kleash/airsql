@@ -126,6 +126,7 @@ extension SidebarController: NSMenuItemValidation {
                 entry.target = MongoTransferMenu.shared
                 menu.addItem(entry)
             }
+            MongoDumpMenu.addItems(to: menu, for: item)
         case .database:
             menu.add([Commands.newQuery, Commands.newDatabase, Commands.createTable, Commands.copyName, Commands.copyPlainName, nil,
                       Commands.export, Commands.restore,

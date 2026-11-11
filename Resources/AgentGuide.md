@@ -125,6 +125,8 @@ databases and `system.*` collections; a negative skip or limit. Every command ca
 a watchdog stops one that runs on. On a replica set or a mongos the reads run inside a transaction that is always
 aborted, so even a write that got past the check is refused by the server; there, `$collStats` and `$indexStats`
 stages fail (use `mongo_stats`). To change data, propose it with `mongo_open`: there is no tool that writes.
+Dump with mongodump… and Restore with mongorestore… are not for agents: through the UI tools they are refused ("Only the
+person at the Mac can run mongodump.").
 
 `mongo_find` and `mongo_aggregate` take `to_file: true` (Schema + read + analytics): the documents, up to the row
 cap, go to a new file in AirSQL's agent export folder, one relaxed Extended JSON document a line (`.jsonl`, nothing

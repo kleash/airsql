@@ -410,3 +410,27 @@ server can't resume from stops the watch and says why; it never starts again by 
 a relaunch waits for Start. The tab keeps the newest 10,000 changes, and at most 32 MB of them; the status bar says
 how many older ones went. It reads on a session of its own, closed with the tab. Watching only reads: nothing is
 written.
+
+## Dump and restore
+
+**Dump with mongodump…** and **Restore with mongorestore…** (Tools menu, after Flush; a MongoDB connection's right-click menu, and a
+database's; a collection's has Dump) run your own MongoDB Database Tools on the connected connection, through its route.
+AirSQL doesn't install them: if it finds none (where it looks for mongosh), it says where to get them, MongoDB's download
+page or `brew install mongodb-database-tools`. The user goes on the command line and the password in a private file
+only you can read (`--config`), removed when the tool ends; the sheet shows the exact command, which holds neither.
+
+A dump writes one database, or one of its collections, to one `.archive.gz` file (`--archive --gzip`), Downloads by
+default, with its size as it grows and Stop. A stopped or failed dump leaves no file.
+
+A restore reads an archive back into the server: every database in it under its own name, or, with a database typed in
+**Into database**, only the file's database named in **From database** (filled in from the file's name) under the new
+name. **Drop each collection first** (`--drop`, off, in red) deletes each of the file's collections on the server, with
+its documents and indexes, before restoring it. Without it only documents with new `_id`s are inserted: those already
+there are skipped, not replaced, and a time-series collection that already exists stops the restore. Before it runs,
+AirSQL asks, showing the command, the server and what it writes. A restore that stops or fails stays partly applied. A
+read-only connection can't be restored into.
+
+The tools know only one way to go without the certificate check, `--tlsInsecure`, which skips all of it. So over an SSH
+or proxy route with TLS (the tools reach one server through a socket on this Mac and can't check its name), with Verify
+CA, or with a certificate you trusted in AirSQL and no authority's file, the sheet says why it can't check and offers
+**Run without checking the certificate**, for one run, noted in the SQL log. Agents can't dump or restore.
