@@ -263,13 +263,13 @@ final class Connector {
     }
 
     /// `establish` for MongoDB: its route opens a forward or relay per server as the driver asks for each
-    /// (`logInMongo`).
+    /// (`signInMongo`).
     func establishMongo(_ saved: inout SavedConnection, password: String? = nil, sessionToken: String? = nil,
                         proxyPassword: String? = nil, on window: NSWindow?,
                         step: @escaping (String) -> Void) async throws -> (MongoConnection, MongoServerInfo) {
         try await withRoutePrompts(saved, proxyPassword: proxyPassword, on: window) { proxy, server in
             step("Logging in to \(saved.host)")
-            return try await logInMongo(&saved, password: password, sessionToken: sessionToken, proxyPassword: proxy,
+            return try await signInMongo(&saved, password: password, sessionToken: sessionToken, proxyPassword: proxy,
                                         askpass: server, on: window)
         }
     }

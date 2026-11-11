@@ -153,8 +153,7 @@ relaunch; Quick Open and Select in Tree for collections; X.509 client certificat
 - **aggregate**: run to a stage, saved pipelines, export a result, Save as View, Open mongosh in Terminal over the route
   (the user only, so mongosh prompts; never a password on argv).
 
-**Later:** mongodump/mongorestore (through a 0600 `--config` file), AWS IAM (libmongoc built without it today),
-change-stream tail, users and roles. **Dropped:** OIDC (its browser flow needs a loopback TCP listener), aggregation
+**Later** (built in Phase 4): mongodump/mongorestore, AWS IAM, change-stream tail, users and roles. **Dropped:** OIDC (its browser flow needs a loopback TCP listener), aggregation
 templates (saved pipelines cover them).
 
 ## Phase 3: autofill and agents that know the database (designed by the Fable 5.2 review)
@@ -196,6 +195,28 @@ passes: Tier A in every Mongo lab run, and Tier B with a real agent (Claude Haik
 data questions on the first try, proposed a correct query in a tab without running it, did not cancel the order, and
 treated the injection canary as data. Also fixed on the way: a MongoDB login's database is Auth source (admin when empty);
 the Database field only says which database opens.
+
+## Phase 4: status
+
+Designed with the Fable 5.2 review (the tools know only `--tlsInsecure`; the driver's own AWS credential search is never
+used; libmongoc resumes a change stream by itself) and built in four lanes, merged on `mongo`:
+
+- **Dump and restore** (Tools ▸ Dump with mongodump… / Restore with mongorestore…): one database or collection to one
+  `.archive.gz` streamed through the app (progress, Stop, no partial file); restore with an optional rename, `--drop`
+  opt-in and marked, refused on read-only connections, confirmed with the exact command. The password goes in a 0600
+  `password:` config file deleted when the run ends; over a route, Verify CA or a pinned certificate the tools can't
+  check names, so they run only with the person's "Run without checking the certificate" tick.
+- **AWS IAM** (`MONGODB-AWS`, libmongoc built with it): the access key ID in User, the secret in Password, an optional
+  session token in the Keychain, added to the string only in memory. mongosh, dump and restore are off for it (the token
+  would go on argv). Untested against Atlas: the lab's Community servers refuse the mechanism, which the lab test checks.
+- **Watch Changes** (a collection or database on a replica set or mongos): a filter, Look Up Full Document, Start/Stop
+  continuing from the resume token, 10,000 events or 32 MB kept; it stops and says so on errors the driver can't resume.
+- **Users and roles** (Connection ▸ MongoDB Server ▸ Users and Roles): users and custom roles with the per-database
+  fallback; create, drop, change password, grant and revoke roles, drop a role; previews redact `pwd`. Creating and
+  editing custom roles is left out.
+
+Also: mongosh runs for real in the lab (Direct, SSH, every TLS mode, X.509, which now passes the client certificate),
+and the real-agent test runs on the replica set too (10 of 10 on each). CI on GitHub builds both libraries.
 
 ## Not doing
 
