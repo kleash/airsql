@@ -2556,6 +2556,31 @@ runs the pipeline to measure it, so a slow pipeline is slow here too.
 
 A collection tab's find can be explained the same way: its plan opens in a window of its own.
 
+### Stages, saved pipelines, views and mongosh
+
+**Run to Here** (⌃⌘↩, or the ⏭ button's menu, which lists the stages) runs the pipeline up to the stage the caret is in
+and shows that stage's documents; a line over the grid says which stage they come from. **Count Each Stage** runs the
+pipeline once per stage with a `$count` after it and shows how many documents each stage gives, in that menu and over
+the grid: it runs the pipeline several times, so it is only done when you ask. After a Run whose documents are all
+loaded, the last stage's count shows there too.
+
+**Save Pipeline…** (the bookmark button, or Data ▸ Collection) keeps the pipeline under a name for its collection, on
+this Mac beside the query history; the same menu opens a saved pipeline, and **Rename Saved Pipeline…** and **Delete
+Saved Pipeline…** act on the one open in the tab. **Export Documents…** (the share button) writes what the pipeline gives,
+in the same formats as a collection's export, a batch at a time.
+
+**Save as View…** makes a view on the collection that gives what the pipeline gives: name it, then the exact `create`
+command shows before it runs. A pipeline that writes (`$out`, `$merge`) can't be a view or be exported, and a read-only
+connection makes no view; a pipeline that writes runs only after its own preview, and never on a read-only connection.
+
+**Open mongosh in Terminal** (Connection menu, or a MongoDB connection's right-click menu) opens your own MongoDB Shell
+in Terminal on the connection, through its route: AirSQL passes the user only, so mongosh asks for the password in
+Terminal, and no password is ever on its command line. Over an SSH or proxy route mongosh reaches one server through a
+socket on this Mac (`directConnection`), so with TLS it can't check the server's name in its certificate, only that an
+authority it trusts signed it (the connection's CA file is passed); Terminal says so before mongosh starts. AirSQL doesn't
+install mongosh: if it finds none (in Homebrew's folders, /usr/local/bin or your PATH), it says where to get it,
+MongoDB's download page or `brew install mongosh`.
+
 ## Agents
 
 With agent access set to **Schema + read** or more, AI agents can find, aggregate, count and sample a MongoDB
@@ -2779,6 +2804,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Schema | ⌃⌥6 |
 | Copy Documents | ⌥⇧⌘C |
 | New Aggregation | ⌥⌘A |
+| Run to Here | ⌃⌘↩ |
 | Indexes | ⌃⌥7 |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in

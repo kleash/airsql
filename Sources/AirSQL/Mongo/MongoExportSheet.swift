@@ -46,7 +46,7 @@ final class MongoExportSheet: NSWindowController, NSTextFieldDelegate {
         self.ref = ref
         self.activity = activity
         query = ref.query.flatMap { $0 == MongoQueryText() ? nil : try? $0.find() }
-        var scopes = ["Every document of \(ref.collection)"]
+        var scopes = [ref.pipeline != nil ? "What the pipeline gives" : "Every document of \(ref.collection)"]
         if let summary = ref.query?.summary, query != nil {
             scopes.append("What the tab's query finds: " + (summary.count > 50 ? String(summary.prefix(49)) + "…" : summary))
         }
@@ -106,7 +106,7 @@ final class MongoExportSheet: NSWindowController, NSTextFieldDelegate {
 
     /// The find of the scope chosen. Not the tab's time limit: it would end a long export part-way.
     private var find: MongoFind {
-        var find = scope.indexOfSelectedItem == 1 ? query ?? MongoFind() : MongoFind()
+        var find = scope.indexOfSelectedItem == 1 ? query ?? MongoFind() : MongoFind(collation: ref.collation)
         find.maxTimeMS = nil
         return find
     }
@@ -130,11 +130,17 @@ final class MongoExportSheet: NSWindowController, NSTextFieldDelegate {
         var find = self.find
         find.limit = min(find.limit.flatMap { $0 > 0 ? $0 : nil } ?? Int64(Self.sampleSize), Int64(Self.sampleSize))
         let (connection, database, collection) = (ref.open.connection, ref.database, ref.collection)
+        let pipeline = ref.pipeline.map { $0 + [BSONDocument([("$limit", .int64(Int64(Self.sampleSize)))])] }
         sampling = Task { [weak self] in
             var documents: [BSONDocument] = []
             var problem: String?
             do {
-                let cursor = try await connection.session(.data).find(database: database, collection: collection, find)
+                let session = try await connection.session(.data)
+                let cursor = if let pipeline {
+                    try await session.aggregate(database: database, collection: collection, pipeline: pipeline, collation: find.collation)
+                } else {
+                    try await session.find(database: database, collection: collection, find)
+                }
                 let batch = try await cursor.next(maxCount: Self.sampleSize, maxBytes: 16 << 20)
                 await cursor.close()
                 documents = try await Task.detached { try batch.map { try BSONDocument(bytes: $0) } }.value
@@ -191,7 +197,7 @@ final class MongoExportSheet: NSWindowController, NSTextFieldDelegate {
                                   + "sheet for them.") else { return }
         guard let parent = window?.sheetParent else { return }
         let (format, find, ref, activity) = (chosenFormat, self.find, self.ref, self.activity)
-        let whole = scope.indexOfSelectedItem == 0
+        let whole = scope.indexOfSelectedItem == 0 && ref.pipeline == nil
         dismiss()
         let panel = NSSavePanel()
         panel.nameFieldStringValue = ref.collection + "." + format.fileExtension
@@ -215,8 +221,8 @@ final class MongoExportSheet: NSWindowController, NSTextFieldDelegate {
             do {
                 let session = try await connection.session(.data)
                 let total = whole ? try? await session.estimatedCount(database: ref.database, collection: ref.collection) : nil
-                _ = try await MongoExport.write(session, database: ref.database, collection: ref.collection, find: find, format: format,
-                                                to: url, stop: stop) { count in
+                _ = try await MongoExport.write(session, database: ref.database, collection: ref.collection, find: find,
+                                                pipeline: ref.pipeline, format: format, to: url, stop: stop) { count in
                     Task { @MainActor in
                         work.detail = count.formatted() + (total.map { " of about \($0.formatted())" } ?? "") + " documents"
                         work.progress = total.map { $0 > 0 ? min(1, Double(count) / Double($0)) : 1 }

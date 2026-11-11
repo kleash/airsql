@@ -32,6 +32,24 @@ extension MainMenu {
     /// Data ▸ Collection ▸ New Aggregation, after Open Collection: for the collection of the tab in front, else the tree's.
     static func addAggregationItems(_ menus: Menus) {
         menus.data.items.last?.submenu?.insertItem(Commands.newAggregation.item(), at: 1)
+        addPipelineItems(menus)
+    }
+}
+
+// MARK: Pipelines (lane P2-aggregate)
+
+extension MainMenu {
+    /// Data ▸ Collection's pipeline items after New Aggregation, for the aggregation tab in front; Connection ▸ Open mongosh
+    /// in Terminal, for the selected MongoDB connection.
+    static func addPipelineItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last?.submenu else { return }
+        let items = [NSMenuItem.separator()] + [Commands.runToStage, Commands.countStages, Commands.savePipeline, Commands.renamePipeline,
+                                                Commands.deletePipeline, Commands.saveAsView].map { $0.item() }
+        for (offset, item) in items.enumerated() { collection.insertItem(item, at: 2 + offset) }
+        let shell = Commands.openMongosh.item()
+        shell.target = MongoShellMenu.shared
+        menus.connection.addItem(.separator())
+        menus.connection.addItem(shell)
     }
 }
 
