@@ -2753,6 +2753,7 @@ The keys: ⌘ Command, ⌥ Option, ⌃ Control, ⇧ Shift, ↩ Return, ⌫ Delet
 | Schema | ⌃⌥6 |
 | Copy Documents | ⌥⇧⌘C |
 | New Aggregation | ⌥⌘A |
+| Run to Here | ⌃⌘↩ |
 | Indexes | ⌃⌥7 |
 
 ⌘S saves a query tab's file, or applies a table's changes: whichever the front tab has. F9 and ⌃F9 run as they do in
