@@ -103,13 +103,19 @@ public enum AgentTools {
                                     "documents": strings("The documents, each its relaxed Extended JSON text (keys in "
                                                          + "order, doubles as 1.0)"),
                                     "count": integer("How many documents the reply has"),
-                                    "capped": boolean("There may be more than the reply has")]
+                                    "capped": boolean("There may be more than the reply has"),
+                                    "warnings": strings("Why the answer may be wrong: a path not in the collection's "
+                                                        + "sample, a literal of a type the field never has there"),
+                                    "file": string("to_file: the file written"), "bytes": integer("to_file: its size")]
+        let toFile = boolean("Write the documents (up to the row cap) to a file in AirSQL's agent export folder instead, "
+                             + "one relaxed Extended JSON document a line; the reply says where (analytics access)")
         let refusals = " $where, $function, $accumulator, $out and $merge are refused anywhere; so are the admin, local and "
             + "config databases and system.* collections. Needs Schema + read access on a MongoDB connection."
+        let teaches = " A server's error comes as JSON {code, codeName, message, stage?, hint?}."
         return [
             tool("mongo_find", "Finds documents in a MongoDB collection, read-only, within the connection's row cap and "
-                 + "timeout: 200 documents unless limit says more (up to the row cap)." + refusals,
-                 place.merging(["filter": filter, "projection": string("Fields to return, as Extended JSON text"),
+                 + "timeout: 200 documents unless limit says more (up to the row cap)." + teaches + refusals,
+                 place.merging(["filter": filter, "projection": string("Fields to return, as Extended JSON text"), "to_file": toFile,
                                 "sort": string("The order, as Extended JSON text: {\"a\": 1, \"b\": -1}"),
                                 "skip": integer("Documents to skip"), "limit": integer("At most this many (default 200)"),
                                 "collation": string("A collation document, as Extended JSON text"),
@@ -117,10 +123,10 @@ public enum AgentTools {
                  required: ["connection", "collection"], output: found, outputRequired: ["connection", "documents", "capped"]),
             tool("mongo_aggregate", "Runs a read-only aggregation pipeline on a MongoDB collection. Stages on an allow-list "
                  + "only ($match, $project, $group, $sort, $lookup and $unionWith in the same database, $facet, …); the row "
-                 + "cap is added as a last $limit." + refusals,
+                 + "cap is added as a last $limit." + teaches + refusals,
                  place.merging(["pipeline": string("The stages: Extended JSON text of an array, such as "
                                                    + "[{\"$match\": {}}, {\"$group\": {\"_id\": \"$k\", \"n\": {\"$sum\": 1}}}]"),
-                                "max_documents": integer("At most this many (default 200)"),
+                                "max_documents": integer("At most this many (default 200)"), "to_file": toFile,
                                 "collation": string("A collation document, as Extended JSON text"),
                                 "hint": string("An index's name, or its key pattern as Extended JSON text")]) { $1 },
                  required: ["connection", "collection", "pipeline"], output: found,
@@ -173,9 +179,45 @@ public enum AgentTools {
     // Phase 3's MongoDB tools (mongo-plan), one slot per tool so that the lanes building them don't edit the same lines.
     // An empty slot lists nothing, and a call to its name gets "AirSQL has no tool": it fails closed until it is built.
     /// mongo_schema: a whole database's paths, types, indexes and references in one call (lane: agent knowledge).
-    static let mongoSchemaTool: [[String: Any]] = []
+    static let mongoSchemaTool: [[String: Any]] = [
+        tool("mongo_schema", "Start here on a MongoDB database: all of it in one call, as text within 24 KB. Per "
+             + "collection: count, average size, indexes, validator; per path (the 60 most often present, 4 deep): types, "
+             + "share, and with read access the enums (up to 12 strings) and ranges of numbers and dates; views with their "
+             + "pipeline; references such as customerId -> customers._id (50/50), each checked by one $in probe. From a "
+             + "sample of each collection, so a path not listed may still exist. Pass the reply's hash as if_changed_from "
+             + "to get just {unchanged: true}. Needs Schema access.",
+             ["connection": connection, "database": string("The database (default: the connection's own)"),
+              "collections": strings("Only these collections (default: all but system.*)"),
+              "sample": boolean("Read the samples not cached yet (default true); false uses only those already read"),
+              "if_changed_from": string("A hash from an earlier mongo_schema reply")], required: ["connection"],
+             output: ["connection": string("The connection"), "database": string("The database"),
+                      "hash": string("The hash of the text"), "unchanged": boolean("Nothing changed since if_changed_from"),
+                      "text": string("The summary"), "capped": boolean("Something was left out: a collection not sampled in "
+                                                                      + "time, or paths and collections to fit 24 KB")],
+             outputRequired: ["connection", "hash", "unchanged"]),
+    ]
     /// mongo_explain: a find's or a pipeline's plan, nothing run (lane: agent knowledge).
-    static let mongoExplainTool: [[String: Any]] = []
+    static let mongoExplainTool: [[String: Any]] = [
+        tool("mongo_explain", "How MongoDB would run a find (filter, projection, sort, limit) or a pipeline: verbosity plan "
+             + "(default) asks the planner only and runs nothing, a free check of a query before running it; run runs it "
+             + "(executionStats) for the figures. Checked and capped as mongo_find and mongo_aggregate are; their warnings "
+             + "too. Needs Schema + read access.",
+             ["connection": connection, "database": string("The database (default: the connection's own)"),
+              "collection": string("The collection or view"),
+              "filter": string("A find's query document, as Extended JSON text"),
+              "projection": string("A find's fields, as Extended JSON text"), "sort": string("A find's order, as Extended JSON text"),
+              "limit": integer("A find's limit"),
+              "pipeline": string("Instead of a find: the stages, as Extended JSON text of an array"),
+              "hint": string("An index's name, or its key pattern as Extended JSON text"),
+              "verbosity": choice(["plan", "run"], "plan (default: runs nothing) or run (runs the query for its figures)")],
+             required: ["connection", "collection"],
+             output: ["connection": string("The connection"), "scan": string("collection, index or none"),
+                      "index": string("The indexes the plan reads"),
+                      "docsExamined": integer("Documents read (run only)"), "returned": integer("Documents returned (run only)"),
+                      "ms": integer("Time it took (run only)"), "warnings": strings("What makes it slow or likely wrong"),
+                      "plan": string("The winning plan as an indented tree")],
+             outputRequired: ["connection", "scan", "warnings", "plan"]),
+    ]
     /// mongo_open: a find or a pipeline put in a new tab for the person, never run (lane: agent control).
     static let mongoOpenTool: [[String: Any]] = []
 

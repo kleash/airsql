@@ -178,7 +178,8 @@ public final class MongoSampleCache: @unchecked Sendable {
         if case .document(let validator)? = info?.options["validator"], case .document(let schema)? = validator["$jsonSchema"] {
             validatorPaths = schemaPaths(schema)
         }
-        return MongoSample(schema: MongoSchema(sample: found), isFirstDocuments: first, indexes: indexes,
+        // 12 values: mongo_schema lists a string field of up to 12 values as an enum.
+        return MongoSample(schema: MongoSchema(sample: found, topLimit: 12), isFirstDocuments: first, indexes: indexes,
                            validatorPaths: validatorPaths)
     }
 

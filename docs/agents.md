@@ -55,6 +55,14 @@ replica set inside a transaction that is always cancelled, so even a write that 
 server. For more safety still, connect with a user that has only the `read` role. Documents, distinct values and sizes
 reach the agent as Extended JSON text, so a field's order and a number's type (`2.0` stays a double) are kept.
 
+With **Schema** access an agent can ask for a whole database in one summary: each collection's count, size, indexes
+and validator, its fields with their types (and with Schema + read their common values and ranges), views, and the
+references between collections (orders' `customerId` to `customers._id`), each checked by looking up a few sampled
+values. It can ask how MongoDB would run a query without running it (explain's plan), or run it for its figures.
+When a query names a field not in the collection's sample, or compares a date with a string, the reply warns and
+names the nearest field; a server's error says which stage and which word it didn't know. With **Schema + read +
+analytics**, finds and pipelines can go to a file in the agent export folder (Settings ▸ Agents), never elsewhere.
+
 ## Agents in AirSQL's windows
 
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.

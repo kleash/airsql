@@ -16,6 +16,9 @@ public enum MongoAgentRequest: Sendable, Equatable {
     /// A collection's stats, or the database's without one.
     case stats(db: String, collection: String?)
     case schemaSample(db: String, collection: String, size: Int)
+    /// A find's or an aggregate's plan: `execute` false asks for queryPlanner (nothing runs), true for executionStats
+    /// (the query runs, as it would on its own).
+    indirect case explain(MongoAgentRequest, execute: Bool)
 }
 
 /// A request the guard passed, with its caps applied: find's limit and schemaSample's size at most `documentCap`,
@@ -125,6 +128,14 @@ public enum MongoAgentGuard {
             try checkNamespace(db, collection)
             guard size > 0 else { throw MongoAgentRefusal(path: "size", reason: "needs at least 1 document") }
             return done(.schemaSample(db: db, collection: collection, size: min(size, cap)))
+        case let .explain(inner, execute):
+            // Only a find's or an aggregate's, checked and capped as each is on its own.
+            switch inner {
+            case .find, .aggregate:
+                return done(.explain(try check(inner, safety: safety).request, execute: execute))
+            default:
+                throw MongoAgentRefusal(path: "", reason: "only a find or an aggregate can be explained")
+            }
         }
     }
 

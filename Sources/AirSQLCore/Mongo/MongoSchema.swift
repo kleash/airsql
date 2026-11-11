@@ -25,12 +25,17 @@ public struct MongoSchema: Sendable {
         public var maxNumber: BSONValue?
         public var minDate: BSONValue?
         public var maxDate: BSONValue?
+        /// The first `exampleLimit` distinct values (not documents or arrays), as read: mongo_schema probes references
+        /// with them.
+        public var examples: [BSONValue] = []
 
         /// A type's share of the values here, 0…1.
         public func share(_ type: String) -> Double {
             present == 0 ? 0 : Double(types.first { $0.name == type }?.count ?? 0) / Double(present)
         }
     }
+
+    public static let exampleLimit = 50
 
     public var documents: Int
     /// In the order paths first appear.
@@ -75,6 +80,7 @@ public struct MongoSchema: Sendable {
                 .map { ($0.key, $0.value) }
             field.distinct = t.values.count
             field.distinctIsExact = !t.overflowed
+            field.examples = t.examples
             (field.minNumber, field.maxNumber, field.minDate, field.maxDate) = (t.minNumber, t.maxNumber, t.minDate, t.maxDate)
             return field
         }
@@ -89,6 +95,7 @@ public struct MongoSchema: Sendable {
         var types: [String: Int] = [:]
         var values: [String: Int] = [:]
         var overflowed = false
+        var examples: [BSONValue] = []
         var minNumber: BSONValue?, maxNumber: BSONValue?, minDate: BSONValue?, maxDate: BSONValue?
 
         mutating func add(_ value: BSONValue, distinctLimit: Int) {
@@ -111,6 +118,7 @@ public struct MongoSchema: Sendable {
                 values[text]! += 1
             } else if values.count < distinctLimit {
                 values[text] = 1
+                if examples.count < MongoSchema.exampleLimit { examples.append(value) }
             } else {
                 overflowed = true
             }

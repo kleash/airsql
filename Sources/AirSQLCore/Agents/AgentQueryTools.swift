@@ -112,7 +112,8 @@ extension AgentTarget {
     }
 
     /// A new file only this user can read, named after the connection, the time and the statement.
-    static func newFile(in folder: URL, name: String, index: Int, csv: Bool) throws -> (URL, FileHandle) {
+    static func newFile(in folder: URL, name: String, index: Int, csv: Bool,
+                        extension suffix: String? = nil) throws -> (URL, FileHandle) {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
         let stem = String(name.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "-" }.prefix(40))
@@ -121,7 +122,7 @@ extension AgentTarget {
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
         let base = "\(stem)-\(formatter.string(from: Date()))-\(index + 1)"
         for attempt in 0..<100 {
-            let url = folder.appendingPathComponent(base + (attempt == 0 ? "" : "-\(attempt)") + (csv ? ".csv" : ".json"))
+            let url = folder.appendingPathComponent(base + (attempt == 0 ? "" : "-\(attempt)") + "." + (suffix ?? (csv ? "csv" : "json")))
             let fd = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
             if fd >= 0 { return (url, FileHandle(fileDescriptor: fd, closeOnDealloc: true)) }
             guard errno == EEXIST else { break }

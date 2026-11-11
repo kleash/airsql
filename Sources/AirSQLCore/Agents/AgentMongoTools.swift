@@ -7,13 +7,44 @@ import Foundation
 extension AgentTarget {
     public static let mongoTools = ["mongo_find", "mongo_aggregate", "mongo_count", "mongo_distinct", "mongo_list_databases",
                                     "mongo_list_collections", "mongo_list_indexes", "mongo_stats", "mongo_schema_sample"]
+        + ["mongo_schema", "mongo_explain"]  // Phase 3, agent knowledge (MongoSchemaSummary, MongoAgentHints)
 
     /// The most BSON a reply's documents add up to; reading stops there and the reply says capped.
     static let mongoReplyBytes = 1 << 20
 
-    public func mongo(_ tool: String, _ arguments: [String: Any]) async throws -> [String: Any] {
+    /// `exports`: where to_file writes (tests: a scratch folder).
+    public func mongo(_ tool: String, _ arguments: [String: Any], exports: URL = exportFolder) async throws -> [String: Any] {
+        if tool == "mongo_schema" { return try await mongoSchema(arguments) }
         try require(.schemaRead, engine: .mongodb)
+        let toFile = arguments["to_file"] as? Bool == true
+        if toFile {
+            guard ["mongo_find", "mongo_aggregate"].contains(tool) else {
+                throw AirSQLError(.other, "to_file is for mongo_find and mongo_aggregate.")
+            }
+            try require(.schemaReadAnalytics, engine: .mongodb)
+        }
         let request = try mongoRequest(tool, arguments)
+        let wanted = (arguments["limit"] as? NSNumber ?? arguments["max_documents"] as? NSNumber)
+            .map { $0.intValue == 0 ? rowCap : $0.intValue } ?? (toFile ? rowCap : Self.defaultRows)
+        var reply = try await mongo(request, wanted: max(1, min(wanted, rowCap)), file: toFile ? exports : nil)
+        // Warnings that teach, from the collection's sample (read now if it isn't cached; without one, none).
+        let place: (db: String, collection: String)?
+        switch request {
+        case let .find(db, collection, _, _, _, _, _, _, _), let .aggregate(db, collection, _, _, _),
+             let .explain(.find(db, collection, _, _, _, _, _, _, _), _), let .explain(.aggregate(db, collection, _, _, _), _):
+            place = (db, collection)
+        default: place = nil
+        }
+        if let place, let sample = try? await mongo?.samples.sample(database: place.db, collection: place.collection) {
+            let found = MongoAgentHints.warnings(request, sample: sample, matched: tool == "mongo_explain" ? nil : reply["count"] as? Int)
+            if !found.isEmpty { reply["warnings"] = (reply["warnings"] as? [String] ?? []) + found }
+        }
+        return reply
+    }
+
+    /// Runs `request` once the guard has passed it, on the agent session in its turn; a server's error on a find, an
+    /// aggregate or an explain comes back as `MongoAgentHints.teach` words it.
+    func mongo(_ request: MongoAgentRequest, wanted: Int, file: URL? = nil) async throws -> [String: Any] {
         var limits = safety
         limits.agentRowCap = rowCap
         limits.agentTimeout = timeout
@@ -21,14 +52,19 @@ extension AgentTarget {
         do {
             checked = try MongoAgentGuard.check(request, safety: limits)
         } catch let refusal as MongoAgentRefusal {
-            throw AirSQLError(.readOnly, "Refused: \(refusal).")
+            throw AirSQLError(.readOnly, MongoAgentHints.refused(refusal))
         }
         guard let mongo else { throw notConnected }
         let session = try await mongo.session(.agent)
-        let wanted = (arguments["limit"] as? NSNumber ?? arguments["max_documents"] as? NSNumber)
-            .map { $0.intValue == 0 ? rowCap : $0.intValue } ?? Self.defaultRows
-        return try await AgentReadOnly.turns.run(session) {
-            try await run(checked, wanted: max(1, min(wanted, rowCap)), on: session, server: mongo.server)
+        do {
+            return try await AgentReadOnly.turns.run(session) {
+                try await run(checked, wanted: wanted, on: session, server: mongo.server, file: file)
+            }
+        } catch let error as AirSQLError where ![50, 11601].contains(error.code) && error.kind != .cancelled {
+            switch request {
+            case .find, .aggregate, .explain: throw MongoAgentHints.teach(error, checked.request, version: mongo.server?.version)
+            default: throw error
+            }
         }
     }
 
@@ -56,7 +92,8 @@ extension AgentTarget {
         switch tool {
         case "mongo_find":
             // One more than wanted, to tell whether there were more (the guard still caps it).
-            let limit = integer("limit").map { $0 == 0 ? rowCap : $0 } ?? Self.defaultRows
+            let limit = integer("limit").map { $0 == 0 ? rowCap : $0 }
+                ?? (arguments["to_file"] as? Bool == true ? rowCap : Self.defaultRows)
             return .find(db: try db(), collection: try needed("collection"), filter: try document("filter") ?? BSONDocument(),
                          projection: try document("projection"), sort: try document("sort"), skip: integer("skip"),
                          limit: limit < 0 ? limit : min(limit, rowCap) + 1, collation: try document("collation"),
@@ -76,6 +113,15 @@ extension AgentTarget {
         case "mongo_stats": return .stats(db: try db(), collection: text("collection"))
         case "mongo_schema_sample":
             return .schemaSample(db: try db(), collection: try needed("collection"), size: integer("size") ?? Self.defaultRows)
+        case "mongo_explain":
+            let execute: Bool
+            switch text("verbosity") ?? "plan" {
+            case "plan": execute = false
+            case "run": execute = true
+            default: throw AirSQLError(.other, "mongo_explain's verbosity is plan (runs nothing) or run (runs the query).")
+            }
+            return .explain(try mongoRequest(arguments["pipeline"] == nil ? "mongo_find" : "mongo_aggregate", arguments),
+                            execute: execute)
         default: throw AirSQLError(.other, "AirSQL has no tool “\(tool)”.")
         }
     }
@@ -125,8 +171,9 @@ extension AgentTarget {
 
     // MARK: Running
 
+    /// `file`: a find's or an aggregate's documents go to a new file in this folder instead (to_file).
     func run(_ checked: MongoCheckedRequest, wanted: Int, on session: MongoSession,
-                     server: MongoServerInfo?) async throws -> [String: Any] {
+                     server: MongoServerInfo?, file: URL? = nil) async throws -> [String: Any] {
         try Task.checkCancellation()  // the person cancelled the call, or turned agents off
         let started = Date(), time = checked.maxTimeMS
         let watchdog = Task { [timeout] in
@@ -141,19 +188,42 @@ extension AgentTarget {
         if case .listCollections = checked.request { reads = false }
         if case .listIndexes = checked.request { reads = false }
         if case .stats = checked.request { reads = false }
+        // explain can't run in a transaction either: the guard's check of its find or pipeline is all it has.
+        if case .explain = checked.request { reads = false }
         let transaction = reads && (server?.setName != nil || server?.isMongos == true)
+        func take(_ cursor: MongoCursor) async throws -> [String: Any] {
+            if let file { return try await export(cursor, to: file, wanted: wanted, cap: checked.documentCap) }
+            return try await Self.documents(cursor, wanted: wanted, cap: checked.documentCap)
+        }
         func read() async throws {
             switch checked.request {
             case let .find(db, collection, filter, projection, sort, skip, limit, collation, hint):
                 let cursor = try await session.find(database: db, collection: collection, MongoFind(
                     filter: filter, projection: projection, sort: sort, skip: skip.map(Int64.init),
                     limit: limit.map(Int64.init), collation: collation, hint: hint, maxTimeMS: time))
-                reply.merge(try await Self.documents(cursor, wanted: wanted, cap: checked.documentCap)) { $1 }
+                reply.merge(try await take(cursor)) { $1 }
                 reply.merge(["database": db, "collection": collection]) { $1 }
             case let .aggregate(db, collection, pipeline, collation, hint):
                 let cursor = try await session.aggregate(database: db, collection: collection, pipeline: pipeline,
                                                          maxTimeMS: time, collation: collation, hint: hint)
-                reply.merge(try await Self.documents(cursor, wanted: wanted, cap: checked.documentCap)) { $1 }
+                reply.merge(try await take(cursor)) { $1 }
+                reply.merge(["database": db, "collection": collection]) { $1 }
+            case let .explain(inner, execute):
+                let db: String, collection: String, command: BSONDocument
+                switch inner {
+                case let .find(name, coll, filter, projection, sort, skip, limit, collation, hint):
+                    (db, collection) = (name, coll)
+                    command = MongoFind(filter: filter, projection: projection, sort: sort, skip: skip.map(Int64.init),
+                                        limit: limit.map(Int64.init), collation: collation, hint: hint).command(collection: coll)
+                case let .aggregate(name, coll, pipeline, collation, hint):
+                    (db, collection) = (name, coll)
+                    command = MongoSession.aggregateCommand(collection: coll, pipeline: pipeline, collation: collation, hint: hint)
+                default: throw AirSQLError(.other, "Only a find or an aggregate can be explained.")
+                }
+                let answer = try await session.command(BSONDocument([
+                    ("explain", .document(command)), ("verbosity", .string(execute ? "executionStats" : "queryPlanner")),
+                    ("maxTimeMS", .int64(Int64(time)))]), database: db)
+                reply.merge(Self.explained(answer, ran: execute)) { $1 }
                 reply.merge(["database": db, "collection": collection]) { $1 }
             case let .count(db, collection, filter):
                 let count = try await session.count(database: db, collection: collection, filter: filter, maxTimeMS: time)
@@ -228,6 +298,57 @@ extension AgentTarget {
         let documents = try raw.prefix(wanted).map { try BSONDocument(bytes: $0) }
         return ["documents": documents.map(text), "count": documents.count,
                 "capped": raw.count > wanted || stopped || raw.count >= cap]
+    }
+
+    /// to_file: up to `wanted` documents of `cursor` into a new file in `folder` (only this user can read it), one
+    /// relaxed Extended JSON document a line, nothing cut; where, how many and whether there were more.
+    private func export(_ cursor: MongoCursor, to folder: URL, wanted: Int, cap: Int) async throws -> [String: Any] {
+        let (url, handle) = try Self.newFile(in: folder, name: saved.displayName, index: 0, csv: false, extension: "jsonl")
+        defer { try? handle.close() }
+        var count = 0
+        do {
+            while count < wanted, !cursor.isExhausted {
+                let batch = try await cursor.next(maxCount: min(1000, wanted - count), maxBytes: 16 << 20)
+                let lines = try batch.map { try BSONDocument(bytes: $0).extendedJSON(.relaxed) + "\n" }.joined()
+                try handle.write(contentsOf: Data(lines.utf8))
+                count += batch.count
+            }
+        } catch {
+            await cursor.close()
+            try? handle.close()
+            try? FileManager.default.removeItem(at: url)  // no half-written files
+            throw error
+        }
+        let more = !cursor.isExhausted
+        await cursor.close()
+        return ["file": url.path, "documents": [String](), "count": count, "capped": more || count >= cap,
+                "bytes": Int((try? handle.offset()) ?? 0)]
+    }
+
+    /// mongo_explain's reply: how the winning plan reads (scan "collection", "index" or "none", its indexes), the
+    /// figures when it ran, `MongoExplain`'s warnings and its tree.
+    static func explained(_ answer: BSONDocument, ran: Bool) -> [String: Any] {
+        var stages: [String] = [], indexes: [String] = [], stats: BSONDocument?
+        answer.walk { path, value in
+            guard !path.contains(.key("rejectedPlans")), case .key(let key)? = path.last else { return }
+            switch (key, value) {
+            case ("stage", .string(let name)): stages.append(name)
+            case ("indexName", .string(let name)) where !indexes.contains(name): indexes.append(name)
+            case ("executionStats", .document(let found)) where stats == nil: stats = found
+            default: break
+            }
+        }
+        let scan = stages.contains("COLLSCAN") ? "collection"
+            : stages.contains { $0.contains("IXSCAN") || ["IDHACK", "COUNT_SCAN", "DISTINCT_SCAN"].contains($0) } ? "index"
+            : stages.contains("EOF") ? "none" : stages.first ?? "unknown"
+        let plan = MongoExplain(answer)
+        var reply: [String: Any] = ["verbosity": ran ? "run" : "plan", "scan": scan, "warnings": plan.warnings, "plan": plan.tree]
+        if !indexes.isEmpty { reply["index"] = indexes.joined(separator: ", ") }
+        // Only what it found: the plan alone has no figures.
+        for (key, name) in [("docsExamined", "totalDocsExamined"), ("returned", "nReturned"), ("ms", "executionTimeMillis")] {
+            if let figure = MongoExplain.number(stats?[name]) { reply[key] = Int(figure) }
+        }
+        return reply
     }
 
     /// A sample's fields for a reply.

@@ -2035,6 +2035,14 @@ replica set inside a transaction that is always cancelled, so even a write that 
 server. For more safety still, connect with a user that has only the `read` role. Documents, distinct values and sizes
 reach the agent as Extended JSON text, so a field's order and a number's type (`2.0` stays a double) are kept.
 
+With **Schema** access an agent can ask for a whole database in one summary: each collection's count, size, indexes
+and validator, its fields with their types (and with Schema + read their common values and ranges), views, and the
+references between collections (orders' `customerId` to `customers._id`), each checked by looking up a few sampled
+values. It can ask how MongoDB would run a query without running it (explain's plan), or run it for its figures.
+When a query names a field not in the collection's sample, or compares a date with a string, the reply warns and
+names the nearest field; a server's error says which stage and which word it didn't know. With **Schema + read +
+analytics**, finds and pipelines can go to a file in the agent export folder (Settings ▸ Agents), never elsewhere.
+
 ## Agents in AirSQL's windows
 
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.
@@ -3110,7 +3118,7 @@ Long calls send progress notifications when your client asks for them (`_meta.pr
 
 A connection whose `engine` is `mongodb` has its own tools; the SQL ones (`get_schema`, `describe`, `search_columns`,
 `run_queries`, `profile`, `explain`, the schema resource) refuse it, and the `mongo_` tools refuse a MySQL one. Each
-needs Schema + read, and the connection connected in AirSQL. `database` defaults to the connection's own.
+needs Schema + read (`mongo_schema`: Schema), and the connection connected in AirSQL. `database` defaults to the connection's own.
 
 Documents you send (`filter`, `projection`, `sort`, `collation`, a `hint` pattern, `pipeline`) are Extended JSON
 text, as strings: `"{\"status\": \"A\", \"total\": {\"$gt\": 10}}"`, with `$oid`, `$date`, `$numberLong`,
@@ -3150,13 +3158,44 @@ a watchdog stops one that runs on. On a replica set or a mongos the reads run in
 aborted, so even a write that got past the check is refused by the server; there, `$collStats` and `$indexStats`
 stages fail (use `mongo_stats`). To change data, describe the change to the person: there is no tool that writes.
 
+`mongo_find` and `mongo_aggregate` take `to_file: true` (Schema + read + analytics): the documents, up to the row
+cap, go to a new file in AirSQL's agent export folder, one relaxed Extended JSON document a line (`.jsonl`, nothing
+cut), and the reply has `file`, `count`, `capped` and `bytes` instead of the documents. There is no path argument.
+
+A server's error on `mongo_find`, `mongo_aggregate` or `mongo_explain` is JSON text: `{code, codeName, message,
+stage?, hint?}`, where `stage` is the pipeline stage that holds the unknown word and `hint` the nearest operator or
+stage (`Did you mean $sum?`) or the version a newer one needs (`$median needs MongoDB 7.0`). A refused stage that
+MongoDB doesn't have gets the nearest one too. A reply that is likely wrong has `warnings`, from the collection's
+sample: a path of the filter, sort or projection (an aggregate's leading `$match` and `$sort`) that is not in the
+sample (`customerID is not in the sample of 200 documents; nearest: customerId`), a literal of a type the field never
+has there (`createdAt is date in the sample …: compare with {"$date": …}`), and `Nothing matched` after them when
+nothing did. A sample shows what it holds, not all there is: check before you conclude.
+
 ### mongo_schema
 
-Not in this build yet: use `mongo_list_collections` and `mongo_schema_sample`.
+`mongo_schema {connection, database?, collections?, sample?, if_changed_from?}` → `{hash, unchanged, text, capped}`:
+start here on a MongoDB database. The whole database in one text within 24 KB, from a sample of each collection (200
+documents, kept by AirSQL until refreshed): per collection its count, average size, indexes (`unique`, `partial`)
+and validator; per path (the 60 most often present, 4 deep; arrays' items under `path.[]`) its types (with shares
+when mixed) and its share when under 100%, and with Schema + read the enums (strings of up to 12 values, with
+shares) and the ranges of numbers and dates; views with their pipeline; and references:
+`customerId objectId -> customers._id (49/50)` means a path named `<name>Id` (or ending in another collection's
+unique-indexed field, `productSku -> products.sku`) of the same type, whose sampled values (up to 50) were looked up
+there with one `$in`: kept when 80% or more were found, with the count, so orphans show as a lower ratio. Needs
+Schema access (no enums or ranges at Schema alone). `collections` limits it; `sample: false` reads no documents and
+lists only collections already sampled. Collections not sampled within the timeout say so and `capped` is true (ask
+again: the samples go on and are kept); so is a text that had to leave paths or collections out. Pass `hash` as
+`if_changed_from` to get `{hash, unchanged: true}`.
 
 ### mongo_explain
 
-Not in this build yet.
+`mongo_explain {connection, database?, collection, filter?, projection?, sort?, limit? | pipeline, hint?,
+verbosity?}` → `{scan, index, docsExamined, returned, ms, warnings, plan}`. `verbosity: "plan"` (the default) asks
+the query planner only and runs nothing: use it to check a query before running it. `"run"` runs it
+(executionStats) for `docsExamined`, `returned` (what the query stage returned; a `$group` after it returns fewer)
+and `ms`. `scan` is `collection`, `index` or `none`; `index` the indexes it reads; `plan` the winning plan as an
+indented tree; `warnings` a whole-collection read, an in-memory sort, and the sample's warnings above. Checked,
+refused and capped as `mongo_find` and `mongo_aggregate` are; Schema + read.
 
 ### mongo_open
 
