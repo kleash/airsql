@@ -2692,6 +2692,30 @@ With agent access set to **Schema + read** or more, AI agents can find, aggregat
 connection's documents, read-only: see [AI agents](https://kleash.github.io/airsql/agents.html#mongodb-connections). Its editor's Agents tab recommends
 connecting with a login that can only read (the `read` role), so the server itself refuses any write.
 
+## Dump and restore
+
+**Dump with mongodump…** and **Restore with mongorestore…** (Tools menu, after Flush; a MongoDB connection's right-click menu, and a
+database's; a collection's has Dump) run your own MongoDB Database Tools on the connected connection, through its route.
+AirSQL doesn't install them: if it finds none (where it looks for mongosh), it says where to get them, MongoDB's download
+page or `brew install mongodb-database-tools`. The user goes on the command line and the password in a private file
+only you can read (`--config`), removed when the tool ends; the sheet shows the exact command, which holds neither.
+
+A dump writes one database, or one of its collections, to one `.archive.gz` file (`--archive --gzip`), Downloads by
+default, with its size as it grows and Stop. A stopped or failed dump leaves no file.
+
+A restore reads an archive back into the server: every database in it under its own name, or, with a database typed in
+**Into database**, only the file's database named in **From database** (filled in from the file's name) under the new
+name. **Drop each collection first** (`--drop`, off, in red) deletes each of the file's collections on the server, with
+its documents and indexes, before restoring it. Without it only documents with new `_id`s are inserted: those already
+there are skipped, not replaced, and a time-series collection that already exists stops the restore. Before it runs,
+AirSQL asks, showing the command, the server and what it writes. A restore that stops or fails stays partly applied. A
+read-only connection can't be restored into.
+
+The tools know only one way to go without the certificate check, `--tlsInsecure`, which skips all of it. So over an SSH
+or proxy route with TLS (the tools reach one server through a socket on this Mac and can't check its name), with Verify
+CA, or with a certificate you trusted in AirSQL and no authority's file, the sheet says why it can't check and offers
+**Run without checking the certificate**, for one run, noted in the SQL log. Agents can't dump or restore.
+
 
 ---
 
@@ -3183,6 +3207,8 @@ databases and `system.*` collections; a negative skip or limit. Every command ca
 a watchdog stops one that runs on. On a replica set or a mongos the reads run inside a transaction that is always
 aborted, so even a write that got past the check is refused by the server; there, `$collStats` and `$indexStats`
 stages fail (use `mongo_stats`). To change data, propose it with `mongo_open`: there is no tool that writes.
+Dump with mongodump… and Restore with mongorestore… are not for agents: through the UI tools they are refused ("Only the
+person at the Mac can run mongodump.").
 
 `mongo_find` and `mongo_aggregate` take `to_file: true` (Schema + read + analytics): the documents, up to the row
 cap, go to a new file in AirSQL's agent export folder, one relaxed Extended JSON document a line (`.jsonl`, nothing

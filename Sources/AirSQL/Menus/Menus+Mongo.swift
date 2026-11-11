@@ -25,6 +25,7 @@ extension MainMenu {
         addMongoAdminItems(menus)
         addMongoHostItems(menus)
         addMongoCompareItems(menus)
+        addMongoDumpItems(menus)
     }
 }
 
@@ -208,5 +209,20 @@ extension SidebarController {
         guard let (open, items) = mongoSelection, items.count == 1, let collection = items[0].collection, items[0].index == nil
         else { return NSSound.beep() }
         MongoCompareWindowController.show(model: model, source: (open.saved, items[0].database, collection))
+    }
+}
+
+// MARK: Dump and restore (lane P4-dump)
+
+extension MainMenu {
+    /// Tools ▸ Dump with mongodump… and Restore with mongorestore…, after SQL's client tools (Flush), for the MongoDB
+    /// connection, database or collection in the tree or the tab in front (`MongoDumpMenu`).
+    static func addMongoDumpItems(_ menus: Menus) {
+        let after = max(menus.tools.indexOfItem(withTitle: "Flush"), menus.tools.indexOfItem(withTitle: Commands.restore.title))
+        for (offset, command) in Commands.mongoDumpCommands.enumerated() {
+            let item = command.item()
+            item.target = MongoDumpMenu.shared
+            menus.tools.insertItem(item, at: after + 1 + offset)
+        }
     }
 }

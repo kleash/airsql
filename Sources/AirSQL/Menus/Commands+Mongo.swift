@@ -21,6 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands
+        + mongoDumpCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -148,4 +149,15 @@ extension Commands {
                                              tip: "Make the target's documents match the source's; the commands show before they run")
 
     static let mongoCompareCommands = [compareCollection, reconcileCollection]
+}
+
+// MARK: Dump and restore (lane P4-dump)
+
+extension Commands {
+    static let mongoDump = Command("Dump with mongodump…", #selector(MongoDumpMenu.dumpMongo(_:)),
+                                   tip: "Write a database or a collection to one .archive.gz file with your own mongodump")
+    static let mongoRestore = Command("Restore with mongorestore…", #selector(MongoDumpMenu.restoreMongo(_:)),
+                                      tip: "Write an .archive.gz file's databases into the server with your own mongorestore; it asks first")
+
+    static let mongoDumpCommands = [mongoDump, mongoRestore]
 }
