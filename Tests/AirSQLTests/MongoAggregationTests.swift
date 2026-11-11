@@ -1,4 +1,4 @@
-// The aggregation tab (docs/dev/mongo-plan.md, lane M4-app): its folds, error places and completion; then, against the
+// The aggregation tab (docs/dev/mongo-plan.md, lane M4-app): its folds and error places (completion: MongoCompletionTests); then, against the
 // Mongo lab (AIRSQL_MONGO_LAB=1), opening it, running, an error at its stage, Load More, Cancel, Explain with its warnings
 // and Text page, a collection tab's Explain; and its pictures (AIRSQL_SCREENSHOTS=1 too).
 import AppKit
@@ -26,18 +26,6 @@ struct MongoAggregationTests {
             #expect(problem.message.hasPrefix("Stage 2, line 3, column 18: Expected ‘,’ or ‘}’"), "\(problem.message)")
             #expect(problem.range == 35..<36)
         }
-    }
-
-    @Test @MainActor func stagesCompleteAtAStagesStartAndFieldsInside() throws {
-        let tab = MongoAggregationController(model: testModel([]), connection: UUID(), database: "d", collection: "c")
-        tab.source.append([try BSONDocument([("_id", .int32(1)), ("amount", .int32(2))]).bytes()])
-        let stage = "[{ $gr"
-        let atStart = tab.completions(stage, stage.utf16.count)
-        #expect(atStart.0 == 3..<6 && atStart.1.map(\.text) == ["$graphLookup", "$group"])
-        let field = "[{ $match: { am"
-        #expect(tab.completions(field, field.utf16.count).1.map(\.text) == ["amount"])
-        let reference = "[{ $group: { _id: $am"
-        #expect(tab.completions(reference, reference.utf16.count).1.map(\.text) == ["$amount"])
     }
 }
 

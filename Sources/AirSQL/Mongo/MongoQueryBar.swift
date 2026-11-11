@@ -3,12 +3,12 @@ import AppKit
 
 /// A collection tab's query bar (mongo-plan, Query bar): the find's filter, projection, sort, skip, limit, collation,
 /// hint and max time, each typed in shell form; Run (⌘↩ or Return in a field), a spinner while it reads, the history and
-/// favourites, and what's wrong with a field said under them. Esc in a field completes a field name from the paths the
-/// tab knows (`paths`).
+/// favourites, and what's wrong with a field said under them. The filter, projection, sort, collation and hint autofill
+/// (`MongoAutofill`) with what the collection tab's `complete` offers.
 @MainActor
 final class MongoQueryBar: NSView, NSTextFieldDelegate {
     let filter = AirSQL.textField("", placeholder: "{ field: \"value\" }   every document when empty", id: "mongo.filter",
-                           tip: "Which documents to find, in shell form: { age: { $gt: 30 } }; Esc completes a field name")
+                           tip: "Which documents to find, in shell form: { age: { $gt: 30 } }; Esc lists what fits here")
     let projection = AirSQL.textField("", placeholder: "{ field: 1 }", id: "mongo.projection",
                                tip: "Which fields to show: { name: 1 } keeps name, { notes: 0 } leaves notes out")
     let sort = AirSQL.textField("", placeholder: "{ field: -1 }", id: "mongo.sort", tip: "The order: { age: -1 } is oldest first")
@@ -23,8 +23,9 @@ final class MongoQueryBar: NSView, NSTextFieldDelegate {
     let history = NSPopUpButton(frame: .zero, pullsDown: true)
     let spinner = NSProgressIndicator()
     let problem = label("", font: .systemFont(ofSize: 11.5), color: .statusBad, wraps: true)
-    /// The field names Esc offers: the loaded documents' paths and the schema sample's.
-    var paths: () -> [String] = { [] }
+    /// Autofill's suggestions for a field's text at a caret.
+    var complete: ((MongoCaret.Root, String, Int) -> (Range<Int>, [CompletionItem]))?
+    let autofill = MongoAutofill()
     /// Return in a field.
     var onRun: (() -> Void)?
     private var fields: [(name: String, field: NSTextField)] {
@@ -125,21 +126,29 @@ final class MongoQueryBar: NSView, NSTextFieldDelegate {
 
     @objc private func returnPressed(_ sender: Any?) { onRun?() }
 
-    /// Esc's list: the paths that start with what is typed before the caret, in the field's partial word's terms.
-    func control(_ control: NSControl, textView: NSTextView, completions words: [String], forPartialWordRange range: NSRange,
-                 indexOfSelectedItem index: UnsafeMutablePointer<Int>) -> [String] {
-        let text = textView.string as NSString
-        var start = range.location
-        let pathCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_.$"))
-        while start > 0, let scalar = UnicodeScalar(text.character(at: start - 1)), pathCharacters.contains(scalar) { start -= 1 }
-        let typed = text.substring(with: NSRange(location: start, length: range.location + range.length - start))
-        let before = range.location - start  // what the partial word leaves out of the path ("address." of "address.ci")
-        return Self.completions(typed, among: paths()).map { String($0.dropFirst(before)) }
+    // MARK: Autofill
+
+    /// What a field's text is; nil: a number, without autofill.
+    func root(of control: NSControl) -> MongoCaret.Root? {
+        [(filter, MongoCaret.Root.filter), (projection, .projection), (sort, .sort), (collation, .collation), (hint, .hint)]
+            .first { $0.0 === control }?.1
     }
 
-    /// The paths that start with `typed`, in their order, without repeats.
-    static func completions(_ typed: String, among paths: [String]) -> [String] {
-        var seen = Set<String>()
-        return paths.filter { $0.hasPrefix(typed) && $0 != typed && seen.insert($0).inserted }
+    private func completer(_ control: NSControl) -> MongoAutofill.Complete? {
+        guard let root = root(of: control), let complete else { return nil }
+        return { complete(root, $0, $1) }
     }
+
+    func controlTextDidChange(_ notification: Notification) {
+        guard let control = notification.object as? NSControl, let complete = completer(control),
+              let editor = notification.userInfo?["NSFieldEditor"] as? NSTextView else { return }
+        autofill.textChanged(editor, complete)
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard let complete = completer(control) else { return false }
+        return autofill.command(selector, in: textView, complete)
+    }
+
+    func controlTextDidEndEditing(_ notification: Notification) { autofill.close() }
 }

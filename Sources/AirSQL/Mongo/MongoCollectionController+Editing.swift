@@ -138,11 +138,19 @@ extension MongoCollectionController {
         guard editingOff == nil, let window = view.window else { return NSSound.beep() }
         MongoValueSheet.show(title: "Insert a Document into \(name)", caption: "Type the document in shell form. Without an _id it "
                              + "gets a new ObjectId. It is inserted when you apply the changes.", text: "{\n  \n}", type: nil,
-                             on: window) { [weak self] text, _ in
+                             on: window, complete: autofill(nil)) { [weak self] text, _ in
             guard let self else { return nil }
             let refusal = change { try $0.insert(try Self.newDocument(text)) }
             if refusal == nil { focus(row: source.rowCount - 1) }
             return refusal
+        }
+    }
+
+    /// The document editor's autofill: the collection's fields under `path` (an array's elements as `[]`; nil: a document).
+    func autofill(_ path: String?) -> MongoAutofill.Complete {
+        { [weak self] text, caret in
+            guard let self, let open = model.openMongo[connectionID] else { return (caret..<caret, []) }
+            return open.autofill(.document, text, caret, database: database, collection: name, path: path, loaded: knownPaths)
         }
     }
 
@@ -157,7 +165,8 @@ extension MongoCollectionController {
     func editNewDocument(_ offset: Int) {
         guard let window = view.window, changes.inserts.indices.contains(offset) else { return NSSound.beep() }
         MongoValueSheet.show(title: "Edit the New Document", caption: "The document in shell form, inserted when you apply the "
-                             + "changes.", text: changes.inserts[offset].shellForm(pretty: true), type: nil, on: window) { [weak self] text, _ in
+                             + "changes.", text: changes.inserts[offset].shellForm(pretty: true), type: nil, on: window,
+                             complete: autofill(nil)) { [weak self] text, _ in
             self?.change { try $0.replaceInsert(offset, with: try Self.newDocument(text)) }
         }
     }
@@ -170,7 +179,8 @@ extension MongoCollectionController {
         let shown = source.bsonValue(row, column), path = source.paths[column].joined(separator: ".")
         MongoValueSheet.show(title: "Edit \(path)", caption: "The value in shell form. It keeps its type, the text read as one, "
                              + "unless you choose another type below.", text: shown?.shellForm(pretty: true) ?? "",
-                             type: shown?.typeAlias ?? "as typed", on: window) { [weak self] text, type in
+                             type: shown?.typeAlias ?? "as typed", on: window,
+                             complete: autofill(source.paths[column].map { Int($0) == nil ? $0 : "[]" }.joined(separator: "."))) { [weak self] text, type in
             self?.keep(text, type: type, row: row, column: column)
         }
     }

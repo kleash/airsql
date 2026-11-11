@@ -98,6 +98,8 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             } catch { return [] }
         }, folds: Self.folds)
         editor.completions = { [weak self] text, caret in self?.completions(text, caret) ?? (caret..<caret, []) }
+        editor.completionDocs = { $0.kind == .template ? SQLTemplate.expand($0.text).text : $0.detail }
+        model.openMongo[connectionID]?.readSample(database: database, collection: collection)
         editor.string = "[\n  { $match: {} }\n]\n"
         editor.onChange = { [weak self] in self?.updateBars() }
         viewer.host = self
@@ -241,26 +243,12 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         }
     }
 
-    /// Stage names at a stage's start, `$`-paths in a stage's value, field names elsewhere: from the documents loaded.
+    /// Autofill (`MongoCompletion`): stages, their keys, operators and the collection's fields, from its cached sample
+    /// (else the documents loaded).
     func completions(_ text: String, _ caret: Int) -> (Range<Int>, [CompletionItem]) {
-        let units = Array(text.utf16)
-        var start = min(caret, units.count)
-        while start > 0, SQLLexer.isNameChar(units[start - 1]) || units[start - 1] == 0x2E { start -= 1 }
-        let typed = String(decoding: units[start..<min(caret, units.count)], as: UTF16.self)
-        var depth = 0
-        for unit in units[..<start] {
-            if unit == 0x7B { depth += 1 } else if unit == 0x7D { depth -= 1 }
-        }
-        let paths = Array(NSOrderedSet(array: source.paths.map { $0.joined(separator: ".") })) as? [String] ?? []
-        let items: [CompletionItem]
-        if depth <= 1 {
-            items = MongoWords.stages.map(\.name).sorted().map { CompletionItem(kind: .keyword, text: $0, label: $0, detail: "stage") }
-        } else if typed.hasPrefix("$") {
-            items = paths.map { CompletionItem(kind: .column, text: "$" + $0, label: "$" + $0, detail: "field") }
-        } else {
-            items = paths.map { CompletionItem(kind: .column, text: $0, label: $0, detail: "field") }
-        }
-        return (start..<caret, items.filter { $0.text.hasPrefix(typed) && $0.text != typed })
+        guard let open = model.openMongo[connectionID] else { return (caret..<caret, []) }
+        return open.autofill(.pipeline, text, caret, database: database, collection: collection,
+                             loaded: source.paths.map { $0.joined(separator: ".") })
     }
 
     // MARK: Reading
