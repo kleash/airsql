@@ -164,17 +164,10 @@ extension MongoPipeline {
     public static func writingStage(_ stages: [BSONDocument]) -> String? {
         stages.compactMap(\.keys.first).first { $0 == "$out" || $0 == "$merge" }
     }
-
-    /// Save as View's command: a view named `name` on `collection` that gives what `stages` give, with their collation.
-    public static func viewCommand(_ name: String, on collection: String, _ stages: [BSONDocument],
-                                   collation: BSONDocument? = nil) -> BSONDocument {
-        BSONDocument([("create", .string(name)), ("viewOn", .string(collection)), ("pipeline", .array(stages.map { .document($0) }))]
-                     + (collation.map { [("collation", .document($0))] } ?? []))
-    }
 }
 
 extension MongoSession {
-    /// Runs Save as View's `create` command (`MongoPipeline.viewCommand`) on `database`.
+    /// Runs Save as View's `create` command (`MongoAdmin.createView`) on `database`.
     public func saveView(_ command: BSONDocument, database: String) async throws {
         _ = try await self.command(command, database: database)
     }

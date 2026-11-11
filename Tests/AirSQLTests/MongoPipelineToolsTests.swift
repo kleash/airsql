@@ -20,10 +20,12 @@ struct MongoPipelineToolsTests {
 
     @Test func aViewIsOneCreateCommandAndWritingStagesAreFound() throws {
         let stages = try MongoPipeline.stages(in: "[{ $match: { n: 1 } }, { $project: { n: 1 } }]").map(\.document)
-        let command = MongoPipeline.viewCommand("v", on: "c", stages, collation: try BSONDocument(shellForm: "{ locale: \"en\" }"))
+        let command = try MongoAdmin.createView(database: "d", name: "v", on: "c", pipeline: stages,
+                                                collation: try BSONDocument(shellForm: "{ locale: \"en\" }")).command
         #expect(command.keys == ["create", "viewOn", "pipeline", "collation"])
         #expect(command["create"] == .string("v") && command["viewOn"] == .string("c") && command["pipeline"] == .array(stages.map { .document($0) }))
-        #expect(MongoPipeline.viewCommand("v", on: "c", []).keys == ["create", "viewOn", "pipeline"])
+        #expect(try MongoAdmin.createView(database: "d", name: "v", on: "c", pipeline: []).command.keys == ["create", "viewOn", "pipeline"])
+        #expect(throws: (any Error).self) { try MongoAdmin.createView(database: "admin", name: "v", on: "c", pipeline: stages) }
         #expect(MongoPipeline.writingStage(stages) == nil)
         #expect(MongoPipeline.writingStage(stages + [try BSONDocument(shellForm: "{ $merge: { into: \"x\" } }")]) == "$merge")
     }

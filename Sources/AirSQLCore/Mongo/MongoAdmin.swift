@@ -96,11 +96,13 @@ public enum MongoAdmin {
 
     /// create for a view of `source` through `pipeline`: read-only, computed each time it is read. Also what an
     /// aggregation tab's Save as View sends.
-    public static func createView(database: String, name: String, on source: String, pipeline: [BSONDocument]) throws -> MongoAdminCommand {
+    public static func createView(database: String, name: String, on source: String, pipeline: [BSONDocument],
+                                  collation: BSONDocument? = nil) throws -> MongoAdminCommand {
         let (db, name) = try names(database, name)
         guard let source = try? names(db, source).1 else { throw Problem(field: "Source", message: "Choose the collection or view it reads") }
         return MongoAdminCommand(command: BSONDocument([("create", .string(name!)), ("viewOn", .string(source)),
-                                                        ("pipeline", .array(pipeline.map { .document($0) }))]), database: db)
+                                                        ("pipeline", .array(pipeline.map { .document($0) }))]
+                                                       + (collation.map { [("collation", .document($0))] } ?? [])), database: db)
     }
 
     /// The same, with the pipeline in shell form (`[{ $match: … }, …]`, as the aggregation tab takes it).

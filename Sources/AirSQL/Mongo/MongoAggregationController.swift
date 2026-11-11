@@ -697,9 +697,15 @@ extension MongoAggregationController {
         askText("Save as View", message: "Name the view of \(collection) that gives what this pipeline gives", placeholder: "View name",
                 action: "Continue", id: "aggregate.viewName", on: window) { [weak self] name in
             guard let self, !name.isEmpty else { return }
-            let command = MongoPipeline.viewCommand(name, on: collection, stages, collation: options.collation)
+            // The admin builder: the same name checks as Create View… (no system.*, no admin, local or config).
+            let made: MongoAdminCommand
+            do {
+                made = try MongoAdmin.createView(database: database, name: name, on: collection, pipeline: stages,
+                                                 collation: options.collation)
+            } catch { return fail("\(error)") }
+            let command = made.command
             var request = SQLPreviewRequest(
-                change: ChangeSQL(title: "Save a pipeline as a view", statements: [MongoIndex.shellForm(command, database: database)],
+                change: ChangeSQL(title: "Save a pipeline as a view", statements: [made.shellForm],
                                   connection: connectionID),
                 heading: "Make the view \(name) in \(database)?",
                 caption: "A view runs this pipeline on \(collection) each time it is read; it keeps no documents of its own.")
