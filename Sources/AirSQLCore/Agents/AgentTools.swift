@@ -84,6 +84,7 @@ public enum AgentTools {
              outputRequired: ["tab", "title"], readOnly: false),
         tool("read_console", "A console tab: its text, and what the person last ran in it with the result or error (rows "
              + "only with Schema + read access). A MongoDB tab: its query bar's fields (query) or its pipeline and options, "
+             + "also as relaxed Extended JSON (queryJSON, pipelineJSON) for mongo_find and mongo_aggregate, "
              + "the last run's state (not run, running, done, failed, cancelled) and documents loaded; with Schema + read "
              + "access the selected documents' _ids and the first 50 documents loaded, as mongo_find gives them. tab: an id "
              + "or title from context (default: the active console tab).",

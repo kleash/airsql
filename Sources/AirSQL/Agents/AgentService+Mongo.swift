@@ -125,11 +125,21 @@ extension AgentService {
         var reply = Self.entry(tab, content, saved)
         let fields = content.agentFields.map { ($0.0, AgentTarget.mongoRedacted($0.1)) }
         reply["text"] = fields[0].1  // the filter, or the pipeline
+        // The same fields as relaxed Extended JSON, as mongo_find and mongo_aggregate take them; a field that doesn't
+        // parse yet (half typed) is left out.
+        func json(_ text: String) -> String? {
+            text.isEmpty ? nil : (try? BSONDocument(shellForm: text))?.extendedJSON(.relaxed)
+        }
         if content.agentKind == "collection" {
             reply["query"] = Dictionary(fields) { $1 }
+            reply["queryJSON"] = Dictionary(fields.filter { ["filter", "projection", "sort", "collation"].contains($0.0) }
+                .compactMap { name, text in json(text).map { (name, $0) } }) { $1 }
         } else {
             reply["pipeline"] = fields[0].1
             reply["options"] = Dictionary(fields.dropFirst().map { $0 }) { $1 }
+            if let stages = try? MongoPipeline.stages(in: fields[0].1) {
+                reply["pipelineJSON"] = "[" + stages.map { $0.document.extendedJSON(.relaxed) }.joined(separator: ",") + "]"
+            }
         }
         let source = content.source
         var run: [String: Any] = ["documentsLoaded": source.loadedCount]

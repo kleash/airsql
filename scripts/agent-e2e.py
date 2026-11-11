@@ -222,19 +222,22 @@ def run():
         before = {json.dumps(t, sort_keys=True) for t in mcp("context", {}).get("consoleTabs", [])}
 
         def proposed(final):
-            # shortcut: written before mongo_open's reply was settled; check these keys against it when it lands.
             new = [t for t in mcp("context", {}).get("consoleTabs", []) if json.dumps(t, sort_keys=True) not in before]
             if not new:
                 return False, "no new tab"
-            tab = mcp("read_console", {"tab": new[-1].get("id") or new[-1].get("tab") or new[-1].get("title")})
-            if tab.get("run"):
+            tab = mcp("read_console", {"tab": new[-1]["tab"]})
+            if tab.get("run", {}).get("state") != "not run":
                 return False, "the tab was run"
+            # The proposal, run here through the read tools exactly as the tab holds it (read_console's Extended JSON).
             arguments = {"connection": CONNECTION, "database": "shop", "collection": tab.get("collection", "orders")}
-            if tab.get("pipeline"):
-                found = documents(mcp("mongo_aggregate", dict(arguments, pipeline=tab["pipeline"], max_documents=0)))
+            if tab.get("kind") == "aggregation":
+                if "pipelineJSON" not in tab:
+                    return False, "the pipeline doesn't parse"
+                found = documents(mcp("mongo_aggregate", dict(arguments, pipeline=tab["pipelineJSON"], max_documents=0)))
             else:
-                found = documents(mcp("mongo_find", dict(arguments, filter=tab.get("filter", "{}"),
-                                                         sort=tab.get("sort", "{}"), projection='{"_id": 1}', limit=0)))
+                query = tab.get("queryJSON", {})
+                found = documents(mcp("mongo_find", dict(arguments, filter=query.get("filter", "{}"),
+                                                         sort=query.get("sort", "{}"), projection='{"_id": 1}', limit=0)))
             ids = [d.get("_id") for d in found]
             return ids == q11["answer"]["orderIds"], f"{len(ids)} orders"
         attempt("q11_propose_in_tab", PREFIX + q11["question"] + ' Then reply with only JSON {"answer": "<what you did>"}.',

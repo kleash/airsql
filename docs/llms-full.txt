@@ -3216,7 +3216,7 @@ and `system.*` collections are refused. Needs Schema + read, and the connection 
 
 `context` lists MongoDB tabs among `consoleTabs` with `kind` (`collection` or `aggregation`), `database` and
 `collection`; `activeTab` is the one in front. `read_console {tab?}` on one gives its `query` (the bar's fields) or
-its `pipeline` and `options`, `text` (the filter or the pipeline), and `run`: `state` (`not run`, `running`, `done`,
+its `pipeline` and `options`, `text` (the filter or the pipeline), the same as relaxed Extended JSON for `mongo_find`/`mongo_aggregate` (`queryJSON`: filter, projection, sort, collation; `pipelineJSON`; a field that doesn't parse yet is left out), and `run`: `state` (`not run`, `running`, `done`,
 `failed`, `cancelled`), `error`, `documentsLoaded`. With Schema + read it adds `selectedIds` and the first 50
 documents loaded (`documents`, as `mongo_find` gives them); with Schema only, `selectedCount` and no documents. Values
 of fields named like secrets (`pwd`, `password`, …) are replaced, as in AirSQL's command log.
