@@ -22,6 +22,7 @@ extension MainMenu {
         addAggregationItems(menus)
         addMongoIndexItems(menus)
         addMongoBulkItems(menus)
+        addMongoAdminItems(menus)
     }
 }
 
@@ -137,4 +138,20 @@ extension MainMenu {
 extension CollectionMenu {
     @objc func updateMany(_ sender: Any?) { tab?.updateMany(sender) }
     @objc func deleteMany(_ sender: Any?) { tab?.deleteMany(sender) }
+}
+
+// MARK: Collections, views and databases (lane P2-admin)
+
+extension MainMenu {
+    /// Data ▸ Collection's admin items, last: for the tree's database or collection while it has the focus, else the tab
+    /// in front (`MongoAdminMenu`).
+    static func addMongoAdminItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        for (index, command) in Commands.mongoAdminCommands.enumerated() {
+            if [0, 3, 5].contains(index) { collection.addItem(.separator()) }
+            let item = command.item()
+            item.target = MongoAdminMenu.shared
+            collection.addItem(item)
+        }
+    }
 }
