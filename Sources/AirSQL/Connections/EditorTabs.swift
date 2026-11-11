@@ -145,11 +145,14 @@ extension ConnectionEditor {
                                        + "this Mac", target: self, action: #selector(findSocket(_:)))],
                      caption: "For a server on this Mac: its socket file, used instead of the host and port.")
         }
-        form.row("User", [text(\.user, placeholder: draft.askPassword ? "asked at each connect" : "root", id: "editor.user",
-                               tip: "Type the database user to log in as")])
+        let aws = mongo && draft.mongoAWS
+        form.row(aws ? "Access key ID" : "User",
+                 [text(\.user, placeholder: draft.askPassword ? "asked at each connect" : aws ? "AKIA…" : "root", id: "editor.user",
+                       tip: aws ? "Type the AWS access key ID of the IAM user or role" : "Type the database user to log in as")])
         let password = NSSecureTextField(string: self.password)
         password.placeholderString = isNew ? "none" : "unchanged"
-        password.toolTip = "Type the password: it is saved in your Keychain, never in AirSQL's files"
+        password.toolTip = aws ? "Type the AWS secret access key: it is saved in your Keychain, never in AirSQL's files"
+            : "Type the password: it is saved in your Keychain, never in AirSQL's files"
         password.setAccessibilityIdentifier("editor.password")
         password.translatesAutoresizingMaskIntoConstraints = false
         password.widthAnchor.constraint(equalToConstant: 200).isActive = true
@@ -159,7 +162,18 @@ extension ConnectionEditor {
         bind(password) { [weak self] in self?.password = password.stringValue }
         let ask = toggle("Ask at each connect", \.askPassword, id: "editor.askPassword",
                          tip: "Ask for the user and password at each connect and never save them") { [weak self] in self?.refreshTab() }
-        form.row("Password", [password, ask])
+        form.row(aws ? "Secret key" : "Password", [password, ask])
+        if aws {
+            let token = NSSecureTextField(string: sessionToken)
+            token.placeholderString = isNew ? "none" : "unchanged"
+            token.toolTip = "Type the session token of temporary AWS credentials: it is saved in your Keychain, never in AirSQL's files"
+            token.setAccessibilityIdentifier("editor.awsSessionToken")
+            token.translatesAutoresizingMaskIntoConstraints = false
+            token.widthAnchor.constraint(equalToConstant: 300).isActive = true
+            bind(token) { [weak self] in self?.sessionToken = token.stringValue }
+            form.row("Session token", [token], caption: "Only for temporary credentials (STS); a new secret key without one "
+                     + "forgets the old token.")
+        }
         form.row("Database", [text(\.database, placeholder: "none", id: "editor.database",
                                    tip: "Type the database to make current after connecting")])
         if mongo { mongoLoginRows(form) }
@@ -201,12 +215,15 @@ extension ConnectionEditor {
 
     /// MongoDB's login method and database, and the address's other options.
     private func mongoLoginRows(_ form: Form) {
-        form.row("Log in with", [choice(\.mongoX509, [("Password (SCRAM)", false), ("X.509 certificate", true)], id: "editor.mongoLogin",
-                                        tip: "Choose how the user proves who it is: its password, or the client certificate "
-                                            + "chosen in the TLS tab") { [weak self] in self?.refreshTab() }],
+        form.row("Log in with", [choice(\.mongoLogin, [("Password (SCRAM)", 0), ("X.509 certificate", 1), ("AWS IAM", 2)],
+                                        id: "editor.mongoLogin",
+                                        tip: "Choose how the user proves who it is: its password, the client certificate "
+                                            + "chosen in the TLS tab, or an AWS IAM key") { [weak self] in self?.refreshTab() }],
                  caption: draft.mongoX509 ? "The TLS tab's client certificate logs in; the user is optional (the certificate's "
-                    + "subject) and the password isn't used." : nil)
-        if !draft.mongoX509 {  // X.509's users are in $external
+                    + "subject) and the password isn't used."
+                    : draft.mongoAWS ? "An AWS access key logs in (MongoDB Atlas). AirSQL uses only the key typed here, never "
+                    + "the Mac's AWS settings." : nil)
+        if !draft.mongoX509 && !draft.mongoAWS {  // their users are in $external
             form.row("Auth source", [text(\.authSource, placeholder: draft.mongoSRV ? "as DNS says, often admin" : "admin",
                                           id: "editor.authSource", tip: "Type the database the user is defined in; empty: admin "
                                             + "(for a DNS seed list, what its DNS record says)", width: 200)])
@@ -409,5 +426,13 @@ final class StartupSQLWatcher: NSObject, NSTextViewDelegate {
     init(_ changed: @escaping (String) -> Void) { self.changed = changed }
     func textDidChange(_ notification: Notification) {
         if let view = notification.object as? NSTextView { changed(view.string) }
+    }
+}
+
+private extension SavedConnection {
+    /// The editor's Log in with: 0 password, 1 X.509 certificate, 2 AWS IAM.
+    var mongoLogin: Int {
+        get { mongoAWS ? 2 : mongoX509 ? 1 : 0 }
+        set { (mongoX509, mongoAWS) = (newValue == 1, newValue == 2) }
     }
 }

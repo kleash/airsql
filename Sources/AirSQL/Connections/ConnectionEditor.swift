@@ -38,7 +38,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     let isNew: Bool
     let model: AppModel
     /// Typed in the General and SSH and Proxy tabs; empty: keep what the Keychain has.
-    var password = "", proxyPassword = ""
+    var password = "", proxyPassword = "", sessionToken = ""
     private(set) var tab = Tab.general
     let tabs = NSSegmentedControl()
     private let holder = NSView()
@@ -261,6 +261,9 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         if draft.mongoX509, draft.tls.mode == .off || (draft.tls.certFile ?? "").isEmpty {
             return "An X.509 login needs TLS and a client certificate: choose them in the TLS tab."
         }
+        if draft.mongoAWS, !draft.askPassword, draft.user.trimmingCharacters(in: .whitespaces).isEmpty {
+            return "An AWS IAM login needs the access key ID: type it in the General tab."
+        }
         return draft.directConnection && !draft.mongoHosts.isEmpty
             ? "Direct connection talks to one server: untick it, or empty Other members in the General tab." : nil
     }
@@ -293,12 +296,17 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
             password = typed
             filled.askPassword = false
         }
+        if filled.mongoAWS, let token = uri.option("authMechanismProperties")?.split(separator: ",")
+            .first(where: { $0.hasPrefix("AWS_SESSION_TOKEN:") })?.dropFirst(18) {
+            sessionToken = String(token)
+        }
         tlsFollowsHost = false  // the address decides
         draft = filled
         refreshTab()
         let servers = uri.srv ? "the servers DNS lists for \(filled.host)" : uri.hosts.count == 1 ? "1 server" : "\(uri.hosts.count) servers"
         let parts = [servers, filled.replicaSet.isEmpty ? nil : "replica set \(filled.replicaSet)",
                      filled.user.isEmpty ? nil : "user \(filled.user)", typed == nil ? nil : "its password (for your Keychain)",
+                     filled.mongoAWS ? "AWS IAM login" : nil,
                      filled.database.isEmpty ? nil : "database \(filled.database)",
                      filled.tls.mode == .off ? nil : "TLS on"].compactMap { $0 }
         status.textColor = filled.tls.mode == .off ? .statusWarning : .secondaryLabelColor
@@ -347,18 +355,20 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
             return
         }
         // The gate (plan §2.8): an agent's Save keeps no password, and nothing the person alone may change.
-        guard password.isEmpty && proxyPassword.isEmpty || !AgentGuard.refuses("Only the person at the Mac can save a "
-                                                                                + "password: nothing was saved.") else { return }
+        guard password.isEmpty && proxyPassword.isEmpty && sessionToken.isEmpty
+                || !AgentGuard.refuses("Only the person at the Mac can save a password: nothing was saved.") else { return }
         testTask?.cancel()
         model.connector.cancelTest(draft.id)
         model.save(draft)
         guard model.connection(draft.id) == draft else { return }  // refused (AgentGuard): the editor stays open
-        let write = model.setSavedPassword, keys = (draft.id.uuidString, draft.proxySecretKey)
-        let typed = (password, proxyPassword)
+        let write = model.setSavedPassword, keys = (draft.id.uuidString, draft.proxySecretKey, draft.awsSessionTokenKey)
+        let typed = (password, proxyPassword, sessionToken), aws = draft.mongoAWS && draft.engine == .mongodb
         // An existing password stays unless a new one was typed; the Keychain may wait for the person: not here.
         DispatchQueue.global(qos: .userInitiated).async {
             if !typed.0.isEmpty { write(keys.0, typed.0) }
             if !typed.1.isEmpty { write(keys.1, typed.1) }
+            // A token belongs to its secret key: a new key without one forgets the old.
+            if aws, !typed.2.isEmpty || !typed.0.isEmpty { write(keys.2, typed.2.isEmpty ? nil : typed.2) }
         }
         close(saved: draft, connect: connect)
     }
@@ -391,10 +401,12 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         func show() { status.stringValue = (done + [current + "…"]).joined(separator: " · ") }
         show()
         let draft = self.draft, password = password.isEmpty ? nil : password, proxy = proxyPassword.isEmpty ? nil : proxyPassword
+        // As Save keeps it: a new secret key without a token has none.
+        let token = !sessionToken.isEmpty ? sessionToken : password == nil ? nil : ""
         testTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await self.model.connector.test(draft, password: password, proxyPassword: proxy,
+                let result = try await self.model.connector.test(draft, password: password, sessionToken: token, proxyPassword: proxy,
                                                                  on: self.window) { step in
                     done.append("✓ " + current + " \(Int(Date().timeIntervalSince(started) * 1000)) ms")
                     (current, started) = (step, Date())

@@ -134,6 +134,7 @@ extension SavedConnection {
         replicaSet = ""
         directConnection = false
         mongoX509 = false
+        mongoAWS = false
         var useTLS = uri.srv, invalidCertificates = false, invalidHostnames = false, caFile: String?, certFile: String?
         var rest: [(key: String, value: String)] = []
         for (key, value) in uri.options {
@@ -148,12 +149,17 @@ extension SavedConnection {
             case "tlscafile": caFile = value
             case "tlscertificatekeyfile": certFile = value
             case "authmechanism" where value.uppercased() == "MONGODB-X509": mongoX509 = true
+            case "authmechanism" where value.uppercased() == "MONGODB-AWS": mongoAWS = true
+            // AWS's session token is a secret, never kept in the options (the editor takes it for the Keychain).
+            case "authmechanismproperties" where uri.option("authMechanism")?.uppercased() == "MONGODB-AWS": break
             default: rest.append((key, value))
             }
         }
         // The address's own rule: with no authSource, its database is where the login lives. Kept explicit, since an
         // empty Auth source means admin here; mongodb+srv is left to its DNS TXT record (Atlas: admin).
-        if authSource.isEmpty, !mongoX509, !uri.srv, uri.user != nil, !uri.database.isEmpty { authSource = uri.database }
+        if authSource.isEmpty, !mongoX509, !mongoAWS, !uri.srv, uri.user != nil, !uri.database.isEmpty {
+            authSource = uri.database
+        }
         tls = TLSOptions(mode: !useTLS ? .off : invalidCertificates ? .required : invalidHostnames ? .verifyCA : .verifyIdentity,
                          caFile: caFile, certFile: certFile)
         mongoOptions = MongoURI.query(rest)
@@ -169,9 +175,10 @@ extension SavedConnection {
         uri.database = database
         if tls.mode != .off || mongoSRV { uri.options.append(("tls", tls.mode != .off ? "true" : "false")) }
         if mongoX509 { uri.options.append(("authMechanism", "MONGODB-X509")) }
-        // X.509's is $external. Otherwise the Database field only says which database opens: the login is in Auth source,
-        // admin when empty (mongodb+srv: its DNS TXT record decides).
-        if !mongoX509, !authSource.isEmpty || (!database.isEmpty && !mongoSRV) {
+        if mongoAWS { uri.options.append(("authMechanism", "MONGODB-AWS")) }
+        // X.509's and AWS's is $external. Otherwise the Database field only says which database opens: the login is in
+        // Auth source, admin when empty (mongodb+srv: its DNS TXT record decides).
+        if !mongoX509, !mongoAWS, !authSource.isEmpty || (!database.isEmpty && !mongoSRV) {
             uri.options.append(("authSource", authSource.isEmpty ? "admin" : authSource))
         }
         if !replicaSet.isEmpty { uri.options.append(("replicaSet", replicaSet)) }

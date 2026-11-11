@@ -33,6 +33,9 @@ final class MongoShellMenu: NSObject, NSMenuItemValidation {
         if let main, let saved = connection(in: main), saved.engine == .mongodb {
             if main.window?.attachedSheet != nil {
                 reason = "A sheet is open: answer it first"
+            } else if saved.mongoAWS {
+                reason = "Off for an AWS IAM login: mongosh takes the session token only on its command line, where other "
+                    + "programs can read it"
             } else if saved.route != .direct, main.model.openMongo[saved.id] == nil {
                 reason = "Connect to \(saved.displayName) first: mongosh goes through its SSH or proxy route"
             }
