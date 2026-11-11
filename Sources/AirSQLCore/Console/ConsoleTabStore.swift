@@ -7,6 +7,8 @@ public struct SavedPlace: Codable, Equatable, Sendable {
         case table, structure, processes, view, procedure, function, trigger, event
         /// A MongoDB collection's documents, and a pipeline on a collection.
         case collection, aggregation
+        /// A MongoDB collection's or database's (no object) changes, with its filter as `text`.
+        case watch
     }
 
     public var kind: Kind

@@ -26,6 +26,7 @@ extension MainMenu {
         addMongoHostItems(menus)
         addMongoCompareItems(menus)
         addMongoUsersItems(menus)
+        addMongoWatchItems(menus)
     }
 }
 
@@ -220,5 +221,17 @@ extension MainMenu {
         guard let server = menus.connection.items.last(where: { $0.title == "MongoDB Server" })?.submenu else { return }
         server.addItem(.separator())
         server.add(Commands.mongoUsersCommands)
+    }
+}
+
+// MARK: Watch Changes (lane P4-watch)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Watch Changes, after New Aggregation: for the tree's collection or database, or the collection
+    /// tab in front.
+    static func addMongoWatchItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let after = collection.items.firstIndex(where: { $0.action == Commands.newAggregation.action }) else { return }
+        collection.insertItem(Commands.watchChanges.item(), at: after + 1)
     }
 }

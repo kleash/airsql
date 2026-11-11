@@ -186,6 +186,9 @@ its `pipeline` and `options`, `text` (the filter or the pipeline), the same as r
 documents loaded (`documents`, as `mongo_find` gives them); with Schema only, `selectedCount` and no documents. Values
 of fields named like secrets (`pwd`, `password`, …) are replaced, as in AirSQL's command log.
 
+Watch Changes tabs (a collection's or database's change stream) are not for agents: `context` doesn't list them and no
+tool watches; to see what changed, run `mongo_find` again (on a field such as `updatedAt`).
+
 ## resources
 
 Each connected connection you may read has its compact schema as a resource, `airsql://<connection name>/schema`

@@ -613,6 +613,8 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             reason = toggle == nil ? "Select a column that holds sub-documents, or one of their fields" : nil
         case Commands.copyDocuments.action?:
             reason = viewer.selectedRows().isEmpty ? "Select rows first" : nil
+        case Commands.watchChanges.action?:
+            reason = watchReason
         case Commands.createIndex.action?, Commands.dropIndex.action?, Commands.hideIndex.action?:
             var title = Commands.hideIndex.title
             reason = indexReason(item.action, title: &title)

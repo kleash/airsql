@@ -21,6 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands + mongoUsersCommands
+        + mongoWatchCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -167,4 +168,13 @@ extension Commands {
                                           tip: "Delete the selected user or custom role; its name is typed to confirm")
 
     static let mongoUsersCommands = [mongoUsers, newMongoUser, changeMongoPassword, grantMongoRole, revokeMongoRole, dropMongoAccount]
+}
+
+// MARK: Watch Changes (lane P4-watch)
+
+extension Commands {
+    static let watchChanges = Command("Watch Changes", #selector(SidebarController.watchChanges(_:)),
+                                      tip: "Open a tab that shows the collection's or database's changes as they happen")
+
+    static let mongoWatchCommands = [watchChanges]
 }
