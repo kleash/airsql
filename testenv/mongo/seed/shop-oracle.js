@@ -60,7 +60,7 @@
     }
   }
   ask('q05_q2_revenue_by_category',
-      'What was the revenue (qty × price of items) of paid orders created in Q2 2024 (April to June, UTC) per product category?',
+      'What was the revenue (qty × price of items) of paid orders (status paid, shipped or delivered) created in Q2 2024 (April to June, UTC) per product category?',
       ranked(q2).map(([category, c]) => ({category, revenue: amount(c)})));
 
   const ordering = new Set(orders.map(o => hex(o.customerId)));
@@ -70,7 +70,7 @@
   const spent = tally(orders.filter(o => paid(o) && customerById[hex(o.customerId)]), o => hex(o.customerId),
                       o => cents(o.total));
   const [top, topCents] = ranked(spent)[0];
-  ask('q07_top_spender', 'Which customer spent the most on paid orders, and how much?',
+  ask('q07_top_spender', 'Which customer spent the most on paid orders (status paid, shipped or delivered), and how much?',
       {customerId: top, name: customerById[top].name, spent: amount(topCents)});
 
   const ratings = {};

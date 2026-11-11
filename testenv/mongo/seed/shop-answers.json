@@ -32,7 +32,7 @@
     ]
   },
   "q05_q2_revenue_by_category": {
-    "question": "What was the revenue (qty × price of items) of paid orders created in Q2 2024 (April to June, UTC) per product category?",
+    "question": "What was the revenue (qty × price of items) of paid orders (status paid, shipped or delivered) created in Q2 2024 (April to June, UTC) per product category?",
     "answer": [
       {
         "category": "electronics",
@@ -84,7 +84,7 @@
     }
   },
   "q07_top_spender": {
-    "question": "Which customer spent the most on paid orders, and how much?",
+    "question": "Which customer spent the most on paid orders (status paid, shipped or delivered), and how much?",
     "answer": {
       "customerId": "cc000000000000000000005c",
       "name": "Customer 92",
