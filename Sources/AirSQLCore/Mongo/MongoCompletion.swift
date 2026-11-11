@@ -12,7 +12,7 @@ public enum MongoCompletion {
                              collections: [String] = [], serverVersion: String? = nil, path: String? = nil,
                              foreign: @escaping (String) -> MongoSample? = { _ in nil }) -> (range: Range<Int>, items: [CompletionItem]) {
         let at = MongoCaret(text: text, caret: caret, root: root)
-        var known = Known(sample, indexes: indexes)
+        var known = Known.cached(sample, indexes: indexes)
         if root == .pipeline, !at.stagesBefore.isEmpty {
             known.paths = outputs(of: at.stagesBefore, in: text, from: known.paths)
         }
@@ -82,6 +82,12 @@ public enum MongoCompletion {
         var share: Double
         var field: MongoSchema.Field?
         var indexed = false
+        /// What the list shows beside it: "indexed · string · 98%".
+        var detail: String {
+            var detail = type.map { "\($0) · \(Answer.percent(share))" } ?? ""
+            if indexed { detail = detail.isEmpty ? "indexed" : "indexed · " + detail }
+            return detail
+        }
     }
 
     struct Known {
@@ -128,6 +134,20 @@ public enum MongoCompletion {
         }
 
         func info(_ path: String) -> PathInfo? { byPath[path] }
+
+        /// The last sample's, kept between keystrokes: the same sample and indexes give the same.
+        private static var last: (key: String, known: Known)?
+        private static let lock = NSLock()
+
+        static func cached(_ sample: MongoSample?, indexes: [BSONDocument]) -> Known {
+            guard let sample else { return Known(nil, indexes: indexes) }
+            let key = "\(sample.sampledAt.timeIntervalSinceReferenceDate) \(sample.schema.fields.count) \(sample.loadedPaths.count) "
+                + "\(sample.validatorPaths.count) \(sample.indexes.count) " + indexes.map { $0.shellForm() }.joined()
+            if let found = lock.locked({ last?.key == key ? last?.known : nil }) { return found }
+            let known = Known(sample, indexes: indexes)
+            lock.locked { last = (key, known) }
+            return known
+        }
     }
 
     // MARK: What fits
@@ -361,10 +381,8 @@ public enum MongoCompletion {
         }
 
         func pathCandidate(_ label: String, info: PathInfo?, text: String? = nil) -> Candidate {
-            var detail = info?.type.map { "\($0) · \(Self.percent(info!.share))" } ?? ""
-            if info?.indexed == true { detail = detail.isEmpty ? "indexed" : "indexed · " + detail }
-            return Candidate(item: CompletionItem(kind: .column, text: text ?? (at.slot == .key ? key(label) : label), label: label,
-                                                  detail: detail),
+            Candidate(item: CompletionItem(kind: .column, text: text ?? (at.slot == .key ? key(label) : label), label: label,
+                                           detail: info?.detail ?? ""),
                              indexed: info?.indexed ?? false, share: info?.share ?? 0)
         }
 
@@ -393,7 +411,10 @@ public enum MongoCompletion {
 
         /// A key as shell form takes it: bare when it is a plain name, else in quotes (`"items.sku"`).
         func key(_ name: String) -> String {
-            let plain = name.first.map { !$0.isNumber } == true && name.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "$") }
+            let bytes = name.utf8
+            let plain = bytes.first.map { !(0x30...0x39).contains($0) } == true && bytes.allSatisfy {
+                (0x30...0x39).contains($0) || (0x41...0x5A).contains($0) || (0x61...0x7A).contains($0) || $0 == 0x5F || $0 == 0x24
+            }
             return at.quoted || plain ? name : quoted(name)
         }
 
@@ -423,10 +444,30 @@ public enum MongoCompletion {
             }
             return next == letters.count
         }
+        func startsWith(_ name: String) -> Bool {
+            var next = 0
+            for unit in name.utf16 {
+                guard next < letters.count else { break }
+                guard ((0x41...0x5A).contains(unit) ? unit + 0x20 : unit) == letters[next] else { return false }
+                next += 1
+            }
+            return next == letters.count
+        }
         let ascii = letters.allSatisfy { $0 < 0x80 }
         for (offset, candidate) in candidates.enumerated() where !siblings.contains(candidate.item.label) {
-            guard !ascii || mayMatch(candidate.item.label), let match = SQLCompletion.match(candidate.item.label, typed) else { continue }
-            keys.append((match, candidate.group, candidate.indexed, candidate.share, offset))
+            guard !ascii || mayMatch(candidate.item.label) else { continue }
+            if ascii ? startsWith(candidate.item.label) : candidate.item.label.lowercased().hasPrefix(typed) {
+                keys.append((0, candidate.group, candidate.indexed, candidate.share, offset))
+            } else {
+                keys.append((-1, candidate.group, candidate.indexed, candidate.share, offset))
+            }
+        }
+        // The fuzzy matcher only when the prefix matches leave room in the list.
+        let fuzzy = keys.filter { $0.match == 0 }.count < 200
+        keys = keys.compactMap { key in
+            guard key.match < 0 else { return key }
+            guard fuzzy, let match = SQLCompletion.match(candidates[key.offset].item.label, typed) else { return nil }
+            return (match, key.group, key.indexed, key.share, key.offset)
         }
         keys.sort { a, b in
             if a.match != b.match { return a.match < b.match }
