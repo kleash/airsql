@@ -80,6 +80,7 @@ final class OpenMongoConnection {
 
     /// Forgets what was read under a database (nil: everything) and reads it again.
     func refresh(_ database: String? = nil) {
+        connection.samples.invalidate(database: database)
         if let database {
             indexes = indexes.filter { !$0.key.hasPrefix(database + ".") }
             loadDatabase(database, again: true)

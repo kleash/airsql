@@ -246,7 +246,12 @@ extension SidebarController {
     func refreshMongo() -> Bool {
         if let (open, items) = mongoSelection {
             for item in items {
-                if let collection = item.collection { open.loadIndexes(item.database, collection, again: true) } else { open.refresh(item.database) }
+                if let collection = item.collection {
+                    open.connection.samples.invalidate(database: item.database, collection: collection)
+                    open.loadIndexes(item.database, collection, again: true)
+                } else {
+                    open.refresh(item.database)
+                }
             }
             return true
         }

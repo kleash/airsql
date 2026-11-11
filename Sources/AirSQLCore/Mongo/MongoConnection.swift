@@ -21,6 +21,8 @@ public final class MongoConnection: @unchecked Sendable {
     /// By role and slot ("data" and "data:<tab>").
     private var opening: [String: Task<MongoSession, Error>] = [:]
     private var closed = false
+    /// The collections' samples, read on the main session, for completion and agents.
+    public let samples = MongoSampleCache()
 
     public init(uri: String, user: String? = nil, password: String? = nil, tls: TLSOptions = TLSOptions(), route: MongoRoute,
                 name: String = "", log: SQLLog = .shared) {
@@ -31,6 +33,10 @@ public final class MongoConnection: @unchecked Sendable {
         self.route = route
         self.name = name
         self.log = log
+        samples.fill = { [weak self] database, collection in
+            guard let self else { throw AirSQLError.disconnected }
+            return try await MongoSampleCache.read(try await session(.main), database: database, collection: collection)
+        }
     }
 
     /// Another user for the next connect (typed at the login prompt).

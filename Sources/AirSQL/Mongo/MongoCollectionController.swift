@@ -377,6 +377,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     /// what was selected stay (a new batch brought new columns).
     func showSource(keepingPlace: Bool = false) {
         source.changes = changes
+        connection?.samples.add(paths: source.paths.map { $0.joined(separator: ".") }, database: database, collection: name)
         let origin = grid.scrollView.contentView.bounds.origin, selection = grid.selection
         viewer.show(source)
         grid.sortOrder = sortShown
@@ -521,6 +522,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     /// Refresh (⌘R): the find again, or on the Schema page a new sample, on the Indexes page the indexes.
     @objc func refresh(_ sender: Any?) {
         guard loading == nil else { return }
+        connection?.samples.invalidate(database: database, collection: name)
         if page == .schema { sample(schemaView.sampleSize) } else if page == .indexes { loadIndexes() } else { run() }
     }
     @objc func cancelQuery(_ sender: Any?) { activity?.cancel() }

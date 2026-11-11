@@ -467,10 +467,12 @@ public final class MongoSession: @unchecked Sendable {
     /// Creates an index on `keys` ({field: 1}); `options` such as name, unique, partialFilterExpression.
     public func createIndex(database: String, collection: String, keys: BSONDocument,
                             options: BSONDocument = BSONDocument()) async throws {
+        defer { connection.samples.invalidate(database: database, collection: collection) }
         _ = try await command(MongoIndex.createCommand(collection: collection, keys: keys, options: options), database: database)
     }
 
     public func dropIndex(database: String, collection: String, name: String) async throws {
+        defer { connection.samples.invalidate(database: database, collection: collection) }
         _ = try await command(MongoIndex.dropCommand(collection: collection, name: name), database: database)
     }
 
@@ -480,7 +482,8 @@ public final class MongoSession: @unchecked Sendable {
                        collation: BSONDocument? = nil,
                        _ body: @escaping (OpaquePointer, UnsafeMutablePointer<bson_t>, UnsafeMutablePointer<bson_t>,
                                           UnsafeMutablePointer<bson_error_t>) throws -> Bool) async throws -> Int64 {
-        try await worker.perform { [self] in
+        defer { connection.samples.invalidate(database: database, collection: collection) }
+        return try await worker.perform { [self] in
             let client = try current()
             let tag = nextTag()
             let server = try select(client, forWrites: true)
@@ -529,6 +532,8 @@ public final class MongoSession: @unchecked Sendable {
 
     /// Commits the open transaction. An unknown result (the connection failed during the commit) says so.
     public func commitTransaction() async throws {
+        // A sample read between a write and its commit saw the old documents.
+        defer { connection.samples.invalidate() }
         try await endTransaction(commit: true)
     }
 
