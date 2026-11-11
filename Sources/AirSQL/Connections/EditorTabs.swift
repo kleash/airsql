@@ -207,9 +207,9 @@ extension ConnectionEditor {
                  caption: draft.mongoX509 ? "The TLS tab's client certificate logs in; the user is optional (the certificate's "
                     + "subject) and the password isn't used." : nil)
         if !draft.mongoX509 {  // X.509's users are in $external
-            form.row("Auth source", [text(\.authSource, placeholder: draft.database.isEmpty ? "admin" : draft.database,
-                                          id: "editor.authSource", tip: "Type the database the user is defined in; empty: the "
-                                            + "database above, else admin", width: 200)])
+            form.row("Auth source", [text(\.authSource, placeholder: draft.mongoSRV ? "as DNS says, often admin" : "admin",
+                                          id: "editor.authSource", tip: "Type the database the user is defined in; empty: admin "
+                                            + "(for a DNS seed list, what its DNS record says)", width: 200)])
         }
         form.row("Options", [text(\.mongoOptions, placeholder: "none", id: "editor.mongoOptions",
                                   tip: "Type the address's other options as key=value&…, such as readPreference=secondary, "

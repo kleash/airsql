@@ -38,7 +38,7 @@ mongosh or Compass.
 - **Log in with**: **Password (SCRAM)**, or **X.509 certificate**: the TLS tab's **Certificate** (one PEM file with
   the certificate and its key, as mongosh's `--tlsCertificateKeyFile` takes it) logs in as the user in `$external`
   its subject names; the user is optional and no password is asked.
-- **Auth source**: the database the user is defined in; empty, the database above, else `admin`.
+- **Auth source**: the database the user is defined in; empty, `admin` (with a DNS seed list, what its DNS record says, `admin` on Atlas). **Database** only says which database opens. A pasted address without `authSource` keeps its own meaning: its database goes into Auth source.
 - **Options**: the address's other options as they follow its `?`, such as `readPreference=secondary&w=majority`,
   `appName` or `retryWrites`. With a `readPreference`, finds, aggregations, counts and distinct values go to the
   member it chooses, and the status bar names a secondary that answered (it may lag the primary); writes, Apply and

@@ -151,6 +151,9 @@ extension SavedConnection {
             default: rest.append((key, value))
             }
         }
+        // The address's own rule: with no authSource, its database is where the login lives. Kept explicit, since an
+        // empty Auth source means admin here; mongodb+srv is left to its DNS TXT record (Atlas: admin).
+        if authSource.isEmpty, !mongoX509, !uri.srv, uri.user != nil, !uri.database.isEmpty { authSource = uri.database }
         tls = TLSOptions(mode: !useTLS ? .off : invalidCertificates ? .required : invalidHostnames ? .verifyCA : .verifyIdentity,
                          caFile: caFile, certFile: certFile)
         mongoOptions = MongoURI.query(rest)
@@ -166,7 +169,11 @@ extension SavedConnection {
         uri.database = database
         if tls.mode != .off || mongoSRV { uri.options.append(("tls", tls.mode != .off ? "true" : "false")) }
         if mongoX509 { uri.options.append(("authMechanism", "MONGODB-X509")) }
-        if !authSource.isEmpty && !mongoX509 { uri.options.append(("authSource", authSource)) }  // X.509's is $external
+        // X.509's is $external. Otherwise the Database field only says which database opens: the login is in Auth source,
+        // admin when empty (mongodb+srv: its DNS TXT record decides).
+        if !mongoX509, !authSource.isEmpty || (!database.isEmpty && !mongoSRV) {
+            uri.options.append(("authSource", authSource.isEmpty ? "admin" : authSource))
+        }
         if !replicaSet.isEmpty { uri.options.append(("replicaSet", replicaSet)) }
         if directConnection { uri.options.append(("directConnection", "true")) }
         uri.options += (try? MongoURI("mongodb://x/?" + mongoOptions))?.options ?? []

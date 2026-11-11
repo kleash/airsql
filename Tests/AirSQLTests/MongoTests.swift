@@ -64,6 +64,28 @@ struct MongoTests {
         }
     }
 
+    /// The Database field only opens a database: an empty Auth source means admin. A pasted address without authSource
+    /// keeps its own meaning (its database holds the login), and mongodb+srv is left to its DNS TXT record.
+    @Test func theLoginsDatabaseIsAuthSourceAndAdminWhenEmpty() throws {
+        var typed = SavedConnection(name: "Typed")
+        typed.engine = .mongodb
+        typed.host = "db1"
+        typed.database = "shop"
+        #expect(typed.mongoURI.option("authSource") == "admin")
+        typed.authSource = "reports"
+        #expect(typed.mongoURI.option("authSource") == "reports")
+
+        var pasted = SavedConnection(name: "Pasted")
+        pasted.engine = .mongodb
+        _ = pasted.apply(try MongoURI("mongodb://app:pw@db1/sales"))
+        #expect(pasted.authSource == "sales" && pasted.mongoURI.option("authSource") == "sales")
+
+        var atlas = SavedConnection(name: "Atlas")
+        atlas.engine = .mongodb
+        _ = atlas.apply(try MongoURI("mongodb+srv://app:pw@cluster0.example.net/sales"))
+        #expect(atlas.authSource.isEmpty && atlas.mongoURI.option("authSource") == nil)
+    }
+
     @Test func aConnectionStringFillsASavedConnectionWithoutItsPassword() throws {
         var saved = SavedConnection(name: "Docs")
         saved.engine = .mongodb
