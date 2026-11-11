@@ -120,7 +120,11 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         grid.fontSize = CGFloat(model.data.settings.gridFontSize)
         grid.setAccessibilityLabel("Documents of \(name)")
         bar.onRun = { [weak self] in self?.run() }
-        bar.paths = { [weak self] in self?.knownPaths ?? [] }
+        bar.complete = { [weak self] root, text, caret in
+            guard let self, let open = model.openMongo[connectionID] else { return (caret..<caret, []) }
+            return open.autofill(root, text, caret, database: database, collection: name, loaded: knownPaths)
+        }
+        model.openMongo[connectionID]?.readSample(database: database, collection: name)
         bar.history.menu?.delegate = self
         notice.owner = self
         emptyNote.add.isHidden = true
@@ -488,8 +492,8 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         show(chosen == page && chosen != .documents ? .documents : chosen)
     }
 
-    /// The field names the query bar completes: the loaded documents' and the sample's (an array's elements by the
-    /// array's name, as a query names them).
+    /// The field names autofill falls back on until the collection's sample is read: the loaded documents' and the
+    /// Schema page's (an array's elements by the array's name, as a query names them).
     var knownPaths: [String] {
         let sampled = (schemaView.schema?.fields ?? []).map { $0.path.replacingOccurrences(of: ".[]", with: "") }
         return source.paths.map { $0.joined(separator: ".") } + sampled
@@ -523,6 +527,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     @objc func refresh(_ sender: Any?) {
         guard loading == nil else { return }
         connection?.samples.invalidate(database: database, collection: name)
+        model.openMongo[connectionID]?.readSample(database: database, collection: name)
         if page == .schema { sample(schemaView.sampleSize) } else if page == .indexes { loadIndexes() } else { run() }
     }
     @objc func cancelQuery(_ sender: Any?) { activity?.cancel() }

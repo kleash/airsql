@@ -68,9 +68,9 @@ Each field takes shell form, as mongosh writes it: `{ age: { $gt: 30 } }`, `Obje
   and **Max Time** (milliseconds the server may spend before it stops the find).
 
 **Run** (⌘↩, or Return in any field) finds the documents. A field AirSQL can't read says what's wrong and where under
-the fields, and nothing runs. Press Esc in a field to complete a field name from the documents loaded and the schema
-sample. The clock button (⌘Y) lists the collection's recent queries and its favourites: choose one to run it again,
-or keep the query in the bar among the favourites. They're kept per connection on this Mac, beside the SQL history.
+the fields, and nothing runs. The fields autofill as you type (see [Autofill](#autofill)). The clock button (⌘Y)
+lists the collection's recent queries and its favourites: choose one to run it again, or keep the query in the bar
+among the favourites. They're kept per connection on this Mac, beside the SQL history.
 
 A click on a column's header sorts by that field on the server; ⇧-click adds it to the sort.
 
@@ -241,9 +241,8 @@ time-series collection, or with edits not applied, both commands are off and say
 **New Aggregation** (⌥⌘A, in a collection's right-click menu and Data ▸ Collection) opens a tab with a pipeline editor
 over the documents it gives. Type the stages in shell form, as an array or one after another:
 `[{ $match: { status: "paid" } }, { $group: { _id: "$customer", total: { $sum: "$amount" } } }]`. Each stage of
-several lines folds on its own; typing `$` at a stage's start offers the stage names, and inside a stage the field
-names of the documents loaded (with `$` before them, as an expression names a field). A mistake is underlined where it
-is, and Run says which stage, line and column.
+several lines folds on its own, and the editor autofills stages, their keys and the fields (see
+[Autofill](#autofill)). A mistake is underlined where it is, and Run says which stage, line and column.
 
 **Run** (⌘↩) runs the pipeline; its documents load a batch at a time, with **Load More** (⌥⌘↓), and show in the same
 grid as a collection's. **Collation** and **Max Time** above the editor apply to the whole pipeline. **Cancel** (⌘.)
@@ -256,6 +255,27 @@ documents each returned and its time, as a diagram, a flame graph, indented **Te
 runs the pipeline to measure it, so a slow pipeline is slow here too.
 
 A collection tab's find can be explained the same way: its plan opens in a window of its own.
+
+### Autofill
+
+The query bar's fields, the pipeline editor and the document editor (Insert Document, Edit Value) list what fits where
+you type: it opens as you type `$`, `.`, `"` or a word's second letter, and Esc opens it anywhere (⌥⎋ in the document
+editor, where Esc cancels). ↑ and ↓ choose, Return inserts, Tab replaces the rest of the word, Esc closes. Nothing is
+sent to the server while you type: the list comes from a sample of the collection (200 documents, read when its tab
+opens and again on Refresh, kept in memory only), its indexes and validator, and the documents loaded.
+
+- **Fields**: nested paths (`address.city`, `items.sku`), the indexed ones first in a filter and a sort, then those most
+  documents have; each says its type and share. Fields already in the document aren't offered again.
+- **Operators** by the field's type: `$gt` for a number or date, `$regex` for a string, `$elemMatch` for an array; in a
+  filter's top level `$and`, `$or`, `$nor`, `$expr`; in an update `$set`, `$inc` and the rest.
+- **Values** by the field's type: `ObjectId("")`, `ISODate("")`, `true` and `false`, `null`, and a string's values when
+  it has 20 or fewer; `1` and `-1` in a sort, `1` and `0` in a projection, the index names in Hint.
+- **Pipelines**: stage names as templates whose required keys Tab walks; each stage's keys; `from:` the database's
+  collections and `foreignField:` that collection's fields once its sample is read; expression operators, and
+  accumulators only where they're allowed (`$group`, `$bucket`, `$setWindowFields`); `"$` the fields, `"$$` the
+  variables. After `$group`, `$project`, `$addFields`, `$set`, `$unset` or `$replaceRoot`, the fields are those the
+  stage gives.
+- Stages and operators newer than the server's version are left out.
 
 ### Stages, saved pipelines, views and mongosh
 

@@ -55,13 +55,6 @@ struct MongoAppTests {
         #expect(mode == 0o600)
     }
 
-    @Test @MainActor func fieldNamesCompleteFromThePathsKnown() {
-        let paths = ["_id", "address", "address.city", "address.zip", "age", "address"]
-        #expect(MongoQueryBar.completions("ad", among: paths) == ["address", "address.city", "address.zip"])
-        #expect(MongoQueryBar.completions("address.c", among: paths) == ["address.city"])
-        #expect(MongoQueryBar.completions("age", among: paths).isEmpty)
-    }
-
     @Test @MainActor func theSchemaSaysEachFieldsTypesAndRange() {
         let documents = [BSONDocument([("n", .int32(1)), ("tag", .string("a"))]), BSONDocument([("n", .double(2.5)), ("tag", .null)]),
                          BSONDocument([("n", .int32(1))])]

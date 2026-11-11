@@ -4,9 +4,10 @@ import AppKit
 /// The document editor (mongo-plan, Safe editing): a field's value, or a whole new document, in shell form in a sheet.
 /// For a field, the Type pop-up keeps its type (the text read as one, as the grid's editor reads it) or changes it to
 /// the type chosen: the only way a field's type changes. Keep (⌘↩) hands the text and the type chosen (nil: keep it) to
-/// `keep`, which makes it a pending change or says why not, under the text; nothing is written to the server here.
+/// `keep`, which makes it a pending change or says why not, under the text; nothing is written to the server here. The
+/// text autofills (`MongoAutofill`) with what `complete` offers.
 @MainActor
-final class MongoValueSheet: NSWindowController {
+final class MongoValueSheet: NSWindowController, NSTextViewDelegate {
     /// The types the pop-up offers, as `$type` names them.
     static let types = ["string", "int", "long", "double", "decimal", "bool", "date", "objectId", "object", "array", "null"]
 
@@ -14,13 +15,16 @@ final class MongoValueSheet: NSWindowController {
     let type: NSPopUpButton?
     private let problem = label("", font: .systemFont(ofSize: 12), color: .statusBad, wraps: true)
     private let keep: (_ text: String, _ type: String?) -> String?
+    private let complete: MongoAutofill.Complete?
+    let autofill = MongoAutofill()
     private var retainUntilClosed: MongoValueSheet?
 
     /// Shows the sheet on `window`; `type` is the field's type now (nil: a whole document, no pop-up).
     @discardableResult
     static func show(title: String, caption: String, text: String, type: String?, on window: NSWindow,
+                     complete: MongoAutofill.Complete? = nil,
                      keep: @escaping (_ text: String, _ type: String?) -> String?) -> MongoValueSheet {
-        let sheet = MongoValueSheet(title: title, caption: caption, text: text, type: type, keep: keep)
+        let sheet = MongoValueSheet(title: title, caption: caption, text: text, type: type, complete: complete, keep: keep)
         window.beginSheet(sheet.window!)
         sheet.retainUntilClosed = sheet
         return sheet
@@ -43,8 +47,10 @@ final class MongoValueSheet: NSWindowController {
         }
     }
 
-    private init(title: String, caption: String, text: String, type: String?, keep: @escaping (String, String?) -> String?) {
+    private init(title: String, caption: String, text: String, type: String?, complete: MongoAutofill.Complete?,
+                 keep: @escaping (String, String?) -> String?) {
         self.keep = keep
+        self.complete = complete
         let scroll = NSTextView.scrollableTextView()
         textView = scroll.documentView as! NSTextView
         textView.string = text
@@ -55,7 +61,7 @@ final class MongoValueSheet: NSWindowController {
         textView.isAutomaticTextReplacementEnabled = false
         textView.textContainerInset = NSSize(width: 6, height: 6)
         textView.setAccessibilityIdentifier("mongoValue.text")
-        textView.toolTip = "The value in shell form: \"text\", 42, NumberLong(42), ISODate(\"…\"), [ … ], { … }"
+        textView.toolTip = "The value in shell form: \"text\", 42, NumberLong(42), ISODate(\"…\"), [ … ], { … }; ⌥⎋ lists what fits here"
         if let type {
             let titles = ["Keep \(type)"] + Self.types.map { "Change to \($0)" }
             self.type = popup(titles, selected: 0, id: "mongoValue.type",
@@ -104,9 +110,19 @@ final class MongoValueSheet: NSWindowController {
         window.contentView = root
         window.setContentSize(root.fittingSize)
         window.initialFirstResponder = textView
+        textView.delegate = self
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    func textDidChange(_ notification: Notification) {
+        if let complete { autofill.textChanged(textView, complete) }
+    }
+
+    func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard let complete else { return false }
+        return autofill.command(selector, in: textView, complete)
+    }
 
     /// The type chosen in the pop-up; nil: keep the field's.
     var chosenType: String? {
@@ -124,9 +140,14 @@ final class MongoValueSheet: NSWindowController {
         finish()
     }
 
-    @objc func cancel(_ sender: Any?) { finish() }
+    /// Cancel, or Esc: with autofill's list open, Esc closes only the list.
+    @objc func cancel(_ sender: Any?) {
+        if autofill.isShown { return autofill.close() }
+        finish()
+    }
 
     private func finish() {
+        autofill.close()
         if let sheet = window, let parent = sheet.sheetParent { parent.endSheet(sheet) }
         retainUntilClosed = nil
     }
