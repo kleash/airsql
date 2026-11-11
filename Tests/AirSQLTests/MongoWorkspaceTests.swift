@@ -28,7 +28,9 @@ extension AppTests {
         let tab = try #require(main.selectedTab?.content as? MongoCollectionController)
         #expect(tab.name == "many" && tab.database == "fixture")
 
-        main.sidebar.select([mongo.saved.id])
+        // Away from the collection's row without a click on the connection, which would show its server page.
+        main.sidebar.outline.deselectAll(nil)
+        #expect(main.sidebar.selectedNodes.isEmpty && main.selectedTab?.content === tab)
         main.selectInTree(nil)
         let row = SidebarNode.Kind.mongo(mongo.saved.id, MongoTreeItem(database: "fixture", collection: "many"))
         #expect(await eventually(timeout: 5) { main.sidebar.selectedNodes.map(\.kind) == [row] })
