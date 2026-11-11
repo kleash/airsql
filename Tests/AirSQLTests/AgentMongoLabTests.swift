@@ -199,4 +199,21 @@ struct AgentMongoBridgeLabTests {
         #expect(documents == ["{\"b\":1,\"a\":2.0}"], "\(called)")
         #expect(text(called).contains("\"{\\\"b\\\":1,\\\"a\\\":2.0}\""), "the same in the text")
     }
+
+    /// The Phase 3 agent tests' answers (testenv/mongo/seed/shop-answers.json) are what the oracle finds in `shop` on
+    /// both servers now: a changed seed or oracle fails here until the answers are written again.
+    @Test(arguments: AgentMongoLabTests.Server.allCases)
+    func shopAnswersMatchTheOracle(_ server: AgentMongoLabTests.Server) throws {
+        let seed = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("testenv/mongo/seed")
+        let oracle = try String(contentsOf: seed.appendingPathComponent("shop-oracle.js"), encoding: .utf8)
+        let tls = server == .standalone ? [] : ["--tls", "--tlsCAFile", "/tls/ca.pem", "--tlsAllowInvalidHostnames"]
+        let printed = try MongoLab.compose(["exec", "-T", server == .standalone ? MongoLab.solo : MongoLab.members[0], "mongosh",
+                                            "--quiet", "-u", "root", "-p", "airsql-root", "--authenticationDatabase", "admin"]
+                                           + tls + ["--eval", oracle])
+        let found = try JSONSerialization.jsonObject(with: Data(printed.utf8)) as? NSDictionary
+        let committed = try JSONSerialization.jsonObject(with: Data(contentsOf: seed.appendingPathComponent("shop-answers.json")))
+        #expect(found == committed as? NSDictionary, "testenv/mongo/seed/shop-answers.json is out of date: run shop-oracle.js")
+        #expect((found?["q10_orphan_orders"] as? NSDictionary)?["answer"] as? Int == 20)
+    }
 }

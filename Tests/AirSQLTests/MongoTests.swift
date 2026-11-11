@@ -22,16 +22,20 @@ enum MongoLab {
     /// Where tests write (dropped after).
     static let scratch = "lane_mongo_m1"
 
-    /// Runs `docker compose` on the Mongo lab (pause, unpause).
-    static func compose(_ arguments: [String]) throws {
+    /// Runs `docker compose` on the Mongo lab (pause, unpause, exec): what it printed.
+    @discardableResult
+    static func compose(_ arguments: [String]) throws -> String {
         let docker = FileManager.default.isExecutableFile(atPath: "/Applications/Docker.app/Contents/Resources/bin/docker")
             ? "/Applications/Docker.app/Contents/Resources/bin/docker" : "/usr/local/bin/docker"
-        let process = Process()
+        let process = Process(), output = Pipe()
         process.executableURL = URL(fileURLWithPath: docker)
         process.arguments = ["compose", "-f", Lab.testenv + "/mongo/docker-compose.yml"] + arguments
+        process.standardOutput = output
         try process.run()
+        let printed = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw SupportError("docker compose \(arguments) failed") }
+        guard process.terminationStatus == 0 else { throw SupportError("docker compose \(arguments.prefix(3)) failed") }
+        return String(decoding: printed, as: UTF8.self)
     }
 }
 
@@ -277,7 +281,7 @@ struct MongoLabTests {
     /// A member that takes connections and never answers (paused): what it costs a connect, and Cancel during it.
     @Test func deadMemberCostAndCancel() async throws {
         try MongoLab.compose(["pause", "mongo-rs3"])
-        defer { try? MongoLab.compose(["unpause", "mongo-rs3"]) }
+        defer { _ = try? MongoLab.compose(["unpause", "mongo-rs3"]) }
         let started = Date()
         let session = try connection(MongoLab.allSeeds + "&connectTimeoutMS=2000", route: .proxy)
         try await session.connect()
