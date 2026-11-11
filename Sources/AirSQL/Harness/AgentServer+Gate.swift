@@ -85,14 +85,15 @@ extension AgentServer {
     /// values), the console's Messages (a server's error quotes values: Duplicate entry '…') and an EXPLAIN's steps, tree
     /// and raw answer, in any of its views (conditions quote values; its table is a grid), the SQL preview's statements (an Apply's or a sync's carry the rows' values) and the SQL log
     /// (every connection's statements, in a window of its own: hidden from every agent), who may log in (the accounts and their grants),
-    /// the selected process's statement, Export Rows' and Import's previews of rows, and a note with a table's first rows.
+    /// the selected process's statement, Export Rows' and Import's previews of rows, a note with a table's first rows, and a
+    /// MongoDB collection's JSON page.
     static func showsData(_ view: NSView) -> Bool {
         view is DataGridView || ["valuePanel", "grid.text", "grid.tree", "grid.chart", "columnSummary", "grid.figure", "grid.set",
                                  "grid.lookup", "grid.editor.problem", "result.filter", "tableData.where", "tableData.suggestions", "values.list",
                                  "quickFilter.value", "recon.rows", "recon.script", "processes.list", "console.messages",
                                  "console.planTree", "console.planOperations", "console.planRaw", "console.planDetails", "console.planDiagram", "preview.sql", "sqlLog.text", "history.every",
                                  "list.usersandroles.table", "users.grants",
-                                 "processes.statement", "export.preview", "csv.preview", "console.insightNote"]
+                                 "processes.statement", "export.preview", "csv.preview", "console.insightNote", "mongo.json"]
             .contains(view.accessibilityIdentifier())
     }
 

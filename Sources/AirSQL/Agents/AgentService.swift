@@ -118,13 +118,14 @@ final class AgentService {
                     }
                 }
                 if tool == "run_queries" { keep(structured, kept.rows, call: call, client: client, connection: target.saved.id) }
-            // Phase 3's slots (AgentTools.mongoSchemaTool, …): mongo_schema and mongo_explain are answered here, then
-            // mongo_open; until then they reach the default, "no tool".
+            // Phase 3's slots (AgentTools.mongoSchemaTool, …): mongo_schema and mongo_explain are answered here; until
+            // then they reach the default, "no tool".
             case _ where AgentTarget.mongoTools.contains(tool):
                 structured = try await reading(tool, try self.target(arguments), progress: progress) { target, _ in
                     try await target.mongo(tool, arguments)
                 }
             case "open_in_console": structured = try openInConsole(arguments)
+            case "mongo_open": structured = try mongoOpen(arguments, client: client)
             case "read_console": structured = try readConsole(arguments)
             case _ where Self.uiTools.contains(tool):
                 let reply = await drive(tool, arguments, client: client)

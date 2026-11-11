@@ -91,12 +91,12 @@ func result(_ messages: [[String: Any]], _ id: Int) -> [String: Any]? {
         let ui = ["snapshot", "screenshot", "menu", "press", "set", "select", "key", "type", "click", "double_click",
                   "right_click", "wait"]
         #expect(names == ["context", "get_schema", "describe", "search_columns", "run_queries", "profile", "explain"]
-                + AgentTarget.mongoTools + ["open_in_console", "read_console", "guide"] + ui)
+                + AgentTarget.mongoTools + ["mongo_open", "open_in_console", "read_console", "guide"] + ui)
         for tool in tools {
             let name = tool["name"] as? String ?? ""
             let annotations = try #require(tool["annotations"] as? [String: Any])
             #expect(annotations["destructiveHint"] as? Bool == false)
-            let reads = !["open_in_console", "menu", "press", "set", "select", "key", "type", "click", "double_click",
+            let reads = !["mongo_open", "open_in_console", "menu", "press", "set", "select", "key", "type", "click", "double_click",
                           "right_click"].contains(name)
             #expect(annotations["readOnlyHint"] as? Bool == reads, "\(name)")
             // UI tools answer with JSON as text (screenshot: an image), as AirSCP's do.
