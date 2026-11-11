@@ -23,6 +23,7 @@ extension MainMenu {
         addMongoIndexItems(menus)
         addMongoBulkItems(menus)
         addMongoAdminItems(menus)
+        addMongoHostItems(menus)
     }
 }
 
@@ -171,5 +172,19 @@ extension MainMenu {
             item.target = MongoAdminMenu.shared
             collection.addItem(item)
         }
+    }
+}
+
+// MARK: Host (lane P2-host)
+
+extension MainMenu {
+    /// Connection ▸ MongoDB Server: the host page's panes and Disk Usage (the sidebar does them, as MySQL's host page),
+    /// and Kill Operation… (the host page in front's).
+    static func addMongoHostItems(_ menus: Menus) {
+        menus.connection.addItem(.separator())
+        let server = submenu("MongoDB Server", [Commands.mongoServer, Commands.mongoMembers, Commands.mongoOperations,
+                                                Commands.mongoDiskUsage].map { $0.item() } + [.separator(), Commands.killOperation.item()])
+        server.toolTip = "Show a MongoDB server's figures, members, operations and disk usage"
+        menus.connection.addItem(server)
     }
 }

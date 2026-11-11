@@ -2581,6 +2581,33 @@ authority it trusts signed it (the connection's CA file is passed); Terminal say
 install mongosh: if it finds none (in Homebrew's folders, /usr/local/bin or your PATH), it says where to get it,
 MongoDB's download page or `brew install mongosh`.
 
+## Server, operations and disk usage
+
+Click a connected MongoDB connection in the sidebar (or choose **Connection ▸ MongoDB Server**, or right-click the
+connection) to see its server page, laid out as a MySQL server's:
+
+- **Server**: what `serverStatus` says: version, host, uptime, storage engine, the replica set and its primary,
+  connections, operations per second (inserts, queries, updates, deletes, get mores, commands), memory, WiredTiger's
+  cache and network. Rates are worked out between the last two reads.
+- **Members**: each member of a replica set with its state, health, how many seconds it is behind the primary, its
+  ping and uptime, from `replSetGetStatus`. A standalone has none, and says so.
+- **Operations**: what `currentOp` finds running on the primary: its id, kind, namespace, how long it has run, its
+  client, its comment (AirSQL tags its own commands) and its plan. It lists this login's own operations, which needs no
+  privilege; **All Operations** lists every login's when the login may (the `inprog` privilege, as `clusterMonitor`
+  gives), and says why not otherwise. **Kill Operation…** asks first, then ends the selected operations with `killOp`;
+  the server's own work (replication, monitoring, background tasks) can't be killed from here, and on a read-only
+  connection Kill is off.
+
+The page reads on a session of its own every 5 seconds while it shows, never while it is hidden, and each read has a
+time limit, so a slow server or route doesn't pile reads up. A login without `clusterMonitor` sees what it may, and the
+page names the role it lacks.
+
+**Disk Usage** (on the server page, in a database's right-click menu, or **Connection ▸ MongoDB Server**) shows where the
+space went, as sorted bars: each database (`dbStats`), and with a double-click its collections (`$collStats`), with the
+space their documents and indexes take on disk, the free space kept for reuse, their size uncompressed and their
+document count. Views take no space and aren't listed. Right-click any of these lists for **Copy List** and **Export
+List…**, which copy or save it as CSV.
+
 ## Agents
 
 With agent access set to **Schema + read** or more, AI agents can find, aggregate, count and sample a MongoDB

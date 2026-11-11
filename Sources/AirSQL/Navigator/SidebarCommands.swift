@@ -63,6 +63,9 @@ extension SidebarController: NSMenuItemValidation {
         if let main, selectedConnectionIDs.count == 1, selectedNodes.count == 1, let open = model.openConnection(selectedConnectionIDs[0]) {
             return main.showHost(open)
         }
+        if let main, selectedConnectionIDs.count == 1, selectedNodes.count == 1, let mongo = model.openMongo[selectedConnectionIDs[0]] {
+            return main.showMongoHost(mongo)
+        }
         if showMongoSelection() { return }
         guard let main, let (open, nodes) = treeSelection, nodes.count == 1 else { return }
         switch nodes[0].kind {
