@@ -25,6 +25,7 @@ extension MainMenu {
         addMongoAdminItems(menus)
         addMongoHostItems(menus)
         addMongoCompareItems(menus)
+        addMongoUsersItems(menus)
     }
 }
 
@@ -208,5 +209,16 @@ extension SidebarController {
         guard let (open, items) = mongoSelection, items.count == 1, let collection = items[0].collection, items[0].index == nil
         else { return NSSound.beep() }
         MongoCompareWindowController.show(model: model, source: (open.saved, items[0].database, collection))
+    }
+}
+
+// MARK: Users and roles (lane P4-users)
+
+extension MainMenu {
+    /// Connection ▸ MongoDB Server: Users and Roles, then the commands of the users page in front.
+    static func addMongoUsersItems(_ menus: Menus) {
+        guard let server = menus.connection.items.last(where: { $0.title == "MongoDB Server" })?.submenu else { return }
+        server.addItem(.separator())
+        server.add(Commands.mongoUsersCommands)
     }
 }

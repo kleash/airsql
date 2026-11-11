@@ -161,10 +161,11 @@ enum MongoAdminActions {
     // MARK: Running
 
     /// Shows `command` in the preview sheet; Run runs it on the connection's admin session with a line in Activity whose
-    /// Cancel stops it, then `done` (or what went wrong).
+    /// Cancel stops it, then `done` (or what went wrong, in `failure`'s words).
     static func run(_ command: MongoAdminCommand, on open: OpenMongoConnection, model: AppModel, window: NSWindow, title: String,
                     heading: String, caption: String, action: String, destructive: Bool, warnings: [String] = [],
-                    typeToConfirm: String? = nil, done: @escaping @MainActor () -> Void) {
+                    typeToConfirm: String? = nil, failure: @escaping (Error) -> String = { $0.localizedDescription },
+                    done: @escaping @MainActor () -> Void) {
         guard let saved = model.connection(open.saved.id) else { return NSSound.beep() }
         var request = SQLPreviewRequest(change: ChangeSQL(title: title, statements: [command.shellForm], connection: saved.id),
                                         heading: heading, caption: caption)
@@ -189,7 +190,7 @@ enum MongoAdminActions {
                     announce("\(title): done")
                 } catch {
                     activity.end()
-                    let words = Task.isCancelled ? "Cancelled. Refresh (⌘R) shows whether it was done." : error.localizedDescription
+                    let words = Task.isCancelled ? "Cancelled. Refresh (⌘R) shows whether it was done." : failure(error)
                     open.refresh()
                     showError(words, title: "\(title) didn't happen", on: window)
                 }

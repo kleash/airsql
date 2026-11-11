@@ -9,7 +9,8 @@ public struct MongoAdminCommand: Sendable, Equatable {
     public let database: String
 
     /// As mongosh runs it: what the preview shows and Copy Commands copies.
-    public var shellForm: String { MongoIndex.shellForm(command, database: database) }
+    /// A user's new password (`MongoUsers`) shows as the command log has it.
+    public var shellForm: String { MongoIndex.shellForm(command["pwd"] == nil ? command : MongoLog.redacted(command), database: database) }
 }
 
 /// The admin commands and the checks on their names. Fields come in as the sheets hold them (shell form, or plain text

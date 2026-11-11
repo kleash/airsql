@@ -130,6 +130,9 @@ stages fail (use `mongo_stats`). To change data, propose it with `mongo_open`: t
 cap, go to a new file in AirSQL's agent export folder, one relaxed Extended JSON document a line (`.jsonl`, nothing
 cut), and the reply has `file`, `count`, `capped` and `bytes` instead of the documents. There is no path argument.
 
+MongoDB's users and roles (Connection ▸ MongoDB Server ▸ Users and Roles) are the person's: not for agents, and
+refused for them like MySQL's.
+
 A server's error on `mongo_find`, `mongo_aggregate` or `mongo_explain` is JSON text: `{code, codeName, message,
 stage?, hint?}`, where `stage` is the pipeline stage that holds the unknown word and `hint` the nearest operator or
 stage (`Did you mean $sum?`) or the version a newer one needs (`$median needs MongoDB 7.0`). A refused stage that

@@ -288,7 +288,7 @@ extension SidebarController {
             } else {
                 reason = "Select one index of a connected MongoDB server in the tree first"
             }
-        case Commands.mongoServer.action?, Commands.mongoDiskUsage.action?:
+        case Commands.mongoServer.action?, Commands.mongoDiskUsage.action?, Commands.mongoUsers.action?:
             reason = mongoTarget == nil ? "Select or open a connected MongoDB server first" : nil
         case Commands.refresh.action? where mongo || selectedConnectionIDs.contains { model.openMongo[$0] != nil }:
             reason = nil
