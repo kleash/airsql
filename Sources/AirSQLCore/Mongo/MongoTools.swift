@@ -50,8 +50,13 @@ public struct MongoToolCommand {
         return nil
     }
 
+    /// Why the tools are off for an AWS IAM login.
+    public static let awsRefusal = "Off for an AWS IAM login: the tools take the session token only on their command line, "
+        + "where other programs can read it"
+
     /// The command line: `config` is the password file's path (nil: no password).
     public func argv(config: String?) throws -> [String] {
+        if saved.mongoAWS { throw AirSQLError(.other, MongoToolCommand.awsRefusal) }
         var uri = saved.mongoURI
         uri.database = ""  // the tools refuse a database in the string that differs from --db
         uri.setOption("connectTimeoutMS", nil)

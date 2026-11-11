@@ -31,6 +31,7 @@ final class MongoDumpMenu: NSObject, NSMenuItemValidation {
             return "Select a MongoDB connection, database or collection first"
         }
         let name = ref.open.saved.displayName
+        if ref.open.saved.mongoAWS { return MongoToolCommand.awsRefusal }
         if action == Commands.mongoRestore.action, main.model.connection(ref.open.saved.id)?.readOnly ?? ref.open.saved.readOnly {
             return "\(name) is read-only: turn that off in the connection's settings to write to it"
         }

@@ -44,6 +44,10 @@ struct MongoToolsTests {
         command.saved.mongoX509 = true
         command.saved.authSource = ""
         #expect(try MongoURI(String(try command.argv(config: nil)[1].dropFirst(6))).option("authSource") == nil)
+        // AWS IAM's session token would have to go on the command line: refused.
+        command.saved.mongoX509 = false
+        command.saved.mongoAWS = true
+        #expect(throws: AirSQLError.self) { try command.argv(config: nil) }
     }
 
     /// The tools know only --tlsInsecure: a route's socket, Verify CA and a pinned certificate are refused unless the
