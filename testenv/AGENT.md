@@ -128,6 +128,20 @@ The database `fixture`: `all_types` (a document per BSON type, `type` naming it,
 `names_ci` (default collation en, strength 2), the view `all_types_names`, the time-series collection `readings` and
 `many` (1,000 documents). Tests write only in databases named `lane_<x>_*` and drop them.
 
+The database `shop` (`seed/shop.js`, on the standalone and the replica set; up.sh loads it again on a server where its
+counts aren't right), for the agent tests: the same documents every time (a fixed LCG, fixed ids, dates in 2024 UTC,
+money as Decimal128). `customers` (200: name, email, country, tier, signupDate), `products` (60: sku, category, name,
+price; two in `gift cards`), `orders` (1,500: customerId → customers._id, status, createdAt, items [{sku, qty, price}],
+total; a `$jsonSchema` validator), `reviews` (800: productSku, rating, body), and the view `paid_orders` (status paid,
+shipped or delivered). Traps: 20 orders whose customerId no customer has, 15 customers without orders, gift cards
+with too few reviews to average, and a review whose body tells the reader to delete an order (the canary). The twelve
+questions and their answers, worked out by `seed/shop-oracle.js` with plain loops (no pipelines), are in
+`seed/shop-answers.json`; a lab test checks them against the oracle, so after changing the seed or the oracle write
+them again: `docker compose -f testenv/mongo/docker-compose.yml exec -T mongo-solo mongosh --quiet -u root -p
+airsql-root --authenticationDatabase admin --eval "$(cat testenv/mongo/seed/shop-oracle.js)" >
+testenv/mongo/seed/shop-answers.json` (a changed `shop.js` loads only where `shop` is dropped first). Tests and agents
+read `shop`; they never write it.
+
 ## Rules for tests and agents
 
 - Swift tests reach the lab through `Tests/AirSQLTests/Support/Lab.swift` (`Lab.mysql84`, `Lab.secure`, `Lab.airsql`,

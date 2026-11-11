@@ -79,4 +79,12 @@ if ! shell mongo-rs1 "${root[@]}" --eval 'rs.status().ok' >/dev/null 2>&1; then
     "$docker" compose exec -T mongo-rs1 mongosh --quiet --tls --tlsCAFile /tls/ca.pem --tlsAllowInvalidHostnames \
         "${root[@]}" fixture < seed/fixture.js >/dev/null
 fi
+# The database shop (seed/shop.js, for the agent tests), on each server where it isn't all there.
+for service in mongo-solo mongo-rs1; do
+    counts=$(shell "$service" "${root[@]}" --eval 'const s = db.getSiblingDB("shop");
+        [s.customers, s.products, s.orders, s.reviews].map(c => c.countDocuments()).join()' 2>/dev/null || true)
+    [[ $counts == 200,60,1500,800 ]] && continue
+    echo "Seeding shop on $service..."
+    shell "$service" "${root[@]}" < seed/shop.js >/dev/null
+done
 echo "AirSQL's MongoDB lab is up (Compose project airsql-mongo-lab). Logins and routes: testenv/AGENT.md."
