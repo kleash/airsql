@@ -88,8 +88,8 @@ struct RoutesTests {
 
     @Test func secretKeysCoverEveryHopAndTheProxy() {
         let jump = connection(.sshJump, hops: 3)
-        #expect(jump.secretKeys.count == 5 && jump.secretKeys[0] == jump.id.uuidString)
-        #expect(Set(jump.secretKeys).count == 5 && jump.secretKeys.contains(jump.secretKey(for: jump.jumpHosts[1])))
+        #expect(jump.secretKeys.count == 6 && jump.secretKeys[0] == jump.id.uuidString)
+        #expect(Set(jump.secretKeys).count == 6 && jump.secretKeys.contains(jump.secretKey(for: jump.jumpHosts[1])))
     }
 
     @Test func promptsAreClassified() {

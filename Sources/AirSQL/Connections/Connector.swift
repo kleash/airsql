@@ -264,11 +264,13 @@ final class Connector {
 
     /// `establish` for MongoDB: its route opens a forward or relay per server as the driver asks for each
     /// (`logInMongo`).
-    func establishMongo(_ saved: inout SavedConnection, password: String? = nil, proxyPassword: String? = nil,
-                        on window: NSWindow?, step: @escaping (String) -> Void) async throws -> (MongoConnection, MongoServerInfo) {
+    func establishMongo(_ saved: inout SavedConnection, password: String? = nil, sessionToken: String? = nil,
+                        proxyPassword: String? = nil, on window: NSWindow?,
+                        step: @escaping (String) -> Void) async throws -> (MongoConnection, MongoServerInfo) {
         try await withRoutePrompts(saved, proxyPassword: proxyPassword, on: window) { proxy, server in
             step("Logging in to \(saved.host)")
-            return try await logInMongo(&saved, password: password, proxyPassword: proxy, askpass: server, on: window)
+            return try await logInMongo(&saved, password: password, sessionToken: sessionToken, proxyPassword: proxy,
+                                        askpass: server, on: window)
         }
     }
 
@@ -291,7 +293,7 @@ final class Connector {
 
     /// Test Connection: connects `draft` as the editor has it, then disconnects. The server's description, and the
     /// draft with what the connect learnt (a certificate the person trusted).
-    func test(_ draft: SavedConnection, password: String?, proxyPassword: String?, on window: NSWindow?,
+    func test(_ draft: SavedConnection, password: String?, sessionToken: String? = nil, proxyPassword: String?, on window: NSWindow?,
               step: @escaping (String) -> Void) async throws -> (summary: String, draft: SavedConnection) {
         var tested = draft
         promptWindow = window
@@ -300,8 +302,8 @@ final class Connector {
             closePrompts(draft.id)
         }
         if draft.engine == .mongodb {
-            let (connection, server) = try await establishMongo(&tested, password: password, proxyPassword: proxyPassword,
-                                                                on: window, step: step)
+            let (connection, server) = try await establishMongo(&tested, password: password, sessionToken: sessionToken,
+                                                                proxyPassword: proxyPassword, on: window, step: step)
             await connection.close()
             return (server.summary + (tested.tls.mode == .off ? ", no TLS" : ", TLS"), tested)
         }

@@ -49,6 +49,9 @@ public enum MongoErrorMapping {
         switch code {
         case 13:
             return error(.accessDenied, "This user lacks the privilege for that.")
+        case 334:  // MechanismUnavailable: Community servers have no MONGODB-AWS
+            return error(.loginMethodNotAllowed, "The server doesn't offer this login method: AWS IAM is on MongoDB Atlas "
+                + "and Enterprise servers that turn it on. Choose another in Log in with.")
         case 50:
             return error(.timeout, "The command ran longer than its time limit, so the server stopped it.")
         case 11601:

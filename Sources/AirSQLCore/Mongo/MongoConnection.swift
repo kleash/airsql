@@ -15,6 +15,7 @@ public final class MongoConnection: @unchecked Sendable {
     private let lock = NSLock()
     private var _user: String?
     private var _password: String?
+    private var _awsSessionToken: String?
     private var _tls: TLSOptions
     private var _certificates: [String: TLSCertificate] = [:]
     private var _server: MongoServerInfo?
@@ -49,6 +50,11 @@ public final class MongoConnection: @unchecked Sendable {
         get { lock.locked { _password } }
         set { lock.locked { _password = newValue } }
     }
+    /// An AWS IAM login's session token (temporary credentials), for the next connect.
+    public var awsSessionToken: String? {
+        get { lock.locked { _awsSessionToken } }
+        set { lock.locked { _awsSessionToken = newValue } }
+    }
     /// Other TLS settings for the next connect (a certificate the person trusted).
     public var tls: TLSOptions {
         get { lock.locked { _tls } }
@@ -68,7 +74,13 @@ public final class MongoConnection: @unchecked Sendable {
     /// called again with other `password` or `tls`, over the same route.
     @discardableResult
     public func connect() async throws -> MongoServerInfo {
-        let main = try await session(.main)
+        let main: MongoSession
+        do {
+            main = try await session(.main)
+        } catch let error as AirSQLError where error.kind == .authFailed && uri.contains("MONGODB-AWS") && error.code != 0 {
+            throw AirSQLError(.authFailed, "The server didn't accept the AWS access key: check its ID, its secret and, for "
+                + "temporary credentials, that the session token hasn't expired.", details: error.details, code: error.code)
+        }
         let hello = try await main.command(BSONDocument([("hello", .int32(1))]), database: "admin")
         let build = try await main.command(BSONDocument([("buildInfo", .int32(1))]), database: "admin")
         guard case .string(let version)? = build["version"] else { throw AirSQLError(.other, "The server didn't say its version.") }
@@ -140,13 +152,14 @@ public final class MongoConnection: @unchecked Sendable {
         return uri.string
     }
 
-    /// Closes every session, then the route; the password is forgotten.
+    /// Closes every session, then the route; the password and session token are forgotten.
     public func close() async {
         let tasks = lock.locked {
             defer {
                 closed = true
                 opening = [:]
                 _password = nil
+                _awsSessionToken = nil
             }
             return Array(opening.values)
         }

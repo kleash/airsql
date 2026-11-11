@@ -35,9 +35,9 @@ mongosh or Compass.
   DNS lists the servers. TLS turns on with it.
 - **Replica set**: its name, such as `rs0`. **Direct connection**: only the server named, never the other members
   (for one secondary on its own).
-- **Log in with**: **Password (SCRAM)**, or **X.509 certificate**: the TLS tab's **Certificate** (one PEM file with
+- **Log in with**: **Password (SCRAM)**, **X.509 certificate**: the TLS tab's **Certificate** (one PEM file with
   the certificate and its key, as mongosh's `--tlsCertificateKeyFile` takes it) logs in as the user in `$external`
-  its subject names; the user is optional and no password is asked.
+  its subject names; the user is optional and no password is asked; or **AWS IAM** (below).
 - **Auth source**: the database the user is defined in; empty, `admin` (with a DNS seed list, what its DNS record says, `admin` on Atlas). **Database** only says which database opens. A pasted address without `authSource` keeps its own meaning: its database goes into Auth source.
 - **Options**: the address's other options as they follow its `?`, such as `readPreference=secondary&w=majority`,
   `appName` or `retryWrites`. With a `readPreference`, finds, aggregations, counts and distinct values go to the
@@ -56,6 +56,21 @@ tab's collection there.
 
 After a relaunch, collection tabs come back with their query bar and page, and pipeline tabs with their pipeline, as
 placeholders: nothing connects until you press **Connect and Open**.
+
+### AWS IAM
+
+**Log in with ▸ AWS IAM** logs in with an AWS access key (`MONGODB-AWS`), as MongoDB Atlas offers for IAM users and
+roles. **Access key ID** takes the key's ID, **Secret key** its secret, and **Session token** the token of temporary
+credentials (from STS), if any: the secret and the token go to your Keychain, never into AirSQL's files, the address or
+the logs, and a new secret key saved without a token forgets the old token. AirSQL uses only the key typed here: it
+never reads the Mac's AWS settings or asks AWS for credentials (an empty Access key ID is refused), and the login goes
+through the connection's route like any other. **Paste Address** understands `authMechanism=MONGODB-AWS` and takes a
+session token in `authMechanismProperties` for the Keychain; **Copy Address** gives the access key ID but never the
+secret or the token. **Open mongosh in Terminal** is off for these connections: mongosh takes the session token only on
+its command line, where other programs on the Mac can read it.
+
+AWS IAM login is tested only as far as the attempt: AirSQL's test servers (MongoDB Community) don't offer it, and say
+so in plain words (*The server doesn't offer this login method*). It hasn't been tried against Atlas.
 
 ## The query bar
 

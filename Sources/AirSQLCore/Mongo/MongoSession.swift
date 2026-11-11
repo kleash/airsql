@@ -92,6 +92,20 @@ public final class MongoSession: @unchecked Sendable {
         // The login goes into the string, which the driver checks authMechanism against as it reads it; the string
         // stays in memory (the driver's log is off), and `uri` and the command log keep none of it.
         var text = uri
+        if var aws = try? MongoURI(uri), aws.option("authMechanism")?.uppercased() == "MONGODB-AWS" {
+            // Only the keys given: the driver's own search (environment, ECS, EC2) would find none in an app started
+            // from the Finder, and would call AWS around the route.
+            guard connection.user?.isEmpty == false else {
+                throw AirSQLError(.other, "An AWS IAM login needs the access key ID: type it in User.")
+            }
+            guard connection.password?.isEmpty == false else {
+                throw AirSQLError(.authFailed, "An AWS IAM login needs the secret access key: type it in Password.")
+            }
+            if let token = connection.awsSessionToken, !token.isEmpty {
+                aws.setOption("authMechanismProperties", "AWS_SESSION_TOKEN:" + token)
+                text = aws.string
+            }
+        }
         if let user = connection.user, let scheme = text.range(of: "://") {
             let login = [user] + (connection.password.map { [$0] } ?? [])
             text.insert(contentsOf: login.map(MongoURI.encode).joined(separator: ":") + "@", at: scheme.upperBound)

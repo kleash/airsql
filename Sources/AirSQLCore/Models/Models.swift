@@ -139,6 +139,9 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
     public var mongoOptions = ""
     /// MongoDB: log in with the TLS tab's client certificate (MONGODB-X509) instead of a password.
     public var mongoX509 = false
+    /// MongoDB: log in with an AWS IAM key (MONGODB-AWS): `user` is the access key ID, the password its secret, and
+    /// a session token, if any, is in the Keychain under `awsSessionTokenKey`.
+    public var mongoAWS = false
 
     public init(id: UUID = UUID(), name: String = "", host: String = "", port: Int? = nil, user: String = "",
                 colour: ConnectionColour = .none, route: Route = .direct) {
@@ -203,6 +206,7 @@ public struct SavedConnection: Codable, Identifiable, Hashable {
         directConnection = try value(.directConnection, defaults.directConnection)
         mongoOptions = try value(.mongoOptions, defaults.mongoOptions)
         mongoX509 = try value(.mongoX509, defaults.mongoX509)
+        mongoAWS = try value(.mongoAWS, defaults.mongoAWS)
     }
 
     /// The name, else user@host:port (or the socket).

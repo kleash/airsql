@@ -124,8 +124,8 @@ extension Connector {
     /// member), for Connect and Test Connection: asks for the password when the server refuses the one it has, and pins
     /// a certificate the person trusts (saved with the connection), once per connect: a replica set's members each
     /// show their own, which a pin can't cover (the CA file can).
-    func logInMongo(_ saved: inout SavedConnection, password typed: String?, proxyPassword: String, askpass: AskpassServer?,
-                    on window: NSWindow?) async throws -> (MongoConnection, MongoServerInfo) {
+    func logInMongo(_ saved: inout SavedConnection, password typed: String?, sessionToken: String?, proxyPassword: String,
+                    askpass: AskpassServer?, on window: NSWindow?) async throws -> (MongoConnection, MongoServerInfo) {
         let route = MongoRoute(saved, proxyPassword: proxyPassword, askpass: askpass)
         let connection = MongoConnection(uri: saved.mongoURI.string, user: saved.user.isEmpty ? nil : saved.user,
                                          tls: saved.tls, route: route, name: saved.displayName)
@@ -140,6 +140,10 @@ extension Connector {
                 connection.password = try await databasePassword(&saved, on: window, retry: false)
             }
             connection.user = saved.user.isEmpty ? nil : saved.user
+            if saved.mongoAWS {
+                connection.awsSessionToken = sessionToken
+                if sessionToken == nil { connection.awsSessionToken = await secret(saved.awsSessionTokenKey) }
+            }
             while true {
                 do {
                     let server = try await withTaskCancellationHandler { try await connection.connect() } onCancel: { route.close() }

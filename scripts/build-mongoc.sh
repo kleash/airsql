@@ -8,8 +8,8 @@
 # Cached as scripts/build-mariadb.sh caches libmariadb: $AIRSQL_VENDOR_CACHE/mongoc-<SHA-256 of this script>, copied
 # into vendor/mongoc, whose stamp holds the SHA-256; build.sh and test.sh run this when the stamp isn't the current one.
 # CMake and OpenSSL are build-mariadb.sh's pins (checked below): the two libraries carry the same OpenSSL.
-# No SASL (Kerberos), Snappy, zstd, AWS login or client-side encryption; zlib is macOS's; mongodb+srv uses macOS's
-# resolver (libresolv).
+# No SASL (Kerberos), Snappy, zstd or client-side encryption; AWS IAM login (MONGODB-AWS) is in (AirSQL always puts the
+# keys in the connection string); zlib is macOS's; mongodb+srv uses macOS's resolver (libresolv).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -178,7 +178,7 @@ for arch in "${archs[@]}"; do
         -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DENABLE_PIC=ON \
         -DENABLE_SSL=OPENSSL -DOPENSSL_ROOT_DIR="$stage$prefix" -DOPENSSL_USE_STATIC_LIBS=ON \
         -DENABLE_SASL=OFF -DENABLE_SNAPPY=OFF -DENABLE_ZSTD=OFF -DENABLE_ZLIB=SYSTEM \
-        -DENABLE_CLIENT_SIDE_ENCRYPTION=OFF -DENABLE_MONGODB_AWS_AUTH=OFF -DENABLE_SRV=ON \
+        -DENABLE_CLIENT_SIDE_ENCRYPTION=OFF -DENABLE_MONGODB_AWS_AUTH=ON -DENABLE_SRV=ON \
         -DUSE_BUNDLED_UTF8PROC=ON -DENABLE_SHM_COUNTERS=OFF -DMONGO_USE_LLD=OFF \
         -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_UNINSTALL=OFF -DENABLE_MAN_PAGES=OFF -DENABLE_HTML_DOCS=OFF
     logged "mongoc-$arch-build" make -C "$work/build/mongoc-$arch" -j"$jobs"
