@@ -20,7 +20,7 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
-        + aggregationCommands + [editValue, removeField] + mongoIndexCommands
+        + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoHostCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -66,4 +66,21 @@ extension Commands {
                                    tip: "Hide the selected index from the query planner, or show it again; it stays up to date")
 
     static let mongoIndexCommands = [collectionIndexes, createIndex, dropIndex, hideIndex]
+}
+
+// MARK: Host (lane P2-host)
+
+extension Commands {
+    static let mongoServer = Command("Server", #selector(SidebarController.showMongoHost(_:)), tag: MongoHostContent.Pane.server.rawValue,
+                                     tip: MongoHostContent.Pane.server.tip)
+    static let mongoMembers = Command("Members", #selector(SidebarController.showMongoHost(_:)), tag: MongoHostContent.Pane.members.rawValue,
+                                      tip: MongoHostContent.Pane.members.tip)
+    static let mongoOperations = Command("Operations", #selector(SidebarController.showMongoHost(_:)), tag: MongoHostContent.Pane.operations.rawValue,
+                                         tip: MongoHostContent.Pane.operations.tip)
+    static let mongoDiskUsage = Command("Disk Usage", #selector(SidebarController.showMongoDiskUsage(_:)),
+                                        tip: "Show where the space went on the MongoDB server, or in the selected database")
+    static let killOperation = Command("Kill Operation…", #selector(MongoHostContent.killOperation(_:)),
+                                       tip: "Stop the selected operations on the server (asks first)")
+
+    static let mongoHostCommands = [mongoServer, mongoMembers, mongoOperations, mongoDiskUsage, killOperation]
 }

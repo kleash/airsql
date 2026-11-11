@@ -603,6 +603,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
                       Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
                       Commands.compareRows, Commands.diskUsage, Commands.users, nil])
+            if nodes.count == 1, let id = nodes[0].connectionID, model.openMongo[id] != nil { Self.addMongoHostItems(to: menu) }
             menu.addItem(ConnectionMenus.colourMenu())
             menu.addItem(ConnectionMenus.moveMenu())
             menu.add([Commands.moveConnectionUp, Commands.moveConnectionDown, Commands.databasesShown])

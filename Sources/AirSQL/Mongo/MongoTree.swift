@@ -144,7 +144,40 @@ extension SidebarController {
             return [Commands.openCollection, Commands.newAggregation, Commands.collectionSchema, Commands.collectionIndexes, Commands.copyName,
                     nil, Commands.createIndex, nil, Commands.refresh]
         }
-        return [Commands.copyName, nil, Commands.refresh]
+        return [Commands.copyName, nil, Commands.mongoDiskUsage, nil, Commands.refresh]
+    }
+
+    // MARK: Host (lane P2-host)
+
+    /// A MongoDB connection's right-click menu: its server's pages, in place of SQL's Disk Usage.
+    static func addMongoHostItems(to menu: NSMenu) {
+        guard let index = menu.items.firstIndex(where: { $0.action == Commands.diskUsage.action }) else { return }
+        menu.removeItem(at: index)
+        for (offset, command) in [Commands.mongoServer, Commands.mongoOperations, Commands.mongoDiskUsage].enumerated() {
+            menu.insertItem(command.item(), at: index + offset)
+        }
+    }
+
+    /// The connected MongoDB connection the server's commands act on: the tree's, else the selected connection's, else
+    /// the window's.
+    var mongoTarget: OpenMongoConnection? {
+        if let open = mongoSelection?.open { return open }
+        let ids = selectedConnectionIDs
+        if ids.count == 1 { return model.openMongo[ids[0]] }
+        return main?.activeConnection.flatMap { model.openMongo[$0.id] }
+    }
+
+    /// A pane of the MongoDB connection's host page, by the menu item's tag.
+    @objc func showMongoHost(_ sender: Any?) {
+        guard let open = mongoTarget else { return }
+        main?.showMongoHost(open, pane: MongoHostContent.Pane(rawValue: (sender as? NSMenuItem)?.tag ?? 0))
+    }
+
+    /// Disk Usage of the tree's database, else of the server.
+    @objc func showMongoDiskUsage(_ sender: Any?) {
+        guard let open = mongoTarget else { return }
+        let items = mongoSelection?.items ?? []
+        main?.showMongoDiskUsage(open, database: items.count == 1 ? items[0].database : nil)
     }
 
     /// Open Collection: each selected collection in its own tab; the preview of the same collection goes.
@@ -245,6 +278,8 @@ extension SidebarController {
             } else {
                 reason = "Select one index of a connected MongoDB server in the tree first"
             }
+        case Commands.mongoServer.action?, Commands.mongoDiskUsage.action?:
+            reason = mongoTarget == nil ? "Select or open a connected MongoDB server first" : nil
         case Commands.refresh.action? where mongo || selectedConnectionIDs.contains { model.openMongo[$0] != nil }:
             reason = nil
         case Commands.copyName.action? where mongo, Commands.copy.action? where mongo:
