@@ -358,6 +358,32 @@ changes before a failure stay, and the report says how many. A replace writes th
 fields included. A read-only connection, a view or a time-series target can't be reconciled; on a Production
 connection you type the collection's name first. Indexes and options aren't changed: the compare only shows them.
 
+## Users and roles
+
+Choose **Connection ▸ MongoDB Server ▸ Users and Roles** (or right-click the connection) to list the server's users
+and custom roles: each one's database (a user's auth source), the roles it holds on each database, and how a user logs
+in (SCRAM-SHA-1, SCRAM-SHA-256) or how many privileges a role has. Select one to see the server's description of it
+under the list. Passwords are never read: AirSQL never asks for `showCredentials`.
+
+Seeing every database's users takes `viewUser` everywhere (`userAdminAnyDatabase`, `root`). Without it, AirSQL asks
+each database in turn and adds your own login, which you may always see; the list says which databases it couldn't
+read. Custom roles are read database by database (`rolesInfo`, which needs `viewRole`). A database that holds no
+collections isn't listed by the server, so its users and roles show only with `viewUser` everywhere.
+
+- **New User…**: the database it is defined in (admin by default), its name, its password typed twice, and a role to
+  start with on a database (empty: the user's own).
+- **Change Password…**: the selected user's new password, typed twice.
+- **Grant Role…** (or double-click a user): a built-in role (`read`, `readWrite`, `dbOwner`, `readAnyDatabase`,
+  `root`…) or a custom one, on a database.
+- **Revoke Role…**: one of the roles the user holds.
+- **Drop User…** or **Drop Role…**: asks you to type its name first. Custom roles are listed read-only: make or change
+  one in mongosh.
+
+Each shows its exact command first and runs only when you press its button; the password shows as `<secret>` there,
+as it does in the Command Log. When the connection has neither TLS nor an SSH route, the preview warns that the
+password travels to the server as typed. A read-only or Production connection can't change users, and agents never
+can. MongoDB Atlas manages its users in its own web console (Database Access); AirSQL says so when Atlas refuses.
+
 ## Agents
 
 With agent access set to **Schema + read** or more, AI agents can find, aggregate, count and sample a MongoDB

@@ -633,7 +633,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
         if ([Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action, Commands.sqlGenerator.action,
              Commands.hostDatabases.action, Commands.users.action, Commands.modifyGrants.action, Commands.mongoServer.action,
-             Commands.mongoDiskUsage.action] + Commands.treeActions).contains(action) { return sidebar }
+             Commands.mongoDiskUsage.action, Commands.mongoUsers.action] + Commands.treeActions).contains(action) { return sidebar }
         // Disk Usage from the sidebar's focus goes there; a Disk Usage tab with the focus takes it first, to go into a row.
         if action == Commands.diskUsage.action, !(selectedTab?.shown is DiskUsageContent), !(selectedTab?.shown is HostContent) {
             return sidebar

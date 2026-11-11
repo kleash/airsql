@@ -20,7 +20,7 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
-        + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands
+        + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands + mongoUsersCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -148,4 +148,23 @@ extension Commands {
                                              tip: "Make the target's documents match the source's; the commands show before they run")
 
     static let mongoCompareCommands = [compareCollection, reconcileCollection]
+}
+
+// MARK: Users and roles (lane P4-users)
+
+extension Commands {
+    static let mongoUsers = Command("Users and Roles", #selector(SidebarController.showMongoUsers(_:)),
+                                    tip: "Show the MongoDB server's users and custom roles, with the roles each holds")
+    static let newMongoUser = Command("New User…", #selector(MongoUsersContent.newMongoUser(_:)),
+                                      tip: "Make a user with a password and a role to start with (shows the command first)")
+    static let changeMongoPassword = Command("Change Password…", #selector(MongoUsersContent.changeMongoPassword(_:)),
+                                             tip: "Give the selected user a new password (shows the command first)")
+    static let grantMongoRole = Command("Grant Role…", #selector(MongoUsersContent.grantMongoRole(_:)),
+                                        tip: "Give the selected user a built-in or custom role on a database (shows the command first)")
+    static let revokeMongoRole = Command("Revoke Role…", #selector(MongoUsersContent.revokeMongoRole(_:)),
+                                         tip: "Take one of its roles away from the selected user (shows the command first)")
+    static let dropMongoAccount = Command("Drop User…", #selector(MongoUsersContent.dropMongoAccount(_:)),
+                                          tip: "Delete the selected user or custom role; its name is typed to confirm")
+
+    static let mongoUsersCommands = [mongoUsers, newMongoUser, changeMongoPassword, grantMongoRole, revokeMongoRole, dropMongoAccount]
 }
