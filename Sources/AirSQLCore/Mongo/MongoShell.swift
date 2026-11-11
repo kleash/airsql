@@ -19,8 +19,9 @@ public enum MongoShell {
     }
 
     /// mongosh's arguments: the connection string (the route's socket, or the saved servers for Direct) with TLS's
-    /// options, then `--username` alone. `nameUnchecked`: over a route, TLS can't check the server's name, as mongosh
-    /// only sees the socket.
+    /// options (and the client certificate's file), then `--username` alone; for X.509 no user, as the certificate logs
+    /// in and nothing is asked. `nameUnchecked`: over a route, TLS can't check the server's name, as mongosh only sees
+    /// the socket.
     public static func arguments(_ saved: SavedConnection, mongosh: String, socket: String?) -> (argv: [String], nameUnchecked: Bool) {
         var uri = saved.mongoURI
         uri.setOption("connectTimeoutMS", nil)
@@ -34,11 +35,12 @@ public enum MongoShell {
         }
         if tls {
             if let ca = saved.tls.caFile, !ca.isEmpty { uri.setOption("tlsCAFile", ca) }
+            if let pem = saved.tls.certFile, !pem.isEmpty { uri.setOption("tlsCertificateKeyFile", pem) }
             if saved.tls.mode == .required { uri.setOption("tlsAllowInvalidCertificates", "true") }
             if saved.tls.mode == .verifyCA || socket != nil { uri.setOption("tlsAllowInvalidHostnames", "true") }
         }
         var argv = [mongosh, uri.string]
-        if !saved.user.isEmpty { argv += ["--username", saved.user] }
+        if !saved.user.isEmpty, !saved.mongoX509 { argv += ["--username", saved.user] }
         return (argv, tls && socket != nil)
     }
 

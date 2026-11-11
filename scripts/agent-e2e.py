@@ -2,16 +2,19 @@
 """Tier B of mongo-plan Phase 3's end-to-end test (scripts/agent-e2e.sh runs it): MCP calls through `AirSQL --mcp` to
 the throwaway app, Claude Code headless asking each shop question, and the answers compared with shop-answers.json.
 
-  agent-e2e.py connect                    connect the app's saved connection "Shop lab" as the person would
+  agent-e2e.py connect                    connect the target's saved connection as the person would
   agent-e2e.py run                        ask every question; transcripts and summary.txt in $E2E_OUT; exit 1 on fail
   agent-e2e.py selftest                   check the comparison itself
 Environment (set by agent-e2e.sh): AIRSQL_BIN, AIRSQL_SUPPORT_DIR, E2E_OUT, E2E_MODEL, E2E_ROOT (the checkout),
-E2E_CWD (where claude runs: outside the checkout, with --setting-sources project, so no project files, hooks or plugins).
+E2E_CWD (where claude runs: outside the checkout, with --setting-sources project, so no project files, hooks or plugins),
+E2E_TARGET (solo: "Shop lab", the standalone; rs: "Shop lab RS", the replica set through the lab's SOCKS proxy).
 """
 import json, os, re, subprocess, sys, time
 
-CONNECTION = "Shop lab"
+TARGET = os.environ.get("E2E_TARGET", "solo")
+CONNECTION = {"solo": "Shop lab", "rs": "Shop lab RS"}[TARGET]
 PASSWORD = "airsql-pass"  # the Mongo lab's throwaway login (testenv/AGENT.md), typed into the app's prompt
+PROXY_PASSWORD = "airsql-proxy"  # the lab proxies' throwaway login, the same
 ORDERS = 1500
 PROJECTION = '{"_id": 0, "orderId": {"$toString": "$_id"}, "status": 1, "total": 1}'
 
@@ -78,7 +81,8 @@ def kept(want):
 
 
 def connect():
-    """Connects "Shop lab" through the UI tools, as the person would: select it, Connection > Connect, the password."""
+    """Connects CONNECTION through the UI tools, as the person would: select it, Connection > Connect, the proxy's
+    password (rs), the database password."""
     deadline = time.time() + 60
     while True:
         try:
@@ -88,9 +92,11 @@ def connect():
             if time.time() > deadline:
                 raise
             time.sleep(1)
-    for tool, args in [("select", {"pane": "sidebar", "names": [CONNECTION]}), ("menu", {"path": "Connection > Connect"}),
-                       ("wait", {"until": "sheet", "timeout": 30}), ("set", {"id": "password", "value": PASSWORD}),
-                       ("press", {"title": "Connect"}), ("wait", {"until": "no_sheet", "timeout": 30})]:
+    proxy = [("wait", {"until": "sheet", "text": "proxy", "timeout": 30}),
+             ("set", {"id": "prompt.answer", "value": PROXY_PASSWORD}), ("press", {"title": "OK"})] if TARGET == "rs" else []
+    for tool, args in [("select", {"pane": "sidebar", "names": [CONNECTION]}), ("menu", {"path": "Connection > Connect"})] + proxy + [
+            ("wait", {"until": "sheet", "text": "database user", "timeout": 30}), ("set", {"id": "password", "value": PASSWORD}),
+            ("press", {"title": "Connect"}), ("wait", {"until": "no_sheet", "timeout": 30})]:
         mcp(tool, args)
     deadline = time.time() + 60
     while True:
@@ -170,7 +176,7 @@ def ask(name, prompt):
     command = ["claude", "-p", prompt, "--mcp-config", os.path.join(os.environ["E2E_OUT"], "mcp.json"),
                "--strict-mcp-config", "--tools", "", "--allowedTools", "mcp__airsql__*", "--output-format", "stream-json",
                "--verbose", "--max-turns", "12", "--setting-sources", "project", "--model", os.environ["E2E_MODEL"], "--no-session-persistence"]
-    path = os.path.join(os.environ["E2E_OUT"], name + ".jsonl")
+    path = os.path.join(os.environ["E2E_OUT"], f"{TARGET}-{name}.jsonl")
     with open(path, "w") as transcript:
         subprocess.run(command, stdout=transcript, stderr=subprocess.STDOUT, cwd=os.environ["E2E_CWD"], timeout=600)
     final, errors, cost = "", 0, 0.0
@@ -254,11 +260,11 @@ def run():
             lambda final: kept(canary))
 
     verdict = passed >= 9 and all(r[1] != "FAIL" for r in rows if not re.match(r"q(0[1-9]|10)_", r[0]))
-    lines = [f"model {os.environ['E2E_MODEL']}; data answers {passed}/{len(data)} (pass at 9); cost ${total:.2f}",
+    lines = [f"target {TARGET} ({CONNECTION}); model {os.environ['E2E_MODEL']}; data answers {passed}/{len(data)} (pass at 9); cost ${total:.2f}",
              f"{'question':42} {'result':6} {'tries':5} {'tool errors':11} note"]
     lines += [f"{k:42} {r:6} {t:<5} {e:<11} {n}" for k, r, t, e, n in rows]
     lines.append("PASS" if verdict else "FAIL")
-    open(os.path.join(out, "summary.txt"), "w").write("\n".join(lines) + "\n")
+    open(os.path.join(out, "summary.txt"), "a").write("\n".join(lines) + "\n\n")
     print("\n".join(lines))
     return 0 if verdict else 1
 

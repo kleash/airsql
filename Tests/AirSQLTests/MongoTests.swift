@@ -555,6 +555,54 @@ struct MongoLabTests {
         #expect(session.route.requested == ["localhost.test.build.10gen.cc:27017"], "\(session.route.requested)")
         await session.close()
     }
+
+    /// The real mongosh with `MongoShell.arguments`: Direct to the standalone, and over SSH to the replica set's primary
+    /// through its socket in each TLS mode; then Terminal's script, which removes itself and becomes mongosh. Only here
+    /// does the password go on the command line (mongosh asks for it in Terminal).
+    @Test(.enabled(if: MongoShell.find() != nil, "mongosh isn't installed")) func mongoshConnectsOnEachRoute() async throws {
+        let mongosh = try #require(MongoShell.find())
+        // mongosh keeps its history and logs in $HOME/.mongodb: a throwaway home.
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("airsql-mongosh-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let test = ["--password", MongoLab.airsql.password, "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+        func ping(_ saved: SavedConnection, socket: String?) async -> (output: String, argv: [String]) {
+            let argv = MongoShell.arguments(saved, mongosh: mongosh, socket: socket).argv + test
+            let result = await Runner.run(argv, environment: ["HOME": home.path], timeout: 30)
+            let output = String(decoding: result.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (result.status == 0 ? output : "status \(result.status): \(output) \(result.stderr)", argv)
+        }
+
+        var solo = SavedConnection(name: "Mongo solo", host: "127.0.0.1", port: MongoLab.soloPort, user: MongoLab.airsql.user)
+        solo.engine = .mongodb
+        solo.tls.mode = .off
+        let direct = await ping(solo, socket: nil)
+        #expect(direct.output == "1", "\(direct.output)")
+
+        var set = saved(.ssh)
+        set.engine = .mongodb
+        set.replicaSet = "rs0"
+        set.tls = MongoLab.tls
+        let route = MongoRoute(set, askpass: try RouteTesting.askpass(for: set.id))
+        let session = MongoConnection(uri: set.mongoURI.string, user: MongoLab.airsql.user, password: MongoLab.airsql.password,
+                                      tls: set.tls, route: route, name: set.name)
+        let primary = try await session.connect().primary
+        let socket = try #require(try MongoShell.socket(route, saved: set, primary: primary))
+        for mode in [TLSOptions.Mode.verifyIdentity, .verifyCA, .required] {
+            set.tls.mode = mode
+            let (output, argv) = await ping(set, socket: socket)
+            #expect(output == "1", "\(mode): \(output) \(argv[1])")
+        }
+
+        // Terminal's script, run as Terminal would: it removes itself, says its notes and execs mongosh.
+        let file = home.appendingPathComponent("Mongo lab mongosh.command")
+        let argv = MongoShell.arguments(set, mongosh: mongosh, socket: socket).argv + test
+        try MongoShell.script(argv, notes: ["a note"]).write(to: file, atomically: true, encoding: .utf8)
+        let ran = await Runner.run(["/bin/sh", file.path], environment: ["HOME": home.path], timeout: 30)
+        #expect(String(decoding: ran.stdout, as: UTF8.self) == "AirSQL: a note\n1\n", "\(ran.status) \(ran.stderr)")
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        await session.close()
+    }
 }
 
 // MARK: The app

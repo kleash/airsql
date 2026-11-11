@@ -235,7 +235,17 @@ struct MongoX509Tests {
         var failure: Error?
         do {
             let x509 = connection(user: nil, password: nil, tls: saved.tls)
-            try await x509.connect()
+            let server = try await x509.connect()
+            // mongosh too, with `MongoShell.arguments` through the primary's socket: logged in by the certificate alone.
+            if let mongosh = MongoShell.find() {
+                let home = TestEnvironment.root + "/mongosh-\(UUID().uuidString)"
+                defer { try? FileManager.default.removeItem(atPath: home) }
+                let socket = try MongoShell.socket(x509.route, saved: saved, primary: server.primary)
+                let user = "db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0].user"
+                let argv = MongoShell.arguments(saved, mongosh: mongosh, socket: socket).argv + ["--quiet", "--eval", user]
+                let ran = await Runner.run(argv, environment: ["HOME": home], timeout: 30)
+                #expect(String(decoding: ran.stdout, as: UTF8.self) == subject + "\n", "\(ran.status) \(ran.stderr)")
+            }
             let status = try await x509.session(.main).command(BSONDocument([("connectionStatus", .int32(1))]), database: "admin")
             let users: BSONValue? = if case .document(let auth)? = status["authInfo"] { auth["authenticatedUsers"] } else { nil }
             #expect(users == .array([.document(BSONDocument([("user", .string(subject)), ("db", .string("$external"))]))]), "\(status)")
