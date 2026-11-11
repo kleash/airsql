@@ -79,7 +79,7 @@ private func labConnection(replicaSet: Bool) -> MongoConnection {
 }
 
 /// Reads `stream` until `count` events came (or `timeout`): them, decoded.
-private func read(_ stream: MongoChangeStream, _ count: Int, timeout: TimeInterval = 30) async throws -> [BSONDocument] {
+func readChanges(_ stream: MongoChangeStream, _ count: Int, timeout: TimeInterval = 30) async throws -> [BSONDocument] {
     var found: [BSONDocument] = []
     let started = Date()
     while found.count < count && Date().timeIntervalSince(started) < timeout {
@@ -105,19 +105,19 @@ struct MongoWatchLabTests {
         try await writer.insertOne(database: watchScratch, collection: "events", doc(["_id": .int32(1), "n": .int32(1)]))
         _ = try await writer.updateOne(database: watchScratch, collection: "events", filter: doc(["_id": .int32(1)]),
                                        update: doc(["$set": .document(doc(["n": .int32(2)]))]))
-        let first = try await read(stream, 2)
+        let first = try await readChanges(stream, 2)
         #expect(first.map { $0["operationType"] } == [.string("insert"), .string("update")], "\(first)")
         // Look Up Full Document: the update's whole document as it is now.
         #expect(first.last?["fullDocument"] == .document(doc(["_id": .int32(1), "n": .int32(2)])))
         try #require(try await writer.deleteOne(database: watchScratch, collection: "events", filter: doc(["_id": .int32(1)])) == 1)
-        #expect(try await read(stream, 1).first?["operationType"] == .string("delete"))
+        #expect(try await readChanges(stream, 1).first?["operationType"] == .string("delete"))
 
         // Stopped: what is written meanwhile comes first once it starts again from the token.
         let token = try #require(stream.token)
         await stream.close()
         try await writer.insertOne(database: watchScratch, collection: "events", doc(["_id": .int32(2)]))
         let again = try await watcher.watch(database: watchScratch, collection: "events", pipeline: [], lookUp: false, resumeAfter: token)
-        let missed = try await read(again, 1)
+        let missed = try await readChanges(again, 1)
         #expect(missed.first?["operationType"] == .string("insert") && missed.first?["documentKey"] == .document(doc(["_id": .int32(2)])))
         await again.close()
 
@@ -127,7 +127,7 @@ struct MongoWatchLabTests {
                                               resumeAfter: nil)
         try await writer.insertOne(database: watchScratch, collection: "other", doc(["_id": .int32(3)]))
         _ = try await writer.deleteOne(database: watchScratch, collection: "other", filter: doc(["_id": .int32(3)]))
-        let filtered = try await read(deletes, 1)
+        let filtered = try await readChanges(deletes, 1)
         guard case .document(let ns)? = filtered.first?["ns"] else { Issue.record("\(filtered)"); return }
         #expect(filtered.first?["operationType"] == .string("delete") && ns["coll"] == .string("other"))
 
@@ -135,43 +135,6 @@ struct MongoWatchLabTests {
         _ = try await writer.command(doc(["dropDatabase": .int32(1)]), database: watchScratch)
         await connection.close()
         await #expect(throws: AirSQLError.self) { _ = try await deletes.next() }
-    }
-
-    /// The primary steps down: the driver resumes the stream on the new one from its token (read-only), and the event
-    /// written there arrives. rs1 (priority 2) takes the primary back afterwards; the test waits for that.
-    @Test func aStepDownIsFollowed() async throws {
-        let connection = labConnection(replicaSet: true)
-        let before = try #require(try await connection.connect().primary)
-        let writer = try await connection.session(.data)
-        let watcher = try await connection.session(.data, slot: "watch")
-        let stream = try await watcher.watch(database: watchScratch, collection: "failover", pipeline: [], lookUp: false, resumeAfter: nil)
-        try await writer.insertOne(database: watchScratch, collection: "failover", doc(["at": .string("before")]))
-        #expect(try await read(stream, 1).count == 1)
-        _ = try? await connection.session(.main).command(doc(["replSetStepDown": .int32(10), "secondaryCatchUpPeriodSecs": .int32(5)]),
-                                                         database: "admin")
-        let started = Date()
-        while true {
-            do {
-                try await writer.insertOne(database: watchScratch, collection: "failover", doc(["at": .string("after")]))
-                break
-            } catch {
-                guard Date().timeIntervalSince(started) < 60 else { throw error }
-                try await Task.sleep(nanoseconds: 500_000_000)
-            }
-        }
-        let after = try await read(stream, 1, timeout: 60)
-        guard case .document(let written)? = after.first?["fullDocument"] else { Issue.record("\(after)"); return }
-        #expect(written["at"] == .string("after"))
-        await stream.close()
-
-        // The set as it was: rs1 primary again, every member up.
-        let back = await eventually(timeout: 120) {
-            let hello = try? await connection.session(.main).command(doc(["hello": .int32(1)]), database: "admin")
-            return hello?["primary"] == .string(before) && hello?["isWritablePrimary"] != nil
-        }
-        #expect(back, "the primary didn't come back to \(before)")
-        _ = try? await writer.command(doc(["dropDatabase": .int32(1)]), database: watchScratch)
-        await connection.close()
     }
 
     @Test func aStandaloneHasNoChangeStreams() async throws {

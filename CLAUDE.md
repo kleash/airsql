@@ -81,6 +81,7 @@ AIRSQL_LAB=1 ./test.sh   # + the lab suites, on the lab as it runs; when some of
                          # in the main checkout only: worktrees share that lab and its key and CA (testenv/AGENT.md).
                          # About 30 minutes. Every lab service must be up: suites loop over all nine servers
 AIRSQL_MONGO_LAB=1 ./test.sh --filter Mongo            # the MongoDB lab (testenv/mongo/up.sh; testenv/AGENT.md)
+AIRSQL_MONGO_LAB=1 AIRSQL_MONGO_FAILOVER=1 ./test.sh --filter failoverIsFollowed   # alone: steps the primary down
 AIRSQL_SCREENSHOTS=1 ./test.sh --filter ScreenshotTests   # light and dark pictures of each screen, in build/screenshots
 AIRSQL_SCREENSHOTS=1 ./test.sh --filter GridScreenshotTests   # the grid's light and dark pictures, in build/screenshots
 AIRSQL_GRID_FPS=1 ./test.sh -c release -Xswiftc -enable-testing --filter GridFrameRateTests

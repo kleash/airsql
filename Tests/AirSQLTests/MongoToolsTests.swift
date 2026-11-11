@@ -261,6 +261,8 @@ extension AppTests {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("airsql-dump-ui-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
+        // The menu acts on the window in front: this test's, not one an earlier test left ordered in.
+        main.window?.orderFront(nil)
         menu.dumpMongo(nil)
         #expect(await eventually(timeout: 10) { ToolSheet.open.contains { $0 is MongoDumpSheet } })
         let dump = try #require(ToolSheet.open.last as? MongoDumpSheet)
@@ -276,6 +278,8 @@ extension AppTests {
         #expect(FileManager.default.fileExists(atPath: file.path))
         dump.close()
 
+        main.window?.orderFront(nil)
+        main.window?.makeFirstResponder(main.sidebar.outline)
         menu.restoreMongo(nil)
         #expect(await eventually(timeout: 10) { ToolSheet.open.contains { $0 is MongoDumpSheet } })
         let restore = try #require(ToolSheet.open.last as? MongoDumpSheet)

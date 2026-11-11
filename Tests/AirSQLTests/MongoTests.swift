@@ -523,12 +523,18 @@ struct MongoLabTests {
         #expect(log.contains("-- connected: MongoDB 7.0") && !log.contains(MongoLab.airsql.password))
     }
 
-    /// The primary steps down; the same session writes to the new one (retryable writes), no reconnect by hand.
-    @Test func failoverIsFollowed() async throws {
+    /// The primary steps down; the same session writes to the new one (retryable writes), no reconnect by hand, and a
+    /// change stream opened before resumes there from its token (Watch Changes). Every other replica-set test would see
+    /// the step-down, so it runs only on its own: AIRSQL_MONGO_FAILOVER=1 ./test.sh --filter failoverIsFollowed. It
+    /// waits for rs1 (priority 2) to be primary again.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["AIRSQL_MONGO_FAILOVER"] == "1", "Steps the primary down: run it alone"))
+    func failoverIsFollowed() async throws {
         let connection = try connection(MongoLab.allSeeds, route: .proxy)
         let before = try #require(try await connection.connect().primary)
         let data = try await connection.session(.data)
         try await data.insertOne(database: MongoLab.scratch, collection: "failover", document(["at": .string("before")]))
+        let stream = try await connection.session(.data, slot: "watch")
+            .watch(database: MongoLab.scratch, collection: "failover", pipeline: [], lookUp: false, resumeAfter: nil)
         _ = try? await connection.session(.main).command(document(["replSetStepDown": .int32(30), "secondaryCatchUpPeriodSecs": .int32(5)]),
                                                          database: "admin")
         let started = Date()
@@ -543,7 +549,13 @@ struct MongoLabTests {
         }
         guard case .string(let after)? = try await hello(connection)["primary"] else { Issue.record("no primary"); return }
         #expect(after != before)
+        let changes = try await readChanges(stream, 1, timeout: 60)
+        guard case .document(let written)? = changes.first?["fullDocument"] else { Issue.record("\(changes)"); return }
+        #expect(written["at"] == .string("after"))
+        await stream.close()
         _ = try await data.command(document(["dropDatabase": .int32(1)]), database: MongoLab.scratch)
+        let back = await eventually(timeout: 120) { (try? await self.hello(connection))?["primary"] == .string(before) }
+        #expect(back, "the primary didn't come back to \(before)")
         await connection.close()
     }
 

@@ -102,7 +102,8 @@ final class MongoWatchController: NSViewController, TabContent, DataGridViewDele
         guard let connection, let open = model.openMongo[connectionID] else {
             return fail("Connect to the server again to watch its changes.")
         }
-        if let reason = open.watchRefusal(database, collection == nil ? nil : open.collections[database]?.first { $0.name == collection }?.kind) {
+        let kind = collection.flatMap { name in open.collections[database]?.first { $0.name == name }?.kind }
+        if let reason = open.watchRefusal(database, collection == nil ? nil : kind) {
             return fail(reason)
         }
         let pipeline: [BSONDocument]
