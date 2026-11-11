@@ -2,8 +2,8 @@ import AirSQLCore
 import Foundation
 
 /// What Import Documents… reads and writes (mongo-plan, Import): the Extended JSON documents of a file (JSON Lines,
-/// documents one after another, or one array), read a document at a time and inserted in batches of at most 1,000
-/// documents and 8 MB, so a file of any size takes little memory.
+/// documents one after another, or one array), or a CSV file's rows (`MongoCSVReader`), read a document at a time and
+/// inserted in batches of at most 1,000 documents and 8 MB, so a file of any size takes little memory.
 enum MongoImport {
     static let batchCount = 1000
     static let batchBytes = 8 << 20
@@ -28,24 +28,46 @@ enum MongoImport {
         }
     }
 
-    /// A file's documents one at a time, with where each is ("Line 4", "Document 4"). `skipBad`: JSON Lines read a line
-    /// at a time, a line that can't be read noted in the report and skipped; else `ExtendedJSONReader`, which reads any
-    /// layout and throws at a document it can't read.
+    /// A file of .csv, read by `MongoCSVReader`; any other is Extended JSON.
+    static func isCSV(_ url: URL) -> Bool { url.pathExtension.lowercased() == "csv" }
+
+    /// A file's documents one at a time, with where each is ("Line 4", "Document 4", "Row 4"). `skipBad`: JSON Lines
+    /// read a line at a time, a line that can't be read noted in the report and skipped; else `ExtendedJSONReader`,
+    /// which reads any layout and throws at a document it can't read. A CSV file's rows are read with `types`, its
+    /// columns' types by name; a bad row is skipped and noted, or (without `skipBad`) throws.
     struct Source {
         private let handle: FileHandle
         private var reader: ExtendedJSONReader?
         private var lines: LineReader?
+        let csv: MongoCSVReader?
+        private let skipBad: Bool
         private var count = 0
 
-        init(_ url: URL, skipBad: Bool) throws {
+        init(_ url: URL, skipBad: Bool, types: [String: MongoCSVType] = [:]) throws {
             handle = try FileHandle(forReadingFrom: url)
+            self.skipBad = skipBad
+            csv = MongoImport.isCSV(url) ? try MongoCSVReader(url) : nil
+            csv?.types = types
+            if csv != nil { return }
             if skipBad { lines = LineReader(handle) } else { reader = ExtendedJSONReader(handle) }
         }
 
         /// How far into the file the reading is.
-        var offset: UInt64 { (try? handle.offset()) ?? 0 }
+        var offset: UInt64 { csv.map { UInt64($0.bytes) } ?? (try? handle.offset()) ?? 0 }
 
         mutating func next(_ report: inout Report) throws -> (BSONDocument, String)? {
+            if let csv {
+                while true {
+                    do {
+                        return try csv.next().map { ($0.0, "Row \($0.1)") }
+                    } catch let error as MongoCSVReader.RowError where skipBad {
+                        report.skipped += 1
+                        report.note(error.message)
+                    } catch let error as MongoCSVReader.RowError {
+                        throw BSONError(error.message)
+                    }
+                }
+            }
             if reader != nil {
                 guard let document = try reader?.next() else { return nil }
                 count += 1
@@ -112,18 +134,21 @@ enum MongoImport {
 
     /// The sheet's look at a file: its first documents, the problems in reading them, and about how many documents it
     /// holds (its size over the first documents' average).
-    static func preview(_ url: URL, skipBad: Bool, count: Int = 5) -> (documents: [BSONDocument], problems: [String], estimate: Int) {
+    static func preview(_ url: URL, skipBad: Bool, types: [String: MongoCSVType] = [:],
+                        count: Int = 5) -> (documents: [BSONDocument], problems: [String], estimate: Int) {
         var report = Report()
         var documents: [BSONDocument] = []
+        var rows: Int?
         do {
-            var source = try Source(url, skipBad: skipBad)
+            var source = try Source(url, skipBad: skipBad, types: types)
             while documents.count < count, let (document, _) = try source.next(&report) { documents.append(document) }
+            rows = source.csv?.estimate
         } catch {
             report.note(message(error))
         }
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         let average = documents.isEmpty ? 0 : documents.map { $0.extendedJSON().utf8.count + 1 }.reduce(0, +) / documents.count
-        let estimate = documents.count < count ? documents.count : size / max(1, average)
+        let estimate = documents.count < count ? documents.count : rows ?? size / max(1, average)
         return (documents, report.problems, estimate)
     }
 
@@ -131,13 +156,14 @@ enum MongoImport {
     /// lines that can't be read and documents the server refuses are skipped and counted; else the import stops at the
     /// first of either, the documents before it inserted. `stop` ends it between batches, so the count stays exact.
     /// `progress` gets the documents inserted and how far into the file it is.
-    static func run(_ session: MongoSession, database: String, collection: String, file: URL, skipBad: Bool, stop: StopFlag,
+    static func run(_ session: MongoSession, database: String, collection: String, file: URL, skipBad: Bool,
+                    types: [String: MongoCSVType] = [:], stop: StopFlag,
                     progress: @escaping @Sendable (Int, Double) -> Void) async -> Report {
         var report = Report()
         let size = Double((try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
         var batch: [BSONDocument] = [], places: [String] = [], bytes = 0
         do {
-            var source = try Source(file, skipBad: skipBad)
+            var source = try Source(file, skipBad: skipBad, types: types)
             /// Sends the batch; false when the import stops there.
             func send() async throws -> Bool {
                 guard !batch.isEmpty else { return true }

@@ -1,8 +1,9 @@
 import AirSQLCore
 import AppKit
 
-/// Import Documents…: an Extended JSON file (JSON Lines, documents one after another, or one array) into a collection,
-/// an existing one or a new name. The sheet shows the first documents, about how many the file holds and exactly what
+/// Import Documents…: an Extended JSON file (JSON Lines, documents one after another, or one array) or a CSV file (its
+/// header row naming the fields, each column's type auto or chosen under Types) into a collection, an existing one or a
+/// new name. The sheet shows the first documents, about how many the file holds and exactly what
 /// Import will write; nothing is written before Import. The documents are inserted off the main thread in batches with
 /// the activity's progress and Cancel, and a summary says how many went in, were refused or skipped, and why.
 @MainActor
@@ -10,12 +11,21 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
     private let ref: MongoCollectionRef
     private let activity: ActivityCenter
     private let fileLabel = label("No file chosen", font: .systemFont(ofSize: 12.5), color: .secondaryLabelColor, truncates: true)
-    private let choose = button("Choose…", id: "mongoImport.choose", tip: "Choose a file of Extended JSON documents", target: nil, action: nil)
+    private let choose = button("Choose…", id: "mongoImport.choose", tip: "Choose a file of Extended JSON documents, or a CSV file",
+                                target: nil, action: nil)
     private let collection = NSComboBox()
     private let errors = popup(["Stop at the first error", "Skip lines that can't be read and refused documents"], selected: 0,
                                id: "mongoImport.errors",
                                tip: "Choose whether a bad line or a refused document stops the import, or is skipped and listed",
                                target: nil, action: nil)
+    /// A CSV file's columns, and the type each is read as (auto when not chosen).
+    let column = popup([], selected: 0, id: "mongoImport.column", tip: "Choose a column of the CSV file to set the type its cells are read as",
+                       target: nil, action: nil)
+    let columnType = popup(["auto: by each cell's shape"] + MongoCSVType.allCases.dropFirst().map(\.rawValue), selected: 0,
+                           id: "mongoImport.type", tip: "Read the column's cells as this type; auto takes numbers, true and false, "
+                               + "null, dates and ObjectIds by their shape, the rest as strings", target: nil, action: nil)
+    private var typesRow: NSGridRow!
+    private var types: [String: MongoCSVType] = [:]
     let preview = label("", font: .monospacedSystemFont(ofSize: 11, weight: .regular), color: .secondaryLabelColor, truncates: false)
     let statement = label("", font: .systemFont(ofSize: 12.5), wraps: true)
     private var importButton: NSButton!
@@ -49,6 +59,10 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
         choose.action = #selector(chooseFile(_:))
         errors.target = self
         errors.action = #selector(errorsChanged(_:))
+        column.target = self
+        column.action = #selector(columnChosen(_:))
+        columnType.target = self
+        columnType.action = #selector(typeChosen(_:))
         collection.addItems(withObjectValues: collections.map(\.name))
         collection.stringValue = ref.collection
         collection.placeholderString = "Name of a new collection"
@@ -77,6 +91,8 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
         form.row("File", [fileLabel, choose])
         form.row("Collection", [collection])
         form.row("Errors", [errors])
+        typesRow = form.row("Types", [column, columnType])
+        typesRow.isHidden = true
         let cancel = button("Cancel", id: "mongoImport.cancel", tip: "Close without importing", target: self, action: #selector(cancel(_:)))
         cancel.keyEquivalent = "\u{1b}"
         importButton = button("Import", id: "mongoImport.run", tip: "Insert the file's documents into the collection", target: self,
@@ -87,7 +103,7 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
         preview.setAccessibilityIdentifier("mongoImport.preview")
         preview.lineBreakMode = .byClipping
         preview.maximumNumberOfLines = Self.previewDocuments + 4
-        preview.toolTip = "The file's first documents, as they'll be read"
+        preview.toolTip = "The file's first documents, as they'll be inserted"
         preview.widthAnchor.constraint(equalToConstant: 520).isActive = true
         preview.heightAnchor.constraint(equalToConstant: 110).isActive = true
         statement.setAccessibilityIdentifier("mongoImport.statement")
@@ -108,7 +124,8 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
     @objc private func chooseFile(_ sender: Any?) {
         guard let window else { return }
         let panel = NSOpenPanel()
-        panel.message = "Choose a file of Extended JSON documents: JSON Lines, documents one after another, or one array"
+        panel.message = "Choose a file of Extended JSON documents (JSON Lines, documents one after another, or one array), or a "
+            + "CSV file whose first row names the fields"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.look(at: url)
@@ -117,20 +134,46 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
 
     /// Reads the first documents of `url` (again, when the way errors are taken changes), off the main thread.
     func look(at url: URL) {
+        if url != file { types = [:] }
         file = url
         fileLabel.stringValue = url.path
         fileLabel.textColor = .labelColor
         looked = nil
         looking?.cancel()
         update()
-        let skipBad = self.skipBad
+        let (skipBad, types) = (self.skipBad, self.types)
         looking = Task { [weak self] in
             let count = Self.previewDocuments
-            let found = await Task.detached { MongoImport.preview(url, skipBad: skipBad, count: count) }.value
+            let (found, names) = await Task.detached {
+                (MongoImport.preview(url, skipBad: skipBad, types: types, count: count),
+                 MongoImport.isCSV(url) ? (try? MongoCSVReader(url))?.names ?? [] : [])
+            }.value
             guard !Task.isCancelled, let self else { return }
             looked = found
+            showColumns(names)
             update()
         }
+    }
+
+    /// A CSV file's columns in the Types row, the one chosen kept.
+    private func showColumns(_ names: [String]) {
+        typesRow.isHidden = names.isEmpty
+        guard names != column.itemTitles else { return }
+        column.removeAllItems()
+        column.addItems(withTitles: names)
+        columnChosen(nil)
+    }
+
+    @objc private func columnChosen(_ sender: Any?) {
+        let type = column.titleOfSelectedItem.flatMap { types[$0] } ?? .auto
+        columnType.selectItem(at: MongoCSVType.allCases.firstIndex(of: type) ?? 0)
+    }
+
+    /// The chosen column's type: the preview is read again with it.
+    @objc func typeChosen(_ sender: Any?) {
+        guard let name = column.titleOfSelectedItem, let file else { return }
+        types[name] = MongoCSVType.allCases[columnType.indexOfSelectedItem]
+        look(at: file)
     }
 
     @objc private func errorsChanged(_ sender: Any?) {
@@ -148,10 +191,12 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
         let existing = collections.first { $0.name == name }
         if file == nil {
             preview.stringValue = ""
-            statement.stringValue = "Choose a file of Extended JSON documents: JSON Lines, documents one after another, or one array."
+            statement.stringValue = "Choose a file of Extended JSON documents (JSON Lines, documents one after another, or one array), "
+                + "or a CSV file whose first row names the fields."
             reason = "Choose a file first"
         } else if let looked {
-            let lines = looked.documents.map { String($0.extendedJSON().prefix(200)) } + looked.problems.prefix(3)
+            let csv = MongoImport.isCSV(file!)
+            let lines = looked.documents.map { String((csv ? $0.shellForm() : $0.extendedJSON()).prefix(200)) } + looked.problems.prefix(3)
             preview.stringValue = lines.isEmpty ? "The file holds no documents" : lines.joined(separator: "\n")
             if looked.documents.isEmpty {
                 reason = looked.problems.isEmpty ? "The file holds no documents" : "The file's first document can't be read"
@@ -169,9 +214,11 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
             let count = looked.documents.count < Self.previewDocuments ? looked.documents.count.formatted() : "about " + looked.estimate.formatted()
             statement.stringValue = "Import adds \(count) document\(looked.estimate == 1 ? "" : "s") from \(file.lastPathComponent) to "
                 + (existing == nil ? "\(ref.database).\(name), a new collection. " : "the collection \(ref.database).\(name). ")
+                + (MongoImport.isCSV(file) ? "Each row is a document: the header names its fields (a.b makes a sub-document) and an "
+                    + "empty cell leaves its field out. " : "")
                 + "A document without an _id gets a new ObjectId; nothing is replaced or deleted. "
                 + (skipBad ? "Lines that can't be read and documents the server refuses (such as a duplicate _id) are skipped and listed "
-                    + "at the end; each line must hold one whole document."
+                    + "at the end" + (MongoImport.isCSV(file) ? "." : "; each line must hold one whole document.")
                     : "It stops at the first document that can't be read or that the server refuses (such as a duplicate _id); "
                     + "the documents before it stay.")
         } else if file != nil {
@@ -198,11 +245,11 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
         let target = MongoCollectionRef(open: ref.open, database: ref.database, collection: name, kind: .collection)
         let isNew = !collections.contains { $0.name == name }
         dismiss()
-        Self.importFile(file, into: target, skipBad: skipBad, isNew: isNew, activity: activity, parent: parent)
+        Self.importFile(file, into: target, skipBad: skipBad, types: types, isNew: isNew, activity: activity, parent: parent)
     }
 
-    static func importFile(_ file: URL, into ref: MongoCollectionRef, skipBad: Bool, isNew: Bool, activity: ActivityCenter, parent: NSWindow?,
-                           done: (@MainActor (MongoImport.Report) -> Void)? = nil) {
+    static func importFile(_ file: URL, into ref: MongoCollectionRef, skipBad: Bool, types: [String: MongoCSVType] = [:], isNew: Bool,
+                           activity: ActivityCenter, parent: NSWindow?, done: (@MainActor (MongoImport.Report) -> Void)? = nil) {
         let stop = StopFlag(), open = ref.open, connection = ref.open.connection
         let work = activity.start("Importing documents into \(ref.collection)", connection: open.saved.id) { stop.set() }
         Task.detached {
@@ -210,7 +257,7 @@ final class MongoImportSheet: NSWindowController, NSComboBoxDelegate {
             do {
                 let session = try await connection.session(.data)
                 report = await MongoImport.run(session, database: ref.database, collection: ref.collection, file: file, skipBad: skipBad,
-                                               stop: stop) { inserted, fraction in
+                                               types: types, stop: stop) { inserted, fraction in
                     Task { @MainActor in
                         work.detail = inserted.formatted() + " documents inserted"
                         work.progress = fraction

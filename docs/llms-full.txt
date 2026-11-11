@@ -2484,6 +2484,32 @@ how many lines were skipped, with the first problems and their line or document 
 batches, and the summary says how many went in. Views and time-series collections are read-only here, and a read-only
 connection imports nothing.
 
+A **CSV** file (`.csv`) imports too: its first row names the fields, and a dotted name such as `address.city` makes a
+sub-document. Each row is one document, and an empty cell leaves its field out. A column's cells are read **auto** by
+default: a cell that is exactly a whole number becomes an int (a long past its range), a number with a fraction or an
+exponent a double, `true`, `false` and `null` those values, an ISO date (`2024-05-01T12:00:00Z`) a date, 24 hex digits
+an ObjectId, and the shell form the CSV export writes (`NumberLong(5)`, `ISODate("…")`) its type; anything else, `007`
+among them, stays a string. Under **Types**, choose a column and the type all its cells are read as (string, int,
+long, double, decimal, bool, date or objectId); the preview shows the first documents as they'll be inserted, and a row
+whose cell isn't that type, or whose number of cells differs from the header, stops the import or is skipped and
+listed, with its row number, as the Errors choice says.
+
+## Update Many and Delete Many
+
+**Data ▸ Collection ▸ Update Many…** changes every document a filter matches, and **Delete Many…** deletes them, on the
+collection tab in front. The filter starts as the tab's, and the tab's collation applies. An update is written as
+operators (`{ $set: { status: "closed" } }`) or as an aggregation pipeline (`[ { $set: { total: { $add: ["$a", "$b"] } } } ]`);
+a replacement document is refused, since it would replace every matching document whole, and upsert is off.
+
+**Preview…** counts the documents the filter matches now, on the tab's own session, and shows the exact `updateMany`
+or `deleteMany` command with that count. Type the count to confirm it; to delete every document (an empty filter),
+type the collection's name instead. Nothing runs before that. While it runs the status bar shows it with **Cancel**
+(⌘.), which ends it on the server: what it had already changed stays. Then AirSQL says how many documents the server
+matched and changed, and warns when that isn't the count you confirmed (documents changed in between); the tab reads
+its documents again. If the connection fails before the server answers, AirSQL can't tell what happened: it says so,
+and never runs the command again; Refresh (⌘R) shows what the server holds. On a read-only connection, a view or a
+time-series collection, or with edits not applied, both commands are off and say why.
+
 ## Aggregation
 
 **New Aggregation** (⌥⌘A, in a collection's right-click menu and Data ▸ Collection) opens a tab with a pipeline editor

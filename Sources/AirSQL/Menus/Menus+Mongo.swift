@@ -21,6 +21,7 @@ extension MainMenu {
         ]))
         addAggregationItems(menus)
         addMongoIndexItems(menus)
+        addMongoBulkItems(menus)
     }
 }
 
@@ -116,4 +117,24 @@ extension MainMenu {
         collection.addItem(.separator())
         for command in Commands.mongoIndexCommands { collection.addItem(command.item()) }
     }
+}
+
+// MARK: Update Many and Delete Many (lane P2-bulk)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Update Many… and Delete Many…, for the collection tab in front (`CollectionMenu`).
+    static func addMongoBulkItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoBulkCommands {
+            let item = command.item()
+            item.target = CollectionMenu.shared
+            collection.addItem(item)
+        }
+    }
+}
+
+extension CollectionMenu {
+    @objc func updateMany(_ sender: Any?) { tab?.updateMany(sender) }
+    @objc func deleteMany(_ sender: Any?) { tab?.deleteMany(sender) }
 }

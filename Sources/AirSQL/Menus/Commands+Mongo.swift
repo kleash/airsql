@@ -20,7 +20,7 @@ extension Commands {
                                        tip: "Copy the selected rows' documents as Extended JSON, one per line")
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
-        + aggregationCommands + [editValue, removeField] + mongoIndexCommands
+        + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -38,7 +38,7 @@ extension Commands {
     static let exportDocuments = Command("Export Documents…", #selector(MongoTransferMenu.exportDocuments(_:)),
                                          tip: "Write the collection's documents, or what its tab finds, to Extended JSON or CSV")
     static let importDocuments = Command("Import Documents…", #selector(MongoTransferMenu.importDocuments(_:)),
-                                         tip: "Insert the documents of an Extended JSON file into a collection")
+                                         tip: "Insert the documents of an Extended JSON or CSV file into a collection")
 
     static let mongoTransferCommands = [exportDocuments, importDocuments]
 }
@@ -66,4 +66,15 @@ extension Commands {
                                    tip: "Hide the selected index from the query planner, or show it again; it stays up to date")
 
     static let mongoIndexCommands = [collectionIndexes, createIndex, dropIndex, hideIndex]
+}
+
+// MARK: Update Many and Delete Many (lane P2-bulk)
+
+extension Commands {
+    static let updateMany = Command("Update Many…", #selector(MongoCollectionController.updateMany(_:)),
+                                    tip: "Change every document a filter matches; the command and how many it matches show first")
+    static let deleteMany = Command("Delete Many…", #selector(MongoCollectionController.deleteMany(_:)),
+                                    tip: "Delete every document a filter matches; the command and how many it matches show first")
+
+    static let mongoBulkCommands = [updateMany, deleteMany]
 }

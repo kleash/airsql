@@ -605,7 +605,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             reason = indexReason(item.action, title: &title)
             if item.action == Commands.hideIndex.action { item.title = title }
         default:
-            reason = editingReason(item)
+            reason = editingReason(item) ?? bulkReason(item)
         }
         item.explain(enabled: reason == nil, reason: reason)
         if reason == nil, let action = item.action, let tip = Self.editingTips[action] { item.toolTip = tip }
