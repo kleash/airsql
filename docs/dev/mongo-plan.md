@@ -186,6 +186,17 @@ document unchanged, the canary harmless.
 **Lanes:** groundwork first (the operator/stage word list, the sample cache, the seed and oracle, tool slots), then
 completion, agent knowledge, agent control and E2E in parallel.
 
+## Phase 3: status
+
+Built and merged on `mongo`: autofill in the query bar, the pipeline editor and the document editor (`MongoCaret`,
+`MongoCompletion`, `MongoWords`, the shared sample cache); agents' `mongo_schema` (the shop database in about 3.6 KB with
+inferred references), `mongo_explain`, `to_file`, teaching errors and warnings, `mongo_open` (a proposed tab that never
+runs on its own), MongoDB tabs in `context` and `read_console` (with the query as Extended JSON too). The end-to-end test
+passes: Tier A in every Mongo lab run, and Tier B with a real agent (Claude Haiku, about $0.03 a run) answered 10 of 10
+data questions on the first try, proposed a correct query in a tab without running it, did not cancel the order, and
+treated the injection canary as data. Also fixed on the way: a MongoDB login's database is Auth source (admin when empty);
+the Database field only says which database opens.
+
 ## Not doing
 
 An embedded JS shell; drag-and-drop stage builder; natural-language queries in the app; Kerberos/LDAP; CSFLE and
