@@ -253,6 +253,56 @@ struct MongoX509Tests {
     }
 }
 
+extension AppTests {
+    /// The X.509 choice in the editor's General and TLS tabs, and a collection tab read from a secondary, light and dark
+    /// (AIRSQL_SCREENSHOTS=1 with the Mongo lab).
+    @Test(.enabled(if: MongoLab.enabled && ProcessInfo.processInfo.environment["AIRSQL_SCREENSHOTS"] == "1"))
+    func mongoX509AndReadPreferencePictures() async throws {
+        func save(_ harness: AgentServer, _ name: String, _ target: String) async throws {
+            let image = try #require(await call(harness, "screenshot", ["target": target, "scale": 2]).image, "\(name)")
+            try #require(image.representation(using: .png, properties: [:]))
+                .write(to: ScreenshotTests.folder.appendingPathComponent(name + ".png"))
+        }
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, "light"), (.darkAqua, "dark")] {
+            var set = SavedConnection(name: "Mongo set", host: MongoLab.members[0], port: 27017, user: MongoLab.airsql.user,
+                                      route: .proxy)
+            set.engine = .mongodb
+            set.mongoHosts = MongoLab.members.dropFirst().map { $0 + ":27017" }
+            set.replicaSet = "rs0"
+            set.mongoOptions = "readPreference=secondary"
+            set.tls = TLSOptions(mode: .verifyIdentity, caFile: Lab.caFile)
+            set.proxy = ProxySettings(kind: .socks5, host: "127.0.0.1", port: Lab.socksProxy.port, user: Lab.socksProxy.user)
+            let model = testModel([set])
+            model.setSavedPassword(set.id.uuidString, MongoLab.airsql.password)
+            model.setSavedPassword(set.proxySecretKey, Lab.socksProxy.password)
+            let (main, harness) = appWindow(model)
+            main.window?.appearance = NSAppearance(named: appearance)
+            main.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
+            main.window?.orderFront(nil)
+
+            var x509 = set
+            x509.mongoX509 = true
+            x509.tls.certFile = "/Users/me/certs/reports-client.pem"
+            let editor = ConnectionEditor.show(x509, isNew: false, model: model, on: try #require(main.window)) { _, _ in }
+            try await save(harness, "mongo-x509-general-\(suffix)", "sheet")
+            _ = await call(harness, "press", ["title": "TLS"])
+            try await save(harness, "mongo-x509-tls-\(suffix)", "sheet")
+            if let sheet = editor.window { main.window?.endSheet(sheet) }
+
+            _ = await call(harness, "select", ["pane": "sidebar", "names": [set.name]])
+            #expect(await call(harness, "menu", ["path": "Connection > Connect"]).error == nil)
+            #expect(await eventually(timeout: 30) { model.openMongo[set.id]?.databases != nil })
+            let mongo = try #require(model.openMongo[set.id])
+            _ = try await open(MongoTreeItem(database: "fixture"), in: main, mongo)
+            let tab = try await openTab("many", in: main, mongo)
+            #expect(tab.viewer.status.rows.stringValue.contains(" · from mongo-rs"), "\(tab.viewer.status.rows.stringValue)")
+            try await save(harness, "mongo-secondary-\(suffix)", "main")
+            model.connector.disconnect(set.id)
+            main.window?.orderOut(nil)
+        }
+    }
+}
+
 /// Waits until `body` gives a value (10 s at most).
 @MainActor private func eventuallyValue<T>(_ body: @escaping () -> T?) async throws -> T {
     _ = await eventually(timeout: 10) { body() != nil }
