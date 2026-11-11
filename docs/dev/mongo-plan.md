@@ -157,6 +157,35 @@ relaunch; Quick Open and Select in Tree for collections; X.509 client certificat
 change-stream tail, users and roles. **Dropped:** OIDC (its browser flow needs a loopback TCP listener), aggregation
 templates (saved pipelines cover them).
 
+## Phase 3: autofill and agents that know the database (designed by the Fable 5.2 review)
+
+**Autofill.** One completion engine in Core (`MongoCaret` scans half-typed shell text to the caret for the key chain,
+slot and prefix; `MongoCompletion` answers) behind three adapters: the query bar's fields, the pipeline editor, and the
+Edit Value / Insert Document editors. It offers field paths (nested and `.[]`), query and update operators by the field's
+sampled type, value constructors by type (`ObjectId("")`, `ISODate("")`), top values of low-cardinality strings, stage
+names and each stage's argument keys (`from:` gives collections, `foreignField:` that collection's paths), expression
+operators (accumulators only in `$group`/`$setWindowFields`), and after `$group`/`$project` that stage's own keys.
+Ranking: prefix, then the one fuzzy matcher, indexed leading fields first, then share in the sample. The schema comes from
+a per-collection sample cache on `MongoConnection` (shared with agents; `$sample` 200 under 5 s, unioned with loaded pages
+and the validator's `$jsonSchema`; dropped by Refresh; never on disk).
+
+**Agents.** `mongo_schema` (the whole database in one call within 24 KB: paths by share, types, enums, indexes, views,
+inferred references such as `orders.customerId -> customers._id (50/50)` checked by an `$in` probe); `mongo_explain`
+(`plan` runs nothing: a free validator); `mongo_open` (puts a find or pipeline in a new tab marked "Proposed by <agent>",
+never run: the only route to a write stays the person's Run with its preview); Mongo tabs in `context`/`read_console`;
+`to_file` on find and aggregate (analytics access, the Agent Exports folder only); errors and warnings that teach (a path
+not in the sample with the nearest one, a literal of a type the field never has).
+
+**End-to-end test.** A deterministic shop seed (customers, products, orders with nested items, reviews; orphan orders,
+customers without orders, an injection canary in a review), answers from an independent plain-JS oracle, 12 questions
+from easy to `$lookup`/`$facet`/dates plus "propose in a tab" and "cancel order X" (must not happen). Tier A: golden
+pipelines through the real `--mcp` bridge in every Mongo lab run. Tier B (`AIRSQL_AGENT_E2E=1`): a real headless agent
+answers over AirSQL's MCP server, results compared by value; pass at 9 of 10 data answers, the tab left unrun, the
+document unchanged, the canary harmless.
+
+**Lanes:** groundwork first (the operator/stage word list, the sample cache, the seed and oracle, tool slots), then
+completion, agent knowledge, agent control and E2E in parallel.
+
 ## Not doing
 
 An embedded JS shell; drag-and-drop stage builder; natural-language queries in the app; Kerberos/LDAP; CSFLE and
