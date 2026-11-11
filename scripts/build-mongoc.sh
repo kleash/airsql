@@ -158,7 +158,7 @@ for arch in "${archs[@]}"; do
     mkdir -p "$work/build/openssl-$arch"
     (cd "$work/build/openssl-$arch" &&
         logged "openssl-$arch-configure" perl "$openssl_src/Configure" "darwin64-$arch-cc" no-shared no-tests no-apps \
-            no-docs no-legacy no-module no-dso no-engine no-ssl3 no-comp no-zlib --prefix="$prefix" \
+            no-docs no-legacy no-module no-dso no-engine no-ssl3 no-quic no-comp no-zlib --prefix="$prefix" \
             --openssldir="$prefix/ssl" --libdir=lib -mmacosx-version-min=$deployment_target &&
         logged "openssl-$arch-build" make -j"$jobs" &&
         logged "openssl-$arch-install" make install_sw DESTDIR="$stage")

@@ -68,7 +68,7 @@ jobs:
 
       - name: OSV-Scanner on the SBOM
         run: |
-          "$RUNNER_TEMP/osv-scanner" scan source -L "$RUNNER_TEMP/sbom.spdx.json"
+          "$RUNNER_TEMP/osv-scanner" scan source --config osv-scanner.toml -L "$RUNNER_TEMP/sbom.spdx.json"
 
   secrets:
     name: Secrets in the git history

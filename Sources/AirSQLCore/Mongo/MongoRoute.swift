@@ -137,8 +137,8 @@ public final class MongoRoute: @unchecked Sendable {
         }
         let generation = lock.locked { _logins }
         lock.locked { () -> Tunnel? in
-            defer { tunnel = nil }
-            return tunnel
+            defer { self.tunnel = nil }
+            return self.tunnel
         }?.close()
         let tunnel = try wait { [saved] in
             // A name of its own each time: the ssh ending may still remove its files after the next one started.
