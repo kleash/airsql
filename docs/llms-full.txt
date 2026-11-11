@@ -3150,6 +3150,18 @@ a watchdog stops one that runs on. On a replica set or a mongos the reads run in
 aborted, so even a write that got past the check is refused by the server; there, `$collStats` and `$indexStats`
 stages fail (use `mongo_stats`). To change data, describe the change to the person: there is no tool that writes.
 
+### mongo_schema
+
+Not in this build yet: use `mongo_list_collections` and `mongo_schema_sample`.
+
+### mongo_explain
+
+Not in this build yet.
+
+### mongo_open
+
+Not in this build yet: describe the query to the person instead.
+
 ## resources
 
 Each connected connection you may read has its compact schema as a resource, `airsql://<connection name>/schema`

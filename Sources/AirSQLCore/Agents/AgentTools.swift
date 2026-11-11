@@ -74,7 +74,7 @@ public enum AgentTools {
               "format": choice(["traditional", "json"], "traditional (default) or json")], required: ["connection", "sql"],
              output: ["connection": string("The connection"), "columns": strings("Columns of the plan"),
                       "rows": arrayOf("The plan's rows")], outputRequired: ["connection", "columns", "rows"]),
-    ] + mongo + [
+    ] + mongo + mongoSchemaTool + mongoExplainTool + mongoOpenTool + [
         tool("open_in_console", "Puts SQL into a new console tab for the person to read, edit and run. It never runs it: "
              + "this is how to propose a change. Then read_console shows what they ran and its result.",
              ["sql": string("The SQL"), "title": string("The tab's title"), "connection": connection], required: ["sql"],
@@ -169,6 +169,15 @@ public enum AgentTools {
                  outputRequired: ["connection", "documents", "fields"]),
         ]
     }()
+
+    // Phase 3's MongoDB tools (mongo-plan), one slot per tool so that the lanes building them don't edit the same lines.
+    // An empty slot lists nothing, and a call to its name gets "AirSQL has no tool": it fails closed until it is built.
+    /// mongo_schema: a whole database's paths, types, indexes and references in one call (lane: agent knowledge).
+    static let mongoSchemaTool: [[String: Any]] = []
+    /// mongo_explain: a find's or a pipeline's plan, nothing run (lane: agent knowledge).
+    static let mongoExplainTool: [[String: Any]] = []
+    /// mongo_open: a find or a pipeline put in a new tab for the person, never run (lane: agent control).
+    static let mongoOpenTool: [[String: Any]] = []
 
     /// Driving AirSQL's windows as the person does (plan §2.8). Whatever would change data, structure, files or settings
     /// waits for the person at the Mac, or is theirs alone. Replies are JSON as text (screenshot: a PNG), isError on
