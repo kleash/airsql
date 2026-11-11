@@ -90,6 +90,15 @@ struct MongoPipelineToolsTests {
         saved.tls.mode = .off
         #expect(try MongoURI(MongoShell.arguments(saved, mongosh: "mongosh", socket: "/s.sock").argv[1]).option("tls") == nil)
         #expect(!MongoShell.arguments(saved, mongosh: "mongosh", socket: "/s.sock").nameUnchecked)
+
+        // X.509: the client certificate's file and the mechanism, no user (the certificate logs in, nothing is asked).
+        saved.user = "ana"
+        saved.mongoX509 = true
+        saved.tls = TLSOptions(mode: .verifyIdentity, certFile: "/Users/x/me.pem")
+        let x509 = MongoShell.arguments(saved, mongosh: "mongosh", socket: socket).argv
+        let certificate = try MongoURI(x509[1])
+        #expect(x509.count == 2 && certificate.option("authMechanism") == "MONGODB-X509" && certificate.option("authSource") == nil)
+        #expect(certificate.option("tlsCertificateKeyFile") == "/Users/x/me.pem")
     }
 
     @Test func mongoshIsFoundInTheToolsFolders() throws {
