@@ -19,8 +19,8 @@ extension AppTests {
             return (main, harness, mongo)
         }
 
-        /// The database, the transaction mode, Run All, Explain, Commit and Roll Back are SQL's; Run and Cancel stay for a
-        /// collection tab, and say so.
+        /// The database, the transaction mode, Run All, Commit and Roll Back are SQL's (hidden on macOS 15 and later), Explain
+        /// too; Run and Cancel stay for a collection tab, and say so.
         @Test func theToolbarsSQLControlsAreNotForMongoDB() async throws {
             let (main, _, _) = await Self.window()
             let toolbar = try #require(main.window?.toolbar)
@@ -29,7 +29,13 @@ extension AppTests {
             }
             main.toolbarController.update()
             toolbar.validateVisibleItems()
-            for id in [NSToolbarItem.Identifier.runAll, .explain, .commit, .rollback] {
+            let sqlOnly: [NSToolbarItem.Identifier] = [.database, .runAll, .transactionMode, .commit, .rollback]
+            func hidden(_ id: NSToolbarItem.Identifier) -> Bool? {
+                guard #available(macOS 15.0, *) else { return nil }
+                return toolbar.items.first { $0.itemIdentifier == id }?.isHidden
+            }
+            for id in sqlOnly { #expect(hidden(id) ?? true, "\(id.rawValue)") }
+            for id in [NSToolbarItem.Identifier.runAll, .explain, .commit, .rollback] where hidden(id) != true {
                 #expect(button(id)?.isEnabled == false && button(id)?.toolTip == NotForMongo.reason, "\(id.rawValue)")
             }
             for popup in [main.toolbarController.databasePopup, main.toolbarController.transactionPopup] {
@@ -42,6 +48,7 @@ extension AppTests {
             main.sidebar.select([Fixtures.production.id])
             main.toolbarController.update()
             toolbar.validateVisibleItems()
+            for id in sqlOnly { #expect(hidden(id) != true, "\(id.rawValue)") }
             #expect(button(.commit)?.toolTip == "No transaction is open in this tab")
             #expect(main.toolbarController.databasePopup.toolTip != NotForMongo.reason)
         }

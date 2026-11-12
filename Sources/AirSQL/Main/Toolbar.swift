@@ -163,7 +163,16 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         transactionPopup.toolTip = canSetMode ? "Choose Auto-commit or Manual, and how this query tab's transactions see others' "
             + "changes (the isolation level)" : why
         // A MongoDB tab or connection: the database and the transaction mode are SQL's (mongo-plan.md, decision 4).
-        if main?.activeConnection?.engine == .mongodb {
+        let mongo = main?.activeConnection?.engine == .mongodb
+        // SQL's controls are hidden on MongoDB where macOS can hide a toolbar item (15 and later), else disabled below.
+        if #available(macOS 15.0, *) {
+            let sqlOnly: Set<NSToolbarItem.Identifier> = [.database, .runAll, .transactionMode, .commit, .rollback]
+            for item in main?.window?.toolbar?.items ?? [] where sqlOnly.contains(item.itemIdentifier) && item.isHidden != mongo {
+                item.isHidden = mongo
+                if !mongo, !(item is PopupToolbarItem) { item.validate() }  // shown again: not in this pass's visible items
+            }
+        }
+        if mongo {
             for popup in [databasePopup, transactionPopup] {
                 popup.isEnabled = false
                 popup.toolTip = NotForMongo.reason
