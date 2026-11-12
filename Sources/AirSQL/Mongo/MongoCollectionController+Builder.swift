@@ -117,9 +117,13 @@ extension MongoCollectionController {
         main.openAggregation(name, database: database, connection: connectionID)
         guard let tab = main.selectedTab?.content as? MongoAggregationController else { return }
         _ = tab.view
-        tab.editor.string = Self.pipelineText(find)
+        // Through the tab, so its stage cards follow, and run again: the tab's first run had no stages yet.
+        let text = Self.pipelineText(find)
+        tab.replacePipeline(text)
+        tab.pipelineWritten = text
         tab.collation.stringValue = bar.collation.stringValue
         tab.maxTime.stringValue = bar.maxTime.stringValue
+        tab.run()
     }
 
     /// `[ { $match: … }, { $sort: … }, { $project: … }, { $skip: n }, { $limit: n } ]`, the parts set only.

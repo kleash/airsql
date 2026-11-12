@@ -246,6 +246,9 @@ extension AppTests {
         #expect(pipeline.collection == "customers")
         #expect(pipeline.editor.string == "[\n  { $match: \(both.shellForm()) },\n  { $sort: { name: -1 } },\n  { $limit: 5 }\n]\n",
                 "\(pipeline.editor.string)")
+        #expect(pipeline.mode == .stages && pipeline.stagesView.forms.map { MongoStagesView.Kind($0) } == [.filter, .sort, .limit],
+                "\(pipeline.stagesView.forms)")
+        #expect(await eventually(timeout: 20) { pipeline.loading == nil && pipeline.source.rowCount == 5 })
         pipeline.close()
         tab.close()
     }

@@ -21,7 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands + mongoUsersCommands
-        + mongoWatchCommands + mongoDumpCommands + mongoQueryCommands
+        + mongoWatchCommands + mongoDumpCommands + mongoStageCommands + mongoQueryCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -188,6 +188,25 @@ extension Commands {
                                       tip: "Write an .archive.gz file's databases into the server with your own mongorestore; it asks first")
 
     static let mongoDumpCommands = [mongoDump, mongoRestore]
+}
+
+// MARK: Stages | Shell (lane P5-stages)
+
+extension Commands {
+    static let pipelineStages = Command("Edit as Stages", #selector(MongoAggregationController.showPipelineMode(_:)), "8", [.control, .option],
+                                        tag: MongoAggregationController.Mode.stages.rawValue,
+                                        tip: "Build the pipeline from cards: Join, Filter, Group, Sort… with SQL's words beside them")
+    static let pipelineShell = Command("Edit as Shell", #selector(MongoAggregationController.showPipelineMode(_:)), "9", [.control, .option],
+                                       tag: MongoAggregationController.Mode.shell.rawValue,
+                                       tip: "Type the pipeline in shell form, as mongosh takes it")
+
+    static let pipelineSQL = Command("Edit as SQL", #selector(MongoAggregationController.showPipelineMode(_:)), "0", [.control, .option],
+                                     tag: MongoAggregationController.Mode.sql.rawValue,
+                                     tip: "Write a SELECT with JOIN, GROUP BY and the rest; it becomes the pipeline")
+    static let queryWithSQL = Command("Query with SQL…", #selector(SidebarController.queryWithSQL(_:)),
+                                      tip: "Open a tab that turns a SELECT on the collection into a pipeline and runs it")
+
+    static let mongoStageCommands = [pipelineStages, pipelineShell, pipelineSQL, queryWithSQL]
 }
 
 // MARK: Query builder (lane P5-query)

@@ -450,6 +450,52 @@ or proxy route with TLS (the tools reach one server through a socket on this Mac
 CA, or with a certificate you trusted in AirSQL and no authority's file, the sheet says why it can't check and offers
 **Run without checking the certificate**, for one run, noted in the SQL log. Agents can't dump or restore.
 
+## Stages
+
+An aggregation tab opens on **Stages**, a card for each stage of the pipeline, so you can build one without knowing
+MongoDB's words; **Shell** (above the cards, or Data ▸ Collection ▸ **Edit as Stages** ⌃⌥8 and **Edit as Shell** ⌃⌥9)
+shows the same pipeline as text. Both edit the same text: switching never changes it, and a card's edit rewrites only
+its own stage, so the rest of what you typed stays as you typed it. Text that isn't a pipeline stays in Shell, with
+its mistake underlined.
+
+Each card names what it does with SQL's word beside it: **Join — JOIN**, **Filter — WHERE**, **Group — GROUP BY**,
+**Sort — ORDER BY**, **Show fields — SELECT**, **Limit — LIMIT**, **Unwind** and **Shell**. Card 1 is the first stage,
+card 2 the second, and so on. Choose another kind in its pop-up to start the card again as that kind; ↑ and ↓ move it,
+the bin removes it, ⏭ runs the pipeline up to it (Run to Here), and after **Count Each Stage** it says how many
+documents it gives. **+ Stage**, after the cards (and **+** between them), adds one: Join comes first.
+
+- **Join**: another collection of this database (**From**), this collection's field that must equal **their field**,
+  and **As**, the field that gets the matching documents as a list. **One document per match** adds an Unwind card
+  after it, so each order with its customer is one document, as SQL's JOIN gives; **Keep documents without a match**
+  then keeps the ones with none, as LEFT JOIN does. Under the card, warnings from the collections' samples: the two
+  fields hold different types (an ObjectId never equals text, so nothing joins), their field has no index (each
+  document's join reads all of theirs), or As replaces a field you have.
+- **Group**: the fields to group **by** (none: every document in one group), then the results: Count, Sum, Average,
+  Smallest, Largest, First, Last, List or Distinct list of a field, each named (`sum_total`; type another name).
+- **Sort**: fields, each ascending or descending. **Show fields**: tick the fields to keep, and `_id`. **Limit**: how
+  many documents. **Unwind**: one document per item of an array field.
+- **Filter**: the conditions as rows, as the query bar's [Builder](#builder) has them: a field, how it compares, a
+  value. **Shell**: the stage as text. A stage no card shows exactly
+  (`$facet`, `$bucket`, a `$lookup` with a pipeline…) is a Shell card of its own text, which goes into the pipeline as
+  you type it.
+
+The field boxes offer the fields each stage sees: the collection's (from its sample), a join's `<As>.<their field>`,
+a group's `_id` and results, only those a Show fields card keeps. Any field typed works.
+
+Aggregations run with `allowDiskUse`, so a big group or sort spills to disk on the server instead of stopping at its
+memory limit.
+
+### Query with SQL
+
+**Query with SQL…** (Data ▸ Collection, or a collection's right-click menu) opens an aggregation tab on its **SQL**
+page (⌃⌥0) with `SELECT * FROM <collection> LIMIT 100`. Write a SELECT with `JOIN` or `LEFT JOIN` on one equality,
+`WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT` and `OFFSET`; **Run** (⌘↩) turns it into the tab's pipeline and
+runs that. **Translate** only writes the pipeline, which shows under the SQL with the notes that apply to it (`=` is
+case-sensitive, `<>` also finds documents without the field, GROUP BY puts null and missing together…), and **Open as
+Stages** writes it and shows its cards to go on from there. A part that isn't translated (a subquery, UNION, CASE…) is
+underlined with what to do instead; nothing is guessed. FROM must be the tab's collection. Translating replaces the
+pipeline's text; when you edited it by hand, AirSQL asks first.
+
 ## Builder
 
 A collection tab opens with its query bar in **Builder**, for people who know SQL rather than MongoDB; **Shell** (the

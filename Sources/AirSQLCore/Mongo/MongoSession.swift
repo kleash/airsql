@@ -397,7 +397,9 @@ public final class MongoSession: @unchecked Sendable {
                                  collation: BSONDocument? = nil, hint: BSONValue? = nil) -> BSONDocument {
         var fields: [(key: String, value: BSONValue)] = [("aggregate", .string(collection)),
                                                          ("pipeline", .array(pipeline.map { .document($0) })),
-                                                         ("cursor", .document(BSONDocument()))]
+                                                         ("cursor", .document(BSONDocument())),
+                                                         // Big groups and sorts spill to disk instead of failing at the memory limit.
+                                                         ("allowDiskUse", .bool(true))]
         if let maxTimeMS { fields.append(("maxTimeMS", .int64(Int64(maxTimeMS)))) }
         if let collation { fields.append(("collation", .document(collation))) }
         if let hint { fields.append(("hint", hint)) }

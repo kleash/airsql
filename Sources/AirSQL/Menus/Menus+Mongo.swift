@@ -28,6 +28,7 @@ extension MainMenu {
         addMongoUsersItems(menus)
         addMongoWatchItems(menus)
         addMongoDumpItems(menus)
+        addMongoStageItems(menus)
         addMongoQueryItems(menus)
     }
 }
@@ -249,6 +250,23 @@ extension MainMenu {
             let item = command.item()
             item.target = MongoDumpMenu.shared
             menus.tools.insertItem(item, at: after + 1 + offset)
+        }
+    }
+}
+
+// MARK: Stages | Shell (lane P5-stages)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Edit as Stages, Shell and SQL, before Run to Here, for the aggregation tab in front; Query with
+    /// SQL… after New Aggregation, for the tree's collection or the collection tab in front.
+    static func addMongoStageItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let at = collection.items.firstIndex(where: { $0.action == Commands.runToStage.action }) else { return }
+        let modes = [Commands.pipelineStages, Commands.pipelineShell, Commands.pipelineSQL]
+        for (offset, command) in modes.enumerated() { collection.insertItem(command.item(), at: at + offset) }
+        collection.insertItem(.separator(), at: at + modes.count)
+        if let after = collection.items.firstIndex(where: { $0.action == Commands.newAggregation.action }) {
+            collection.insertItem(Commands.queryWithSQL.item(), at: after + 1)
         }
     }
 }
