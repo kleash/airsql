@@ -27,11 +27,11 @@ struct MongoBuilderTests {
             (B.Rule("name", .startsWith, ["A+"]), #"{ name: /^A\+/ }"#),
             (B.Rule("name", .endsWith, ["$"]), #"{ name: /\$$/ }"#),
             (B.Rule("name", .matches, ["^a.*z$"], ignoreCase: true), #"{ name: /^a.*z$/i }"#),
-            (B.Rule("age", .greater, ["30"], type: .number), #"{ age: { $gt: NumberLong(30) } }"#),
+            (B.Rule("age", .greater, ["30"], type: .number), #"{ age: { $gt: 30 } }"#),
             (B.Rule("age", .atLeast, ["2.5"], type: .number), #"{ age: { $gte: 2.5 } }"#),
-            (B.Rule("age", .less, ["30"], type: .number), #"{ age: { $lt: NumberLong(30) } }"#),
-            (B.Rule("age", .atMost, ["30"], type: .number), #"{ age: { $lte: NumberLong(30) } }"#),
-            (B.Rule("age", .between, ["1", "2"], type: .number), #"{ age: { $gte: NumberLong(1), $lte: NumberLong(2) } }"#),
+            (B.Rule("age", .less, ["30"], type: .number), #"{ age: { $lt: 30 } }"#),
+            (B.Rule("age", .atMost, ["30"], type: .number), #"{ age: { $lte: 30 } }"#),
+            (B.Rule("age", .between, ["1", "2"], type: .number), #"{ age: { $gte: 1, $lte: 2 } }"#),
             (B.Rule("s", .oneOf, ["a", "b"]), #"{ s: { $in: [ "a", "b" ] } }"#),
             (B.Rule("s", .noneOf, ["a"]), #"{ s: { $nin: [ "a" ] } }"#),
             (B.Rule("s", .hasValue), #"{ s: { $ne: null } }"#),
@@ -63,7 +63,8 @@ struct MongoBuilderTests {
     }
 
     @Test func valuesAreTypedOrSayWhatIsWrong() throws {
-        #expect(try B.ValueType.number.value(" 42 ") == .int64(42))
+        #expect(try B.ValueType.number.value(" 42 ") == .int32(42))
+        #expect(try B.ValueType.number.value("2147483648") == .int64(2_147_483_648))
         #expect(try B.ValueType.number.value("-2.5e3") == .double(-2500))
         #expect(try B.ValueType.number.value("9223372036854775807") == .int64(.max))
         #expect(try B.ValueType.text.value(" spaced ") == .string(" spaced "))
@@ -153,9 +154,16 @@ struct MongoBuilderTests {
 
     @Test func repeatedKeysAndSeveralAnyGroupsUseAnd() throws {
         #expect(try filter(B.Rule("a", .atLeast, ["1"], type: .number), B.Rule("b", .is, ["x"]))
-                == #"{ a: { $gte: NumberLong(1) }, b: "x" }"#)
-        #expect(try filter(B.Rule("a", .atLeast, ["1"], type: .number), B.Rule("a", .less, ["5"], type: .number))
-                == "{ $and: [ { a: { $gte: NumberLong(1) } }, { a: { $lt: NumberLong(5) } } ] }")
+                == #"{ a: { $gte: 1 }, b: "x" }"#)
+        // A field's operators are merged while none repeats; then it is $and, in the rules' order.
+        #expect(try filter(B.Rule("a", .atLeast, ["1"], type: .number), B.Rule("b", .is, ["x"]), B.Rule("a", .less, ["5"], type: .number))
+                == #"{ a: { $gte: 1, $lt: 5 }, b: "x" }"#)
+        #expect(try filter(B.Rule("a", .atLeast, ["1"], type: .number), B.Rule("b", .is, ["x"]), B.Rule("a", .atLeast, ["5"], type: .number))
+                == #"{ $and: [ { a: { $gte: 1 } }, { b: "x" }, { a: { $gte: 5 } } ] }"#)
+        #expect(try filter(B.Rule("a", .is, ["1"]), B.Rule("a", .isNot, ["2"])) == #"{ $and: [ { a: "1" }, { a: { $ne: "2" } } ] }"#)
+        #expect(try filter(B.Rule("a", .contains, ["x"]), B.Rule("a", .notContains, ["y"])) == "{ $and: [ { a: /x/ }, { a: { $not: /y/ } } ] }")
+        #expect(try filter(B.Rule("a", .hasValue), B.Rule("a", .isNot, ["2"])) == #"{ $and: [ { a: { $ne: null } }, { a: { $ne: "2" } } ] }"#)
+        #expect(try filter(B.Rule("a", .notContains, ["x"]), B.Rule("a", .hasValue)) == "{ a: { $not: /x/, $ne: null } }")
         let anyAB = B.Condition.group(B.Group(any: true, [.rule(B.Rule("a", .is, ["1"])), .rule(B.Rule("b", .is, ["2"]))]))
         let anyC = B.Condition.group(B.Group(any: true, [.rule(B.Rule("c", .is, ["3"]))]))
         #expect(try B.Group([.rule(B.Rule("x", .hasValue)), anyAB]).filter().shellForm()
@@ -236,6 +244,31 @@ struct MongoBuilderTests {
             }
         }
         #expect(count > 300)
+    }
+
+    /// Two rules on one field, every pair of operators of a type: merged or `$and`, the round trip is exact.
+    @Test func sameFieldPairsRoundTrip() throws {
+        let values: [B.ValueType: [String]] = [.text: ["Ada", "Zed"], .number: ["5", "7.5"],
+                                               .date: ["2026-11-12", "2026-11-30 10:00"], .objectId: [Self.id, "65a1b2c3d4e5f60718293a4c"]]
+        var count = 0
+        for (type, vs) in values {
+            func rule(_ op: B.Operator) -> B.Rule {
+                switch op.arity {
+                case .none: return B.Rule("a", op, type: type)
+                case .one: return B.Rule("a", op, [vs[0]], type: type)
+                case .two, .list: return B.Rule("a", op, vs, type: type)
+                }
+            }
+            for first in B.Operator.fitting(type) {
+                for second in B.Operator.fitting(type) {
+                    let built = try B.Group([.rule(rule(first)), .rule(B.Rule("b", .is, ["1"])), .rule(rule(second))]).filter()
+                    let read = try #require(B.Group(filter: try BSONDocument(shellForm: built.shellForm())), "\(built.shellForm())")
+                    #expect(try read.filter() == built, "\(built.shellForm())")
+                    count += 1
+                }
+            }
+        }
+        #expect(count > 500)
     }
 
     // MARK: Lists, projection, sort, collation, arrays

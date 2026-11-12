@@ -89,13 +89,19 @@ public enum MongoStageForm: Equatable, Sendable {
         /// Unused for Count.
         public var field: String
 
-        public init(_ op: Accumulator, _ field: String = "") {
+        /// The name it is written under.
+        public var name: String
+
+        public init(_ op: Accumulator, _ field: String = "", name: String? = nil) {
             self.op = op
             self.field = field
+            self.name = name ?? Self.defaultName(op, field)
         }
 
-        /// The name it is written under: `count`, `sum_price`, `avg_items_qty`.
-        public var name: String { op == .count ? "count" : op.prefix + "_" + MongoStageForm.key(field) }
+        /// `count`, `sum_price`, `avg_items_qty`.
+        public static func defaultName(_ op: Accumulator, _ field: String) -> String {
+            op == .count ? "count" : op.prefix + "_" + MongoStageForm.key(field)
+        }
     }
 
     /// `$group` — GROUP BY `by` (none: one group of every document).
@@ -208,17 +214,17 @@ public enum MongoStageForm: Equatable, Sendable {
         default: return nil
         }
         for (name, value) in d.fields.dropFirst() {
-            guard case .document(let acc) = value, acc.fields.count == 1 else { return nil }
+            guard case .document(let acc) = value, acc.fields.count == 1, !name.hasPrefix("$"), !name.contains(".") else { return nil }
             let (op, arg) = acc.fields[0]
             let output: Output
             switch arg {
-            case .int32(1) where op == "$sum", .int64(1) where op == "$sum", .double(1) where op == "$sum": output = Output(.count)
+            case .int32(1) where op == "$sum", .int64(1) where op == "$sum", .double(1) where op == "$sum":
+                output = Output(.count, name: name)
             case .string(let s):
                 guard let path = fieldPath(s), let a = Accumulator.allCases.first(where: { $0 != .count && $0.mongo == op }) else { return nil }
-                output = Output(a, path)
+                output = Output(a, path, name: name)
             default: return nil
             }
-            guard output.name == name else { return nil }
             group.outputs.append(output)
         }
         return group
@@ -246,6 +252,10 @@ public enum MongoStageForm: Equatable, Sendable {
             var fields: [(key: String, value: BSONValue)] = [("_id", id)]
             for output in g.outputs {
                 let arg: BSONValue = output.op == .count ? .int32(1) : .string("$" + (try path(output.field, "a field for \(output.op.title)")))
+                guard !output.name.isEmpty else { throw BSONError("Name the result of \(output.op.title)") }
+                guard !output.name.hasPrefix("$"), !output.name.contains(".") else {
+                    throw BSONError("‘\(output.name)’: a result's name can't start with $ or hold a dot")
+                }
                 guard !fields.contains(where: { $0.key == output.name }) else { throw BSONError("Two results are both named \(output.name)") }
                 fields.append((output.name, .document(one(output.op.mongo, arg))))
             }
