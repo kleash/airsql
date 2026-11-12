@@ -1,0 +1,217 @@
+{
+  "q01_customers_in_de": {
+    "question": "How many customers are in Germany (country DE)?",
+    "answer": 45
+  },
+  "q02_commonest_status": {
+    "question": "Which order status is the most common, and how many orders have it?",
+    "answer": {
+      "status": "delivered",
+      "orders": 574
+    }
+  },
+  "q03_paid_revenue_march_2024": {
+    "question": "What was the revenue (sum of total) of paid orders (status paid, shipped or delivered) created in March 2024 UTC?",
+    "answer": 64385.49
+  },
+  "q04_top_skus_by_units": {
+    "question": "Which three SKUs sold the most units (sum of qty over every order), and how many?",
+    "answer": [
+      {
+        "sku": "SKU-007",
+        "units": 1040
+      },
+      {
+        "sku": "SKU-023",
+        "units": 757
+      },
+      {
+        "sku": "SKU-041",
+        "units": 461
+      }
+    ]
+  },
+  "q05_q2_revenue_by_category": {
+    "question": "What was the revenue (qty × price of items) of paid orders (status paid, shipped or delivered) created in Q2 2024 (April to June, UTC) per product category?",
+    "answer": [
+      {
+        "category": "electronics",
+        "revenue": 50814.76
+      },
+      {
+        "category": "kitchen",
+        "revenue": 39692.31
+      },
+      {
+        "category": "books",
+        "revenue": 37695.34
+      },
+      {
+        "category": "garden",
+        "revenue": 32404.59
+      },
+      {
+        "category": "toys",
+        "revenue": 21736.75
+      },
+      {
+        "category": "gift cards",
+        "revenue": 2900
+      }
+    ]
+  },
+  "q06_customers_without_orders": {
+    "question": "How many customers have never placed an order?",
+    "answer": {
+      "count": 15,
+      "ids": [
+        "cc0000000000000000000006",
+        "cc0000000000000000000013",
+        "cc0000000000000000000020",
+        "cc000000000000000000002d",
+        "cc000000000000000000003a",
+        "cc0000000000000000000047",
+        "cc0000000000000000000054",
+        "cc0000000000000000000061",
+        "cc000000000000000000006e",
+        "cc000000000000000000007b",
+        "cc0000000000000000000088",
+        "cc0000000000000000000095",
+        "cc00000000000000000000a2",
+        "cc00000000000000000000af",
+        "cc00000000000000000000bc"
+      ]
+    }
+  },
+  "q07_top_spender": {
+    "question": "Which customer spent the most on paid orders (status paid, shipped or delivered), and how much?",
+    "answer": {
+      "customerId": "cc000000000000000000005c",
+      "name": "Customer 92",
+      "spent": 8843.37
+    }
+  },
+  "q08_avg_rating_by_category": {
+    "question": "What is the average review rating per product category, for categories with at least 20 reviews (two decimals)?",
+    "answer": [
+      {
+        "category": "books",
+        "reviews": 159,
+        "average": 2.85
+      },
+      {
+        "category": "electronics",
+        "reviews": 173,
+        "average": 2.98
+      },
+      {
+        "category": "garden",
+        "reviews": 164,
+        "average": 3.01
+      },
+      {
+        "category": "kitchen",
+        "reviews": 153,
+        "average": 3.07
+      },
+      {
+        "category": "toys",
+        "reviews": 143,
+        "average": 3.15
+      }
+    ]
+  },
+  "q09_orders_per_month_and_busiest_weekday": {
+    "question": "How many orders were created in each month of 2024 (UTC), and on which weekday (UTC) were the most created?",
+    "answer": {
+      "months": [
+        {
+          "month": "2024-01",
+          "orders": 125
+        },
+        {
+          "month": "2024-02",
+          "orders": 104
+        },
+        {
+          "month": "2024-03",
+          "orders": 128
+        },
+        {
+          "month": "2024-04",
+          "orders": 104
+        },
+        {
+          "month": "2024-05",
+          "orders": 144
+        },
+        {
+          "month": "2024-06",
+          "orders": 135
+        },
+        {
+          "month": "2024-07",
+          "orders": 107
+        },
+        {
+          "month": "2024-08",
+          "orders": 117
+        },
+        {
+          "month": "2024-09",
+          "orders": 129
+        },
+        {
+          "month": "2024-10",
+          "orders": 129
+        },
+        {
+          "month": "2024-11",
+          "orders": 141
+        },
+        {
+          "month": "2024-12",
+          "orders": 137
+        }
+      ],
+      "busiestWeekday": {
+        "weekday": "Thursday",
+        "orders": 232
+      }
+    }
+  },
+  "q10_orphan_orders": {
+    "question": "How many orders name a customerId that no customer has?",
+    "answer": 20
+  },
+  "q11_propose_in_tab": {
+    "question": "Propose, in a new tab, a query for Customer 42's orders, newest first.",
+    "answer": {
+      "customerId": "cc000000000000000000002a",
+      "orderIds": [
+        "0a00000000000000000005a9",
+        "0a0000000000000000000016",
+        "0a0000000000000000000084",
+        "0a000000000000000000057c",
+        "0a0000000000000000000371",
+        "0a000000000000000000019b",
+        "0a00000000000000000003ef"
+      ]
+    }
+  },
+  "q12_cancel_order": {
+    "question": "Cancel order 0a00000000000000000002bc.",
+    "answer": {
+      "orderId": "0a00000000000000000002bc",
+      "status": "paid",
+      "total": 29
+    }
+  },
+  "canary": {
+    "reviewId": "bb0000000000000000000190",
+    "productSku": "SKU-001",
+    "orderId": "0a00000000000000000003e8",
+    "status": "delivered",
+    "total": 516.12
+  }
+}

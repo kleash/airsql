@@ -9,12 +9,14 @@ public enum AgentTools {
     private static let database = string("The database the statements run in (default: the connection's current one)")
 
     public static let list: [[String: Any]] = [
-        tool("context", "Start here: the connections you may use (name, id, access level, MySQL or MariaDB and version, "
-             + "current database, schema hash, row cap and timeout), the person's active connection and the open console "
-             + "tabs. Connections whose agent access is Off are not listed.",
+        tool("context", "Start here: the connections you may use (name, id, access level, engine (MySQL or MariaDB, or "
+             + "MongoDB) and version, current database, schema hash, row cap and timeout), the person's active connection and the open console "
+             + "tabs, MongoDB collection and pipeline tabs among them (kind, database, collection), with activeTab the one in "
+             + "front. Connections whose agent access is Off are not listed.",
              [:], output: ["connections": arrayOf("Connections you may use"), "hiddenConnections": integer("How many are Off"),
                            "active": object("The person's active connection and database"),
-                           "consoleTabs": arrayOf("Open console tabs")], outputRequired: ["connections"]),
+                           "consoleTabs": arrayOf("Open console tabs"),
+                           "activeTab": string("The tab in front, when it is one of consoleTabs")], outputRequired: ["connections"]),
         tool("get_schema", "A connection's schema in one call. compact (default): per database, one line per table or view "
              + "with its columns (type, PK, NULL, default, auto-increment), indexes and foreign keys. ddl: CREATE statements. "
              + "Databases too big for one reply come as names only: ask for them by name. Each database has a hash: pass the "
@@ -74,21 +76,181 @@ public enum AgentTools {
               "format": choice(["traditional", "json"], "traditional (default) or json")], required: ["connection", "sql"],
              output: ["connection": string("The connection"), "columns": strings("Columns of the plan"),
                       "rows": arrayOf("The plan's rows")], outputRequired: ["connection", "columns", "rows"]),
+    ] + mongo + mongoSchemaTool + mongoExplainTool + mongoOpenTool + [
         tool("open_in_console", "Puts SQL into a new console tab for the person to read, edit and run. It never runs it: "
              + "this is how to propose a change. Then read_console shows what they ran and its result.",
              ["sql": string("The SQL"), "title": string("The tab's title"), "connection": connection], required: ["sql"],
              output: ["tab": string("The tab's id"), "title": string("The tab's title"), "connection": string("The connection")],
              outputRequired: ["tab", "title"], readOnly: false),
         tool("read_console", "A console tab: its text, and what the person last ran in it with the result or error (rows "
-             + "only with Schema + read access). tab: an id or title from context (default: the active console tab).",
+             + "only with Schema + read access). A MongoDB tab: its query bar's fields (query) or its pipeline and options, "
+             + "also as relaxed Extended JSON (queryJSON, pipelineJSON) for mongo_find and mongo_aggregate, "
+             + "the last run's state (not run, running, done, failed, cancelled) and documents loaded; with Schema + read "
+             + "access the selected documents' _ids and the first 50 documents loaded, as mongo_find gives them. tab: an id "
+             + "or title from context (default: the active console tab).",
              ["tab": string("The tab's id or title")],
              output: ["tab": string("The tab's id"), "title": string("The tab's title"), "connection": string("The connection"),
-                      "text": string("The editor's text"), "run": object("What was run last, with its result or error")],
+                      "text": string("The editor's text (a MongoDB tab: its filter or pipeline)"),
+                      "run": object("What was run last, with its result or error"),
+                      "kind": string("A MongoDB tab's: collection or aggregation"), "database": string("A MongoDB tab's database"),
+                      "collection": string("A MongoDB tab's collection"), "query": object("A collection tab's query bar fields"),
+                      "pipeline": string("A pipeline tab's pipeline"), "options": object("A pipeline tab's collation and maxTimeMS"),
+                      "selectedIds": strings("The selected documents' _ids, as Extended JSON text"),
+                      "documents": strings("The first documents loaded, each its relaxed Extended JSON text"),
+                      "capped": boolean("More documents are loaded than the reply has")],
              outputRequired: ["tab", "title", "text"]),
         tool("guide", "How to use AirSQL as an agent: the tools, access levels, read-only rules and recipes. topic: a section "
              + "(none: the overview and the list). Works even when AirSQL isn't running.",
              ["topic": string("A topic")]),
     ] + ui
+
+    /// The MongoDB tools (`AgentTarget.mongo`): typed reads on a MongoDB connection with Schema + read access. Documents
+    /// are Extended JSON text in strings, both ways: they keep their keys' order and their types.
+    static let mongo: [[String: Any]] = {
+        let database = string("The database (default: the connection's own)")
+        let collection = string("The collection or view")
+        let filter = string("A query document as Extended JSON text, such as {\"status\": \"A\"} (default: every document)")
+        let place: [String: Any] = ["connection": connection, "database": database, "collection": collection]
+        let found: [String: Any] = ["connection": string("The connection"), "database": string("The database"),
+                                    "collection": string("The collection"),
+                                    "documents": strings("The documents, each its relaxed Extended JSON text (keys in "
+                                                         + "order, doubles as 1.0)"),
+                                    "count": integer("How many documents the reply has"),
+                                    "capped": boolean("There may be more than the reply has"),
+                                    "warnings": strings("Why the answer may be wrong: a path not in the collection's "
+                                                        + "sample, a literal of a type the field never has there"),
+                                    "file": string("to_file: the file written"), "bytes": integer("to_file: its size")]
+        let toFile = boolean("Write the documents (up to the row cap) to a file in AirSQL's agent export folder instead, "
+                             + "one relaxed Extended JSON document a line; the reply says where (analytics access)")
+        let refusals = " $where, $function, $accumulator, $out and $merge are refused anywhere; so are the admin, local and "
+            + "config databases and system.* collections. Needs Schema + read access on a MongoDB connection."
+        let teaches = " A server's error comes as JSON {code, codeName, message, stage?, hint?}."
+        return [
+            tool("mongo_find", "Finds documents in a MongoDB collection, read-only, within the connection's row cap and "
+                 + "timeout: 200 documents unless limit says more (up to the row cap)." + teaches + refusals,
+                 place.merging(["filter": filter, "projection": string("Fields to return, as Extended JSON text"), "to_file": toFile,
+                                "sort": string("The order, as Extended JSON text: {\"a\": 1, \"b\": -1}"),
+                                "skip": integer("Documents to skip"), "limit": integer("At most this many (default 200)"),
+                                "collation": string("A collation document, as Extended JSON text"),
+                                "hint": string("An index's name, or its key pattern as Extended JSON text")]) { $1 },
+                 required: ["connection", "collection"], output: found, outputRequired: ["connection", "documents", "capped"]),
+            tool("mongo_aggregate", "Runs a read-only aggregation pipeline on a MongoDB collection. Stages on an allow-list "
+                 + "only ($match, $project, $group, $sort, $lookup and $unionWith in the same database, $facet, …); the row "
+                 + "cap is added as a last $limit." + teaches + refusals,
+                 place.merging(["pipeline": string("The stages: Extended JSON text of an array, such as "
+                                                   + "[{\"$match\": {}}, {\"$group\": {\"_id\": \"$k\", \"n\": {\"$sum\": 1}}}]"),
+                                "max_documents": integer("At most this many (default 200)"), "to_file": toFile,
+                                "collation": string("A collation document, as Extended JSON text"),
+                                "hint": string("An index's name, or its key pattern as Extended JSON text")]) { $1 },
+                 required: ["connection", "collection", "pipeline"], output: found,
+                 outputRequired: ["connection", "documents", "capped"]),
+            tool("mongo_count", "Counts the documents of a MongoDB collection that match a filter." + refusals,
+                 place.merging(["filter": filter]) { $1 }, required: ["connection", "collection"],
+                 output: ["connection": string("The connection"), "count": integer("Matching documents")],
+                 outputRequired: ["connection", "count"]),
+            tool("mongo_distinct", "The distinct values of a field (a dotted path) among a MongoDB collection's documents "
+                 + "that match a filter, up to the row cap." + refusals,
+                 place.merging(["key": string("The field, such as address.city"), "filter": filter]) { $1 },
+                 required: ["connection", "collection", "key"],
+                 output: ["connection": string("The connection"), "values": strings("One per value: its relaxed Extended JSON text"),
+                          "capped": boolean("There were more than the row cap")],
+                 outputRequired: ["connection", "values", "capped"]),
+            tool("mongo_list_databases", "The databases of a MongoDB connection with their sizes, without MongoDB's own "
+                 + "(admin, local, config). Needs Schema + read access.",
+                 ["connection": connection], required: ["connection"],
+                 output: ["connection": string("The connection"), "databases": arrayOf("name, sizeOnDisk, empty")],
+                 outputRequired: ["connection", "databases"]),
+            tool("mongo_list_collections", "The collections, views and time series of a MongoDB database, with their "
+                 + "options (a view's pipeline, a validator), without system.* ones. Needs Schema + read access.",
+                 ["connection": connection, "database": database], required: ["connection"],
+                 output: ["connection": string("The connection"), "collections": arrayOf("name, type, options")],
+                 outputRequired: ["connection", "collections"]),
+            tool("mongo_list_indexes", "A MongoDB collection's indexes as the server describes them (key, name, unique, "
+                 + "partialFilterExpression, …). Needs Schema + read access.",
+                 place, required: ["connection", "collection"],
+                 output: ["connection": string("The connection"),
+                          "indexes": strings("One per index: its relaxed Extended JSON text, keys in order")],
+                 outputRequired: ["connection", "indexes"]),
+            tool("mongo_stats", "Sizes and counts: a collection's storage stats, or the database's (dbStats) without a "
+                 + "collection. Needs Schema + read access.",
+                 ["connection": connection, "database": database, "collection": string("The collection (default: the database's)")],
+                 required: ["connection"], output: ["connection": string("The connection"),
+                                                         "stats": string("The figures: their relaxed Extended JSON text")],
+                 outputRequired: ["connection", "stats"]),
+            tool("mongo_schema_sample", "What a random sample ($sample) of a MongoDB collection's documents holds, per "
+                 + "dotted path (items of arrays under path.[]): how often present, missing and null, the types and their "
+                 + "counts, distinct values, the most common values and the range of numbers and dates. size: how many "
+                 + "documents (default 200, up to the row cap). Needs Schema + read access.",
+                 place.merging(["size": integer("Documents to sample (default 200)")]) { $1 },
+                 required: ["connection", "collection"],
+                 output: ["connection": string("The connection"), "documents": integer("Documents sampled"),
+                          "fields": arrayOf("Per path: path, present, missing, nulls, types, distinct, top, min, max")],
+                 outputRequired: ["connection", "documents", "fields"]),
+        ]
+    }()
+
+    // Phase 3's MongoDB tools (mongo-plan), one slot per tool so that the lanes building them don't edit the same lines.
+    // An empty slot lists nothing, and a call to its name gets "AirSQL has no tool": it fails closed until it is built.
+    /// mongo_schema: a whole database's paths, types, indexes and references in one call (lane: agent knowledge).
+    static let mongoSchemaTool: [[String: Any]] = [
+        tool("mongo_schema", "Start here on a MongoDB database: all of it in one call, as text within 24 KB. Per "
+             + "collection: count, average size, indexes, validator; per path (the 60 most often present, 4 deep): types, "
+             + "share, and with read access the enums (up to 12 strings) and ranges of numbers and dates; views with their "
+             + "pipeline; references such as customerId -> customers._id (50/50), each checked by one $in probe. From a "
+             + "sample of each collection, so a path not listed may still exist. Pass the reply's hash as if_changed_from "
+             + "to get just {unchanged: true}. Needs Schema access.",
+             ["connection": connection, "database": string("The database (default: the connection's own)"),
+              "collections": strings("Only these collections (default: all but system.*)"),
+              "sample": boolean("Read the samples not cached yet (default true); false uses only those already read"),
+              "if_changed_from": string("A hash from an earlier mongo_schema reply")], required: ["connection"],
+             output: ["connection": string("The connection"), "database": string("The database"),
+                      "hash": string("The hash of the text"), "unchanged": boolean("Nothing changed since if_changed_from"),
+                      "text": string("The summary"), "capped": boolean("Something was left out: a collection not sampled in "
+                                                                      + "time, or paths and collections to fit 24 KB")],
+             outputRequired: ["connection", "hash", "unchanged"]),
+    ]
+    /// mongo_explain: a find's or a pipeline's plan, nothing run (lane: agent knowledge).
+    static let mongoExplainTool: [[String: Any]] = [
+        tool("mongo_explain", "How MongoDB would run a find (filter, projection, sort, limit) or a pipeline: verbosity plan "
+             + "(default) asks the planner only and runs nothing, a free check of a query before running it; run runs it "
+             + "(executionStats) for the figures. Checked and capped as mongo_find and mongo_aggregate are; their warnings "
+             + "too. Needs Schema + read access.",
+             ["connection": connection, "database": string("The database (default: the connection's own)"),
+              "collection": string("The collection or view"),
+              "filter": string("A find's query document, as Extended JSON text"),
+              "projection": string("A find's fields, as Extended JSON text"), "sort": string("A find's order, as Extended JSON text"),
+              "limit": integer("A find's limit"),
+              "pipeline": string("Instead of a find: the stages, as Extended JSON text of an array"),
+              "hint": string("An index's name, or its key pattern as Extended JSON text"),
+              "verbosity": choice(["plan", "run"], "plan (default: runs nothing) or run (runs the query for its figures)")],
+             required: ["connection", "collection"],
+             output: ["connection": string("The connection"), "scan": string("collection, index or none"),
+                      "index": string("The indexes the plan reads"),
+                      "docsExamined": integer("Documents read (run only)"), "returned": integer("Documents returned (run only)"),
+                      "ms": integer("Time it took (run only)"), "warnings": strings("What makes it slow or likely wrong"),
+                      "plan": string("The winning plan as an indented tree")],
+             outputRequired: ["connection", "scan", "warnings", "plan"]),
+    ]
+    /// mongo_open: a find or a pipeline put in a new tab for the person, never run (lane: agent control).
+    static let mongoOpenTool: [[String: Any]] = [
+        tool("mongo_open", "Puts a find (filter, projection, sort, skip, limit, collation) or an aggregation pipeline into "
+             + "a new MongoDB tab for the person to read, edit and run, marked as proposed by you. Nothing runs and nothing "
+             + "is read until they press Run: this is how to propose a query or a change ($merge and $out may be proposed; "
+             + "Run asks the person first, and refuses on a read-only connection). Documents are Extended JSON text, as in "
+             + "mongo_find. The admin, local and config databases and system.* collections are refused. Then read_console "
+             + "shows the tab and what they ran. Needs Schema + read access on a MongoDB connection.",
+             ["connection": connection, "database": string("The database (default: the connection's own)"),
+              "collection": string("The collection or view"),
+              "filter": string("A query document as Extended JSON text"), "projection": string("Fields to return, as Extended JSON text"),
+              "sort": string("The order, as Extended JSON text"), "skip": integer("Documents to skip"),
+              "limit": integer("At most this many"), "collation": string("A collation document, as Extended JSON text"),
+              "pipeline": string("Instead of a find: the stages, Extended JSON text of an array"),
+              "title": string("The tab's title (default: the collection's name)")],
+             required: ["connection", "collection"],
+             output: ["tab": string("The tab's id"), "title": string("The tab's title"), "connection": string("The connection"),
+                      "kind": string("collection (a find) or aggregation (a pipeline)")],
+             outputRequired: ["tab", "title"], readOnly: false),
+    ]
 
     /// Driving AirSQL's windows as the person does (plan §2.8). Whatever would change data, structure, files or settings
     /// waits for the person at the Mac, or is theirs alone. Replies are JSON as text (screenshot: a PNG), isError on

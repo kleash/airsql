@@ -114,7 +114,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
     @objc private func gridSettingsChanged(_ notification: Notification) {
         guard let settings = (notification.object as? AppModel)?.data.settings,
               let old = notification.userInfo?["old"] as? AppSettings else { return }
-        grid.nullText = settings.nullText
+        grid.nullText = source is MongoDocumentSource ? MongoDocumentSource.nullText : settings.nullText
         applyLook(settings)
         if grid.fontSize == CGFloat(old.gridFontSize) { grid.fontSize = CGFloat(settings.gridFontSize) }
     }
@@ -171,6 +171,7 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
             zones = [:]
         }
         displayed = source.map(display)
+        if source is MongoDocumentSource { grid.nullText = MongoDocumentSource.nullText }
         heat = [:]
         updateTint()
         grid.source = displayed
@@ -409,7 +410,8 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         if case .placeholder(let words) = source.cell(row, column) { placeholder = words }
         valuePanel.show(column: source.columns[column], value: placeholder == nil ? source.value(row, column) : nil,
                         bytes: (source as? GridBytes)?.bytes(row, column), placeholder: placeholder,
-                        loadFull: cut ? { [weak self] in self?.readWhole?([row], [column]) {} } : nil)
+                        loadFull: cut ? { [weak self] in self?.readWhole?([row], [column]) {} } : nil,
+                        bson: (source as? MongoDocumentSource)?.bsonValue(row, column))
     }
 
     /// Edits the focused cell's value in the value panel, opening it first (a long or multi-line value).

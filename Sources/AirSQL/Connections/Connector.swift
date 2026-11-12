@@ -65,7 +65,7 @@ final class Connector {
 
     /// Connects `id` unless it is connected or connecting; prompts and the Trust sheet show on `window`.
     func connect(_ id: UUID, on window: NSWindow?) {
-        guard let saved = model.connection(id), open[id] == nil, connecting[id] == nil else { return }
+        guard let saved = model.connection(id), open[id] == nil, model.openMongo[id] == nil, connecting[id] == nil else { return }
         let activity = model.activity.start("Connecting to \(saved.displayName)", connection: id) { [weak self] in
             self?.cancel(id)
         }
@@ -142,6 +142,7 @@ final class Connector {
         droppedOpens = [:]
         for connected in open.values { connected.route.close() }
         open = [:]
+        for mongo in model.openMongo.values { mongo.connection.route.close() }
         askpass?.close()
     }
 
@@ -156,6 +157,19 @@ final class Connector {
             model.states[id] = .connecting(step: text)
         }
         do {
+            if saved.engine == .mongodb {
+                let (connection, server) = try await establishMongo(&saved, on: window, step: step)
+                guard connecting[id]?.activity === activity else { return await connection.close() }
+                connecting[id] = nil
+                activity.end()
+                sheets[id] = nil
+                model.states[id] = .connected(server: server.summary)
+                let mongo = OpenMongoConnection(saved: saved, connection: connection, server: server)
+                model.attach(mongo: mongo, to: id)
+                saveRemembered(id)
+                watch(mongo, id: id)
+                return
+            }
             let (connection, server, route) = try await establish(&saved, on: window, step: step)
             guard connecting[id]?.activity === activity else {
                 await connection.disconnect()
@@ -231,6 +245,39 @@ final class Connector {
     /// asked). A pinned certificate and the user name typed at a prompt end up in `saved`.
     func establish(_ saved: inout SavedConnection, password: String? = nil, proxyPassword: String? = nil, on window: NSWindow?,
                    step: @escaping (String) -> Void) async throws -> (Connection, ServerInfo, OpenRoute) {
+        try await withRoutePrompts(saved, proxyPassword: proxyPassword, on: window) { proxy, server in
+            let route = try await OpenRoute.open(saved, proxyPassword: proxy, askpass: { [server] in
+                guard let server else { throw AirSQLError(.other, "No askpass for this route.") }
+                return server
+            }, progress: { text in DispatchQueue.main.async { step(text) } })
+            do {
+                try Task.checkCancellation()
+                step("Logging in to \(saved.host.isEmpty ? saved.socket : saved.host)")
+                let (connection, server) = try await logIn(&saved, password: password, routeSocket: route.socket, on: window)
+                return (connection, server, route)
+            } catch {
+                route.close()
+                throw route.relay?.lastError ?? error  // the proxy's reason: the driver only saw the connection close
+            }
+        }
+    }
+
+    /// `establish` for MongoDB: its route opens a forward or relay per server as the driver asks for each
+    /// (`signInMongo`).
+    func establishMongo(_ saved: inout SavedConnection, password: String? = nil, sessionToken: String? = nil,
+                        proxyPassword: String? = nil, on window: NSWindow?,
+                        step: @escaping (String) -> Void) async throws -> (MongoConnection, MongoServerInfo) {
+        try await withRoutePrompts(saved, proxyPassword: proxyPassword, on: window) { proxy, server in
+            step("Logging in to \(saved.host)")
+            return try await signInMongo(&saved, password: password, sessionToken: sessionToken, proxyPassword: proxy,
+                                        askpass: server, on: window)
+        }
+    }
+
+    /// Runs `body` with the proxy's password and, on an SSH route, the askpass server that shows ssh's prompts on
+    /// `window`.
+    private func withRoutePrompts<T>(_ saved: SavedConnection, proxyPassword: String?, on window: NSWindow?,
+                                     _ body: (_ proxy: String, _ askpass: AskpassServer?) async throws -> T) async throws -> T {
         let usesProxy = saved.route == .proxy || saved.route == .sshProxy
         let proxy = usesProxy ? try await self.proxyPassword(saved, typed: proxyPassword, on: window) : ""
         let id = saved.id.uuidString
@@ -241,30 +288,24 @@ final class Connector {
             server?.setHandler(sshPrompts(for: saved, on: window), for: id)
         }
         defer { server?.setHandler(nil, for: id) }
-        let route = try await OpenRoute.open(saved, proxyPassword: proxy, askpass: { [server] in
-            guard let server else { throw AirSQLError(.other, "No askpass for this route.") }
-            return server
-        }, progress: { text in DispatchQueue.main.async { step(text) } })
-        do {
-            try Task.checkCancellation()
-            step("Logging in to \(saved.host.isEmpty ? saved.socket : saved.host)")
-            let (connection, server) = try await logIn(&saved, password: password, routeSocket: route.socket, on: window)
-            return (connection, server, route)
-        } catch {
-            route.close()
-            throw route.relay?.lastError ?? error  // the proxy's reason: the driver only saw the connection close
-        }
+        return try await body(proxy, server)
     }
 
     /// Test Connection: connects `draft` as the editor has it, then disconnects. The server's description, and the
     /// draft with what the connect learnt (a certificate the person trusted).
-    func test(_ draft: SavedConnection, password: String?, proxyPassword: String?, on window: NSWindow?,
+    func test(_ draft: SavedConnection, password: String?, sessionToken: String? = nil, proxyPassword: String?, on window: NSWindow?,
               step: @escaping (String) -> Void) async throws -> (summary: String, draft: SavedConnection) {
         var tested = draft
         promptWindow = window
         defer {
             remembered[draft.id] = nil
             closePrompts(draft.id)
+        }
+        if draft.engine == .mongodb {
+            let (connection, server) = try await establishMongo(&tested, password: password, sessionToken: sessionToken,
+                                                                proxyPassword: proxyPassword, on: window, step: step)
+            await connection.close()
+            return (server.summary + (tested.tls.mode == .off ? ", no TLS" : ", TLS"), tested)
         }
         let (connection, server, route) = try await establish(&tested, password: password, proxyPassword: proxyPassword,
                                                              on: window, step: step)
@@ -338,6 +379,29 @@ final class Connector {
                 }
             }
         }
+    }
+
+    /// `watch` for MongoDB: the route's ssh ending, or the main session's `hello` failing, is a drop. Nothing is kept to
+    /// reconnect: the sessions and the route close, the tabs keep what they show and their pending changes, and Connect
+    /// makes new ones.
+    private func watch(_ mongo: OpenMongoConnection, id: UUID) {
+        mongo.connection.route.onExit = { [weak self, weak mongo] error in
+            DispatchQueue.main.async { self?.dropped(id, mongo, error.message) }
+        }
+        mongo.keepAlive = Timer.scheduledTimer(withTimeInterval: Self.keepAliveInterval, repeats: true) { [weak self, weak mongo] _ in
+            MainActor.assumeIsolated {
+                guard let mongo else { return }
+                Task { [weak self] in
+                    if await !mongo.connection.isAlive() { self?.dropped(id, mongo, AirSQLError.disconnected.message) }
+                }
+            }
+        }
+    }
+
+    func dropped(_ id: UUID, _ mongo: OpenMongoConnection?, _ message: String) {
+        guard let mongo, model.openMongo[id] === mongo else { return }
+        model.detach(id)
+        model.states[id] = .failed(message)
     }
 
     /// Disconnects a connection idle for its `idleDisconnectMinutes`, never with work open: a statement running, a

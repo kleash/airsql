@@ -235,6 +235,9 @@ extension AppTests {
         #expect(panel.mode == .text && panel.text.string == source.value(1, 6))
         grid.selection.select(GridPosition(row: 3, column: 4))
         #expect(source.cell(3, 4) == .null && panel.footer.stringValue == "NULL")
+        // MongoDB's null by its own name.
+        panel.show(column: source.columns[4], value: nil, bytes: nil, bson: .null)
+        #expect(panel.footer.stringValue == "null")
         // Hex on request, kept while it fits.
         grid.selection.select(GridPosition(row: 2, column: 1))
         panel.modes.selectedSegment = GridValuePanel.Mode.hex.rawValue

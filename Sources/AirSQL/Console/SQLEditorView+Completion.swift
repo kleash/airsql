@@ -12,6 +12,7 @@ extension SQLEditorView {
         }
         if pairTyped(typed, replacementRange) {
             if typed == "'" { updateCompletion(force: false) }  // an ENUM's values
+            if typed == "\"", otherLanguage != nil { updateCompletion(force: true) }  // a pipeline's paths and values
             if typed == "(" { applyKeywordCase(before: selectedRange().location - 1) }
             return
         }
@@ -79,7 +80,7 @@ extension SQLEditorView {
     // shortcut: not with several carets, whose text isn't coloured (so not lexed) until all have typed; do it if asked.
     private func applyKeywordCase(before end: Int) {
         let settings = Self.settings()
-        guard settings.autoKeywordCase, settings.formatStyle.keywords != .keep, !applyingCarets, extraCarets.isEmpty, end > 0 else { return }
+        guard otherLanguage == nil, settings.autoKeywordCase, settings.formatStyle.keywords != .keep, !applyingCarets, extraCarets.isEmpty, end > 0 else { return }
         let text = self.string as NSString
         var start = end
         while start > 0, SQLLexer.isNameChar(text.character(at: start - 1)) { start -= 1 }
@@ -145,8 +146,8 @@ extension SQLEditorView {
         }
         let caret = selectedRange().location
         let (range, items) = completions(string, caret)
-        // Inside a string only an ENUM's values, and nothing inside a comment.
-        let inText = tokens.contains { [.string, .comment, .hint].contains($0.kind) && $0.range.lowerBound < caret
+        // Inside a string only an ENUM's values, and nothing inside a comment; another language's completion knows its own.
+        let inText = otherLanguage == nil && tokens.contains { [.string, .comment, .hint].contains($0.kind) && $0.range.lowerBound < caret
             && (caret < $0.range.upperBound || !$0.isClosed) }
         let utf16 = Array(string.utf16)
         let afterDot = range.lowerBound > 0 && utf16[range.lowerBound - 1] == 0x2E

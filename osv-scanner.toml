@@ -1,0 +1,22 @@
+# Advisories that don't reach AirSQL, each until a date: then the scan flags it again and the pin is looked at anew.
+# OpenSSL 3.5.9 (scripts/build-mariadb.sh, build-mongoc.sh) is the newest 3.5 release; these have no fixed release yet.
+
+[[IgnoredVulns]]
+id = "CVE-2026-88822"
+ignoreUntil = 2026-12-15
+reason = "QUIC: OpenSSL is built with no-quic; AirSQL's TLS runs over TCP only"
+
+[[IgnoredVulns]]
+id = "CVE-2026-95691"
+ignoreUntil = 2026-12-15
+reason = "QUIC: OpenSSL is built with no-quic; AirSQL's TLS runs over TCP only"
+
+[[IgnoredVulns]]
+id = "CVE-2026-88823"
+ignoreUntil = 2026-12-15
+reason = "AES-GCM-SIV: not a TLS cipher; neither Connector/C nor libmongoc calls it"
+
+[[IgnoredVulns]]
+id = "CVE-2026-95692"
+ignoreUntil = 2026-12-15
+reason = "AES-GCM-SIV: not a TLS cipher; neither Connector/C nor libmongoc calls it"

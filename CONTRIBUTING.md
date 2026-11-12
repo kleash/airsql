@@ -15,15 +15,16 @@ AIRSQL_LAB=1 ./test.sh   # also the lab: MySQL and MariaDB servers and the SSH a
 ```
 
 The app builds with Swift 5.9 or later. The tests never touch your `~/.ssh` or your Keychain. libmariadb (MariaDB
-Connector/C with OpenSSL) is built by `scripts/build-mariadb.sh` from pinned, checksummed sources, once, into a cache
-next to the repository.
+Connector/C with OpenSSL) and libmongoc2 (the MongoDB C Driver with OpenSSL) are built by `scripts/build-mariadb.sh`
+and `scripts/build-mongoc.sh` from pinned, checksummed sources, once, into a cache next to the repository.
 
 ## What a change needs
 
 - **The smallest change that solves the problem.** No new layers, settings or abstractions unless the problem needs
   them.
-- **No third-party Swift packages, and nothing from Homebrew** in the build or the app. The one C dependency is
-  libmariadb; the SBOM (`scripts/sbom.sh`) and the vulnerability scan read its pins in `scripts/build-mariadb.sh`.
+- **No third-party Swift packages, and nothing from Homebrew** in the build or the app. The two C dependencies
+  are libmariadb and libmongoc2; the SBOM (`scripts/sbom.sh`) and the vulnerability scan read their pins in
+  `scripts/build-mariadb.sh` and `scripts/build-mongoc.sh`.
 - **The app explains itself.** Every button, menu item and field gets a one-line tooltip (verb first, no full stop); a
   disabled one says why. A test fails on any control without one. Plain words first, jargon in brackets.
 - **Native feel**: single click selects, double click opens, right click shows the menu; no database, network or file

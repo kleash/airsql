@@ -1,9 +1,9 @@
 #!/bin/bash
-# Makes AirSQL's release (ported from AirSCP's scripts/release-local.sh): the universal app and its libmariadb signed
-# with the Developer ID and the hardened runtime, notarized and stapled, as build/AirSQL-<version>.zip with
-# build/AirSQL-<version>.zip.sha256, then checked the way Gatekeeper will; and next to it the exact source of that
-# libmariadb (Connector/C's and OpenSSL's tarballs, as scripts/build-mariadb.sh checked them), which every release
-# attaches (NOTICE).
+# Makes AirSQL's release (ported from AirSCP's scripts/release-local.sh): the universal app and its libmariadb and
+# libmongoc2 signed with the Developer ID and the hardened runtime, notarized and stapled, as build/AirSQL-<version>.zip
+# with build/AirSQL-<version>.zip.sha256, then checked the way Gatekeeper will; and next to it the exact source of those
+# libraries (Connector/C's, mongo-c-driver's and OpenSSL's tarballs, as scripts/build-mariadb.sh and build-mongoc.sh
+# checked them); every release attaches libmariadb's (NOTICE).
 #   scripts/release-local.sh               the Keychain's "Developer ID Application" identity, notarytool profile
 #                                          airsql-notary
 #   scripts/release-local.sh --adhoc       a dry run: ad hoc with the hardened runtime, not notarized (never for a
@@ -30,7 +30,7 @@ zip=build/AirSQL-$version.zip
 
 # The hardened runtime's library validation loads only libraries signed by Apple or by the app's own team, and an ad
 # hoc signature has no team: the dry run turns it off to start at all, so it proves everything but that check. The
-# release needs no entitlements: libmariadb gets the app's Developer ID (docs/dev/release.md).
+# release needs no entitlements: the libraries get the app's Developer ID (docs/dev/release.md).
 entitlements=()
 if $adhoc; then
     identity=- timestamp=--timestamp=none
@@ -58,13 +58,14 @@ fi
 ./build.sh
 # build.sh signs ad hoc for development; the release signs again with the hardened runtime, inside out: the library,
 # then the app (--deep is for checking only).
-codesign --force --options runtime "$timestamp" --sign "$identity" "$app/Contents/Frameworks/libmariadb.3.dylib"
+codesign --force --options runtime "$timestamp" --sign "$identity" "$app/Contents/Frameworks/libmariadb.3.dylib" \
+    "$app/Contents/Frameworks/libmongoc2.dylib"
 codesign --force --options runtime "$timestamp" ${entitlements[@]+"${entitlements[@]}"} --sign "$identity" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
-# It starts and loads its libmariadb under that signature: dyld stops it before it prints when library validation
-# refuses the library.
-"$app/Contents/MacOS/AirSQL" --version | grep 'MariaDB Connector/C' \
-    || { echo "The signed app doesn't start with its libmariadb (above)." >&2; exit 1; }
+# It starts and loads its libraries under that signature: dyld stops it before it prints when library validation
+# refuses one.
+"$app/Contents/MacOS/AirSQL" --version | grep 'MariaDB Connector/C.*libmongoc' \
+    || { echo "The signed app doesn't start with its libmariadb and libmongoc2 (above)." >&2; exit 1; }
 
 if $notarize; then
     rm -f "$zip"
@@ -83,11 +84,11 @@ if $notarize; then
     spctl --assess --type execute --verbose=4 "$app"
 fi
 
-# The zip people download: the (stapled) app, with its signature intact; and the library's source next to it.
+# The zip people download: the (stapled) app, with its signature intact; and the libraries' source next to it.
 rm -f "$zip"
 ditto -c -k --keepParent "$app" "$zip"
 (cd build && shasum -a 256 "$(basename "$zip")" > "$(basename "$zip").sha256")
-cp vendor/out/source/*.tar.gz build/
+cp vendor/out/source/*.tar.gz vendor/mongoc/source/*.tar.gz build/
 if $adhoc; then
     echo "Built $zip: ad hoc with the hardened runtime (library validation off), NOT notarized: a dry run only."
 elif ! $notarize; then

@@ -204,6 +204,7 @@ final class ToolsResponder: NSResponder, NSMenuItemValidation {
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if NotForMongo.applies(item, connection) { return false }
         let (enabled, reason) = availability(item.action)
         item.explain(enabled: enabled, reason: reason)
         return enabled

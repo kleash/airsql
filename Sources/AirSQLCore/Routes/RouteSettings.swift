@@ -81,10 +81,13 @@ extension SavedConnection {
     /// The Keychain key of the proxy's password.
     public var proxySecretKey: String { id.uuidString + " proxy" }
 
+    /// The Keychain key of a MongoDB AWS IAM login's session token.
+    public var awsSessionTokenKey: String { id.uuidString + " aws session token" }
+
     /// Every Keychain key this connection may have used (Duplicate copies them, Delete removes them): the database
-    /// password's (the id), each hop's and the proxy's.
+    /// password's (the id), each hop's, the proxy's and the AWS session token's.
     public var secretKeys: [String] {
-        [id.uuidString] + (jumpHosts + [sshHost]).map(secretKey(for:)) + [proxySecretKey]
+        [id.uuidString] + (jumpHosts + [sshHost]).map(secretKey(for:)) + [proxySecretKey, awsSessionTokenKey]
     }
 
     /// Whether the database filter lets `name` show; patterns compare without case.

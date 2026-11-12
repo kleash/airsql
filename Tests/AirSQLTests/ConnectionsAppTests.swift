@@ -247,6 +247,215 @@ extension AppTests {
         #expect(main.validateMenuItem(item) == false)
     }
 
+    /// MongoDB in the editor: its port, and none of MySQL's own settings (cleartext login, compression, time zone,
+    /// isolation, startup SQL, client tools); back to MySQL they come back.
+    @Test func theEditorLeavesOutMySQLsSettingsForMongoDB() async throws {
+        let docs = SavedConnection(name: "Docs", host: "db.example.com", user: "app")
+        let model = testModel([docs])
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Docs"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let sheet = try #require(await editor(main))
+        let window = try #require(sheet.window)
+        #expect(await call(harness, "set", ["id": "editor.engine", "value": "MongoDB"]).error == nil)
+        #expect(sheet.draft.engine == .mongodb)
+        #expect(find(NSTextField.self, id: "editor.port", in: window.contentView!)?.placeholderString == "27017")
+        #expect(await call(harness, "press", ["title": "TLS"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.tlsMode", "value": "Encrypt, check the certificate"]).error == nil)
+        #expect(find(NSButton.self, id: "editor.cleartext", in: window.contentView!) == nil)
+        #expect(await call(harness, "press", ["title": "Options"]).error == nil)
+        for id in ["editor.compress", "editor.timeZone", "editor.startIsolation", "editor.startupSQL", "editor.clientPath", "editor.dumpPath"] {
+            #expect(find(NSView.self, id: id, in: window.contentView!) == nil, "\(id)")
+        }
+        #expect(find(NSView.self, id: "editor.readOnly", in: window.contentView!) != nil)
+        #expect(await call(harness, "press", ["title": "General"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.engine", "value": "MySQL or MariaDB"]).error == nil)
+        #expect(await call(harness, "press", ["title": "Options"]).error == nil)
+        #expect(find(NSView.self, id: "editor.compress", in: window.contentView!) != nil)
+        #expect(await call(harness, "press", ["title": "General"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.engine", "value": "MongoDB"]).error == nil)
+        #expect(await call(harness, "press", ["id": "editor.save"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        #expect(model.connection(docs.id)?.engine == .mongodb)
+    }
+
+    /// MongoDB's General tab: Paste Address fills the fields and keeps the password for the Keychain (never the file),
+    /// says what it understood, warns when the address asks for no TLS and says why a bad one can't be read; the DNS
+    /// seed list takes one host without a port and turns TLS on; MySQL's editor has none of it.
+    @Test func aPastedMongoDBAddressFillsTheEditorAndTheKeychain() async throws {
+        let board = NSPasteboard.general, kept = board.string(forType: .string)
+        defer { board.clearContents(); if let kept { board.setString(kept, forType: .string) } }
+        func paste(_ text: String) {
+            board.clearContents()
+            board.setString(text, forType: .string)
+        }
+        var docs = SavedConnection(name: "Docs", host: "db.example.com", port: 27018, user: "old")
+        docs.engine = .mongodb
+        docs.mongoHosts = ["m2:27017"]
+        docs.tls.mode = .off
+        let model = testModel([docs, Fixtures.local])
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Docs"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let sheet = try #require(await editor(main))
+        let content = try #require(sheet.window?.contentView)
+
+        paste("mongodb://a,,b")
+        #expect(await call(harness, "press", ["id": "editor.pasteAddress"]).error == nil)
+        #expect(sheet.status.stringValue == "That isn't a MongoDB address: The connection string names no server.")
+        #expect(sheet.draft.host == "db.example.com")
+
+        paste("mongodb+srv://us%40er:p%40ss%3Aw@cluster0.example.net/sales?authSource=admin&readPreference=secondary")
+        #expect(await call(harness, "press", ["id": "editor.pasteAddress"]).error == nil)
+        #expect(sheet.draft.mongoSRV && sheet.draft.host == "cluster0.example.net" && sheet.draft.port == nil)
+        #expect(sheet.draft.mongoHosts.isEmpty && sheet.draft.user == "us@er" && sheet.draft.database == "sales")
+        #expect(sheet.draft.authSource == "admin" && sheet.draft.mongoOptions == "readPreference=secondary")
+        #expect(sheet.draft.tls.mode == .verifyIdentity && sheet.password == "p@ss:w")
+        #expect(sheet.status.stringValue.hasPrefix("Understood: the servers DNS lists for cluster0.example.net, user us@er"),
+                "\(sheet.status.stringValue)")
+        #expect(find(NSButton.self, id: "editor.mongoSRV", in: content)?.state == .on)
+        #expect(find(NSTextField.self, id: "editor.port", in: content)?.isEnabled == false)
+        #expect(find(NSView.self, id: "editor.mongoHosts", in: content) == nil && find(NSView.self, id: "editor.directConnection", in: content) == nil)
+        #expect(find(NSTextField.self, id: "editor.mongoOptions", in: content)?.stringValue == "readPreference=secondary")
+
+        // Copy Address: the user, never the password.
+        #expect(await call(harness, "press", ["id": "editor.copyAddress"]).error == nil)
+        #expect(board.string(forType: .string) == "mongodb+srv://us%40er@cluster0.example.net/sales?tls=true&authSource=admin"
+                + "&readPreference=secondary")
+
+        // An address without tls=true: no TLS, and the editor says so.
+        paste("mongodb://app@10.1.2.3:27017,10.1.2.4/?replicaSet=rs0")
+        #expect(await call(harness, "press", ["id": "editor.pasteAddress"]).error == nil)
+        #expect(!sheet.draft.mongoSRV && sheet.draft.host == "10.1.2.3" && sheet.draft.mongoHosts == ["10.1.2.4"])
+        #expect(sheet.draft.replicaSet == "rs0" && sheet.draft.tls.mode == .off && sheet.password == "p@ss:w")
+        #expect(sheet.status.stringValue.hasSuffix("This server's address doesn't ask for TLS: the connection isn't encrypted."))
+
+        // Direct connection is for one server.
+        #expect(await call(harness, "set", ["id": "editor.directConnection", "value": true]).error == nil)
+        _ = await call(harness, "press", ["id": "editor.save"])
+        #expect(sheet.status.stringValue.hasPrefix("Direct connection talks to one server"))
+        #expect(await call(harness, "set", ["id": "editor.directConnection", "value": false]).error == nil)
+        // The DNS seed list: one host, no port or other members, TLS on.
+        #expect(await call(harness, "set", ["id": "editor.mongoSRV", "value": true]).error == nil)
+        #expect(sheet.draft.mongoHosts.isEmpty && sheet.draft.port == nil && sheet.draft.tls.mode == .verifyIdentity)
+        #expect(await call(harness, "set", ["id": "editor.mongoSRV", "value": false]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.mongoHosts", "value": "10.1.2.4:27017, [::1]:27019"]).error == nil)
+        #expect(await call(harness, "set", ["id": "editor.mongoOptions", "value": "w"]).error == nil)
+        _ = await call(harness, "press", ["id": "editor.save"])
+        #expect(sheet.status.stringValue == "The option “w” has no value.")
+        #expect(await call(harness, "set", ["id": "editor.mongoOptions", "value": "w=majority"]).error == nil)
+        #expect(await call(harness, "press", ["id": "editor.save"]).error == nil)
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+        let saved = try #require(model.connection(docs.id))
+        #expect(saved.mongoHosts == ["10.1.2.4:27017", "[::1]:27019"] && saved.replicaSet == "rs0" && saved.user == "app")
+        #expect(await eventually(timeout: 10) { model.savedPassword(docs.id.uuidString) == "p@ss:w" })
+        #expect(!String(decoding: try JSONEncoder().encode(model.data), as: UTF8.self).contains("p@ss"))
+
+        // MySQL's editor is as it was.
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Local MariaDB 11.8"]])
+        #expect(await call(harness, "menu", ["path": "Connection > Edit…"]).error == nil)
+        let mysql = try #require(await editor(main))
+        for id in ["editor.pasteAddress", "editor.copyAddress", "editor.mongoSRV", "editor.mongoHosts", "editor.replicaSet",
+                   "editor.directConnection", "editor.authSource", "editor.mongoOptions"] {
+            #expect(find(NSView.self, id: id, in: try #require(mysql.window?.contentView)) == nil, "\(id)")
+        }
+        #expect(find(NSView.self, id: "editor.socket", in: try #require(mysql.window?.contentView)) != nil)
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
+    /// File ▸ New Connection from URL… takes a mongodb:// address too: a new MongoDB connection, filled from it.
+    @Test func aNewConnectionFromAMongoDBURL() async throws {
+        let board = NSPasteboard.general, kept = board.string(forType: .string)
+        defer { board.clearContents(); if let kept { board.setString(kept, forType: .string) } }
+        board.clearContents()
+        board.setString("mongodb://reader:pw@db1.example.com:27017,db2.example.com/shop?replicaSet=rs1&tls=true", forType: .string)
+        let model = testModel([])
+        let (main, harness) = appWindow(model)
+        main.newConnectionFromURL(nil)
+        _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+        #expect(await call(harness, "press", ["title": "Continue"]).error == nil)
+        let sheet = try #require(await editor(main))
+        #expect(sheet.isNew && sheet.draft.engine == .mongodb && sheet.draft.host == "db1.example.com")
+        #expect(sheet.draft.mongoHosts == ["db2.example.com"] && sheet.draft.replicaSet == "rs1" && sheet.password == "pw")
+        #expect(sheet.draft.tls.mode == .verifyIdentity)
+        _ = await call(harness, "press", ["id": "editor.cancel"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
+    /// The lab's replica set set up in the editor as a person would (its members, its name, TLS with the lab's CA,
+    /// through the SOCKS proxy), then the standalone from a pasted address: each connects.
+    @Test(.enabled(if: MongoLab.enabled)) func aMongoReplicaSetAndStandaloneSetUpInTheEditorConnect() async throws {
+        let board = NSPasteboard.general, kept = board.string(forType: .string)
+        defer { board.clearContents(); if let kept { board.setString(kept, forType: .string) } }
+        let model = testModel([])
+        let (main, harness) = appWindow(model)
+        func connectNew(_ fill: (ConnectionEditor) async -> Void) async throws -> UUID {
+            #expect(await call(harness, "menu", ["path": "File > New Connection…"]).error == nil)
+            let sheet = try #require(await editor(main))
+            #expect(await call(harness, "set", ["id": "editor.engine", "value": "MongoDB"]).error == nil)
+            await fill(sheet)
+            let id = sheet.draft.id
+            #expect(await call(harness, "press", ["id": "editor.saveAndConnect"]).error == nil)
+            #expect(await eventually(timeout: 30) { model.openMongo[id] != nil }, "\(String(describing: model.states[id])) \(sheet.status.stringValue)")
+            return id
+        }
+        let set = try await connectNew { _ in
+            for (id, value) in [("editor.name", "Set"), ("editor.host", MongoLab.members[0]), ("editor.port", "27017"),
+                                ("editor.mongoHosts", MongoLab.members.dropFirst().map { $0 + ":27017" }.joined(separator: ", ")),
+                                ("editor.replicaSet", "rs0"), ("editor.user", MongoLab.airsql.user),
+                                ("editor.password", MongoLab.airsql.password)] {
+                #expect(await call(harness, "set", ["id": id, "value": value]).error == nil, "\(id)")
+            }
+            _ = await call(harness, "press", ["title": "TLS"])
+            #expect(await call(harness, "set", ["id": "editor.tlsMode", "value": "Encrypt, check certificate and host name"]).error == nil)
+            #expect(await call(harness, "set", ["id": "editor.caFile", "value": Lab.caFile]).error == nil)
+            _ = await call(harness, "press", ["title": "SSH and Proxy"])
+            for (id, value) in [("editor.route", "Proxy, no SSH"), ("editor.proxyKind", "SOCKS5"), ("editor.proxyHost", "127.0.0.1"),
+                                ("editor.proxyPort", String(Lab.socksProxy.port)), ("editor.proxyUser", Lab.socksProxy.user),
+                                ("editor.proxyPassword", Lab.socksProxy.password)] {
+                #expect(await call(harness, "set", ["id": id, "value": value]).error == nil, "\(id)")
+            }
+        }
+        if case .connected(let server)? = model.states[set] { #expect(server.hasSuffix("replica set rs0"), "\(server)") }
+        board.clearContents()
+        board.setString("mongodb://\(MongoLab.airsql.user):\(MongoLab.airsql.password)@127.0.0.1:\(MongoLab.soloPort)/fixture?authSource=admin",
+                        forType: .string)
+        let solo = try await connectNew { sheet in
+            #expect(await call(harness, "press", ["id": "editor.pasteAddress"]).error == nil)
+            #expect(sheet.draft.tls.mode == .off && sheet.password == MongoLab.airsql.password)
+        }
+        if case .connected(let server)? = model.states[solo] { #expect(server.hasSuffix("standalone"), "\(server)") }
+        for id in [set, solo] {
+            model.connector.disconnect(id)
+            #expect(await eventually(timeout: 10) { model.openMongo[id] == nil })
+        }
+    }
+
+    /// A MongoDB connection logs in with MongoDB's driver, never MySQL's, and fails in its own words where nothing
+    /// listens; SQL's commands say it isn't for them.
+    @Test func aMongoDBConnectionFailsInItsOwnWords() async throws {
+        var mongo = SavedConnection(name: "Documents", host: "127.0.0.1", port: 1, user: "root")
+        mongo.engine = .mongodb
+        mongo.tls.mode = .off
+        let model = testModel([mongo])
+        let (main, harness) = appWindow(model)
+        _ = await call(harness, "select", ["pane": "sidebar", "names": ["Documents"]])
+        let newQuery = Commands.newQuery.item()
+        #expect(main.validateMenuItem(newQuery) == false && newQuery.toolTip == NotForMongo.reason)
+        #expect(main.validateMenuItem(Commands.connect.item()))
+        #expect(await call(harness, "menu", ["path": "Connection > Connect"]).error == nil)
+        #expect(await eventually(timeout: 30) { main.window?.attachedSheet != nil })
+        if case .failed(let reason)? = model.states[mongo.id] {
+            #expect(reason == "Nothing answers at 127.0.0.1:1.", "\(reason)")
+        } else {
+            Issue.record("not failed: \(String(describing: model.states[mongo.id]))")
+        }
+        #expect(model.open[mongo.id] == nil && model.openMongo[mongo.id] == nil && model.activity.isIdle)
+        _ = await call(harness, "press", ["title": "Close"])
+        _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+
     @Test func foldersAreMadeRenamedAndDeleted() async throws {
         let model = testModel(Fixtures.shop)
         let (main, harness) = appWindow(model)
@@ -354,6 +563,31 @@ extension AppTests {
         #expect(!box.isEnabled && box.toolTip == "A Production connection connects only when you ask")
         #expect(await call(harness, "press", ["id": "editor.cancel"]).error == nil)
         _ = await call(harness, "wait", ["until": "no_sheet", "timeout": 10])
+    }
+}
+
+/// A MongoDB connection's address and back: Copy Address gives what Paste Address reads into the same fields, with the
+/// user but never the password.
+@MainActor
+struct MongoAddressTests {
+    @Test func copiedAddressesReadBackToTheSameFields() throws {
+        for text in ["mongodb+srv://us%40er:p%40ss@cluster0.example.net/shop?retryWrites=true&w=majority&authSource=admin",
+                     "mongodb://app:pw@[::1]:27018,m2:27019/orders?replicaSet=rs0&tls=true&tlsAllowInvalidHostnames=true"
+                        + "&tlsCAFile=%2Ftmp%2Fca.pem&readPreference=secondary&connectTimeoutMS=900",
+                     "mongodb://h:1/?directConnection=true&tlsInsecure=true&tls=true",
+                     "mongodb://plain.example.com", "mongodb+srv://c.example.net/?tls=false&appName=a%26b"] {
+            var first = SavedConnection()
+            first.engine = .mongodb
+            let password = first.apply(try MongoURI(text))
+            let copied = ConnectionEditor.mongoAddress(first)
+            var again = first
+            #expect(again.apply(try MongoURI(copied)) == nil, "\(copied)")
+            #expect(again == first, "\(text) → \(copied)")
+            if let password { #expect(!copied.contains(password) && !copied.contains("pw@")) }
+        }
+        var srv = SavedConnection()
+        _ = srv.apply(try MongoURI("mongodb+srv://us%40er:p%40ss@cluster0.example.net/shop?w=majority"))
+        #expect(ConnectionEditor.mongoAddress(srv) == "mongodb+srv://us%40er@cluster0.example.net/shop?tls=true&w=majority")
     }
 }
 

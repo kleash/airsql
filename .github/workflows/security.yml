@@ -1,15 +1,17 @@
 # The README's "Security" badge: on pushes to main, pull requests, by hand, and before every release (a CVE published
 # since the last run shows then). Any finding fails the run. As in AirSCP's security.yml:
 # - OSV-Scanner checks the SBOM (scripts/sbom.sh: MariaDB Connector/C and OpenSSL, as scripts/build-mariadb.sh pins
-#   them) against the OSV database (osv.dev), after showing that it sees these two at all: the same SBOM with older
-#   releases must fail. OSV lists few Connector/C CVEs (most are filed against MariaDB Server), so its release notes
-#   are worth a look when the pin moves.
+#   them, and mongo-c-driver with its utf8proc, as scripts/build-mongoc.sh pins it) against the OSV database (osv.dev),
+#   after showing that it sees Connector/C, OpenSSL and mongo-c-driver at all: the same SBOM with older releases must
+#   fail (OSV has no utf8proc CVE to show it with). OSV lists few Connector/C CVEs (most are filed against MariaDB
+#   Server), so its release notes are worth a look when the pin moves.
 # - gitleaks looks for secrets in every commit of every branch (.gitleaks.toml lists its verified false positives).
-# A CVE in Connector/C or OpenSSL is fixed by a newer pin in scripts/build-mariadb.sh.
+# A CVE in Connector/C or OpenSSL is fixed by a newer pin in scripts/build-mariadb.sh (OpenSSL's in build-mongoc.sh
+# too), one in mongo-c-driver or utf8proc by a newer pin in scripts/build-mongoc.sh.
 name: Security
 
 # Pull requests, merges into main, by hand, and as a gate in release.yml, so no release ships with a known
-# vulnerability in Connector/C or OpenSSL.
+# vulnerability in the libraries it ships.
 on:
   push:
     branches: [main]
@@ -51,22 +53,22 @@ jobs:
           echo "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108  $RUNNER_TEMP/osv-scanner" | sha256sum -c -
           chmod +x "$RUNNER_TEMP/osv-scanner"
 
-      - name: OSV-Scanner sees Connector/C and OpenSSL (Connector/C 3.1.7 and OpenSSL 3.5.0 must fail it)
+      - name: OSV-Scanner sees Connector/C, OpenSSL and mongo-c-driver (3.1.7, 3.5.0 and 1.27.4 must fail it)
         run: |
-          sed -E 's#(pkg:git/github.com/mariadb-corporation/mariadb-connector-c@)[^"]+#\1v3.1.7#; s#(pkg:git/github.com/openssl/openssl@)[^"]+#\1openssl-3.5.0#' \
+          sed -E 's#(pkg:git/github.com/mariadb-corporation/mariadb-connector-c@)[^"]+#\1v3.1.7#; s#(pkg:git/github.com/openssl/openssl@)[^"]+#\1openssl-3.5.0#; s#(pkg:git/github.com/mongodb/mongo-c-driver@)[^"]+#\11.27.4#' \
             "$RUNNER_TEMP/sbom.spdx.json" > "$RUNNER_TEMP/old.spdx.json"
           "$RUNNER_TEMP/osv-scanner" scan source --format json -L "$RUNNER_TEMP/old.spdx.json" > "$RUNNER_TEMP/old.json" || true
           found=$(jq -r '[.results[].packages[] | select(.vulnerabilities | length > 0) | .package.name] | sort | join(" ")' \
             "$RUNNER_TEMP/old.json" || true)
-          if [ "$found" != "mariadb-connector-c openssl" ]; then
-            echo "::error::OSV-Scanner flagged '$found' instead of both Connector/C 3.1.7 and OpenSSL 3.5.0: it can't see these components, so its scan of the SBOM would prove nothing"
+          if [ "$found" != "mariadb-connector-c mongo-c-driver openssl" ]; then
+            echo "::error::OSV-Scanner flagged '$found' instead of Connector/C 3.1.7, OpenSSL 3.5.0 and mongo-c-driver 1.27.4: it can't see these components, so its scan of the SBOM would prove nothing"
             exit 1
           fi
-          echo "OSV-Scanner flags Connector/C 3.1.7 and OpenSSL 3.5.0, so it sees both components."
+          echo "OSV-Scanner flags Connector/C 3.1.7, OpenSSL 3.5.0 and mongo-c-driver 1.27.4, so it sees these components."
 
       - name: OSV-Scanner on the SBOM
         run: |
-          "$RUNNER_TEMP/osv-scanner" scan source -L "$RUNNER_TEMP/sbom.spdx.json"
+          "$RUNNER_TEMP/osv-scanner" scan source --config osv-scanner.toml -L "$RUNNER_TEMP/sbom.spdx.json"
 
   secrets:
     name: Secrets in the git history

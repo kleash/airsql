@@ -38,7 +38,7 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
     let isNew: Bool
     let model: AppModel
     /// Typed in the General and SSH and Proxy tabs; empty: keep what the Keychain has.
-    var password = "", proxyPassword = ""
+    var password = "", proxyPassword = "", sessionToken = ""
     private(set) var tab = Tab.general
     let tabs = NSSegmentedControl()
     private let holder = NSView()
@@ -246,7 +246,96 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         if draft.route == .proxy || draft.route == .sshProxy, draft.proxy.host.trimmingCharacters(in: .whitespaces).isEmpty {
             return "Type the proxy's address in the SSH and Proxy tab."
         }
+        if draft.engine == .mongodb, let problem = mongoProblem { return problem }
         return [.ssh, .sshJump, .sshProxy].contains(draft.route) ? SSHConfig.problem(with: draft) : nil
+    }
+
+    /// What the MongoDB fields get wrong (a member that isn't host:port, an option without a value), in MongoURI's words.
+    private var mongoProblem: String? {
+        do {
+            _ = try MongoURI(draft.mongoURI.string)
+            _ = try MongoURI("mongodb://x/?" + draft.mongoOptions)  // mongoURI leaves out options it can't read
+        } catch {
+            return (error as? AirSQLError)?.message ?? error.localizedDescription
+        }
+        if draft.mongoX509, draft.tls.mode == .off || (draft.tls.certFile ?? "").isEmpty {
+            return "An X.509 login needs TLS and a client certificate: choose them in the TLS tab."
+        }
+        if draft.mongoAWS, !draft.askPassword, draft.user.trimmingCharacters(in: .whitespaces).isEmpty {
+            return "An AWS IAM login needs the access key ID: type it in the General tab."
+        }
+        return draft.directConnection && !draft.mongoHosts.isEmpty
+            ? "Direct connection talks to one server: untick it, or empty Other members in the General tab." : nil
+    }
+
+    // MARK: MongoDB's address
+
+    /// Fills the fields from the clipboard's mongodb:// or mongodb+srv:// address.
+    @objc func pasteMongoAddress(_ sender: Any?) {
+        window?.makeFirstResponder(nil)
+        applyMongoAddress(NSPasteboard.general.string(forType: .string) ?? "")
+    }
+
+    /// Fills the fields from `text`, its password kept for the Keychain (saved with the connection), and says what it
+    /// understood, or why it can't.
+    func applyMongoAddress(_ text: String) {
+        let uri: MongoURI
+        do {
+            uri = try MongoURI(text)
+        } catch {
+            status.textColor = .statusBad
+            status.stringValue = "That isn't a MongoDB address: " + ((error as? AirSQLError)?.message ?? error.localizedDescription)
+            return fitWindow()
+        }
+        var filled = draft
+        let typed = filled.apply(uri)
+        // The person's own files stay unless the address names others.
+        filled.tls.caFile = filled.tls.caFile ?? draft.tls.caFile
+        (filled.tls.certFile, filled.tls.keyFile) = (draft.tls.certFile, draft.tls.keyFile)
+        if let typed {
+            password = typed
+            filled.askPassword = false
+        }
+        if filled.mongoAWS, let token = uri.option("authMechanismProperties")?.split(separator: ",")
+            .first(where: { $0.hasPrefix("AWS_SESSION_TOKEN:") })?.dropFirst(18) {
+            sessionToken = String(token)
+        }
+        tlsFollowsHost = false  // the address decides
+        draft = filled
+        refreshTab()
+        let servers = uri.srv ? "the servers DNS lists for \(filled.host)" : uri.hosts.count == 1 ? "1 server" : "\(uri.hosts.count) servers"
+        let parts = [servers, filled.replicaSet.isEmpty ? nil : "replica set \(filled.replicaSet)",
+                     filled.user.isEmpty ? nil : "user \(filled.user)", typed == nil ? nil : "its password (for your Keychain)",
+                     filled.mongoAWS ? "AWS IAM login" : nil,
+                     filled.database.isEmpty ? nil : "database \(filled.database)",
+                     filled.tls.mode == .off ? nil : "TLS on"].compactMap { $0 }
+        status.textColor = filled.tls.mode == .off ? .statusWarning : .secondaryLabelColor
+        status.stringValue = "Understood: " + parts.joined(separator: ", ") + "."
+            + (filled.tls.mode == .off ? " This server's address doesn't ask for TLS: the connection isn't encrypted." : "")
+        fitWindow()
+    }
+
+    /// Copies the address, user but no password, with the TLS choices a driver understands.
+    @objc func copyMongoAddress(_ sender: Any?) {
+        window?.makeFirstResponder(nil)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Self.mongoAddress(draft), forType: .string)
+        status.textColor = .secondaryLabelColor
+        status.stringValue = "Copied the address, without the password."
+    }
+
+    /// `connection`'s mongodb:// address as mongosh and Compass take it: its user, never its password.
+    static func mongoAddress(_ connection: SavedConnection) -> String {
+        var uri = connection.mongoURI
+        uri.user = connection.user.isEmpty ? nil : connection.user
+        if let caFile = connection.tls.caFile { uri.setOption("tlsCAFile", caFile) }
+        if connection.tls.mode == .required { uri.setOption("tlsAllowInvalidCertificates", "true") }
+        if connection.tls.mode == .verifyCA { uri.setOption("tlsAllowInvalidHostnames", "true") }
+        // AirSQL's own connect timeout, unless the person set one.
+        if (try? MongoURI("mongodb://x/?" + connection.mongoOptions))?.option("connectTimeoutMS") == nil {
+            uri.setOption("connectTimeoutMS", nil)
+        }
+        return uri.string
     }
 
     @objc private func save(_ sender: Any?) { finish(connect: false) }
@@ -266,18 +355,20 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
             return
         }
         // The gate (plan §2.8): an agent's Save keeps no password, and nothing the person alone may change.
-        guard password.isEmpty && proxyPassword.isEmpty || !AgentGuard.refuses("Only the person at the Mac can save a "
-                                                                                + "password: nothing was saved.") else { return }
+        guard password.isEmpty && proxyPassword.isEmpty && sessionToken.isEmpty
+                || !AgentGuard.refuses("Only the person at the Mac can save a password: nothing was saved.") else { return }
         testTask?.cancel()
         model.connector.cancelTest(draft.id)
         model.save(draft)
         guard model.connection(draft.id) == draft else { return }  // refused (AgentGuard): the editor stays open
-        let write = model.setSavedPassword, keys = (draft.id.uuidString, draft.proxySecretKey)
-        let typed = (password, proxyPassword)
+        let write = model.setSavedPassword, keys = (draft.id.uuidString, draft.proxySecretKey, draft.awsSessionTokenKey)
+        let typed = (password, proxyPassword, sessionToken), aws = draft.mongoAWS && draft.engine == .mongodb
         // An existing password stays unless a new one was typed; the Keychain may wait for the person: not here.
         DispatchQueue.global(qos: .userInitiated).async {
             if !typed.0.isEmpty { write(keys.0, typed.0) }
             if !typed.1.isEmpty { write(keys.1, typed.1) }
+            // A token belongs to its secret key: a new key without one forgets the old.
+            if aws, !typed.2.isEmpty || !typed.0.isEmpty { write(keys.2, typed.2.isEmpty ? nil : typed.2) }
         }
         close(saved: draft, connect: connect)
     }
@@ -310,10 +401,12 @@ final class ConnectionEditor: NSWindowController, NSWindowDelegate {
         func show() { status.stringValue = (done + [current + "…"]).joined(separator: " · ") }
         show()
         let draft = self.draft, password = password.isEmpty ? nil : password, proxy = proxyPassword.isEmpty ? nil : proxyPassword
+        // As Save keeps it: a new secret key without a token has none.
+        let token = !sessionToken.isEmpty ? sessionToken : password == nil ? nil : ""
         testTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await self.model.connector.test(draft, password: password, proxyPassword: proxy,
+                let result = try await self.model.connector.test(draft, password: password, sessionToken: token, proxyPassword: proxy,
                                                                  on: self.window) { step in
                     done.append("✓ " + current + " \(Int(Date().timeIntervalSince(started) * 1000)) ms")
                     (current, started) = (step, Date())

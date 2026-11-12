@@ -21,6 +21,8 @@ final class SidebarNode: NSObject {
         case message(UUID, String)
         /// Users and Roles, the last row of a connected connection's tree.
         case users(UUID)
+        /// A MongoDB connection's database, collection or index (`MongoTree`).
+        case mongo(UUID, MongoTreeItem)
     }
 
     let kind: Kind
@@ -243,6 +245,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         observers.append(model.$states.sink { [weak self] _ in
             DispatchQueue.main.async { self?.refreshRows() }
         })
+        observers.append(model.$openMongo.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.reload() }
+        })
         observers.append(model.$open.sink { [weak self] _ in
             DispatchQueue.main.async {
                 self?.reload()
@@ -308,7 +313,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         folders = newFolders
         connections = newConnections
         treeNodes = fresh
-        treeShown.formIntersection(model.open.keys)
+        treeShown.formIntersection(Set(model.open.keys).union(model.openMongo.keys))
         reloading = true
         outline.reloadData()
         outline.expandItem(header)
@@ -350,6 +355,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     }
 
     @objc private func openConnectionChanged(_ notification: Notification) {
+        if let mongo = notification.object as? OpenMongoConnection, model.openMongo[mongo.saved.id] === mongo { return reload() }
         guard let open = notification.object as? OpenConnection, model.open[open.id] === open else { return }
         reload()
     }
@@ -403,7 +409,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             switch node.kind {
             case .header: return nil
             case .folder(let id), .connection(let id), .database(let id, _), .category(let id, _, _), .object(let id, _),
-                 .part(let id, _, _), .detail(let id, _, _, _), .prefix(let id, _, _, _), .message(let id, _), .users(let id): return id
+                 .part(let id, _, _), .detail(let id, _, _, _), .prefix(let id, _, _, _), .message(let id, _), .users(let id),
+                 .mongo(let id, _): return id
             }
         }
     }
@@ -434,7 +441,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         }
         guard let node = row(), let id = node.connectionOfTree ?? node.connectionID else { return false }
         var above = [model.connection(id)?.folderID.flatMap { folders[$0] }, connections[id]]
-        if let database = node.database, kind != .database(id, database) {
+        if case .mongo(_, let item) = kind, item.collection != nil {
+            above += [treeNodes[.mongo(id, MongoTreeItem(database: item.database))],
+                      item.index == nil ? nil : treeNodes[.mongo(id, MongoTreeItem(database: item.database, collection: item.collection))]]
+        } else if let database = node.database, kind != .database(id, database) {
             above.append(treeNodes[.database(id, database)])
             if let object = node.object {
                 above.append(treeNodes[.category(id, database, object.kind)])
@@ -490,6 +500,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         switch node.kind {
         case .database(let id, let name): model.openConnection(id)?.loadDetails(name)
         case .object(let id, let object): model.openConnection(id)?.loadDetails(object.database)
+        case .mongo(let id, let item): mongoOpened(id, item)
         default: break
         }
     }
@@ -571,12 +582,12 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .connection(let id):
             // Connected, it opens and closes as the tree's rows do; else whatever connects implements Connect.
-            guard model.openConnection(id) != nil else {
+            guard model.openConnection(id) != nil || model.openMongo[id] != nil else {
                 outline.sendCommand(Commands.connect.action)
                 return
             }
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
-        case .database, .category, .object, .part, .detail, .prefix:
+        case .database, .category, .object, .part, .detail, .prefix, .mongo:
             treeDoubleClicked(node)
         case .message, .users:
             break  // a click already showed Users and Roles
@@ -592,10 +603,17 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
                       Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
                       Commands.compareRows, Commands.diskUsage, Commands.users, nil])
+            if nodes.count == 1, let id = nodes[0].connectionID, model.openMongo[id] != nil {
+                Self.addMongoHostItems(to: menu)
+                Self.addMongoUsersItem(to: menu)
+            }
             menu.addItem(ConnectionMenus.colourMenu())
             menu.addItem(ConnectionMenus.moveMenu())
             menu.add([Commands.moveConnectionUp, Commands.moveConnectionDown, Commands.databasesShown])
             menu.add([nil, Commands.deleteConnection])
+            let connections = nodes.compactMap { $0.connectionID.flatMap(model.connection) }
+            MongoShellMenu.replaceTerminal(in: menu, connections: connections)
+            MongoDumpMenu.replaceExportRestore(in: menu, connections: connections)
         } else if nodes.allSatisfy({ $0.connectionOfTree != nil }) {
             return treeMenu(nodes)
         } else {
@@ -658,10 +676,11 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             cell.showFolder(folder?.name ?? "", count: node.children.count)
         case .connection(let id):
             if let connection = model.connection(id) {
-                cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true)
+                cell.show(connection, state: model.states[id], busy: model.openConnection(id)?.loading.contains(.schema) == true
+                    || model.openMongo[id]?.loading.contains("") == true)
                 if let shown = shownDatabases(id) { cell.showDatabases(shown) }
             }
-        case .database, .category, .object, .part, .detail, .prefix, .message, .users:
+        case .database, .category, .object, .part, .detail, .prefix, .message, .users, .mongo:
             return treeCell(node, in: outlineView)
         }
         return cell
@@ -739,6 +758,7 @@ final class SidebarCell: NSTableCellView {
     private let shield = NSImageView()
     private let state = NSImageView()
     private let lock = NSImageView()
+    private let mongo = NSImageView()
     private let badge = NSTextField(labelWithString: "")
     private let icon = NSImageView()
     private let spinner = NSProgressIndicator()
@@ -769,12 +789,16 @@ final class SidebarCell: NSTableCellView {
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
         lock.contentTintColor = .secondaryLabelColor
         lock.toolTip = "Read-only: AirSQL refuses writes on this connection"
+        mongo.image = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: "MongoDB")?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+        mongo.contentTintColor = .secondaryLabelColor
+        mongo.toolTip = "MongoDB: this connection is to a MongoDB server"
         icon.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.setAccessibilityLabel("Loading the schema")
-        let stack = NSStackView(views: [icon, dot, name, lock, shield, spinner, state, badge])
+        let stack = NSStackView(views: [icon, dot, mongo, name, lock, shield, spinner, state, badge])
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.setHuggingPriority(.defaultLow, for: .horizontal)
@@ -806,6 +830,7 @@ final class SidebarCell: NSTableCellView {
         colour()
         shield.isHidden = !connection.hasCustomSafety
         lock.isHidden = !connection.readOnly
+        mongo.isHidden = connection.engine != .mongodb
         badge.isHidden = false
         badge.stringValue = (connection.isProduction ? "PROD · " : "") + connection.routeBadge
         // Each state its own shape, not only its own colour.
@@ -833,7 +858,7 @@ final class SidebarCell: NSTableCellView {
             : connection.host + (connection.port.map { ":\($0)" } ?? "")
         toolTip = name.stringValue + (where_.isEmpty ? "" : " — " + where_) + " · " + connection.routeBadge
             + (connection.marks.isEmpty ? "" : " · " + connection.marks) + ": " + next + ", right-click for more"
-        setAccessibilityLabel([name.stringValue, connection.marks, status].filter { !$0.isEmpty }.joined(separator: ", "))
+        setAccessibilityLabel([name.stringValue, connection.engine == .mongodb ? "MongoDB" : "", connection.marks, status].filter { !$0.isEmpty }.joined(separator: ", "))
     }
 
     /// Adds how many of the server's databases the tree shows, when not all ("3 of 12").
@@ -850,6 +875,7 @@ final class SidebarCell: NSTableCellView {
         nameColour = .labelColor
         colour()
         shield.isHidden = true
+        mongo.isHidden = true
         lock.isHidden = true
         state.isHidden = true
         badge.isHidden = false
@@ -866,6 +892,7 @@ final class SidebarCell: NSTableCellView {
         nameColour = .quietText
         colour()
         shield.isHidden = true
+        mongo.isHidden = true
         lock.isHidden = true
         state.isHidden = true
         badge.isHidden = true

@@ -230,8 +230,15 @@ extension AppModel {
         return opened
     }
 
+    /// The same for a MongoDB connection, kept in `openMongo`.
+    func attach(mongo: OpenMongoConnection, to id: UUID) {
+        if let previous = openMongo.updateValue(mongo, forKey: id), previous !== mongo { previous.close() }
+        if mongo.databases == nil { mongo.load() }
+    }
+
     /// Disconnect: forgets the connection's schema and closes its sessions (a drop leaves those to the connector).
     func detach(_ id: UUID, closingSessions: Bool = true) {
         open.removeValue(forKey: id)?.close(closingSessions: closingSessions)
+        if let mongo = openMongo.removeValue(forKey: id), closingSessions { mongo.close() }
     }
 }

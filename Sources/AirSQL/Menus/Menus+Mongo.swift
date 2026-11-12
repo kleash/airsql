@@ -1,0 +1,283 @@
+import AppKit
+
+extension MainMenu {
+    /// MongoDB (mongo-plan.md): Data ▸ Collection, what a collection tab and the tree's collections do. Run, Cancel,
+    /// Refresh, Load More, Count and the history are the console's and grid's commands under a collection's names (the
+    /// same shortcuts, which the menus before this one answer first); SQL's own commands say "Not for MongoDB"
+    /// (`NotForMongo`).
+    static func addMongoItems(_ menus: Menus) {
+        func shared(_ command: Command, _ title: String) -> NSMenuItem {
+            let item = command.item()
+            item.title = title
+            item.target = CollectionMenu.shared
+            return item
+        }
+        menus.data.addItem(.separator())
+        menus.data.addItem(submenu("Collection", [
+            Commands.openCollection.item(), .separator(), shared(Commands.runStatement, "Run Query"), shared(Commands.cancelQuery, "Cancel"),
+            shared(Commands.refresh, "Refresh"), shared(Commands.loadMore, "Load More"), shared(Commands.countRows, "Count Documents Exactly"),
+            shared(Commands.history, "Query History"), .separator(), Commands.collectionDocuments.item(), Commands.collectionJSON.item(),
+            Commands.collectionSchema.item(), Commands.expandField.item(), .separator(), Commands.copyDocuments.item(),
+        ]))
+        addAggregationItems(menus)
+        addMongoIndexItems(menus)
+        addMongoBulkItems(menus)
+        addMongoAdminItems(menus)
+        addMongoHostItems(menus)
+        addMongoCompareItems(menus)
+        addMongoUsersItems(menus)
+        addMongoWatchItems(menus)
+        addMongoDumpItems(menus)
+        addMongoStageItems(menus)
+        addMongoQueryItems(menus)
+    }
+}
+
+// MARK: Aggregation (lane M4-app)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ New Aggregation, after Open Collection: for the collection of the tab in front, else the tree's.
+    static func addAggregationItems(_ menus: Menus) {
+        menus.data.items.last?.submenu?.insertItem(Commands.newAggregation.item(), at: 1)
+        addPipelineItems(menus)
+    }
+}
+
+// MARK: Pipelines (lane P2-aggregate)
+
+extension MainMenu {
+    /// Data ▸ Collection's pipeline items after New Aggregation, for the aggregation tab in front; Connection ▸ Open mongosh
+    /// in Terminal, for the selected MongoDB connection.
+    static func addPipelineItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last?.submenu else { return }
+        let items = [NSMenuItem.separator()] + [Commands.runToStage, Commands.countStages, Commands.savePipeline, Commands.renamePipeline,
+                                                Commands.deletePipeline, Commands.saveAsView].map { $0.item() }
+        for (offset, item) in items.enumerated() { collection.insertItem(item, at: 2 + offset) }
+        let shell = Commands.openMongosh.item()
+        shell.target = MongoShellMenu.shared
+        menus.connection.addItem(.separator())
+        menus.connection.addItem(shell)
+    }
+}
+
+/// The target of Data ▸ Collection's items that share their action with SQL's (Run Statement, Cancel…): they reach only
+/// the MongoDB collection tab in front, so Run Query never runs a console's SQL.
+@MainActor
+final class CollectionMenu: NSObject, NSMenuItemValidation {
+    static let shared = CollectionMenu()
+
+    private var tab: MongoCollectionController? {
+        // The frontmost main window's, as the Window menu finds it (AirSQL needn't be the active app).
+        let windows = [NSApp.mainWindow, NSApp.keyWindow].compactMap { $0 } + NSApp.orderedWindows
+        let main = windows.lazy.compactMap { $0.windowController as? MainWindowController }.first
+        return main?.selectedTab?.shown as? MongoCollectionController
+    }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        guard let tab else {
+            item.toolTip = "Open a MongoDB collection first: double-click one in the tree"
+            return false
+        }
+        let enabled = tab.validateMenuItem(item)
+        if item.action == Commands.runStatement.action { item.toolTip = "Find the documents the query bar describes" }
+        return enabled
+    }
+
+    @objc func runStatement(_ sender: Any?) { tab?.runStatement(sender) }
+    @objc func cancelQuery(_ sender: Any?) { tab?.cancelQuery(sender) }
+    @objc func refresh(_ sender: Any?) { tab?.refresh(sender) }
+    @objc func loadMore(_ sender: Any?) { tab?.loadMore(sender) }
+    @objc func countRows(_ sender: Any?) { tab?.countRows(sender) }
+    @objc func showHistory(_ sender: Any?) { tab?.showHistory(sender) }
+}
+
+// MARK: Export and import (lane M5)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Export Documents… and Import Documents…, which act on the tree's collection or the tab in front.
+    static func addMongoTransferItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoTransferCommands {
+            let item = command.item()
+            item.target = MongoTransferMenu.shared
+            collection.addItem(item)
+        }
+    }
+}
+
+// MARK: Editing documents (lane M3-app)
+
+extension MainMenu {
+    /// Data ▸ Collection's editing items: Edit Value… and Remove Field, then the grid's commands under a collection's
+    /// names, which reach only the collection tab in front (`CollectionMenu`).
+    static func addMongoEditItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in [Commands.editValue, Commands.removeField] { collection.addItem(command.item()) }
+        for command in [Commands.addRow, Commands.duplicateRow, Commands.deleteRows, Commands.revert, Commands.apply] {
+            let item = command.item()
+            item.title = MongoCollectionController.editingTitles[command.action] ?? command.title
+            item.toolTip = MongoCollectionController.editingTips[command.action] ?? command.tip
+            item.target = CollectionMenu.shared
+            collection.addItem(item)
+        }
+    }
+}
+
+extension CollectionMenu {
+    @objc func addRow(_ sender: Any?) { tab?.addRow(sender) }
+    @objc func duplicateRow(_ sender: Any?) { tab?.duplicateRow(sender) }
+    @objc func deleteRows(_ sender: Any?) { tab?.deleteRows(sender) }
+    @objc func revertChanges(_ sender: Any?) { tab?.revertChanges(sender) }
+    @objc func applyChanges(_ sender: Any?) { tab?.applyChanges(sender) }
+}
+
+// MARK: Indexes (lane M-index)
+
+extension MainMenu {
+    /// Data ▸ Collection's index items, after the pages: the Indexes page, then Create, Drop and Hide, for the tab in front
+    /// or the tree's collection or index.
+    static func addMongoIndexItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoIndexCommands { collection.addItem(command.item()) }
+    }
+}
+
+// MARK: Update Many and Delete Many (lane P2-bulk)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Update Many… and Delete Many…, for the collection tab in front (`CollectionMenu`).
+    static func addMongoBulkItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoBulkCommands {
+            let item = command.item()
+            item.target = CollectionMenu.shared
+            collection.addItem(item)
+        }
+    }
+}
+
+extension CollectionMenu {
+    @objc func updateMany(_ sender: Any?) { tab?.updateMany(sender) }
+    @objc func deleteMany(_ sender: Any?) { tab?.deleteMany(sender) }
+}
+
+// MARK: Collections, views and databases (lane P2-admin)
+
+extension MainMenu {
+    /// Data ▸ Collection's admin items, last: for the tree's database or collection while it has the focus, else the tab
+    /// in front (`MongoAdminMenu`).
+    static func addMongoAdminItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        for (index, command) in Commands.mongoAdminCommands.enumerated() {
+            if [0, 3, 5].contains(index) { collection.addItem(.separator()) }
+            let item = command.item()
+            item.target = MongoAdminMenu.shared
+            collection.addItem(item)
+        }
+    }
+}
+
+// MARK: Host (lane P2-host)
+
+extension MainMenu {
+    /// Connection ▸ MongoDB Server: the host page's panes and Disk Usage (the sidebar does them, as MySQL's host page),
+    /// and Kill Operation… (the host page in front's).
+    static func addMongoHostItems(_ menus: Menus) {
+        menus.connection.addItem(.separator())
+        let server = submenu("MongoDB Server", [Commands.mongoServer, Commands.mongoMembers, Commands.mongoOperations,
+                                                Commands.mongoDiskUsage].map { $0.item() } + [.separator(), Commands.killOperation.item()])
+        server.toolTip = "Show a MongoDB server's figures, members, operations and disk usage"
+        menus.connection.addItem(server)
+    }
+}
+
+// MARK: Compare (lane P2-compare)
+
+extension MainMenu {
+    /// Data ▸ Collection's compare items, last: Compare With… for the tree's collection, Reconcile… for the compare
+    /// window in front.
+    static func addMongoCompareItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu else { return }
+        collection.addItem(.separator())
+        for command in Commands.mongoCompareCommands { collection.addItem(command.item()) }
+    }
+}
+
+extension SidebarController {
+    /// Compare With… on a collection: it is the source; the target starts on its database, its collection to choose.
+    @objc func compareCollection(_ sender: Any?) {
+        guard let (open, items) = mongoSelection, items.count == 1, let collection = items[0].collection, items[0].index == nil
+        else { return NSSound.beep() }
+        MongoCompareWindowController.show(model: model, source: (open.saved, items[0].database, collection))
+    }
+}
+
+// MARK: Users and roles (lane P4-users)
+
+extension MainMenu {
+    /// Connection ▸ MongoDB Server: Users and Roles, then the commands of the users page in front.
+    static func addMongoUsersItems(_ menus: Menus) {
+        guard let server = menus.connection.items.last(where: { $0.title == "MongoDB Server" })?.submenu else { return }
+        server.addItem(.separator())
+        server.add(Commands.mongoUsersCommands)
+    }
+}
+
+// MARK: Watch Changes (lane P4-watch)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Watch Changes, after New Aggregation: for the tree's collection or database, or the collection
+    /// tab in front.
+    static func addMongoWatchItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let after = collection.items.firstIndex(where: { $0.action == Commands.newAggregation.action }) else { return }
+        collection.insertItem(Commands.watchChanges.item(), at: after + 1)
+    }
+}
+
+// MARK: Dump and restore (lane P4-dump)
+
+extension MainMenu {
+    /// Tools ▸ Dump with mongodump… and Restore with mongorestore…, after SQL's client tools (Flush), for the MongoDB
+    /// connection, database or collection in the tree or the tab in front (`MongoDumpMenu`).
+    static func addMongoDumpItems(_ menus: Menus) {
+        let after = max(menus.tools.indexOfItem(withTitle: "Flush"), menus.tools.indexOfItem(withTitle: Commands.restore.title))
+        for (offset, command) in Commands.mongoDumpCommands.enumerated() {
+            let item = command.item()
+            item.target = MongoDumpMenu.shared
+            menus.tools.insertItem(item, at: after + 1 + offset)
+        }
+    }
+}
+
+// MARK: Stages | Shell (lane P5-stages)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Edit as Stages, Shell and SQL, before Run to Here, for the aggregation tab in front; Query with
+    /// SQL… after New Aggregation, for the tree's collection or the collection tab in front.
+    static func addMongoStageItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let at = collection.items.firstIndex(where: { $0.action == Commands.runToStage.action }) else { return }
+        let modes = [Commands.pipelineStages, Commands.pipelineShell, Commands.pipelineSQL]
+        for (offset, command) in modes.enumerated() { collection.insertItem(command.item(), at: at + offset) }
+        collection.insertItem(.separator(), at: at + modes.count)
+        if let after = collection.items.firstIndex(where: { $0.action == Commands.newAggregation.action }) {
+            collection.insertItem(Commands.queryWithSQL.item(), at: after + 1)
+        }
+    }
+}
+
+// MARK: Query builder (lane P5-query)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Query Builder and Aggregate…, after Query History: for the collection tab in front.
+    static func addMongoQueryItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let after = collection.items.firstIndex(where: { $0.title == "Query History" }) else { return }
+        for (offset, command) in Commands.mongoQueryCommands.enumerated() { collection.insertItem(command.item(), at: after + 1 + offset) }
+    }
+}

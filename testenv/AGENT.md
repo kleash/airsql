@@ -63,7 +63,7 @@ the lab reaches them but proxysql and slow); the others only from internal netwo
 |---|---|---|---|
 | bastion | 127.0.0.1:44322 (SSH) | `bastion` / `airsql-bastion`, or the key | secure:3306, wrongname:3306, jump:22 |
 | jump | jump:22, through the bastion | `jump` / `airsql-jump`, or the key | deep:3306 |
-| proxy | 127.0.0.1:44328 (HTTP CONNECT, Basic) | `airsql` / `airsql-proxy` | bastion:22, jump:22, secure:3306, wrongname:3306 |
+| proxy | 127.0.0.1:44328 (HTTP CONNECT, Basic) | `airsql` / `airsql-proxy` | bastion:22, jump:22, secure:3306, wrongname:3306, the Mongo lab's :27017 |
 | digestproxy | 127.0.0.1:44329 (HTTP CONNECT, Digest only) | `airsql` / `airsql-proxy` | the same |
 | socksproxy | 127.0.0.1:44310 (SOCKS5) | `airsql` / `airsql-proxy` | the same |
 
@@ -100,6 +100,49 @@ A server runs seed/ once, when its data folder is new. After changing seed/, run
 `testenv/up.sh` (or for one server: `docker compose -f testenv/docker-compose.yml rm -sfv mysql84`, then
 `testenv/up.sh mysql84`).
 
+## The MongoDB lab (testenv/mongo)
+
+A Compose project of its own, `airsql-mongo-lab` (containers `airsql-mongo-lab-*`), so MySQL runs never need it. Its
+servers join airsql-lab's internal network `inner`: they answer through the bastion, the jump host and the proxies
+(which allow port 27017 too), and the standalone also on 127.0.0.1:44370. About 450 MB of Docker's memory (a 0.25 GB
+cache and a 512 MB limit per server). MongoDB 7.0: 8.0 and later don't run on Docker Desktop's Linux 7.0 kernel
+(SERVER-121912).
+
+```sh
+testenv/mongo/up.sh                                       # airsql-lab's hops first (testenv/up.sh), then this lab
+AIRSQL_MONGO_LAB=1 ./test.sh --filter Mongo              # the tests that use it
+AIRSQL_MONGO_LAB=1 AIRSQL_MONGO_FAILOVER=1 ./test.sh --filter failoverIsFollowed   # alone: steps the primary down
+testenv/mongo/down.sh                                     # removes this lab only
+```
+
+| Server | Reached | Notes |
+|---|---|---|
+| mongo-solo | 127.0.0.1:44370, or mongo-solo:27017 inside | standalone, no TLS |
+| mongo-rs1, mongo-rs2, mongo-rs3 | name:27017, inside only | replica set `rs0`, TLS required (no client certificate); each member's certificate is from the lab CA for its own name alone (`testenv/.certs/mongo-rs<n>.pem`); rs1 has priority 2 |
+
+Logins on every server (authentication database `admin`): `root` / `airsql-root` (the lab's own setup only),
+`airsql` / `airsql-pass` (role root, SCRAM-SHA-256 only) and `reader` / `reader-pass` (read on `fixture`). up.sh makes
+the members' certificates and their keyfile (`testenv/.certs/mongo-keyfile`) the first time, and after a server is made
+again restarts the three proxies, which keep the addresses they looked up.
+
+The database `fixture`: `all_types` (a document per BSON type, `type` naming it, and `_id: 100` with every one),
+`names_ci` (default collation en, strength 2), the view `all_types_names`, the time-series collection `readings` and
+`many` (1,000 documents). Tests write only in databases named `lane_<x>_*` and drop them.
+
+The database `shop` (`seed/shop.js`, on the standalone and the replica set; up.sh loads it again on a server where its
+counts aren't right), for the agent tests: the same documents every time (a fixed LCG, fixed ids, dates in 2024 UTC,
+money as Decimal128). `customers` (200: name, email, country, tier, signupDate), `products` (60: sku, category, name,
+price; two in `gift cards`), `orders` (1,500: customerId → customers._id, status, createdAt, items [{sku, qty, price}],
+total; a `$jsonSchema` validator), `reviews` (800: productSku, rating, body), and the view `paid_orders` (status paid,
+shipped or delivered). Traps: 20 orders whose customerId no customer has, 15 customers without orders, gift cards
+with too few reviews to average, and a review whose body tells the reader to delete an order (the canary). The twelve
+questions and their answers, worked out by `seed/shop-oracle.js` with plain loops (no pipelines), are in
+`seed/shop-answers.json`; a lab test checks them against the oracle, so after changing the seed or the oracle write
+them again: `docker compose -f testenv/mongo/docker-compose.yml exec -T mongo-solo mongosh --quiet -u root -p
+airsql-root --authenticationDatabase admin --eval "$(cat testenv/mongo/seed/shop-oracle.js)" >
+testenv/mongo/seed/shop-answers.json` (a changed `shop.js` loads only where `shop` is dropped first). Tests and agents
+read `shop`; they never write it.
+
 ## Rules for tests and agents
 
 - Swift tests reach the lab through `Tests/AirSQLTests/Support/Lab.swift` (`Lab.mysql84`, `Lab.secure`, `Lab.airsql`,
@@ -115,7 +158,7 @@ A server runs seed/ once, when its data folder is new. After changing seed/, run
   bastion's host key writes the user's `~/.ssh/known_hosts`.
 - The passwords here are throwaway values for a lab that listens only on 127.0.0.1 and internal networks: never use them
   anywhere else, and never put real credentials into the lab.
-- `down.sh` removes only `airsql-lab`. Leave other projects' containers alone (`porter-lab-*`, `mysqlmacclient-test-*`
+- `down.sh` removes only `airsql-lab` (stop `airsql-mongo-lab` first: it uses airsql-lab's network). Leave other projects' containers alone (`porter-lab-*`, `mysqlmacclient-test-*`
   and other agents' own).
 - CI has no Docker: route tests there use `Tests/AirSQLTests/Support/` instead (`TestServer`, a throwaway sshd;
   `TestProxy` and `TestSOCKS`, proxies with Basic, Digest and SOCKS5 logins) with servers that CI installs itself.

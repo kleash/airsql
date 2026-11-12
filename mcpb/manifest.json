@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "airsql",
   "display_name": "AirSQL",
-  "version": "1.0.2",
-  "description": "Work with your MySQL and MariaDB databases through AirSQL, the Mac app: schemas, read-only queries, profiles, proposed SQL.",
-  "long_description": "AirSQL is a native Mac app for MySQL and MariaDB. This bundle starts AirSQL's own MCP server (`AirSQL --mcp`), which talks to the AirSQL running on this Mac. It needs AirSQL installed and **AirSQL ▸ Settings ▸ Agents ▸ Allow AI agents to use AirSQL** turned on; each connection's access (Off, Schema, Schema + read, Schema + read + analytics) is chosen there, and connections start at Off. Agents never see passwords and can't change data: their statements must be provably read-only and run in a read-only transaction on a read-only session, and changes are proposed in a console tab for the person to run.",
+  "version": "1.1.0",
+  "description": "Work with your MySQL, MariaDB and MongoDB databases through AirSQL, the Mac app: schemas, read-only queries, profiles, proposed SQL.",
+  "long_description": "AirSQL is a native Mac app for MySQL, MariaDB and MongoDB. This bundle starts AirSQL's own MCP server (`AirSQL --mcp`), which talks to the AirSQL running on this Mac. It needs AirSQL installed and **AirSQL ▸ Settings ▸ Agents ▸ Allow AI agents to use AirSQL** turned on; each connection's access (Off, Schema, Schema + read, Schema + read + analytics) is chosen there, and connections start at Off. Agents never see passwords and can't change data: their statements must be provably read-only and run in a read-only transaction on a read-only session, and changes are proposed in a console tab for the person to run.",
   "author": {
     "name": "kleash",
     "url": "https://github.com/kleash"
@@ -33,11 +33,20 @@
     {"name": "run_queries", "description": "Several read-only statements in one call, as JSON or CSV, or into files"},
     {"name": "profile", "description": "Column statistics of a table, computed on the server in one call"},
     {"name": "explain", "description": "The server's plan for a read-only statement"},
+    {"name": "mongo_find", "description": "Documents of a MongoDB collection, read-only, within the row cap"},
+    {"name": "mongo_aggregate", "description": "A read-only aggregation pipeline on a MongoDB collection"},
+    {"name": "mongo_count", "description": "How many documents of a MongoDB collection match a filter"},
+    {"name": "mongo_distinct", "description": "The distinct values of a field in a MongoDB collection"},
+    {"name": "mongo_list_databases", "description": "A MongoDB connection's databases and their sizes"},
+    {"name": "mongo_list_collections", "description": "A MongoDB database's collections, views and time series"},
+    {"name": "mongo_list_indexes", "description": "A MongoDB collection's indexes"},
+    {"name": "mongo_stats", "description": "Sizes and counts of a MongoDB collection or database"},
+    {"name": "mongo_schema_sample", "description": "Per field: types, nulls and common values in a sample of documents"},
     {"name": "open_in_console", "description": "Put SQL into a console tab for the person to edit and run"},
     {"name": "read_console", "description": "What the person ran in a console tab, with the result or error"},
     {"name": "guide", "description": "How to use AirSQL as an agent: tools, access levels, read-only rules, recipes"}
   ],
-  "keywords": ["mysql", "mariadb", "sql", "database", "schema", "macos"],
+  "keywords": ["mysql", "mariadb", "mongodb", "sql", "database", "schema", "macos"],
   "license": "Apache-2.0",
   "compatibility": {
     "platforms": ["darwin"]

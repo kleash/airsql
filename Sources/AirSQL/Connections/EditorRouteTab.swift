@@ -92,7 +92,7 @@ extension ConnectionEditor {
 
     /// The way the connection goes, from this Mac to the database.
     var routePath: String {
-        let database = (draft.host.isEmpty ? "the database" : draft.host) + ":\(draft.port ?? 3306)"
+        let database = (draft.host.isEmpty ? "the database" : draft.host) + ":\(draft.port ?? draft.engine.defaultPort)"
         switch draft.route {
         case .direct:
             return draft.socket.isEmpty ? "This Mac → \(database)" : "This Mac → the server's socket \(draft.socket)"

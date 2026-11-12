@@ -98,6 +98,9 @@ enum MainMenu {
         addAgentItems(menus)
         addReconItems(menus)
         addWorkspaceItems(menus)
+        addMongoItems(menus)
+        addMongoEditItems(menus)
+        addMongoTransferItems(menus)
 
         // Last in View, as on every Mac.
         menus.view.add([nil, Commands.customizeToolbar, Commands.fullScreen])
@@ -158,9 +161,33 @@ final class OffReasons: NSObject, NSMenuDelegate {
         while let parent = top.supermenu, parent.supermenu != nil { top = parent }
         for item in menu.items where !item.isEnabled {
             guard let action = item.action, NSApp.target(forAction: action, to: item.target, from: item) == nil else { continue }
+            if NotForMongo.applies(item, (NSApp.mainWindow?.windowController as? MainWindowController)?.activeConnection) { continue }
             let reason = Self.inCompare.contains(action) ? "Open Tools ▸ Compare… first" : Self.inLists[action] ?? Self.reasons[top.title]
             item.toolTip = reason ?? Commands.tip(for: item)
         }
+    }
+}
+
+/// SQL's commands, off for a MongoDB tab or connection (mongo-plan.md, decision 4). The validators that answer for a
+/// connection ask it first: the main window, the sidebar and the tools; `OffReasons` when nothing answers.
+@MainActor
+enum NotForMongo {
+    nonisolated static let reason = "Not for MongoDB"
+    /// The menu bar's menus that are all SQL or MySQL's tools, but for Tools ▸ Agents.
+    private static let menus: Set<String> = ["Query", "Database", "Tools"]
+    /// SQL's commands elsewhere: in the File menu and the sidebar's menu.
+    private static let actions = Set([Commands.newQuery, Commands.sessions, Commands.openInTerminal, Commands.export, Commands.restore,
+                                      Commands.compare, Commands.compareWith, Commands.compareRows, Commands.diskUsage, Commands.users,
+                                      Commands.databasesShown].map(\.action))
+
+    /// Whether `item` is SQL's and `connection` (the tab's, else the one selected) is MongoDB's; it then says so.
+    static func applies(_ item: NSMenuItem, _ connection: SavedConnection?) -> Bool {
+        guard connection?.engine == .mongodb, let action = item.action, item.menu?.title != "Agents" else { return false }
+        var top = item.menu
+        while let parent = top?.supermenu, parent.supermenu != nil { top = parent }
+        guard actions.contains(action) || menus.contains(top?.title ?? "") else { return false }
+        item.explain(enabled: false, reason: reason)
+        return true
     }
 }
 

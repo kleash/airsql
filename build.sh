@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds build/AirSQL.app with libmariadb in Contents/Frameworks, and signs both ad hoc.
+# Builds build/AirSQL.app with libmariadb and libmongoc2 in Contents/Frameworks, and signs them ad hoc.
 #   ./build.sh            universal: arm64 + x86_64
 #   ./build.sh --native   host architecture only (fast dev loop)
 set -euo pipefail
@@ -30,9 +30,11 @@ if [ -z "${SDKROOT:-}" ]; then
     fi
 fi
 
-# libmariadb, as scripts/build-mariadb.sh makes it: copied from the shared vendor cache (built there first when this
-# version of the script hasn't been yet) when vendor/out is missing or was made by another version.
+# libmariadb and libmongoc2, as scripts/build-mariadb.sh and build-mongoc.sh make them: copied from the shared vendor
+# cache (built there first when this version of the script hasn't been yet) when vendor/out or vendor/mongoc is missing
+# or was made by another version.
 [ "$(cat vendor/out/stamp 2>/dev/null)" = "$(shasum -a 256 scripts/build-mariadb.sh | cut -d' ' -f1)" ] || scripts/build-mariadb.sh
+[ "$(cat vendor/mongoc/stamp 2>/dev/null)" = "$(shasum -a 256 scripts/build-mongoc.sh | cut -d' ' -f1)" ] || scripts/build-mongoc.sh
 
 # shortcut: the deprecated native build system, as in AirSCP's build.sh. SwiftPM 6.4's default (swiftbuild) records the
 # deployment target as the SDK the app was built with (vtool -show-build), which turns on AppKit's behaviour for old
@@ -59,8 +61,8 @@ plutil -replace CFBundleShortVersionString -string "$version" "$app/Contents/Inf
 plutil -replace CFBundleVersion -string "$version" "$app/Contents/Info.plist"
 cp Resources/AppIcon.icns "$app/Contents/Resources/"  # scripts/make-icon.swift draws it
 cp Resources/Assets.car "$app/Contents/Resources/"  # the accent colour: scripts/make-accent.sh
-# The app finds it through its rpath, @executable_path/../Frameworks (Package.swift).
-cp vendor/out/universal/lib/libmariadb.3.dylib "$app/Contents/Frameworks/"
+# The app finds them through its rpath, @executable_path/../Frameworks (Package.swift).
+cp vendor/out/universal/lib/libmariadb.3.dylib vendor/mongoc/universal/lib/libmongoc2.dylib "$app/Contents/Frameworks/"
 # The libraries' licences, and NOTICE (it says how to use another build of libmariadb).
 cp -R Resources/Licenses "$app/Contents/Resources/"
 # What agents read through the guide tool and MCP's instructions.
@@ -68,8 +70,8 @@ cp Resources/AgentGuide.md "$app/Contents/Resources/"
 cp docs/llms-full.txt "$app/Contents/Resources/AirSQL Help.txt"
 cp NOTICE "$app/Contents/Resources/Licenses/NOTICE.txt"
 
-# Inside out: the library, then the app.
-codesign --force --sign - "$app/Contents/Frameworks/libmariadb.3.dylib"
+# Inside out: the libraries, then the app.
+codesign --force --sign - "$app/Contents/Frameworks/libmariadb.3.dylib" "$app/Contents/Frameworks/libmongoc2.dylib"
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"
 echo "Built $app $version (${archs[*]})"

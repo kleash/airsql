@@ -27,7 +27,7 @@ public struct OpenRoute {
         if saved.route == .proxy {
             progress("Proxy \(saved.proxy.host)")
             return OpenRoute(tunnel: nil, relay: try ProxyRelay(socket: base + ".sock", proxy: saved.proxy, password: proxyPassword,
-                                                                host: saved.host, port: saved.port ?? 3306))
+                                                                host: saved.host, port: saved.port ?? saved.engine.defaultPort))
         }
         if let problem = SSHConfig.problem(with: saved) { throw AirSQLError(.other, problem) }
         var relay: ProxyRelay?

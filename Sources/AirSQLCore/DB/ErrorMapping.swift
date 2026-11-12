@@ -24,6 +24,9 @@ public struct AirSQLError: Error, LocalizedError, Equatable {
         case syntax, notFound, duplicate, foreignKey, readOnly, deadlock, lockTimeout
         /// An SSH host showed another host key than the one known for it (`ErrorMapping.ssh`).
         case hostKeyChanged
+        /// A write was sent and the connection failed before its answer: it may or may not have happened. Never sent
+        /// again on its own (MongoDB's Apply reloads instead).
+        case outcomeUnknown
         case other
     }
 

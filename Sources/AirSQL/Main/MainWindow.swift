@@ -201,12 +201,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// View ▸ SQL Log: shows or hides the docked log; with nothing connected, its window.
     @objc func showSQLLog(_ sender: Any?) {
         guard !model.open.isEmpty else {
-            SQLLogWindowController.show()
+            SQLLogWindowController.show(title: logTitle)
             return
         }
         model.data.settings.tree.showsLog.toggle()
         model.windows.forEach { $0.updateLogDock() }
     }
+
+    /// The log's name here: MongoDB's commands aren't SQL (the same file, `SQLLog`).
+    var logTitle: String { activeConnection?.engine == .mongodb ? "Command Log" : "SQL Log" }
 
     // MARK: What is active
 
@@ -454,10 +457,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         statusBar.setAccessory(selectedTab?.tabContent?.statusAccessory)
         let canShowLog = statusBar.sqlLog.commandTarget(Commands.sqlLog.action) != nil
         statusBar.sqlLog.isEnabled = canShowLog
-        statusBar.sqlLog.attributedTitle = NSAttributedString(string: "SQL Log", attributes: [
+        statusBar.sqlLog.attributedTitle = NSAttributedString(string: logTitle, attributes: [
             .foregroundColor: canShowLog ? NSColor.accent : NSColor.tertiaryLabelColor, .font: NSFont.systemFont(ofSize: 11.5)])
-        statusBar.sqlLog.toolTip = canShowLog ? Commands.sqlLog.tipWithShortcut
-            : "Nothing has been sent yet: the SQL log lists every statement once you connect"
+        statusBar.sqlLog.setAccessibilityLabel(logTitle)
+        let mongo = activeConnection?.engine == .mongodb
+        statusBar.sqlLog.toolTip = !canShowLog
+            ? "Nothing has been sent yet: " + (mongo ? "the command log lists every command" : "the SQL log lists every statement")
+                + " once you connect"
+            : mongo ? Commands.sqlLog.tipWithShortcut.replacingOccurrences(of: "statement", with: "command") : Commands.sqlLog.tipWithShortcut
     }
 
     // MARK: Commands
@@ -625,7 +632,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     /// the toolbar's Run does.
     override func supplementalTarget(forAction action: Selector, sender: Any?) -> Any? {
         if ([Commands.newDatabase.action, Commands.findOnServer.action, Commands.processList.action, Commands.sqlGenerator.action,
-             Commands.hostDatabases.action, Commands.users.action, Commands.modifyGrants.action] + Commands.treeActions).contains(action) { return sidebar }
+             Commands.hostDatabases.action, Commands.users.action, Commands.modifyGrants.action, Commands.mongoServer.action,
+             Commands.mongoDiskUsage.action, Commands.mongoUsers.action] + Commands.treeActions).contains(action) { return sidebar }
         // Disk Usage from the sidebar's focus goes there; a Disk Usage tab with the focus takes it first, to go into a row.
         if action == Commands.diskUsage.action, !(selectedTab?.shown is DiskUsageContent), !(selectedTab?.shown is HostContent) {
             return sidebar
@@ -641,6 +649,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if NotForMongo.applies(item, activeConnection) { return false }
         let connections = targetConnections
         var enabled = true, reason: String?
         switch item.action {
@@ -699,7 +708,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             enabled = window?.attachedSheet == nil
             reason = "A sheet is open: answer it first"
         case Commands.selectInTree.action?:
-            enabled = model.openConnection(selectedTab?.connectionID) != nil
+            enabled = model.openConnection(selectedTab?.connectionID) != nil || selectedTab?.connectionID.map { model.openMongo[$0] != nil } == true
             reason = "The tab shown has no connected server, so nothing of it is in the tree"
         case Commands.reopenClosedTab.action?:
             enabled = closedTabs.contains { $0.connection == nil || model.connection($0.connection) != nil }

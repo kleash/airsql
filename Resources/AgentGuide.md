@@ -1,15 +1,16 @@
 # AirSQL agent guide
 
-AirSQL is a Mac app for MySQL and MariaDB. Through its MCP server you can read the schemas of the connections the
-person at the Mac allows, run read-only queries, profile tables, propose SQL in a console tab for the person to edit
+AirSQL is a Mac app for MySQL and MariaDB, and MongoDB. Through its MCP server you can read the schemas of the
+connections the person at the Mac allows, run read-only queries (on MongoDB: finds, aggregations and counts; see
+mongodb), profile tables, propose SQL in a console tab for the person to edit
 and run, and drive AirSQL's windows as they do. You never see passwords, and you can't change data, connections or
 settings on your own: whatever would change something waits for the person at the Mac (see gate), and each
 connection's access level is their choice alone.
 
 ## overview
 
-1. `context` first: the connections you may use (name, id, access level, MySQL or MariaDB and its version, current
-   database, schema hash, row cap and timeout), the person's active connection and the open console tabs. A connection
+1. `context` first: the connections you may use (name, id, access level, `engine` (`mysql` or `mongodb`) and the
+   server's version, current database, schema hash, row cap and timeout), the person's active connection and the open console tabs. A connection
    whose access is Off isn't listed; `hiddenConnections` counts them.
 2. `get_schema` once per connection: every database's tables in one compact reply. Keep its `hash` and pass it back as
    `if_changed_from` later: an unchanged schema answers `{unchanged: true}` and costs nothing.
@@ -35,8 +36,9 @@ Each connection has one level, set by the person in Settings ▸ Agents (or the 
   10,000 rows and 30 s by default, 1,000 and 15 s on Production).
 - **Schema + read + analytics**: also `profile`, `to_file`, ten times the rows and four times the timeout.
 
-Sample rows are a separate switch: when on, `describe` shows a few rows of each table. A call beyond the level is refused
-with the level it needs. Ask the person to change a level; you can't.
+On a MongoDB connection every `mongo_` tool needs Schema + read; with analytics, ten times the documents and four
+times the timeout. Sample rows are a separate switch: when on, `describe` shows a few rows of each table. A call beyond
+the level is refused with the level it needs. Ask the person to change a level; you can't.
 
 ## read-only
 
@@ -76,7 +78,118 @@ The person sees each statement you ran and the rows you got in the connection's 
   Ask an Agent request names a tab by id, and lines to look at.
 - `guide {topic?}`: this guide.
 
+- The `mongo_` tools, for MongoDB connections: see mongodb.
+
 Long calls send progress notifications when your client asks for them (`_meta.progressToken`).
+
+## mongodb
+
+A connection whose `engine` is `mongodb` has its own tools; the SQL ones (`get_schema`, `describe`, `search_columns`,
+`run_queries`, `profile`, `explain`, the schema resource) refuse it, and the `mongo_` tools refuse a MySQL one. Each
+needs Schema + read (`mongo_schema`: Schema), and the connection connected in AirSQL. `database` defaults to the connection's own.
+
+Documents you send (`filter`, `projection`, `sort`, `collation`, a `hint` pattern, `pipeline`) are Extended JSON
+text, as strings: `"{\"status\": \"A\", \"total\": {\"$gt\": 10}}"`, with `$oid`, `$date`, `$numberLong`,
+`$numberDecimal` for the types JSON lacks. A string keeps the keys' order (a sort on two fields); an object is refused.
+Documents you get back (`mongo_find`, `mongo_aggregate`, `mongo_list_indexes`, `mongo_stats`) are strings too, each
+one document's relaxed Extended JSON text, so their keys keep their order and a double keeps its `.0`
+(`{"b": 1, "a": 2.0}`): parse each one; so is each of `mongo_distinct`'s values (`2.0`, `"Paris"`). Numbers are plain, other types `{"$oid": …}`, `{"$date": "2024-…Z"}`, `{"$numberDecimal": "…"}`; strings
+longer than 2,000 characters are cut.
+
+- `mongo_find {connection, database?, collection, filter?, projection?, sort?, skip?, limit?, collation?, hint?}`:
+  200 documents unless `limit` says more (0: the row cap), at most the row cap and 1 MB of documents; `capped: true`
+  means there may be more.
+- `mongo_aggregate {connection, database?, collection, pipeline, max_documents?, collation?, hint?}`: the same caps;
+  the row cap is added as the last stage, `{$limit: …}`.
+- `mongo_count {connection, database?, collection, filter?}`: `count`.
+- `mongo_distinct {connection, database?, collection, key, filter?}`: `values`, at most the row cap (`capped`).
+- `mongo_list_databases {connection}`: name, sizeOnDisk, empty; never admin, local or config.
+- `mongo_list_collections {connection, database?}`: name, type (`collection`, `view`, `timeseries`) and options (a
+  view's `viewOn` and pipeline, a validator); never `system.*`.
+- `mongo_list_indexes {connection, database?, collection}`: each index as the server describes it, as text.
+- `mongo_stats {connection, database?, collection?}`: a collection's storage stats (count, size, avgObjSize,
+  storageSize, totalIndexSize, indexSizes), or the database's dbStats without a collection.
+- `mongo_schema_sample {connection, database?, collection, size?}`: `$sample` of `size` documents (200, at most the
+  row cap), then per dotted path (array items under `path.[]`): `present`, `missing`, `nulls`, `types` with counts,
+  `distinct`, the five most common values (`top`, in shell form) and `min`/`max` of numbers or dates. Start here on an
+  unknown collection.
+
+Every call is checked before anything is sent, and refused (`Refused: <where>: <why>`) for: `$where`, `$function`,
+`$accumulator`, `$out` or `$merge` anywhere in any argument, or JavaScript code (`{"$code": …}`); a stage not on the
+allow-list (`$match`, `$project`, `$addFields`, `$set`, `$unset`, `$group`, `$sort`, `$limit`, `$skip`, `$count`,
+`$unwind`, `$sortByCount`, `$bucket`, `$bucketAuto`, `$replaceRoot`, `$replaceWith`, `$sample`, `$redact`,
+`$densify`, `$fill`, `$setWindowFields`, `$geoNear`, `$documents`, `$collStats`, `$indexStats`, `$lookup`,
+`$graphLookup`, `$unionWith`, `$facet`), so not `$currentOp`, `$changeStream` or `$search`; `$lookup`,
+`$graphLookup` and `$unionWith` of another database (name the collection plainly); the admin, local and config
+databases and `system.*` collections; a negative skip or limit. Every command carries `maxTimeMS` (the timeout), and
+a watchdog stops one that runs on. On a replica set or a mongos the reads run inside a transaction that is always
+aborted, so even a write that got past the check is refused by the server; there, `$collStats` and `$indexStats`
+stages fail (use `mongo_stats`). To change data, propose it with `mongo_open`: there is no tool that writes.
+Dump with mongodump… and Restore with mongorestore… are not for agents: through the UI tools they are refused ("Only the
+person at the Mac can run mongodump.").
+
+`mongo_find` and `mongo_aggregate` take `to_file: true` (Schema + read + analytics): the documents, up to the row
+cap, go to a new file in AirSQL's agent export folder, one relaxed Extended JSON document a line (`.jsonl`, nothing
+cut), and the reply has `file`, `count`, `capped` and `bytes` instead of the documents. There is no path argument.
+
+MongoDB's users and roles (Connection ▸ MongoDB Server ▸ Users and Roles) are the person's: not for agents, and
+refused for them like MySQL's.
+
+A server's error on `mongo_find`, `mongo_aggregate` or `mongo_explain` is JSON text: `{code, codeName, message,
+stage?, hint?}`, where `stage` is the pipeline stage that holds the unknown word and `hint` the nearest operator or
+stage (`Did you mean $sum?`) or the version a newer one needs (`$median needs MongoDB 7.0`). A refused stage that
+MongoDB doesn't have gets the nearest one too. A reply that is likely wrong has `warnings`, from the collection's
+sample: a path of the filter, sort or projection (an aggregate's leading `$match` and `$sort`) that is not in the
+sample (`customerID is not in the sample of 200 documents; nearest: customerId`), a literal of a type the field never
+has there (`createdAt is date in the sample …: compare with {"$date": …}`), and `Nothing matched` after them when
+nothing did. A sample shows what it holds, not all there is: check before you conclude.
+
+### mongo_schema
+
+`mongo_schema {connection, database?, collections?, sample?, if_changed_from?}` → `{hash, unchanged, text, capped}`:
+start here on a MongoDB database. The whole database in one text within 24 KB, from a sample of each collection (200
+documents, kept by AirSQL until refreshed): per collection its count, average size, indexes (`unique`, `partial`)
+and validator; per path (the 60 most often present, 4 deep; arrays' items under `path.[]`) its types (with shares
+when mixed) and its share when under 100%, and with Schema + read the enums (strings of up to 12 values, with
+shares) and the ranges of numbers and dates; views with their pipeline; and references:
+`customerId objectId -> customers._id (49/50)` means a path named `<name>Id` (or ending in another collection's
+unique-indexed field, `productSku -> products.sku`) of the same type, whose sampled values (up to 50) were looked up
+there with one `$in`: kept when 80% or more were found, with the count, so orphans show as a lower ratio. Needs
+Schema access (no enums or ranges at Schema alone). `collections` limits it; `sample: false` reads no documents and
+lists only collections already sampled. Collections not sampled within the timeout say so and `capped` is true (ask
+again: the samples go on and are kept); so is a text that had to leave paths or collections out. Pass `hash` as
+`if_changed_from` to get `{hash, unchanged: true}`.
+
+### mongo_explain
+
+`mongo_explain {connection, database?, collection, filter?, projection?, sort?, limit? | pipeline, hint?,
+verbosity?}` → `{scan, index, docsExamined, returned, ms, warnings, plan}`. `verbosity: "plan"` (the default) asks
+the query planner only and runs nothing: use it to check a query before running it. `"run"` runs it
+(executionStats) for `docsExamined`, `returned` (what the query stage returned; a `$group` after it returns fewer)
+and `ms`. `scan` is `collection`, `index` or `none`; `index` the indexes it reads; `plan` the winning plan as an
+indented tree; `warnings` a whole-collection read, an in-memory sort, and the sample's warnings above. Checked,
+refused and capped as `mongo_find` and `mongo_aggregate` are; Schema + read.
+
+### mongo_open
+
+`mongo_open {connection, database?, collection, filter?, projection?, sort?, skip?, limit?, collation?}` or
+`{connection, database?, collection, pipeline, collation?}`, each with `title?`: puts a find into a new collection tab's
+query bar, or a pipeline into a new aggregation tab, in shell form, and answers `{tab, title, connection, kind}`. The
+tab is titled `<title or collection> · proposed by <you>` and says so; nothing runs and nothing is read until the
+person presses Run. This is how to propose a query to look at, or a change: a pipeline with `$merge` or `$out` may be
+proposed, and Run then shows it to the person first (on a read-only connection it refuses). Documents are Extended JSON
+text, as for `mongo_find`; one that doesn't parse is refused with where and why. The admin, local and config databases
+and `system.*` collections are refused. Needs Schema + read, and the connection connected.
+
+`context` lists MongoDB tabs among `consoleTabs` with `kind` (`collection` or `aggregation`), `database` and
+`collection`; `activeTab` is the one in front. `read_console {tab?}` on one gives its `query` (the bar's fields) or
+its `pipeline` and `options`, `text` (the filter or the pipeline), the same as relaxed Extended JSON for `mongo_find`/`mongo_aggregate` (`queryJSON`: filter, projection, sort, collation; `pipelineJSON`; a field that doesn't parse yet is left out), and `run`: `state` (`not run`, `running`, `done`,
+`failed`, `cancelled`), `error`, `documentsLoaded`. With Schema + read it adds `selectedIds` and the first 50
+documents loaded (`documents`, as `mongo_find` gives them); with Schema only, `selectedCount` and no documents. Values
+of fields named like secrets (`pwd`, `password`, …) are replaced, as in AirSQL's command log.
+
+Watch Changes tabs (a collection's or database's change stream) are not for agents: `context` doesn't list them and no
+tool watches; to see what changed, run `mongo_find` again (on a field such as `updatedAt`).
 
 ## resources
 
@@ -305,7 +418,10 @@ Ids for `press`, `set` and `screenshot element:<id>`; `snapshot include elements
 - "needs Schema + read" (or analytics): the person can raise the level in Settings ▸ Agents.
 - "Refused": the statement isn't provably read-only; rewrite it as one plain SELECT, or propose it with
   `open_in_console`.
-- "Stopped at the agent timeout": narrow the query (WHERE, LIMIT), or ask for the analytics level.
+- "Stopped at the agent timeout": narrow the query (WHERE, LIMIT; on MongoDB a filter on an indexed field), or ask
+  for the analytics level.
+- "is a MongoDB connection" or "is a MySQL or MariaDB connection": use the tools of that engine (see mongodb).
+- "… is Extended JSON text: pass it as a string": send documents and pipelines as strings of JSON.
 - "Only the person at the Mac can approve…" or "…can change…": that is the gate; tell the person what waits for them.
 - "The person at the Mac declined": nothing ran; ask what they want instead.
 - "Settings are the person's", "The clipboard is the person's": use `snapshot include settings` to read settings, and

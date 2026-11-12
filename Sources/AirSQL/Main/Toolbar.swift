@@ -70,7 +70,8 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         case .transactionMode: return popupItem(identifier, flag ? transactionPopup : NSPopUpButton(), label: "Transaction Mode",
                                                 width: (110, 130))
         case .run: return CommandToolbarItem(identifier, Commands.runStatement, title: "Run", symbol: "play.fill", primary: true,
-                                             reason: "Open a query tab (⌘T) to run SQL")
+                                             reason: "Open a query tab (⌘T) to run SQL",
+                                             mongoReason: "Open a collection (double-click it in the tree) to find its documents")
         case .runAll: return CommandToolbarItem(identifier, Commands.runAll, title: "Run All", symbol: "play.square.stack",
                                                 iconOnly: true, reason: "Open a query tab (⌘T) to run SQL")
         case .explain: return CommandToolbarItem(identifier, Commands.explain, title: "Explain", symbol: "text.magnifyingglass",
@@ -81,7 +82,8 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         case .rollback: return CommandToolbarItem(identifier, Commands.rollback, title: "Roll Back", symbol: nil,
                                                   reason: "No transaction is open in this tab")
         case .cancel: return CommandToolbarItem(identifier, Commands.cancelQuery, title: "Cancel", symbol: "stop.fill",
-                                                iconOnly: true, reason: "Nothing is running in this tab")
+                                                iconOnly: true, reason: "Nothing is running in this tab",
+                                                mongoReason: "Nothing is running in this tab")
         default: return nil
         }
     }
@@ -160,6 +162,23 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         transactionPopup.isEnabled = canSetMode
         transactionPopup.toolTip = canSetMode ? "Choose Auto-commit or Manual, and how this query tab's transactions see others' "
             + "changes (the isolation level)" : why
+        // A MongoDB tab or connection: the database and the transaction mode are SQL's (mongo-plan.md, decision 4).
+        let mongo = main?.activeConnection?.engine == .mongodb
+        // SQL's controls are hidden on MongoDB where macOS can hide a toolbar item (15 and later), else disabled below.
+        if #available(macOS 15.0, *) {
+            let sqlOnly: Set<NSToolbarItem.Identifier> = [.database, .runAll, .transactionMode, .commit, .rollback]
+            for item in main?.window?.toolbar?.items ?? [] where sqlOnly.contains(item.itemIdentifier) && item.isHidden != mongo {
+                item.isHidden = mongo
+                if !mongo, !(item is PopupToolbarItem) { item.validate() }  // shown again: not in this pass's visible items
+            }
+        }
+        if mongo {
+            for popup in [databasePopup, transactionPopup] {
+                popup.isEnabled = false
+                popup.toolTip = NotForMongo.reason
+            }
+            popupItems[databasePopup]?.toolTip = NotForMongo.reason
+        }
         popupItems[transactionPopup]?.toolTip = transactionPopup.toolTip
     }
 
@@ -190,16 +209,18 @@ final class PopupToolbarItem: NSToolbarItem {
 
 /// A command's button in the toolbar: its symbol and title, its tooltip (with its shortcut), enabled only while
 /// something in the responder chain can do it now, as its menu item would be, and otherwise saying why not (the
-/// handler's reason, else `reason`).
+/// handler's reason, else `reason`; on a MongoDB tab or connection, `mongoReason`).
 final class CommandToolbarItem: NSToolbarItem {
     let command: Command
     let reason: String
+    let mongoReason: String
     private let button: NSButton
 
     init(_ identifier: NSToolbarItem.Identifier, _ command: Command, title: String, symbol: String?, primary: Bool = false,
-         iconOnly: Bool = false, reason: String) {
+         iconOnly: Bool = false, reason: String, mongoReason: String = NotForMongo.reason) {
         self.command = command
         self.reason = reason
+        self.mongoReason = mongoReason
         button = NSButton(title: title, target: nil, action: command.action)
         super.init(itemIdentifier: identifier)
         button.bezelStyle = .texturedRounded
@@ -224,7 +245,9 @@ final class CommandToolbarItem: NSToolbarItem {
     }
 
     override func validate() {
-        let (enabled, why) = command.availability(from: button, otherwise: reason)
+        // On MongoDB only a collection tab answers (Run, Cancel): the rest of the chain is SQL's.
+        let mongo = (view?.window?.windowController as? MainWindowController)?.activeConnection?.engine == .mongodb
+        let (enabled, why) = command.availability(from: button, otherwise: mongo ? mongoReason : reason)
         button.isEnabled = enabled
         button.toolTip = enabled ? tip : why
         // The item's own tooltip too: AppKit gives it to the button as its accessibility help (what VoiceOver reads).

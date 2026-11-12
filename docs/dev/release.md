@@ -106,12 +106,14 @@ Run workflow (tag `vX.Y.Z`). With the CI signing secrets, a tag is enough: `git 
 
 ## The hardened runtime and libmariadb
 
-The release signs `Contents/Frameworks/libmariadb.3.dylib`, then the app, with the Developer ID and `--options runtime`,
-and no entitlements:
+The release signs `Contents/Frameworks/libmariadb.3.dylib` and `libmongoc2.dylib`, then the app, with the Developer ID
+and `--options runtime`, and no entitlements:
 
 - **Library validation** comes with the hardened runtime: the app loads only libraries signed by Apple or by its own
-  team. libmariadb carries the same Developer ID, so it loads; the release workflow proves it by starting the app from
-  the zip (`AirSQL --version` prints the library's version, and dyld would stop the app before that).
+  team. libmariadb and libmongoc2 carry the same Developer ID, so they load; the release workflow proves it by starting
+  the app from the zip (`AirSQL --version` prints both libraries' versions, and dyld would stop the app before that).
+  The mongo-c-driver source isn't attached to releases: its Apache License 2.0 doesn't ask for it, and the SBOM names
+  the tarball with its SHA-256.
 - **No entitlements.** AirSQL compiles no code at run time (no JIT or unsigned executable memory) and needs no camera,
   microphone, location, contacts, calendars, photos or Apple Events. The network entitlements belong to the App
   Sandbox, which this build doesn't use, so connections need none: the first connection to the local network shows
@@ -153,11 +155,12 @@ are downloads, checked against the SHA-256s that `scripts/build-mariadb.sh` pins
 | Workflow (badge) | What it checks | When |
 |---|---|---|
 | `codeql.yml` (CodeQL) | AirSQL's Swift and C with the `security-extended` queries | Pushes to `main`, pull requests, by hand |
-| `security.yml` (Security) | OSV-Scanner on the SBOM against osv.dev, after showing it flags Connector/C 3.1.7 and OpenSSL 3.5.0; gitleaks over every commit | Pushes to `main`, pull requests, by hand, and before every release (release.yml calls it) |
+| `security.yml` (Security) | OSV-Scanner on the SBOM against osv.dev, after showing it flags Connector/C 3.1.7, OpenSSL 3.5.0 and mongo-c-driver 1.27.4; gitleaks over every commit | Pushes to `main`, pull requests, by hand, and before every release (release.yml calls it) |
 | `scorecard.yml` (OpenSSF Scorecard) | Supply-chain practices; publishes the score behind the badge | Pushes to `main`, by hand |
 
-A finding fails the run. For a CVE in Connector/C or OpenSSL: move the pin in `scripts/build-mariadb.sh` to the fixed
-release, then the gates and a release. OSV lists few Connector/C CVEs (most are filed against MariaDB Server), so read
+A finding fails the run. For a CVE in Connector/C or OpenSSL: move the pin in `scripts/build-mariadb.sh` (OpenSSL's in
+`scripts/build-mongoc.sh` too) to the fixed release, then the gates and a release; for mongo-c-driver or the utf8proc
+it bundles, its pin in `scripts/build-mongoc.sh` (and `utf8proc_version` in `scripts/sbom.sh`). OSV lists few Connector/C CVEs (most are filed against MariaDB Server), so read
 Connector/C's release notes when its pin moves. Every action is pinned to a commit SHA with its version in a comment,
 and every tool a workflow or script downloads is one release checked by its SHA-256.
 

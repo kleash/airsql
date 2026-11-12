@@ -13,8 +13,9 @@ if [[ ! $version =~ Swift\ version\ ([0-9]+)[0-9.]* ]] || (( BASH_REMATCH[1] < 6
     echo "The app itself builds with Swift 5.9 or later: ./build.sh" >&2
     exit 1
 fi
-# libmariadb, as build.sh gets it: when vendor/out is missing or was made by another version of its script.
+# libmariadb and libmongoc2, as build.sh gets them: when vendor/out or vendor/mongoc is missing or stale.
 [ "$(cat vendor/out/stamp 2>/dev/null)" = "$(shasum -a 256 scripts/build-mariadb.sh | cut -d' ' -f1)" ] || scripts/build-mariadb.sh
+[ "$(cat vendor/mongoc/stamp 2>/dev/null)" = "$(shasum -a 256 scripts/build-mongoc.sh | cut -d' ' -f1)" ] || scripts/build-mongoc.sh
 if [[ ${AIRSQL_LAB:-} == 1 ]]; then
     docker=/Applications/Docker.app/Contents/Resources/bin/docker
     [[ -x $docker ]] || docker=docker

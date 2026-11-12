@@ -1,8 +1,8 @@
 {
   "name": "airsql",
   "displayName": "AirSQL",
-  "version": "1.0.2",
-  "description": "Let Claude use AirSQL, the Mac app for MySQL and MariaDB: read schemas, run read-only queries, profile tables and propose SQL in a console tab for you to run, through AirSQL's own MCP server.",
+  "version": "1.1.0",
+  "description": "Let Claude use AirSQL, the Mac app for MySQL, MariaDB and MongoDB: read schemas, run read-only queries and finds, profile tables and propose SQL in a console tab for you to run, through AirSQL's own MCP server.",
   "author": {
     "name": "kleash",
     "url": "https://github.com/kleash"

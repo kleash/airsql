@@ -70,13 +70,14 @@ public struct TLSCertificate: Equatable, Sendable {
 final class TLSCheck {
     let host: String
     let options: TLSOptions
-    let mysql: UnsafeMutablePointer<MYSQL>
+    /// nil for a check AirSQL runs itself (MongoDB's, after the handshake).
+    let mysql: UnsafeMutablePointer<MYSQL>?
     /// The server's certificate, once the handshake showed it.
     private(set) var certificate: TLSCertificate?
     /// Why the check failed: the connect's error, in place of Connector/C's.
     private(set) var failure: AirSQLError?
 
-    init(host: String, options: TLSOptions, mysql: UnsafeMutablePointer<MYSQL>) {
+    init(host: String, options: TLSOptions, mysql: UnsafeMutablePointer<MYSQL>? = nil) {
         self.host = host
         self.options = options
         self.mysql = mysql
@@ -95,7 +96,7 @@ final class TLSCheck {
         let passed = check.verify(peerCertificates(tls))
         // Connector/C goes on to its own password-based check (MariaDB 11.4's) unless the status is cleared, and fails
         // the connect for a status above HOST|TRUST.
-        check.mysql.pointee.net.tls_verify_status = passed ? 0 : UInt8(MARIADB_TLS_VERIFY_ERROR)
+        check.mysql?.pointee.net.tls_verify_status = passed ? 0 : UInt8(MARIADB_TLS_VERIFY_ERROR)
         return passed ? 0 : 1
     }
 

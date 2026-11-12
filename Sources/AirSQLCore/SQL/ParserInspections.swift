@@ -100,6 +100,34 @@ public enum SQLInspections {
         return Array(found.prefix(ConsoleScript.unclosedLimit))
     }
 
+    /// The name nearest `name`, when it's near enough to be a typo (case doesn't count). MongoDB's agent hints use it too.
+    static func closest(to name: String, in candidates: [String]) -> String? {
+        let lower = Array(name.lowercased())
+        let limit = max(1, lower.count / 3)
+        var best: (name: String, distance: Int)?
+        for candidate in candidates {
+            let other = Array(candidate.lowercased())
+            guard abs(other.count - lower.count) <= limit else { continue }
+            let distance = editDistance(lower, other)
+            if distance <= limit, distance < (best?.distance ?? .max) { best = (candidate, distance) }
+        }
+        return best?.name
+    }
+
+    private static func editDistance(_ a: [Character], _ b: [Character]) -> Int {
+        var row = Array(0...b.count)
+        for (i, x) in a.enumerated() {
+            var previous = row[0]
+            row[0] = i + 1
+            for (j, y) in b.enumerated() {
+                let cost = min(previous + (x == y ? 0 : 1), row[j] + 1, row[j + 1] + 1)
+                previous = row[j + 1]
+                row[j + 1] = cost
+            }
+        }
+        return row[b.count]
+    }
+
     private struct Check {
         let analysis: SQLAnalysis
         let noBackslashEscapes: Bool
@@ -151,7 +179,7 @@ public enum SQLInspections {
         mutating func names() {
             let refresh = "as far as AirSQL knows. If it's new, refresh the schema"
             for issue in analysis.issues {
-                let replace = closest(to: issue.name, in: issue.candidates).map {
+                let replace = SQLInspections.closest(to: issue.name, in: issue.candidates).map {
                     SQLFix("Change to “\($0)”", .edit([SQLEdit(range: issue.range, text: SQLCompletion.quote($0))]))
                 }
                 let reload = SQLFix("Refresh the Schema", .refreshSchema)
@@ -178,34 +206,6 @@ public enum SQLInspections {
                     say("ambiguousColumn", issue.range, "“\(issue.name)” is in " + sources.map { "“\($0)”" }.joined(separator: " and "), fixes: fixes)
                 }
             }
-        }
-
-        /// The name nearest `name`, when it's near enough to be a typo.
-        func closest(to name: String, in candidates: [String]) -> String? {
-            let lower = Array(name.lowercased())
-            let limit = max(1, lower.count / 3)
-            var best: (name: String, distance: Int)?
-            for candidate in candidates {
-                let other = Array(candidate.lowercased())
-                guard abs(other.count - lower.count) <= limit else { continue }
-                let distance = editDistance(lower, other)
-                if distance <= limit, distance < (best?.distance ?? .max) { best = (candidate, distance) }
-            }
-            return best?.name
-        }
-
-        private func editDistance(_ a: [Character], _ b: [Character]) -> Int {
-            var row = Array(0...b.count)
-            for (i, x) in a.enumerated() {
-                var previous = row[0]
-                row[0] = i + 1
-                for (j, y) in b.enumerated() {
-                    let cost = min(previous + (x == y ? 0 : 1), row[j] + 1, row[j + 1] + 1)
-                    previous = row[j + 1]
-                    row[j + 1] = cost
-                }
-            }
-            return row[b.count]
         }
 
         // MARK: Statements

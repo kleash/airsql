@@ -13,10 +13,13 @@ a few options. Passwords go in your Keychain, never in AirSQL's files.
 Choose **File ▸ New Connection…** (⌘N), or select a connection and choose **Connection ▸ Edit…**. The editor has six
 tabs:
 
-- **General**: a name, the sidebar folder, a colour (Production also turns on the strict safety checks), the host and
+- **General**: the kind of server (MySQL or MariaDB, or MongoDB: browse, query and edit its collections as [MongoDB
+  collections](mongodb.md) says; its editor leaves out MySQL's own settings), a name, the sidebar folder, a colour
+  (Production also turns on the strict safety checks), the host and
   port, or for a server on this Mac its socket file, the user and password, the database to open, and a comment (what
   it is for, who to ask). Tick **Ask at each connect** to type the user and password each time; they are kept until
-  you disconnect and never saved.
+  you disconnect and never saved. A MongoDB connection has its own fields here: see [Connect to
+  MongoDB](mongodb.md#connect-to-mongodb).
 - **TLS**: how the connection is encrypted. A new connection to `127.0.0.1` or `localhost` starts with TLS off, as such
   servers rarely offer it and nothing leaves this Mac; any other host, or any route, starts with the strict check. **Encrypt, check certificate and host name** is the safe choice: the server must
   show a certificate for the host name you typed, even through a tunnel. A server whose certificate macOS doesn't know
@@ -77,15 +80,17 @@ you can then edit.
 
 ## Import and export connections
 
-- **File ▸ New Connection from URL…** takes a `mysql://user@host:3306/database` address (or `mariadb://`), from the
-  clipboard when it holds one, and opens the connection's settings to check before you save.
+- **File ▸ New Connection from URL…** takes a `mysql://user@host:3306/database` address (or `mariadb://`, or a
+  MongoDB `mongodb://` or `mongodb+srv://` address), from the clipboard when it holds one, and opens the connection's
+  settings to check before you save.
 - **File ▸ Import Connections…** reads the saved connections of Sequel Ace, TablePlus, DBeaver or MySQL Workbench when
   they are on this Mac, or a file you choose: an AirSQL export, one of those apps' files, or HeidiSQL's exported
   settings. It lists the MySQL and MariaDB connections with ticks; one that is already here starts unticked.
 - **File ▸ Export Connections…** saves the selected connections, or all of them, to a file for another Mac or a
   colleague.
 
-Passwords never come along: an export has none, an import doesn't read them, and a password in a URL is left out.
+Passwords never come along: an export has none, an import doesn't read them, and a password in a MySQL URL is left
+out (a MongoDB address's goes to your Keychain when you save).
 AirSQL asks for each when you connect. An imported AirSQL file also leaves out what would run by itself: the client
 programs chosen, startup SQL and agent access. TLS starts strict, except for a server on this Mac.
 

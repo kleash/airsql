@@ -44,6 +44,31 @@ no agent can, whatever it asks.
 - To change something, an agent puts the SQL into a query tab. Nothing runs until you press Run.
 - For more safety still, connect with a database user that can only read.
 
+## MongoDB connections
+
+On a MongoDB connection with **Schema + read** (or analytics), agents get tools of their own: find, aggregate, count,
+distinct, the lists of databases, collections and indexes, sizes, and a summary of a sample of documents. They can't
+write: every request is checked before it is sent, and refused if it would run JavaScript (`$where`, `$function`) or
+write (`$out`, `$merge`), uses a pipeline stage AirSQL hasn't vetted, or reaches MongoDB's own databases (admin,
+local, config) or `system` collections. Each runs with the time limit and document cap of Settings ▸ Safety, and on a
+replica set inside a transaction that is always cancelled, so even a write that got past the check is refused by the
+server. For more safety still, connect with a user that has only the `read` role. Documents, distinct values and sizes
+reach the agent as Extended JSON text, so a field's order and a number's type (`2.0` stays a double) are kept.
+
+With **Schema** access an agent can ask for a whole database in one summary: each collection's count, size, indexes
+and validator, its fields with their types (and with Schema + read their common values and ranges), views, and the
+references between collections (orders' `customerId` to `customers._id`), each checked by looking up a few sampled
+values. It can ask how MongoDB would run a query without running it (explain's plan), or run it for its figures.
+When a query names a field not in the collection's sample, or compares a date with a string, the reply warns and
+names the nearest field; a server's error says which stage and which word it didn't know. With **Schema + read +
+analytics**, finds and pipelines can go to a file in the agent export folder (Settings ▸ Agents), never elsewhere.
+
+To propose a query or a change, an agent opens a new collection tab with the query bar filled in, or a pipeline tab,
+titled "… · proposed by" the agent and with a note that says so (**Dismiss** hides it). Nothing runs, and nothing is
+read, until you press Run; a pipeline that writes (`$merge`, `$out`) still shows you its preview first, and is refused
+on a read-only connection. The agent can read what a MongoDB tab holds and how its last run went; the documents
+loaded in it only when the connection allows Schema + read.
+
 ## Agents in AirSQL's windows
 
 Agents can also work in AirSQL's windows as you do: open tabs, choose menu commands, fill in sheets, take screenshots.

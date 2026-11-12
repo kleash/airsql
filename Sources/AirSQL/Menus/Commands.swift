@@ -423,7 +423,7 @@ enum Commands {
     static let exportConnections = Command("Export Connections…", #selector(AirSQLActions.exportConnections(_:)),
                                            tip: "Save the selected connections, or all of them, to a file, without passwords")
     static let newConnectionFromURL = Command("New Connection from URL…", #selector(AirSQLActions.newConnectionFromURL(_:)),
-                                              tip: "Make a connection from a mysql:// address")
+                                              tip: "Make a connection from a mysql:// or mongodb:// address")
 
     // MARK: Edit
     static let undo = Command("Undo", sel("undo:"), "z", tip: "Undo the last change")
@@ -995,7 +995,7 @@ enum Commands {
         setUpAgents, agentActivity, agentResults, openInNewConsole, turnAgentsOff,
         minimize, zoom, previousTab, nextTab, previousTabControl, nextTabControl, mainWindow, bringAllToFront, tab(1),
         help, offlineHelp, gettingStarted, shortcuts, releaseNotes, reportProblem, copyDiagnostics, agentGuide,
-    ] + editorCommands + treeCommands + schema + workspaceCommands
+    ] + editorCommands + treeCommands + schema + workspaceCommands + mongoCommands + mongoTransferCommands
 
     /// The command with this action (and tag, for the actions several commands share).
     static func command(for action: Selector?, tag: Int = 0) -> Command? {
@@ -1014,6 +1014,7 @@ enum Commands {
         "Server Home": "Show what the server holds and does: databases, variables, status, processes",
         "Focus": "Put the keyboard in the sidebar, the editor or the results",
         "Grid": "Change how the grid shows its rows: a record at a time, turned, tinted, as text or as a chart",
+        "Collection": "Run, page, sample and copy a MongoDB collection's documents",
         "Text Size": "Make the text bigger or smaller, or go back to its usual size",
         "Server": "Look after the server: its home page, variables and what it is running",
         "Users": "Manage the server's logins, roles and grants",

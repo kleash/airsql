@@ -5,16 +5,29 @@ public struct SavedPlace: Codable, Equatable, Sendable {
     /// The last five are `ObjectKind`'s: the object editors.
     public enum Kind: String, Codable, Sendable {
         case table, structure, processes, view, procedure, function, trigger, event
+        /// A MongoDB collection's documents, and a pipeline on a collection.
+        case collection, aggregation
+        /// A MongoDB collection's or database's (no object) changes, with its filter as `text`.
+        case watch
     }
 
     public var kind: Kind
     public var database: String?
     public var object: String?
+    /// A collection tab's query bar and page.
+    public var query: MongoQueryText?
+    public var page: Int?
+    /// An aggregation tab's pipeline.
+    public var text: String?
 
-    public init(kind: Kind, database: String? = nil, object: String? = nil) {
+    public init(kind: Kind, database: String? = nil, object: String? = nil, query: MongoQueryText? = nil, page: Int? = nil,
+                text: String? = nil) {
         self.kind = kind
         self.database = database
         self.object = object
+        self.query = query
+        self.page = page
+        self.text = text
     }
 }
 

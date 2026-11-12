@@ -7,14 +7,17 @@ public struct AgentTarget {
     public var safety: SafetySettings
     /// The open connection; nil: not connected.
     public var connection: Connection?
+    /// The open MongoDB connection, for a MongoDB target; nil: not connected.
+    public var mongo: MongoConnection?
     /// Its schema cache; nil: not loaded.
     public var schema: SchemaCache?
     /// The database statements run in when the call names none: the person's current one.
     public var database: String?
 
     public init(saved: SavedConnection, safety: SafetySettings, connection: Connection? = nil, schema: SchemaCache? = nil,
-                database: String? = nil) {
+                database: String? = nil, mongo: MongoConnection? = nil) {
         self.saved = saved
+        self.mongo = mongo
         self.safety = safety
         self.connection = connection
         self.schema = schema
@@ -29,8 +32,13 @@ public struct AgentTarget {
     public var rowCap: Int { max(1, safety.agentRowCap) * (access == .schemaReadAnalytics ? 10 : 1) }
     public var timeout: Int { max(1, safety.agentTimeout) * (access == .schemaReadAnalytics ? 4 : 1) }
 
-    /// Refuses unless the access level is at least `level`.
-    func require(_ level: AgentAccess) throws {
+    /// Refuses unless the connection is `engine`'s (SQL tools: MySQL's; the mongo_ tools: MongoDB's) and the access
+    /// level is at least `level`.
+    func require(_ level: AgentAccess, engine: Engine = .mysql) throws {
+        guard saved.engine == engine else {
+            throw AirSQLError(.other, "“\(saved.displayName)” is a \(saved.engine.title) connection, and this tool is for "
+                              + (engine == .mysql ? "MySQL and MariaDB: use the mongo_ tools." : "MongoDB: use the SQL tools."))
+        }
         guard access.rank >= level.rank else {
             throw AirSQLError(.accessDenied, "“\(saved.displayName)” allows agents \(access.title) access, and this needs "
                               + "\(level.title). Only the person at the Mac can change that (Settings ▸ Agents).")
@@ -39,18 +47,20 @@ public struct AgentTarget {
 
     /// The agent session, opened on first use, of an open connection.
     func session() async throws -> DBConnection {
+        try require(.schema)
         guard let connection else { throw notConnected }
         return try await connection.session(.agent)
     }
 
     /// The schema as loaded; it loads now if nothing has yet.
     func snapshot() async throws -> SchemaSnapshot {
+        try require(.schema)
         guard let schema else { throw notConnected }
         if schema.snapshot.server == nil { try await schema.load() }
         return schema.snapshot
     }
 
-    private var notConnected: AirSQLError {
+    var notConnected: AirSQLError {
         AirSQLError(.disconnected, "“\(saved.displayName)” isn't connected: ask the person to connect it in AirSQL.")
     }
 }

@@ -5,8 +5,8 @@
 #   vendor/out/universal/include                 (Connector/C's headers; OpenSSL's in openssl/)
 #   vendor/out/source/                           (Connector/C's and OpenSSL's source tarballs as built, for releases)
 # The result is kept outside the repository in $AIRSQL_VENDOR_CACHE/<SHA-256 of this script> (default: the folder
-# airsql-vendor-cache next to the repository, so every worktree shares it) and copied into vendor/out; vendor/out/stamp
-# holds the SHA-256. build.sh and test.sh run this when the stamp isn't the current one. A script with other versions or
+# airsql-vendor-cache next to the main checkout, so every worktree shares it) and copied into vendor/out;
+# vendor/out/stamp holds the SHA-256. build.sh and test.sh run this when the stamp isn't the current one. A script with other versions or
 # options has another SHA-256 and builds again (a few minutes, and the internet the first time).
 # Downloads (pinned versions, SHA-256 checked) are kept in $AIRSQL_VENDOR_CACHE/dl. Command Line Tools only: a portable
 # CMake is downloaded too, and nothing from Homebrew (/opt/homebrew, /usr/local) is looked at.
@@ -41,7 +41,9 @@ plugins=(mysql_native_password caching_sha2_password sha256_password client_ed25
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 unset PKG_CONFIG_PATH PKG_CONFIG_LIBDIR CMAKE_PREFIX_PATH CPATH C_INCLUDE_PATH LIBRARY_PATH LDFLAGS CFLAGS CPPFLAGS
 hash=$(shasum -a 256 scripts/build-mariadb.sh | cut -d' ' -f1)
-base=${AIRSQL_VENDOR_CACHE:-$(dirname "$PWD")/airsql-vendor-cache}
+# Next to the main checkout, also from a worktree (.claude/worktrees/<name>), so every worktree shares it.
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$PWD/.git")
+base=${AIRSQL_VENDOR_CACHE:-$(dirname "$(dirname "$common")")/airsql-vendor-cache}
 cache=$base/$hash
 step() { echo "build-mariadb: $*"; }
 
@@ -105,7 +107,7 @@ for arch in "${archs[@]}"; do
     mkdir -p "$work/build/openssl-$arch"
     (cd "$work/build/openssl-$arch" &&
         logged "openssl-$arch-configure" perl "$openssl_src/Configure" "darwin64-$arch-cc" no-shared no-tests no-apps \
-            no-docs no-legacy no-module no-dso no-engine no-ssl3 no-comp no-zlib --prefix="$prefix" \
+            no-docs no-legacy no-module no-dso no-engine no-ssl3 no-quic no-comp no-zlib --prefix="$prefix" \
             --openssldir="$prefix/ssl" --libdir=lib -mmacosx-version-min=$deployment_target &&
         logged "openssl-$arch-build" make -j"$jobs" &&
         logged "openssl-$arch-install" make install_sw DESTDIR="$stage")

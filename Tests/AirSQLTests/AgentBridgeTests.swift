@@ -8,12 +8,14 @@ import Testing
 
 private final class Marker {}
 
-/// The debug build of AirSQL, with the libmariadb the tests use (the app finds it in its bundle).
+/// The debug build of AirSQL, with the libmariadb and libmongoc2 the tests use (the app finds them in its bundle).
 private var airsqlBinary: String {
     Bundle(for: Marker.self).bundleURL.deletingLastPathComponent().appendingPathComponent("AirSQL").path
 }
-private let vendorLibrary = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-    .deletingLastPathComponent().appendingPathComponent("vendor/out/universal/lib").path
+private let vendorLibrary = ["vendor/out/universal/lib", "vendor/mongoc/universal/lib"].map {
+    URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent($0).path
+}.joined(separator: ":")
 
 /// Runs `AirSQL --mcp` with these messages on stdin (which then ends), its settings folder `support`; the messages it
 /// wrote, in order.
@@ -88,13 +90,13 @@ func result(_ messages: [[String: Any]], _ id: Int) -> [String: Any]? {
         let names = tools.compactMap { $0["name"] as? String }
         let ui = ["snapshot", "screenshot", "menu", "press", "set", "select", "key", "type", "click", "double_click",
                   "right_click", "wait"]
-        #expect(names == ["context", "get_schema", "describe", "search_columns", "run_queries", "profile", "explain",
-                          "open_in_console", "read_console", "guide"] + ui)
+        #expect(names == ["context", "get_schema", "describe", "search_columns", "run_queries", "profile", "explain"]
+                + AgentTarget.mongoTools + ["mongo_open", "open_in_console", "read_console", "guide"] + ui)
         for tool in tools {
             let name = tool["name"] as? String ?? ""
             let annotations = try #require(tool["annotations"] as? [String: Any])
             #expect(annotations["destructiveHint"] as? Bool == false)
-            let reads = !["open_in_console", "menu", "press", "set", "select", "key", "type", "click", "double_click",
+            let reads = !["mongo_open", "open_in_console", "menu", "press", "set", "select", "key", "type", "click", "double_click",
                           "right_click"].contains(name)
             #expect(annotations["readOnlyHint"] as? Bool == reads, "\(name)")
             // UI tools answer with JSON as text (screenshot: an image), as AirSCP's do.

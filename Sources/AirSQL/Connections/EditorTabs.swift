@@ -103,6 +103,9 @@ extension ConnectionEditor {
 
     func generalTab() -> NSView {
         let form = Form()
+        form.row("Server", [choice(\.engine, Engine.allCases.map { ($0.title, $0) }, id: "editor.engine",
+                                   tip: "Choose whether the server is MySQL or MariaDB, or MongoDB") { [weak self] in self?.refreshTab() }],
+                 caption: draft.engine == .mongodb ? "Browse, query and edit MongoDB's collections." : nil)
         form.row("Name", [text(\.name, placeholder: draft.user.isEmpty ? "user@host" : draft.displayName, id: "editor.name",
                                tip: "Type the name the sidebar shows; empty: user@host")])
         let folders = [("None", UUID?.none)] + model.data.folders.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -111,37 +114,124 @@ extension ConnectionEditor {
         form.row("Colour", [choice(\.colour, ConnectionColour.allCases.map { ($0.title, $0) }, id: "editor.colour",
                                    tip: "Mark the connection with a colour; Production also turns on stricter safety")],
                  caption: "Production starts with the strict safety checks and agent access Off.")
-        let host = text(\.host, placeholder: draft.route == .direct ? "127.0.0.1" : "as the SSH host or proxy reaches it",
-                        id: "editor.host", tip: "Type the server's host name or address; TLS checks the certificate against it")
-        form.row(draft.route == .direct ? "Host" : "Database host",
-                 [host, label("Port"), number(\.port, placeholder: "3306", id: "editor.port", tip: "Type the server's port (3306 by default)")],
+        let mongo = draft.engine == .mongodb
+        if mongo {
+            form.row("Address", [button("Paste Address", id: "editor.pasteAddress", tip: "Fill the fields from the mongodb:// "
+                                        + "or mongodb+srv:// address on the clipboard", target: self, action: #selector(pasteMongoAddress(_:))),
+                                 button("Copy Address", id: "editor.copyAddress", tip: "Copy this connection's mongodb:// address, "
+                                        + "without its password, for mongosh or Compass", target: self, action: #selector(copyMongoAddress(_:)))],
+                     caption: "A password in a pasted address goes to your Keychain on Save.")
+        }
+        let srv = mongo && draft.mongoSRV
+        let host = text(\.host, placeholder: srv ? "cluster0.example.mongodb.net"
+                            : draft.route == .direct ? "127.0.0.1" : "as the SSH host or proxy reaches it", id: "editor.host",
+                        tip: srv ? "Type the cluster's DNS name, which lists its servers" : mongo
+                            ? "Type the first server's host name or address; TLS checks the certificate against it"
+                            : "Type the server's host name or address; TLS checks the certificate against it")
+        let port = number(\.port, placeholder: String(draft.engine.defaultPort), id: "editor.port",
+                          tip: "Type the server's port (\(draft.engine.defaultPort) by default)")
+        if srv {
+            port.isEnabled = false
+            port.placeholderString = ""
+            port.toolTip = "Off with a DNS seed list: DNS gives each server's port"
+        }
+        form.row(draft.route == .direct ? "Host" : "Database host", [host, label("Port"), port],
                  caption: draft.route == .direct ? nil : "As the last SSH host or the proxy reaches it, often 127.0.0.1 or a private address.")
-        if draft.route == .direct {
+        if mongo { mongoServerRows(form) }
+        if draft.route == .direct && draft.engine == .mysql {
             form.row("Socket", [text(\.socket, placeholder: "none: TCP", id: "editor.socket",
                                      tip: "Type the path of a server's own socket on this Mac (Homebrew, MAMP, DBngin)"),
                                 button("Find", id: "editor.findSocket", tip: "Look for a server's socket in the usual places on "
                                        + "this Mac", target: self, action: #selector(findSocket(_:)))],
                      caption: "For a server on this Mac: its socket file, used instead of the host and port.")
         }
-        form.row("User", [text(\.user, placeholder: draft.askPassword ? "asked at each connect" : "root", id: "editor.user",
-                               tip: "Type the database user to log in as")])
+        let aws = mongo && draft.mongoAWS
+        form.row(aws ? "Access key ID" : "User",
+                 [text(\.user, placeholder: draft.askPassword ? "asked at each connect" : aws ? "AKIA…" : "root", id: "editor.user",
+                       tip: aws ? "Type the AWS access key ID of the IAM user or role" : "Type the database user to log in as")])
         let password = NSSecureTextField(string: self.password)
         password.placeholderString = isNew ? "none" : "unchanged"
-        password.toolTip = "Type the password: it is saved in your Keychain, never in AirSQL's files"
+        password.toolTip = aws ? "Type the AWS secret access key: it is saved in your Keychain, never in AirSQL's files"
+            : "Type the password: it is saved in your Keychain, never in AirSQL's files"
         password.setAccessibilityIdentifier("editor.password")
         password.translatesAutoresizingMaskIntoConstraints = false
         password.widthAnchor.constraint(equalToConstant: 200).isActive = true
-        password.isEnabled = !draft.askPassword
+        password.isEnabled = !draft.askPassword && !(mongo && draft.mongoX509)
         if draft.askPassword { password.toolTip = "Off while Ask at each connect is ticked: nothing is saved" }
+        if mongo && draft.mongoX509 { password.toolTip = "Not used: the client certificate in the TLS tab logs in" }
         bind(password) { [weak self] in self?.password = password.stringValue }
         let ask = toggle("Ask at each connect", \.askPassword, id: "editor.askPassword",
                          tip: "Ask for the user and password at each connect and never save them") { [weak self] in self?.refreshTab() }
-        form.row("Password", [password, ask])
+        form.row(aws ? "Secret key" : "Password", [password, ask])
+        if aws {
+            let token = NSSecureTextField(string: sessionToken)
+            token.placeholderString = isNew ? "none" : "unchanged"
+            token.toolTip = "Type the session token of temporary AWS credentials: it is saved in your Keychain, never in AirSQL's files"
+            token.setAccessibilityIdentifier("editor.awsSessionToken")
+            token.translatesAutoresizingMaskIntoConstraints = false
+            token.widthAnchor.constraint(equalToConstant: 300).isActive = true
+            bind(token) { [weak self] in self?.sessionToken = token.stringValue }
+            form.row("Session token", [token], caption: "Only for temporary credentials (STS); a new secret key without one "
+                     + "forgets the old token.")
+        }
         form.row("Database", [text(\.database, placeholder: "none", id: "editor.database",
                                    tip: "Type the database to make current after connecting")])
+        if mongo { mongoLoginRows(form) }
         form.row("Comment", [text(\.comment, placeholder: "what it is for, who to ask", id: "editor.comment",
                                   tip: "Type a note the connection's summary shows")])
         return content(form)
+    }
+
+    /// MongoDB's servers: a DNS seed list, the replica set's other members, its name, and Direct connection.
+    private func mongoServerRows(_ form: Form) {
+        form.row("", [toggle("DNS seed list (mongodb+srv)", \.mongoSRV, id: "editor.mongoSRV",
+                             tip: "Look the servers up in DNS from the host name, as Atlas's mongodb+srv:// addresses do") { [weak self] in
+            guard let self else { return }
+            if self.draft.mongoSRV {
+                (self.draft.port, self.draft.mongoHosts, self.draft.directConnection) = (nil, [], false)
+                if self.draft.tls.mode == .off { self.draft.tls.mode = .verifyIdentity }
+            }
+            self.refreshTab()
+        }], caption: "One host name, no port: DNS lists the servers. TLS turns on.")
+        guard !draft.mongoSRV else {
+            form.row("Replica set", [text(\.replicaSet, placeholder: "the one DNS names", id: "editor.replicaSet",
+                                          tip: "Type the replica set's name; empty: the one DNS names", width: 200)])
+            return
+        }
+        let members = textField(draft.mongoHosts.joined(separator: ", "), placeholder: "none", id: "editor.mongoHosts",
+                                tip: "Type the replica set's other members as host:port, separated by commas; optional, as the "
+                                    + "driver finds them from any one")
+        members.widthAnchor.constraint(greaterThanOrEqualToConstant: 300).isActive = true
+        bind(members) { [weak self] in
+            self?.draft.mongoHosts = members.stringValue.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init)
+        }
+        form.row("Other members", [members])
+        form.row("Replica set", [text(\.replicaSet, placeholder: "none", id: "editor.replicaSet",
+                                      tip: "Type the replica set's name, such as rs0; empty: whatever the servers say", width: 200),
+                                 toggle("Direct connection", \.directConnection, id: "editor.directConnection",
+                                        tip: "Talk only to the server named, never the replica set's other members, such as "
+                                            + "one secondary on its own")])
+    }
+
+    /// MongoDB's login method and database, and the address's other options.
+    private func mongoLoginRows(_ form: Form) {
+        form.row("Log in with", [choice(\.mongoLogin, [("Password (SCRAM)", 0), ("X.509 certificate", 1), ("AWS IAM", 2)],
+                                        id: "editor.mongoLogin",
+                                        tip: "Choose how the user proves who it is: its password, the client certificate "
+                                            + "chosen in the TLS tab, or an AWS IAM key") { [weak self] in self?.refreshTab() }],
+                 caption: draft.mongoX509 ? "The TLS tab's client certificate logs in; the user is optional (the certificate's "
+                    + "subject) and the password isn't used."
+                    : draft.mongoAWS ? "An AWS access key logs in (MongoDB Atlas). AirSQL uses only the key typed here, never "
+                    + "the Mac's AWS settings." : nil)
+        if !draft.mongoX509 && !draft.mongoAWS {  // their users are in $external
+            form.row("Auth source", [text(\.authSource, placeholder: draft.mongoSRV ? "as DNS says, often admin" : "admin",
+                                          id: "editor.authSource", tip: "Type the database the user is defined in; empty: admin "
+                                            + "(for a DNS seed list, what its DNS record says)", width: 200)])
+        }
+        form.row("Options", [text(\.mongoOptions, placeholder: "none", id: "editor.mongoOptions",
+                                  tip: "Type the address's other options as key=value&…, such as readPreference=secondary, "
+                                    + "appName=reports, retryWrites=false or w=majority")],
+                 caption: "As after an address's ?, such as readPreference=secondary&w=majority.")
     }
 
     // MARK: TLS
@@ -161,10 +251,17 @@ extension ConnectionEditor {
         guard draft.tls.mode != .off else { return content(form) }
         form.row("CA certificate", file(\.tls.caFile, placeholder: "macOS's own", id: "editor.caFile",
                                         tip: "Choose the PEM file of a private certificate authority to trust besides the Mac's"))
-        form.row("Certificate", file(\.tls.certFile, placeholder: "none", id: "editor.certFile",
-                                     tip: "Choose your client certificate (PEM), for a server that asks for one"))
-        form.row("Key", file(\.tls.keyFile, placeholder: "none", id: "editor.keyFile",
-                             tip: "Choose the client certificate's key (PEM)"))
+        if draft.engine == .mongodb {
+            form.row("Certificate", file(\.tls.certFile, placeholder: "none", id: "editor.certFile",
+                                         tip: "Choose your client certificate with its key in one PEM file, for an X.509 login "
+                                            + "or a server that asks for one"),
+                     caption: "One file with both, as mongosh's --tlsCertificateKeyFile takes it.")
+        } else {
+            form.row("Certificate", file(\.tls.certFile, placeholder: "none", id: "editor.certFile",
+                                         tip: "Choose your client certificate (PEM), for a server that asks for one"))
+            form.row("Key", file(\.tls.keyFile, placeholder: "none", id: "editor.keyFile",
+                                 tip: "Choose the client certificate's key (PEM)"))
+        }
         let pinned = draft.tls.pinnedFingerprint.map(fingerprintField) ?? label("None", color: .secondaryLabelColor)
         pinned.setAccessibilityIdentifier("editor.pinned")
         var views: [NSView] = [pinned]
@@ -178,6 +275,7 @@ extension ConnectionEditor {
             views.append(forget)
         }
         form.row("Trusted", views, caption: "The fingerprint of the certificate you trusted for this server, if any.")
+        guard draft.engine == .mysql else { return content(form) }
         form.row("", [toggle("PAM or LDAP login", \.cleartextLogin, id: "editor.cleartext",
                              tip: "Allow the plain-text login PAM and LDAP accounts need, only over TLS that proves the server")],
                  caption: "Such logins send the password as plain text, so AirSQL allows them only when TLS proves the server.")
@@ -196,8 +294,11 @@ extension ConnectionEditor {
                                   : "Connect this connection each time AirSQL opens")
         atLaunch.isEnabled = !production
         form.row("", [atLaunch], caption: production ? "Not for a Production connection: it connects only when you ask." : nil)
-        form.row("", [toggle("Compress traffic", \.compress, id: "editor.compress",
-                             tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
+        let mysql = draft.engine == .mysql
+        if mysql {
+            form.row("", [toggle("Compress traffic", \.compress, id: "editor.compress",
+                                 tip: "Compress what goes over the network: faster on slow links, a little more work for both ends")])
+        }
         let timeout = textField(draft.queryTimeout == 0 ? "" : String(draft.queryTimeout), placeholder: "none",
                                 id: "editor.queryTimeout", tip: "Type how many seconds a statement may run before it is "
                                     + "cancelled; empty: no limit", width: 64)
@@ -218,20 +319,26 @@ extension ConnectionEditor {
         }
         form.row("Disconnect after", [idle, label("idle minutes", color: .secondaryLabelColor)],
                  caption: "Never with a transaction, edits or a running statement open.")
-        form.row("Time zone", [text(\.timeZone, placeholder: "the server's", id: "editor.timeZone",
-                                    tip: "Type the time zone sessions use, such as +00:00 or Europe/Paris; empty: the server's", width: 180)])
+        if mysql {
+            form.row("Time zone", [text(\.timeZone, placeholder: "the server's", id: "editor.timeZone",
+                                        tip: "Type the time zone sessions use, such as +00:00 or Europe/Paris; empty: the server's", width: 180)])
+        }
         form.row("", [toggle("Query tabs share one session", \.sharedQuerySession, id: "editor.sharedSession",
                              tip: "Run every query tab on one session, with one transaction and database, so they see each "
                                 + "other's temporary tables")],
                  caption: "Off, each query tab has a session of its own and can run while the others do.")
         form.row("", [toggle("Start query tabs in Manual Commit", \.startsManual, id: "editor.startsManual",
                              tip: "Start each new session with Auto-commit off, so changes wait for Commit")])
-        let levels: [(String, IsolationLevel?)] = [("Server's default", nil)] + IsolationLevel.allCases.map { ($0.title, $0) }
-        form.row("Isolation level", [choice(\.startIsolation, levels, id: "editor.startIsolation",
-                                            tip: "Choose the isolation level new query sessions start at")])
+        if mysql {
+            let levels: [(String, IsolationLevel?)] = [("Server's default", nil)] + IsolationLevel.allCases.map { ($0.title, $0) }
+            form.row("Isolation level", [choice(\.startIsolation, levels, id: "editor.startIsolation",
+                                                tip: "Choose the isolation level new query sessions start at")])
+        }
         form.row("Databases shown", [text(\.databaseFilter, placeholder: "all", id: "editor.databaseFilter",
                                           tip: "Type the databases to show, separated by commas; * and ? match any text")],
                  caption: "For example: shop, reports_*. The others stay on the server, out of the way.")
+        // Compression, the time zone, the isolation level, startup SQL and the client tools are MySQL's own.
+        guard mysql else { return content(form) }
         let sql = NSTextView()
         sql.string = draft.startupSQL
         sql.backgroundColor = .content
@@ -297,11 +404,15 @@ extension ConnectionEditor {
     func agentsTab() -> NSView {
         let form = Form()
         form.row("Agent access", [choice(\.agentAccess, AgentAccess.allCases.map { ($0.title, $0) }, id: "editor.agentAccess",
-                                         tip: "Choose what AI agents may do with this connection")],
+                                         tip: "Choose what AI agents may do with this connection") { [weak self] in self?.refreshTab() }],
                  caption: "Schema: names and structure. Read: also read-only queries. Analytics: also larger results and "
                     + "exports to the agents' folder.")
         form.row("", [toggle("Agents may see sample rows", \.agentSampleRows, id: "editor.sampleRows",
                              tip: "Let agents see a few rows of a table with its structure (off by default)")])
+        // MongoDB has no read-only session: the login's own rights are the last guard (mongo-plan, Agents).
+        if draft.engine == .mongodb, draft.agentAccess.rank >= AgentAccess.schemaRead.rank {
+            form.row("", [caption("For agents, use a database login that can only read: AirSQL refuses writes, and such a login can't make any.")])
+        }
         if !model.data.settings.agentsAllowed {
             form.row("", [caption("Agents are off for every connection until you turn them on in Settings\u{A0}▸\u{A0}Agents.")])
         }
@@ -315,5 +426,13 @@ final class StartupSQLWatcher: NSObject, NSTextViewDelegate {
     init(_ changed: @escaping (String) -> Void) { self.changed = changed }
     func textDidChange(_ notification: Notification) {
         if let view = notification.object as? NSTextView { changed(view.string) }
+    }
+}
+
+private extension SavedConnection {
+    /// The editor's Log in with: 0 password, 1 X.509 certificate, 2 AWS IAM.
+    var mongoLogin: Int {
+        get { mongoAWS ? 2 : mongoX509 ? 1 : 0 }
+        set { (mongoX509, mongoAWS) = (newValue == 1, newValue == 2) }
     }
 }
