@@ -6,7 +6,7 @@ cask "airsql" do
 
   url "https://github.com/kleash/airsql/releases/download/v#{version}/AirSQL-#{version}.zip"
   name "AirSQL"
-  desc "MySQL and MariaDB client with SSH tunnels, a data grid and schema tools"
+  desc "MySQL, MariaDB and MongoDB client with SSH tunnels and visual query builders"
   homepage "https://kleash.github.io/airsql/"
 
   livecheck do
