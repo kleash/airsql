@@ -102,6 +102,17 @@ extension AppTests {
         ], "\(tab.editor.string)")
         #expect(MongoStageForm.forms(from: stages).map { MongoStagesView.Kind($0) } == [.join, .unwind, .group])
 
+        // A Filter card first, its condition in rows: WHERE status IN the paid ones; the other stages' text stays.
+        let built = tab.editor.string
+        tab.stagesView.add(.filter, at: 0)
+        let rows = try #require(tab.stagesView.cards.first?.conditions)
+        rows.group = MongoBuilder.Group([.rule(.init("status", .oneOf, ["paid", "shipped", "delivered"]))])
+        rows.onChange?()
+        #expect(try MongoPipeline.stages(in: tab.editor.string).first?.document.shellForm()
+                == "{ $match: { status: { $in: [\"paid\", \"shipped\", \"delivered\"] } } }", "\(tab.editor.string)")
+        #expect(tab.editor.string.hasSuffix(String(built.dropFirst(4))), "\(tab.editor.string)")
+        let paid: Set<String> = ["paid", "shipped", "delivered"]
+
         tab.run()
         #expect(await eventually(timeout: 30) { tab.loading == nil })
         #expect(tab.problem == nil, "\(tab.problem ?? "")")
@@ -123,7 +134,8 @@ extension AppTests {
         for c in customers { if case .objectId(let id)? = c["_id"], case .string(let land)? = c["country"] { country[id.hex] = land } }
         var expected: [String: Decimal] = [:]
         for o in orders {
-            guard case .objectId(let id)? = o["customerId"], let land = country[id.hex], case .decimal128(let total)? = o["total"] else { continue }
+            guard case .objectId(let id)? = o["customerId"], let land = country[id.hex], case .decimal128(let total)? = o["total"],
+                  case .string(let status)? = o["status"], paid.contains(status) else { continue }
             expected[land, default: 0] += Decimal(string: total.description) ?? .nan
         }
         #expect(!expected.isEmpty && got == expected, "\(got) ≠ \(expected)")
@@ -225,13 +237,17 @@ extension AppTests {
                 main.window?.setContentSize(NSSize(width: 1180, height: 900))
                 main.window?.setFrameOrigin(NSPoint(x: 40, y: 40))
                 main.window?.orderFront(nil)
-                // The Join and Group cards in view.
+                // The Filter and Join cards, then the Group card.
+                let top = await call(harness, "screenshot", ["target": "main", "scale": 2])
+                let topImage = try #require(top.image)
+                try #require(topImage.representation(using: .png, properties: [:]))
+                    .write(to: ScreenshotTests.folder.appendingPathComponent("mongo-stages-\(suffix).png"))
                 let group = tab.stagesView.cards[3].box
                 group.scrollToVisible(group.bounds)
                 let reply = await call(harness, "screenshot", ["target": "main", "scale": 2])
                 let image = try #require(reply.image, "\(reply.error ?? "")")
                 try #require(image.representation(using: .png, properties: [:]))
-                    .write(to: ScreenshotTests.folder.appendingPathComponent("mongo-stages-\(suffix).png"))
+                    .write(to: ScreenshotTests.folder.appendingPathComponent("mongo-stages-group-\(suffix).png"))
                 // The SQL page, translated and run.
                 tab.show(.sql)
                 tab.sqlPage.editor.string = "SELECT c.country, SUM(o.total) AS revenue, COUNT(*) AS orders\nFROM orders o JOIN customers c ON o.customerId = c._id\n"

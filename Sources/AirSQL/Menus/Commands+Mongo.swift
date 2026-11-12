@@ -21,7 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands + mongoUsersCommands
-        + mongoWatchCommands + mongoDumpCommands + mongoStageCommands
+        + mongoWatchCommands + mongoDumpCommands + mongoStageCommands + mongoQueryCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -207,4 +207,15 @@ extension Commands {
                                       tip: "Open a tab that turns a SELECT on the collection into a pipeline and runs it")
 
     static let mongoStageCommands = [pipelineStages, pipelineShell, pipelineSQL, queryWithSQL]
+}
+
+// MARK: Query builder (lane P5-query)
+
+extension Commands {
+    static let aggregateQuery = Command("Aggregate…", #selector(MongoCollectionController.aggregateQuery(_:)),
+                                        tip: "Group, join and reshape these documents in steps: a pipeline that starts with this query")
+    static let queryBuilder = Command("Query Builder", #selector(MongoCollectionController.toggleQueryBuilder(_:)),
+                                      tip: "Build the query from fields, operators and values, or type it in shell form")
+
+    static let mongoQueryCommands = [aggregateQuery, queryBuilder]
 }

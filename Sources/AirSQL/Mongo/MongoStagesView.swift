@@ -231,7 +231,7 @@ final class MongoStagesView: NSView {
         let before = fieldsBefore
         for card in cards where before.indices.contains(card.index) {
             card.offer(Self.names(before[card.index]), foreign: { [weak self] in Self.names(self?.sample($0)?.paths ?? []) },
-                       collections: collections)
+                       collections: collections, schema: card.index == 0 ? sample(tab.collection)?.schema : nil)
         }
     }
 
@@ -269,7 +269,7 @@ final class MongoStagesView: NSView {
             list.addArrangedSubview(addButton(at: index, compact: true))
             let card = Card(index: index, form: forms[index], text: stageText(index), view: self)
             card.offer(Self.names(before[index]), foreign: { [weak self] in Self.names(self?.sample($0)?.paths ?? []) },
-                       collections: collections)
+                       collections: collections, schema: index == 0 ? sample(tab.collection)?.schema : nil)
             cards.append(card)
             list.addArrangedSubview(card.box)
             card.box.widthAnchor.constraint(equalTo: list.widthAnchor, constant: -2 * Spacing.double).isActive = true
@@ -456,6 +456,7 @@ final class MongoStagesView: NSView {
         private var perMatch: NSButton?
         private var keepUnmatched: NSButton?
         private(set) var shellEditor: SQLEditorView?
+        private(set) var conditions: MongoConditionsView?
         private let generation: Int
 
         init(index: Int, form: MongoStageForm, text: String, view: MongoStagesView) {
@@ -531,7 +532,12 @@ final class MongoStagesView: NSView {
         func focus() { box.window?.makeFirstResponder(kind) }
 
         /// The fields this stage sees, their collection's fields (`foreign`) and this database's collections, in its boxes.
-        func offer(_ names: [String], foreign: @escaping (String) -> [String], collections: [String]) {
+        /// `schema`: the collection's sample, for the first stage's conditions (later stages see other documents).
+        func offer(_ names: [String], foreign: @escaping (String) -> [String], collections: [String], schema: MongoSchema?) {
+            if let conditions {
+                if conditions.paths != names { conditions.paths = names }
+                if (conditions.schema == nil) != (schema == nil) { conditions.schema = schema }
+            }
             fieldNames = names
             self.foreign = foreign
             self.collections = collections
@@ -554,12 +560,24 @@ final class MongoStagesView: NSView {
             perMatch = nil
             keepUnmatched = nil
             shellEditor = nil
+            conditions = nil
             let id = "stage.\(index)"
             switch form {
-            case .filter:
-                // shortcut: the Filter card is its $match as text until MongoConditionsView (lane P5-query) merges; then
-                // this case becomes `MongoConditionsView(group:onChange:)` committing `.filter(group)`.
-                shellBody()
+            case .filter(let group):
+                let rows = MongoConditionsView()
+                rows.group = group
+                rows.paths = fieldNames
+                rows.maxHeight = 320
+                rows.setAccessibilityIdentifier(id + ".filter")
+                rows.setAccessibilityLabel("Stage \(index + 1) conditions")
+                rows.onChange = { [weak self, weak rows] in
+                    guard let self, let rows, self.generation == self.view.currentGeneration else { return }
+                    if let problem = rows.problem { return self.show(problem: problem) }
+                    self.view.commit(self.index, .filter(rows.group))
+                }
+                conditions = rows
+                body.addArrangedSubview(rows)
+                rows.widthAnchor.constraint(equalTo: body.widthAnchor).isActive = true
             case .shell:
                 shellBody()
             case .join(let join):
