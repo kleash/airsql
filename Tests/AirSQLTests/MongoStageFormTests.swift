@@ -41,13 +41,18 @@ struct MongoStageFormTests {
         #expect(F(stage: shell(#"{ $unwind: { path: "$a" } }"#)) == .unwind(F.Unwind(path: "a")))
         #expect(F(stage: shell("{ $limit: 3.0 }")) == .limit(3))
         #expect(F(stage: shell(#"{ $group: { _id: "$a", count: { $sum: NumberLong(1) } } }"#)) == .group(F.Grouping(by: ["a"], outputs: [F.Output(.count)])))
+        // Results keep the names they were written under (Query with SQL's aliases).
+        let named = F.group(F.Grouping(by: ["a"], outputs: [F.Output(.sum, "total", name: "revenue"), F.Output(.count, name: "orders")]))
+        #expect(try named.stage().shellForm() == #"{ $group: { _id: "$a", revenue: { $sum: "$total" }, orders: { $sum: 1 } } }"#)
+        #expect(F(stage: try named.stage()) == named)
+        #expect(F.Output(.average, "items.qty").name == "avg_items_qty")
     }
 
     @Test func stagesNoCardShowsExactlyAreShellCards() {
         let shells = [
             #"{ $match: { a: { $elemMatch: { b: 1 } } } }"#, #"{ $lookup: { from: "c", pipeline: [], as: "x" } }"#,
             #"{ $lookup: { from: "c", localField: "a", foreignField: "b", as: "x", let: {} } }"#,
-            #"{ $group: { _id: "$a", total: { $sum: "$t" } } }"#, #"{ $group: { _id: "$a", count: { $sum: 2 } } }"#,
+            #"{ $group: { _id: "$a", count: { $sum: 2 } } }"#, #"{ $group: { _id: "$a", "a.b": { $sum: "$t" } } }"#,
             #"{ $group: { _id: { k: "$a" } } }"#, #"{ $group: { _id: "$$ROOT" } }"#, #"{ $group: { _id: "$a", n: { $count: {} } } }"#,
             #"{ $group: { _id: "$a", sum_t: { $sum: "$t" }, sum_t: { $sum: "$t" } } }"#,
             "{ $sort: {} }", #"{ $sort: { s: { $meta: "textScore" } } }"#, "{ $project: { a: 0 } }", #"{ $project: { a: "$b" } }"#,
@@ -63,6 +68,8 @@ struct MongoStageFormTests {
             (.join(F.Join(from: "c", localField: "a", foreignField: "", as: "c")), "Choose their field"),
             (.group(F.Grouping(by: ["a"], outputs: [F.Output(.sum)])), "Choose a field for Sum"),
             (.group(F.Grouping(outputs: [F.Output(.count), F.Output(.count)])), "Two results are both named count"),
+            (.group(F.Grouping(outputs: [F.Output(.sum, "x", name: "")])), "Name the result of Sum"),
+            (.group(F.Grouping(outputs: [F.Output(.sum, "x", name: "a.b")])), "‘a.b’: a result's name can't start with $ or hold a dot"),
             (.sort([]), "Add a field to sort by"), (.show(MongoBuilder.Projection()), "Tick the fields to show"),
             (.limit(0), "Type a limit of 1 or more"), (.unwind(F.Unwind(path: "")), "Choose the array field to unwind"),
             (.filter(MongoBuilder.Group([.rule(MongoBuilder.Rule("n", .is, ["x"], type: .number))])), "n: ‘x’ isn't a number"),

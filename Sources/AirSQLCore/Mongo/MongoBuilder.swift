@@ -198,7 +198,22 @@ public enum MongoBuilder {
         }
     }
 
+    /// The parts as one document: a field's operator documents merged when no operator repeats
+    /// (`{ age: { $gte: 18, $lt: 65 } }`), else `$and` of them all.
     static func and(_ parts: [BSONDocument]) -> BSONDocument {
+        func operators(_ value: BSONValue?) -> BSONDocument? {
+            guard case .document(let d)? = value, !d.fields.isEmpty, d.keys.allSatisfy({ $0.hasPrefix("$") }) else { return nil }
+            return d
+        }
+        var done = Set<String>()
+        let parts = parts.compactMap { part in
+            let key = part.fields[0].key
+            let same = parts.filter { $0.fields[0].key == key }
+            let ops = same.compactMap { operators($0[key]) }, opKeys = ops.flatMap(\.keys)
+            guard same.count > 1, !key.hasPrefix("$"), ops.count == same.count, Set(opKeys).count == opKeys.count else { return part }
+            guard done.insert(key).inserted else { return nil }
+            return BSONDocument([(key, .document(BSONDocument(ops.flatMap(\.fields))))])
+        }
         let keys = parts.flatMap(\.keys)
         if Set(keys).count == keys.count { return BSONDocument(parts.flatMap(\.fields)) }
         return BSONDocument([("$and", .array(parts.map(BSONValue.document)))])
@@ -246,6 +261,7 @@ public enum MongoBuilder {
         case .text: return (.string(raw), false)
         case .shell: return (try shell(), false)
         case .number:
+            if let n = Int32(text) { return (.int32(n), false) }
             if let n = Int64(text) { return (.int64(n), false) }
             if let d = Double(text), d.isFinite, text.first.map({ $0.isNumber || "+-.".contains($0) }) == true { return (.double(d), false) }
             throw BSONError("‘\(text)’ isn't a number")
@@ -633,13 +649,6 @@ extension MongoBuilder {
     static func operatorRules(_ path: String, _ d: BSONDocument) -> [Rule]? {
         guard Set(d.keys).count == d.keys.count else { return nil }
         if let a = day(d) { return [Rule(path, .is, [dayText(a)], type: .date)] }
-        if d.keys == ["$not"] {
-            switch d["$not"]! {
-            case let .regex(pattern, options): return patternRule(path, pattern, options, negated: true).map { [$0] }
-            case .document(let inner): return day(inner).map { [Rule(path, .isNot, [dayText($0)], type: .date)] }
-            default: return nil
-            }
-        }
         if d.keys == ["$gte", "$lt"], case .datetime(let a)? = d["$gte"], case .datetime(let b)? = d["$lt"], isMidnight(b) {
             return [Rule(path, .between, [isMidnight(a) ? dayText(a) : dateText(a), dayText(b - msPerDay)], type: .date)]
         }
@@ -650,6 +659,16 @@ extension MongoBuilder {
         var rules: [Rule] = []
         for (key, value) in d.fields {
             switch key {
+            case "$not":
+                switch value {
+                case let .regex(pattern, options):
+                    guard let rule = patternRule(path, pattern, options, negated: true) else { return nil }
+                    rules.append(rule)
+                case .document(let inner):
+                    guard let a = day(inner) else { return nil }
+                    rules.append(Rule(path, .isNot, [dayText(a)], type: .date))
+                default: return nil
+                }
             case "$eq":
                 if value == .null { rules.append(Rule(path, .hasNoValue)); continue }
                 guard scalar(value), let (type, text) = typed(value) else { return nil }
