@@ -218,6 +218,77 @@ used; libmongoc resumes a change stream by itself) and built in four lanes, merg
 Also: mongosh runs for real in the lab (Direct, SSH, every TLS mode, X.509, which now passes the client certificate),
 and the real-agent test runs on the replica set too (10 of 10 on each). CI on GitHub builds both libraries.
 
+## Phase 5: builders for people who know SQL, not MongoDB (designed with the Fable 5.2 review)
+
+The owner, 2026-11-12: filters, partial and complex filters, joins and aggregation all had to be typed in shell form;
+"a noob in mongodb who is coming from sql database background can easily handle and do complex queries easily".
+
+**Principle.** The shell text stays the one source of truth (Run, history, restore, Explain, agents read it). The
+builders edit it: a builder edit rewrites only its own part (a query bar field; one stage's `MongoPipeline.Stage.range`,
+spliced in place); switching modes never touches the text. What a builder can't read stays text: that part only (an
+unreadable filter shows its text field in place of the rows while Show and Sort stay GUI; a stage becomes a Shell card).
+SQL names sit beside MongoDB's everywhere: "Filter — WHERE", "Show fields — SELECT", "Sort — ORDER BY", "Join — JOIN",
+"Group — GROUP BY", "Limit — LIMIT"; operators "contains — LIKE '%x%'", "is one of — IN", "has no value — IS NULL".
+
+**A. Query builder** (collection tab, **Builder | Shell**; a new tab opens in Builder):
+- Find documents where [all/any] of: condition rows, `+ Condition`, `+ Group` (one group level; deeper stays text).
+  Row: field (combo box: sample paths, each with its types, "text 80%, number 20%"; any typed path works), operator by
+  the field's type (an array field's from its element type), value, Ignore case on text operators, remove.
+- Operators: is / is not, contains / doesn't contain / starts with / ends with (escaped regex; Ignore case → `i`),
+  matches pattern (raw), greater / at least / less / at most, between, is one of / is none of (comma list), has a value /
+  has no value (`$ne: null` / `null`; `$exists` reads back as these).
+- Values: typed by the sample's main type (text, number, date, ObjectId, true/false); a shell constructor typed
+  (`ObjectId("…")`, `UUID("…")`, `NumberDecimal("…")`) is taken as written; the box offers the sample's top values,
+  already typed. Numbers: Int64 if whole else Double (the server compares across number types). Dates are UTC (said so):
+  a day without a time is a range (`$gte` day, `$lt` next day), "between" days includes the last day; presets today,
+  last 7 days, this month. A date typed for a string-typed field warns.
+- Writing: `$and` whenever a key repeats or there are several any-groups; empty groups dropped; never duplicate keys.
+  Parse-back refuses duplicate keys, sub-document/array equality, `$eq` of a regex, `$elemMatch`, and anything else
+  outside these shapes; the round trip build → text → parse → build is the test.
+- Rows on fields under the same array (`items.sku`, `items.qty`) get a note: they may match different items.
+- Show (projection ticks, `_id` on), Sort rows, Skip, Limit; "Ignore case in comparisons and sorting" (collation
+  strength 2; also changes is/in/ranges, not regex). The query in shell form under it, one selectable line, including
+  Hint and Max Time when set in Shell.
+- The grid gets the cell Quick Filter the MySQL grid has (`QuickFilter`'s menu shape, `GridCondition.Operator` subset:
+  is, is not, greater, less, contains; ⌥ adds to the filter), from the cell's real BSON value. Schema value ⌥-click adds.
+- **Aggregate…** in the query bar opens an aggregation tab with the current filter, sort, projection, skip and limit as
+  its first stages.
+
+**B. Stage builder** (aggregation tab, **Stages | Shell**): a card per stage (kind, ↑ ↓, remove, Run to Here, Count
+Each Stage's count), `+ Stage` lists Join first. Cards: Filter (the conditions block of A), Join (`$lookup`: from a
+collection of this database, this field = their field, as — default the alias/collection name; "One document per match"
+inserts or removes a visible Unwind card after it, "keep documents without a match" its preserve flag), Group (by
+fields; Count, Sum, Average, Smallest, Largest, First, Last, List, Distinct list; `_id` `"$a"` or `{ a: "$a" }`; parse-
+back only when names match the ones it would write), Sort, Show fields, Limit, Unwind, Shell (any stage as text, with
+the error underline). No folding of stages: card n is stage n. Fields downstream follow the stages (Join adds
+`<as>.<their paths>`, Group gives `_id` and its names, Show narrows). Join warnings (one helper, from cached samples,
+shared with SQL): types differ (ObjectId vs string matches nothing), no index on their field, `as` overwrites a field.
+Aggregations run with `allowDiskUse` so big groups don't hit the server's memory limit.
+
+**C. Query with SQL** (aggregation tab, a third mode **SQL**; "Query with SQL…" from the collection tab and the tree):
+`SELECT … FROM coll [a] [LEFT] JOIN other [b] ON a.x = b.y … WHERE … GROUP BY … HAVING … ORDER BY … LIMIT … OFFSET`,
+parsed with AirSQL's `SQLParser` and translated in core (`MongoSQL`) to a pipeline, always; the MongoDB pipeline shows
+beside it and "Open as Stages" switches to cards. One way: translating replaces the pipeline text, asking first when
+that was edited by hand. Supported: columns, `*`, aliases, dotted paths, COUNT(*), SUM/AVG/MIN/MAX(col), DISTINCT;
+INNER and LEFT JOIN on one equality (`$lookup` + `$unwind`, preserve for LEFT; the alias is `as`); WHERE = <> < <= > >=,
+AND/OR/NOT, IN, NOT IN, BETWEEN, LIKE / NOT LIKE (anchored escaped regex, `i` and `s`: MySQL people expect LIKE to
+ignore case), IS [NOT] NULL; GROUP BY, HAVING; ORDER BY names/positions; LIMIT, OFFSET; literals string, number,
+TRUE/FALSE, NULL, `DATE '…'`, `TIMESTAMP '…'`, `ObjectId('…')`. Conditions on the base collection only go before the
+`$lookup`. Refused with a plain message naming the part (never guessed): syntax errors, CTEs, UNION and other set
+operators, subqueries, CASE, window functions, expressions in SELECT, ON other than one equality, RIGHT/FULL/NATURAL/
+USING, COUNT(DISTINCT), COUNT(col), ESCAPE, anything that writes. Notes shown with the translation: `=` is case-
+sensitive and never converts string to number/date/ObjectId (warn from sample types); `<>`, NOT IN and NOT LIKE also
+return documents without the field; GROUP BY puts null and missing in one group.
+
+**Out of scope:** drag-and-drop, `$expr`/`$where` builders, geo, `$facet`/`$bucket`/`$graphLookup`/pipeline `$lookup`
+forms (Shell cards), a stage disable switch, nested groups deeper than one, update/delete builders.
+
+**Lanes (Opus 5.5 medium):** 1. **core**: `MongoBuilder.swift` (conditions, values, projection, sort, collation, to and
+from documents), `MongoStageForm.swift` (cards ↔ stages, fields downstream), `MongoJoinCheck` (the warnings), tests.
+2. **sql** (in parallel with core): `MongoSQL.swift` + tests + a lab oracle test on `shop`. Then, on core: 3. **query**
+(the query bar's Builder, Quick Filter, Aggregate…) and 4. **stages** (cards, then the SQL mode once sql is merged).
+Integrator: merge, every SQL translation opens as non-Shell cards bar a listed few, light/dark look, docs.
+
 ## Not doing
 
 An embedded JS shell; drag-and-drop stage builder; natural-language queries in the app; Kerberos/LDAP; CSFLE and
