@@ -127,6 +127,8 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             return open.autofill(root, text, caret, database: database, collection: name, loaded: knownPaths)
         }
         model.openMongo[connectionID]?.readSample(database: database, collection: name)
+        bar.collection = name
+        loadBuilderSample()
         bar.history.menu?.delegate = self
         notice.owner = self
         emptyNote.add.isHidden = true
@@ -196,6 +198,8 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     /// Run (⌘↩, Return in a field): the find the query bar describes, from its first batch; a field it can't read says
     /// why under the fields, and nothing runs.
     func run() {
+        bar.readText()  // what wrote the text (a cell's filter, the schema, a test) is shown in the builder too
+        if let message = bar.builderProblem { return bar.show(field: "Filter", message) }
         guard changes.isEmpty else { return askToDiscard { [weak self] in self?.run() } }
         let text = bar.query
         let find: MongoFind
@@ -386,6 +390,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         connection?.samples.add(paths: source.paths.map { $0.joined(separator: ".") }, database: database, collection: name)
         let origin = grid.scrollView.contentView.bounds.origin, selection = grid.selection
         viewer.show(source)
+        bar.use(nil, paths: knownPaths)
         grid.sortOrder = sortShown
         if keepingPlace {
             grid.selection = selection
@@ -530,6 +535,7 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
         guard loading == nil else { return }
         connection?.samples.invalidate(database: database, collection: name)
         model.openMongo[connectionID]?.readSample(database: database, collection: name)
+        loadBuilderSample()
         if page == .schema { sample(schemaView.sampleSize) } else if page == .indexes { loadIndexes() } else { run() }
     }
     @objc func cancelQuery(_ sender: Any?) { activity?.cancel() }
@@ -615,6 +621,12 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
             reason = viewer.selectedRows().isEmpty ? "Select rows first" : nil
         case Commands.watchChanges.action?:
             reason = watchReason
+        case Commands.sortAscending.action?, Commands.sortDescending.action?:
+            reason = ((item.representedObject as? Int) ?? viewer.focusedColumn) == nil ? "Select a column first" : nil
+        case Commands.queryBuilder.action?:
+            item.state = bar.mode == .builder ? .on : .off
+        case Commands.aggregateQuery.action?:
+            reason = nil
         case Commands.createIndex.action?, Commands.dropIndex.action?, Commands.hideIndex.action?:
             var title = Commands.hideIndex.title
             reason = indexReason(item.action, title: &title)
@@ -708,11 +720,15 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
     func dataGrid(_ grid: DataGridView, menuFor target: DataGridView.Target) -> NSMenu? {
         let menu = NSMenu(title: "Documents")
         if case .column(let column) = target {
-            guard fieldToggle(column) != nil else { return nil }
-            let item = Commands.expandField.item()
-            item.representedObject = column
-            menu.addItem(item)
+            var commands = [Commands.sortAscending, Commands.sortDescending]
+            if fieldToggle(column) != nil { commands.append(Commands.expandField) }
+            for command in commands {
+                let item = command.item()
+                item.representedObject = column
+                menu.addItem(item)
+            }
         } else {
+            if let quick = quickFilterItem() { menu.addItem(quick) }
             menu.add([Commands.copyDocuments])
             addEditingItems(to: menu)
         }
