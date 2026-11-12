@@ -28,6 +28,7 @@ extension MainMenu {
         addMongoUsersItems(menus)
         addMongoWatchItems(menus)
         addMongoDumpItems(menus)
+        addMongoQueryItems(menus)
     }
 }
 
@@ -249,5 +250,16 @@ extension MainMenu {
             item.target = MongoDumpMenu.shared
             menus.tools.insertItem(item, at: after + 1 + offset)
         }
+    }
+}
+
+// MARK: Query builder (lane P5-query)
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Query Builder and Aggregate…, after Query History: for the collection tab in front.
+    static func addMongoQueryItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let after = collection.items.firstIndex(where: { $0.title == "Query History" }) else { return }
+        for (offset, command) in Commands.mongoQueryCommands.enumerated() { collection.insertItem(command.item(), at: after + 1 + offset) }
     }
 }

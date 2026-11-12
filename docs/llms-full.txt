@@ -2778,6 +2778,37 @@ or proxy route with TLS (the tools reach one server through a socket on this Mac
 CA, or with a certificate you trusted in AirSQL and no authority's file, the sheet says why it can't check and offers
 **Run without checking the certificate**, for one run, noted in the SQL log. Agents can't dump or restore.
 
+## Builder
+
+A collection tab opens with its query bar in **Builder**, for people who know SQL rather than MongoDB; **Shell** (the
+switch at its left, or Data ▸ Collection ▸ Query Builder) shows the shell-form fields of [The query bar](#the-query-bar).
+The builder only edits those fields' text, which stays what Run, the history, Explain and restored tabs use; switching
+never changes it.
+
+- **Find documents where all / any of these are true** (SQL's `WHERE … AND` / `OR`): a row per condition, with the
+  field (the collection's sample offers its fields with their types' shares, "string 80%, int 20%"; any dotted path can
+  be typed), what its value is read as (the sample's main type is chosen for you), how it compares (each with SQL's way
+  beside it: "contains — LIKE '%x%'", "is one of — IN", "has no value — IS NULL"), and the value: the sample's most
+  common values are offered, between takes two, is one of a comma list, true/false a pop-up. Dates are UTC; a day alone
+  is the whole day, and the calendar button fills in today, the last 7 days or this month. **Ignore case** sits on the
+  text operators. **+ Group** adds a group with its own all/any (parentheses in SQL), one level deep.
+- A row that makes no condition says why under it, in red, and Run refuses until it's fixed. Under a row also: a date
+  typed for a field the sample holds as text (it compares as text), and conditions on fields of one array
+  (`items.sku`, `items.qty`), which may each match a different item.
+- **Show** ticks the fields to show (`SELECT`), **Sort by** rows (`ORDER BY`), **Skip** (`OFFSET`), **Limit**
+  (`LIMIT`), and **Ignore case in comparisons and sorting** (a collation, strength 2). Under them is the query in shell
+  form, one line you can select and copy, with Hint and Max Time when set in Shell.
+- A part the builder can't show (a `$where`, `$elemMatch`, an exclusion projection, another collation…) shows its text
+  field in place of its controls, while the others stay as controls; fix or clear the text to build it here again.
+
+In the grid, a cell's menu has **Quick Filter**: is, is not, greater than, less than and contains, from the value as it
+is stored (a number stays a number, an ObjectId an ObjectId). Each replaces the filter; hold ⌥ for **Add to Filter**,
+which adds it to the conditions there. A column header's menu has **Sort Ascending** and **Sort Descending**.
+
+**Aggregate…** in the query bar (Data ▸ Collection ▸ Aggregate…) opens an [aggregation](#aggregation) tab on the
+collection whose pipeline starts with the query: `$match`, `$sort`, `$project`, `$skip` and `$limit`, only the parts
+that are set, with its collation and max time.
+
 
 ---
 
