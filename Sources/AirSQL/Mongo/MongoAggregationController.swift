@@ -9,7 +9,7 @@ import AppKit
 final class MongoAggregationController: NSViewController, TabContent, DataGridViewDelegate, NSMenuItemValidation {
     enum Page: Int { case documents, explain }
     /// How the pipeline is edited: as cards (`MongoStagesView`) or as its text; both edit the same text.
-    enum Mode: Int { case stages, shell }
+    enum Mode: Int { case stages, shell, sql }
 
     let model: AppModel
     let connectionID: UUID
@@ -44,9 +44,13 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         return link
     }()
     private(set) var page = Page.documents
-    private(set) var mode = Mode.stages
+    /// Set before the view loads: Query with SQL opens the tab on its SQL.
+    var mode = Mode.stages
+    private(set) lazy var sqlPage = MongoSQLPage(tab: self)
+    /// The pipeline text as AirSQL last wrote it (the tab's first, or a translation): another means it was edited by hand.
+    var pipelineWritten = ""
     private(set) lazy var stagesView = MongoStagesView(tab: self)
-    let modeSwitch = NSSegmentedControl(labels: ["Stages", "Shell"], trackingMode: .selectOne, target: nil, action: nil)
+    let modeSwitch = NSSegmentedControl(labels: ["Stages", "Shell", "SQL"], trackingMode: .selectOne, target: nil, action: nil)
     /// The tab's own session, made on first use; `sessionOf` is the connection it belongs to (a reconnect makes another).
     private var session: MongoSession?
     private weak var sessionOf: MongoConnection?
@@ -106,6 +110,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         editor.completionDocs = { $0.kind == .template ? SQLTemplate.expand($0.text).text : $0.detail }
         model.openMongo[connectionID]?.readSample(database: database, collection: collection)
         editor.string = "[\n  { $match: {} }\n]\n"
+        pipelineWritten = editor.string
         editor.onChange = { [weak self] in self?.updateBars() }
         viewer.host = self
         viewer.viewKey = GridViewer.ViewKey(connection: connectionID, database: database, table: collection)
@@ -148,6 +153,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         modeSwitch.action = #selector(modeSwitched(_:))
         modeSwitch.setToolTip("Build the pipeline from cards: Join, Filter, Group… (\(Commands.pipelineStages.shortcut))", forSegment: 0)
         modeSwitch.setToolTip("Type the pipeline in shell form (\(Commands.pipelineShell.shortcut))", forSegment: 1)
+        modeSwitch.setToolTip("Write a SELECT and see it as a pipeline (\(Commands.pipelineSQL.shortcut))", forSegment: 2)
         modeSwitch.setAccessibilityLabel("Edit the pipeline as")
         modeSwitch.setAccessibilityIdentifier("aggregate.mode")
         let options = NSStackView(views: [modeSwitch] + named(collation, "Collation") + named(maxTime, "Max Time")
@@ -182,12 +188,13 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         split.isVertical = false
         split.dividerStyle = .thin
         let top = NSView()
-        for part in [editorScroll, stagesView] as [NSView] {
+        for part in [editorScroll, stagesView, sqlPage] as [NSView] {
             top.addSubview(part)
             part.pin(to: top)
         }
         editorScroll.isHidden = mode != .shell
         stagesView.isHidden = mode != .stages
+        sqlPage.isHidden = mode != .sql
         split.addArrangedSubview(top)
         split.addArrangedSubview(lower)
         split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 0)
@@ -206,7 +213,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         self.view = view
         updateBars()
         loadSaved()
-        if proposedBy == nil { run() }
+        if proposedBy == nil { mode == .sql ? sqlPage.translate(thenRun: true) : run() }
     }
 
     private var placedDivider = false
@@ -503,7 +510,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
 
     // MARK: Commands
 
-    @objc func runStatement(_ sender: Any?) { run() }
+    @objc func runStatement(_ sender: Any?) { mode == .sql ? sqlPage.translate(thenRun: true) : run() }
     @objc func explain(_ sender: Any?) { explain() }
     @objc func cancelQuery(_ sender: Any?) { activity?.cancel() }
     @objc func loadMore(_ sender: Any?) { loadMore() }
@@ -803,10 +810,14 @@ extension MongoAggregationController {
 
 extension MainWindowController {
     /// A new aggregation tab on a collection.
-    func openAggregation(_ collection: String, database: String, connection: UUID) {
+    func openAggregation(_ collection: String, database: String, connection: UUID, sql: String? = nil) {
         let content = MongoAggregationController(model: model, connection: connection, database: database, collection: collection)
+        if let sql {
+            content.mode = .sql
+            content.sqlPage.editor.string = sql
+        }
         open(content, title: collection + " pipeline", connection: connection)
-        window?.makeFirstResponder(content.mode == .shell ? content.editor : content.stagesView.cards.first?.kind)
+        window?.makeFirstResponder(content.firstResponder)
     }
 }
 
@@ -846,8 +857,9 @@ extension MongoAggregationController {
         modeSwitch.selectedSegment = mode.rawValue
         editorScroll.isHidden = mode != .shell
         stagesView.isHidden = mode != .stages
+        sqlPage.isHidden = mode != .sql
         if mode == .stages { stagesView.updateCounts() }
-        view.window?.makeFirstResponder(mode == .shell ? editor : stagesView.cards.first?.kind)
+        view.window?.makeFirstResponder(firstResponder)
         updateBars()
     }
 
@@ -857,10 +869,20 @@ extension MongoAggregationController {
         modeSwitch.selectedSegment = Mode.shell.rawValue
         editorScroll.isHidden = false
         stagesView.isHidden = true
+        sqlPage.isHidden = true
         fail("The pipeline isn't one the cards can show: " + problem)
     }
 
     func showProblem(_ message: String) { fail(message) }
+
+    /// Where the keys go in the mode shown.
+    var firstResponder: NSView? {
+        switch mode {
+        case .shell: return editor
+        case .stages: return stagesView.cards.first?.kind
+        case .sql: return sqlPage.editor
+        }
+    }
 
     /// A card's edit: the editor's whole text replaced in one undoable change.
     func replacePipeline(_ text: String) {

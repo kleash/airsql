@@ -2812,6 +2812,17 @@ a group's `_id` and results, only those a Show fields card keeps. Any field type
 Aggregations run with `allowDiskUse`, so a big group or sort spills to disk on the server instead of stopping at its
 memory limit.
 
+### Query with SQL
+
+**Query with SQL…** (Data ▸ Collection, or a collection's right-click menu) opens an aggregation tab on its **SQL**
+page (⌃⌥0) with `SELECT * FROM <collection> LIMIT 100`. Write a SELECT with `JOIN` or `LEFT JOIN` on one equality,
+`WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT` and `OFFSET`; **Run** (⌘↩) turns it into the tab's pipeline and
+runs that. **Translate** only writes the pipeline, which shows under the SQL with the notes that apply to it (`=` is
+case-sensitive, `<>` also finds documents without the field, GROUP BY puts null and missing together…), and **Open as
+Stages** writes it and shows its cards to go on from there. A part that isn't translated (a subquery, UNION, CASE…) is
+underlined with what to do instead; nothing is guessed. FROM must be the tab's collection. Translating replaces the
+pipeline's text; when you edited it by hand, AirSQL asks first.
+
 
 ---
 

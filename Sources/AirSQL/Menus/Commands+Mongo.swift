@@ -200,5 +200,11 @@ extension Commands {
                                        tag: MongoAggregationController.Mode.shell.rawValue,
                                        tip: "Type the pipeline in shell form, as mongosh takes it")
 
-    static let mongoStageCommands = [pipelineStages, pipelineShell]
+    static let pipelineSQL = Command("Edit as SQL", #selector(MongoAggregationController.showPipelineMode(_:)), "0", [.control, .option],
+                                     tag: MongoAggregationController.Mode.sql.rawValue,
+                                     tip: "Write a SELECT with JOIN, GROUP BY and the rest; it becomes the pipeline")
+    static let queryWithSQL = Command("Query with SQL…", #selector(SidebarController.queryWithSQL(_:)),
+                                      tip: "Open a tab that turns a SELECT on the collection into a pipeline and runs it")
+
+    static let mongoStageCommands = [pipelineStages, pipelineShell, pipelineSQL, queryWithSQL]
 }

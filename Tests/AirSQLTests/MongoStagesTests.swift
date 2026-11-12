@@ -232,9 +232,85 @@ extension AppTests {
                 let image = try #require(reply.image, "\(reply.error ?? "")")
                 try #require(image.representation(using: .png, properties: [:]))
                     .write(to: ScreenshotTests.folder.appendingPathComponent("mongo-stages-\(suffix).png"))
+                // The SQL page, translated and run.
+                tab.show(.sql)
+                tab.sqlPage.editor.string = "SELECT c.country, SUM(o.total) AS revenue, COUNT(*) AS orders\nFROM orders o JOIN customers c ON o.customerId = c._id\n"
+                    + "WHERE o.status IN ('paid', 'shipped', 'delivered')\nGROUP BY c.country ORDER BY revenue DESC LIMIT 5"
+                tab.sqlPage.translate(thenRun: true)
+                if main.window?.attachedSheet != nil { _ = await call(harness, "press", ["title": "Replace"]) }
+                #expect(await eventually(timeout: 30) { tab.loading == nil && tab.source.rowCount == 5 })
+                let sql = await call(harness, "screenshot", ["target": "main", "scale": 2])
+                let sqlImage = try #require(sql.image)
+                try #require(sqlImage.representation(using: .png, properties: [:]))
+                    .write(to: ScreenshotTests.folder.appendingPathComponent("mongo-sql-\(suffix).png"))
                 main.close(try #require(main.tabs.first { $0.content === tab }))
                 main.window?.orderOut(nil)
             }
         }
+    }
+}
+
+// MARK: Query with SQL
+
+extension AppTests {
+    /// Query with SQL… on the tree's reviews: the starter SELECT runs; a refusal is underlined; a JOIN + GROUP BY + HAVING
+    /// gives the oracle's average rating per category; a pipeline edited by hand is asked about before it is replaced;
+    /// Open as Stages shows Join, Unwind and Group cards.
+    @Test(.enabled(if: MongoLab.enabled)) func aSelectWithAJoinAndAGroupGivesTheOraclesAnswerAndOpensAsStages() async throws {
+        let (main, mongo, harness) = try await shopWindow(replicaSet: false)
+        let shop = try #require(main.sidebar.treeNodes[.mongo(mongo.saved.id, MongoTreeItem(database: "shop"))])
+        main.sidebar.outline.expandItem(shop)
+        #expect(await eventually(timeout: 20) { !mongo.isLoading })
+        #expect(main.sidebar.reveal(.mongo(mongo.saved.id, MongoTreeItem(database: "shop", collection: "reviews"))))
+        main.window?.makeFirstResponder(main.sidebar.outline)
+        #expect(await call(harness, "menu", ["path": "Data > Collection > Query with SQL…"]).error == nil)
+        let tab = try #require(main.selectedTab?.content as? MongoAggregationController)
+        #expect(tab.collection == "reviews" && tab.mode == .sql && tab.sqlPage.editor.string == "SELECT * FROM reviews LIMIT 100")
+        #expect(await eventually(timeout: 20) { tab.loading == nil && tab.source.rowCount == 100 }, "\(tab.problem ?? "")")
+        #expect(try MongoPipeline.stages(in: tab.editor.string).map(\.name).last == "$limit", "\(tab.editor.string)")
+        #expect(tab.editor.string == tab.sqlPage.pipeline.string)
+
+        // Refused, with the part underlined; another collection's FROM is said so.
+        tab.sqlPage.editor.string = "SELECT * FROM reviews WHERE rating IN (SELECT 1)"
+        tab.runStatement(nil)
+        #expect(tab.problem?.contains("Subqueries") == true && tab.sqlPage.editor.runProblem != nil, "\(tab.problem ?? "")")
+        tab.sqlPage.editor.string = "SELECT * FROM orders"
+        tab.runStatement(nil)
+        #expect(tab.problem?.hasPrefix("This tab's pipeline runs on reviews") == true, "\(tab.problem ?? "")")
+
+        // The oracle's q08.
+        tab.sqlPage.editor.string = """
+            SELECT p.category, COUNT(*) AS reviews, AVG(r.rating) AS average FROM reviews r JOIN products p ON r.productSku = p.sku
+            GROUP BY p.category HAVING COUNT(*) >= 20 ORDER BY p.category
+            """
+        tab.runStatement(nil)
+        #expect(await eventually(timeout: 30) { tab.loading == nil })
+        #expect(tab.problem == nil, "\(tab.problem ?? "")")
+        let q08 = try #require(MongoSQLLabTests.answers()["q08_avg_rating_by_category"] as? [[String: Any]])
+        let rows = (0..<tab.source.rowCount).compactMap { tab.source.document($0) }
+        #expect(rows.map { $0["category"] } == q08.map { .string($0["category"] as! String) })
+        #expect(rows.map { MongoSQLLabTests.number($0["reviews"]) } == q08.map { Double($0["reviews"] as! Int) })
+        #expect(rows.map { MongoSQLLabTests.number($0["average"]).map { ($0 * 100).rounded() / 100 } }
+                == q08.map { ($0["average"] as! NSNumber).doubleValue })
+        #expect(!tab.sqlPage.notes.isHidden && tab.sqlPage.notes.stringValue.contains("GROUP BY"), "\(tab.sqlPage.notes.stringValue)")
+
+        // Edited by hand: translating asks first, and Cancel keeps the edit.
+        let edited = tab.editor.string.replacingOccurrences(of: "\n]", with: ",\n  { $limit: 3 }\n]")
+        tab.replacePipeline(edited)
+        tab.sqlPage.translate(thenRun: false)
+        #expect(await eventually(timeout: 5) { main.window?.attachedSheet != nil })
+        #expect(await call(harness, "press", ["title": "Cancel"]).error == nil)
+        #expect(await eventually(timeout: 5) { main.window?.attachedSheet == nil })
+        #expect(tab.editor.string == edited)
+
+        // Open as Stages: Replace, then the cards.
+        tab.sqlPage.openAsStages(nil)
+        #expect(await eventually(timeout: 5) { main.window?.attachedSheet != nil })
+        #expect(await call(harness, "press", ["title": "Replace"]).error == nil)
+        #expect(await eventually(timeout: 5) { tab.mode == .stages })
+        let kinds = tab.stagesView.forms.map { MongoStagesView.Kind($0) }
+        #expect(Array(kinds.prefix(3)) == [.join, .unwind, .group], "\(tab.editor.string)")
+        #expect(tab.editor.string == tab.sqlPage.pipeline.string)
+        main.close(try #require(main.tabs.first { $0.content === tab }))
     }
 }
