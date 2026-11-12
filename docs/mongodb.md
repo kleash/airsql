@@ -17,7 +17,8 @@ opens them in a tab of their own. Right-click a row to open it, sample its schem
 (**Refresh**, ⌘R).
 
 SQL's commands are for MySQL and MariaDB: on a MongoDB tab or connection they're off and say *Not for MongoDB*, in the
-menus and in the toolbar (the database, the transaction mode, Run All, Explain, Commit and Roll Back). The toolbar's
+menus and in the toolbar, which hides the database, the transaction mode, Run All, Commit and Roll Back there (on
+macOS 15 and later; earlier, they're off). The toolbar's
 **Run** and **Cancel** work on the collection tab. The log at the right of the status bar is the **Command Log** there:
 the same file as [the SQL log](sql-log.md), with every command AirSQL sends to MongoDB in shell form, passwords masked.
 
@@ -88,6 +89,37 @@ lists the collection's recent queries and its favourites: choose one to run it a
 among the favourites. They're kept per connection on this Mac, beside the SQL history.
 
 A click on a column's header sorts by that field on the server; ⇧-click adds it to the sort.
+
+## Builder
+
+A collection tab opens with its query bar in **Builder**, for people who know SQL rather than MongoDB; **Shell** (the
+switch at its left, or Data ▸ Collection ▸ Query Builder) shows the shell-form fields of [The query bar](#the-query-bar).
+The builder only edits those fields' text, which stays what Run, the history, Explain and restored tabs use; switching
+never changes it.
+
+- **Find documents where all / any of these are true** (SQL's `WHERE … AND` / `OR`): a row per condition, with the
+  field (the collection's sample offers its fields with their types' shares, "string 80%, int 20%"; any dotted path can
+  be typed), what its value is read as (the sample's main type is chosen for you), how it compares (each with SQL's way
+  beside it: "contains — LIKE '%x%'", "is one of — IN", "has no value — IS NULL"), and the value: the sample's most
+  common values are offered, between takes two, is one of a comma list, true/false a pop-up. Dates are UTC; a day alone
+  is the whole day, and the calendar button fills in today, the last 7 days or this month. **Ignore case** sits on the
+  text operators. **+ Group** adds a group with its own all/any (parentheses in SQL), one level deep.
+- A row that makes no condition says why under it, in red, and Run refuses until it's fixed. Under a row also: a date
+  typed for a field the sample holds as text (it compares as text), and conditions on fields of one array
+  (`items.sku`, `items.qty`), which may each match a different item.
+- **Show** ticks the fields to show (`SELECT`), **Sort by** rows (`ORDER BY`), **Skip** (`OFFSET`), **Limit**
+  (`LIMIT`), and **Ignore case in comparisons and sorting** (a collation, strength 2). Under them is the query in shell
+  form, one line you can select and copy, with Hint and Max Time when set in Shell.
+- A part the builder can't show (a `$where`, `$elemMatch`, an exclusion projection, another collation…) shows its text
+  field in place of its controls, while the others stay as controls; fix or clear the text to build it here again.
+
+In the grid, a cell's menu has **Quick Filter**: is, is not, greater than, less than and contains, from the value as it
+is stored (a number stays a number, an ObjectId an ObjectId). Each replaces the filter; hold ⌥ for **Add to Filter**,
+which adds it to the conditions there. A column header's menu has **Sort Ascending** and **Sort Descending**.
+
+**Aggregate…** in the query bar (Data ▸ Collection ▸ Aggregate…) opens an [aggregation](#aggregation) tab on the
+collection whose pipeline starts with the query: `$match`, `$sort`, `$project`, `$skip` and `$limit`, only the parts
+that are set, with its collation and max time.
 
 ## Documents
 
@@ -317,6 +349,52 @@ authority it trusts signed it (the connection's CA file is passed); Terminal say
 install mongosh: if it finds none (in Homebrew's folders, /usr/local/bin or your PATH), it says where to get it,
 MongoDB's download page or `brew install mongosh`.
 
+## Stages
+
+An aggregation tab opens on **Stages**, a card for each stage of the pipeline, so you can build one without knowing
+MongoDB's words; **Shell** (above the cards, or Data ▸ Collection ▸ **Edit as Stages** ⌃⌥8 and **Edit as Shell** ⌃⌥9)
+shows the same pipeline as text. Both edit the same text: switching never changes it, and a card's edit rewrites only
+its own stage, so the rest of what you typed stays as you typed it. Text that isn't a pipeline stays in Shell, with
+its mistake underlined.
+
+Each card names what it does with SQL's word beside it: **Join — JOIN**, **Filter — WHERE**, **Group — GROUP BY**,
+**Sort — ORDER BY**, **Show fields — SELECT**, **Limit — LIMIT**, **Unwind** and **Shell**. Card 1 is the first stage,
+card 2 the second, and so on. Choose another kind in its pop-up to start the card again as that kind; ↑ and ↓ move it,
+the bin removes it, ⏭ runs the pipeline up to it (Run to Here), and after **Count Each Stage** it says how many
+documents it gives. **+ Stage**, after the cards (and **+** between them), adds one: Join comes first.
+
+- **Join**: another collection of this database (**From**), this collection's field that must equal **their field**,
+  and **As**, the field that gets the matching documents as a list. **One document per match** adds an Unwind card
+  after it, so each order with its customer is one document, as SQL's JOIN gives; **Keep documents without a match**
+  then keeps the ones with none, as LEFT JOIN does. Under the card, warnings from the collections' samples: the two
+  fields hold different types (an ObjectId never equals text, so nothing joins), their field has no index (each
+  document's join reads all of theirs), or As replaces a field you have.
+- **Group**: the fields to group **by** (none: every document in one group), then the results: Count, Sum, Average,
+  Smallest, Largest, First, Last, List or Distinct list of a field, each named (`sum_total`; type another name).
+- **Sort**: fields, each ascending or descending. **Show fields**: tick the fields to keep, and `_id`. **Limit**: how
+  many documents. **Unwind**: one document per item of an array field.
+- **Filter**: the conditions as rows, as the query bar's [Builder](#builder) has them: a field, how it compares, a
+  value. **Shell**: the stage as text. A stage no card shows exactly
+  (`$facet`, `$bucket`, a `$lookup` with a pipeline…) is a Shell card of its own text, which goes into the pipeline as
+  you type it.
+
+The field boxes offer the fields each stage sees: the collection's (from its sample), a join's `<As>.<their field>`,
+a group's `_id` and results, only those a Show fields card keeps. Any field typed works.
+
+Aggregations run with `allowDiskUse`, so a big group or sort spills to disk on the server instead of stopping at its
+memory limit.
+
+### Query with SQL
+
+**Query with SQL…** (Data ▸ Collection, or a collection's right-click menu) opens an aggregation tab on its **SQL**
+page (⌃⌥0) with `SELECT * FROM <collection> LIMIT 100`. Write a SELECT with `JOIN` or `LEFT JOIN` on one equality,
+`WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT` and `OFFSET`; **Run** (⌘↩) turns it into the tab's pipeline and
+runs that. **Translate** only writes the pipeline, which shows under the SQL with the notes that apply to it (`=` is
+case-sensitive, `<>` also finds documents without the field, GROUP BY puts null and missing together…), and **Open as
+Stages** writes it and shows its cards to go on from there. A part that isn't translated (a subquery, UNION, CASE…) is
+underlined with what to do instead; nothing is guessed. FROM must be the tab's collection. Translating replaces the
+pipeline's text; when you edited it by hand, AirSQL asks first.
+
 ## Server, operations and disk usage
 
 Click a connected MongoDB connection in the sidebar (or choose **Connection ▸ MongoDB Server**, or right-click the
@@ -449,80 +527,3 @@ The tools know only one way to go without the certificate check, `--tlsInsecure`
 or proxy route with TLS (the tools reach one server through a socket on this Mac and can't check its name), with Verify
 CA, or with a certificate you trusted in AirSQL and no authority's file, the sheet says why it can't check and offers
 **Run without checking the certificate**, for one run, noted in the SQL log. Agents can't dump or restore.
-
-## Stages
-
-An aggregation tab opens on **Stages**, a card for each stage of the pipeline, so you can build one without knowing
-MongoDB's words; **Shell** (above the cards, or Data ▸ Collection ▸ **Edit as Stages** ⌃⌥8 and **Edit as Shell** ⌃⌥9)
-shows the same pipeline as text. Both edit the same text: switching never changes it, and a card's edit rewrites only
-its own stage, so the rest of what you typed stays as you typed it. Text that isn't a pipeline stays in Shell, with
-its mistake underlined.
-
-Each card names what it does with SQL's word beside it: **Join — JOIN**, **Filter — WHERE**, **Group — GROUP BY**,
-**Sort — ORDER BY**, **Show fields — SELECT**, **Limit — LIMIT**, **Unwind** and **Shell**. Card 1 is the first stage,
-card 2 the second, and so on. Choose another kind in its pop-up to start the card again as that kind; ↑ and ↓ move it,
-the bin removes it, ⏭ runs the pipeline up to it (Run to Here), and after **Count Each Stage** it says how many
-documents it gives. **+ Stage**, after the cards (and **+** between them), adds one: Join comes first.
-
-- **Join**: another collection of this database (**From**), this collection's field that must equal **their field**,
-  and **As**, the field that gets the matching documents as a list. **One document per match** adds an Unwind card
-  after it, so each order with its customer is one document, as SQL's JOIN gives; **Keep documents without a match**
-  then keeps the ones with none, as LEFT JOIN does. Under the card, warnings from the collections' samples: the two
-  fields hold different types (an ObjectId never equals text, so nothing joins), their field has no index (each
-  document's join reads all of theirs), or As replaces a field you have.
-- **Group**: the fields to group **by** (none: every document in one group), then the results: Count, Sum, Average,
-  Smallest, Largest, First, Last, List or Distinct list of a field, each named (`sum_total`; type another name).
-- **Sort**: fields, each ascending or descending. **Show fields**: tick the fields to keep, and `_id`. **Limit**: how
-  many documents. **Unwind**: one document per item of an array field.
-- **Filter**: the conditions as rows, as the query bar's [Builder](#builder) has them: a field, how it compares, a
-  value. **Shell**: the stage as text. A stage no card shows exactly
-  (`$facet`, `$bucket`, a `$lookup` with a pipeline…) is a Shell card of its own text, which goes into the pipeline as
-  you type it.
-
-The field boxes offer the fields each stage sees: the collection's (from its sample), a join's `<As>.<their field>`,
-a group's `_id` and results, only those a Show fields card keeps. Any field typed works.
-
-Aggregations run with `allowDiskUse`, so a big group or sort spills to disk on the server instead of stopping at its
-memory limit.
-
-### Query with SQL
-
-**Query with SQL…** (Data ▸ Collection, or a collection's right-click menu) opens an aggregation tab on its **SQL**
-page (⌃⌥0) with `SELECT * FROM <collection> LIMIT 100`. Write a SELECT with `JOIN` or `LEFT JOIN` on one equality,
-`WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT` and `OFFSET`; **Run** (⌘↩) turns it into the tab's pipeline and
-runs that. **Translate** only writes the pipeline, which shows under the SQL with the notes that apply to it (`=` is
-case-sensitive, `<>` also finds documents without the field, GROUP BY puts null and missing together…), and **Open as
-Stages** writes it and shows its cards to go on from there. A part that isn't translated (a subquery, UNION, CASE…) is
-underlined with what to do instead; nothing is guessed. FROM must be the tab's collection. Translating replaces the
-pipeline's text; when you edited it by hand, AirSQL asks first.
-
-## Builder
-
-A collection tab opens with its query bar in **Builder**, for people who know SQL rather than MongoDB; **Shell** (the
-switch at its left, or Data ▸ Collection ▸ Query Builder) shows the shell-form fields of [The query bar](#the-query-bar).
-The builder only edits those fields' text, which stays what Run, the history, Explain and restored tabs use; switching
-never changes it.
-
-- **Find documents where all / any of these are true** (SQL's `WHERE … AND` / `OR`): a row per condition, with the
-  field (the collection's sample offers its fields with their types' shares, "string 80%, int 20%"; any dotted path can
-  be typed), what its value is read as (the sample's main type is chosen for you), how it compares (each with SQL's way
-  beside it: "contains — LIKE '%x%'", "is one of — IN", "has no value — IS NULL"), and the value: the sample's most
-  common values are offered, between takes two, is one of a comma list, true/false a pop-up. Dates are UTC; a day alone
-  is the whole day, and the calendar button fills in today, the last 7 days or this month. **Ignore case** sits on the
-  text operators. **+ Group** adds a group with its own all/any (parentheses in SQL), one level deep.
-- A row that makes no condition says why under it, in red, and Run refuses until it's fixed. Under a row also: a date
-  typed for a field the sample holds as text (it compares as text), and conditions on fields of one array
-  (`items.sku`, `items.qty`), which may each match a different item.
-- **Show** ticks the fields to show (`SELECT`), **Sort by** rows (`ORDER BY`), **Skip** (`OFFSET`), **Limit**
-  (`LIMIT`), and **Ignore case in comparisons and sorting** (a collation, strength 2). Under them is the query in shell
-  form, one line you can select and copy, with Hint and Max Time when set in Shell.
-- A part the builder can't show (a `$where`, `$elemMatch`, an exclusion projection, another collation…) shows its text
-  field in place of its controls, while the others stay as controls; fix or clear the text to build it here again.
-
-In the grid, a cell's menu has **Quick Filter**: is, is not, greater than, less than and contains, from the value as it
-is stored (a number stays a number, an ObjectId an ObjectId). Each replaces the filter; hold ⌥ for **Add to Filter**,
-which adds it to the conditions there. A column header's menu has **Sort Ascending** and **Sort Descending**.
-
-**Aggregate…** in the query bar (Data ▸ Collection ▸ Aggregate…) opens an [aggregation](#aggregation) tab on the
-collection whose pipeline starts with the query: `$match`, `$sort`, `$project`, `$skip` and `$limit`, only the parts
-that are set, with its collation and max time.

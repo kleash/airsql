@@ -1,12 +1,13 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/main-light.png" width="49%" alt="AirSQL's window: saved connections and a shop database's tables on the left, its newest orders in the grid">
-  <img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/main-dark.png" width="49%" alt="The same window in dark mode">
+  <img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/mongo-sql-light.png" width="49%" alt="A SQL SELECT with a JOIN and GROUP BY, translated to a MongoDB pipeline and run on a shop's orders">
+  <img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/mongo-stages-dark.png" width="49%" alt="The same query as stage cards: a filter, a join and a group, in dark mode">
 </p>
 
 <h1 align="center"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/icon.png" width="40" alt=""> AirSQL</h1>
 
-<p align="center"><b>A native Mac app for MySQL and MariaDB: every way to connect, a fast data grid with safe editing, and
-AI agents that never change anything without you. Free and open source.</b></p>
+<p align="center"><b>One native Mac app for MySQL, MariaDB and MongoDB.<br>
+Write SQL against MongoDB. Join and group without learning <code>$lookup</code>. Let AI agents read your data, never
+write it behind your back.<br>Free and open source.</b></p>
 
 <p align="center">
   <a href="https://github.com/kleash/airsql/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/kleash/airsql/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
@@ -17,110 +18,56 @@ AI agents that never change anything without you. Free and open source.</b></p>
   <a href="https://github.com/kleash/airsql/releases/latest"><img src="https://img.shields.io/github/v/release/kleash/airsql" alt="Latest release"></a>
 </p>
 
-[AirSQL Help](docs/index.md) describes each part; [Install](#install) gets it.
-
-- **Every way in** ([Connections and routes](docs/connections.md)): direct or a socket, SSH tunnels (password, key,
-  ssh-agent, 2FA, your `~/.ssh/config`), jump hosts, HTTP and SOCKS5 proxies, each ending in a private socket on your
-  Mac. TLS is checked against the server's real name, also through a tunnel. Folders, colours, read-only connections,
-  startup SQL, and imports from Sequel Ace, TablePlus, DBeaver, MySQL Workbench and HeidiSQL.
-- **A SQL editor that reads what you write** ([The SQL console](docs/console.md)): a parser for MySQL and MariaDB behind
-  completion that knows aliases, CTEs, subqueries and joins by foreign key; checks as you type against the schema, with
-  fixes (⌥↩); go to declaration, find usages and rename; a formatter with rules and presets that changes only layout
-  and the case you ask for. Multiple carets, folding, templates, snippets, line and statement commands, bookmarks and local history.
-- **A session per query tab**: each tab has its own transaction and current database, so a long query in one leaves the
-  others free. Query parameters, run to a file, EXPLAIN and EXPLAIN ANALYZE as a tree, a diagram and a flame graph,
-  profiles, history, result tabs, and a log of every statement AirSQL sends.
-- **A fast data grid with safe editing** ([A table's rows](docs/table-data.md), [Read the data in a grid](docs/data-grid.md)):
-  a toolbar and a pager beside the rows; filter and sort on the server or in the loaded rows, search every column, quick
-  filters and filter by values; an editor for each type (dates, JSON, ENUM and SET, foreign keys with search), paste
-  from a spreadsheet, undo. Long values are cut at the server and read whole when you ask, so a table of blobs opens at
-  once. Nothing is written until you Apply, and Apply checks that every change touched exactly the rows it should.
-  Transpose, record view, value panel, display formats, heatmaps, charts, column summary and frozen columns; compare two
-  results; copy and export as CSV, JSON, SQL, Markdown, HTML, XML or Excel.
-- **A server at a glance** ([Browse a server](docs/navigator.md)): a host page with databases and sizes, variables,
-  status, processes and command statistics; Disk Usage from the server down to a table's indexes and partitions; the
-  tree with favourites, filters and size bars, Quick Open for anything, and text found in every table.
-- **Users and roles** ([Users and roles](docs/users.md)): list, add, clone and drop logins and roles, with their
-  privileges at every level, limits, TLS requirements and passwords, the SQL shown first.
-- **Schema tools** ([Change tables, views and routines](docs/editors.md)): Data, Structure and DDL as a switch on one tab;
-  the table editor, with its ALTER shown as you type (columns, indexes, foreign keys, checks, partitions, options); views,
-  routines, triggers and events as CREATE code with a form for their head; ER diagrams of chosen tables that keep their
-  layout; a SQL Generator that writes a script, or a file per object.
-- **Client tools** ([Export, restore, copy and import](docs/client-tools.md)): your own `mysqldump` and `mysql`, with
-  passwords kept off the command line, or AirSQL's own export and runner; Terminal over any route; copies to another
-  server; import from CSV, Excel, JSON and the clipboard, into a new table if you want.
-- **Compare and reconcile** ([Compare](docs/compare.md)): two servers, databases, tables or objects, structure and data,
-  with a sync script you review first and a report as HTML, CSV or Markdown; **Liquibase changesets**
-  ([Liquibase changelogs](docs/liquibase.md)) of a schema or of any change.
-- **AI agents over MCP** ([AI agents](docs/agents.md)), at the level you set for each connection: their queries must
-  pass a read-only check, their changes wait for your approval, you see what they ran, and they never see your
-  passwords.
-- **A Mac app** ([Keyboard shortcuts](docs/shortcuts.md), [Files and your workspace](docs/workspace.md)): native AppKit,
-  light and dark, right-click menus and a shortcut for every common command, shortcuts of your own, several windows,
-  split tabs, a Files panel for your scripts, and no waiting on the network while you work. Apple silicon and Intel,
-  macOS 13.1 or later. No account.
-
-It does MySQL and MariaDB only. It has no AI of its own (it works with the agent you already use), no version control, no
-built-in terminal and no update check (Homebrew does that). InnoDB's sizes and row counts are the server's estimates, and
-what a login can't read AirSQL can't show.
-
-## Screenshots
-
-<table>
-  <tr>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/console-light.png" alt="The SQL console with a query's results"><br><b>The SQL console</b>: run a statement or a script, its results in the grid</td>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/explain-light.png" alt="The console's Plan tab: EXPLAIN as a tree"><br><b>EXPLAIN as a plan</b>: how the server would run the statement, without running it</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/edit-light.png" alt="Two edited cells in the grid and the sheet with the UPDATE statements Apply would run"><br><b>Safe editing</b>: the SQL first, then one transaction that checks the rows it touched</td>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/connection-light.png" alt="The connection editor's SSH and Proxy tab: a jump host, then an SSH host"><br><b>Every route</b>: jump hosts, SSH and proxies, ending in a private socket on your Mac</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/compare-light.png" alt="The compare window: tables that differ, a table's changed rows and the sync script"><br><b>Compare and sync</b>: structure and rows, and a script you review before it runs</td>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/liquibase-light.png" alt="Generate a Liquibase changelog: the database's objects and their changesets"><br><b>Liquibase</b>: a database, or any change, as formatted SQL changesets</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/agents-light.png" alt="Settings ▸ Agents: each connection's access, and adding AirSQL to Claude Code or Gemini CLI"><br><b>AI agents</b>: the access you choose for each connection, never your passwords</td>
-    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/settings-light.png" alt="Settings ▸ Safety: the checks before data changes"><br><b>Safety checks</b>: what asks first, for every connection or just Production</td>
-  </tr>
-</table>
-
-A made-up shop ([scripts/demo-shop.sql](scripts/demo-shop.sql)) on MySQL 8.4; each picture is also in dark mode in
-[docs/assets/screenshots](docs/assets/screenshots).
-
-## Install
-
 ```sh
 brew install --cask kleash/tap/airsql
 ```
 
-Or download the zip from [Releases](https://github.com/kleash/airsql/releases). AirSQL is signed with a Developer ID
-and notarized by Apple, so it opens like any app. Every release has the zip's SHA-256, the exact source of the client
-library inside and signed build provenance: [check a download](SECURITY.md#check-a-download).
+## Why people switch
+
+<table>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/mongo-sql-light.png" alt="A SELECT with JOIN, WHERE, GROUP BY and ORDER BY beside the MongoDB pipeline it became"><br><b>SQL on MongoDB.</b> Type <code>SELECT … JOIN … GROUP BY</code>; get the pipeline, its results, and notes where MongoDB differs from SQL.</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/mongo-builder-light.png" alt="The query builder: name contains, country is one of, a date range, sorted, with the find it wrote"><br><b>Filters without the syntax.</b> Field, operator, value: contains, is one of, between, date ranges. It writes the <code>find</code> for you, and shows it.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/mongo-stages-group-light.png" alt="Pipeline stages as cards: an unwind and a group by country with a sum and a count"><br><b>Joins and group-bys as cards.</b> Filter, Join, Group, Sort: each stage a form, with a count per stage and warnings when a join can't match.</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/agents-light.png" alt="Settings ▸ Agents: each connection's access, and adding AirSQL to Claude Code or Gemini CLI"><br><b>AI agents, on a leash.</b> Claude Code, Gemini CLI or Claude Desktop over MCP: read-only checks, changes wait for your OK, never your passwords.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/console-light.png" alt="The SQL console with a query's results"><br><b>A SQL editor that reads your SQL.</b> Completion that knows aliases and joins, checks as you type, rename, a formatter, a session per tab.</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/edit-light.png" alt="Two edited cells in the grid and the sheet with the UPDATE statements Apply would run"><br><b>Edits you can trust.</b> Nothing is written until Apply; you see every statement first, and Apply checks it touched exactly those rows.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/connection-light.png" alt="The connection editor's SSH and Proxy tab: a jump host, then an SSH host"><br><b>Every way in.</b> SSH, jump hosts, HTTP and SOCKS proxies, your <code>~/.ssh/config</code>, replica sets and <code>mongodb+srv</code>; TLS checked against the real name.</td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/kleash/airsql/main/docs/assets/screenshots/compare-light.png" alt="The compare window: tables that differ, a table's changed rows and the sync script"><br><b>Compare and sync.</b> Two servers, databases or tables, structure and rows, with a script you review before it runs.</td>
+  </tr>
+</table>
+
+Also: EXPLAIN as a tree and a flame graph, a fast grid with charts and heatmaps, users and roles, Disk Usage, the table
+editor and ER diagrams, Liquibase changesets, dump and restore, Watch Changes on a replica set, and import from Sequel
+Ace, TablePlus, DBeaver, Workbench and HeidiSQL. Native AppKit, light and dark, a shortcut for everything, Apple silicon
+and Intel, macOS 13.1+, no account. Every picture is also in dark mode in
+[docs/assets/screenshots](docs/assets/screenshots); [AirSQL Help](https://kleash.github.io/airsql/) has the rest.
+
+## Install
+
+`brew install --cask kleash/tap/airsql`, or the zip from [Releases](https://github.com/kleash/airsql/releases).
+Signed with a Developer ID and notarized by Apple; every release has its SHA-256, an SBOM and signed build provenance
+([check a download](SECURITY.md#check-a-download)).
+
+## Security in brief
+
+Passwords stay in your Keychain, never in files, logs or what agents see. TLS is verified against the server's real
+name. Tunnels end in private Unix sockets, never network ports. Nothing is written without Run or Apply, and a lost
+connection is never reconnected behind your back. Report a vulnerability privately: [SECURITY.md](SECURITY.md).
 
 ## Build from source
 
 ```sh
-./build.sh --native   # build/AirSQL.app for this Mac (./build.sh: universal); the first build compiles libmariadb
+./build.sh --native   # build/AirSQL.app for this Mac; the Command Line Tools are enough, no Xcode
 ./test.sh             # the tests (Swift 6)
 ```
 
-The Command Line Tools are enough (`xcode-select --install`); Xcode isn't needed. More in
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Security in brief
-
-- Passwords live in your Keychain, never in files, logs or what agents see.
-- TLS is verified against the server's real name; a certificate macOS doesn't know is shown with its fingerprint first.
-- Tunnels end in private Unix sockets, never network ports. The server can't make AirSQL read your files
-  (`LOAD DATA LOCAL INFILE` is off), and one statement goes at a time.
-- Nothing is written without Run or Apply, and a lost connection is never reconnected behind your back.
-- Releases are signed with a Developer ID, use the hardened runtime, are notarized, and come with an SBOM.
-
-Report a vulnerability privately: [SECURITY.md](SECURITY.md).
-
-## More
-
-[AirSQL Help](https://kleash.github.io/airsql/) · [Report a problem](https://github.com/kleash/airsql/issues/new) ·
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md) · For agents:
-[llms.txt](docs/llms.txt), [AGENTS.md](AGENTS.md) · Apache 2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE))
+[Contributing](CONTRIBUTING.md) · [Report a problem](https://github.com/kleash/airsql/issues/new) ·
+[Code of conduct](CODE_OF_CONDUCT.md) · For agents: [llms.txt](docs/llms.txt), [AGENTS.md](AGENTS.md) · Apache 2.0
+([LICENSE](LICENSE), [NOTICE](NOTICE))

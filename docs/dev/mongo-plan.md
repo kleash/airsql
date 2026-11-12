@@ -289,6 +289,14 @@ from documents), `MongoStageForm.swift` (cards ↔ stages, fields downstream), `
 (the query bar's Builder, Quick Filter, Aggregate…) and 4. **stages** (cards, then the SQL mode once sql is merged).
 Integrator: merge, every SQL translation opens as non-Shell cards bar a listed few, light/dark look, docs.
 
+## Phase 5: status
+
+Built in four lanes (core, sql, query, stages), merged on `mongo` for 1.1.0: the collection tab's Builder (conditions,
+Show, Sort, Quick Filter, Aggregate…), the aggregation tab's Stages | Shell | SQL with the cards and the SQL page, and
+`allowDiskUse` on aggregations. The SQL lab test answers six shop questions as the oracle does, on the standalone and
+the replica set. Left: Schema ⌥-click to add a condition; a card switched to Shell by hand returns to its kind when the
+cards are rebuilt; `= NULL` and NULL in IN are refused rather than translated.
+
 ## Not doing
 
 An embedded JS shell; drag-and-drop stage builder; natural-language queries in the app; Kerberos/LDAP; CSFLE and
