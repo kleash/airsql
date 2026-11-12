@@ -373,6 +373,9 @@ private final class Translator {
         return found
     }
 
+    /// A whole number as int32 when it fits, as mongosh writes it (`{ $limit: 5 }`), else Int64.
+    func number(_ n: Int64) -> BSONValue { Int32(exactly: n).map(BSONValue.int32) ?? .int64(n) }
+
     func literal(_ e: SQLExpr) throws -> BSONValue {
         let written = source(e.range)
         switch e.kind {
@@ -381,7 +384,7 @@ private final class Translator {
             case "string": return .string(try string(written, e.range))
             case "number":
                 guard written.allSatisfy({ "0123456789.eE+-".contains($0) }) else { break }
-                if let whole = Int64(written) { return .int64(whole) }
+                if let whole = Int64(written) { return number(whole) }
                 if let number = Double(written), number.isFinite { return .double(number) }
             case "TRUE": return .bool(true)
             case "FALSE": return .bool(false)
@@ -391,7 +394,8 @@ private final class Translator {
             }
         case .unary where ["-", "+"].contains(e.op) && e.children[0].kind == .literal && e.children[0].op == "number":
             switch try literal(e.children[0]) {
-            case .int64(let n): return .int64(e.op == "-" ? -n : n)
+            case .int32(let n): return number(e.op == "-" ? -Int64(n) : Int64(n))
+            case .int64(let n): return number(e.op == "-" ? -n : n)
             case .double(let n): return .double(e.op == "-" ? -n : n)
             default: break
             }
@@ -461,7 +465,7 @@ private final class Translator {
         let theirs = kind(main), ours: String
         switch value {
         case .string: ours = "text"
-        case .int64, .double: ours = "number"
+        case .int32, .int64, .double: ours = "number"
         case .bool: ours = "true/false"
         case .datetime: ours = "date"
         case .objectId: ours = "ObjectId"
@@ -686,8 +690,8 @@ private final class Translator {
         }
         if count == 0 { throw refuse("LIMIT 0 returns nothing", select.limit[0].range) }
         var stages: [BSONDocument] = []
-        if let offset, offset > 0 { stages.append(stage("$skip", .int64(offset))) }
-        if let count { stages.append(stage("$limit", .int64(count))) }
+        if let offset, offset > 0 { stages.append(stage("$skip", number(offset))) }
+        if let count { stages.append(stage("$limit", number(count))) }
         return stages
     }
 }

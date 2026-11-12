@@ -32,24 +32,24 @@ struct MongoSQLTests {
 
     @Test func everyComparisonOperator() throws {
         #expect(try pipe("SELECT * FROM t WHERE a = 'x'") == #"{ $match: { a: "x" } }"#)
-        #expect(try pipe("SELECT * FROM t WHERE a <> 1 AND b != 2") == "{ $match: { a: { $ne: NumberLong(1) }, b: { $ne: NumberLong(2) } } }")
+        #expect(try pipe("SELECT * FROM t WHERE a <> 1 AND b != 2") == "{ $match: { a: { $ne: 1 }, b: { $ne: 2 } } }")
         #expect(try pipe("SELECT * FROM t WHERE a < 1 AND b <= 2 AND c > 3 AND d >= 4")
-                == "{ $match: { a: { $lt: NumberLong(1) }, b: { $lte: NumberLong(2) }, c: { $gt: NumberLong(3) }, d: { $gte: NumberLong(4) } } }")
-        #expect(try pipe("SELECT * FROM t WHERE 5 < a AND 6 >= b") == "{ $match: { a: { $gt: NumberLong(5) }, b: { $lte: NumberLong(6) } } }",
+                == "{ $match: { a: { $lt: 1 }, b: { $lte: 2 }, c: { $gt: 3 }, d: { $gte: 4 } } }")
+        #expect(try pipe("SELECT * FROM t WHERE 5 < a AND 6 >= b") == "{ $match: { a: { $gt: 5 }, b: { $lte: 6 } } }",
                 "a literal first turns the operator round")
         #expect(try pipe("SELECT * FROM t WHERE a IN ('x', 'y') AND b NOT IN (1)")
-                == #"{ $match: { a: { $in: [ "x", "y" ] }, b: { $nin: [ NumberLong(1) ] } } }"#)
+                == #"{ $match: { a: { $in: [ "x", "y" ] }, b: { $nin: [ 1 ] } } }"#)
         #expect(try pipe("SELECT * FROM t WHERE a BETWEEN 1 AND 2 OR b NOT BETWEEN 3 AND 4")
-                == "{ $match: { $or: [ { a: { $gte: NumberLong(1), $lte: NumberLong(2) } }, { b: { $not: { $gte: NumberLong(3), $lte: NumberLong(4) } } } ] } }")
+                == "{ $match: { $or: [ { a: { $gte: 1, $lte: 2 } }, { b: { $not: { $gte: 3, $lte: 4 } } } ] } }")
         #expect(try pipe("SELECT * FROM t WHERE a IS NULL AND b IS NOT NULL") == "{ $match: { a: null, b: { $ne: null } } }")
-        #expect(try pipe("SELECT * FROM t WHERE NOT (a = 1)") == "{ $match: { $nor: [ { a: NumberLong(1) } ] } }")
+        #expect(try pipe("SELECT * FROM t WHERE NOT (a = 1)") == "{ $match: { $nor: [ { a: 1 } ] } }")
     }
 
     @Test func andMergesUnlessAKeyRepeats() throws {
         #expect(try pipe("SELECT * FROM t WHERE a > 1 AND a < 5")
-                == "{ $match: { $and: [ { a: { $gt: NumberLong(1) } }, { a: { $lt: NumberLong(5) } } ] } }")
+                == "{ $match: { $and: [ { a: { $gt: 1 } }, { a: { $lt: 5 } } ] } }")
         #expect(try pipe("SELECT * FROM t WHERE (a = 1 OR b = 2) AND (c = 3 OR d = 4)")
-                == "{ $match: { $and: [ { $or: [ { a: NumberLong(1) }, { b: NumberLong(2) } ] }, { $or: [ { c: NumberLong(3) }, { d: NumberLong(4) } ] } ] } }")
+                == "{ $match: { $and: [ { $or: [ { a: 1 }, { b: 2 } ] }, { $or: [ { c: 3 }, { d: 4 } ] } ] } }")
     }
 
     @Test func likeIsAnAnchoredEscapedRegexIgnoringCase() throws {
@@ -69,7 +69,7 @@ struct MongoSQLTests {
         #expect(try pipe(#"SELECT * FROM t WHERE a = 'it''s' AND b = "q" AND c = 'x' 'y'"#)
                 == #"{ $match: { a: "it's", b: "q", c: "xy" } }"#)
         #expect(try pipe("SELECT * FROM t WHERE a = 42 AND b = -7 AND c = 1.5 AND d = 2e3 AND e = -0.25")
-                == "{ $match: { a: NumberLong(42), b: NumberLong(-7), c: 1.5, d: 2000.0, e: -0.25 } }")
+                == "{ $match: { a: 42, b: -7, c: 1.5, d: 2000.0, e: -0.25 } }")
         #expect(try pipe("SELECT * FROM t WHERE a = TRUE AND b = false") == "{ $match: { a: true, b: false } }")
         #expect(try pipe("SELECT * FROM t WHERE a >= DATE '2024-02-29' AND b < TIMESTAMP '2024-03-01 10:11:12.5' AND c = TIMESTAMP '2024-03-01'")
                 == #"{ $match: { a: { $gte: ISODate("2024-02-29T00:00:00.000Z") }, b: { $lt: ISODate("2024-03-01T10:11:12.500Z") }, c: ISODate("2024-03-01T00:00:00.000Z") } }"#)
@@ -83,7 +83,7 @@ struct MongoSQLTests {
         LEFT JOIN products AS p ON p.sku = o.sku WHERE o.status = 'paid' AND c.country = 'DE' AND o.total > 10
         """
         #expect(try pipe(sql) == """
-        { $match: { status: "paid", total: { $gt: NumberLong(10) } } }
+        { $match: { status: "paid", total: { $gt: 10 } } }
         { $lookup: { from: "customers", localField: "customerId", foreignField: "_id", as: "c" } }
         { $unwind: { path: "$c" } }
         { $lookup: { from: "products", localField: "sku", foreignField: "sku", as: "p" } }
@@ -107,7 +107,7 @@ struct MongoSQLTests {
         #expect(try pipe("SELECT * FROM o JOIN c ON o.x = c.y WHERE o.a = 1 OR c.b = 2") == """
         { $lookup: { from: "c", localField: "x", foreignField: "y", as: "c" } }
         { $unwind: { path: "$c" } }
-        { $match: { $or: [ { a: NumberLong(1) }, { "c.b": NumberLong(2) } ] } }
+        { $match: { $or: [ { a: 1 }, { "c.b": 2 } ] } }
         """)
     }
 
@@ -125,14 +125,14 @@ struct MongoSQLTests {
             { $lookup: { from: "customers", localField: "customerId", foreignField: "_id", as: "c" } }
             { $unwind: { path: "$c" } }
             { $group: { _id: { country: "$c.country", tier: "$tier" }, "COUNT(*)": { $sum: 1 }, _agg1: { $max: "$total" } } }
-            { $match: { "COUNT(*)": { $gt: NumberLong(2) }, _agg1: { $lt: NumberLong(100) }, "_id.tier": { $ne: "x" } } }
+            { $match: { "COUNT(*)": { $gt: 2 }, _agg1: { $lt: 100 }, "_id.tier": { $ne: "x" } } }
             { $sort: { "COUNT(*)": -1, "_id.country": 1 } }
-            { $skip: NumberLong(10) }
-            { $limit: NumberLong(5) }
+            { $skip: 10 }
+            { $limit: 5 }
             { $project: { _id: 0, country: "$_id.country", tier: "$_id.tier", "COUNT(*)": "$COUNT(*)" } }
             """)
         #expect(try pipe("SELECT COUNT(*) AS n FROM t WHERE a = 1") == """
-        { $match: { a: NumberLong(1) } }
+        { $match: { a: 1 } }
         { $group: { _id: null, n: { $sum: 1 } } }
         { $project: { _id: 0, n: "$n" } }
         """)
@@ -140,7 +140,7 @@ struct MongoSQLTests {
         #expect(try pipe("SELECT a AS k, COUNT(*) AS n FROM t GROUP BY k HAVING n >= 2 ORDER BY n")
                 == """
                 { $group: { _id: "$a", n: { $sum: 1 } } }
-                { $match: { n: { $gte: NumberLong(2) } } }
+                { $match: { n: { $gte: 2 } } }
                 { $sort: { n: 1 } }
                 { $project: { _id: 0, k: "$_id", n: "$n" } }
                 """, "GROUP BY and HAVING take the SELECT list's aliases")
@@ -168,14 +168,14 @@ struct MongoSQLTests {
         { $sort: { b: -1, a: 1, "c.d": -1 } }
         { $project: { _id: 0, a: "$a", x: "$b" } }
         """, "sorted before the $project, so fields not selected sort too; a repeated key keeps its first place")
-        #expect(try pipe("SELECT * FROM t ORDER BY a LIMIT 3") == "{ $sort: { a: 1 } }\n{ $limit: NumberLong(3) }")
+        #expect(try pipe("SELECT * FROM t ORDER BY a LIMIT 3") == "{ $sort: { a: 1 } }\n{ $limit: 3 }")
     }
 
     @Test func limitAndOffsetInEveryForm() throws {
-        #expect(try pipe("SELECT * FROM t LIMIT 3") == "{ $limit: NumberLong(3) }")
-        #expect(try pipe("SELECT * FROM t LIMIT 10, 3") == "{ $skip: NumberLong(10) }\n{ $limit: NumberLong(3) }")
-        #expect(try pipe("SELECT * FROM t LIMIT 3 OFFSET 10") == "{ $skip: NumberLong(10) }\n{ $limit: NumberLong(3) }")
-        #expect(try pipe("SELECT * FROM t LIMIT 3 OFFSET 0") == "{ $limit: NumberLong(3) }")
+        #expect(try pipe("SELECT * FROM t LIMIT 3") == "{ $limit: 3 }")
+        #expect(try pipe("SELECT * FROM t LIMIT 10, 3") == "{ $skip: 10 }\n{ $limit: 3 }")
+        #expect(try pipe("SELECT * FROM t LIMIT 3 OFFSET 10") == "{ $skip: 10 }\n{ $limit: 3 }")
+        #expect(try pipe("SELECT * FROM t LIMIT 3 OFFSET 0") == "{ $limit: 3 }")
     }
 
     @Test func notesOnlyWhenTheyApply() throws {
@@ -281,7 +281,7 @@ struct MongoSQLTests {
         let name = SQLParser.parse("SELECT o.a.b.c FROM t o").first?.query?.blocks.first?.items.first?.expr.name
         #expect(name?.parts.map(\.value) == ["o", "a", "b", "c"])
         #expect(try pipe("SELECT o.a.b.c FROM t o WHERE o.a.b.d = 1")
-                == "{ $match: { \"a.b.d\": NumberLong(1) } }\n{ $project: { _id: 0, c: \"$a.b.c\" } }")
+                == "{ $match: { \"a.b.d\": 1 } }\n{ $project: { _id: 0, c: \"$a.b.c\" } }")
     }
 }
 

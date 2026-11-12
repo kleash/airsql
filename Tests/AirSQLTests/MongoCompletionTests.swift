@@ -219,7 +219,9 @@ extension AppTests {
     @Test(.enabled(if: MongoLab.enabled)) func theQueryBarAndThePipelineEditorAutofillFromTheSample() async throws {
         let (main, harness, mongo, tab) = try await shopOrders()
         let window = try #require(main.window)
-        // The filter: an indexed field first, then its values once a quote is typed; Return takes one.
+        // The filter: an indexed field first, then its values once a quote is typed; Return takes one (in Shell, where the
+        // fields are typed).
+        tab.bar.setMode(.shell)
         #expect(window.makeFirstResponder(tab.bar.filter))
         let field = try #require(tab.bar.filter.currentEditor() as? NSTextView)
         typeEach("{ st", into: field)

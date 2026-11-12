@@ -100,7 +100,8 @@ final class MongoSQLPage: NSView {
                                    + "open Query with SQL… on \(translation.collection)")
         }
         let text = MongoPipeline.text(translation.pipeline)
-        pipeline.string = text
+        // A stage a line, so the whole translation shows at a glance; the tab's text stays laid out as the editor's.
+        pipeline.string = "[\n  " + translation.pipeline.map { $0.shellForm() }.joined(separator: ",\n  ") + "\n]"
         notes.stringValue = translation.notes.map { "• " + $0 }.joined(separator: "\n")
         notes.isHidden = translation.notes.isEmpty
         let apply = { [weak self] in

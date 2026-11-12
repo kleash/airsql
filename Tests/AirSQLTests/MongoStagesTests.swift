@@ -18,7 +18,7 @@ import Testing
         saved.tls.caFile = Lab.caFile
         saved.proxy = ProxySettings(kind: .socks5, host: "127.0.0.1", port: Lab.socksProxy.port, user: Lab.socksProxy.user)
     } else {
-        saved = SavedConnection(name: "Mongo stages", host: "127.0.0.1", port: MongoLab.soloPort, user: MongoLab.airsql.user)
+        saved = SavedConnection(name: "Shop · MongoDB", host: "127.0.0.1", port: MongoLab.soloPort, user: MongoLab.airsql.user)
         saved.tls.mode = .off
     }
     saved.engine = .mongodb
@@ -285,7 +285,7 @@ extension AppTests {
         #expect(tab.collection == "reviews" && tab.mode == .sql && tab.sqlPage.editor.string == "SELECT * FROM reviews LIMIT 100")
         #expect(await eventually(timeout: 20) { tab.loading == nil && tab.source.rowCount == 100 }, "\(tab.problem ?? "")")
         #expect(try MongoPipeline.stages(in: tab.editor.string).map(\.name).last == "$limit", "\(tab.editor.string)")
-        #expect(tab.editor.string == tab.sqlPage.pipeline.string)
+        #expect(try MongoPipeline.stages(in: tab.editor.string).map(\.document) == MongoPipeline.stages(in: tab.sqlPage.pipeline.string).map(\.document))
 
         // Refused, with the part underlined; another collection's FROM is said so.
         tab.sqlPage.editor.string = "SELECT * FROM reviews WHERE rating IN (SELECT 1)"
@@ -327,7 +327,7 @@ extension AppTests {
         #expect(await eventually(timeout: 5) { tab.mode == .stages })
         let kinds = tab.stagesView.forms.map { MongoStagesView.Kind($0) }
         #expect(Array(kinds.prefix(3)) == [.join, .unwind, .group], "\(tab.editor.string)")
-        #expect(tab.editor.string == tab.sqlPage.pipeline.string)
+        #expect(try MongoPipeline.stages(in: tab.editor.string).map(\.document) == MongoPipeline.stages(in: tab.sqlPage.pipeline.string).map(\.document))
         main.close(try #require(main.tabs.first { $0.content === tab }))
     }
 }

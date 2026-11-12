@@ -151,7 +151,7 @@ struct MongoQueryBuilderTests {
 
 /// The standalone, or the replica set through the SOCKS proxy, connected in a window of its own.
 @MainActor private func builderWindow(replicaSet: Bool) async throws -> (MainWindowController, OpenMongoConnection) {
-    var saved = SavedConnection(name: "Mongo solo", host: "127.0.0.1", port: MongoLab.soloPort, user: MongoLab.airsql.user)
+    var saved = SavedConnection(name: "Shop", host: "127.0.0.1", port: MongoLab.soloPort, user: MongoLab.airsql.user)
     var password = MongoLab.airsql.password
     if replicaSet {
         saved = SavedConnection(name: "Mongo set", route: .proxy)
