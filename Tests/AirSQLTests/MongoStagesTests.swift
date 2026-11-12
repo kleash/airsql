@@ -108,8 +108,9 @@ extension AppTests {
         let rows = try #require(tab.stagesView.cards.first?.conditions)
         rows.group = MongoBuilder.Group([.rule(.init("status", .oneOf, ["paid", "shipped", "delivered"]))])
         rows.onChange?()
-        #expect(try MongoPipeline.stages(in: tab.editor.string).first?.document.shellForm()
-                == "{ $match: { status: { $in: [\"paid\", \"shipped\", \"delivered\"] } } }", "\(tab.editor.string)")
+        let first = try MongoPipeline.stages(in: tab.editor.string).first?.document
+        let wanted = try BSONDocument(shellForm: "{ $match: { status: { $in: [\"paid\", \"shipped\", \"delivered\"] } } }")
+        #expect(first == wanted, "\(first?.shellForm() ?? "")")
         #expect(tab.editor.string.hasSuffix(String(built.dropFirst(4))), "\(tab.editor.string)")
         let paid: Set<String> = ["paid", "shipped", "delivered"]
 
