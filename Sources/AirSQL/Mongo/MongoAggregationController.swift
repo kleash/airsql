@@ -8,6 +8,8 @@ import AppKit
 @MainActor
 final class MongoAggregationController: NSViewController, TabContent, DataGridViewDelegate, NSMenuItemValidation {
     enum Page: Int { case documents, explain }
+    /// How the pipeline is edited: as cards (`MongoStagesView`) or as its text; both edit the same text.
+    enum Mode: Int { case stages, shell }
 
     let model: AppModel
     let connectionID: UUID
@@ -42,6 +44,9 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         return link
     }()
     private(set) var page = Page.documents
+    private(set) var mode = Mode.stages
+    private(set) lazy var stagesView = MongoStagesView(tab: self)
+    let modeSwitch = NSSegmentedControl(labels: ["Stages", "Shell"], trackingMode: .selectOne, target: nil, action: nil)
     /// The tab's own session, made on first use; `sessionOf` is the connection it belongs to (a reconnect makes another).
     private var session: MongoSession?
     private weak var sessionOf: MongoConnection?
@@ -138,7 +143,14 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             field.setAccessibilityTitleUIElement(name)
             return [name, field]
         }
-        let options = NSStackView(views: named(collation, "Collation") + named(maxTime, "Max Time")
+        modeSwitch.selectedSegment = mode.rawValue
+        modeSwitch.target = self
+        modeSwitch.action = #selector(modeSwitched(_:))
+        modeSwitch.setToolTip("Build the pipeline from cards: Join, Filter, Group… (\(Commands.pipelineStages.shortcut))", forSegment: 0)
+        modeSwitch.setToolTip("Type the pipeline in shell form (\(Commands.pipelineShell.shortcut))", forSegment: 1)
+        modeSwitch.setAccessibilityLabel("Edit the pipeline as")
+        modeSwitch.setAccessibilityIdentifier("aggregate.mode")
+        let options = NSStackView(views: [modeSwitch] + named(collation, "Collation") + named(maxTime, "Max Time")
                                   + [label("ms", font: .systemFont(ofSize: 12), color: .secondaryLabelColor), spinner])
         options.spacing = Spacing.unit
         options.edgeInsets = NSEdgeInsets(top: 6, left: Spacing.double, bottom: 6, right: Spacing.double)
@@ -169,10 +181,17 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
 
         split.isVertical = false
         split.dividerStyle = .thin
-        split.addArrangedSubview(editorScroll)
+        let top = NSView()
+        for part in [editorScroll, stagesView] as [NSView] {
+            top.addSubview(part)
+            part.pin(to: top)
+        }
+        editorScroll.isHidden = mode != .shell
+        stagesView.isHidden = mode != .stages
+        split.addArrangedSubview(top)
         split.addArrangedSubview(lower)
         split.setHoldingPriority(.defaultLow + 1, forSubviewAt: 0)
-        editorScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true
+        top.heightAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true
         lower.heightAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
 
         split.translatesAutoresizingMaskIntoConstraints = false
@@ -197,7 +216,8 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         guard !placedDivider, split.bounds.height > 240 else { return }
         placedDivider = true
         // After this pass: a split moved in the middle of its own layout puts the divider back.
-        DispatchQueue.main.async { [self] in split.setPosition(min(200, split.bounds.height * 0.4), ofDividerAt: 0) }
+        // Cards take more room than the text.
+        DispatchQueue.main.async { [self] in split.setPosition(min(mode == .stages ? 420 : 200, split.bounds.height * (mode == .stages ? 0.55 : 0.4)), ofDividerAt: 0) }
     }
 
     // MARK: The pipeline
@@ -205,6 +225,10 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
     /// The stages typed and the options, or nil after saying what's wrong (the editor's caret moves to it).
     private func parsed() -> (stages: [BSONDocument], options: MongoFind)? {
         let text = editor.string
+        if mode == .stages, let problem = stagesView.firstProblem {
+            fail(problem)
+            return nil
+        }
         do {
             let stages = try MongoPipeline.stages(in: text).map(\.document)
             editor.runProblem = nil
@@ -212,6 +236,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             return (stages, options)
         } catch let error as MongoPipeline.ParseError {
             let found = Self.problem(error, in: text)
+            if mode == .stages { show(.shell) }
             editor.runProblem = found
             editor.setSelectedRange(NSRange(location: found.range.lowerBound, length: 0))
             view.window?.makeFirstResponder(editor)
@@ -469,6 +494,9 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             "Read from \($0), a secondary, as the connection's readPreference asks: it may lag the primary"
         }
         moreLink.isHidden = !more
+        if mode == .stages {
+            if let problem = stagesView.sync() { showShell(because: problem) } else { stagesView.updateCounts() }
+        }
         viewer.status.update()
         toolbar.setNeedsValidation()
     }
@@ -495,6 +523,8 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
                 : cursor?.isExhausted == false ? nil : "Every document the pipeline gives is loaded"
         case Commands.cancelQuery.action?:
             reason = activity?.canCancel == true ? nil : "Nothing is running now"
+        case Commands.pipelineStages.action?:
+            item.state = item.tag == mode.rawValue ? .on : .off
         default:
             reason = pipelineReason(item.action)
         }
@@ -776,7 +806,7 @@ extension MainWindowController {
     func openAggregation(_ collection: String, database: String, connection: UUID) {
         let content = MongoAggregationController(model: model, connection: connection, database: database, collection: collection)
         open(content, title: collection + " pipeline", connection: connection)
-        window?.makeFirstResponder(content.editor)
+        window?.makeFirstResponder(content.mode == .shell ? content.editor : content.stagesView.cards.first?.kind)
     }
 }
 
@@ -804,4 +834,42 @@ extension MongoAggregationController {
     @objc func newAggregation(_ sender: Any?) {
         (view.window?.windowController as? MainWindowController)?.openAggregation(collection, database: database, connection: connectionID)
     }
+}
+
+// MARK: Stages | Shell (lane P5-stages)
+
+extension MongoAggregationController {
+    /// Stages or Shell: switching never touches the text; a text that isn't a pipeline stays in Shell with its error.
+    func show(_ mode: Mode) {
+        if mode == .stages, let problem = stagesView.sync() { return showShell(because: problem) }
+        self.mode = mode
+        modeSwitch.selectedSegment = mode.rawValue
+        editorScroll.isHidden = mode != .shell
+        stagesView.isHidden = mode != .stages
+        if mode == .stages { stagesView.updateCounts() }
+        view.window?.makeFirstResponder(mode == .shell ? editor : stagesView.cards.first?.kind)
+        updateBars()
+    }
+
+    /// Back to Shell, where the text's error is underlined, saying why.
+    func showShell(because problem: String) {
+        mode = .shell
+        modeSwitch.selectedSegment = Mode.shell.rawValue
+        editorScroll.isHidden = false
+        stagesView.isHidden = true
+        fail("The pipeline isn't one the cards can show: " + problem)
+    }
+
+    func showProblem(_ message: String) { fail(message) }
+
+    /// A card's edit: the editor's whole text replaced in one undoable change.
+    func replacePipeline(_ text: String) {
+        let whole = NSRange(location: 0, length: (editor.string as NSString).length)
+        guard editor.shouldChangeText(in: whole, replacementString: text) else { return }
+        editor.textStorage?.replaceCharacters(in: whole, with: text)
+        editor.didChangeText()
+    }
+
+    @objc private func modeSwitched(_ sender: NSSegmentedControl) { show(Mode(rawValue: sender.selectedSegment) ?? .stages) }
+    @objc func showPipelineMode(_ sender: Any?) { show(Mode(rawValue: (sender as? NSMenuItem)?.tag ?? 0) ?? .stages) }
 }

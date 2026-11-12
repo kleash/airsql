@@ -21,7 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands + mongoUsersCommands
-        + mongoWatchCommands + mongoDumpCommands
+        + mongoWatchCommands + mongoDumpCommands + mongoStageCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -188,4 +188,17 @@ extension Commands {
                                       tip: "Write an .archive.gz file's databases into the server with your own mongorestore; it asks first")
 
     static let mongoDumpCommands = [mongoDump, mongoRestore]
+}
+
+// MARK: Stages | Shell (lane P5-stages)
+
+extension Commands {
+    static let pipelineStages = Command("Edit as Stages", #selector(MongoAggregationController.showPipelineMode(_:)), "8", [.control, .option],
+                                        tag: MongoAggregationController.Mode.stages.rawValue,
+                                        tip: "Build the pipeline from cards: Join, Filter, Group, Sort… with SQL's words beside them")
+    static let pipelineShell = Command("Edit as Shell", #selector(MongoAggregationController.showPipelineMode(_:)), "9", [.control, .option],
+                                       tag: MongoAggregationController.Mode.shell.rawValue,
+                                       tip: "Type the pipeline in shell form, as mongosh takes it")
+
+    static let mongoStageCommands = [pipelineStages, pipelineShell]
 }
