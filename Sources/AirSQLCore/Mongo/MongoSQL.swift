@@ -35,6 +35,26 @@ public enum MongoSQL {
     public static func translate(_ sql: String, sample: ((String) -> MongoSample?)? = nil) throws -> Translation {
         try Translator(sql, sample: sample).translate()
     }
+
+    /// The database as the SQL editor's schema, for its completion: each collection a table, its sample's top-level
+    /// fields the columns (a collection not sampled yet has none).
+    public static func snapshot(database: String, collections: [String], sample: (String) -> MongoSample?) -> SchemaSnapshot {
+        var found = SchemaDatabase(name: database, charset: "", collation: "")
+        found.detailsLoaded = true
+        found.tables = collections.map { name in
+            var table = SchemaTable(name: name, kind: .table)
+            table.columns = (sample(name)?.schema.fields ?? []).filter { !$0.path.contains(".") }.map { field in
+                let type = field.types.first { $0.name != "null" }?.name ?? "null"
+                return SchemaColumn(name: field.path, dataType: type, columnType: type, nullable: true, defaultValue: .none,
+                                    autoIncrement: false, onUpdate: nil, generated: nil, invisible: false, isJSON: false,
+                                    charset: nil, collation: nil, comment: "")
+            }
+            return table
+        }
+        var snapshot = SchemaSnapshot()
+        snapshot.databases = [found]
+        return snapshot
+    }
 }
 
 private typealias Refusal = MongoSQL.Refusal
@@ -207,6 +227,7 @@ private final class Translator {
             guard let theirs, sides[1 - theirs].join != name else {
                 throw refuse("ON must compare a field of \(name) with one of an earlier collection", on.range)
             }
+            sides.forEach(missingNote)
             let local = sides[1 - theirs].path, foreign = sides[theirs].local
             stages.append(stage("$lookup", .document(BSONDocument([("from", .string(collection)), ("localField", .string(local)),
                                                                    ("foreignField", .string(foreign)), ("as", .string(name))]))))
@@ -444,6 +465,14 @@ private final class Translator {
         }
         let milliseconds = Int64((part(7) ?? "0").padding(toLength: 3, withPad: "0", startingAt: 0))!
         return .datetime(Int64(date.timeIntervalSince1970.rounded()) * 1000 + milliseconds)
+    }
+
+    /// A join key the collection's sample never holds: the join then finds nothing.
+    func missingNote(_ field: Field) {
+        guard let fields = sample?(field.collection)?.schema.fields, !fields.isEmpty,
+              !fields.contains(where: { $0.path.replacingOccurrences(of: ".[]", with: "") == field.local }) else { return }
+        note("\(field.collection) has no \(field.local) in its sample, so the join may find nothing"
+             + (field.local == "id" ? ": MongoDB's key is _id" : ""))
     }
 
     /// The sample's main type at the field, when the literal's is another.

@@ -27,6 +27,7 @@ final class MongoSQLPage: NSView {
         editor.setAccessibilityLabel("SQL query of \(tab.collection)")
         editor.toolTip = "Write a SELECT … FROM \(tab.collection) with JOIN, WHERE, GROUP BY, ORDER BY, LIMIT; Run (⌘↩) translates and runs it"
         editor.onChange = { [weak self] in self?.editor.runProblem = nil }
+        editor.completions = { [weak self] text, caret in self?.completions(text, caret) ?? (caret..<caret, []) }
 
         pipeline.isEditable = false
         pipeline.isSelectable = true
@@ -73,6 +74,22 @@ final class MongoSQLPage: NSView {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     @objc private func translatePressed(_ sender: Any?) { translate(thenRun: false) }
+
+    /// Autofill: the console's SQL completion over this database's collections, with the sampled top-level fields of
+    /// those named in the text as their columns (`c.` lists customers' fields, `_id` among them).
+    private func completions(_ text: String, _ caret: Int) -> (Range<Int>, [CompletionItem]) {
+        guard let open = tab.model.openMongo[tab.connectionID] else { return (caret..<caret, []) }
+        let database = tab.database
+        if open.collections[database] == nil { open.loadDatabase(database) }
+        let names = (open.collections[database] ?? []).map(\.name)
+        // shortcut: a name that is only part of a longer word gets sampled too; harmless, a sample is read once and cached.
+        for name in names where text.contains(name) { open.readSample(database: database, collection: name) }
+        let snapshot = MongoSQL.snapshot(database: database, collections: names) {
+            open.connection.samples.cached(database: database, collection: $0)
+        }
+        return SQLCompletion.suggestions(text: text, caret: caret, snapshot: snapshot, database: database, noBackslashEscapes: false,
+                                         options: tab.model.data.settings.completionOptions(recent: CompletionPopup.chosen))
+    }
 
     /// Open as Stages: the translation in the tab's text, then its cards.
     @objc func openAsStages(_ sender: Any?) {

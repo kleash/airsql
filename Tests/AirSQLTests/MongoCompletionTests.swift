@@ -269,6 +269,20 @@ extension AppTests {
         typeEach("\"$cu", into: editor)
         #expect(popup.isShown && popup.selected?.label == "$customerId", "\(popup.items.map(\.label))")
         popup.close()
+
+        // The SQL page: an alias's fields, from the sample of the collection it names (read once named).
+        pipeline.show(MongoAggregationController.Mode.sql)
+        let sql = pipeline.sqlPage.editor
+        sql.string = "SELECT * FROM customers c JOIN orders o ON c"
+        sql.setSelectedRange(NSRange(location: (sql.string as NSString).length, length: 0))
+        window.makeFirstResponder(sql)
+        typeEach(".", into: sql)
+        #expect(await eventually(timeout: 20) {
+            sql.updateCompletion(force: true)
+            return sql.completionPopup?.items.contains { $0.label == "_id" } == true
+        }, "\(sql.completionPopup?.items.map(\.label) ?? [])")
+        #expect(sql.completionPopup?.items.contains { $0.label == "id" || $0.label == "customerId" } == false)
+        sql.completionPopup?.close()
         pipeline.close()
         tab.close()
         _ = mongo
