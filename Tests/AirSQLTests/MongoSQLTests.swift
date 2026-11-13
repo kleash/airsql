@@ -188,6 +188,30 @@ struct MongoSQLTests {
         }
     }
 
+    @Test func notesAJoinKeyTheSampleNeverHolds() throws {
+        let customers = MongoSample(schema: MongoSchema(sample: [BSONDocument([("_id", .objectId(BSONObjectId.generate())), ("name", .string("a"))])]))
+        let orders = MongoSample(schema: MongoSchema(sample: [BSONDocument([("customerId", .objectId(BSONObjectId.generate()))])]))
+        let sample: (String) -> MongoSample? = { ["orders": orders, "customers": customers][$0] }
+        #expect(try notes("SELECT * FROM customers c JOIN orders o ON c.id = o.customerId", sample: sample)
+                == ["customers has no id in its sample, so the join may find nothing: MongoDB's key is _id", MongoSQL.joinNote])
+        #expect(try notes("SELECT * FROM customers c JOIN orders o ON c._id = o.customerId", sample: sample) == [MongoSQL.joinNote])
+    }
+
+    @Test func completesCollectionsAndTheirSampledFields() {
+        let customers = MongoSample(schema: MongoSchema(sample: [BSONDocument([
+            ("_id", .objectId(BSONObjectId.generate())), ("name", .string("a")), ("address", .document(BSONDocument([("city", .string("b"))]))),
+        ])]))
+        let snapshot = MongoSQL.snapshot(database: "shop", collections: ["customers", "orders"]) { $0 == "customers" ? customers : nil }
+        let sql = "SELECT c. FROM customers c JOIN orders o ON c._id = o.customerId"
+        let labels = SQLCompletion.suggestions(text: sql, caret: 9, snapshot: snapshot, database: "shop", noBackslashEscapes: false,
+                                               options: CompletionOptions()).1.map(\.label)
+        #expect(Set(labels).isSuperset(of: ["_id", "name", "address"]), "\(labels)")
+        #expect(!labels.contains("address.city"))
+        let tables = SQLCompletion.suggestions(text: "SELECT * FROM ", caret: 14, snapshot: snapshot, database: "shop",
+                                               noBackslashEscapes: false, options: CompletionOptions()).1.map(\.label)
+        #expect(Set(tables).isSuperset(of: ["customers", "orders"]), "\(tables)")
+    }
+
     @Test func notesWhenTheSampleHoldsAnotherType() throws {
         let orders = MongoSample(schema: MongoSchema(sample: [
             BSONDocument([("createdAt", .datetime(0)), ("qty", .int32(1)), ("items", .array([.document(BSONDocument([("sku", .string("a"))]))]))]),
