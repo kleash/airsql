@@ -72,7 +72,7 @@ session of its own, so a long query in one tab leaves the others free.
   built-in ones, and the connection's **History** by day, each with a bar as long as it took. Double-click one to put it
   in at the cursor, or drag it into the editor (a column's name comes quoted where it needs to be, as completion puts it
   in). Right-click a snippet to edit or delete it; editing a built-in one makes a copy of your own.
-- **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression**, **Match
+- **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor (the word selected in a line, if there is one), with **Regular Expression**, **Match
   Case**, **Whole Words** and **In Selection** (the text selected when you tick it). With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
 - Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete

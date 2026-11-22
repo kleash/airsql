@@ -815,6 +815,23 @@ extension AppTests {
             #expect(find.isHidden && console.view.window?.firstResponder === console.editor)
         }
 
+        /// ⌘F takes the word selected in a line as what to find; a selection over lines stays, for In Selection.
+        @Test func findTakesTheSelectedWord() async throws {
+            let (main, harness, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            let find = try #require(console.findBar)
+            defer { find.close(nil) }
+            editor.setText("SELECT total\nFROM orders")
+            editor.setSelectedRange(NSRange(location: 7, length: 5))
+            main.window?.makeFirstResponder(editor)
+            #expect(await call(harness, "menu", ["path": "Edit > Find > Find…"]).error == nil)
+            #expect(find.search.stringValue == "total" && find.matches()?.count == 1)
+            editor.setSelectedRange(NSRange(location: 0, length: 16))
+            main.window?.makeFirstResponder(editor)
+            #expect(await call(harness, "menu", ["path": "Edit > Find > Find…"]).error == nil)
+            #expect(find.search.stringValue == "total", "several lines: what In Selection searches")
+        }
+
         @Test func theSQLLogShowsFiltersAndClearsTheLog() async throws {
             let folder = try scratch()
             let log = SQLLog(fileURL: URL(fileURLWithPath: folder + "/SQL.log"))
