@@ -90,6 +90,15 @@ among the favourites. They're kept per connection on this Mac, beside the SQL hi
 
 A click on a column's header sorts by that field on the server; ⇧-click adds it to the sort.
 
+**Data ▸ Collection ▸ Copy Query as JavaScript** puts the query bar's find on the clipboard as a script mongosh runs as
+it is, `db.getSiblingDB("shop").getCollection("orders").find({ status: "paid" }).sort({ total: -1 }).limit(50)`, with
+only the parts that are set; **Export Query as JavaScript…** saves it as `<collection>.js`. In an aggregation tab they
+write the pipeline, a stage a line, with `{ allowDiskUse: true }` and its Collation and Max Time. Values keep their
+types (`ObjectId("…")`, `ISODate("…")`, `NumberLong("…")`, and `Double(5.0)` for a whole double, which mongosh would
+otherwise send as an int32). The script names the database and collection only, never the connection's address, user
+or password. A field that doesn't parse is refused as Run refuses it, and so are `undefined` and `DBPointer(…)`,
+deprecated types mongosh can't write.
+
 ## Builder
 
 A collection tab opens with its query bar in **Builder**, for people who know SQL rather than MongoDB; **Shell** (the
@@ -335,7 +344,8 @@ loaded, the last stage's count shows there too.
 **Save Pipeline…** (the bookmark button, or Data ▸ Collection) keeps the pipeline under a name for its collection, on
 this Mac beside the query history; the same menu opens a saved pipeline, and **Rename Saved Pipeline…** and **Delete
 Saved Pipeline…** act on the one open in the tab. **Export Documents…** (the share button) writes what the pipeline gives,
-in the same formats as a collection's export, a batch at a time.
+in the same formats as a collection's export, a batch at a time. **Copy Query as JavaScript** and **Export Query as
+JavaScript…** write the pipeline for mongosh (see [The query bar](#the-query-bar)).
 
 **Save as View…** makes a view on the collection that gives what the pipeline gives: name it, then the exact `create`
 command shows before it runs. A pipeline that writes (`$out`, `$merge`) can't be a view or be exported, and a read-only

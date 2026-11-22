@@ -19,6 +19,14 @@ extension BSONValue {
         var parser = ShellParser(text)
         self = try parser.whole(documentOnly: false)
     }
+
+    /// Shell form that mongosh reads back with the same types (`MongoScript`): a whole double as Double(…), which
+    /// mongosh would otherwise send as an int32, and a 64-bit integer from a string, as mongosh asks.
+    func mongoshForm() -> String {
+        var formatter = ShellFormatter(pretty: false, limit: nil, mongosh: true)
+        formatter.value(self, indent: 0)
+        return formatter.result
+    }
 }
 
 extension BSONDocument {
@@ -49,6 +57,7 @@ extension BSONValue {
 private struct ShellFormatter {
     let pretty: Bool
     let limit: Int?
+    var mongosh = false
     var out = ""
     var written = 0
     var done = false
@@ -121,6 +130,7 @@ private struct ShellFormatter {
 
     mutating func value(_ v: BSONValue, indent: Int) {
         switch v {
+        case .double(let d) where mongosh && d.isFinite && d == d.rounded(): append("Double(" + BSONValue.doubleText(d) + ")")
         case .double(let d): append(BSONValue.doubleText(d))
         case .string(let s): quoted(s)
         case .document(let d): document(d, indent: indent)
@@ -172,7 +182,7 @@ private struct ShellFormatter {
             append(")")
         case .int32(let n): append(String(n))
         case let .timestamp(t, i): append("Timestamp({ t: \(t), i: \(i) })")
-        case .int64(let n): append(n.magnitude <= 1 << 53 ? "NumberLong(\(n))" : "NumberLong(\"\(n)\")")
+        case .int64(let n): append(n.magnitude <= 1 << 53 && !mongosh ? "NumberLong(\(n))" : "NumberLong(\"\(n)\")")
         case .decimal128(let d): append("NumberDecimal(\"\(d)\")")
         case .minKey: append("MinKey()")
         case .maxKey: append("MaxKey()")

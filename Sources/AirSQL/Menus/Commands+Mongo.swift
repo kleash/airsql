@@ -21,7 +21,7 @@ extension Commands {
 
     static let mongoCommands = [openCollection, collectionDocuments, collectionJSON, collectionSchema, expandField, copyDocuments]
         + aggregationCommands + [editValue, removeField] + mongoIndexCommands + mongoBulkCommands + mongoAdminCommands + mongoHostCommands + mongoCompareCommands + mongoUsersCommands
-        + mongoWatchCommands + mongoDumpCommands + mongoStageCommands + mongoQueryCommands
+        + mongoWatchCommands + mongoDumpCommands + mongoStageCommands + mongoQueryCommands + mongoScriptCommands
 }
 
 // MARK: Aggregation (lane M4-app)
@@ -218,4 +218,15 @@ extension Commands {
                                       tip: "Build the query from fields, operators and values, or type it in shell form")
 
     static let mongoQueryCommands = [aggregateQuery, queryBuilder]
+}
+
+// MARK: Query as JavaScript
+
+extension Commands {
+    static let copyQueryScript = Command("Copy Query as JavaScript", #selector(MongoCollectionController.copyQueryScript(_:)),
+                                         tip: "Copy the tab's find or pipeline as a script mongosh runs as it is")
+    static let exportQueryScript = Command("Export Query as JavaScript…", #selector(MongoCollectionController.exportQueryScript(_:)),
+                                           tip: "Save the tab's find or pipeline as a .js file mongosh runs as it is")
+
+    static let mongoScriptCommands = [copyQueryScript, exportQueryScript]
 }

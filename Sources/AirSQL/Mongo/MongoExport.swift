@@ -16,6 +16,32 @@ struct MongoCollectionRef {
     var refusal: String?
 }
 
+extension MongoExport {
+    /// Copy Query as JavaScript's clipboard.
+    @MainActor static func copy(_ script: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(script, forType: .string)
+    }
+
+    /// Export Query as JavaScript…: `<collection>.js`, written off the main thread, atomically.
+    @MainActor static func save(_ script: String, collection: String, on window: NSWindow) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = collection + ".js"
+        panel.allowedContentTypes = [.javaScript]
+        panel.message = "Export the query on \(collection) as JavaScript for mongosh"
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task.detached {
+                do {
+                    try script.write(to: url, atomically: true, encoding: .utf8)
+                } catch {
+                    await showError(error.localizedDescription, title: "The script wasn't saved", on: window)
+                }
+            }
+        }
+    }
+}
+
 /// What Export Documents… writes (mongo-plan, Export): every document of a collection, or what its tab's query finds,
 /// as Extended JSON or CSV, read from a cursor a byte-bounded batch at a time and written as it goes, never held whole.
 enum MongoExport {

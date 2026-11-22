@@ -774,6 +774,24 @@ extension MongoAggregationController {
         MongoExportSheet.show(ref, activity: model.activity, on: window)
     }
 
+    /// Copy and Export Query as JavaScript: the pipeline with the options Run gives it, as mongosh runs it; what doesn't
+    /// parse is shown as Run shows it.
+    @objc func copyQueryScript(_ sender: Any?) { if let script = queryScript() { MongoExport.copy(script) } }
+    @objc func exportQueryScript(_ sender: Any?) {
+        guard let window = view.window, let script = queryScript() else { return }
+        MongoExport.save(script, collection: collection, on: window)
+    }
+
+    private func queryScript() -> String? {
+        guard let (stages, options) = parsed() else { return nil }
+        do {
+            return try MongoScript.aggregate(stages, options: options, database: database, collection: collection)
+        } catch {
+            fail("\(error)")
+            return nil
+        }
+    }
+
     /// The pipeline Export Documents… writes the documents of, or why it can't.
     func exportPipeline() -> (stages: [BSONDocument], collation: BSONDocument?, refusal: String?) {
         guard let stages = try? MongoPipeline.stages(in: editor.string).map(\.document),
