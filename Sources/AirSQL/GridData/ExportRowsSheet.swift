@@ -88,6 +88,7 @@ final class ExportRowsSheet: NSWindowController, NSTextFieldDelegate {
         }
         otherSeparator.delegate = self
         otherSeparator.isHidden = true
+        restoreChoices()
         window.contentView = makeContent()
         window.setContentSize(window.contentView!.fittingSize)
         formatChanged(nil)
@@ -172,6 +173,29 @@ final class ExportRowsSheet: NSWindowController, NSTextFieldDelegate {
 
     func controlTextDidChange(_ notification: Notification) { formatChanged(nil) }
 
+    // MARK: The last choices
+
+    /// The choices of the last Export or Copy, which the sheet opens with; which rows is chosen each time.
+    static let choicesKey = "exportRowsChoices"
+    private var choicePopups: [String: NSPopUpButton] {
+        ["format": format, "null": nullText, "separator": separator, "quote": quote, "encoding": encoding]
+    }
+    private var choiceBoxes: [String: NSButton] { ["headers": headers, "crlf": crlf, "joinLines": joinLines, "open": openAfter] }
+
+    private func restoreChoices() {
+        guard let saved = UserDefaults.standard.dictionary(forKey: Self.choicesKey) else { return }
+        for (key, popup) in choicePopups { if let title = saved[key] as? String, popup.item(withTitle: title) != nil { popup.selectItem(withTitle: title) } }
+        for (key, box) in choiceBoxes { if let on = saved[key] as? Bool { box.state = on ? .on : .off } }
+        otherSeparator.stringValue = saved["otherSeparator"] as? String ?? ""
+    }
+
+    private func saveChoices() {
+        var saved: [String: Any] = choicePopups.compactMapValues(\.titleOfSelectedItem)
+        for (key, box) in choiceBoxes { saved[key] = box.state == .on }
+        saved["otherSeparator"] = otherSeparator.stringValue
+        UserDefaults.standard.set(saved, forKey: Self.choicesKey)
+    }
+
     @objc private func cancel(_ sender: Any?) { dismiss() }
 
     private func dismiss() {
@@ -183,6 +207,7 @@ final class ExportRowsSheet: NSWindowController, NSTextFieldDelegate {
     @objc private func copyRows(_ sender: Any?) {
         guard let format = chosenFormat else { return }
         let request = request, options = options, selected = scope.indexOfSelectedItem == 0
+        saveChoices()
         dismiss()
         request.readWhole(!selected) {
             let text = CopyWriter.text(format, columns: request.columns, rows: selected ? request.selected() : request.loaded(), database: request.database,
@@ -200,6 +225,7 @@ final class ExportRowsSheet: NSWindowController, NSTextFieldDelegate {
         let format = chosenFormat, options = options, request = request, activity = activity
         let which = scope.indexOfSelectedItem
         let text = Self.encodings[max(0, encoding.indexOfSelectedItem)], open = openAfter.state == .on
+        saveChoices()
         dismiss()
         let panel = NSSavePanel()
         panel.nameFieldStringValue = request.title + "." + (format?.fileExtension ?? "xlsx")

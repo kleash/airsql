@@ -51,7 +51,8 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   first, with recent files. In a query tab, **Go to Statement…** (⌃⌘O) lists its statements.
 - Drag a table, column or database into the SQL editor to insert its name, quoted for SQL; hold ⇧ as you start to add its
   database. Drag a table onto a database in the tree to copy it there, through **Copy Table…**'s questions.
-- **Move Up** and **Move Down** in a connection's menu put its list in your own order.
+- **Move Up** and **Move Down** in a connection's menu put its list in your own order. It also has **Refresh**,
+  **Find Text on Server…** and **Process List** for that server, once it is connected.
 - F2 renames the selected table or view (or folder), as **Database ▸ Rename…** does.
 - **Refresh** (⌘R) reads the selected database or objects again from the server; with the connection selected, all of it.
 
@@ -80,7 +81,8 @@ The button beside the filter, and **View ▸ Tree**, hold these choices. They la
 
 Every change shows its SQL first ([Check SQL before it runs](sql-preview.md)); nothing runs until you choose to.
 
-- **New Database…** asks for a name, a character set and a collation (the server's own are chosen at first).
+- **New Database…** asks for a name, a character set and a collation (the server's own are chosen at first). The new
+  database, and a table made with **Create Table…**, is selected in the tree once AirSQL has read it; the tab in front stays.
 - **Drop…** deletes the selected databases or objects. Dropping a database always asks you to type its name; on a
   Production connection, so does dropping or emptying a table.
 - **Truncate…** deletes every row of the selected tables. It can't be rolled back.
@@ -108,7 +110,8 @@ These open a query tab with the SQL in it, built from the names AirSQL read; not
 - **Select Top 1000 Rows** on a table's menu writes a `SELECT` of its first 1,000 rows.
 - **Run…** on a procedure's menu writes its `CALL`, with a `?` and the name and type of each value it takes (Run then asks for each by name); OUT and
   INOUT parameters go in variables that a `SELECT` after the call shows. On a function's menu it writes a `SELECT` of it.
-- **New Query**, **Export…** and **Restore…** on a database's menu start in that database.
+- **New Query**, **Export…** and **Restore…** on a database's menu start in that database; **New Query** on a table's
+  menu starts in the table's database.
 
 ## Find text in tabs and files
 

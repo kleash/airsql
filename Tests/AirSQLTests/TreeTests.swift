@@ -423,6 +423,55 @@ extension AppTests {
             #expect(await eventually(timeout: 10) { (main.selectedTab?.content as? TableDataController)?.shows(self.id, "airsql_fixture", "customers") == true })
         }
 
+        /// A table's menu has New Query, in the table's database; a connection's has Refresh, Find Text on Server and
+        /// Process List, off with a reason until it connects; a MongoDB connection's has Refresh but not MySQL's two.
+        @Test func aTablesAndAConnectionsMenusHaveTheirEverydayItems() async throws {
+            var mongo = SavedConnection(name: "Documents", host: "127.0.0.1", port: 1, user: "root")
+            mongo.engine = .mongodb
+            let model = testModel(Fixtures.shop + [mongo])
+            let (main, harness) = appWindow(model)
+            let open = await openReplayed(model, id)
+            open.currentDatabase = nil
+            let row = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders"))))
+            _ = await call(harness, "click", ["x": row.point.0, "y": row.point.1, "button": "right"])
+            #expect(await call(harness, "menu", ["path": "context > New Query"]).error == nil)
+            #expect((main.selectedTab?.content as? ConsoleViewController)?.connectionID == id && open.currentDatabase == "airsql_fixture")
+
+            func menu(_ name: String) async throws -> [String: (enabled: Bool, reason: String)] {
+                let point = try #require(sidebarRow(main, name))
+                let items = await call(harness, "click", ["x": point.0, "y": point.1, "button": "right"])["menu"] as? [[String: Any]] ?? []
+                return Dictionary(items.map { ($0["title"] as? String ?? "", ($0["enabled"] as? Bool ?? false, $0["reason"] as? String ?? "")) }) { $1 }
+            }
+            let staging = try await menu("Staging · shop")
+            for title in ["Refresh", "Find Text on Server…", "Process List"] {
+                #expect(staging[title]?.enabled == false && staging[title]?.reason.isEmpty == false, "\(title): \(String(describing: staging[title]))")
+            }
+            let documents = try await menu("Documents")
+            #expect(documents["Refresh"] != nil && documents["Find Text on Server…"] == nil && documents["Process List"] == nil)
+        }
+
+        /// What New Database or Create Table made is selected once the tree shows it, with no preview over the tab in
+        /// front and the focus where it was.
+        @Test func aRowJustMadeIsSelectedOnceTheTreeShowsIt() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let tab = main.openConsole(text: "", title: nil, connection: id)
+            _ = await consoleTookTheFocus(main)
+            let responder = main.window?.firstResponder
+            let orders = SidebarNode.Kind.object(id, DatabaseObject(.table, "airsql_fixture", "orders"))
+            main.sidebar.filter.stringValue = "no such name"
+            main.sidebar.reload()
+            #expect(main.sidebar.treeNodes[orders] == nil)
+            main.sidebar.revealWhenShown(orders)
+            #expect(main.sidebar.selectedNodes.map(\.kind) != [orders])
+            main.sidebar.filter.stringValue = ""
+            main.sidebar.reload()  // as the schema read back does
+            #expect(main.sidebar.selectedNodes.map(\.kind) == [orders])
+            #expect(main.selectedTab === tab && !main.tabs.contains { $0.content is PreviewContent })
+            #expect(main.window?.firstResponder === responder)
+        }
+
         @Test func f4OnAGroupListsItAndADDLGoesToThePage() async throws {
             let model = testModel(Fixtures.shop)
             let (main, _) = appWindow(model)

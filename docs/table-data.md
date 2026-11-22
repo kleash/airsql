@@ -133,7 +133,8 @@ Nothing is written until you apply. Leaving a row writes nothing.
 - **Data ▸ Set Value ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
   `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
   or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
-- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
+- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones, with the cursor on its first column shown that isn't
+  AUTO_INCREMENT or generated. Where the server fills a value in, the new row says so
   in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, and
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.
@@ -232,6 +233,7 @@ These work in a query's results too.
   (`NULL`, `\N` or nothing), CSV's separator (any text) and quotes, Windows line endings, the file's encoding (UTF-8, with
   or without a BOM, UTF-16, Windows-1252 and others; characters it lacks are replaced, and you're told), whether line breaks
   inside values become spaces and whether the file opens afterwards, then **Export…** to a file or **Copy** to the clipboard.
+  The sheet opens next time with these choices again; which rows, you choose each time.
   In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
   and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.
   Hidden columns aren't exported, and the sheet says how many are left out. SQL formats leave out generated columns.

@@ -1,3 +1,4 @@
+import AirSQLCore
 import AppKit
 
 /// One result tab on the results bar (mockup's .rtab): its label in a capsule when shown, a pin when pinned, a ✕ unless
@@ -74,7 +75,11 @@ final class ResultTabButton: NSView {
         closeWidth.constant = tab.content.isRenamable ? 14 : 0
         let what = tab.content.isRenamable ? "click to show it, double-click to rename it, middle-click to close it, right-click for more"
             : "click to show what each statement did"
-        toolTip = tab.label + (tab.pinned ? " (pinned)" : "") + ": " + what
+        // The statement's first line tells results of the same name apart.
+        let line = tab.sql.flatMap { SQLLog.mask($0).split(whereSeparator: \.isNewline).lazy
+            .map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } }
+        let statement = line.map { " — " + ($0.count > 80 ? String($0.prefix(79)) + "…" : $0) } ?? ""
+        toolTip = tab.label + statement + (tab.pinned ? " (pinned)" : "") + ": " + what
         setAccessibilityLabel(tab.label)
         setAccessibilityValue(selected ? 1 : 0)
         setAccessibilityHelp(toolTip)

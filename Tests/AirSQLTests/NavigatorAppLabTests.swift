@@ -66,7 +66,7 @@ extension AppTests {
             #expect(await sheet("New database"))
             #expect(await call(harness, "set", ["id": "newDatabase.name", "value": db, "in": "sheet"]).error == nil)
             _ = await call(harness, "press", ["title": "Create", "in": "sheet"])
-            #expect(await eventually(timeout: 20) { main.sidebar.treeNodes[.database(id, db)] != nil })
+            #expect(await eventually(timeout: 20) { main.sidebar.selectedNodes.map(\.kind) == [.database(id, db)] })
 
             _ = try await setup.query("CREATE TABLE \(SQLQuote.identifier(db, "orders")) (id INT PRIMARY KEY, note TEXT)")
             _ = try await setup.query("INSERT INTO \(SQLQuote.identifier(db, "orders")) VALUES (1, 'a'), (2, 'b')")

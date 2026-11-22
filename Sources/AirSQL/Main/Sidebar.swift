@@ -72,6 +72,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     fileprivate var openingMenu = false
     /// A tab's own row is being selected: the tab stays as it is.
     private var revealing = false
+    /// A database or table just made, selected once the schema read back puts it in the tree (`revealWhenShown`).
+    private var madeRow: SidebarNode.Kind?
     /// Quick Documentation or Definition on show, and what it says.
     var treeNote: NSPopover?
     var shownTreeNote = ""
@@ -353,6 +355,16 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         })
         outline.selectRowIndexes(rows, byExtendingSelection: false)
         reloading = false
+        if let made = madeRow, treeNodes[made] != nil {
+            madeRow = nil
+            reveal(made)
+        }
+    }
+
+    /// Selects what New Database or Create Table made, now or once the tree shows it; the tab and the focus stay.
+    func revealWhenShown(_ kind: SidebarNode.Kind) {
+        madeRow = kind
+        reload()
     }
 
     @objc private func openConnectionChanged(_ notification: Notification) {
@@ -609,9 +621,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         guard !nodes.isEmpty else { return nil }
         let menu = NSMenu(title: "Connection")
         if nodes.allSatisfy({ $0.connectionID != nil }) {
-            menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
+            menu.add([Commands.connect, Commands.disconnect, Commands.refresh, nil, Commands.editConnection, Commands.duplicateConnection,
                       Commands.newQuery, Commands.newDatabase, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
-                      Commands.compareRows, Commands.diskUsage, Commands.users, nil])
+                      Commands.compareRows, nil, Commands.findOnServer, Commands.processList, Commands.diskUsage, Commands.users, nil])
             if nodes.count == 1, let id = nodes[0].connectionID, model.openMongo[id] != nil {
                 Self.addMongoHostItems(to: menu)
                 Self.addMongoUsersItem(to: menu)
@@ -624,6 +636,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             MongoShellMenu.replaceTerminal(in: menu, connections: connections)
             Self.replaceNewDatabase(in: menu, connections: connections)
             MongoDumpMenu.replaceExportRestore(in: menu, connections: connections)
+            // MySQL's server-wide searches: a MongoDB server's operations are its own item (its host items).
+            if connections.contains(where: { $0.engine == .mongodb }) {
+                menu.items.filter { [Commands.findOnServer.action, Commands.processList.action].contains($0.action) }.forEach(menu.removeItem)
+            }
         } else if nodes.allSatisfy({ $0.connectionOfTree != nil }) {
             return treeMenu(nodes)
         } else {

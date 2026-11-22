@@ -335,6 +335,38 @@ extension AppTests {
             GridCopy.format = .tsv
         }
 
+        /// Export Rows opens with the choices of the last Copy or Export, but which rows; at first, CSV with headers.
+        @Test func exportRowsOpensWithTheLastChoices() async throws {
+            UserDefaults.standard.removeObject(forKey: ExportRowsSheet.choicesKey)
+            defer { UserDefaults.standard.removeObject(forKey: ExportRowsSheet.choicesKey) }
+            let (main, harness, tab) = try await Self.tab()
+            func sheet() async throws -> NSView {
+                tab.exportRows(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                return try #require(main.window?.attachedSheet?.contentView)
+            }
+            func popup(_ id: String, _ view: NSView) -> String? { find(NSPopUpButton.self, id: id, in: view)?.titleOfSelectedItem }
+            func box(_ id: String, _ view: NSView) -> Bool? { find(NSButton.self, id: id, in: view).map { $0.state == .on } }
+            tab.grid.selection.select(GridPosition(row: 0, column: 0))
+            var view = try await sheet()
+            #expect(popup("export.format", view) == "CSV" && popup("export.separator", view) == "Comma" && box("export.headers", view) == true)
+            let rows = try #require(find(NSPopUpButton.self, id: "export.rows", in: view)), first = rows.titleOfSelectedItem
+            rows.selectItem(at: rows.indexOfSelectedItem == 0 ? 1 : 0)
+            for (id, value) in [("export.separator", "Semicolon"), ("export.null", "Empty"), ("export.quote", "Single quotes"),
+                                ("export.encoding", "UTF-8 with BOM")] {
+                #expect(await call(harness, "set", ["id": id, "value": value, "in": "sheet"]).error == nil, "\(id)")
+            }
+            _ = await call(harness, "press", ["id": "export.headers", "in": "sheet"])
+            _ = await call(harness, "press", ["id": "export.crlf", "in": "sheet"])
+            _ = await call(harness, "press", ["id": "export.copy"])
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("1;7;EU;100;12.50;\r\n") == true)
+            view = try await sheet()
+            #expect(popup("export.separator", view) == "Semicolon" && popup("export.null", view) == "Empty" && popup("export.quote", view) == "Single quotes")
+            #expect(popup("export.encoding", view) == "UTF-8 with BOM" && box("export.headers", view) == false && box("export.crlf", view) == true)
+            #expect(popup("export.rows", view) == first)
+            _ = await call(harness, "press", ["id": "export.cancel"])
+        }
+
         @Test func exportsRowsToTheClipboardOrAFile() async throws {
             let (main, harness, tab) = try await Self.tab()
             tab.exportRows(nil)
@@ -858,6 +890,25 @@ extension AppTests {
             #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title)
                     == ["Copy", "Copy with Headers", "Copy As", "Quick Filter", "Clear Filter", "Export Rows…", "Copy Result to Table…", "Value Panel", "Record View", "Transpose",
                         "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"])
+        }
+
+        /// Add Row starts on the first column shown that isn't AUTO_INCREMENT or generated, through hidden and moved
+        /// columns; Esc there keeps the focus in the grid.
+        @Test func addRowStartsOnTheFirstColumnThePersonFills() async throws {
+            let (main, _, tab) = try await Self.tab()
+            #expect(tab.source?.table.columns.first?.autoIncrement == true)
+            tab.addRow(nil)
+            #expect(tab.grid.selection.cursor.map { tab.grid.sourceColumn($0.column) } == 1)  // customer_id, after the id
+            tab.grid.columnOrder = [3, 0, 2, 4, 5]  // number moved first, customer_id hidden
+            tab.addRow(nil)
+            #expect(tab.grid.selection.cursor?.column == 0)
+            tab.grid.columnOrder = [0, 2, 1, 3, 4, 5]
+            tab.addRow(nil)
+            #expect(tab.grid.selection.cursor?.column == 1 && tab.grid.sourceColumn(1) == 2)
+            tab.viewer.cancelOperation(nil)
+            tab.viewer.cancelOperation(nil)
+            #expect(main.window?.firstResponder === tab.grid)
+            tab.revertAllChanges(nil)
         }
 
         @Test func readOnlyConnectionsRefuseEditsAndLongValuesOpenInTheValuePanel() async throws {

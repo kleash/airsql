@@ -279,6 +279,22 @@ extension AppTests {
         #expect(!grid.selection.contains(GridPosition(row: 1, column: 0)))
     }
 
+    /// In a console's result, the Esc after the selection is one cell goes back to the editor (a table tab's grid keeps
+    /// the focus: `addRowStartsOnTheFirstColumnThePersonFills`).
+    @Test func escInAConsolesResultGoesBackToTheEditor() async throws {
+        let (main, _) = appWindow(testModel(Fixtures.shop))
+        let viewer = try #require(resultViewer(main))
+        let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+        let window = try #require(main.window), grid = viewer.grid
+        grid.selection.select(GridPosition(row: 0, column: 0))
+        grid.selection.select(GridPosition(row: 1, column: 1), extend: true)
+        window.makeFirstResponder(grid)
+        viewer.cancelOperation(nil)
+        #expect(grid.selection.areas.count == 1 && window.firstResponder === grid)
+        viewer.cancelOperation(nil)
+        #expect(window.firstResponder === console.editor)
+    }
+
     /// ⌫ on a cell starts its edit empty; Return on one that can't be edited shows its value instead of beeping.
     @Test func deleteKeyAndReturnOnCells() {
         let (_, _, content) = gridWindow(FakeGridSource.large())
