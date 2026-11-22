@@ -11,14 +11,14 @@ extension AppTests.InteractionTests {
         let orders = DatabaseObject(.table, "airsql_fixture", "orders")
         let procedure = DatabaseObject(.procedure, "airsql_fixture", "add_customer")
         let views = SidebarNode.Kind.category(id, "airsql_fixture", .view)
-        let tableMenu = ["Open Data", "Open Structure", "Select Top 1000 Rows", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…",
+        let tableMenu = ["Open Data", "Open Structure", "Select Top 1000 Rows", "New Query", "Copy Name", "Copy Name Without Quotes", "Copy CREATE", "Open CREATE in Query Tab", "SQL Generator…",
                          "Add to Favourites", "Find Where Used…", "New Column…", "New Index…", "New Foreign Key…", "Edit Comment…", "Generate SELECT",
                          "Generate INSERT", "Generate UPDATE", "Export…", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Compare Two Selected", "Diagram of Selected Tables", "Diagram of Neighbours",
                          "Maintenance", "Truncate…", "Rename…", "Drop…", "Disk Usage", "Modify Grants…", "Refresh"]
-        let treeOnly: Set<String> = ["Add to Favourites", "Find Where Used…", "New Column…", "New Index…", "New Foreign Key…", "Edit Comment…", "Open CREATE in Query Tab",
+        let treeOnly: Set<String> = ["New Query", "Add to Favourites", "Find Where Used…", "New Column…", "New Index…", "New Foreign Key…", "Edit Comment…", "Open CREATE in Query Tab",
                                      "SQL Generator…", "Diagram of Selected Tables", "Diagram of Neighbours"]
         let viewMenu = tableMenu.filter { !treeOnly.contains($0) && !$0.hasPrefix("Compare") && $0 != "Modify Grants…" }
-        let tableCommands: Set<String> = ["Open Data", "Open Structure", "Copy Name", "Add to Favourites", "Find Where Used…", "New Column…", "New Index…",
+        let tableCommands: Set<String> = ["Open Data", "Open Structure", "New Query", "Copy Name", "Add to Favourites", "Find Where Used…", "New Column…", "New Index…",
                                           "New Foreign Key…", "Edit Comment…", "Generate SELECT", "Generate INSERT",
                                           "Generate UPDATE", "Copy Table…", "Bulk Table Editor…", "Compare With…", "Maintenance", "Truncate…",
                                           "Rename…", "Drop…", "Refresh"]

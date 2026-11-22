@@ -102,10 +102,11 @@ extension AppTests {
                         main.window?.attachedSheet == nil && main.selectedTab?.connectionID == Fixtures.production.id
                             && main.model.states[Fixtures.production.id] == .connected(server: "MariaDB 11.8.3")
                     },
-                    menu: ["Connect", "Disconnect", "Edit…", "Duplicate", "New Query", "Open in Terminal", "Export…", "Restore…",
-                           "Compare With…", "Compare Two Selected", "Disk Usage", "Users and Roles", "Colour", "Move to Folder", "Move Up", "Move Down", "Databases Shown…", "Delete…"],
-                    enabled: ["Connect", "Disconnect", "Edit…", "Duplicate", "Open in Terminal", "Export…", "Restore…", "Colour",
-                              "Move Up", "Move Down", "Databases Shown…", "Delete…"]),
+                    menu: ["Connect", "Disconnect", "Refresh", "Edit…", "Duplicate", "New Query", "New Database…", "Open in Terminal", "Export…", "Restore…",
+                           "Compare With…", "Compare Two Selected", "Find Text on Server…", "Process List", "Disk Usage", "Users and Roles", "Colour",
+                           "Move to Folder", "Move Up", "Move Down", "Databases Shown…", "Delete…"],
+                    enabled: ["Connect", "Disconnect", "Refresh", "Edit…", "Duplicate", "New Database…", "Open in Terminal", "Export…", "Restore…",
+                              "Find Text on Server…", "Process List", "Colour", "Move Up", "Move Down", "Databases Shown…", "Delete…"]),
             Surface(name: "Folder in the sidebar",
                     place: { main, _ in folderRow(main, "Clients") },
                     clicked: { $0.sidebar.selectedFolderNodeID == InteractionTests.folder.id },

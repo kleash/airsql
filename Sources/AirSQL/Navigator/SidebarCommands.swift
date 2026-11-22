@@ -147,7 +147,7 @@ extension SidebarController: NSMenuItemValidation {
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
         case .object(_, let object) where object.kind.isTableLike:
-            menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.copyName, Commands.copyPlainName,
+            menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.newQuery, Commands.copyName, Commands.copyPlainName,
                       Commands.copyCreate, Commands.createToConsole, Commands.sqlGenerator, Commands.favourite, Commands.findUsedBy, nil,
                       Commands.newColumn, Commands.newIndex, Commands.newForeignKey, Commands.editComment, nil, Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,
