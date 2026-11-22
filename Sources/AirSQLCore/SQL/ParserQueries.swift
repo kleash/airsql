@@ -8,8 +8,8 @@ extension SQLParser {
     /// Clauses of a SELECT in the order the grammar has them.
     private static let clauseOrder: [String: Int] = ["FROM": 1, "WHERE": 2, "GROUP": 3, "HAVING": 4, "WINDOW": 5, "ORDER": 6, "LIMIT": 7,
                                                      "OFFSET": 7, "FETCH": 7, "PROCEDURE": 8, "FOR": 9, "LOCK": 9]
-    /// Where reading goes on after an error in a clause.
-    static let clauseWords = Set(clauseOrder.keys).union(["INTO", "UNION", "EXCEPT", "INTERSECT", "MINUS", "SET", "RETURNING", "ON"])
+    /// Where reading goes on after an error in a clause. SELECT: the next query, when no ; ends this one (`SQLParser.read`).
+    static let clauseWords = Set(clauseOrder.keys).union(["INTO", "UNION", "EXCEPT", "INTERSECT", "MINUS", "SET", "RETURNING", "ON", "SELECT"])
     private static let setOperators: Set<String> = ["UNION", "EXCEPT", "INTERSECT", "MINUS"]
 
     /// A query, from WITH, SELECT, VALUES, TABLE or a "(" at `index`.

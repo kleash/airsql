@@ -17,6 +17,8 @@ struct SQLCompletionPlace {
     let noBackslashEscapes: Bool
     let options: CompletionOptions
     let words: [StatementCheck.Word]
+    /// Where `words` start: `lower`, or the query the caret is in when several stand with no ; between them.
+    let wordsStart: Int
     let analysis: SQLAnalysis
     let scope: SQLScope?
     let clause: SQLClause?
@@ -35,9 +37,11 @@ struct SQLCompletionPlace {
         self.database = database
         self.noBackslashEscapes = noBackslashEscapes
         self.options = options
-        words = StatementCheck.codeWords(String(decoding: utf16[lower..<start], as: UTF16.self), noBackslashEscapes: noBackslashEscapes)
         analysis = SQLAnalysis(String(decoding: utf16[lower..<upper], as: UTF16.self), snapshot: snapshot, database: database,
                                noBackslashEscapes: noBackslashEscapes)
+        // Queries with no ; between them: the words before the caret are those of the one it's in.
+        wordsStart = min(lower + (analysis.statement(at: start - lower)?.range.lowerBound ?? 0), start)
+        words = StatementCheck.codeWords(String(decoding: utf16[wordsStart..<start], as: UTF16.self), noBackslashEscapes: noBackslashEscapes)
         scope = analysis.scope(at: start - lower)
         clause = scope?.clause(at: start - lower)
         current = database.flatMap { snapshot?.database($0) }
@@ -117,7 +121,8 @@ struct SQLCompletionPlace {
            let table = snapshot?.table(db, qualifier) {
             return table.columns.map { CompletionItem(kind: .column, text: SQLCompletion.quote($0.name), label: $0.name, detail: $0.columnType) }
         }
-        if let source = source(qualifier) {
+        // `FROM shop. WHERE …`: the parser reads a table named as the database, with no columns; its tables are meant.
+        if let source = source(qualifier), !source.columns.isEmpty || snapshot?.database(qualifier) == nil {
             var items = source.columns.map {
                 CompletionItem(kind: .column, text: SQLCompletion.quote($0.name), label: $0.name, detail: $0.type ?? "")
             }
@@ -234,7 +239,7 @@ struct SQLCompletionPlace {
     /// Just after a `*` or `t.*` of the select list: what it stands for, in its place.
     private func starExpansion() -> CompletionItem? {
         guard prefix.isEmpty, clause == .selectList, let scope else { return nil }
-        let star = words[words.count - 1].range.lowerBound + lower
+        let star = words[words.count - 1].range.lowerBound + wordsStart
         if words.count >= 3, words[words.count - 2].raw == "." {
             guard let source = source(SQLQuote.unquoted(words[words.count - 3].raw)), !source.columns.isEmpty else { return nil }
             return CompletionItem(kind: .column, text: self.star([source], qualified: true), label: "all columns", detail: source.name,

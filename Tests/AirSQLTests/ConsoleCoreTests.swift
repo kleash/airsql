@@ -332,6 +332,26 @@ struct SQLCompletionTests {
         #expect(back.contains { $0.text == "orders o ON o.customer_id = c.id" }, "\(back.prefix(3).map(\.text))")
     }
 
+    /// A tab of queries with no ; between them: each completes as its own, whichever is being changed.
+    @Test func queriesWithNoSemicolonBetweenThemEachComplete() async throws {
+        let later = try await suggest("SELECT * FROM orders WHERE id = 1\n\nSELECT * FROM customers c WHERE c.|\n\nSELECT 1")
+        #expect(later.first?.label == "id" && later.contains { $0.label == "email" } && later.allSatisfy { $0.kind == .column })
+        #expect(try await suggest("SELECT * FROM orders\n\nSELECT na| FROM customers").first?.label == "name")
+        // A half-typed one doesn't take the next one's tables for its own.
+        let earlier = try await suggest("SELECT * FROM customers c WHERE c.| = 'x'\n\nSELECT * FROM orders WHERE id = 1")
+        #expect(earlier.contains { $0.label == "email" } && !earlier.contains { $0.label == "customer_id" })
+        let open = try await suggest("SELECT * FROM customers WHERE |\n\nSELECT * FROM orders WHERE id = 1")
+        #expect(open.first?.label == "id" && open.contains { $0.label == "email" } && !open.contains { $0.label == "customer_id" })
+        #expect(try await suggest("SELECT * FROM orders\n\nUPDATE customers SET | WHERE id = 1").contains { $0.label == "email" })
+        // One statement of several lines is still one.
+        #expect(try await suggest("INSERT INTO customers (id)\nSELECT cu| FROM orders").first?.label == "customer_id")
+    }
+
+    @Test func aDatabasesTablesBeforeAKeyword() async throws {
+        #expect(try await suggest("SELECT * FROM airsql_fixture.| WHERE id = 1").contains { $0.label == "orders" && $0.kind == .table })
+        #expect(try await suggest("SELECT * FROM airsql_fixture.or|\nJOIN customers c ON 1 = 1").map(\.label).contains("orders"))
+    }
+
     @Test func functionsOfTheServerAndKeywords() async throws {
         let items = try await suggest("SELECT CONC|")
         #expect(items.map(\.label).prefix(2) == ["CONCAT", "CONCAT_WS"] && items.first?.text == "CONCAT(")
