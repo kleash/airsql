@@ -157,17 +157,64 @@ public enum MongoBuilder {
 
         /// `{ path: … }`, or a plain error naming the field and the value that is wrong.
         public func clause() throws -> BSONDocument {
-            BSONDocument([(path, try condition())])
+            guard !path.isEmpty else { throw BSONError("Choose a field") }
+            return BSONDocument([(path, try condition())])
+        }
+
+        /// For a rule with no path in an `Item`: the operators `$elemMatch` applies to the item's own value.
+        public func itemCondition() throws -> BSONDocument {
+            switch try condition() {
+            case .document(let d) where d.fields.first?.key.hasPrefix("$") == true: return d
+            case let .regex(pattern, options): return BSONDocument([("$regex", .regex(pattern: pattern, options: options))])
+            case let value: return BSONDocument([("$eq", value)])
+            }
         }
     }
 
     public indirect enum Condition: Equatable, Sendable {
         case rule(Rule)
         case group(Group)
+        case item(Item)
     }
 
-    /// Find documents where all (`$and`) or any (`$or`) of the conditions hold. The builders make one level of groups
-    /// inside the top one; parse-back reads no deeper.
+    /// An item of an array field where all/any of the conditions hold (`$elemMatch`): they all match the same item.
+    /// Rule paths are the item's fields (`sku` for `items.sku`); a rule with no path is on the item's own value, for
+    /// an array of plain values.
+    public struct Item: Equatable, Sendable {
+        public var path: String
+        public var group: Group
+
+        public init(_ path: String, _ group: Group = Group()) {
+            self.path = path
+            self.group = group
+        }
+
+        /// `{ path: { $elemMatch: … } }`, or a plain error.
+        public func clause() throws -> BSONDocument {
+            guard !path.isEmpty else { throw BSONError("Choose the array field for the item") }
+            guard !path.hasPrefix("$") else { throw BSONError("‘\(path)’: a field's name can't start with $") }
+            let onValue = group.children.filter { if case .rule(let r) = $0 { return r.path.isEmpty } else { return false } }
+            var query = BSONDocument()
+            if onValue.isEmpty {
+                query = try group.filter()
+            } else {
+                // The item's own value takes operators only: no $or, no field names beside them.
+                guard onValue.count == group.children.count, !group.any || onValue.count == 1 else {
+                    throw BSONError("\(path): conditions on the item itself can't sit with conditions on its fields, in groups or under any")
+                }
+                for case .rule(let rule) in onValue {
+                    for (key, value) in try rule.itemCondition().fields {
+                        guard query[key] == nil else { throw BSONError("\(path): two conditions on the item both use \(key): put them in two items") }
+                        query.fields.append((key, value))
+                    }
+                }
+            }
+            guard !query.fields.isEmpty else { throw BSONError("Add a condition on the items of \(path)") }
+            return BSONDocument([(path, .document(BSONDocument([("$elemMatch", .document(query))])))])
+        }
+    }
+
+    /// Find documents where all (`$and`) or any (`$or`) of the conditions hold, groups inside groups to any depth.
     public struct Group: Equatable, Sendable {
         public var any: Bool
         public var children: [Condition]
@@ -189,10 +236,10 @@ public enum MongoBuilder {
         /// The conditions of a filter `filter()` could have written, or nil (it stays text).
         public init?(filter: BSONDocument) {
             if filter.fields.count == 1, filter.fields[0].key == "$or" {
-                guard let children = MongoBuilder.orChildren(filter.fields[0].value, level: 0) else { return nil }
+                guard let children = MongoBuilder.orChildren(filter.fields[0].value) else { return nil }
                 self.init(any: true, children)
             } else {
-                guard let children = MongoBuilder.conditions(filter, level: 0) else { return nil }
+                guard let children = MongoBuilder.conditions(filter) else { return nil }
                 self.init(any: false, children)
             }
         }
@@ -202,7 +249,9 @@ public enum MongoBuilder {
     /// (`{ age: { $gte: 18, $lt: 65 } }`), else `$and` of them all.
     static func and(_ parts: [BSONDocument]) -> BSONDocument {
         func operators(_ value: BSONValue?) -> BSONDocument? {
-            guard case .document(let d)? = value, !d.fields.isEmpty, d.keys.allSatisfy({ $0.hasPrefix("$") }) else { return nil }
+            // An item's $elemMatch stays its own part, so it reads back as the item.
+            guard case .document(let d)? = value, !d.fields.isEmpty, d.keys.allSatisfy({ $0.hasPrefix("$") }),
+                  !d.keys.contains("$elemMatch") else { return nil }
             return d
         }
         var done = Set<String>()
@@ -489,8 +538,9 @@ extension MongoBuilder.Rule {
 
     /// The value under the field's key.
     func condition() throws -> BSONValue {
-        guard !path.isEmpty else { throw BSONError("Choose a field") }
         guard !path.hasPrefix("$") else { throw BSONError("‘\(path)’: a field's name can't start with $") }
+        // No path: an item's own value (`Item`).
+        let path = self.path.isEmpty ? "the item" : self.path
         func values(_ count: Int) throws -> [(value: BSONValue, isDay: Bool)] {
             guard self.values.count >= count else { throw BSONError("Type a value for \(path)") }
             return try self.values.prefix(count).map { text in
@@ -558,6 +608,7 @@ extension MongoBuilder.Condition {
             let filter = try group.filter()
             return filter.fields.isEmpty ? [] : [filter]
         case .group(let group): return try group.children.flatMap { try $0.andParts() }
+        case .item(let item): return [try item.clause()]
         }
     }
 
@@ -569,6 +620,7 @@ extension MongoBuilder.Condition {
         case .group(let group):
             let filter = try group.filter()
             return filter.fields.isEmpty ? [] : [filter]
+        case .item(let item): return [try item.clause()]
         }
     }
 }
@@ -576,9 +628,9 @@ extension MongoBuilder.Condition {
 // MARK: Reading a filter back
 
 extension MongoBuilder {
-    /// The conditions of a document whose fields all hold (`{a: 1, $or: […]}`, `{$and: […]}`), in a group at `level`
-    /// (the top is 0); nil for anything a builder doesn't write.
-    static func conditions(_ document: BSONDocument, level: Int) -> [Condition]? {
+    /// The conditions of a document whose fields all hold (`{a: 1, $or: […]}`, `{$and: […]}`); nil for anything a
+    /// builder doesn't write.
+    static func conditions(_ document: BSONDocument) -> [Condition]? {
         guard Set(document.keys).count == document.keys.count else { return nil }
         var out: [Condition] = []
         for (key, value) in document.fields {
@@ -586,30 +638,47 @@ extension MongoBuilder {
             case "$and":
                 guard case .array(let parts) = value, !parts.isEmpty else { return nil }
                 for part in parts {
-                    guard case .document(let d) = part, !d.fields.isEmpty, let more = conditions(d, level: level) else { return nil }
+                    guard case .document(let d) = part, !d.fields.isEmpty, let more = conditions(d) else { return nil }
                     out += more
                 }
             case "$or":
-                guard level == 0, let children = orChildren(value, level: 1) else { return nil }
+                guard let children = orChildren(value) else { return nil }
                 out.append(.group(Group(any: true, children)))
             default:
-                guard !key.hasPrefix("$"), !key.isEmpty, let rules = rules(key, value) else { return nil }
+                guard !key.hasPrefix("$"), !key.isEmpty else { return nil }
+                if let item = item(key, value) {
+                    out.append(.item(item))
+                    continue
+                }
+                guard let rules = rules(key, value) else { return nil }
                 out += rules.map(Condition.rule)
             }
         }
         return out
     }
 
-    /// The children of an any-group at `level` from its `$or` array: a rule each, or an all-group of several.
-    static func orChildren(_ value: BSONValue, level: Int) -> [Condition]? {
+    /// `{ $elemMatch: … }` alone as an item: on its fields (a filter the builder reads), or on its own value (operators).
+    static func item(_ path: String, _ value: BSONValue) -> Item? {
+        guard case .document(let d) = value, d.keys == ["$elemMatch"], case .document(let query)? = d["$elemMatch"],
+              let first = query.fields.first?.key else { return nil }
+        if first.hasPrefix("$") && first != "$and" && first != "$or" {
+            return operatorRules("", query).map { Item(path, Group($0.map(Condition.rule))) }
+        }
+        return Group(filter: query).map { Item(path, $0) }
+    }
+
+    /// The children of an any-group from its `$or` array: a rule or item each, else an all-group of what the part holds.
+    static func orChildren(_ value: BSONValue) -> [Condition]? {
         guard case .array(let parts) = value, !parts.isEmpty else { return nil }
         var out: [Condition] = []
         for part in parts {
-            guard case .document(let d) = part, !d.fields.isEmpty, let found = conditions(d, level: level + 1) else { return nil }
-            if found.count == 1, case .rule = found[0] {
+            guard case .document(let d) = part, !d.fields.isEmpty, let found = conditions(d) else { return nil }
+            // A lone group stays in an all-group: put straight in this one, an any-group would merge into its `$or`.
+            if found.count == 1, case .group = found[0] {
+                out.append(.group(Group(any: false, found)))
+            } else if found.count == 1 {
                 out.append(found[0])
             } else {
-                guard level == 0, found.allSatisfy({ if case .rule = $0 { return true } else { return false } }) else { return nil }
                 out.append(.group(Group(any: false, found)))
             }
         }
@@ -694,6 +763,10 @@ extension MongoBuilder {
             case "$exists":
                 guard case .bool(let b) = value else { return nil }
                 rules.append(Rule(path, b ? .hasValue : .hasNoValue))
+            case "$regex" where path.isEmpty:
+                // An item's own value, as `itemCondition` writes a pattern.
+                guard case let .regex(pattern, options) = value, let rule = patternRule(path, pattern, options, negated: false) else { return nil }
+                rules.append(rule)
             default: return nil
             }
         }
