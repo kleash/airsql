@@ -202,11 +202,37 @@ struct MongoBuilderTests {
             "{ a: { $eq: { b: 1 } } }", "{ a: { $in: [ [ 1 ] ] } }", "{ a: { $in: [] } }",
             "{ $nor: [ { a: 1 } ] }", "{ a: { $size: 2 } }", "{ a: { $regex: \"x\" } }", "{ $expr: { $eq: [ 1, 1 ] } }",
             "{ a: { $not: { $gt: 1 } } }", "{ a: { $exists: 1 } }", "{ $or: [] }", "{ $or: [ {} ] }", "{ $or: [ 1 ] }",
-            // Deeper than one group.
-            "{ $or: [ { $or: [ { a: 1 } ] } ] }", "{ $or: [ { a: 1, $or: [ { b: 1 } ] } ] }",
-            "{ $and: [ { $or: [ { a: 1, b: 1 } ] } ] }", "{ x: 1, $or: [ { $or: [ { a: 1 } ] } ] }",
+            // Something unreadable deep inside groups.
+            "{ $or: [ { a: 1, $or: [ { b: 1 }, { $or: [ { c: { $size: 1 } } ] } ] } ] }", "{ $or: [ { $and: [] } ] }",
         ]
         for text in refused { #expect(B.Group(filter: shell(text)) == nil, "\(text)") }
+    }
+
+    @Test func groupsInsideGroupsReadBackToAnyDepth() throws {
+        let a = B.Rule("a", .is, ["1"], type: .number), b = B.Rule("b", .is, ["1"], type: .number), x = B.Rule("x", .is, ["1"], type: .number)
+        let read: [(String, B.Group)] = [
+            ("{ $or: [ { $or: [ { a: 1 } ] } ] }", B.Group(any: true, [.group(B.Group([.group(B.Group(any: true, [.rule(a)]))]))])),
+            ("{ $or: [ { a: 1, $or: [ { b: 1 } ] } ] }", B.Group(any: true, [.group(B.Group([.rule(a), .group(B.Group(any: true, [.rule(b)]))]))])),
+            ("{ x: 1, $or: [ { $or: [ { a: 1 } ] } ] }",
+             B.Group([.rule(x), .group(B.Group(any: true, [.group(B.Group([.group(B.Group(any: true, [.rule(a)]))]))]))])),
+            ("{ $and: [ { $or: [ { a: 1, b: 1 } ] } ] }", B.Group([.group(B.Group(any: true, [.group(B.Group([.rule(a), .rule(b)]))]))])),
+        ]
+        for (text, group) in read {
+            #expect(B.Group(filter: shell(text)) == group, "\(text)")
+            #expect(try B.Group(filter: try group.filter())?.filter() == group.filter(), "\(text)")
+        }
+        #expect(try read[0].1.filter() == shell(read[0].0) && read[2].1.filter() == shell(read[2].0))
+
+        // Four levels with an item at the bottom: the document, then the same groups from it.
+        let item = B.Item("items", B.Group(any: true, [.rule(B.Rule("sku", .is, ["A1"])),
+                                                       .group(B.Group([.rule(B.Rule("qty", .atLeast, ["1"], type: .number)),
+                                                                       .rule(B.Rule("qty", .less, ["5"], type: .number))]))]))
+        let deep = B.Group([.rule(x), .group(B.Group(any: true, [.rule(a), .group(B.Group([.rule(b), .group(B.Group(any: true, [
+            .rule(B.Rule("c", .is, ["z"])), .group(B.Group([.rule(B.Rule("d", .hasValue)), .item(item)]))]))]))]))])
+        let built = try deep.filter()
+        #expect(built.shellForm() == #"{ x: 1, $or: [ { a: 1 }, { b: 1, $or: [ { c: "z" }, { d: { $ne: null }, "#
+                + #"items: { $elemMatch: { $or: [ { sku: "A1" }, { qty: { $gte: 1, $lt: 5 } } ] } } } ] } ] }"#)
+        #expect(B.Group(filter: try BSONDocument(shellForm: built.shellForm())) == deep)
     }
 
     /// Every operator with every type it fits: build → shell text → parse → build gives the same document.
@@ -232,7 +258,9 @@ struct MongoBuilderTests {
                         }
                         let rule = B.Rule("f.g", op, given, type: type, ignoreCase: ignoreCase)
                         let groups = [B.Group([.rule(rule)]), B.Group(any: true, [.rule(rule), .rule(B.Rule("f.g", .hasValue))]),
-                                      B.Group([.rule(rule), .group(B.Group(any: true, [.rule(rule), .rule(B.Rule("z", .is, ["1"]))]))])]
+                                      B.Group([.rule(rule), .group(B.Group(any: true, [.rule(rule), .rule(B.Rule("z", .is, ["1"]))]))]),
+                                      B.Group(any: true, [.rule(B.Rule("z", .is, ["1"])), .group(B.Group([.rule(rule), .group(B.Group(any: true, [
+                                          .rule(rule), .group(B.Group([.rule(rule), .rule(B.Rule("y", .hasValue))]))]))]))])]
                         for group in groups {
                             let built = try group.filter()
                             let read = try #require(B.Group(filter: try BSONDocument(shellForm: built.shellForm())), "\(type) \(op) \(built.shellForm())")
@@ -243,7 +271,7 @@ struct MongoBuilderTests {
                 }
             }
         }
-        #expect(count > 300)
+        #expect(count > 400)
     }
 
     /// Two rules on one field, every pair of operators of a type: merged or `$and`, the round trip is exact.

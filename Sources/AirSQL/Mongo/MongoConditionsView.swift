@@ -2,8 +2,8 @@ import AirSQLCore
 import AppKit
 
 /// The query builder's conditions (mongo-plan, Phase 5 A): "Find documents where all/any of these are true" (SQL's
-/// WHERE … AND/OR), a row per condition (field, operator, value), `+ Condition`, `+ Group` (one level), `+ Item` (one item
-/// of an array meeting its conditions together, `$elemMatch`). A plain view: set
+/// WHERE … AND/OR), a row per condition (field, operator, value), `+ Condition`, `+ Group` (groups inside groups), `+ Item`
+/// (one item of an array meeting its conditions together, `$elemMatch`). A plain view: set
 /// `group`, read it back after `onChange`; `schema` and `paths` give the fields, their types and values. The query bar
 /// and the stage builder's Filter card both use it. It grows downward, and scrolls past `maxHeight`.
 @MainActor
@@ -66,6 +66,10 @@ final class MongoConditionsView: NSView {
     /// `+ Condition`: a new empty row at the end of the top group, with the keyboard in its field.
     @discardableResult
     func addCondition() -> ConditionRowView { top.newRow() }
+
+    /// `+ Group`: a new group at the end of the top group.
+    @discardableResult
+    func addGroup() -> ConditionGroupView { top.newGroup() }
 
     /// `+ Item`: a new item at the end of the top group.
     @discardableResult
@@ -147,8 +151,9 @@ final class MongoConditionsView: NSView {
 
 // MARK: A group
 
-/// The top group (level 0: "Find documents where …", `+ Condition`, `+ Group`, `+ Item`), a group inside it ("all/any
-/// of these:", its rows, `+ Condition`, remove), or an item ("An item of <array> where all/any of these:", `$elemMatch`).
+/// The top group (level 0: "Find documents where …"), a group inside one ("all/any of these:", remove), indented, or an
+/// item ("An item of <array> where all/any of these:", `$elemMatch`); each with its rows, `+ Condition`, `+ Group` and
+/// `+ Item`, to any depth.
 @MainActor
 final class ConditionGroupView: NSStackView, NSComboBoxDelegate {
     let level: Int
@@ -164,7 +169,6 @@ final class ConditionGroupView: NSStackView, NSComboBoxDelegate {
     private let tail = label("", font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
     private let body = NSStackView()
     private let addRule: NSButton
-    private var addGroup: NSButton?
 
     init(level: Int, item: Bool = false) {
         self.level = level
@@ -194,12 +198,10 @@ final class ConditionGroupView: NSStackView, NSComboBoxDelegate {
                              tip: "Add conditions that one item of an array must meet together ($elemMatch)", target: self, action: #selector(addItem(_:)))
         addRule.target = self
         addRule.action = #selector(addRule(_:))
-        var header: [NSView] = []
-        if level == 0 || item {
-            addGroup = button("+ Group", id: ids + ".addGroup",
+        let addGroup = button("+ Group", id: ids + ".addGroup",
                               tip: "Add a group of conditions with its own all or any, as parentheses in SQL", target: self, action: #selector(addGroup(_:)))
-        }
-        for b in [addRule, addItem] + (addGroup.map { [$0] } ?? []) {
+        var header: [NSView] = []
+        for b in [addRule, addGroup, addItem] {
             b.controlSize = .small
             b.font = .systemFont(ofSize: 11.5)
             b.bezelStyle = .recessed
@@ -231,7 +233,7 @@ final class ConditionGroupView: NSStackView, NSComboBoxDelegate {
         body.orientation = .vertical
         body.alignment = .leading
         body.spacing = 4
-        let foot = NSStackView(views: [addRule] + (addGroup.map { [$0] } ?? []) + [addItem])
+        let foot = NSStackView(views: [addRule, addGroup, addItem])
         foot.spacing = Spacing.half
         addArrangedSubview(head)
         addArrangedSubview(body)
@@ -362,10 +364,15 @@ final class ConditionGroupView: NSStackView, NSComboBoxDelegate {
         return row
     }
 
-    @objc func addGroup(_ sender: Any?) {
+    @objc func addGroup(_ sender: Any?) { newGroup() }
+
+    /// `+ Group`: a group with one empty row; any inside all and all inside any, the only way a group changes anything.
+    @discardableResult
+    func newGroup() -> ConditionGroupView {
         let view = nested(MongoBuilder.Group(any: !isAny))
         append(view)
-        view.addRule(nil)
+        view.newRow()
+        return view
     }
 
     @objc func addItem(_ sender: Any?) { newItem() }

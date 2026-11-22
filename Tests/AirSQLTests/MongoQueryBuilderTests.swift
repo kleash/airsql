@@ -162,6 +162,30 @@ struct MongoQueryBuilderTests {
         #expect(bar.conditions.allRows.map(\.itemPrefix) == ["items", "items", "scores"] && scores.superview == nil)
     }
 
+    /// Groups three deep through `+ Group` (any inside all, all inside any), written and read back as groups.
+    @Test @MainActor func groupsInsideGroupsAreBuiltAndReadBack() throws {
+        let bar = MongoQueryBar()
+        bar.collection = "customers"
+        fill(bar.conditions.addCondition(), "country", .is, ["DE"])
+        let any = bar.conditions.addGroup()
+        fill(any.rows[0], "tier", .is, ["gold"])
+        let all = any.newGroup()
+        fill(all.rows[0], "tier", .is, ["silver"])
+        let inner = all.newGroup()
+        fill(inner.rows[0], "city", .is, ["Berlin"])
+        inner.addRule(nil)
+        fill(inner.rows[1], "city", .is, ["Paris"])
+        #expect([any, all, inner].map(\.level) == [1, 2, 3] && [any, all, inner].map { $0.anyPopup.titleOfSelectedItem } == ["any", "all", "any"])
+        #expect([any, all, inner].allSatisfy { $0.edgeInsets.left > 0 && $0.layer?.borderWidth == 1 }, "each level is indented in its box")
+        let text = #"{ country: "DE", $or: [ { tier: "gold" }, { tier: "silver", $or: [ { city: "Berlin" }, { city: "Paris" } ] } ] }"#
+        #expect(bar.filter.stringValue == text, "\(bar.filter.stringValue)")
+        let group = bar.conditions.group
+        bar.query = MongoQueryText(filter: text)
+        bar.readText(force: true)
+        #expect(!bar.asText.contains("Filter") && bar.conditions.group == group && any.superview == nil, "\(bar.conditions.group)")
+        #expect(bar.conditions.allRows.count == 5)
+    }
+
     @Test @MainActor func quickFilterOffersClausesFromTheValueAndAddsToTheFilter() throws {
         let text = MongoCollectionController.quickFilters(path: "country", value: .string("DE"))
         #expect(text.map(\.title) == ["is", "is not", "greater than", "less than", "contains"])

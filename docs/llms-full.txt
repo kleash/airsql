@@ -2432,7 +2432,9 @@ never changes it.
   beside it: "contains — LIKE '%x%'", "is one of — IN", "has no value — IS NULL"), and the value: the sample's most
   common values are offered, between takes two, is one of a comma list, true/false a pop-up. Dates are UTC; a day alone
   is the whole day, and the calendar button fills in today, the last 7 days or this month. **Ignore case** sits on the
-  text operators. **+ Group** adds a group with its own all/any (parentheses in SQL), one level deep.
+  text operators. **+ Group** adds a group with its own all/any (parentheses in SQL); a group (and an item, below)
+  has its own **+ Condition**, **+ Group** and **+ Item** too, to any depth, each indented in its box, and starts as any inside all, all inside any. A filter of
+  `$and` and `$or` inside each other reads back as these groups.
 - **+ Item** adds **an item of** an array field **where** all / any of its own rows are true: one item has to meet
   them together (MongoDB's `$elemMatch`; in SQL, an `EXISTS` over the array's rows). Its rows name the item's fields
   (`sku`, `qty` for `items.sku`, `items.qty`); a row whose field is left empty is on **the item itself**, for an array

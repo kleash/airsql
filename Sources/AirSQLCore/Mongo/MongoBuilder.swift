@@ -214,8 +214,7 @@ public enum MongoBuilder {
         }
     }
 
-    /// Find documents where all (`$and`) or any (`$or`) of the conditions hold. The builders make one level of groups
-    /// inside the top one; parse-back reads no deeper.
+    /// Find documents where all (`$and`) or any (`$or`) of the conditions hold, groups inside groups to any depth.
     public struct Group: Equatable, Sendable {
         public var any: Bool
         public var children: [Condition]
@@ -237,10 +236,10 @@ public enum MongoBuilder {
         /// The conditions of a filter `filter()` could have written, or nil (it stays text).
         public init?(filter: BSONDocument) {
             if filter.fields.count == 1, filter.fields[0].key == "$or" {
-                guard let children = MongoBuilder.orChildren(filter.fields[0].value, level: 0) else { return nil }
+                guard let children = MongoBuilder.orChildren(filter.fields[0].value) else { return nil }
                 self.init(any: true, children)
             } else {
-                guard let children = MongoBuilder.conditions(filter, level: 0) else { return nil }
+                guard let children = MongoBuilder.conditions(filter) else { return nil }
                 self.init(any: false, children)
             }
         }
@@ -629,9 +628,9 @@ extension MongoBuilder.Condition {
 // MARK: Reading a filter back
 
 extension MongoBuilder {
-    /// The conditions of a document whose fields all hold (`{a: 1, $or: […]}`, `{$and: […]}`), in a group at `level`
-    /// (the top is 0); nil for anything a builder doesn't write.
-    static func conditions(_ document: BSONDocument, level: Int) -> [Condition]? {
+    /// The conditions of a document whose fields all hold (`{a: 1, $or: […]}`, `{$and: […]}`); nil for anything a
+    /// builder doesn't write.
+    static func conditions(_ document: BSONDocument) -> [Condition]? {
         guard Set(document.keys).count == document.keys.count else { return nil }
         var out: [Condition] = []
         for (key, value) in document.fields {
@@ -639,11 +638,11 @@ extension MongoBuilder {
             case "$and":
                 guard case .array(let parts) = value, !parts.isEmpty else { return nil }
                 for part in parts {
-                    guard case .document(let d) = part, !d.fields.isEmpty, let more = conditions(d, level: level) else { return nil }
+                    guard case .document(let d) = part, !d.fields.isEmpty, let more = conditions(d) else { return nil }
                     out += more
                 }
             case "$or":
-                guard level == 0, let children = orChildren(value, level: 1) else { return nil }
+                guard let children = orChildren(value) else { return nil }
                 out.append(.group(Group(any: true, children)))
             default:
                 guard !key.hasPrefix("$"), !key.isEmpty else { return nil }
@@ -668,17 +667,18 @@ extension MongoBuilder {
         return Group(filter: query).map { Item(path, $0) }
     }
 
-    /// The children of an any-group at `level` from its `$or` array: a rule each, or an all-group of several.
-    static func orChildren(_ value: BSONValue, level: Int) -> [Condition]? {
+    /// The children of an any-group from its `$or` array: a rule or item each, else an all-group of what the part holds.
+    static func orChildren(_ value: BSONValue) -> [Condition]? {
         guard case .array(let parts) = value, !parts.isEmpty else { return nil }
         var out: [Condition] = []
         for part in parts {
-            guard case .document(let d) = part, !d.fields.isEmpty, let found = conditions(d, level: level + 1) else { return nil }
-            func plain(_ c: Condition) -> Bool { if case .group = c { return false } else { return true } }
-            if found.count == 1, plain(found[0]) {
+            guard case .document(let d) = part, !d.fields.isEmpty, let found = conditions(d) else { return nil }
+            // A lone group stays in an all-group: put straight in this one, an any-group would merge into its `$or`.
+            if found.count == 1, case .group = found[0] {
+                out.append(.group(Group(any: false, found)))
+            } else if found.count == 1 {
                 out.append(found[0])
             } else {
-                guard level == 0, found.allSatisfy(plain) else { return nil }
                 out.append(.group(Group(any: false, found)))
             }
         }
