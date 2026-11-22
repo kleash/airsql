@@ -58,6 +58,18 @@ extension SidebarController: NSMenuItemValidation {
         return (open, name)
     }
 
+    /// The query tab a double-click on `node` types its name into: the tab in front, when it's a query of the row's
+    /// connection and the row is an object or something a table holds.
+    func queryTaking(_ node: SidebarNode) -> ConsoleViewController? {
+        switch node.kind {
+        case .object(let id, _), .detail(let id, _, _, _):
+            let console = main?.selectedTab?.content as? ConsoleViewController
+            return console?.connectionID == id ? console : nil
+        default:
+            return nil
+        }
+    }
+
     /// A single click shows the row in the preview tab: a database's tables, a table's rows, an object's definition.
     @objc func showSelectedObject() {
         if let main, selectedConnectionIDs.count == 1, selectedNodes.count == 1, let open = model.openConnection(selectedConnectionIDs[0]) {

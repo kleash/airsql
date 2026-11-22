@@ -29,6 +29,9 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   another of its kind.
 - **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
   open it; double-click again to close it. The console's statements run in the current database ([The SQL console](console.md)).
+- **While a query tab of the connection is in front**, a click on a table, view, routine or column only selects it, so
+  the query stays where it is, and a **double-click types its name into the query** at the cursor (in backticks when it
+  needs them). Return, or **Open Data** in its menu, opens it as usual.
 - **Right-click** anything for everything you can do with it; the tab in front stays. Every command is also in the
   **Database** menu. **Copy Name** quotes it for SQL, **Copy Name Without Quotes** doesn't, and **Copy CREATE** copies
   the statement that makes it.

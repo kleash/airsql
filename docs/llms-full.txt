@@ -135,7 +135,7 @@ until you press **Apply** (⌘S), which shows the SQL first; **Revert** takes th
   to close the others or all of them, or to duplicate it. ⌘W closes the tab shown, or the window when it has no tab, as
   it does in Settings, the SQL log and Compare. ⇧⌘T brings back the tab you closed last. ⌘P (**Quick Open…**) goes to a
   table, view or connection by part of its name.
-- **The toolbar** (right-click it for **Icon and Text**, or **View ▸ Customize Toolbar…**) shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
+- **The toolbar** (right-click it for **Icon and Text**, or **View ▸ Customize Toolbar…**) has **+** for a new connection, and shows the connection and database a tab works on (choose another in either pop-up), Run (⌘↩), Run
   All (⇧⌘↩), Explain, the transaction mode and isolation level, Commit, Roll Back and Cancel. A button that can't act
   now is dimmed, and its tooltip says why.
 - **The status bar** shows the route to the server, its version, an open transaction, the work running now (click it to
@@ -470,6 +470,9 @@ session of its own, so a long query in one tab leaves the others free.
     that table's. ORDER BY, GROUP BY and HAVING offer the aliases of the select list too.
   - `SELECT nam` with no FROM yet offers every table's columns: choosing one adds its FROM.
   - Just after `*` or `t.*` in a select list, the list offers all the columns in its place.
+  - It works the same in the middle of a query you're changing, and in a tab of several queries with no `;` between
+    them: each is read as its own, though the first is underlined (**Expected ; before SELECT**), as the server would
+    refuse the text as it stands.
   - `INSERT INTO t (` offers the whole column list, then each column left. `VALUES (` offers a field for each column.
   - After `status = ` or inside `status = '` an ENUM or SET column offers its values. `ENGINE=`, `CHARSET` and `COLLATE`
     offer theirs, CALL the procedures, `@` the variables of the text, `@@` and SET the common server variables.
@@ -580,6 +583,9 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
   missing column), and changes such as quoting or qualifying a name, adding a table alias, expanding `*` to its columns,
   moving a subquery to WITH, and splitting or merging INSERTs or removing one of their columns. Each is one step of Undo.
 - **Go to Declaration** (⌘B) jumps to where an alias or WITH query is declared, and opens a table or routine.
+- **⌘-click** a name to go where it leads: an alias or WITH query to where it's declared, a table, view or column to
+  the table's rows in a tab (as **Open Table at Cursor**, F4, does), a routine to its editor. Right-click (or
+  Control-click) a name for the same commands in a menu.
 - **Find Usages…** (⌥F7) lists every place in the text that means the name at the cursor. The other places are also
   tinted when you stop on a name, and BEGIN, CASE and IF are tinted with their END.
 - **Rename Name…** (⇧F6) changes an alias, WITH query, column alias or `@variable` everywhere it's used. On a table or
@@ -895,7 +901,8 @@ than the safety setting allows.
 Folders group connections in the sidebar. **Connection ▸ New Folder…** makes one (the selected connections move into
 it); right-click a folder to rename or delete it (its connections stay; Delete asks too). To move connections, drag them onto
 a folder (or onto the list to take them out of one), or use **Connection ▸ Move to Folder**. Right-click the list's empty
-space for New Connection and New Folder. F2 on a connection opens it to rename, and the filter's ↓ and Return go on to
+space for New Connection and New Folder, and a connection for **New Database…** (on MongoDB, **Create Database…**) among its commands. The toolbar's **+** and the
+button under the list make a new connection too. F2 on a connection opens it to rename, and the filter's ↓ and Return go on to
 the first match.
 
 
@@ -929,6 +936,9 @@ tables, views, sequences (MariaDB), procedures, functions, triggers and events, 
   another of its kind.
 - **Double-click** a database to make it the current one (it shows in bold, and in the toolbar's database pop-up) and
   open it; double-click again to close it. The console's statements run in the current database ([The SQL console](https://kleash.github.io/airsql/console.html)).
+- **While a query tab of the connection is in front**, a click on a table, view, routine or column only selects it, so
+  the query stays where it is, and a **double-click types its name into the query** at the cursor (in backticks when it
+  needs them). Return, or **Open Data** in its menu, opens it as usual.
 - **Right-click** anything for everything you can do with it; the tab in front stays. Every command is also in the
   **Database** menu. **Copy Name** quotes it for SQL, **Copy Name Without Quotes** doesn't, and **Copy CREATE** copies
   the statement that makes it.

@@ -203,6 +203,30 @@ extension SQLEditorView {
         }
     }
 
+    /// ⌘-click on a name: an alias or WITH query goes to where it's declared; a table, view or column opens the table's
+    /// rows and a routine its editor (Open Table at Cursor, which whoever holds the editor answers).
+    func openName(at index: Int) {
+        window?.makeFirstResponder(self)
+        setSelectedRange(NSRange(location: index, length: 0))
+        withInsight { [weak self] analysis in
+            guard let self else { return }
+            if let declaration = analysis.reference(at: index)?.symbol.declaration {
+                self.select(declaration)
+            } else {
+                self.tryToPerform(Commands.openNameData.action, with: self)
+            }
+        }
+    }
+
+    /// The character drawn at `point`; nil in the space around the text.
+    func characterIndex(under point: NSPoint) -> Int? {
+        guard let layout = layoutManager, let container = textContainer, layout.numberOfGlyphs > 0 else { return nil }
+        let place = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        let glyph = layout.glyphIndex(for: place, in: container)
+        guard layout.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container).contains(place) else { return nil }
+        return layout.characterIndexForGlyph(at: glyph)
+    }
+
     private func select(_ range: Range<Int>) {
         guard range.upperBound <= (string as NSString).length else { return }  // a problem older than the last edit
         let target = NSRange(range)

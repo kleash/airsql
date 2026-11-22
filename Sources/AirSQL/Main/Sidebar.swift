@@ -43,7 +43,8 @@ final class SidebarNode: NSObject {
 /// The sidebar (plan §2.4, §2.12): a filter field, the connections in their folders (the navigator's tree goes under
 /// a connected one), and a footer with New Connection and the process list. A click selects a connection and shows its
 /// summary, a double-click connects it (or, connected, opens or closes its tree), a right-click opens its menu; ⌘ and ⇧
-/// select several.
+/// select several. While a query tab of the connection is in front, a double-click on a table, view, routine or column
+/// types its name into the query instead (`queryTaking`).
 @MainActor
 final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate {
     let model: AppModel
@@ -389,7 +390,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         view.window?.makeFirstResponder(outline)
         // Return kept what was typed for the field's recent searches.
         if opens { filter.recentSearches = [text] + filter.recentSearches.filter { $0 != text }.prefix(9) }
-        if opens { doubleClicked(nil) }
+        if opens { activateRow(typingNames: false) }
         return true
     }
 
@@ -480,6 +481,9 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         guard !reloading else { return }
         onSelect?()
         guard !openingMenu, !revealing else { return }
+        // A table or column selected while its connection's query is in front leaves the query there: a double-click
+        // types the name into it, Return opens the row.
+        if selectedNodes.count == 1, queryTaking(selectedNodes[0]) != nil { return }
         // Arrowing passes over rows: only the one it stops on is read, or the others would queue ahead of it.
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(showSelectedObject), object: nil)
         if NSApp.currentEvent?.type == .keyDown {
@@ -573,7 +577,10 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         return !ids.isEmpty
     }
 
-    @objc fileprivate func doubleClicked(_ sender: Any?) {
+    @objc fileprivate func doubleClicked(_ sender: Any?) { activateRow(typingNames: true) }
+
+    /// A double-click, or Return (which never types a name into the query in front: `typingNames`).
+    fileprivate func activateRow(typingNames: Bool) {
         let row = outline.clickedRow >= 0 ? outline.clickedRow : outline.selectedRow
         guard let node = outline.item(atRow: row) as? SidebarNode else { return }
         switch node.kind {
@@ -588,6 +595,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             }
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .database, .category, .object, .part, .detail, .prefix, .mongo:
+            // Into the query in front, as HeidiSQL does.
+            if typingNames, let console = queryTaking(node), let name = node.name { return console.insertName(name) }
             treeDoubleClicked(node)
         case .message, .users:
             break  // a click already showed Users and Roles
@@ -601,7 +610,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         let menu = NSMenu(title: "Connection")
         if nodes.allSatisfy({ $0.connectionID != nil }) {
             menu.add([Commands.connect, Commands.disconnect, nil, Commands.editConnection, Commands.duplicateConnection,
-                      Commands.newQuery, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
+                      Commands.newQuery, Commands.newDatabase, Commands.openInTerminal, nil, Commands.export, Commands.restore, Commands.compareWith,
                       Commands.compareRows, Commands.diskUsage, Commands.users, nil])
             if nodes.count == 1, let id = nodes[0].connectionID, model.openMongo[id] != nil {
                 Self.addMongoHostItems(to: menu)
@@ -613,6 +622,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             menu.add([nil, Commands.deleteConnection])
             let connections = nodes.compactMap { $0.connectionID.flatMap(model.connection) }
             MongoShellMenu.replaceTerminal(in: menu, connections: connections)
+            Self.replaceNewDatabase(in: menu, connections: connections)
             MongoDumpMenu.replaceExportRestore(in: menu, connections: connections)
         } else if nodes.allSatisfy({ $0.connectionOfTree != nil }) {
             return treeMenu(nodes)
@@ -722,8 +732,8 @@ final class SidebarOutlineView: NSOutlineView {
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 36, 76:  // Return, Enter: as a double-click
-            if let action = doubleAction { NSApp.sendAction(action, to: target, from: self) }
+        case 36, 76:  // Return, Enter: as a double-click, but for typing a name into the query in front
+            sidebar?.activateRow(typingNames: false)
         case 51, 117:  // Delete, Forward Delete
             if sidebar?.selectedConnectionIDs.isEmpty == false {
                 sendCommand(Commands.deleteConnection.action)

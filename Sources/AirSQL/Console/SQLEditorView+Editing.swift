@@ -231,7 +231,10 @@ extension SQLEditorView {
         if !NSLocationInRange(index, selectedRange()) { setSelectedRange(NSRange(location: index, length: 0)) }
         let menu = NSMenu(title: "SQL Editor")
         menu.add([Commands.runStatement, Commands.runSelection, Commands.explain, Commands.formatSQL, Commands.toggleComment,
-                  Commands.editAsTable, nil, Commands.cut, Commands.copy, Commands.paste, Commands.pastePlain])
+                  Commands.editAsTable, nil])
+        // The name under the pointer: where it leads.
+        if nameContext != nil { menu.add([Commands.openNameData, Commands.goToDeclaration, Commands.goToDDL, Commands.findUsages, nil]) }
+        menu.add([Commands.cut, Commands.copy, Commands.paste, Commands.pastePlain])
         return menu
     }
 

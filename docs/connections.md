@@ -116,5 +116,6 @@ than the safety setting allows.
 Folders group connections in the sidebar. **Connection ▸ New Folder…** makes one (the selected connections move into
 it); right-click a folder to rename or delete it (its connections stay; Delete asks too). To move connections, drag them onto
 a folder (or onto the list to take them out of one), or use **Connection ▸ Move to Folder**. Right-click the list's empty
-space for New Connection and New Folder. F2 on a connection opens it to rename, and the filter's ↓ and Return go on to
+space for New Connection and New Folder, and a connection for **New Database…** (on MongoDB, **Create Database…**) among its commands. The toolbar's **+** and the
+button under the list make a new connection too. F2 on a connection opens it to rename, and the filter's ↓ and Return go on to
 the first match.

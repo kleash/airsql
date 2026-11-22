@@ -57,7 +57,9 @@ extension SQLEditorView {
 
     /// The place is inside a string, name or comment, or one the text leaves open.
     private func inTextToken(_ place: Int) -> Bool {
-        tokens.contains { [.string, .quotedName, .comment, .hint].contains($0.kind) && $0.range.lowerBound < place
+        // Shell form has no comments: what SQL's lexer takes for one (a # or -- in a regular expression) is code there.
+        let kinds: [SQLToken.Kind] = otherLanguage == nil ? [.string, .quotedName, .comment, .hint] : [.string, .quotedName]
+        return tokens.contains { kinds.contains($0.kind) && $0.range.lowerBound < place
             && (place < $0.range.upperBound || !$0.isClosed) }
     }
 

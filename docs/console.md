@@ -50,6 +50,9 @@ session of its own, so a long query in one tab leaves the others free.
     that table's. ORDER BY, GROUP BY and HAVING offer the aliases of the select list too.
   - `SELECT nam` with no FROM yet offers every table's columns: choosing one adds its FROM.
   - Just after `*` or `t.*` in a select list, the list offers all the columns in its place.
+  - It works the same in the middle of a query you're changing, and in a tab of several queries with no `;` between
+    them: each is read as its own, though the first is underlined (**Expected ; before SELECT**), as the server would
+    refuse the text as it stands.
   - `INSERT INTO t (` offers the whole column list, then each column left. `VALUES (` offers a field for each column.
   - After `status = ` or inside `status = '` an ENUM or SET column offers its values. `ENGINE=`, `CHARSET` and `COLLATE`
     offer theirs, CALL the procedures, `@` the variables of the text, `@@` and SET the common server variables.
@@ -160,6 +163,9 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
   missing column), and changes such as quoting or qualifying a name, adding a table alias, expanding `*` to its columns,
   moving a subquery to WITH, and splitting or merging INSERTs or removing one of their columns. Each is one step of Undo.
 - **Go to Declaration** (⌘B) jumps to where an alias or WITH query is declared, and opens a table or routine.
+- **⌘-click** a name to go where it leads: an alias or WITH query to where it's declared, a table, view or column to
+  the table's rows in a tab (as **Open Table at Cursor**, F4, does), a routine to its editor. Right-click (or
+  Control-click) a name for the same commands in a menu.
 - **Find Usages…** (⌥F7) lists every place in the text that means the name at the cursor. The other places are also
   tinted when you stop on a name, and BEGIN, CASE and IF are tinted with their END.
 - **Rename Name…** (⇧F6) changes an alias, WITH query, column alias or `@variable` everywhere it's used. On a table or

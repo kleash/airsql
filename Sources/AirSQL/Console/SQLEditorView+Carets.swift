@@ -171,6 +171,10 @@ extension SQLEditorView {
         completionPopup?.close()
         let point = convert(event.locationInWindow, from: nil)
         if let fold = folds.first(where: { foldMark($0).contains(point) }) { return open(fold) }
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.clickCount == 1, nameContext != nil,
+           let index = characterIndex(under: point) {
+            return openName(at: index)
+        }
         if event.modifierFlags.isSuperset(of: [.option, .shift]) {
             let place = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
             return setCarets([selectedRange()] + extraCarets + [NSRange(location: place, length: 0)])
