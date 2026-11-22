@@ -767,14 +767,7 @@ final class MongoStagesView: NSView {
             let (scroll, editor) = SQLEditorView.make(fontSize: 12)
             scroll.rulersVisible = false
             editor.positionLabel.isHidden = true
-            editor.otherLanguage = (problems: { text in
-                do {
-                    _ = try MongoPipeline.stages(in: text)
-                    return []
-                } catch let error as MongoPipeline.ParseError {
-                    return [MongoAggregationController.problem(error, in: text)]
-                } catch { return [] }
-            }, folds: { _ in [] })
+            editor.otherLanguage = (problems: MongoAggregationController.problems, folds: { _ in [] })
             editor.string = text
             editor.setAccessibilityIdentifier("stage.\(index).shell")
             editor.setAccessibilityLabel("Stage \(index + 1) in shell form")

@@ -26,6 +26,11 @@ struct MongoAggregationTests {
             #expect(problem.message.hasPrefix("Stage 2, line 3, column 18: Expected ‘,’ or ‘}’"), "\(problem.message)")
             #expect(problem.range == 35..<36)
         }
+        // What the editors underline: the parse error, else the checks (both editors share it, the Shell card too).
+        #expect(MongoAggregationController.problems(in: bad).map(\.range) == [35..<36])
+        let limit = MongoAggregationController.problems(in: "[{ $match: {} }, { $limit: \"5\" }]")
+        #expect(limit.map(\.range) == [19..<25] && limit.first?.severity == .error)
+        #expect(MongoAggregationController.problems(in: "[{ $mach: {} }]").first?.severity == .warning)
     }
 }
 
