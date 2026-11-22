@@ -151,9 +151,13 @@ extension ConsoleViewController {
         model.connector.connect(id, on: view.window)
     }
 
-    /// Selects a message's statement in the editor.
+    /// Selects a message's statement in the editor; an error's, the place the server named in it (underlined in red).
     func reveal(_ message: ConsoleMessage) {
-        guard let range = message.range, NSMaxRange(range) <= (text as NSString).length else { return }
+        guard var range = message.range, NSMaxRange(range) <= (text as NSString).length else { return }
+        if message.level == .error, let place = editor.runProblem?.range, range.location <= place.lowerBound,
+           place.upperBound <= NSMaxRange(range) {
+            range = NSRange(place)
+        }
         view.window?.makeFirstResponder(editor)
         editor.setSelectedRange(range)
         editor.scrollRangeToVisible(range)

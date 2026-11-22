@@ -832,6 +832,22 @@ extension AppTests {
             #expect(find.search.stringValue == "total", "several lines: what In Selection searches")
         }
 
+        /// Double-clicking an error in Messages selects the place the server named, underlined in red; another message
+        /// selects its statement.
+        @Test func anErrorRevealsItsPlace() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            editor.setText("SELECT 1;\nSELECT nope FROM t;")
+            editor.runProblem = SQLProblem(range: 17..<21, message: "Unknown column 'nope'")
+            let statement = NSRange(location: 10, length: 18)
+            console.reveal(ConsoleMessage(level: .error, range: statement, line: 2, statement: "SELECT nope FROM t", text: "Unknown column"))
+            #expect(editor.selectedRange() == NSRange(location: 17, length: 4))
+            console.reveal(ConsoleMessage(level: .ok, range: statement, line: 2, statement: "SELECT nope FROM t", text: "1 row"))
+            #expect(editor.selectedRange() == statement)
+            console.reveal(ConsoleMessage(level: .error, range: NSRange(location: 0, length: 8), line: 1, statement: "SELECT 1", text: "x"))
+            #expect(editor.selectedRange() == NSRange(location: 0, length: 8), "the place is in another statement")
+        }
+
         @Test func theSQLLogShowsFiltersAndClearsTheLog() async throws {
             let folder = try scratch()
             let log = SQLLog(fileURL: URL(fileURLWithPath: folder + "/SQL.log"))

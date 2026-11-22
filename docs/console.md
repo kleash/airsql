@@ -267,7 +267,7 @@ share the current database too.
 - **Messages** lists when and what each statement did: its rows or the rows it changed, how long it took, the server's
   warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
   names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
-  to select its statement.
+  to select its statement, or an error's, the place the server names.
 - A result keeps at most its first 100,000 rows (**Settings ▸ Grid ▸ Most rows in a result**); the tab then says it is cut short.
 - **Edit ▸ Find** (⌘F) with a result's rows focused finds values in them, as in a [table tab](table-data.md): ⌘G and ⇧⌘G
   move between matches, and Options has Match Case, Regular Expression, Whole Words and Filter Rows. Replace is for
