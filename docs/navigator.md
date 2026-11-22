@@ -81,7 +81,8 @@ The button beside the filter, and **View ▸ Tree**, hold these choices. They la
 
 Every change shows its SQL first ([Check SQL before it runs](sql-preview.md)); nothing runs until you choose to.
 
-- **New Database…** asks for a name, a character set and a collation (the server's own are chosen at first).
+- **New Database…** asks for a name, a character set and a collation (the server's own are chosen at first). The new
+  database, and a table made with **Create Table…**, is selected in the tree once AirSQL has read it; the tab in front stays.
 - **Drop…** deletes the selected databases or objects. Dropping a database always asks you to type its name; on a
   Production connection, so does dropping or emptying a table.
 - **Truncate…** deletes every row of the selected tables. It can't be rolled back.

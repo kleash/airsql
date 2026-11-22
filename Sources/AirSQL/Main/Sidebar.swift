@@ -72,6 +72,8 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
     fileprivate var openingMenu = false
     /// A tab's own row is being selected: the tab stays as it is.
     private var revealing = false
+    /// A database or table just made, selected once the schema read back puts it in the tree (`revealWhenShown`).
+    private var madeRow: SidebarNode.Kind?
     /// Quick Documentation or Definition on show, and what it says.
     var treeNote: NSPopover?
     var shownTreeNote = ""
@@ -353,6 +355,16 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         })
         outline.selectRowIndexes(rows, byExtendingSelection: false)
         reloading = false
+        if let made = madeRow, treeNodes[made] != nil {
+            madeRow = nil
+            reveal(made)
+        }
+    }
+
+    /// Selects what New Database or Create Table made, now or once the tree shows it; the tab and the focus stay.
+    func revealWhenShown(_ kind: SidebarNode.Kind) {
+        madeRow = kind
+        reload()
     }
 
     @objc private func openConnectionChanged(_ notification: Notification) {

@@ -450,6 +450,28 @@ extension AppTests {
             #expect(documents["Refresh"] != nil && documents["Find Text on Server…"] == nil && documents["Process List"] == nil)
         }
 
+        /// What New Database or Create Table made is selected once the tree shows it, with no preview over the tab in
+        /// front and the focus where it was.
+        @Test func aRowJustMadeIsSelectedOnceTheTreeShowsIt() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let tab = main.openConsole(text: "", title: nil, connection: id)
+            _ = await consoleTookTheFocus(main)
+            let responder = main.window?.firstResponder
+            let orders = SidebarNode.Kind.object(id, DatabaseObject(.table, "airsql_fixture", "orders"))
+            main.sidebar.filter.stringValue = "no such name"
+            main.sidebar.reload()
+            #expect(main.sidebar.treeNodes[orders] == nil)
+            main.sidebar.revealWhenShown(orders)
+            #expect(main.sidebar.selectedNodes.map(\.kind) != [orders])
+            main.sidebar.filter.stringValue = ""
+            main.sidebar.reload()  // as the schema read back does
+            #expect(main.sidebar.selectedNodes.map(\.kind) == [orders])
+            #expect(main.selectedTab === tab && !main.tabs.contains { $0.content is PreviewContent })
+            #expect(main.window?.firstResponder === responder)
+        }
+
         @Test func f4OnAGroupListsItAndADDLGoesToThePage() async throws {
             let model = testModel(Fixtures.shop)
             let (main, _) = appWindow(model)

@@ -106,6 +106,10 @@ extension TableEditorController {
             designChanged()
             reloadList()
             renameTab()
+            if applied, oldName == nil {
+                (view.window?.windowController as? MainWindowController)?.sidebar
+                    .revealWhenShown(.object(context.connection.id, DatabaseObject(.table, database, newName)))
+            }
             if applied, saveAsChangeset { SQLPreviewSheet.changesetWriter?(change, server.noBackslashEscapes) }
             if let failure {
                 let message = failure.localizedDescription
