@@ -512,7 +512,8 @@ session of its own, so a long query in one tab leaves the others free.
 - **Edit ▸ SQL ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ SQL ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
-  (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
+  (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines. With nothing selected, they change the cursor's
+  line and the cursor stays where it was in it.
 - **Edit ▸ SQL ▸ Lines** works on the selected lines, or the cursor's: **Duplicate Line** (⌃D), **Delete Line** (⌃⇧K), **Move Line Up** and
   **Down** (⌥⇧↑, ⌥⇧↓), **Join Lines** (⌃⇧J; a line ending in a `--` comment, or a line break inside a string, stays), **Sort Lines** and
   **Reverse Lines**. ⌘C with nothing selected copies the line.

@@ -525,6 +525,31 @@ extension AppTests {
             #expect(editor.string == "a\nb")
         }
 
+        /// ⌘/, ⌘] and ⌘[ with nothing selected keep the caret where it was in its line, moved with its text; a selection
+        /// stays on the lines. Each is one Undo.
+        @Test func lineCommandsKeepTheCaret() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            editor.setText("SELECT a\n  FROM t")
+            editor.setSelectedRange(NSRange(location: 13, length: 0))  // FR|OM
+            editor.toggleComment(nil)
+            #expect(editor.string == "SELECT a\n  -- FROM t" && editor.selectedRange() == NSRange(location: 16, length: 0))
+            editor.undoManager?.undo()
+            #expect(editor.string == "SELECT a\n  FROM t", "one Undo")
+            editor.setText("SELECT a\n  -- FROM t")
+            editor.setSelectedRange(NSRange(location: 12, length: 0))  // inside the --
+            editor.toggleComment(nil)
+            #expect(editor.string == "SELECT a\n  FROM t" && editor.selectedRange() == NSRange(location: 11, length: 0))
+            editor.setSelectedRange(NSRange(location: 13, length: 0))
+            editor.indentLines(nil)
+            #expect(editor.string == "SELECT a\n      FROM t" && editor.selectedRange() == NSRange(location: 17, length: 0))
+            editor.outdentLines(nil)
+            #expect(editor.string == "SELECT a\n  FROM t" && editor.selectedRange() == NSRange(location: 13, length: 0))
+            editor.setSelectedRange(NSRange(location: 2, length: 10))
+            editor.toggleComment(nil)
+            #expect(editor.string == "-- SELECT a\n--   FROM t" && editor.selectedRange() == NSRange(location: 0, length: 23))
+        }
+
         /// Openers bring their partners, outside strings; closers step over them; Delete takes an empty pair; ⌘Z undoes it.
         @Test func bracketsAndQuotesCloseThemselves() async throws {
             let (_, _, console) = try await Self.console()
