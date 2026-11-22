@@ -20,3 +20,13 @@ reason = "AES-GCM-SIV: not a TLS cipher; neither Connector/C nor libmongoc calls
 id = "CVE-2026-95692"
 ignoreUntil = 2026-12-15
 reason = "AES-GCM-SIV: not a TLS cipher; neither Connector/C nor libmongoc calls it"
+
+[[IgnoredVulns]]
+id = "CVE-2026-124709"
+ignoreUntil = 2026-12-15
+reason = "QUIC server: OpenSSL is built with no-quic; AirSQL's TLS runs over TCP only, as a client"
+
+[[IgnoredVulns]]
+id = "CVE-2026-35190"
+ignoreUntil = 2026-12-15
+reason = "A TLS 1.3 server with the Suite B certificate flag: AirSQL is a client, and neither Connector/C nor libmongoc sets the flag"
