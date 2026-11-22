@@ -292,6 +292,24 @@ extension AppTests {
             #expect(main.tabs.isEmpty)
         }
 
+        /// Close Tabs to the Right closes the tabs after the one shown but pinned ones; off, saying why, at the end.
+        @Test func closeTabsToTheRightLeavesTheOnesBeforeAndPinnedOnes() throws {
+            let (main, _) = appWindow(testModel())
+            let a = main.open(FixtureContent("a"), title: "A", connection: nil)
+            _ = main.open(FixtureContent("b"), title: "B", connection: nil)
+            let c = main.open(FixtureContent("c"), title: "C", connection: nil)
+            main.togglePinTab(nil)
+            _ = main.open(FixtureContent("d"), title: "D", connection: nil)
+            #expect(main.tabs.first === c)
+            main.select(a)
+            main.closeTabsToRight(nil)
+            #expect(main.tabs.map(\.title) == ["C", "D", "A"])  // D opened beside C
+            let item = Commands.closeTabsToRight.item()
+            #expect(!main.validateMenuItem(item) && item.toolTip == "No tab is to the right of this one")
+            main.select(c)
+            #expect(main.validateMenuItem(item))
+        }
+
         // MARK: Several windows
 
         /// One transaction on a shared session, with tabs on it in two windows: Quit lists it once from either window,

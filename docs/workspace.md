@@ -43,8 +43,11 @@ tab puts it on that side. **View ▸ Go to Other Side** (⌃⌘\\) moves the foc
 
 ## Pin a tab
 
-**Window ▸ Pin Tab**, also in a tab's right-click menu, keeps the tab at the left of the strip: **Close Other Tabs** and
-**Close All Tabs** leave it, and it stays pinned at the next launch. Click its pin to unpin it.
+**Window ▸ Pin Tab**, also in a tab's right-click menu, keeps the tab at the left of the strip: **Close Other Tabs**,
+**Close Tabs to the Right** and **Close All Tabs** leave it, and it stays pinned at the next launch. Click its pin to unpin it.
+
+**File ▸ Close Tabs to the Right**, also in a tab's right-click menu, closes the unpinned tabs after that one; as with
+**Close Other Tabs**, a tab with unsaved work asks first.
 
 ## Several windows
 
