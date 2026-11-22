@@ -1315,4 +1315,19 @@ extension AppTests.ConsoleAppTests {
         messages.otherMouseUp(with: try Self.middleClick())
         #expect(console.resultTabs.count == 1 && !console.resultTabs.contains { $0 === tab })
     }
+
+    /// A result's tooltip has its statement's first line after its label, cut short; the tab keeps its name.
+    @Test func aResultsTooltipShowsItsStatement() async throws {
+        let (_, _, console) = try await Self.console()
+        console.addResult(ConsoleFixtures.customers(rows: 1), title: nil, summary: "")
+        let tab = try #require(console.resultTabs.last)
+        tab.sql = "\n  SELECT name FROM customers\nWHERE id = 1"
+        console.selectResult(tab)
+        let button = try #require(console.results.tabButton(for: tab))
+        #expect(button.toolTip?.hasPrefix(tab.label + " — SELECT name FROM customers: ") == true, "\(button.toolTip ?? "")")
+        #expect(tab.title.hasPrefix("Result "))
+        tab.sql = "SELECT '" + String(repeating: "x", count: 100) + "'"
+        console.selectResult(console.messagesTab)
+        #expect(button.toolTip?.contains(String(repeating: "x", count: 71) + "…:") == true, "\(button.toolTip ?? "")")
+    }
 }

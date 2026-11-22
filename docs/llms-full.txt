@@ -667,6 +667,7 @@ share the current database too.
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
   tabs, unless you **pin** one (right-click it, or Query ▸ Result ▸ Pin Result); a result with edits not yet applied stays too.
+  Hold the pointer over a result tab to see the first line of its statement.
   A tab's ✕ closes it. **Query ▸ Result ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
   Messages included.
 - **Query ▸ Result ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
