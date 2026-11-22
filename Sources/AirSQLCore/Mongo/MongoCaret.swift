@@ -58,11 +58,11 @@ public struct MongoCaret: Equatable, Sendable {
 
     public init(text: String, caret: Int, root: Root) {
         self.root = root
-        let units = Array(text.utf16.prefix(max(0, caret)))
-        let end = units.count
+        let units = Array(text.utf16)
+        let end = min(max(0, caret), units.count)
         range = end..<end
         var stack: [Frame] = []
-        let first = units.first { ![0x20, 0x09, 0x0A, 0x0D].contains($0) }
+        let first = units[..<end].first { ![0x20, 0x09, 0x0A, 0x0D].contains($0) }
         // The text may leave out its outermost brackets: a filter typed `status: "paid"`, stages one after another.
         switch root {
         case .pipeline where first != 0x5B: stack.append(Frame(kind: .array, start: 0))
@@ -79,72 +79,94 @@ public struct MongoCaret: Equatable, Sendable {
             stack[top].values[key] = value
         }
 
-        var i = 0, inString: (start: Int, quote: UInt16)?, inRegex = false
-        scan: while i < end {
-            let c = units[i]
-            switch c {
-            case 0x7B, 0x5B, 0x28:  // { [ (
-                stack.append(Frame(kind: c == 0x7B ? .document : c == 0x5B ? .array : .call, start: i))
-                i += 1
-            case 0x7D, 0x5D, 0x29:  // } ] )
-                if let frame = stack.popLast(), root == .pipeline, frame.kind == .document, stack.count == pipelineDepth {
-                    stagesBefore.append(frame.start..<(i + 1))
+        var i = 0, inString: (start: Int, quote: UInt16)?, inRegex = false, closed: [Range<Int>] = []
+        /// Reads from `i` to `limit`. `rest`: the text after the caret, read only until the caret's document (`depth`
+        /// frames deep) closes, for the keys and values it has there.
+        func read(to limit: Int, rest: Bool = false, depth: Int = 0) {
+            scan: while i < limit {
+                let c = units[i]
+                switch c {
+                case 0x7B, 0x5B, 0x28:  // { [ (
+                    stack.append(Frame(kind: c == 0x7B ? .document : c == 0x5B ? .array : .call, start: i))
+                    i += 1
+                case 0x7D, 0x5D, 0x29:  // } ] )
+                    if rest, stack.count <= depth { return }
+                    if let frame = stack.popLast(), root == .pipeline, frame.kind == .document, stack.count == pipelineDepth {
+                        closed.append(frame.start..<(i + 1))
+                    }
+                    i += 1
+                case 0x2C:  // ,
+                    if let top = stack.indices.last, stack[top].kind == .document { (stack[top].key, stack[top].pending) = (nil, nil) }
+                    i += 1
+                case 0x3A:  // :
+                    if let top = stack.indices.last, stack[top].kind == .document, let key = stack[top].pending {
+                        stack[top].key = key
+                        stack[top].pending = nil
+                        stack[top].siblings.append(key)
+                    }
+                    i += 1
+                case 0x22, 0x27:  // " '
+                    var j = i + 1
+                    while j < limit, units[j] != c {
+                        if units[j] == 0x5C { j += 1 }
+                        j += 1
+                    }
+                    guard j < limit else {
+                        if !rest { inString = (i + 1, c) }
+                        break scan
+                    }
+                    let content = String(decoding: units[(i + 1)..<j], as: UTF16.self)
+                    if let top = stack.indices.last, stack[top].expectsKey { stack[top].pending = content } else { scalar(content) }
+                    i = j + 1
+                case 0x2F:  // a regular expression: shell form has no division
+                    var j = i + 1, inClass = false
+                    while j < limit, inClass || units[j] != 0x2F {
+                        if units[j] == 0x5C { j += 1 } else if units[j] == 0x5B { inClass = true } else if units[j] == 0x5D { inClass = false }
+                        j += 1
+                    }
+                    guard j < limit else {
+                        if !rest { inRegex = true }
+                        break scan
+                    }
+                    i = j + 1
+                case _ where isWord(c):
+                    var j = i
+                    while j < limit, isWord(units[j]) { j += 1 }
+                    if j == limit, !rest { break scan }  // the word at the caret: what is typed
+                    let word = String(decoding: units[i..<j], as: UTF16.self)
+                    if let top = stack.indices.last, stack[top].expectsKey { stack[top].pending = word } else { scalar(word) }
+                    i = j
+                default:
+                    i += 1
                 }
-                i += 1
-            case 0x2C:  // ,
-                if let top = stack.indices.last, stack[top].kind == .document { (stack[top].key, stack[top].pending) = (nil, nil) }
-                i += 1
-            case 0x3A:  // :
-                if let top = stack.indices.last, stack[top].kind == .document, let key = stack[top].pending {
-                    stack[top].key = key
-                    stack[top].pending = nil
-                    stack[top].siblings.append(key)
-                }
-                i += 1
-            case 0x22, 0x27:  // " '
-                var j = i + 1
-                while j < end, units[j] != c {
-                    if units[j] == 0x5C { j += 1 }
-                    j += 1
-                }
-                guard j < end else {
-                    inString = (i + 1, c)
-                    break scan
-                }
-                let content = String(decoding: units[(i + 1)..<j], as: UTF16.self)
-                if let top = stack.indices.last, stack[top].expectsKey { stack[top].pending = content } else { scalar(content) }
-                i = j + 1
-            case 0x2F:  // a regular expression: shell form has no division
-                var j = i + 1, inClass = false
-                while j < end, inClass || units[j] != 0x2F {
-                    if units[j] == 0x5C { j += 1 } else if units[j] == 0x5B { inClass = true } else if units[j] == 0x5D { inClass = false }
-                    j += 1
-                }
-                guard j < end else {
-                    inRegex = true
-                    break scan
-                }
-                i = j + 1
-            case _ where isWord(c):
-                var j = i
-                while j < end, isWord(units[j]) { j += 1 }
-                if j == end { break scan }  // the word at the caret: what is typed
-                let word = String(decoding: units[i..<j], as: UTF16.self)
-                if let top = stack.indices.last, stack[top].expectsKey { stack[top].pending = word } else { scalar(word) }
-                i = j
-            default:
-                i += 1
             }
         }
 
+        read(to: end)
+        stagesBefore = closed
         let top = stack.last
         chain = stack.compactMap { $0.kind == .array ? "[]" : $0.kind == .document ? $0.key : nil }
         if root == .pipeline, !chain.isEmpty { chain.removeFirst() }
         siblings = top?.siblings ?? []
         values = top?.values ?? [:]
         if inRegex { slot = .none; return }
+        // The caret's document goes on after it: its keys there aren't offered again, its values count (`from` after
+        // `foreignField`). Past the rest of the word or string at the caret first.
+        if top?.kind == .document {
+            let depth = stack.count
+            if let (start, quote) = inString {
+                i = start
+                while i < units.count, units[i] != quote, units[i] != 0x0A { i += units[i] == 0x5C ? 2 : 1 }
+                i += 1
+            } else {
+                i = end
+                while i < units.count, isWord(units[i]) { i += 1 }
+            }
+            read(to: units.count, rest: true, depth: depth)
+            (siblings, values) = (stack[depth - 1].siblings, stack[depth - 1].values)
+        }
         if let (start, _) = inString {
-            prefix = String(decoding: units[start...], as: UTF16.self)
+            prefix = String(decoding: units[start..<end], as: UTF16.self)
             range = start..<end
             if top?.expectsKey == true {
                 (slot, quoted) = (.key, true)
@@ -155,7 +177,7 @@ public struct MongoCaret: Equatable, Sendable {
         }
         var start = end
         while start > 0, isWord(units[start - 1]) { start -= 1 }
-        prefix = String(decoding: units[start...], as: UTF16.self)
+        prefix = String(decoding: units[start..<end], as: UTF16.self)
         range = start..<end
         switch top?.kind {
         case .document?: slot = top!.expectsKey ? (top!.pending == nil || !prefix.isEmpty ? .key : .none) : .value

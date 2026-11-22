@@ -98,14 +98,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         editor.setAccessibilityIdentifier("aggregate.editor")
         editor.setAccessibilityLabel("Pipeline of \(collection)")
         editor.toolTip = "The pipeline in shell form: [{ $match: {…} }, { $group: {…} }]; Run (⌘↩) runs it, Explain (⌥⌘E) shows its plan"
-        editor.otherLanguage = (problems: { text in
-            do {
-                _ = try MongoPipeline.stages(in: text)
-                return []
-            } catch let error as MongoPipeline.ParseError {
-                return [Self.problem(error, in: text)]
-            } catch { return [] }
-        }, folds: Self.folds)
+        editor.otherLanguage = (problems: Self.problems, folds: Self.folds)
         editor.completions = { [weak self] text, caret in self?.completions(text, caret) ?? (caret..<caret, []) }
         editor.completionDocs = { $0.kind == .template ? SQLTemplate.expand($0.text).text : $0.detail }
         model.openMongo[connectionID]?.readSample(database: database, collection: collection)
@@ -236,18 +229,25 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             fail(problem)
             return nil
         }
-        do {
-            let stages = try MongoPipeline.stages(in: text).map(\.document)
-            editor.runProblem = nil
-            let options = try MongoQueryText(collation: collation.stringValue, maxTimeMS: maxTime.stringValue).find()
-            return (stages, options)
-        } catch let error as MongoPipeline.ParseError {
-            let found = Self.problem(error, in: text)
+        func reject(_ found: SQLProblem) {
             if mode == .stages { show(.shell) }
             editor.runProblem = found
             editor.setSelectedRange(NSRange(location: found.range.lowerBound, length: 0))
             view.window?.makeFirstResponder(editor)
             fail(found.message)
+        }
+        do {
+            let parsed = try MongoPipeline.stages(in: text)
+            // What the server would refuse for sure stops Run here, where it is; a warning doesn't.
+            if let found = MongoPipeline.problems(parsed, in: text).first(where: { $0.severity == .error }) {
+                reject(found)
+                return nil
+            }
+            editor.runProblem = nil
+            let options = try MongoQueryText(collation: collation.stringValue, maxTimeMS: maxTime.stringValue).find()
+            return (parsed.map(\.document), options)
+        } catch let error as MongoPipeline.ParseError {
+            reject(Self.problem(error, in: text))
         } catch let error as MongoQueryText.Problem {
             fail("\(error.field): \(error.message)")
             view.window?.makeFirstResponder(error.field == "Collation" ? collation : maxTime)
@@ -255,6 +255,15 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             fail(error.localizedDescription)
         }
         return nil
+    }
+
+    /// What the editor underlines in a pipeline's text: the parser's error, else what `MongoPipeline.problems` finds.
+    static func problems(in text: String) -> [SQLProblem] {
+        do {
+            return MongoPipeline.problems(try MongoPipeline.stages(in: text), in: text)
+        } catch let error as MongoPipeline.ParseError {
+            return [problem(error, in: text)]
+        } catch { return [] }
     }
 
     /// The parser's error as the editor underlines it: the character it points at, and which stage.

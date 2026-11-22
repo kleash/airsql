@@ -49,6 +49,10 @@ public struct MongoQueryText: Codable, Equatable, Sendable {
         var find = MongoFind(filter: try document(filter, "Filter") ?? BSONDocument())
         find.projection = try document(projection, "Project")
         find.sort = try document(sort, "Sort")
+        for (field, direction) in find.sort?.fields ?? [] where MongoPipeline.whole(direction).map({ abs($0) == 1 }) != true {
+            if case .document = direction { continue }  // { $meta: "textScore" }
+            throw Problem(field: "Sort", message: "Type 1 (ascending) or -1 (descending) for \(field)")
+        }
         find.collation = try document(collation, "Collation")
         find.limit = try count(limit, "Limit")
         find.skip = try count(skip, "Skip")

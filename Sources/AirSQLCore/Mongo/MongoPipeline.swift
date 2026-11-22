@@ -36,7 +36,9 @@ public enum MongoPipeline {
             return ParseError(message: message, stage: stage, line: line, column: column, offset: offset)
         }
         func found(_ at: Int) -> String {
-            at < units.count ? "‘" + String(decoding: units[at..<at + 1], as: UTF16.self) + "’" : "the end of the text"
+            guard at < units.count else { return "the end of the text" }
+            if units[at] == 0x2F, at + 1 < units.count, [0x2F, 0x2A].contains(units[at + 1]) { return "a comment, which shell form doesn't take: remove it" }
+            return "‘" + String(decoding: units[at..<at + 1], as: UTF16.self) + "’"
         }
 
         skipSpace()
@@ -82,6 +84,108 @@ public enum MongoPipeline {
             if i < units.count && units[i] == UInt8(ascii: ",") { i += 1 }
         }
         return stages
+    }
+
+    /// What the parser lets through in `stages` of `text` that the server is sure to refuse: a stage without a key it
+    /// needs, `$limit` or `$skip` that isn't a whole number it takes, a `$sort` direction other than 1 or -1. As
+    /// warnings, since a newer server may have the name: a stage, a stage's key or a `$match` operator close to a known
+    /// one. Only the pipeline's own stages, not those inside `$lookup` or `$facet`.
+    public static func problems(_ stages: [Stage], in text: String) -> [SQLProblem] {
+        let units = Array(text.utf16)
+        var found: [SQLProblem] = []
+        for (index, stage) in stages.enumerated() {
+            let name = stage.name, value = stage.document.fields[0].value
+            /// Underlines `word` where it first stands whole in the stage, else the stage's first character.
+            func flag(_ message: String, at word: String, warning: Bool = false) {
+                let range = whole(word, in: units, within: stage.range) ?? stage.range.lowerBound..<(stage.range.lowerBound + 1)
+                let (line, column) = place(of: range.lowerBound, in: units)
+                found.append(SQLProblem(range: range, message: "Stage \(index + 1), line \(line), column \(column): \(message)",
+                                        severity: warning ? .warning : .error))
+            }
+            func unknown(_ word: String, among known: [MongoWord], _ what: String) {
+                // Without the $, so a short name allows one letter off: $mach is $match, $score isn't $sort.
+                guard let near = SQLInspections.closest(to: String(word.dropFirst()), in: known.map { String($0.name.dropFirst()) })
+                else { return }
+                flag("\(word) isn't \(what) AirSQL knows: did you mean $\(near)?", at: word, warning: true)
+            }
+            func operators(_ filter: BSONDocument) {
+                for (key, value) in filter.fields {
+                    if ["$and", "$or", "$nor"].contains(key), case .array(let list) = value {
+                        for case .document(let inner) in list { operators(inner) }
+                    } else if key.hasPrefix("$") {
+                        if MongoWords.named(key, kind: .query).isEmpty { unknown(key, among: MongoWords.query.filter(\.topLevel), "an operator") }
+                    } else if case .document(let conditions) = value, conditions.keys.first?.hasPrefix("$") == true {
+                        // $ref, $id and $db: a DBRef the field equals.
+                        for op in conditions.keys where MongoWords.named(op, kind: .query).isEmpty && !["$ref", "$id", "$db"].contains(op) {
+                            unknown(op, among: MongoWords.query.filter { !$0.topLevel }, "an operator")
+                        }
+                    }
+                }
+            }
+            guard let word = MongoWords.stage(name) else {
+                unknown(name, among: MongoWords.stages, "a stage")
+                continue
+            }
+            switch (name, value) {
+            case ("$limit", _) where whole(value).map({ $0 < 1 }) ?? true:
+                flag("$limit takes a whole number above 0, such as $limit: 10", at: name)
+            case ("$skip", _) where whole(value).map({ $0 < 0 }) ?? true:
+                flag("$skip takes a whole number, 0 or more, such as $skip: 20", at: name)
+            case ("$sort", .document(let keys)):
+                if keys.fields.isEmpty { flag("$sort needs a field to sort by, such as $sort: { total: -1 }", at: name) }
+                for (field, direction) in keys.fields where whole(direction).map({ abs($0) == 1 }) != true {
+                    if case .document = direction { continue }  // { $meta: "textScore" }
+                    flag("$sort takes 1 (ascending) or -1 (descending) for \(field)", at: field)
+                }
+            case ("$match", .document(let filter)):
+                operators(filter)
+            case (_, .document(let options)) where !word.keys.isEmpty:
+                // shortcut: not $geoNear's, whose distanceField not every server version needs.
+                var missing = word.keys.filter { $0.required && options[$0.name] == nil && name != "$geoNear" }.map(\.name)
+                if name == "$lookup" {
+                    if options["from"] == nil && options["pipeline"] == nil { missing.insert("from", at: 0) }
+                    let (local, foreign) = (options["localField"] != nil, options["foreignField"] != nil)
+                    if local != foreign || (!local && options["pipeline"] == nil) {
+                        flag("$lookup needs both localField and foreignField, or a pipeline", at: name)
+                    }
+                }
+                if name == "$group", missing == ["_id"] {
+                    flag("$group needs _id: what to group by (null puts every document in one group)", at: name)
+                } else if !missing.isEmpty {
+                    flag("\(name) needs \(missing.joined(separator: ", ")): add \(missing.count == 1 ? "it" : "them")", at: name)
+                }
+                guard word.argument != .accumulators else { break }  // $group's other keys are its results
+                let keys = word.keys.map(\.name)
+                for key in options.keys where !keys.contains(key) {
+                    let near = SQLInspections.closest(to: key, in: keys)
+                    flag("\(name) has no key \(key): " + (near.map { "did you mean \($0)?" } ?? "it takes " + keys.joined(separator: ", ")),
+                         at: key, warning: true)
+                }
+            default: break
+            }
+        }
+        return found
+    }
+
+    /// A number with no fraction; nil for anything else. shortcut: a decimal isn't read, so it passes as 1.
+    static func whole(_ value: BSONValue) -> Int64? {
+        switch value {
+        case .int32(let n): return Int64(n)
+        case .int64(let n): return n
+        case .double(let d) where d.rounded() == d && abs(d) < 1e18: return Int64(d)
+        case .decimal128: return 1
+        default: return nil
+        }
+    }
+
+    /// Where `word` first stands whole, not inside a longer name (`total`, not in `subtotal` or `"$total"`), in `range`.
+    static func whole(_ word: String, in units: [UInt16], within range: Range<Int>) -> Range<Int>? {
+        let target = Array(word.utf16)
+        guard !target.isEmpty, range.count >= target.count, range.upperBound <= units.count else { return nil }
+        func isName(_ i: Int) -> Bool { range.contains(i) && (SQLLexer.isNameChar(units[i]) || units[i] == 0x2E) }
+        return (range.lowerBound...(range.upperBound - target.count)).first {
+            units[$0..<($0 + target.count)].elementsEqual(target) && !isName($0 - 1) && !isName($0 + target.count)
+        }.map { $0..<($0 + target.count) }
     }
 
     /// The stages as the editor shows them: an array with each stage indented on lines of its own.

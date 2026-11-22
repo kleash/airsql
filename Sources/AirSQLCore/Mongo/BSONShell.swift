@@ -322,9 +322,13 @@ private struct ShellParser {
     /// What's at the cursor, for "found …" in an error.
     var found: String {
         guard i < s.count else { return "the end of the text" }
+        if atComment { return "a comment, which shell form doesn't take: remove it" }
         let rest = String(decoding: s[i..<min(i + 4, s.count)], as: UTF8.self)
         return "‘\(rest.first.map(String.init) ?? "?")’"
     }
+
+    /// `//` or `/*`: never a regular expression, which can't be empty or start with `*`.
+    var atComment: Bool { peek == UInt8(ascii: "/") && i + 1 < s.count && (s[i + 1] == UInt8(ascii: "/") || s[i + 1] == UInt8(ascii: "*")) }
 
     mutating func skipSpace() {
         while let c = peek, c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D { i += 1 }
@@ -352,7 +356,7 @@ private struct ShellParser {
         case UInt8(ascii: "{"): return .document(try document())
         case UInt8(ascii: "["): return try array()
         case UInt8(ascii: "\""), UInt8(ascii: "'"): return .string(try string())
-        case UInt8(ascii: "/"): return try regex()
+        case UInt8(ascii: "/") where !atComment: return try regex()
         case UInt8(ascii: "-") where s[(i + 1)...].starts(with: "Infinity".utf8):
             i += 9
             return .double(-.infinity)

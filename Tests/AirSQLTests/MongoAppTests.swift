@@ -24,10 +24,12 @@ struct MongoAppTests {
         #expect(empty.filter.fields.isEmpty && empty.projection == nil && empty.limit == nil && empty.hint == nil)
         for (bad, field) in [(MongoQueryText(filter: "{ n: "), "Filter"), (MongoQueryText(sort: "[1]"), "Sort"),
                              (MongoQueryText(limit: "-1"), "Limit"), (MongoQueryText(skip: "two"), "Skip"),
-                             (MongoQueryText(maxTimeMS: "1.5"), "Max Time"), (MongoQueryText(hint: "{ n: "), "Hint")] {
+                             (MongoQueryText(maxTimeMS: "1.5"), "Max Time"), (MongoQueryText(hint: "{ n: "), "Hint"),
+                             (MongoQueryText(sort: "{ n: 2 }"), "Sort"), (MongoQueryText(sort: "{ n: \"asc\" }"), "Sort")] {
             #expect(throws: MongoQueryText.Problem.self, "\(bad)") { try bad.find() }
             do { _ = try bad.find() } catch let problem as MongoQueryText.Problem { #expect(problem.field == field, "\(problem)") }
         }
+        #expect(try MongoQueryText(sort: "{ s: { $meta: \"textScore\" }, n: -1.0 }").find().sort?.keys == ["s", "n"])
         #expect(full.summary.hasPrefix("{ n: { $gt: NumberLong(5) } } · project { n: 1 } · sort { n: -1 }"))
         #expect(MongoQueryText().summary == "{} (every document)")
     }

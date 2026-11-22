@@ -83,8 +83,9 @@ Each field takes shell form, as mongosh writes it: `{ age: { $gt: 30 } }`, `Obje
 - **Collation** (how strings compare, such as `{ locale: "en", strength: 2 }`), **Hint** (an index's name, or its keys)
   and **Max Time** (milliseconds the server may spend before it stops the find).
 
-**Run** (⌘↩, or Return in any field) finds the documents. A field AirSQL can't read says what's wrong and where under
-the fields, and nothing runs. The fields autofill as you type (see [Autofill](#autofill)). The clock button (⌘Y)
+**Run** (⌘↩, or Return in any field) finds the documents. A field AirSQL can't read (or a sort direction other than 1
+or -1) says what's wrong and where under the fields, and nothing runs. Shell form has no comments: take out `//` and
+`/* */` ones. The fields autofill as you type (see [Autofill](#autofill)). The clock button (⌘Y)
 lists the collection's recent queries and its favourites: choose one to run it again, or keep the query in the bar
 among the favourites. They're kept per connection on this Mac, beside the SQL history.
 
@@ -298,7 +299,11 @@ time-series collection, or with edits not applied, both commands are off and say
 over the documents it gives. Type the stages in shell form, as an array or one after another:
 `[{ $match: { status: "paid" } }, { $group: { _id: "$customer", total: { $sum: "$amount" } } }]`. Each stage of
 several lines folds on its own, and the editor autofills stages, their keys and the fields (see
-[Autofill](#autofill)). A mistake is underlined where it is, and Run says which stage, line and column.
+[Autofill](#autofill)). A mistake is underlined where it is, and Run says which stage, line and column: text that
+doesn't parse, and what the server would refuse for sure (a stage without a key it needs, such as `$group`'s `_id` or
+`$lookup`'s `from`; `$limit` or `$skip` that isn't a whole number it takes; a `$sort` direction other than 1 or -1). A
+stage, a stage's key or a `$match` operator close to a known one gets a yellow underline instead (`$mach`: did
+you mean `$match`?), and Run still sends it, since a newer server may have the name.
 
 **Run** (⌘↩) runs the pipeline; its documents load a batch at a time, with **Load More** (⌥⌘↓), and show in the same
 grid as a collection's. **Collation** and **Max Time** above the editor apply to the whole pipeline. **Cancel** (⌘.)
