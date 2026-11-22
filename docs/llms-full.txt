@@ -463,7 +463,8 @@ session of its own, so a long query in one tab leaves the others free.
   - A name matches by its start, a word in it (`cust` finds `old_customers`), an abbreviation of its words (`fica` finds
     `film_category`, `ob` finds `ORDER BY`) or its middle. Keywords of several words come as one, in the case Settings ▸
     Format sets, and words already in the text come last.
-  - After FROM or JOIN: tables, views and the statement's CTEs. A table comes with an alias (`orders o`) unless you turn
+  - After FROM or JOIN: tables, views and the statement's CTEs; the space after FROM, JOIN, INTO, UPDATE or TABLE opens
+    the list. A table comes with an alias (`orders o`) unless you turn
     that off in Settings ▸ Editor. After JOIN the joins come first: those of foreign keys, real or defined by you, then
     those names suggest (`customer_id` to `customers.id`). After ON, the condition.
   - Columns come from tables, CTEs and subqueries alike, with the table's name when two have the same one; `alias.` lists

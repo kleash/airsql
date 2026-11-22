@@ -849,6 +849,32 @@ extension AppTests {
             #expect(!popup.isShown)
         }
 
+        /// A space after FROM, JOIN, INTO, UPDATE or TABLE opens the tables, before a letter is typed; not after a dot,
+        /// in a string or a comment, nor after another word.
+        @Test func aSpaceAfterFromOpensTheTables() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let (_, _, console) = try await Self.console(testModel([saved]), on: saved.id)
+            let editor = try #require(console.editor)
+            func type(_ text: String) { for character in text { editor.insertText(String(character), replacementRange: editor.selectedRange()) } }
+            func shown(after text: String) -> Bool {
+                editor.completionPopup?.close()
+                editor.setText("")
+                type(text)
+                return editor.completionPopup?.isShown == true
+            }
+            #expect(shown(after: "SELECT * FROM "))
+            #expect(editor.completionPopup?.items.contains { $0.kind == .table } == true)
+            #expect(shown(after: "SELECT * FROM orders o join "), "any case")
+            #expect(shown(after: "update "))
+            for text in ["SELECT o.from ", "SELECT 'FROM ", "-- FROM ", "SELECT * FROM orders "] {
+                #expect(!shown(after: text), "\(text)")
+            }
+        }
+
         @Test func templatesExpandAndTabWalksTheirFields() async throws {
             let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
             ConsoleViewController.schemaCache = { _ in cache }
