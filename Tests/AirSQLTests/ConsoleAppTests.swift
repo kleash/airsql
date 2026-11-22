@@ -40,9 +40,10 @@ extension AppTests {
             }
             let tx = main.toolbarController.transactionPopup
             toolbar.validateVisibleItems()
-            #expect(button(.run)?.isEnabled == false && button(.run)?.toolTip?.hasPrefix("Connect first: double-click") == true)
+            // Not connected, Run would connect first; with nothing typed it has nothing to run.
+            #expect(button(.run)?.isEnabled == false && button(.run)?.toolTip == "Type a statement first")
             let help = AXNode.flatten(try #require(main.window)).first { $0.id == "toolbar.run" }?.help
-            #expect(help?.hasPrefix("Connect first: double-click") == true, "VoiceOver reads why too: \(help ?? "")")
+            #expect(help == "Type a statement first", "VoiceOver reads why too: \(help ?? "")")
             #expect(button(.commit)?.isEnabled == false && button(.commit)?.toolTip == "No transaction is open in this tab")
             #expect(button(.cancel)?.isEnabled == false && button(.cancel)?.toolTip == "Nothing is running in this tab")
             #expect(!tx.isEnabled && tx.toolTip?.hasPrefix("Connect first: double-click") == true)
@@ -1076,12 +1077,34 @@ extension AppTests {
             ConsoleDocuments.shared.fileURL = ConsoleTabStore.fileURL
         }
 
-        @Test func runSaysToConnectFirst() async throws {
-            let (_, harness, console) = try await Self.console()
-            _ = await call(harness, "type", ["text": "SELECT 1"])
-            let run = await call(harness, "menu", ["path": "Query > Run Statement"])
-            #expect(run.error?.contains("Connect first") == true, "\(run.error ?? "")")
-            #expect(console.results.cancelButton.isHidden)
+        /// Run on a tab that isn't connected (after a relaunch, or a Disconnect) connects first: here nothing listens, so
+        /// the connect fails, its error shows and nothing runs. An agent's Run there is refused, as it always was.
+        @Test func runConnectsFirstAndRunsNothingWhenThatFails() async throws {
+            let closed = SavedConnection(name: "Closed port", host: "127.0.0.1", port: 1, user: "nobody")
+            let (main, harness, service) = try await AgentGateUITests.agents([closed])
+            defer { service.close() }
+            let model = main.model
+            func failed() -> Bool { if case .failed? = model.states[closed.id] { return true } else { return false } }
+            func dismiss() { if let sheet = main.window?.attachedSheet { main.window?.endSheet(sheet) } }
+            main.sidebar.select([closed.id])
+            #expect(await call(harness, "menu", ["path": "File > New Query"]).error == nil)
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(await eventually(timeout: 10) { failed() })  // New Query's own connect
+            dismiss()
+            model.states[closed.id] = nil
+            main.window?.layoutIfNeeded()
+            let connect = try #require(find(NSButton.self, id: "console.emptyAction", in: console.view))
+            #expect(connect.title == "Connect" && connect.target === console && connect.toolTip?.isEmpty == false)
+            console.editor.setText("SELECT 1")
+            let refused = await agentCall(service, "menu", ["path": "Query > Run Statement"])
+            #expect(refused.error?.contains("Connect first") == true, "\(refused.error ?? "")")
+            #expect(model.states[closed.id] == nil, "the agent's Run connected nothing")
+            #expect(await call(harness, "menu", ["path": "Query > Run Statement"]).error == nil)
+            #expect(await eventually(timeout: 10) { failed() }, "the person's Run connected first")
+            #expect(await eventually(timeout: 5) { main.window?.attachedSheet != nil }, "the connect's error shows")
+            dismiss()
+            #expect(console.running == nil && console.lastOutcome == nil && console.results.cancelButton.isHidden)
+            #expect(!console.messagesView.messages.contains { $0.text.hasPrefix("Not connected") })
             let commit = await call(harness, "menu", ["path": "Query > Commit"])
             #expect(commit.error?.contains("No transaction is open") == true, "\(commit.error ?? "")")
         }

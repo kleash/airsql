@@ -110,10 +110,12 @@ extension ConsoleViewController {
         let view = NSView()
         let text: String
         var next: Command?
+        var connects = false
         if isConnected {
             text = "Run the statement at the cursor with ⌘↩, or every statement with ⇧⌘↩: the results show here."
         } else if let connection {
-            text = "Connect to “\(connection.displayName)” to run SQL: double-click it in the sidebar."
+            text = "Connect to “\(connection.displayName)” to run SQL, or press ⌘↩: Run connects first."
+            connects = true
         } else if model.data.connections.isEmpty {
             text = "Add a connection with File ▸ New Connection… (⌘N) to run SQL."
             next = Commands.newConnection
@@ -125,8 +127,11 @@ extension ConsoleViewController {
         words.alignment = .center
         words.setAccessibilityIdentifier("console.empty")
         view.addSubview(words)
-        if let next {
-            let action = button(next.title, id: "console.emptyAction", tip: next.tip, target: nil, action: next.action)
+        let action = connects
+            ? button("Connect", id: "console.emptyAction", tip: "Connect to this tab's connection, asking for a password if it needs one",
+                     target: self, action: #selector(connectTab(_:)))
+            : next.map { button($0.title, id: "console.emptyAction", tip: $0.tip, target: nil, action: $0.action) }
+        if let action {
             view.addSubview(action)
             NSLayoutConstraint.activate([action.topAnchor.constraint(equalTo: words.bottomAnchor, constant: Spacing.unit),
                                          action.centerXAnchor.constraint(equalTo: view.centerXAnchor)])
@@ -138,6 +143,12 @@ extension ConsoleViewController {
             words.widthAnchor.constraint(lessThanOrEqualToConstant: 460),
         ])
         return view
+    }
+
+    /// The empty results' Connect: this tab's connection, whatever the sidebar has selected.
+    @objc func connectTab(_ sender: Any?) {
+        guard let id = connectionID else { return }
+        model.connector.connect(id, on: view.window)
     }
 
     /// Selects a message's statement in the editor.

@@ -613,6 +613,10 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
 
 The ▶ beside the line numbers, at the start of the statement at the cursor, runs it too.
 
+On a tab that isn't connected (after AirSQL opens again, or a Disconnect), Run connects first, with the usual password
+and trust prompts, then runs as it would have. If the connect fails or you cancel it, nothing runs. The empty results
+have a **Connect** button too.
+
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
 on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another. If one fails with others to come, a
 sheet asks whether to **Stop**, **Retry** it, **Skip** it, or **Skip All** that fail from there on. Each

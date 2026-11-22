@@ -92,6 +92,8 @@ extension ConsoleViewController: NSMenuItemValidation {
             : shared.runner != nil && shared.runner != documentID ? "Another console tab of this connection is running a statement"
             : nil
         let offline = isConnected ? nil : "Connect first: double-click “\(connection?.displayName ?? "the connection")” in the sidebar"
+        // Run connects a tab with a saved connection first (`connectFirst`).
+        let runOffline = connection == nil ? offline : nil
         // The toolbar asks at every event: the first character that isn't a space answers.
         let hasText = text.contains { !$0.isWhitespace }
         switch item.action {
@@ -99,10 +101,10 @@ extension ConsoleViewController: NSMenuItemValidation {
             return (isConnected, offline ?? "")
         case #selector(runStatement(_:)), #selector(runAll(_:)), #selector(runFromCaret(_:)), #selector(runSubquery(_:)), #selector(explain(_:)),
              #selector(explainAnalyze(_:)), #selector(profileQuery(_:)), Commands.runToFile.action:
-            if let reason = offline ?? busy { return (false, reason) }
+            if let reason = runOffline ?? busy { return (false, reason) }
             return (hasText, "Type a statement first")
         case #selector(runSelection(_:)), #selector(runSelectionWhole(_:)):
-            if let reason = offline ?? busy { return (false, reason) }
+            if let reason = runOffline ?? busy { return (false, reason) }
             return (editor.selectedRange().length > 0, "Select the SQL to run first")
         case #selector(cancelQuery(_:)):
             return (running.map { !$0.cancelled } ?? false, "Nothing is running in this tab")
