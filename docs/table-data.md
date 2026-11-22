@@ -133,7 +133,8 @@ Nothing is written until you apply. Leaving a row writes nothing.
 - **Data ▸ Set Value ▸ Insert Value** (and a cell's right-click menu) puts in a value the server works out when Apply runs:
   `NULL`, `DEFAULT`, `NOW()`, `UTC_TIMESTAMP()`, `CURDATE()`, `CURTIME()`, `UNIX_TIMESTAMP()`, `UUID()`, `UUID_SHORT()`
   or a random value, whichever fit the column. Until then the cell shows it in grey: `ƒ NOW()`.
-- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones. Where the server fills a value in, the new row says so
+- **Data ▸ Add Row** (⌘I) adds a new row after the loaded ones, with the cursor on its first column shown that isn't
+  AUTO_INCREMENT or generated. Where the server fills a value in, the new row says so
   in grey: *auto* (AUTO_INCREMENT), *default*, *generated*. **Duplicate Row** (⌘D) copies the selected rows, and
   their AUTO_INCREMENT columns show *auto* for the server to number; **Duplicate Row Without Keys** (⇧⌘D) leaves every
   key column to the server too.

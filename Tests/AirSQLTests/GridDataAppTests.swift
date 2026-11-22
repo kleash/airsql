@@ -860,6 +860,25 @@ extension AppTests {
                         "Column Summary…", "Chart", "Open URL", "Compare Cells", "Display As"])
         }
 
+        /// Add Row starts on the first column shown that isn't AUTO_INCREMENT or generated, through hidden and moved
+        /// columns; Esc there keeps the focus in the grid.
+        @Test func addRowStartsOnTheFirstColumnThePersonFills() async throws {
+            let (main, _, tab) = try await Self.tab()
+            #expect(tab.source?.table.columns.first?.autoIncrement == true)
+            tab.addRow(nil)
+            #expect(tab.grid.selection.cursor.map { tab.grid.sourceColumn($0.column) } == 1)  // customer_id, after the id
+            tab.grid.columnOrder = [3, 0, 2, 4, 5]  // number moved first, customer_id hidden
+            tab.addRow(nil)
+            #expect(tab.grid.selection.cursor?.column == 0)
+            tab.grid.columnOrder = [0, 2, 1, 3, 4, 5]
+            tab.addRow(nil)
+            #expect(tab.grid.selection.cursor?.column == 1 && tab.grid.sourceColumn(1) == 2)
+            tab.viewer.cancelOperation(nil)
+            tab.viewer.cancelOperation(nil)
+            #expect(main.window?.firstResponder === tab.grid)
+            tab.revertAllChanges(nil)
+        }
+
         @Test func readOnlyConnectionsRefuseEditsAndLongValuesOpenInTheValuePanel() async throws {
             let (_, _, readOnly) = try await Self.tab(readOnly: true)
             #expect(readOnly.notice.text.stringValue.hasPrefix("Read-only. This connection is read-only"))
