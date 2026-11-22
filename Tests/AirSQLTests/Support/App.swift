@@ -6,6 +6,25 @@ import Testing
 @testable import AirSQL
 @testable import AirSQLCore
 
+/// Nothing of a run reaches the person's desktop: the test process's windows are transparent to the window server and
+/// take no clicks (views still draw, and pictures are rendered from their layers), and copies go to a clipboard of the
+/// run's own. AIRSQL_GRID_FPS measures real frames, so it keeps its window.
+func quietDesktop() {
+    let board = NSPasteboard.withUniqueName()
+    let general = class_getClassMethod(NSPasteboard.self, #selector(getter: NSPasteboard.general))!
+    method_setImplementation(general, imp_implementationWithBlock({ _ in board } as @convention(block) (AnyObject) -> NSPasteboard))
+    guard ProcessInfo.processInfo.environment["AIRSQL_GRID_FPS"] != "1" else { return }
+    let selector = #selector(NSWindow.order(_:relativeTo:))
+    let order = class_getInstanceMethod(NSWindow.self, selector)!
+    typealias Order = @convention(c) (NSWindow, Selector, Int, Int) -> Void
+    let original = unsafeBitCast(method_getImplementation(order), to: Order.self)
+    method_setImplementation(order, imp_implementationWithBlock({ window, place, other in
+        window.alphaValue = 0
+        window.ignoresMouseEvents = true
+        original(window, selector, place, other)
+    } as @convention(block) (NSWindow, Int, Int) -> Void))
+}
+
 /// A model for one test: its own data, activity and saved passwords (in memory); what it saves is recorded.
 @MainActor
 func testModel(_ connections: [SavedConnection] = [], folders: [ConnectionFolder] = []) -> AppModel {

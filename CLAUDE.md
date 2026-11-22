@@ -88,6 +88,10 @@ AIRSQL_GRID_FPS=1 ./test.sh -c release -Xswiftc -enable-testing --filter GridFra
                          # the grid's frame rate on this Mac's display (puts a window on screen for about 15 s)
 ```
 
+A test run shows nothing on the desktop and leaves the clipboard alone (`quietDesktop` in `Tests/…/Support/App.swift`:
+its windows are transparent and it copies to a clipboard of its own), so it can run while the Mac is in use. Only the
+frame-rate test above shows a window.
+
 The lab needs about 6 GB of Docker memory for a parallel run: with less, Docker's VM kills servers part-way (the OOM
 killer, not a test) and dozens of tests fail with lost connections. Check `docker stats` before reading those as bugs.
 

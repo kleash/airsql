@@ -118,6 +118,13 @@ func crosses(_ rect: NSRect, _ bounds: NSRect, radius r: CGFloat) -> Bool {
 
 extension AppTests {
     @MainActor @Suite struct LayoutTests {
+        @Test func aRunStaysOffThePersonsDesktop() {
+            let (main, _) = appWindow(testModel())
+            main.window?.orderFront(nil)
+            #expect(main.window?.alphaValue == 0 && main.window?.ignoresMouseEvents == true)
+            #expect(NSPasteboard.general.name != .general)
+        }
+
         @Test func cornersAndOverlapsAreFound() {
             // The checks themselves: a label in a chip's corner, two buttons on top of each other.
             #expect(crosses(NSRect(x: 0, y: 0, width: 10, height: 10), NSRect(x: 0, y: 0, width: 100, height: 20), radius: 10))
