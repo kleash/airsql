@@ -142,6 +142,8 @@ public enum MongoPipeline {
             case (_, .document(let options)) where !word.keys.isEmpty:
                 // shortcut: not $geoNear's, whose distanceField not every server version needs.
                 var missing = word.keys.filter { $0.required && options[$0.name] == nil && name != "$geoNear" }.map(\.name)
+                // A pipeline that starts with $documents needs no collection.
+                if name == "$unionWith", options["pipeline"] != nil { missing.removeAll { $0 == "coll" } }
                 if name == "$lookup" {
                     if options["from"] == nil && options["pipeline"] == nil { missing.insert("from", at: 0) }
                     let (local, foreign) = (options["localField"] != nil, options["foreignField"] != nil)

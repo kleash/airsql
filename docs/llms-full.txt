@@ -2652,6 +2652,10 @@ doesn't parse, and what the server would refuse for sure (a stage without a key 
 stage, a stage's key or a `$match` operator close to a known one gets a yellow underline instead (`$mach`: did
 you mean `$match`?), and Run still sends it, since a newer server may have the name.
 
+While the tab shows **Shell** or **SQL**, a double-click on a collection in the tree types its name at the cursor (as a
+string in Shell, as a name in SQL) instead of opening it, and a click only selects it, so the pipeline stays in front;
+Return, or **Open Collection** in its menu, opens it.
+
 **Run** (⌘↩) runs the pipeline; its documents load a batch at a time, with **Load More** (⌥⌘↓), and show in the same
 grid as a collection's. **Collation** and **Max Time** above the editor apply to the whole pipeline. **Cancel** (⌘.)
 stops it on the server: the tab has a session of its own, so it stops only this tab's work, and closing the tab closes

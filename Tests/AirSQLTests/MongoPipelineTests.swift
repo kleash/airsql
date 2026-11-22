@@ -105,6 +105,7 @@ struct MongoPipelineTests {
                     #"[{ $match: { owner: { $ref: "u", $id: 1 }, $where: "x", loc: { $near: [0, 0], $maxDistance: 5 } } }]"#,
                     #"[{ $limit: 2.0 }, { $skip: 0 }, { $sort: { s: { $meta: "textScore" }, n: NumberLong(-1) } }, { $limit: NumberDecimal("1") }]"#,
                     #"[{ $lookup: { from: "c", pipeline: [], as: "y" } }, { $lookup: { pipeline: [{ $documents: [] }], as: "z" } }]"#,
+                    #"[{ $unionWith: { pipeline: [{ $documents: [{ a: 1 }] }] } }, { $unionWith: "archive" }]"#,
                     #"[{ $geoNear: { near: [0, 0] } }, { $group: { _id: null, n: { $sum: 1 } } }, { $unwind: "$a" }]"#]
         for text in fine { #expect(try problems(text).isEmpty, "\(text)") }
     }

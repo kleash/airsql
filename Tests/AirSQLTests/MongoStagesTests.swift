@@ -212,6 +212,28 @@ extension AppTests {
 }
 
 extension AppTests {
+    /// The tree's double-click on a collection types its name at the cursor of the page shown: a string in Shell, a name
+    /// on the SQL page, and nothing on Stages, where it opens the collection as it always did.
+    @Test func aCollectionsNameIsTypedIntoThePageShown() throws {
+        let tab = MongoAggregationController(model: testModel(), connection: UUID(), database: "shop", collection: "orders")
+        _ = tab.view
+        tab.replacePipeline("")
+        tab.show(.stages)
+        #expect(tab.nameInserter == nil)
+        tab.show(.shell)
+        tab.editor.string = "{ $lookup: { from:  } }"
+        tab.editor.setSelectedRange(NSRange(location: 19, length: 0))
+        let quoted = try #require(tab.nameInserter)
+        quoted("order \"lines\"")
+        #expect(tab.editor.string == #"{ $lookup: { from: "order \"lines\"" } }"#)
+        tab.show(.sql)
+        tab.sqlPage.editor.string = "SELECT * FROM orders JOIN "
+        tab.sqlPage.editor.setSelectedRange(NSRange(location: 26, length: 0))
+        let named = try #require(tab.nameInserter)
+        named("order lines")
+        #expect(tab.sqlPage.editor.string == "SELECT * FROM orders JOIN `order lines`")
+    }
+
     /// Add field, Skip and Count built through their cards' controls on a tab without a server: each writes only its
     /// own stage, a wrong operand is refused on its card, and the text reads back as those cards; a stage the Add field
     /// card can't write exactly is a Shell card of its own text.

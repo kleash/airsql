@@ -44,7 +44,7 @@ final class SidebarNode: NSObject {
 /// a connected one), and a footer with New Connection and the process list. A click selects a connection and shows its
 /// summary, a double-click connects it (or, connected, opens or closes its tree), a right-click opens its menu; ⌘ and ⇧
 /// select several. While a query tab of the connection is in front, a double-click on a table, view, routine or column
-/// types its name into the query instead (`queryTaking`).
+/// types its name into the query instead (`nameTaker`).
 @MainActor
 final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate {
     let model: AppModel
@@ -483,7 +483,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
         guard !openingMenu, !revealing else { return }
         // A table or column selected while its connection's query is in front leaves the query there: a double-click
         // types the name into it, Return opens the row.
-        if selectedNodes.count == 1, queryTaking(selectedNodes[0]) != nil { return }
+        if selectedNodes.count == 1, nameTaker(selectedNodes[0]) != nil { return }
         // Arrowing passes over rows: only the one it stops on is read, or the others would queue ahead of it.
         NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(showSelectedObject), object: nil)
         if NSApp.currentEvent?.type == .keyDown {
@@ -596,7 +596,7 @@ final class SidebarController: NSViewController, NSOutlineViewDataSource, NSOutl
             if outline.isItemExpanded(node) { gently(outline).collapseItem(node) } else { gently(outline).expandItem(node) }
         case .database, .category, .object, .part, .detail, .prefix, .mongo:
             // Into the query in front, as HeidiSQL does.
-            if typingNames, let console = queryTaking(node), let name = node.name { return console.insertName(name) }
+            if typingNames, let type = nameTaker(node), let name = node.name { return type(name) }
             treeDoubleClicked(node)
         case .message, .users:
             break  // a click already showed Users and Roles

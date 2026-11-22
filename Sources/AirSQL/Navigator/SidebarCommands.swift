@@ -58,13 +58,17 @@ extension SidebarController: NSMenuItemValidation {
         return (open, name)
     }
 
-    /// The query tab a double-click on `node` types its name into: the tab in front, when it's a query of the row's
-    /// connection and the row is an object or something a table holds.
-    func queryTaking(_ node: SidebarNode) -> ConsoleViewController? {
+    /// What types `node`'s name into the tab in front, for a double-click: a query tab of the row's connection takes an
+    /// object's name or that of something a table holds, and a MongoDB aggregation's Shell or SQL page a collection's.
+    func nameTaker(_ node: SidebarNode) -> ((String) -> Void)? {
+        let front = main?.selectedTab?.content
         switch node.kind {
         case .object(let id, _), .detail(let id, _, _, _):
-            let console = main?.selectedTab?.content as? ConsoleViewController
-            return console?.connectionID == id ? console : nil
+            guard let console = front as? ConsoleViewController, console.connectionID == id else { return nil }
+            return console.insertName
+        case .mongo(let id, let item) where item.collection != nil && item.index == nil:
+            guard let tab = front as? MongoAggregationController, tab.connectionID == id else { return nil }
+            return tab.nameInserter
         default:
             return nil
         }

@@ -877,6 +877,17 @@ extension MongoAggregationController {
 // MARK: Stages | Shell (lane P5-stages)
 
 extension MongoAggregationController {
+    /// What types a collection's name at the cursor of the page shown, for the tree's double-click: a string in Shell, a
+    /// name as SQL takes it on the SQL page; nil on Stages, whose cards pick collections themselves.
+    var nameInserter: ((String) -> Void)? {
+        guard mode != .stages else { return nil }
+        let sql = mode == .sql, editor = sql ? sqlPage.editor : self.editor
+        return { [weak self] name in
+            self?.view.window?.makeFirstResponder(editor)
+            editor.insertText(sql ? SQLCompletion.quote(name) : BSONValue.string(name).shellForm(), replacementRange: editor.selectedRange())
+        }
+    }
+
     /// Stages or Shell: switching never touches the text; a text that isn't a pipeline stays in Shell with its error.
     func show(_ mode: Mode) {
         if mode == .stages, let problem = stagesView.sync() { return showShell(because: problem) }
