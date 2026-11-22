@@ -575,6 +575,30 @@ final class MongoCollectionController: NSViewController, TabContent, DataGridVie
                                        forType: .string)
     }
 
+    /// Copy and Export Query as JavaScript: the query bar's find as mongosh runs it; a field it can't read says why
+    /// under the fields, as Run does.
+    @objc func copyQueryScript(_ sender: Any?) { if let script = queryScript() { MongoExport.copy(script) } }
+    @objc func exportQueryScript(_ sender: Any?) {
+        guard let window = view.window, let script = queryScript() else { return }
+        MongoExport.save(script, collection: name, on: window)
+    }
+
+    private func queryScript() -> String? {
+        bar.readText()
+        if let message = bar.builderProblem {
+            bar.show(field: "Filter", message)
+            return nil
+        }
+        do {
+            let script = try MongoScript.find(bar.query, database: database, collection: name)
+            bar.show(nil)
+            return script
+        } catch {
+            bar.show(error as? MongoQueryText.Problem)  // the only error `find` throws
+            return nil
+        }
+    }
+
     /// A link in the status bar that sends `command` to this tab.
     private func link(_ title: String, _ command: Command, id: String, tip: String) -> NSButton {
         let link = GridStatusView.link(title, id: id, tip: tip + (command.shortcut.isEmpty ? "" : " (\(command.shortcut))"),
