@@ -243,9 +243,10 @@ SQL names sit beside MongoDB's everywhere: "Filter — WHERE", "Show fields — 
   a day without a time is a range (`$gte` day, `$lt` next day), "between" days includes the last day; presets today,
   last 7 days, this month. A date typed for a string-typed field warns.
 - Writing: `$and` whenever a key repeats or there are several any-groups; empty groups dropped; never duplicate keys.
-  Parse-back refuses duplicate keys, sub-document/array equality, `$eq` of a regex, `$elemMatch`, and anything else
+  Parse-back refuses duplicate keys, sub-document/array equality, `$eq` of a regex, and anything else
   outside these shapes; the round trip build → text → parse → build is the test.
-- Rows on fields under the same array (`items.sku`, `items.qty`) get a note: they may match different items.
+- Rows on fields under the same array (`items.sku`, `items.qty`) get a note: they may match different items. **+ Item**
+  makes one item meet them all (`$elemMatch`, read back as an item), and groups nest to any depth.
 - Show (projection ticks, `_id` on), Sort rows, Skip, Limit; "Ignore case in comparisons and sorting" (collation
   strength 2; also changes is/in/ranges, not regex). The query in shell form under it, one selectable line, including
   Hint and Max Time when set in Shell.
