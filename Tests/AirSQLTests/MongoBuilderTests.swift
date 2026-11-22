@@ -199,7 +199,7 @@ struct MongoBuilderTests {
     @Test func parseBackRefusesWhatItCannotShow() {
         let refused = [
             #"{ a: 1, a: 2 }"#, "{ a: { $gt: 1, $gt: 2 } }", "{ a: { b: 1 } }", "{ a: [ 1, 2 ] }", "{ a: { $eq: /x/ } }",
-            "{ a: { $eq: { b: 1 } } }", "{ a: { $in: [ [ 1 ] ] } }", "{ a: { $in: [] } }", "{ a: { $elemMatch: { b: 1 } } }",
+            "{ a: { $eq: { b: 1 } } }", "{ a: { $in: [ [ 1 ] ] } }", "{ a: { $in: [] } }",
             "{ $nor: [ { a: 1 } ] }", "{ a: { $size: 2 } }", "{ a: { $regex: \"x\" } }", "{ $expr: { $eq: [ 1, 1 ] } }",
             "{ a: { $not: { $gt: 1 } } }", "{ a: { $exists: 1 } }", "{ $or: [] }", "{ $or: [ {} ] }", "{ $or: [ 1 ] }",
             // Deeper than one group.
@@ -269,6 +269,88 @@ struct MongoBuilderTests {
             }
         }
         #expect(count > 500)
+    }
+
+    // MARK: Items of an array ($elemMatch)
+
+    @Test func anItemWritesElemMatchAndReadsBack() throws {
+        let cases: [(B.Item, String)] = [
+            (B.Item("items", B.Group([.rule(B.Rule("sku", .is, ["A1"])), .rule(B.Rule("qty", .greater, ["2"], type: .number))])),
+             #"{ items: { $elemMatch: { sku: "A1", qty: { $gt: 2 } } } }"#),
+            (B.Item("items", B.Group(any: true, [.rule(B.Rule("sku", .is, ["A1"])), .rule(B.Rule("sku", .startsWith, ["B"]))])),
+             #"{ items: { $elemMatch: { $or: [ { sku: "A1" }, { sku: /^B/ } ] } } }"#),
+            // The item's own value, for an array of plain values: its operators only.
+            (B.Item("scores", B.Group([.rule(B.Rule("", .atLeast, ["80"], type: .number)), .rule(B.Rule("", .less, ["85"], type: .number))])),
+             "{ scores: { $elemMatch: { $gte: 80, $lt: 85 } } }"),
+            (B.Item("tags", B.Group([.rule(B.Rule("", .startsWith, ["a"], ignoreCase: true))])), "{ tags: { $elemMatch: { $regex: /^a/i } } }"),
+            (B.Item("tags", B.Group([.rule(B.Rule("", .is, ["x"]))])), #"{ tags: { $elemMatch: { $eq: "x" } } }"#),
+            (B.Item("tags", B.Group([.rule(B.Rule("", .hasNoValue))])), "{ tags: { $elemMatch: { $eq: null } } }"),
+            (B.Item("d", B.Group([.rule(B.Rule("", .is, ["2026-11-12"], type: .date))])),
+             #"{ d: { $elemMatch: { $gte: ISODate("2026-11-12T00:00:00.000Z"), $lt: ISODate("2026-11-13T00:00:00.000Z") } } }"#),
+            // An item in an item: an array of arrays of documents.
+            (B.Item("orders", B.Group([.rule(B.Rule("paid", .is, ["true"], type: .bool)),
+                                       .item(B.Item("lines", B.Group([.rule(B.Rule("sku", .is, ["A1"]))])))])),
+             #"{ orders: { $elemMatch: { paid: true, lines: { $elemMatch: { sku: "A1" } } } } }"#),
+        ]
+        for (item, text) in cases {
+            #expect(try item.clause().shellForm() == text)
+            #expect(B.Group(filter: shell(text)) == B.Group([.item(item)]), "\(text)")
+        }
+        // Beside a rule on the same array it stays its own part, so it reads back as the item.
+        let both = B.Group([.rule(B.Rule("items", .hasValue)), .item(cases[0].0)])
+        #expect(try both.filter().shellForm() == #"{ $and: [ { items: { $ne: null } }, { items: { $elemMatch: { sku: "A1", qty: { $gt: 2 } } } } ] }"#)
+        #expect(B.Group(filter: try both.filter()) == both)
+        let anyOf = B.Group(any: true, [.item(cases[4].0), .rule(B.Rule("tags", .hasNoValue))])
+        #expect(B.Group(filter: try anyOf.filter()) == anyOf)
+    }
+
+    /// Every operator with every type it fits, on the item's own value and on a field of it: the round trip is exact.
+    @Test func everyOperatorRoundTripsInAnItem() throws {
+        let values: [B.ValueType: [String]] = [.text: ["Ada (x)*", "Zed"], .number: ["42", "2.5"], .date: ["2026-11-12", "2026-11-30 10:00"],
+                                               .objectId: [Self.id, "65a1b2c3d4e5f60718293a4c"], .bool: ["true", "false"],
+                                               .shell: [#"NumberDecimal("1.5")"#, "MinKey()"]]
+        var count = 0
+        for (type, vs) in values {
+            for op in B.Operator.fitting(type) {
+                for ignoreCase in op.isPattern ? [false, true] : [false] {
+                    let given = op.arity == .none ? [] : op.arity == .one ? [vs[0]] : vs
+                    for path in ["", "f.g"] {
+                        let item = B.Group([.item(B.Item("arr", B.Group([.rule(B.Rule(path, op, given, type: type, ignoreCase: ignoreCase))])))])
+                        let built = try item.filter()
+                        let read = try #require(B.Group(filter: try BSONDocument(shellForm: built.shellForm())), "\(built.shellForm())")
+                        #expect(try read.filter() == built, "\(built.shellForm())")
+                        count += 1
+                    }
+                }
+            }
+        }
+        #expect(count > 100)
+    }
+
+    @Test func anItemSaysWhatIsWrongAndOddShapesStayText() {
+        let bad: [(B.Item, String)] = [
+            (B.Item("", B.Group([.rule(B.Rule("sku", .is, ["a"]))])), "Choose the array field for the item"),
+            (B.Item("$x", B.Group([.rule(B.Rule("sku", .is, ["a"]))])), "‘$x’: a field's name can't start with $"),
+            (B.Item("tags"), "Add a condition on the items of tags"),
+            (B.Item("tags", B.Group([.group(B.Group(any: true))])), "Add a condition on the items of tags"),
+            (B.Item("tags", B.Group([.rule(B.Rule("", .is))])), "Type a value for the item"),
+            (B.Item("tags", B.Group([.rule(B.Rule("", .is, ["x"])), .rule(B.Rule("sku", .is, ["a"]))])),
+             "tags: conditions on the item itself can't sit with conditions on its fields, in groups or under any"),
+            (B.Item("tags", B.Group(any: true, [.rule(B.Rule("", .is, ["x"])), .rule(B.Rule("", .is, ["y"]))])),
+             "tags: conditions on the item itself can't sit with conditions on its fields, in groups or under any"),
+            (B.Item("n", B.Group([.rule(B.Rule("", .hasValue)), .rule(B.Rule("", .isNot, ["2"]))])),
+             "n: two conditions on the item both use $ne: put them in two items"),
+        ]
+        for (item, message) in bad {
+            #expect { try item.clause() } throws: { ($0 as? BSONError)?.message == message }
+            #expect { try B.Group([.item(item)]).filter() } throws: { ($0 as? BSONError)?.message == message }
+        }
+        let text = [
+            "{ a: { $elemMatch: {} } }", "{ a: { $elemMatch: 1 } }", "{ a: { $elemMatch: { $gt: 1, b: 1 } } }",
+            "{ a: { $elemMatch: { b: 1 }, $size: 2 } }", #"{ a: { $elemMatch: { $regex: "x" } } }"#, "{ a: { $elemMatch: { $size: 2 } } }",
+            "{ a: { $elemMatch: { b: { c: 1 } } } }", "{ a: { $elemMatch: { $and: [ { $gt: 1 } ] } } }", "{ b: { $regex: /x/ } }",
+        ]
+        for filter in text { #expect(B.Group(filter: shell(filter)) == nil, "\(filter)") }
     }
 
     // MARK: Lists, projection, sort, collation, arrays

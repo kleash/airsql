@@ -104,13 +104,19 @@ never changes it.
   common values are offered, between takes two, is one of a comma list, true/false a pop-up. Dates are UTC; a day alone
   is the whole day, and the calendar button fills in today, the last 7 days or this month. **Ignore case** sits on the
   text operators. **+ Group** adds a group with its own all/any (parentheses in SQL), one level deep.
+- **+ Item** adds **an item of** an array field **where** all / any of its own rows are true: one item has to meet
+  them together (MongoDB's `$elemMatch`; in SQL, an `EXISTS` over the array's rows). Its rows name the item's fields
+  (`sku`, `qty` for `items.sku`, `items.qty`); a row whose field is left empty is on **the item itself**, for an array
+  of plain values (an item of `scores` at least 80 and less than 85). A filter with `$elemMatch` reads back as items.
 - A row that makes no condition says why under it, in red, and Run refuses until it's fixed. Under a row also: a date
   typed for a field the sample holds as text (it compares as text), and conditions on fields of one array
-  (`items.sku`, `items.qty`), which may each match a different item.
+  (`items.sku`, `items.qty`), which may each match a different item: put them in an item to have one item meet them
+  all. Under an item, what keeps it from being a condition: no array field, or a row on the item itself beside rows on
+  its fields (MongoDB can't ask both of one item).
 - **Show** ticks the fields to show (`SELECT`), **Sort by** rows (`ORDER BY`), **Skip** (`OFFSET`), **Limit**
   (`LIMIT`), and **Ignore case in comparisons and sorting** (a collation, strength 2). Under them is the query in shell
   form, one line you can select and copy, with Hint and Max Time when set in Shell.
-- A part the builder can't show (a `$where`, `$elemMatch`, an exclusion projection, another collation…) shows its text
+- A part the builder can't show (a `$where`, `$size`, an exclusion projection, another collation…) shows its text
   field in place of its controls, while the others stay as controls; fix or clear the text to build it here again.
 
 In the grid, a cell's menu has **Quick Filter**: is, is not, greater than, less than and contains, from the value as it

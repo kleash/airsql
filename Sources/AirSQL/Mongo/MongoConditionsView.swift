@@ -2,7 +2,8 @@ import AirSQLCore
 import AppKit
 
 /// The query builder's conditions (mongo-plan, Phase 5 A): "Find documents where all/any of these are true" (SQL's
-/// WHERE … AND/OR), a row per condition (field, operator, value), `+ Condition`, `+ Group` (one level). A plain view: set
+/// WHERE … AND/OR), a row per condition (field, operator, value), `+ Condition`, `+ Group` (one level), `+ Item` (one item
+/// of an array meeting its conditions together, `$elemMatch`). A plain view: set
 /// `group`, read it back after `onChange`; `schema` and `paths` give the fields, their types and values. The query bar
 /// and the stage builder's Filter card both use it. It grows downward, and scrolls past `maxHeight`.
 @MainActor
@@ -53,18 +54,36 @@ final class MongoConditionsView: NSView {
         get { top.group }
         set {
             top.set(newValue)
-            changed(notify: false)
+            fieldsChanged()
         }
     }
 
-    /// The first bad row's message ("age: ‘x’ isn't a number"); nil when every row makes a condition.
-    var problem: String? { allRows.lazy.compactMap(\.error).first }
+    /// The first bad row's message ("age: ‘x’ isn't a number"), else a bad item's; nil when all make conditions.
+    var problem: String? { allRows.lazy.compactMap(\.error).first ?? top.items.lazy.compactMap(\.error).first }
 
     var allRows: [ConditionRowView] { top.rows }
 
     /// `+ Condition`: a new empty row at the end of the top group, with the keyboard in its field.
     @discardableResult
     func addCondition() -> ConditionRowView { top.newRow() }
+
+    /// `+ Item`: a new item at the end of the top group.
+    @discardableResult
+    func addItem() -> ConditionGroupView { top.newItem() }
+
+    /// The field box's list for a row in the item(s) of `array` (`items`: their fields, `sku`), or of the whole document.
+    func fieldItems(under array: String?) -> [String] {
+        let paths = array.map { a in fieldPaths.compactMap { $0.hasPrefix(a + ".") ? String($0.dropFirst(a.count + 1)) : nil } } ?? fieldPaths
+        return paths.map { p in shares(array.map { $0 + "." + p } ?? p).map { p + Self.sharesMark + $0 } ?? p }
+    }
+
+    /// The sample's array fields, named from inside the item(s) of `array` when there is one.
+    func arrayPaths(under array: String?) -> [String] {
+        var seen = Set<String>()
+        let all = (schema?.fields ?? []).filter { $0.path.hasSuffix(".[]") }.map { MongoBuilder.queryPath(String($0.path.dropLast(3))) }
+        let paths = array.map { a in all.compactMap { $0.hasPrefix(a + ".") ? String($0.dropFirst(a.count + 1)) : nil } } ?? all
+        return paths.filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
 
     /// Every path the field boxes offer: the sample's as a query names them, then `paths`.
     var fieldPaths: [String] {
@@ -100,20 +119,22 @@ final class MongoConditionsView: NSView {
     }
 
     private func fieldsChanged() {
-        let items = fieldPaths.map { path in shares(path).map { path + Self.sharesMark + $0 } ?? path }
-        for row in allRows { row.offer(items) }
+        for row in allRows { row.offer(fieldItems(under: row.itemPrefix)) }
+        for item in top.items { item.offerArrays() }
         changed(notify: false)
     }
 
     /// Between a field's path and its shares in the field box's list.
     static let sharesMark = "  —  "
 
-    /// After an edit: the notes and messages under the rows, the height, then `onChange`.
+    /// After an edit: the notes and messages under the rows and items, the height, then `onChange`.
     func changed(notify: Bool = true) {
         let rows = allRows
         let arrays = (schema?.fields ?? []).map(\.path)
-        let shared = MongoBuilder.sharedArrays(paths: rows.map { $0.rule?.path ?? "" }, arrayPaths: arrays)
+        // Rows in an item match one item together already.
+        let shared = MongoBuilder.sharedArrays(paths: rows.map { $0.itemPrefix == nil ? $0.rule?.path ?? "" : "" }, arrayPaths: arrays)
         for (row, array) in zip(rows, shared) { row.updateMessage(sharedArray: row.rule == nil ? nil : array) }
+        for item in top.items.reversed() { item.updateMessage() }
         resize()
         if notify { onChange?() }
     }
@@ -126,29 +147,41 @@ final class MongoConditionsView: NSView {
 
 // MARK: A group
 
-/// The top group (level 0: "Find documents where …", `+ Condition`, `+ Group`) or one inside it (level 1: "all/any of
-/// these:", its rows, `+ Condition`, remove).
+/// The top group (level 0: "Find documents where …", `+ Condition`, `+ Group`, `+ Item`), a group inside it ("all/any
+/// of these:", its rows, `+ Condition`, remove), or an item ("An item of <array> where all/any of these:", `$elemMatch`).
 @MainActor
-final class ConditionGroupView: NSStackView {
+final class ConditionGroupView: NSStackView, NSComboBoxDelegate {
     let level: Int
+    /// An item of an array field (`MongoBuilder.Item`) rather than a group.
+    let isItem: Bool
     weak var owner: MongoConditionsView?
     let anyPopup: NSPopUpButton
+    /// An item's array field.
+    let arrayField = NSComboBox()
+    /// Under an item: what makes it no condition.
+    let message = label("", font: .systemFont(ofSize: 11), color: .statusBad, wraps: true)
+    private(set) var error: String?
     private let tail = label("", font: .systemFont(ofSize: 12), color: .secondaryLabelColor)
     private let body = NSStackView()
     private let addRule: NSButton
     private var addGroup: NSButton?
 
-    init(level: Int) {
+    init(level: Int, item: Bool = false) {
         self.level = level
-        anyPopup = popup(["all", "any"], selected: 0, id: "mongo.conditions.anyAll\(level == 0 ? "" : ".group")",
+        isItem = item
+        let kind = level == 0 ? "" : item ? ".item" : ".group", ids = "mongo.conditions" + kind
+        anyPopup = popup(["all", "any"], selected: 0, id: "mongo.conditions.anyAll" + kind,
                          tip: "Choose whether every condition must hold (all: AND) or one is enough (any: OR)", target: nil, action: nil)
         anyPopup.item(at: 0)?.toolTip = "Every condition must hold, as SQL's AND"
         anyPopup.item(at: 1)?.toolTip = "One condition is enough, as SQL's OR"
         anyPopup.controlSize = .small
         anyPopup.font = .systemFont(ofSize: 12)
-        anyPopup.setAccessibilityLabel(level == 0 ? "Find documents where all or any of the conditions are true" : "Group: all or any")
-        addRule = button("+ Condition", id: level == 0 ? "mongo.conditions.add" : "mongo.conditions.group.add",
-                         tip: level == 0 ? "Add a condition: a field, how it compares and a value" : "Add a condition to this group",
+        anyPopup.setAccessibilityLabel(level == 0 ? "Find documents where all or any of the conditions are true"
+                                       : item ? "Item: all or any" : "Group: all or any")
+        addRule = button("+ Condition", id: ids + ".add",
+                         tip: level == 0 ? "Add a condition: a field, how it compares and a value"
+                             : item ? "Add a condition on this item: one of its fields, or leave the field empty for the item itself"
+                             : "Add a condition to this group",
                          target: nil, action: nil)
         super.init(frame: .zero)
         orientation = .vertical
@@ -157,30 +190,48 @@ final class ConditionGroupView: NSStackView {
         translatesAutoresizingMaskIntoConstraints = false
         anyPopup.target = self
         anyPopup.action = #selector(anyChanged(_:))
-        for b in [addRule] { b.controlSize = .small; b.font = .systemFont(ofSize: 11.5); b.bezelStyle = .recessed }
+        let addItem = button("+ Item", id: ids + ".addItem",
+                             tip: "Add conditions that one item of an array must meet together ($elemMatch)", target: self, action: #selector(addItem(_:)))
         addRule.target = self
         addRule.action = #selector(addRule(_:))
         var header: [NSView] = []
+        if level == 0 || item {
+            addGroup = button("+ Group", id: ids + ".addGroup",
+                              tip: "Add a group of conditions with its own all or any, as parentheses in SQL", target: self, action: #selector(addGroup(_:)))
+        }
+        for b in [addRule, addItem] + (addGroup.map { [$0] } ?? []) {
+            b.controlSize = .small
+            b.font = .systemFont(ofSize: 11.5)
+            b.bezelStyle = .recessed
+        }
         if level == 0 {
             header = [label("Find documents where", font: .systemFont(ofSize: 12), color: .secondaryLabelColor), anyPopup, tail]
-            let group = button("+ Group", id: "mongo.conditions.addGroup",
-                               tip: "Add a group of conditions with its own all or any, as parentheses in SQL", target: self, action: #selector(addGroup(_:)))
-            group.controlSize = .small
-            group.font = .systemFont(ofSize: 11.5)
-            group.bezelStyle = .recessed
-            addGroup = group
         } else {
-            let remove = removeButton(tip: "Remove this group and its conditions", id: "mongo.conditions.group.remove")
+            let remove = removeButton(tip: item ? "Remove this item and its conditions" : "Remove this group and its conditions", id: ids + ".remove")
             remove.target = self
             remove.action = #selector(removeSelf(_:))
             header = [anyPopup, tail, remove]
+        }
+        if item {
+            arrayField.placeholderString = "array field"
+            arrayField.toolTip = "Type or choose the array field whose items the conditions are on (items, or tags for plain values)"
+            arrayField.setAccessibilityLabel("Array field")
+            arrayField.setAccessibilityIdentifier("mongo.conditions.item.array")
+            arrayField.completes = false
+            arrayField.delegate = self
+            arrayField.controlSize = .small
+            arrayField.font = .monospacedSystemFont(ofSize: 11.5, weight: .regular)
+            arrayField.translatesAutoresizingMaskIntoConstraints = false
+            arrayField.widthAnchor.constraint(equalToConstant: 150).isActive = true
+            header = [label("An item of", font: .systemFont(ofSize: 12), color: .secondaryLabelColor), arrayField,
+                      label("where", font: .systemFont(ofSize: 12), color: .secondaryLabelColor)] + header
         }
         let head = NSStackView(views: header)
         head.spacing = Spacing.half
         body.orientation = .vertical
         body.alignment = .leading
         body.spacing = 4
-        let foot = NSStackView(views: [addRule] + (addGroup.map { [$0] } ?? []))
+        let foot = NSStackView(views: [addRule] + (addGroup.map { [$0] } ?? []) + [addItem])
         foot.spacing = Spacing.half
         addArrangedSubview(head)
         addArrangedSubview(body)
@@ -192,7 +243,15 @@ final class ConditionGroupView: NSStackView {
             layer?.borderWidth = 1
             setAccessibilityElement(true)
             setAccessibilityRole(.group)
-            setAccessibilityLabel("Group of conditions")
+            setAccessibilityLabel(item ? "Item of an array" : "Group of conditions")
+            setAccessibilityIdentifier(item ? "mongo.conditions.item" : "mongo.conditions.group")
+        }
+        if item {
+            message.isSelectable = true
+            message.preferredMaxLayoutWidth = 640
+            message.isHidden = true
+            message.setAccessibilityIdentifier("mongo.conditions.item.message")
+            addArrangedSubview(message)
         }
         updateTail()
     }
@@ -213,8 +272,11 @@ final class ConditionGroupView: NSStackView {
 
     private func updateTail() {
         tail.stringValue = level == 0 ? (isAny ? "of these are true   (SQL: WHERE … OR …)" : "of these are true   (SQL: WHERE … AND …)")
+            : isItem ? (isAny ? "of these hold for that one item   (OR)" : "of these hold for that one item   (AND)")
             : (isAny ? "of these   (OR)" : "of these   (AND)")
     }
+
+    var arrayPath: String { arrayField.stringValue.trimmingCharacters(in: .whitespaces) }
 
     /// Its rows, a group's rows after it in order.
     var rows: [ConditionRowView] {
@@ -224,12 +286,19 @@ final class ConditionGroupView: NSStackView {
         }
     }
 
+    /// The items inside it, each before the items inside that one.
+    var items: [ConditionGroupView] {
+        body.arrangedSubviews.compactMap { $0 as? ConditionGroupView }.flatMap { ($0.isItem ? [$0] : []) + $0.items }
+    }
+
     var group: MongoBuilder.Group {
         MongoBuilder.Group(any: isAny, body.arrangedSubviews.compactMap { view in
             if let row = view as? ConditionRowView { return row.rule.map(MongoBuilder.Condition.rule) }
-            return (view as? ConditionGroupView).map { .group($0.group) }
+            return (view as? ConditionGroupView)?.condition
         })
     }
+
+    var condition: MongoBuilder.Condition { isItem ? .item(MongoBuilder.Item(arrayPath, group)) : .group(group) }
 
     func set(_ group: MongoBuilder.Group) {
         anyPopup.selectItem(at: group.any ? 1 : 0)
@@ -238,13 +307,20 @@ final class ConditionGroupView: NSStackView {
         for child in group.children {
             switch child {
             case .rule(let rule): append(row(rule))
-            case .group(let inner):
-                let view = ConditionGroupView(level: level + 1)
-                view.owner = owner
-                view.set(inner)
+            case .group(let inner): append(nested(inner))
+            case .item(let item):
+                let view = nested(item.group, item: true)
+                view.arrayField.stringValue = item.path
                 append(view)
             }
         }
+    }
+
+    private func nested(_ group: MongoBuilder.Group, item: Bool = false) -> ConditionGroupView {
+        let view = ConditionGroupView(level: level + 1, item: item)
+        view.owner = owner
+        view.set(group)
+        return view
     }
 
     private func row(_ rule: MongoBuilder.Rule?) -> ConditionRowView {
@@ -258,6 +334,16 @@ final class ConditionGroupView: NSStackView {
         if view is ConditionGroupView { view.widthAnchor.constraint(greaterThanOrEqualToConstant: 200).isActive = true }
     }
 
+    /// An item's conditions: what it says under it when its rows are good but it makes no condition.
+    func updateMessage() {
+        error = nil
+        if rows.allSatisfy({ $0.error == nil }), items.allSatisfy({ $0.error == nil }) {
+            do { _ = try MongoBuilder.Item(arrayPath, group).clause() } catch { self.error = (error as? BSONError)?.message ?? "\(error)" }
+        }
+        message.stringValue = error ?? ""
+        message.isHidden = error == nil
+    }
+
     @objc private func anyChanged(_ sender: Any?) {
         updateTail()
         owner?.changed()
@@ -269,23 +355,60 @@ final class ConditionGroupView: NSStackView {
     func newRow() -> ConditionRowView {
         let row = row(nil)
         append(row)
+        owner.map { row.offer($0.fieldItems(under: row.itemPrefix)) }
+        row.followSample()
         owner?.changed(notify: false)
         window?.makeFirstResponder(row.field)
         return row
     }
 
     @objc func addGroup(_ sender: Any?) {
-        let view = ConditionGroupView(level: level + 1)
-        view.owner = owner
-        view.set(MongoBuilder.Group(any: true))
+        let view = nested(MongoBuilder.Group(any: !isAny))
         append(view)
         view.addRule(nil)
+    }
+
+    @objc func addItem(_ sender: Any?) { newItem() }
+
+    /// `+ Item`: an item with one empty row, the keyboard in its array field.
+    @discardableResult
+    func newItem() -> ConditionGroupView {
+        let view = nested(MongoBuilder.Group(), item: true)
+        append(view)
+        view.offerArrays()
+        view.newRow()
+        window?.makeFirstResponder(view.arrayField)
+        return view
+    }
+
+    /// An item's array box: the sample's arrays, named from the item it is in.
+    func offerArrays() {
+        guard isItem, let owner else { return }
+        arrayField.removeAllItems()
+        arrayField.addItems(withObjectValues: owner.arrayPaths(under: ConditionRowView.prefix(above: superview)))
     }
 
     @objc private func removeSelf(_ sender: Any?) {
         let owner = owner
         removeFromSuperview()
         owner?.changed()
+    }
+
+    // MARK: The array field
+
+    private func arrayChanged() {
+        for row in rows {
+            owner.map { row.offer($0.fieldItems(under: row.itemPrefix)) }
+            row.followSample()
+        }
+        owner?.changed()
+    }
+
+    func controlTextDidChange(_ notification: Notification) { arrayChanged() }
+
+    func comboBoxSelectionDidChange(_ notification: Notification) {
+        // The box takes the chosen item's text after this.
+        DispatchQueue.main.async { [weak self] in self?.arrayChanged() }
     }
 }
 
@@ -395,9 +518,24 @@ final class ConditionRowView: NSStackView, NSComboBoxDelegate {
 
     private var path: String { field.stringValue.trimmingCharacters(in: .whitespaces) }
 
-    /// The row's condition; nil while it has no field.
+    /// The array paths of the items the row is in, outermost first (`orders.items`); nil outside any item.
+    var itemPrefix: String? { Self.prefix(above: superview) }
+
+    static func prefix(above view: NSView?) -> String? {
+        var paths: [String] = [], view = view
+        while let each = view, !(each is MongoConditionsView) {
+            if let item = each as? ConditionGroupView, item.isItem { paths.insert(item.arrayPath, at: 0) }
+            view = each.superview
+        }
+        return paths.isEmpty ? nil : paths.filter { !$0.isEmpty }.joined(separator: ".")
+    }
+
+    /// The path as the sample names it: in an item, under its array (no field: the array's items themselves).
+    private var fullPath: String { [itemPrefix ?? "", path].filter { !$0.isEmpty }.joined(separator: ".") }
+
+    /// The row's condition; nil while it has no field (in an item, no field is the item's own value).
     var rule: MongoBuilder.Rule? {
-        guard !path.isEmpty, ops.indices.contains(opPopup.indexOfSelectedItem) else { return nil }
+        guard !path.isEmpty || itemPrefix != nil, ops.indices.contains(opPopup.indexOfSelectedItem) else { return nil }
         let op = ops[opPopup.indexOfSelectedItem]
         let texts: [String]
         switch op.arity {
@@ -426,6 +564,8 @@ final class ConditionRowView: NSStackView, NSComboBoxDelegate {
 
     /// The field box's list: paths, each with its shares.
     func offer(_ items: [String]) {
+        field.placeholderString = itemPrefix == nil ? "field" : "the item itself"
+        updateFieldTip()
         field.removeAllItems()
         field.addItems(withObjectValues: items)
         for box in boxes { (box as? NSComboBox).map(fillValues) }
@@ -526,16 +666,20 @@ final class ConditionRowView: NSStackView, NSComboBoxDelegate {
 
     private func fillValues(_ combo: NSComboBox) {
         combo.removeAllItems()
-        combo.addItems(withObjectValues: Array((owner?.topValues(path) ?? []).prefix(15)))
+        combo.addItems(withObjectValues: Array((owner?.topValues(fullPath) ?? []).prefix(15)))
     }
 
     private func updateFieldTip() {
-        guard let shares = owner?.shares(path) else {
-            field.toolTip = path.isEmpty ? "Type or choose the field: dotted for a sub-document's (address.city) or an array's items (items.sku)"
-                : "\(path) isn't in the sample: choose the type its value is read as"
+        if path.isEmpty, itemPrefix != nil {
+            field.toolTip = "Type or choose a field of the item (sku), or leave it empty for the item's own value (an array of plain values)"
             return
         }
-        field.toolTip = "\(path) in the sample: \(shares)"
+        guard let shares = owner?.shares(fullPath) else {
+            field.toolTip = path.isEmpty ? "Type or choose the field: dotted for a sub-document's (address.city) or an array's items (items.sku)"
+                : "\(fullPath) isn't in the sample: choose the type its value is read as"
+            return
+        }
+        field.toolTip = "\(fullPath) in the sample: \(shares)"
     }
 
     // MARK: Messages
@@ -546,13 +690,14 @@ final class ConditionRowView: NSStackView, NSComboBoxDelegate {
         error = nil
         var notes: [String] = []
         if let rule {
-            do { _ = try rule.clause() } catch { self.error = (error as? BSONError)?.message ?? "\(error)" }
-            if type == .text, owner?.sampleType(rule.path) == .text, owner?.field(rule.path) != nil,
+            do { _ = try rule.path.isEmpty ? rule.itemCondition() : rule.clause() } catch { self.error = (error as? BSONError)?.message ?? "\(error)" }
+            if type == .text, owner?.sampleType(fullPath) == .text, owner?.field(fullPath) != nil,
                rule.values.contains(where: { $0.range(of: #"^\d{4}-\d{2}-\d{2}"#, options: .regularExpression) != nil }) {
-                notes.append("\(rule.path) holds text in the sample, so this compares the date as text, not as a date")
+                notes.append("\(fullPath) holds text in the sample, so this compares the date as text, not as a date")
             }
             if let sharedArray {
-                notes.append("Conditions on fields of the array \(sharedArray) may each match a different item of it")
+                notes.append("Conditions on fields of the array \(sharedArray) may each match a different item of it: "
+                             + "+ Item makes one item meet them all")
             }
         }
         message.stringValue = error ?? notes.joined(separator: " · ")
@@ -595,11 +740,16 @@ final class ConditionRowView: NSStackView, NSComboBoxDelegate {
         if let mark = field.stringValue.range(of: MongoConditionsView.sharesMark) {
             field.stringValue = String(field.stringValue[..<mark.lowerBound])
         }
-        let type = owner?.sampleType(path) ?? .text
-        if type != self.type, owner?.field(path) != nil { setType(type, keeping: nil) }
-        for box in boxes { (box as? NSComboBox).map(fillValues) }
+        followSample()
         updateFieldTip()
         edited(nil)
+    }
+
+    /// The type and values of the sample's field (in an item with no field: its array's items).
+    func followSample() {
+        let type = owner?.sampleType(fullPath) ?? .text
+        if type != self.type, owner?.field(fullPath) != nil { setType(type, keeping: nil) }
+        for box in boxes { (box as? NSComboBox).map(fillValues) }
     }
 
     func controlTextDidChange(_ notification: Notification) {

@@ -108,6 +108,60 @@ struct MongoQueryBuilderTests {
         #expect(MongoBuilder.ignoresCase(try BSONDocument(shellForm: bar.collation.stringValue)) == true)
     }
 
+    /// `+ Item` through its controls: one item of `items` with two fields, the items of `scores` themselves, the note on
+    /// rows of one array pointing to it, a mix it can't write refused, and the filter read back as the items.
+    @Test @MainActor func anItemOfAnArrayIsBuiltThroughItsControlsAndReadBack() throws {
+        let schema = MongoSchema(sample: [try BSONDocument(shellForm: #"{ items: [ { sku: "A1", qty: 2 } ], scores: [ 80, 90 ], name: "a" }"#)])
+        let loose = MongoQueryBar()
+        loose.use(schema, paths: [])
+        fill(loose.conditions.addCondition(), "items.sku", .is, ["A1"])
+        fill(loose.conditions.addCondition(), "items.qty", .greater, ["2"])
+        #expect(loose.conditions.allRows[1].message.stringValue.hasSuffix("+ Item makes one item meet them all"),
+                "\(loose.conditions.allRows[1].message.stringValue)")
+
+        let bar = MongoQueryBar()
+        bar.collection = "orders"
+        bar.use(schema, paths: [])
+        let item = bar.conditions.addItem()
+        #expect(item.arrayField.objectValues as? [String] == ["items", "scores"])
+        func choose(_ array: String, _ view: ConditionGroupView) {
+            view.arrayField.stringValue = array
+            view.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: view.arrayField))
+        }
+        choose("items", item)
+        let first = try #require(item.rows.first)
+        #expect(first.field.placeholderString == "the item itself" && first.itemPrefix == "items")
+        #expect((first.field.objectValues as? [String])?.map { $0.components(separatedBy: MongoConditionsView.sharesMark)[0] } == ["sku", "qty"])
+        fill(first, "sku", .is, ["A1"])
+        item.addRule(nil)
+        fill(item.rows[1], "qty", .greater, ["2"])
+        #expect(item.rows[1].type == .number && item.rows[1].message.isHidden, "the sample's type of items.qty, and no note: one item")
+        #expect(bar.filter.stringValue == #"{ items: { $elemMatch: { sku: "A1", qty: { $gt: 2 } } } }"#, "\(bar.filter.stringValue)")
+
+        // The items of an array of plain values: no field is the item itself, typed as the sample's items are.
+        let scores = bar.conditions.addItem()
+        choose("scores", scores)
+        let value = try #require(scores.rows.first)
+        #expect(value.type == .number && value.rule?.path == "")
+        #expect(bar.builderProblem == "the item: Type a value", "\(bar.builderProblem ?? "")")
+        fill(value, "", .between, ["80", "85"])
+        let text = #"{ items: { $elemMatch: { sku: "A1", qty: { $gt: 2 } } }, scores: { $elemMatch: { $gte: 80, $lte: 85 } } }"#
+        #expect(bar.filter.stringValue == text, "\(bar.filter.stringValue)")
+        let group = bar.conditions.group
+
+        // A field beside the item's own value can't be written: the item says so, Run refuses, the text stays.
+        scores.addRule(nil)
+        fill(scores.rows[1], "name", .is, ["1"])
+        #expect(bar.builderProblem == "scores: conditions on the item itself can't sit with conditions on its fields, in groups or under any")
+        #expect(!scores.message.isHidden && scores.message.stringValue == bar.builderProblem && bar.filter.stringValue == text)
+
+        // Read back from the text: the items, not a text field.
+        bar.query = MongoQueryText(filter: text)
+        bar.readText(force: true)
+        #expect(!bar.asText.contains("Filter") && bar.conditions.group == group, "\(bar.conditions.group)")
+        #expect(bar.conditions.allRows.map(\.itemPrefix) == ["items", "items", "scores"] && scores.superview == nil)
+    }
+
     @Test @MainActor func quickFilterOffersClausesFromTheValueAndAddsToTheFilter() throws {
         let text = MongoCollectionController.quickFilters(path: "country", value: .string("DE"))
         #expect(text.map(\.title) == ["is", "is not", "greater than", "less than", "contains"])

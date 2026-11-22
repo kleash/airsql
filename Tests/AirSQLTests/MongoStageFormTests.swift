@@ -50,7 +50,7 @@ struct MongoStageFormTests {
 
     @Test func stagesNoCardShowsExactlyAreShellCards() {
         let shells = [
-            #"{ $match: { a: { $elemMatch: { b: 1 } } } }"#, #"{ $lookup: { from: "c", pipeline: [], as: "x" } }"#,
+            #"{ $match: { a: { $elemMatch: {} } } }"#, #"{ $lookup: { from: "c", pipeline: [], as: "x" } }"#,
             #"{ $lookup: { from: "c", localField: "a", foreignField: "b", as: "x", let: {} } }"#,
             #"{ $group: { _id: "$a", count: { $sum: 2 } } }"#, #"{ $group: { _id: "$a", "a.b": { $sum: "$t" } } }"#,
             #"{ $group: { _id: { k: "$a" } } }"#, #"{ $group: { _id: "$$ROOT" } }"#, #"{ $group: { _id: "$a", n: { $count: {} } } }"#,
