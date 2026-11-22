@@ -331,6 +331,79 @@ struct MongoSQLLabTests {
 
     static func cents(_ value: Any?) -> Int? { (value as? NSNumber).map { Int(($0.doubleValue * 100).rounded()) } }
 
+    /// What the builders' newer parts write, run on the server and checked against the same question answered here from
+    /// the documents themselves: an item of an array (`$elemMatch`), groups inside groups, and the Skip, Count and Add
+    /// field cards.
+    @Test func itemsNestedGroupsAndTheNewCardsGiveWhatTheDocumentsSay() async throws {
+        let target = try await AgentMongoLabTests.target(.standalone)
+        let mongo = try #require(target.mongo)
+        defer { Task { await mongo.close() } }
+        let session = try await mongo.session(.data)
+        func aggregate(_ pipeline: [BSONDocument]) async throws -> [BSONDocument] {
+            try await session.all(session.aggregate(database: "shop", collection: "orders", pipeline: pipeline))
+        }
+        let sorted = try BSONDocument(shellForm: "{ $sort: { _id: 1 } }")
+        let orders = try await aggregate([sorted])
+        #expect(orders.count > 100)
+        func text(_ value: BSONValue?) -> String? { if case .string(let s)? = value { return s } else { return nil } }
+        func items(_ order: BSONDocument) -> [BSONDocument] {
+            guard case .array(let list)? = order["items"] else { return [] }
+            return list.compactMap { if case .document(let d) = $0 { return d } else { return nil } }
+        }
+        func ids(_ documents: [BSONDocument]) -> [BSONValue?] { documents.map { $0["_id"] } }
+        func found(_ group: MongoBuilder.Group) async throws -> [BSONValue?] {
+            ids(try await aggregate([BSONDocument([("$match", .document(try group.filter()))]), sorted]))
+        }
+        typealias Rule = MongoBuilder.Rule
+
+        // One item with this sku AND two or more of it: fewer orders than "some item has the sku, some item has two".
+        let sku = try #require(orders.lazy.flatMap(items).compactMap { text($0["sku"]) }.first)
+        let item = MongoBuilder.Item("items", MongoBuilder.Group([.rule(Rule("sku", .is, [sku])), .rule(Rule("qty", .atLeast, ["2"], type: .number))]))
+        let sameItem = orders.filter { items($0).contains { text($0["sku"]) == sku && (Self.number($0["qty"]) ?? 0) >= 2 } }
+        let itemFound = try await found(MongoBuilder.Group([.item(item)]))
+        #expect(!sameItem.isEmpty && itemFound == ids(sameItem))
+        let anyItem = orders.filter { order in
+            items(order).contains { text($0["sku"]) == sku } && items(order).contains { (Self.number($0["qty"]) ?? 0) >= 2 }
+        }
+        let rows = MongoBuilder.Group([.rule(Rule("items.sku", .is, [sku])), .rule(Rule("items.qty", .atLeast, ["2"], type: .number))])
+        let rowsFound = try await found(rows)
+        #expect(anyItem.count > sameItem.count && rowsFound == ids(anyItem))
+
+        // Three levels: paid, or (shipped and (total over 200, or (total under 20 and that item))).
+        let nested = MongoBuilder.Group(any: true, [
+            .rule(Rule("status", .is, ["paid"])),
+            .group(MongoBuilder.Group([
+                .rule(Rule("status", .is, ["shipped"])),
+                .group(MongoBuilder.Group(any: true, [
+                    .rule(Rule("total", .greater, ["200"], type: .number)),
+                    .group(MongoBuilder.Group([.rule(Rule("total", .less, ["20"], type: .number)), .item(item)])),
+                ])),
+            ])),
+        ])
+        let nestedHere = orders.filter { order in
+            let status = text(order["status"]), total = Self.number(order["total"]) ?? 0
+            return status == "paid" || (status == "shipped" && (total > 200 || (total < 20 && sameItem.contains { $0["_id"] == order["_id"] })))
+        }
+        let nestedFound = try await found(nested)
+        #expect(!nestedHere.isEmpty && nestedHere.count < orders.count && nestedFound == ids(nestedHere))
+        // Read back from its text, it is the same filter.
+        let back = try #require(MongoBuilder.Group(filter: try BSONDocument(shellForm: nested.filter().shellForm())))
+        let backFound = try await found(back)
+        #expect(backFound == ids(nestedHere))
+
+        // Skip, Add field and Count.
+        let double = MongoStageForm.addField(.init(name: "twice", left: "total", .multiply, right: "2"))
+        let page = try await aggregate([sorted, try MongoStageForm.skip(5).stage(), try MongoStageForm.limit(10).stage(), try double.stage()])
+        #expect(ids(page) == Array(ids(orders)[5..<15]))
+        func cents(_ number: Double?) -> Int? { number.map { Int(($0 * 100).rounded()) } }
+        #expect(page.map { cents(Self.number($0["twice"])) } == orders[5..<15].map { cents(Self.number($0["total"]).map { $0 * 2 }) })
+        let label = MongoStageForm.addField(.init(name: "label", left: "status", .concat, right: "\" order\""))
+        let labelled = try await aggregate([sorted, try MongoStageForm.limit(3).stage(), try label.stage()])
+        #expect(labelled.map { text($0["label"]) } == orders.prefix(3).map { (text($0["status"]) ?? "") + " order" })
+        let counted = try await aggregate([BSONDocument([("$match", .document(try nested.filter()))]), try MongoStageForm.count("orders").stage()])
+        #expect(counted.count == 1 && Self.number(counted[0]["orders"]) == Double(nestedHere.count))
+    }
+
     @Test(arguments: AgentMongoLabTests.Server.allCases)
     func shopQuestionsInSQLGiveTheOraclesAnswers(_ server: AgentMongoLabTests.Server) async throws {
         let target = try await AgentMongoLabTests.target(server)
