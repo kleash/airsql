@@ -98,6 +98,8 @@ final class ConsoleViewController: NSViewController, TabContent {
     /// A session that ended unasked, until the person answers; then what its replacement takes over from it.
     var lostSession: LostSession?
     var carried: LostSession?
+    /// A Run waits for its connection to connect (`connectFirst`): another Run meanwhile is one too many.
+    var connectingToRun = false
     /// The next run keeps the result tabs (Keep Results).
     var keepsResults = false
     /// Run Result Again every so often: the seconds (0: off), the timer and the tab it reruns.

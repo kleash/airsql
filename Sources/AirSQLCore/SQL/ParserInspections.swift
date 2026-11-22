@@ -151,7 +151,7 @@ public enum SQLInspections {
             names()
             references()
             for statement in analysis.statements {
-                if let error = statement.errors.first { syntax(error) }
+                if let error = statement.errors.first { syntax(error, in: statement) }
                 // What follows a syntax error isn't what was meant, so nothing else is said of the statement.
                 if statement.errors.isEmpty, !statement.shallow || statement.kind == .create { check(statement) }
                 if readOnly, StatementCheck.writes(string(statement.range), noBackslashEscapes: noBackslashEscapes) {
@@ -167,11 +167,16 @@ public enum SQLInspections {
             return start..<max(end, min(start + 1, statement.range.upperBound))
         }
 
-        mutating func syntax(_ error: SQLSyntaxError) {
+        mutating func syntax(_ error: SQLSyntaxError, in statement: SQLParsedStatement) {
             var fixes: [SQLFix] = []
             let word = string(error.range)
             if SQLWords.reserved.contains(word.uppercased()), error.message.contains("name") || error.message.contains("value") {
                 fixes.append(SQLFix("Quote “\(word)” as a Name", .edit([SQLEdit(range: error.range, text: SQLQuote.identifier(word))])))
+            }
+            // A query run on into the next (`Parser.read`): its range ends at its last token, before the space between them.
+            if error.message.hasPrefix("Expected ; before ") {
+                let end = statement.range.upperBound
+                fixes.append(SQLFix("Add ; before \(word)", .edit([SQLEdit(range: end..<end, text: ";")])))
             }
             say("syntax", error.range, error.message, fixes: fixes)
         }

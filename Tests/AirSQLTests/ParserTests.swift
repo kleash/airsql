@@ -543,6 +543,12 @@ import Testing
         #expect(fixed("SELECT * FROM order", "Quote “order” as a Name") == "SELECT * FROM `order`")
     }
 
+    /// Two queries with no ; between them: the fix ends the first one's text with it, before the space between them.
+    @Test func aMissingSemicolonGetsAFix() {
+        #expect(fixed("SELECT id FROM orders  \n\nselect total FROM orders", "Add ; before select")
+                == "SELECT id FROM orders;  \n\nselect total FROM orders")
+    }
+
     @Test func didYouMean() {
         #expect(fixed("SELECT totl FROM orders", "Change to “total”") == "SELECT total FROM orders")
         #expect(fixed("SELECT * FROM order_s", "Change to “orders”") == "SELECT * FROM orders")

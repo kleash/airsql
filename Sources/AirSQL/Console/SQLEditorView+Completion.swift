@@ -21,9 +21,19 @@ extension SQLEditorView {
         // One character typed: a letter, digit, _, a dot, @ or * opens or narrows the list; anything else closes it.
         if typed.count == 1, let unit = typed.utf16.first, [0x2E, 0x40, 0x2A].contains(unit) || SQLLexer.isNameChar(unit) || popupOpenInString {
             updateCompletion(force: false)
+        } else if typed == " ", otherLanguage == nil, completesWhileTyping, followsTableKeyword(selectedRange().location - 1) {
+            updateCompletion(force: true)  // the tables, before a letter of their name is typed
         } else {
             completionPopup?.close()
         }
+    }
+
+    /// FROM, JOIN, INTO, UPDATE or TABLE ends at `end` as a keyword: a word of the SQL, not in a string or comment, not after a dot.
+    private func followsTableKeyword(_ end: Int) -> Bool {
+        guard let word = tokens.last(where: { $0.range.upperBound == end }), word.kind == .word, word.range.lowerBound == 0
+                || (string as NSString).character(at: word.range.lowerBound - 1) != 0x2E else { return false }
+        let text = (string as NSString).substring(with: NSRange(word.range)).uppercased()
+        return ["FROM", "JOIN", "INTO", "UPDATE", "TABLE"].contains(text)
     }
 
     /// What a typed opener closes with.

@@ -120,6 +120,11 @@ final class FindBar: NSView, NSSearchFieldDelegate, NSTextFieldDelegate {
     }
 
     func show(replace: Bool) {
+        // Text selected within a line is what to find, as ⌘E makes it; over several lines it's what In Selection searches.
+        if let editor, window?.firstResponder === editor, editor.selectedRange().length > 0,
+           !(editor.string as NSString).substring(with: editor.selectedRange()).contains(where: \.isNewline) {
+            perform(.setSearchString)
+        }
         replaceRow.isHidden = !replace
         if isHidden {
             isHidden = false

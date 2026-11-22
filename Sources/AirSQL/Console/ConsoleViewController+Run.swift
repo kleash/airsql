@@ -105,6 +105,9 @@ extension ConsoleViewController {
     private func withParameters(_ statements: [SQLStatement], then run: @escaping ([SQLStatement]) -> Void) {
         noticeLostSession()
         if let lostSession { return askAboutLostSession(lostSession) }  // before any other question about statements that won't run
+        if let id = connectionID, connection != nil, Self.openConnection(id) == nil {
+            return connectFirst(id) { [weak self] in self?.withParameters(statements, then: run) }
+        }
         // A tab's first run has no session yet: the server's sql_mode, for the values and for the checks after them.
         if let known = session?.noBackslashEscapes ?? model.openConnection(connectionID)?.snapshot.server?.noBackslashEscapes {
             editor.noBackslashEscapes = known
@@ -136,6 +139,25 @@ extension ConsoleViewController {
                 bound.sql = QueryParameters.bind(statement.sql, places, values: self.parameterValues, noBackslashEscapes: noBackslashEscapes)
                 return bound
             })
+        }
+    }
+
+    /// Run on a tab whose connection isn't connected (after a relaunch, or a Disconnect) connects it first, its prompts on
+    /// this window, then goes on as if it had been. If the connect fails or is cancelled nothing runs: the connector says why.
+    private func connectFirst(_ id: UUID, then go: @escaping () -> Void) {
+        // The gate (plan §2.8): an agent's Run on a tab that isn't connected is refused, as it always was.
+        guard !AgentGuard.refuses("Connect first: double-click “\(connection?.displayName ?? "the connection")” in the sidebar") else { return }
+        guard !connectingToRun else { return NSSound.beep() }
+        connectingToRun = true
+        let before = text
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.connectingToRun = false }
+            do { _ = try await self.model.connector.connection(id, on: self.view.window) } catch { return }
+            guard self.connectionID == id, Self.openConnection(id) != nil else { return }
+            // The statements were chosen in the text as it was: changed meanwhile, they may no longer be what was asked for.
+            guard self.text == before else { return self.note(.info, "The text changed while AirSQL connected: nothing ran. Run it again.") }
+            go()
         }
     }
 
