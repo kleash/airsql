@@ -335,6 +335,38 @@ extension AppTests {
             GridCopy.format = .tsv
         }
 
+        /// Export Rows opens with the choices of the last Copy or Export, but which rows; at first, CSV with headers.
+        @Test func exportRowsOpensWithTheLastChoices() async throws {
+            UserDefaults.standard.removeObject(forKey: ExportRowsSheet.choicesKey)
+            defer { UserDefaults.standard.removeObject(forKey: ExportRowsSheet.choicesKey) }
+            let (main, harness, tab) = try await Self.tab()
+            func sheet() async throws -> NSView {
+                tab.exportRows(nil)
+                _ = await call(harness, "wait", ["until": "sheet", "timeout": 10])
+                return try #require(main.window?.attachedSheet?.contentView)
+            }
+            func popup(_ id: String, _ view: NSView) -> String? { find(NSPopUpButton.self, id: id, in: view)?.titleOfSelectedItem }
+            func box(_ id: String, _ view: NSView) -> Bool? { find(NSButton.self, id: id, in: view).map { $0.state == .on } }
+            tab.grid.selection.select(GridPosition(row: 0, column: 0))
+            var view = try await sheet()
+            #expect(popup("export.format", view) == "CSV" && popup("export.separator", view) == "Comma" && box("export.headers", view) == true)
+            let rows = try #require(find(NSPopUpButton.self, id: "export.rows", in: view)), first = rows.titleOfSelectedItem
+            rows.selectItem(at: rows.indexOfSelectedItem == 0 ? 1 : 0)
+            for (id, value) in [("export.separator", "Semicolon"), ("export.null", "Empty"), ("export.quote", "Single quotes"),
+                                ("export.encoding", "UTF-8 with BOM")] {
+                #expect(await call(harness, "set", ["id": id, "value": value, "in": "sheet"]).error == nil, "\(id)")
+            }
+            _ = await call(harness, "press", ["id": "export.headers", "in": "sheet"])
+            _ = await call(harness, "press", ["id": "export.crlf", "in": "sheet"])
+            _ = await call(harness, "press", ["id": "export.copy"])
+            #expect(NSPasteboard.general.string(forType: .string)?.hasPrefix("1;7;EU;100;12.50;\r\n") == true)
+            view = try await sheet()
+            #expect(popup("export.separator", view) == "Semicolon" && popup("export.null", view) == "Empty" && popup("export.quote", view) == "Single quotes")
+            #expect(popup("export.encoding", view) == "UTF-8 with BOM" && box("export.headers", view) == false && box("export.crlf", view) == true)
+            #expect(popup("export.rows", view) == first)
+            _ = await call(harness, "press", ["id": "export.cancel"])
+        }
+
         @Test func exportsRowsToTheClipboardOrAFile() async throws {
             let (main, harness, tab) = try await Self.tab()
             tab.exportRows(nil)

@@ -1341,6 +1341,7 @@ These work in a query's results too.
   (`NULL`, `\N` or nothing), CSV's separator (any text) and quotes, Windows line endings, the file's encoding (UTF-8, with
   or without a BOM, UTF-16, Windows-1252 and others; characters it lacks are replaced, and you're told), whether line breaks
   inside values become spaces and whether the file opens afterwards, then **Export…** to a file or **Copy** to the clipboard.
+  The sheet opens next time with these choices again; which rows, you choose each time.
   In a workbook, exact numbers over 15 digits (a 20-digit id, a long DECIMAL) go as text, as Excel would round them,
   and a value over Excel's 32,767 characters a cell is cut: AirSQL says how many were, and CSV keeps them whole.
   Hidden columns aren't exported, and the sheet says how many are left out. SQL formats leave out generated columns.
