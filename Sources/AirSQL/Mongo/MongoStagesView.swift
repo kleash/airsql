@@ -9,7 +9,7 @@ import AppKit
 final class MongoStagesView: NSView {
     /// The kinds a card can be, in the `+ Stage` menu's order (Join first: what SQL people miss most).
     enum Kind: Int, CaseIterable {
-        case join, filter, group, sort, show, limit, unwind, shell
+        case join, filter, group, sort, show, addField, limit, skip, count, unwind, shell
 
         var title: String {
             switch self {
@@ -19,6 +19,9 @@ final class MongoStagesView: NSView {
             case .sort: return "Sort — ORDER BY"
             case .show: return "Show fields — SELECT"
             case .limit: return "Limit — LIMIT"
+            case .skip: return "Skip — OFFSET"
+            case .count: return "Count — COUNT(*)"
+            case .addField: return "Add field — SELECT a + b AS c"
             case .unwind: return "Unwind"
             case .shell: return "Shell"
             }
@@ -32,6 +35,9 @@ final class MongoStagesView: NSView {
             case .sort: return "Put the documents in order by fields ($sort)"
             case .show: return "Keep only the ticked fields ($project)"
             case .limit: return "Keep only the first documents ($limit)"
+            case .skip: return "Leave out the first documents ($skip)"
+            case .count: return "Give one document holding how many documents there are ($count)"
+            case .addField: return "Add a field worked out of two fields or numbers, or joined text ($addFields)"
             case .unwind: return "Make one document per item of an array field ($unwind)"
             case .shell: return "Type the stage in shell form, for any stage the cards don't cover"
             }
@@ -45,6 +51,9 @@ final class MongoStagesView: NSView {
             case .sort: self = .sort
             case .show: self = .show
             case .limit: self = .limit
+            case .skip: self = .skip
+            case .count: self = .count
+            case .addField: self = .addField
             case .unwind: self = .unwind
             case .shell: self = .shell
             }
@@ -426,6 +435,9 @@ final class MongoStagesView: NSView {
             if let path = fields.first { return try MongoStageForm.show(.init(paths: [path])).stage() }
             return BSONDocument([("$project", .document(BSONDocument([("_id", .int32(1))])))])
         case .limit: return try MongoStageForm.limit(10).stage()
+        case .skip: return try MongoStageForm.skip(10).stage()
+        case .count: return try MongoStageForm.count("count").stage()
+        case .addField: return try MongoStageForm.addField(.init(name: "new_field", left: fields.first ?? "_id", .add, right: "1")).stage()
         case .unwind:
             let arrays = (fieldsBefore[safe: index] ?? []).filter { $0.hasSuffix(".[]") }.map { MongoBuilder.queryPath($0) }
             return try MongoStageForm.unwind(.init(path: arrays.first ?? fields.first ?? "_id")).stage()
@@ -732,6 +744,42 @@ final class MongoStagesView: NSView {
                     let number = Int64(value.trimmingCharacters(in: .whitespaces)) ?? 0
                     self.view.commit(self.index, .limit(number))
                 }, word("documents")]))
+            case .skip(let n):
+                body.addArrangedSubview(row([word("Skip the first"), field(String(n), id: id + ".skip", label: "Skip",
+                                                                           tip: "Type how many documents to leave out (OFFSET)", width: 90) { [weak self] value in
+                    guard let self else { return }
+                    self.view.commit(self.index, .skip(Int64(value) ?? -1))
+                }, word("documents")]))
+            case .count(let name):
+                body.addArrangedSubview(row([word("Count the documents as"), field(name, id: id + ".count", label: "Count name",
+                                                                                   tip: "Name the field the number of documents is written in (AS in SQL)",
+                                                                                   width: 140) { [weak self] value in
+                    guard let self else { return }
+                    self.view.commit(self.index, .count(value))
+                }]))
+            case .addField(let add):
+                let name = field(add.name, id: id + ".addField.name", label: "New field name", tip: "Name the new field (AS in SQL)",
+                                 width: 140) { [weak self] value in self?.editAddField { $0.name = value } }
+                let left = combo(add.left, id: id + ".addField.left", label: "Left operand",
+                                 tip: "Choose a field or type a number; text goes in quotes (\"Mr \") for joined with") { [weak self] value in
+                    self?.editAddField { $0.left = value }
+                }
+                let ops = MongoStageForm.AddField.Op.allCases
+                let op = popup(ops.map(\.title), selected: ops.firstIndex(of: add.op) ?? 0, id: id + ".addField.op",
+                               tip: "Choose how the two make the new field: add, take away, multiply, divide, or join as text", target: nil, action: nil)
+                for (item, tip) in zip(op.itemArray, ["Add the two (a + b)", "Take the right one from the left one (a - b)", "Multiply the two (a * b)",
+                                                      "Divide the left one by the right one (a / b)", "Join the two texts into one (CONCAT(a, b))"]) {
+                    item.toolTip = tip
+                }
+                op.setAccessibilityLabel("Operator")
+                op.target = act { [weak self] in self?.editAddField { $0.op = ops[max(0, op.indexOfSelectedItem)] } }
+                op.action = #selector(Act.fire(_:))
+                let right = combo(add.right, id: id + ".addField.right", label: "Right operand",
+                                  tip: "Choose a field or type a number, or text in quotes (\" - \") for joined with") { [weak self] value in
+                    self?.editAddField { $0.right = value }
+                }
+                for box in [left, right] { box.placeholderString = "field, 1 or \"text\"" }
+                body.addArrangedSubview(row([word("Add"), name, word("="), left, op, right]))
             case .unwind(let unwind):
                 let path = combo(unwind.path, id: id + ".unwind.path", label: "Array field",
                                  tip: "Choose the array field: one document per item of it") { [weak self] value in
@@ -821,6 +869,12 @@ final class MongoStagesView: NSView {
             change(&keys)
             view.commit(index, .sort(keys))
             if again { rebuildBody() }
+        }
+
+        private func editAddField(_ change: (inout MongoStageForm.AddField) -> Void) {
+            guard case .addField(var f) = form else { return }
+            change(&f)
+            view.commit(index, .addField(f))
         }
 
         private func editShow(_ change: (inout MongoBuilder.Projection) -> Void) {

@@ -29,6 +29,18 @@ struct MongoStageFormTests {
             (.limit(5_000_000_000), "{ $limit: NumberLong(5000000000) }"),
             (.unwind(F.Unwind(path: "items")), #"{ $unwind: "$items" }"#),
             (.unwind(F.Unwind(path: "customer", preserve: true)), #"{ $unwind: { path: "$customer", preserveNullAndEmptyArrays: true } }"#),
+            (.skip(20), "{ $skip: 20 }"), (.skip(0), "{ $skip: 0 }"), (.skip(5_000_000_000), "{ $skip: NumberLong(5000000000) }"),
+            (.count("orders"), #"{ $count: "orders" }"#),
+            (.addField(F.AddField(name: "total", left: "price", .multiply, right: "qty")),
+             #"{ $addFields: { total: { $multiply: [ "$price", "$qty" ] } } }"#),
+            (.addField(F.AddField(name: "net", left: "price", .subtract, right: "2.5")), #"{ $addFields: { net: { $subtract: [ "$price", 2.5 ] } } }"#),
+            (.addField(F.AddField(name: "a.half", left: "1", .divide, right: "items.qty")),
+             #"{ $addFields: { "a.half": { $divide: [ 1, "$items.qty" ] } } }"#),
+            (.addField(F.AddField(name: "p", left: "price", .add, right: #"NumberDecimal("1.5")"#)),
+             #"{ $addFields: { p: { $add: [ "$price", NumberDecimal("1.5") ] } } }"#),
+            (.addField(F.AddField(name: "label", left: "first", .concat, right: #"" - ""#)),
+             #"{ $addFields: { label: { $concat: [ "$first", " - " ] } } }"#),
+            (.addField(F.AddField(name: "hi", left: #""Mr \"""#, .concat, right: "name")), #"{ $addFields: { hi: { $concat: [ "Mr \"", "$name" ] } } }"#),
             (.shell(shell("{ $facet: { a: [] } }")), "{ $facet: { a: [] } }"),
         ]
         for (form, text) in cases {
@@ -39,7 +51,12 @@ struct MongoStageFormTests {
         #expect(F.limit(1).title == "Limit — LIMIT" && F.join(F.Join(from: "", localField: "", foreignField: "", as: "")).title == "Join — JOIN")
         // Plain forms a card also shows.
         #expect(F(stage: shell(#"{ $unwind: { path: "$a" } }"#)) == .unwind(F.Unwind(path: "a")))
-        #expect(F(stage: shell("{ $limit: 3.0 }")) == .limit(3))
+        #expect(F(stage: shell("{ $limit: 3.0 }")) == .limit(3) && F(stage: shell("{ $skip: 3.0 }")) == .skip(3))
+        // An operand typed with spaces or single quotes writes as the card shows it.
+        #expect(try F.addField(F.AddField(name: "s", left: " a ", .concat, right: "' x'")).stage().shellForm()
+                == #"{ $addFields: { s: { $concat: [ "$a", " x" ] } } }"#)
+        #expect(F.skip(1).title == "Skip — OFFSET" && F.count("n").title == "Count — COUNT(*)"
+                && F.addField(F.AddField(name: "", left: "", .add, right: "")).title == "Add field — SELECT a + b AS c")
         #expect(F(stage: shell(#"{ $group: { _id: "$a", count: { $sum: NumberLong(1) } } }"#)) == .group(F.Grouping(by: ["a"], outputs: [F.Output(.count)])))
         // Results keep the names they were written under (Query with SQL's aliases).
         let named = F.group(F.Grouping(by: ["a"], outputs: [F.Output(.sum, "total", name: "revenue"), F.Output(.count, name: "orders")]))
@@ -57,7 +74,15 @@ struct MongoStageFormTests {
             #"{ $group: { _id: "$a", sum_t: { $sum: "$t" }, sum_t: { $sum: "$t" } } }"#,
             "{ $sort: {} }", #"{ $sort: { s: { $meta: "textScore" } } }"#, "{ $project: { a: 0 } }", #"{ $project: { a: "$b" } }"#,
             "{ $limit: 0 }", "{ $limit: 2.5 }", #"{ $unwind: { path: "$a", includeArrayIndex: "i" } }"#, #"{ $unwind: "a" }"#,
-            "{ $skip: 2 }", "{ $count: \"n\" }", #"{ $addFields: { a: 1 } }"#,
+            #"{ $addFields: { a: 1 } }"#, "{ $skip: -1 }", "{ $skip: 1.5 }", #"{ $skip: "1" }"#,
+            #"{ $count: "" }"#, #"{ $count: "a.b" }"#, #"{ $count: "$n" }"#, "{ $count: 1 }",
+            // Add field: only what the card writes back exactly.
+            #"{ $addFields: { a: { $add: [ "$x", NumberLong(1) ] } } }"#, #"{ $addFields: { a: { $add: [ "$x", 1, 2 ] } } }"#,
+            #"{ $addFields: { a: { $add: [ "$x", "y" ] } } }"#, #"{ $addFields: { a: { $concat: [ "$a", 1 ] } } }"#,
+            #"{ $addFields: { a: { $concat: [ "$a", "$$NOW" ] } } }"#, #"{ $addFields: { a: { $add: [ "$x", 1 ] }, b: 1 } }"#,
+            #"{ $addFields: { a: { $add: [ "$2020", 1 ] } } }"#, #"{ $addFields: { a: { $add: [ "$x", { $abs: "$y" } ] } } }"#,
+            #"{ $addFields: { "$a": { $add: [ "$x", 1 ] } } }"#, #"{ $addFields: { a: { $add: [ "$x", 1 ], $mod: [ 1, 2 ] } } }"#,
+            #"{ $set: { a: { $add: [ "$x", 1 ] } } }"#, #"{ $addFields: { a: { $pow: [ "$x", 2 ] } } }"#,
         ]
         for text in shells { #expect(F(stage: shell(text)) == .shell(shell(text)), "\(text)") }
     }
@@ -73,6 +98,16 @@ struct MongoStageFormTests {
             (.sort([]), "Add a field to sort by"), (.show(MongoBuilder.Projection()), "Tick the fields to show"),
             (.limit(0), "Type a limit of 1 or more"), (.unwind(F.Unwind(path: "")), "Choose the array field to unwind"),
             (.filter(MongoBuilder.Group([.rule(MongoBuilder.Rule("n", .is, ["x"], type: .number))])), "n: ‘x’ isn't a number"),
+            (.skip(-1), "Type how many documents to skip: 0 or more"), (.count(""), "Name the count"),
+            (.count("a.b"), "‘a.b’: the count's name can't start with $ or hold a dot"),
+            (.addField(F.AddField(name: "", left: "a", .add, right: "1")), "Name the new field"),
+            (.addField(F.AddField(name: "$t", left: "a", .add, right: "1")), "‘$t’: a field's name can't start with $"),
+            (.addField(F.AddField(name: "t", left: "a", .add, right: " ")), #"Type a field, a number or "text" on both sides of +"#),
+            (.addField(F.AddField(name: "t", left: "a", .add, right: #""x""#)), #"‘"x"’ is text: only joined with takes text"#),
+            (.addField(F.AddField(name: "t", left: "a", .concat, right: "1")), "‘1’ is a number: joined with takes fields and text, so put it in quotes"),
+            (.addField(F.AddField(name: "t", left: "a", .concat, right: #""$x""#)), #"‘"$x"’ starts with $: write it in a Shell card, with $literal"#),
+            (.addField(F.AddField(name: "t", left: "a", .concat, right: #""open"#)), #"‘"open’: close the quotes around the text"#),
+            (.addField(F.AddField(name: "t", left: "$a", .add, right: "1")), "‘$a’: a field's name can't start with $"),
         ]
         for (form, message) in bad {
             #expect { try form.stage() } throws: { ($0 as? BSONError)?.message == message }
@@ -151,6 +186,9 @@ struct MongoStageFormTests {
         #expect(after[3] == ["_id", "items", "items.sku", "total", "customer", "customer.name"])
         #expect(after[4] == ["_id", "sum_total"])
         #expect(after[5] == ["_id", "_id.a", "_id.b"])
+        // Add field adds its name, Skip keeps them, Count gives only its name.
+        #expect(F.fields(after: [.addField(F.AddField(name: "net", left: "total", .subtract, right: "1")), .skip(5), .count("n")],
+                         base: ["_id", "total"]) { _ in [] } == [["_id", "total", "net"], ["_id", "total", "net"], ["n"]])
         // A join's `as` replaces what was there.
         #expect(F.fields(after: [.join(F.Join(from: "c", localField: "a", foreignField: "b", as: "items"))], base: base) { _ in ["x"] }[0]
                 == ["_id", "customerId", "status", "total", "items", "items.x"])

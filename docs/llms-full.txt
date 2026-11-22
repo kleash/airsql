@@ -2695,10 +2695,10 @@ its own stage, so the rest of what you typed stays as you typed it. Text that is
 its mistake underlined.
 
 Each card names what it does with SQL's word beside it: **Join — JOIN**, **Filter — WHERE**, **Group — GROUP BY**,
-**Sort — ORDER BY**, **Show fields — SELECT**, **Limit — LIMIT**, **Unwind** and **Shell**. Card 1 is the first stage,
-card 2 the second, and so on. Choose another kind in its pop-up to start the card again as that kind; ↑ and ↓ move it,
-the bin removes it, ⏭ runs the pipeline up to it (Run to Here), and after **Count Each Stage** it says how many
-documents it gives. **+ Stage**, after the cards (and **+** between them), adds one: Join comes first.
+**Sort — ORDER BY**, **Show fields — SELECT**, **Add field — SELECT a + b AS c**, **Limit — LIMIT**, **Skip — OFFSET**,
+**Count — COUNT(\*)**, **Unwind** and **Shell**. Card 1 is the first stage, card 2 the second, and so on. Choose
+another kind in its pop-up to start the card again as that kind; ↑ and ↓ move it, the bin removes it, ⏭ runs the
+pipeline up to it (Run to Here), and after **Count Each Stage** it says how many documents it gives. **+ Stage**, after the cards (and **+** between them), adds one: Join comes first.
 
 - **Join**: another collection of this database (**From**), this collection's field that must equal **their field**,
   and **As**, the field that gets the matching documents as a list. **One document per match** adds an Unwind card
@@ -2709,14 +2709,19 @@ documents it gives. **+ Stage**, after the cards (and **+** between them), adds 
 - **Group**: the fields to group **by** (none: every document in one group), then the results: Count, Sum, Average,
   Smallest, Largest, First, Last, List or Distinct list of a field, each named (`sum_total`; type another name).
 - **Sort**: fields, each ascending or descending. **Show fields**: tick the fields to keep, and `_id`. **Limit**: how
-  many documents. **Unwind**: one document per item of an array field.
+  many documents. **Skip**: how many to leave out first (`$skip`). **Count**: one document holding how many documents
+  there are, under the name you give it (`$count`). **Unwind**: one document per item of an array field.
+- **Add field**: a new field (its name, SQL's `AS`) worked out of two others: on each side a field (`price`), a number
+  (`1.5`) or text in quotes (`" - "`), between them **+**, **−**, **×**, **÷** or **joined with** (SQL's `CONCAT`, for
+  text). A richer `$addFields` (several fields, other expressions) is a Shell card.
 - **Filter**: the conditions as rows, as the query bar's [Builder](#builder) has them: a field, how it compares, a
-  value. **Shell**: the stage as text. A stage no card shows exactly
+  value, in groups and items. **Shell**: the stage as text. A stage no card shows exactly
   (`$facet`, `$bucket`, a `$lookup` with a pipeline…) is a Shell card of its own text, which goes into the pipeline as
   you type it.
 
 The field boxes offer the fields each stage sees: the collection's (from its sample), a join's `<As>.<their field>`,
-a group's `_id` and results, only those a Show fields card keeps. Any field typed works.
+a group's `_id` and results, an Add field's new field, a Count's name, only those a Show fields card keeps. Any field
+typed works.
 
 Aggregations run with `allowDiskUse`, so a big group or sort spills to disk on the server instead of stopping at its
 memory limit.
