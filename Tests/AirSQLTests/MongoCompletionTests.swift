@@ -159,6 +159,37 @@ struct MongoCompletionTests {
         #expect(labels(.pipeline, "[{ $group: { _id: } }, { $match: { st").first == "status")
     }
 
+    /// `|` is the caret, in the middle of text that goes on after it.
+    func labels(_ root: MongoCaret.Root, marked: String, foreign: @escaping (String) -> MongoSample? = { _ in nil }) -> [String] {
+        let caret = (marked as NSString).range(of: "|").location
+        return MongoCompletion.items(root: root, text: marked.replacingOccurrences(of: "|", with: ""), caret: caret,
+                                     sample: Self.sample, foreign: foreign).items.map(\.label)
+    }
+
+    @Test func inTheMiddleTheKeysAfterTheCaretCountToo() {
+        // A key typed between two: the one after it isn't offered again, as those before it aren't.
+        let filter = labels(.filter, marked: "{ status: \"paid\", | total: { $gt: 5 } }")
+        #expect(!filter.contains("total") && !filter.contains("status") && filter.contains("customerId"), "\(filter)")
+        #expect(!labels(.filter, marked: "{ status: \"paid\", t| , total: 5 }").contains("total"))
+        #expect(!labels(.projection, marked: "{ status: 1, | total: 1 }").contains("total"))
+        #expect(!labels(.document, marked: "{ _id: 1, | status: \"x\" }").contains("status"))
+        #expect(labels(.pipeline, marked: "[{ $lookup: { from: \"customers\", | as: \"buyer\" } }]") == ["localField", "foreignField", "let", "pipeline"])
+        // The key being changed, and the rest of a word or string at the caret, aren't keys after it.
+        #expect(labels(.filter, marked: "{ st|atus: \"paid\", total: 5 }").prefix(2) == ["status", "statusNote"])
+        #expect(labels(.filter, marked: "{ \"st|atus\": 1, total: 5 }").prefix(2) == ["status", "statusNote"])
+        #expect(labels(.filter, marked: "{ status: \"pa|id\", total: 5 }") == ["paid"])
+        // Deeper documents' keys are theirs, and text after the document's close is the rest's.
+        let deeper = labels(.filter, marked: "{ | , items: { status: 1 } }, total: 1")
+        #expect(!deeper.contains("items") && deeper.contains("status") && deeper.contains("total"), "\(deeper)")
+        // A value after the caret counts: foreignField before from offers the other collection's fields.
+        let customers = MongoSample(schema: MongoSchema(sample: [BSONDocument([("_id", .int32(1)), ("email", .string("a"))])]))
+        #expect(labels(.pipeline, marked: "[{ $lookup: { foreignField: \"|\", from: \"customers\", as: \"c\" } }]",
+                       foreign: { $0 == "customers" ? customers : nil }) == ["_id", "email"])
+        // A mistake after the caret (an unclosed string or brace) changes nothing before it.
+        #expect(labels(.filter, marked: "{ status: \"paid\", cu| , note: \"unclosed }") == ["customerId"])
+        #expect(labels(.pipeline, marked: "[{ $match: { st| }, { $limit: 5 }]").prefix(2) == ["status", "statusNote"])
+    }
+
     @Test func wordsNewerThanTheServerAreLeftOut() {
         #expect(labels(.pipeline, "[{ $dens", version: "5.0.3").isEmpty)
         #expect(labels(.pipeline, "[{ $dens", version: "7.0.2") == ["$densify"])
