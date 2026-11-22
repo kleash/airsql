@@ -27,6 +27,25 @@ import Testing
         #expect(text(sql, select.from[1].range) == "customers c")
     }
 
+    /// Queries with no ; between them: the server would refuse the text, so the first keeps the error, but each is read.
+    @Test func queriesWithNoSemicolonBetweenThemAreEachRead() throws {
+        let sql = "SELECT a FROM t WHERE\n\nSELECT b FROM u\nUPDATE v SET c = 1;\nSELECT 2"
+        let all = SQLParser.parse(sql)
+        #expect(all.map(\.verb) == ["SELECT", "SELECT", "UPDATE", "SELECT"])
+        #expect(all.map { $0.errors.first?.message } == ["Expected a value, found SELECT", "Expected ; before UPDATE", nil, nil])
+        let text = sql as NSString
+        #expect(all.map { text.substring(with: NSRange($0.range)) } == ["SELECT a FROM t WHERE", "SELECT b FROM u", "UPDATE v SET c = 1", "SELECT 2"])
+        // Only the one a delimiter ends has an end past its text.
+        #expect(all.map { $0.end - $0.range.upperBound } == [0, 0, 1, 0])
+        #expect(all[0].query?.blocks.first?.from.count == 1 && all[1].query?.blocks.first?.from.count == 1)
+        // What only looks like a second statement stays one.
+        for one in ["INSERT INTO t (a)\nSELECT a FROM u", "SELECT a FROM t UNION\nSELECT b FROM u", "SELECT a FROM t FOR UPDATE",
+                    "INSERT INTO t VALUES (1) ON DUPLICATE KEY UPDATE a = 2", "WITH c AS (SELECT 1)\nDELETE FROM t WHERE a IN (SELECT * FROM c)",
+                    "SELECT REPLACE(a, 'x', 'y'), INSERT(a, 1, 2, 'z') FROM t", "CREATE TABLE t AS\nSELECT 1"] {
+            #expect(SQLParser.parse(one).count == 1 && SQLParser.parse(one)[0].errors.isEmpty, "\(one)")
+        }
+    }
+
     @Test func rangesCountFromTheWholeText() throws {
         let sql = "SELECT 1;\n-- é\nSELECT é FROM t"
         let statements = SQLParser.parse(sql)
@@ -241,6 +260,7 @@ import Testing
         #expect(error("SELECT a FROM t ORDER BY a WHERE b") == "WHERE can’t come after ORDER")
         #expect(error("SELECT a FROM t LIMIT 1 ORDER BY a") == "ORDER can’t come after LIMIT")
         #expect(error("SELECT a b c FROM t") == "Unexpected c")
+        #expect(error("SELECT a FROM t SELECT b FROM u") == "Expected ; before SELECT")
         #expect(error("SELECT 1)") == "Unmatched )")
         #expect(error("SELECT a FROM t JOIN") == "Expected a table name")
         #expect(error("SELECT CASE a THEN 1 END") == "Expected WHEN, found THEN")
@@ -521,6 +541,12 @@ import Testing
 
     @Test func reservedWordsGetAQuoteFix() {
         #expect(fixed("SELECT * FROM order", "Quote “order” as a Name") == "SELECT * FROM `order`")
+    }
+
+    /// Two queries with no ; between them: the fix ends the first one's text with it, before the space between them.
+    @Test func aMissingSemicolonGetsAFix() {
+        #expect(fixed("SELECT id FROM orders  \n\nselect total FROM orders", "Add ; before select")
+                == "SELECT id FROM orders;  \n\nselect total FROM orders")
     }
 
     @Test func didYouMean() {

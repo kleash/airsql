@@ -876,14 +876,21 @@ final class GridViewer: NSView, DataGridViewDelegate, NSMenuItemValidation {
         return menu
     }
 
-    /// Esc steps back: it closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
+    /// Esc steps back: it closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused
+    /// cell; in a console's result, once there is nothing more to narrow, it goes back to the editor.
     override func cancelOperation(_ sender: Any?) {
+        var narrowed = grid.selection
+        if let cursor = narrowed.cursor { narrowed.select(cursor) }
         if let findBar, !findBar.isHidden {
             findBar.close(sender)
         } else if transposed || record != nil {
             backToGrid(sender)
-        } else if let cursor = grid.selection.cursor {
-            grid.selection.select(cursor)
+        } else if narrowed != grid.selection {
+            grid.selection = narrowed
+        } else if host is ResultGridView, let window = window?.windowController as? NSMenuItemValidation,
+                  window.validateMenuItem(Commands.focusEditor.item()) {
+            // Go to Editor (⌥⌘2), where the tab has one: an agent's or a compare's result has none.
+            NSApp.sendAction(Commands.focusEditor.action, to: window, from: sender)
         }
     }
 

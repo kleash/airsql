@@ -76,6 +76,51 @@ struct MongoPipelineTests {
         #expect(two.message == "Stage 1 has 2 fields ($match, $sort): a stage is one operator, so put each in a stage of its own")
     }
 
+    @Test func whatTheServerWouldRefuseIsUnderlinedWhereItIs() throws {
+        func problems(_ text: String) throws -> [String] {
+            let units = Array(text.utf16)
+            return try MongoPipeline.problems(MongoPipeline.stages(in: text), in: text).map {
+                "\($0.severity == .error ? "error" : "warning") \(String(decoding: units[$0.range], as: UTF16.self)): \($0.message)"
+            }
+        }
+        // Sure to be refused: errors, at the stage's name or the field.
+        #expect(try problems("[{ $match: {} },\n  { $group: { total: { $sum: 1 } } }]")
+                == ["error $group: Stage 2, line 2, column 5: $group needs _id: what to group by (null puts every document in one group)"])
+        #expect(try problems(#"[{ $lookup: { localField: "a", foreignField: "b", as: "c" } }]"#) == ["error $lookup: Stage 1, line 1, column 4: $lookup needs from: add it"])
+        #expect(try problems(#"[{ $lookup: { from: "c", as: "x" } }]"#).first?.hasSuffix("needs both localField and foreignField, or a pipeline") == true)
+        #expect(try problems(#"[{ $unwind: { includeArrayIndex: "i" } }]"#) == ["error $unwind: Stage 1, line 1, column 4: $unwind needs path: add it"])
+        #expect(try problems(#"[{ $limit: "5" }]"#).first?.hasSuffix("$limit takes a whole number above 0, such as $limit: 10") == true)
+        #expect(try problems("[{ $limit: 0 }, { $skip: -1 }]").count == 2)
+        #expect(try problems("[{ $sort: { subtotal: 1, total: 2 } }]") == ["error total: Stage 1, line 1, column 26: $sort takes 1 (ascending) or -1 (descending) for total"])
+        #expect(try problems(#"[{ $sort: { total: "asc" } }]"#).count == 1)
+        // Likely typos: warnings with the closest name, which Run still sends.
+        #expect(try problems(#"[{ $mach: { status: "paid" } }]"#) == ["warning $mach: Stage 1, line 1, column 4: $mach isn't a stage AirSQL knows: did you mean $match?"])
+        #expect(try problems("[{ $grup: { _id: 1 } }]").first?.hasSuffix("did you mean $group?") == true)
+        #expect(try problems("[{ $match: { total: { $gtee: 5 } } }]") == ["warning $gtee: Stage 1, line 1, column 23: $gtee isn't an operator AirSQL knows: did you mean $gte?"])
+        #expect(try problems("[{ $match: { $or: [{ a: { $exist: true } }] } }]").first?.hasSuffix("did you mean $exists?") == true)
+        #expect(try problems(#"[{ $lookup: { from: "c", localfield: "a", foreignField: "b", as: "c" } }]"#).last
+                == "warning localfield: Stage 1, line 1, column 26: $lookup has no key localfield: did you mean localField?")
+        // What can be valid stays unflagged: newer stages, a DBRef, operators the table lacks, a decimal, $meta, 2.0.
+        let fine = [#"[{ $search: { text: {} } }, { $vectorSearch: {} }, { $score: {} }, { $changeStream: {} }]"#,
+                    #"[{ $match: { owner: { $ref: "u", $id: 1 }, $where: "x", loc: { $near: [0, 0], $maxDistance: 5 } } }]"#,
+                    #"[{ $limit: 2.0 }, { $skip: 0 }, { $sort: { s: { $meta: "textScore" }, n: NumberLong(-1) } }, { $limit: NumberDecimal("1") }]"#,
+                    #"[{ $lookup: { from: "c", pipeline: [], as: "y" } }, { $lookup: { pipeline: [{ $documents: [] }], as: "z" } }]"#,
+                    #"[{ $unionWith: { pipeline: [{ $documents: [{ a: 1 }] }] } }, { $unionWith: "archive" }]"#,
+                    #"[{ $geoNear: { near: [0, 0] } }, { $group: { _id: null, n: { $sum: 1 } } }, { $unwind: "$a" }]"#]
+        for text in fine { #expect(try problems(text).isEmpty, "\(text)") }
+    }
+
+    @Test func aCommentIsSaidToBeOne() throws {
+        for text in ["[\n  { $match: {} },\n  // note\n  { $limit: 5 }\n]", "{ $match: { a: // x\n 1 } }", "{ $match: { /* x */ a: 1 } }"] {
+            do {
+                _ = try MongoPipeline.stages(in: text)
+                Issue.record("\(text) parsed")
+            } catch let error as MongoPipeline.ParseError {
+                #expect(error.message.hasSuffix("found a comment, which shell form doesn't take: remove it"), "\(error)")
+            }
+        }
+    }
+
     // MARK: Explain
 
     @Test func anIndexedFindReadsItsIndex() throws {

@@ -1,7 +1,8 @@
 // The aggregation tab's Stages mode (docs/dev/mongo-plan.md, Phase 5 B), against the Mongo lab (AIRSQL_MONGO_LAB=1):
 // a Join and a Group built on the cards over `shop` give what plain finds add up to; a hand-written pipeline opens with
 // its $facet as a Shell card and its text as it was; reordering, removing and editing a card keep every other stage's
-// text byte for byte; a join of an ObjectId with text warns; and its pictures (AIRSQL_SCREENSHOTS=1 too).
+// text byte for byte; a join of an ObjectId with text warns; and its pictures (AIRSQL_SCREENSHOTS=1 too). Without a
+// server: the Add field, Skip and Count cards.
 import AppKit
 import Foundation
 import Testing
@@ -207,6 +208,76 @@ extension AppTests {
         type("_id", into: "stage.0.join.foreign", tab)
         #expect(card.warnings.isHidden, "\(card.warnings.stringValue)")
         main.close(try #require(main.tabs.first { $0.content === tab }))
+    }
+}
+
+extension AppTests {
+    /// The tree's double-click on a collection types its name at the cursor of the page shown: a string in Shell, a name
+    /// on the SQL page, and nothing on Stages, where it opens the collection as it always did.
+    @Test func aCollectionsNameIsTypedIntoThePageShown() throws {
+        let tab = MongoAggregationController(model: testModel(), connection: UUID(), database: "shop", collection: "orders")
+        _ = tab.view
+        tab.replacePipeline("")
+        tab.show(.stages)
+        #expect(tab.nameInserter == nil)
+        tab.show(.shell)
+        tab.editor.string = "{ $lookup: { from:  } }"
+        tab.editor.setSelectedRange(NSRange(location: 19, length: 0))
+        let quoted = try #require(tab.nameInserter)
+        quoted("order \"lines\"")
+        #expect(tab.editor.string == #"{ $lookup: { from: "order \"lines\"" } }"#)
+        tab.show(.sql)
+        tab.sqlPage.editor.string = "SELECT * FROM orders JOIN "
+        tab.sqlPage.editor.setSelectedRange(NSRange(location: 26, length: 0))
+        let named = try #require(tab.nameInserter)
+        named("order lines")
+        #expect(tab.sqlPage.editor.string == "SELECT * FROM orders JOIN `order lines`")
+    }
+
+    /// Add field, Skip and Count built through their cards' controls on a tab without a server: each writes only its
+    /// own stage, a wrong operand is refused on its card, and the text reads back as those cards; a stage the Add field
+    /// card can't write exactly is a Shell card of its own text.
+    @Test func addFieldSkipAndCountCardsWriteTheirStagesAndReadThemBack() throws {
+        let tab = MongoAggregationController(model: testModel(), connection: UUID(), database: "shop", collection: "orders")
+        _ = tab.view
+        let match = "{ $match: { status: \"paid\" } }"
+        tab.replacePipeline("[\n  \(match)\n]\n")
+        tab.show(.stages)
+        #expect(tab.mode == .stages && tab.stagesView.forms.count == 1)
+        #expect(MongoStagesView.Kind.allCases.map(\.title).contains("Add field — SELECT a + b AS c"))
+
+        tab.stagesView.add(.addField, at: 1)
+        type("total", into: "stage.1.addField.name", tab)
+        type("price", into: "stage.1.addField.left", tab)
+        let op = try #require(control(NSPopUpButton.self, "stage.1.addField.op", tab))
+        op.selectItem(at: MongoStageForm.AddField.Op.allCases.firstIndex(of: .multiply)!)
+        fire(op)
+        type("qty", into: "stage.1.addField.right", tab)
+        tab.stagesView.add(.skip, at: 2)
+        type("20", into: "stage.2.skip", tab)
+        tab.stagesView.add(.count, at: 3)
+        type("orders", into: "stage.3.count", tab)
+        #expect(tab.stagesView.firstProblem == nil, "\(tab.stagesView.firstProblem ?? "")")
+        let built = tab.editor.string
+        #expect(built == "[\n  \(match),\n  { $addFields: { total: { $multiply: [ \"$price\", \"$qty\" ] } } },\n  { $skip: 20 },\n"
+                + "  { $count: \"orders\" }\n]\n", "\(built)")
+
+        // Text in a sum: refused on the card, and the stage keeps its last good text.
+        type("\"x\"", into: "stage.1.addField.right", tab)
+        #expect(tab.stagesView.cards[1].problemText == "‘\"x\"’ is text: only joined with takes text" && tab.editor.string == built)
+        #expect(tab.stagesView.firstProblem?.hasPrefix("Stage 2: ") == true)
+        type("-5", into: "stage.2.skip", tab)
+        #expect(tab.stagesView.cards[2].problemText == "Type how many documents to skip: 0 or more" && tab.editor.string == built)
+
+        // Read back from the text: the same cards; NumberLong(1) can't be shown exactly, so it stays as typed.
+        let odd = "{ $addFields: { n: { $add: [ \"$a\", NumberLong(1) ] } } }"
+        let text = built.replacingOccurrences(of: "\n]\n", with: ",\n  \(odd)\n]\n")
+        tab.show(.shell)
+        tab.replacePipeline(text)
+        tab.show(.stages)
+        #expect(tab.stagesView.forms.map { MongoStagesView.Kind($0) } == [.filter, .addField, .skip, .count, .shell], "\(tab.stagesView.forms)")
+        #expect(tab.stagesView.cards[4].shellEditor?.string == odd && tab.editor.string == text)
+        #expect(control(NSComboBox.self, "stage.1.addField.right", tab)?.stringValue == "qty")
     }
 }
 

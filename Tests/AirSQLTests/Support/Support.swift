@@ -30,6 +30,7 @@ enum TestEnvironment {
     }
 
     static let isolated: Void = {
+        quietDesktop()
         try? "# The tests' ssh_config: no hosts, so nothing from ~/.ssh/config.\n"
             .write(toFile: sshConfig, atomically: true, encoding: .utf8)
         try? FileManager.default.createDirectory(atPath: root + "/local-home/.ssh", withIntermediateDirectories: true)

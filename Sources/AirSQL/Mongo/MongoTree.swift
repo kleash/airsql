@@ -160,6 +160,14 @@ extension SidebarController {
         }
     }
 
+    /// A MongoDB connection's menu makes a database MongoDB's way, with its first collection.
+    static func replaceNewDatabase(in menu: NSMenu, connections: [SavedConnection]) {
+        guard connections.contains(where: { $0.engine == .mongodb }),
+              let index = menu.items.firstIndex(where: { $0.action == Commands.newDatabase.action }) else { return }
+        menu.removeItem(at: index)
+        if connections.count == 1 { menu.insertItem(Commands.createMongoDatabase.item(), at: index) }
+    }
+
     /// The connected MongoDB connection the server's commands act on: the tree's, else the selected connection's, else
     /// the window's.
     var mongoTarget: OpenMongoConnection? {

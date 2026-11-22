@@ -90,7 +90,9 @@ extension TableDataController: DataGridViewDelegate {
         guard let source, editingOff == nil else { return NSSound.beep() }
         let id = source.changes.addRow()
         changesDidChange()
-        focus(row: source.index(of: id))
+        // The first column shown that the person fills: typing in an AUTO_INCREMENT id would replace "auto" with a number.
+        let column = viewer.shownColumns.first { source.table.columns[safe: $0].map { !$0.autoIncrement && $0.generated == nil } == true }
+        focus(row: source.index(of: id), column: column)
     }
 
     @objc func duplicateRow(_ sender: Any?) { duplicate(keepingKeys: true) }
@@ -178,13 +180,15 @@ extension TableDataController: DataGridViewDelegate {
         changesDidChange()
     }
 
-    /// Selects a row's first cell and scrolls to it (in the grid: out of Transpose and Record View).
-    func focus(row: Int?) {
+    /// Selects a row's cell in `column` (a source column; the first shown when nil or hidden) and scrolls to it (in the
+    /// grid: out of Transpose and Record View).
+    func focus(row: Int?, column: Int? = nil) {
         viewer.backToGrid(nil)
         guard let row, row < grid.rowCount, grid.columnCount > 0 else { return }
         view.layoutSubtreeIfNeeded()  // the first pending change opens the notice, which takes height from the rows
-        grid.selection.select(GridPosition(row: row, column: 0))
-        grid.reveal(grid.cellRect(GridPosition(row: row, column: 0)))
+        let cell = GridPosition(row: row, column: column.flatMap(grid.columnOrder.firstIndex(of:)) ?? 0)
+        grid.selection.select(cell)
+        grid.reveal(grid.cellRect(cell))
         view.window?.makeFirstResponder(grid)
     }
 

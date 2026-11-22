@@ -356,6 +356,122 @@ extension AppTests {
             #expect(SQLIntentions.documentation(of: DatabaseObject(.trigger, "airsql_fixture", "t"), snapshot: open.snapshot) == nil)
         }
 
+        /// A query of the connection in front: a click on a table leaves it there, a double-click types the name at the
+        /// cursor (quoted when it has to be), and Return opens the table as it always did.
+        @Test func aDoubleClickTypesANameIntoTheQueryInFront() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, harness) = appWindow(model)
+            _ = await openReplayed(model, id)
+            main.openConsole(text: "SELECT * FROM ", title: nil, connection: id)
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            console.editor.setSelectedRange(NSRange(location: 14, length: 0))
+            let orders = DatabaseObject(.table, "airsql_fixture", "orders")
+            let row = try #require(treeRow(main, .object(id, orders)))
+            _ = await call(harness, "click", ["x": row.point.0, "y": row.point.1])
+            #expect(main.sidebar.selectedObjects == [orders] && main.selectedTab?.content === console)
+            _ = await call(harness, "click", ["x": row.point.0, "y": row.point.1, "count": 2])
+            #expect(console.text == "SELECT * FROM orders" && main.selectedTab?.content === console)
+            #expect(main.window?.firstResponder === console.editor)
+            let odd = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "we`ird 'name' ✓"))))
+            console.editor.setText("")
+            _ = await call(harness, "click", ["x": odd.point.0, "y": odd.point.1, "count": 2])
+            #expect(console.text == "`we``ird 'name' ✓`")
+            // Return opens the row selected, and so does a double-click once no query is in front.
+            main.sidebar.reveal(.object(id, orders))
+            #expect(main.selectedTab?.content === console)
+            let key = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                    windowNumber: main.window?.windowNumber ?? 0, context: nil, characters: "\r",
+                                                    charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36))
+            main.sidebar.outline.keyDown(with: key)
+            let table = try #require(main.selectedTab?.content as? TableDataController)
+            #expect(table.shows(id, "airsql_fixture", "orders"))
+            let customers = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "customers"))))
+            _ = await call(harness, "click", ["x": customers.point.0, "y": customers.point.1, "count": 2])
+            #expect((main.selectedTab?.content as? TableDataController)?.shows(id, "airsql_fixture", "customers") == true)
+            #expect(console.text == "`we``ird 'name' ✓`")
+        }
+
+        /// ⌘-click on a name in a query: a table's rows open in its tab, an alias goes to where it's declared.
+        @Test func aCommandClickOnANameOpensWhatItNames() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let text = "SELECT o.id FROM airsql_fixture.orders o;\nSHOW CREATE TABLE airsql_fixture.customers"
+            main.openConsole(text: text, title: nil, connection: id)
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            let editor = try #require(console.editor)
+            func commandClick(_ word: String, _ flags: NSEvent.ModifierFlags = .command) throws {
+                let layout = try #require(editor.layoutManager), container = try #require(editor.textContainer)
+                layout.ensureLayout(for: container)
+                let first = NSRange(location: (text as NSString).range(of: word).location, length: 1)
+                let glyphs = layout.glyphRange(forCharacterRange: first, actualCharacterRange: nil)
+                let rect = layout.boundingRect(forGlyphRange: glyphs, in: container)
+                let point = editor.convert(NSPoint(x: rect.midX + editor.textContainerOrigin.x, y: rect.midY + editor.textContainerOrigin.y), to: nil)
+                editor.mouseDown(with: try #require(NSEvent.mouseEvent(
+                    with: .leftMouseDown, location: point, modifierFlags: flags, timestamp: 0, windowNumber: main.window?.windowNumber ?? 0,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: 1)))
+            }
+            try commandClick("orders")
+            #expect(await eventually(timeout: 10) { (main.selectedTab?.content as? TableDataController)?.shows(self.id, "airsql_fixture", "orders") == true })
+            let tab = try #require(main.tabs.first { $0.content === console })
+            main.select(tab)
+            try commandClick("o.id")
+            #expect(await eventually(timeout: 10) { editor.selectedRange() == NSRange(location: 39, length: 1) })
+            #expect(main.selectedTab?.content === console)
+            // A statement the reading takes no names from: the word itself, as a table of the schema.
+            try commandClick("customers")
+            #expect(await eventually(timeout: 10) { (main.selectedTab?.content as? TableDataController)?.shows(self.id, "airsql_fixture", "customers") == true })
+        }
+
+        /// A table's menu has New Query, in the table's database; a connection's has Refresh, Find Text on Server and
+        /// Process List, off with a reason until it connects; a MongoDB connection's has Refresh but not MySQL's two.
+        @Test func aTablesAndAConnectionsMenusHaveTheirEverydayItems() async throws {
+            var mongo = SavedConnection(name: "Documents", host: "127.0.0.1", port: 1, user: "root")
+            mongo.engine = .mongodb
+            let model = testModel(Fixtures.shop + [mongo])
+            let (main, harness) = appWindow(model)
+            let open = await openReplayed(model, id)
+            open.currentDatabase = nil
+            let row = try #require(treeRow(main, .object(id, DatabaseObject(.table, "airsql_fixture", "orders"))))
+            _ = await call(harness, "click", ["x": row.point.0, "y": row.point.1, "button": "right"])
+            #expect(await call(harness, "menu", ["path": "context > New Query"]).error == nil)
+            #expect((main.selectedTab?.content as? ConsoleViewController)?.connectionID == id && open.currentDatabase == "airsql_fixture")
+
+            func menu(_ name: String) async throws -> [String: (enabled: Bool, reason: String)] {
+                let point = try #require(sidebarRow(main, name))
+                let items = await call(harness, "click", ["x": point.0, "y": point.1, "button": "right"])["menu"] as? [[String: Any]] ?? []
+                return Dictionary(items.map { ($0["title"] as? String ?? "", ($0["enabled"] as? Bool ?? false, $0["reason"] as? String ?? "")) }) { $1 }
+            }
+            let staging = try await menu("Staging · shop")
+            for title in ["Refresh", "Find Text on Server…", "Process List"] {
+                #expect(staging[title]?.enabled == false && staging[title]?.reason.isEmpty == false, "\(title): \(String(describing: staging[title]))")
+            }
+            let documents = try await menu("Documents")
+            #expect(documents["Refresh"] != nil && documents["Find Text on Server…"] == nil && documents["Process List"] == nil)
+        }
+
+        /// What New Database or Create Table made is selected once the tree shows it, with no preview over the tab in
+        /// front and the focus where it was.
+        @Test func aRowJustMadeIsSelectedOnceTheTreeShowsIt() async throws {
+            let model = testModel(Fixtures.shop)
+            let (main, _) = appWindow(model)
+            _ = await openReplayed(model, id)
+            let tab = main.openConsole(text: "", title: nil, connection: id)
+            _ = await consoleTookTheFocus(main)
+            let responder = main.window?.firstResponder
+            let orders = SidebarNode.Kind.object(id, DatabaseObject(.table, "airsql_fixture", "orders"))
+            main.sidebar.filter.stringValue = "no such name"
+            main.sidebar.reload()
+            #expect(main.sidebar.treeNodes[orders] == nil)
+            main.sidebar.revealWhenShown(orders)
+            #expect(main.sidebar.selectedNodes.map(\.kind) != [orders])
+            main.sidebar.filter.stringValue = ""
+            main.sidebar.reload()  // as the schema read back does
+            #expect(main.sidebar.selectedNodes.map(\.kind) == [orders])
+            #expect(main.selectedTab === tab && !main.tabs.contains { $0.content is PreviewContent })
+            #expect(main.window?.firstResponder === responder)
+        }
+
         @Test func f4OnAGroupListsItAndADDLGoesToThePage() async throws {
             let model = testModel(Fixtures.shop)
             let (main, _) = appWindow(model)

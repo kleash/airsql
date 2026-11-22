@@ -98,14 +98,7 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
         editor.setAccessibilityIdentifier("aggregate.editor")
         editor.setAccessibilityLabel("Pipeline of \(collection)")
         editor.toolTip = "The pipeline in shell form: [{ $match: {…} }, { $group: {…} }]; Run (⌘↩) runs it, Explain (⌥⌘E) shows its plan"
-        editor.otherLanguage = (problems: { text in
-            do {
-                _ = try MongoPipeline.stages(in: text)
-                return []
-            } catch let error as MongoPipeline.ParseError {
-                return [Self.problem(error, in: text)]
-            } catch { return [] }
-        }, folds: Self.folds)
+        editor.otherLanguage = (problems: Self.problems, folds: Self.folds)
         editor.completions = { [weak self] text, caret in self?.completions(text, caret) ?? (caret..<caret, []) }
         editor.completionDocs = { $0.kind == .template ? SQLTemplate.expand($0.text).text : $0.detail }
         model.openMongo[connectionID]?.readSample(database: database, collection: collection)
@@ -236,18 +229,25 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             fail(problem)
             return nil
         }
-        do {
-            let stages = try MongoPipeline.stages(in: text).map(\.document)
-            editor.runProblem = nil
-            let options = try MongoQueryText(collation: collation.stringValue, maxTimeMS: maxTime.stringValue).find()
-            return (stages, options)
-        } catch let error as MongoPipeline.ParseError {
-            let found = Self.problem(error, in: text)
+        func reject(_ found: SQLProblem) {
             if mode == .stages { show(.shell) }
             editor.runProblem = found
             editor.setSelectedRange(NSRange(location: found.range.lowerBound, length: 0))
             view.window?.makeFirstResponder(editor)
             fail(found.message)
+        }
+        do {
+            let parsed = try MongoPipeline.stages(in: text)
+            // What the server would refuse for sure stops Run here, where it is; a warning doesn't.
+            if let found = MongoPipeline.problems(parsed, in: text).first(where: { $0.severity == .error }) {
+                reject(found)
+                return nil
+            }
+            editor.runProblem = nil
+            let options = try MongoQueryText(collation: collation.stringValue, maxTimeMS: maxTime.stringValue).find()
+            return (parsed.map(\.document), options)
+        } catch let error as MongoPipeline.ParseError {
+            reject(Self.problem(error, in: text))
         } catch let error as MongoQueryText.Problem {
             fail("\(error.field): \(error.message)")
             view.window?.makeFirstResponder(error.field == "Collation" ? collation : maxTime)
@@ -255,6 +255,15 @@ final class MongoAggregationController: NSViewController, TabContent, DataGridVi
             fail(error.localizedDescription)
         }
         return nil
+    }
+
+    /// What the editor underlines in a pipeline's text: the parser's error, else what `MongoPipeline.problems` finds.
+    static func problems(in text: String) -> [SQLProblem] {
+        do {
+            return MongoPipeline.problems(try MongoPipeline.stages(in: text), in: text)
+        } catch let error as MongoPipeline.ParseError {
+            return [problem(error, in: text)]
+        } catch { return [] }
     }
 
     /// The parser's error as the editor underlines it: the character it points at, and which stage.
@@ -774,6 +783,24 @@ extension MongoAggregationController {
         MongoExportSheet.show(ref, activity: model.activity, on: window)
     }
 
+    /// Copy and Export Query as JavaScript: the pipeline with the options Run gives it, as mongosh runs it; what doesn't
+    /// parse is shown as Run shows it.
+    @objc func copyQueryScript(_ sender: Any?) { if let script = queryScript() { MongoExport.copy(script) } }
+    @objc func exportQueryScript(_ sender: Any?) {
+        guard let window = view.window, let script = queryScript() else { return }
+        MongoExport.save(script, collection: collection, on: window)
+    }
+
+    private func queryScript() -> String? {
+        guard let (stages, options) = parsed() else { return nil }
+        do {
+            return try MongoScript.aggregate(stages, options: options, database: database, collection: collection)
+        } catch {
+            fail("\(error)")
+            return nil
+        }
+    }
+
     /// The pipeline Export Documents… writes the documents of, or why it can't.
     func exportPipeline() -> (stages: [BSONDocument], collation: BSONDocument?, refusal: String?) {
         guard let stages = try? MongoPipeline.stages(in: editor.string).map(\.document),
@@ -850,6 +877,17 @@ extension MongoAggregationController {
 // MARK: Stages | Shell (lane P5-stages)
 
 extension MongoAggregationController {
+    /// What types a collection's name at the cursor of the page shown, for the tree's double-click: a string in Shell, a
+    /// name as SQL takes it on the SQL page; nil on Stages, whose cards pick collections themselves.
+    var nameInserter: ((String) -> Void)? {
+        guard mode != .stages else { return nil }
+        let sql = mode == .sql, editor = sql ? sqlPage.editor : self.editor
+        return { [weak self] name in
+            self?.view.window?.makeFirstResponder(editor)
+            editor.insertText(sql ? SQLCompletion.quote(name) : BSONValue.string(name).shellForm(), replacementRange: editor.selectedRange())
+        }
+    }
+
     /// Stages or Shell: switching never touches the text; a text that isn't a pipeline stays in Shell with its error.
     func show(_ mode: Mode) {
         if mode == .stages, let problem = stagesView.sync() { return showShell(because: problem) }

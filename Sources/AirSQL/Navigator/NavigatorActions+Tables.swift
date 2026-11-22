@@ -110,7 +110,9 @@ extension NavigatorActions {
             let request = SQLPreviewRequest(change: ChangeSQL(title: "Create database \(text)", statements: [sql],
                                                               connection: open.id),
                                             heading: "", caption: "")
-            confirmAndRun(request, on: open, window: window, ask: false, refreshing: [.database(text)])
+            confirmAndRun(request, on: open, window: window, ask: false, refreshing: [.database(text)]) { _ in
+                (window.windowController as? MainWindowController)?.sidebar.revealWhenShown(.database(open.id, text))
+            }
         }
     }
 

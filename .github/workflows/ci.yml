@@ -27,7 +27,7 @@ permissions:
 jobs:
   build-and-test:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       # AirSQL builds with the Command Line Tools alone (no Xcode project); the runner has them next to Xcode.
       DEVELOPER_DIR: /Library/Developer/CommandLineTools

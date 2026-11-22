@@ -30,6 +30,7 @@ extension MainMenu {
         addMongoDumpItems(menus)
         addMongoStageItems(menus)
         addMongoQueryItems(menus)
+        addMongoScriptItems(menus)
     }
 }
 
@@ -279,5 +280,17 @@ extension MainMenu {
         guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
               let after = collection.items.firstIndex(where: { $0.title == "Query History" }) else { return }
         for (offset, command) in Commands.mongoQueryCommands.enumerated() { collection.insertItem(command.item(), at: after + 1 + offset) }
+    }
+}
+
+// MARK: Query as JavaScript
+
+extension MainMenu {
+    /// Data ▸ Collection ▸ Copy and Export Query as JavaScript, after Copy Documents: for the collection or aggregation tab
+    /// in front.
+    static func addMongoScriptItems(_ menus: Menus) {
+        guard let collection = menus.data.items.last(where: { $0.title == "Collection" })?.submenu,
+              let after = collection.items.firstIndex(where: { $0.action == Commands.copyDocuments.action }) else { return }
+        for (offset, command) in Commands.mongoScriptCommands.enumerated() { collection.insertItem(command.item(), at: after + 1 + offset) }
     }
 }

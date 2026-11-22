@@ -9,6 +9,10 @@ public enum MongoStageForm: Equatable, Sendable {
     case sort([MongoBuilder.SortKey])
     case show(MongoBuilder.Projection)
     case limit(Int64)
+    case skip(Int64)
+    /// `$count`: one document with the number of documents under this name.
+    case count(String)
+    case addField(AddField)
     case unwind(Unwind)
     case shell(BSONDocument)
 
@@ -120,6 +124,81 @@ public enum MongoStageForm: Equatable, Sendable {
         var idIsDocument: Bool { by.count > 1 || (byDocument && by.count == 1) }
     }
 
+    /// `$addFields` of one field worked out of two operands, as SQL's `SELECT a + b AS c`. Operands as typed, SQL's way:
+    /// a field (`price`), a number (`1.5`) or text in quotes (`" - "`).
+    public struct AddField: Equatable, Sendable {
+        public enum Op: String, CaseIterable, Sendable {
+            case add, subtract, multiply, divide, concat
+
+            public var title: String {
+                switch self {
+                case .add: return "+"
+                case .subtract: return "−"
+                case .multiply: return "×"
+                case .divide: return "÷"
+                case .concat: return "joined with — CONCAT"
+                }
+            }
+
+            var mongo: String {
+                switch self {
+                case .add: return "$add"
+                case .subtract: return "$subtract"
+                case .multiply: return "$multiply"
+                case .divide: return "$divide"
+                case .concat: return "$concat"
+                }
+            }
+        }
+
+        public var name: String
+        public var left: String
+        public var op: Op
+        public var right: String
+
+        public init(name: String, left: String, _ op: Op, right: String) {
+            self.name = name
+            self.left = left
+            self.op = op
+            self.right = right
+        }
+
+        /// The operand's value in the expression: `"$price"`, a number, or the text.
+        func operand(_ typed: String) throws -> BSONValue {
+            let text = typed.trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty else { throw BSONError("Type a field, a number or \"text\" on both sides of \(op.title)") }
+            if text.hasPrefix("\"") || text.hasPrefix("'") {
+                guard case .string(let s)? = try? BSONValue(shellForm: text) else { throw BSONError("‘\(text)’: close the quotes around the text") }
+                guard op == .concat else { throw BSONError("‘\(text)’ is text: only joined with takes text") }
+                // MongoDB reads text starting with $ as a field.
+                guard !s.hasPrefix("$") else { throw BSONError("‘\(text)’ starts with $: write it in a Shell card, with $literal") }
+                return .string(s)
+            }
+            if let number = try? MongoBuilder.value(text, .number).value, MongoStageForm.isNumber(number) {
+                guard op != .concat else { throw BSONError("‘\(text)’ is a number: joined with takes fields and text, so put it in quotes") }
+                return number
+            }
+            guard !text.hasPrefix("$") else { throw BSONError("‘\(text)’: a field's name can't start with $") }
+            return .string("$" + text)
+        }
+
+        /// An operand as a card types it; nil for anything else (`"$$NOW"`, a document).
+        static func text(_ value: BSONValue) -> String? {
+            switch value {
+            case .string(let s): return MongoStageForm.fieldPath(s) ?? (s.hasPrefix("$") ? nil : value.shellForm())
+            case .int32, .int64, .double, .decimal128: return MongoBuilder.typed(value)?.text
+            default: return nil
+            }
+        }
+    }
+
+    static func isNumber(_ value: BSONValue) -> Bool {
+        switch value {
+        case .int32, .int64, .double, .decimal128: return true
+        default: return false
+        }
+    }
+
     public struct Unwind: Equatable, Sendable {
         public var path: String
         /// Keep documents whose array is missing or empty (a join's "keep documents without a match").
@@ -140,6 +219,9 @@ public enum MongoStageForm: Equatable, Sendable {
         case .sort: return "Sort — ORDER BY"
         case .show: return "Show fields — SELECT"
         case .limit: return "Limit — LIMIT"
+        case .skip: return "Skip — OFFSET"
+        case .count: return "Count — COUNT(*)"
+        case .addField: return "Add field — SELECT a + b AS c"
         case .unwind: return "Unwind"
         case .shell: return "Shell"
         }
@@ -169,13 +251,17 @@ public enum MongoStageForm: Equatable, Sendable {
         case ("$group", .document(let d)): return readGroup(d).map(MongoStageForm.group)
         case ("$sort", .document(let d)) where !d.fields.isEmpty: return MongoBuilder.sortKeys(d).map(MongoStageForm.sort)
         case ("$project", .document(let d)): return MongoBuilder.Projection(document: d).map(MongoStageForm.show)
-        case ("$limit", _):
-            switch value {
-            case .int32(let n) where n > 0: return .limit(Int64(n))
-            case .int64(let n) where n > 0: return .limit(n)
-            case .double(let d) where d >= 1 && d < 9.2e18 && d.rounded() == d: return .limit(Int64(d))
-            default: return nil
-            }
+        case ("$limit", _): return whole(value).flatMap { $0 > 0 ? .limit($0) : nil }
+        case ("$skip", _): return whole(value).map(MongoStageForm.skip)
+        case ("$count", .string(let s)): return countName(s) == nil ? .count(s) : nil
+        case ("$addFields", .document(let d)):
+            guard d.fields.count == 1, case .document(let expression) = d.fields[0].value, expression.fields.count == 1,
+                  let op = AddField.Op.allCases.first(where: { $0.mongo == expression.fields[0].key }),
+                  case .array(let operands) = expression.fields[0].value, operands.count == 2,
+                  let left = AddField.text(operands[0]), let right = AddField.text(operands[1]) else { return nil }
+            // Only what the card writes back exactly (a NumberLong(1) would come back as 1).
+            let form = MongoStageForm.addField(AddField(name: d.fields[0].key, left: left, op, right: right))
+            return (try? form.stage()) == stage ? form : nil
         case ("$unwind", .string(let s)): return fieldPath(s).map { .unwind(Unwind(path: $0)) }
         case ("$unwind", .document(let d)):
             guard d.keys.first == "path", Set(d.keys).count == d.keys.count,
@@ -189,6 +275,23 @@ public enum MongoStageForm: Equatable, Sendable {
             return .unwind(Unwind(path: path, preserve: preserve))
         default: return nil
         }
+    }
+
+    /// A whole number of 0 or more.
+    static func whole(_ value: BSONValue) -> Int64? {
+        switch value {
+        case .int32(let n) where n >= 0: return Int64(n)
+        case .int64(let n) where n >= 0: return n
+        case .double(let d) where d >= 0 && d < 9.2e18 && d.rounded() == d: return Int64(d)
+        default: return nil
+        }
+    }
+
+    /// What is wrong with a name for `$count`; nil when it is good.
+    static func countName(_ name: String) -> String? {
+        if name.isEmpty { return "Name the count" }
+        if name.hasPrefix("$") || name.contains(".") { return "‘\(name)’: the count's name can't start with $ or hold a dot" }
+        return nil
     }
 
     /// `"$a.b"` → `a.b`; nil for anything else (`"$$ROOT"`, a literal).
@@ -271,6 +374,17 @@ public enum MongoStageForm: Equatable, Sendable {
         case .limit(let n):
             guard n > 0 else { throw BSONError("Type a limit of 1 or more") }
             return one("$limit", Int32(exactly: n).map(BSONValue.int32) ?? .int64(n))
+        case .skip(let n):
+            guard n >= 0 else { throw BSONError("Type how many documents to skip: 0 or more") }
+            return one("$skip", Int32(exactly: n).map(BSONValue.int32) ?? .int64(n))
+        case .count(let name):
+            if let problem = Self.countName(name) { throw BSONError(problem) }
+            return one("$count", .string(name))
+        case .addField(let f):
+            guard !f.name.isEmpty else { throw BSONError("Name the new field") }
+            guard !f.name.hasPrefix("$") else { throw BSONError("‘\(f.name)’: a field's name can't start with $") }
+            let expression = one(f.op.mongo, .array([try f.operand(f.left), try f.operand(f.right)]))
+            return one("$addFields", .document(BSONDocument([(f.name, .document(expression))])))
         case .unwind(let u):
             let p = "$" + (try path(u.path, "the array field to unwind"))
             return one("$unwind", u.preserve ? .document(BSONDocument([("path", .string(p)), ("preserveNullAndEmptyArrays", .bool(true))]))
@@ -283,7 +397,8 @@ public enum MongoStageForm: Equatable, Sendable {
 
     /// The paths after each stage (`result[n]`: what stage n+1 sees), from the collection's sample paths (`items.[].sku`)
     /// and a joined collection's (`foreign(from)`): Join adds `<as>` and `<as>.<their paths>`, Group gives `_id` and its
-    /// names, Show narrows, Unwind turns `path.[]…` into `path…`; the others keep them.
+    /// names, Count its name, Add field adds its name, Show narrows, Unwind turns `path.[]…` into `path…`; the others keep
+    /// them.
     public static func fields(after forms: [MongoStageForm], base: [String], foreign: (String) -> [String]) -> [[String]] {
         var paths = base
         return forms.map { form in
@@ -305,7 +420,9 @@ public enum MongoStageForm: Equatable, Sendable {
                     if p == array + ".[]" { return nil }
                     return p.hasPrefix(array + ".[].") ? array + "." + p.dropFirst(array.count + 4) : p
                 }
-            case .filter, .sort, .limit, .shell: break
+            case .count(let name): paths = [name]
+            case .addField(let f): paths.append(f.name)
+            case .filter, .sort, .limit, .skip, .shell: break
             }
             var seen = Set<String>()
             paths = paths.filter { seen.insert($0).inserted }

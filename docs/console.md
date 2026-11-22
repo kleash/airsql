@@ -43,13 +43,17 @@ session of its own, so a long query in one tab leaves the others free.
   - A name matches by its start, a word in it (`cust` finds `old_customers`), an abbreviation of its words (`fica` finds
     `film_category`, `ob` finds `ORDER BY`) or its middle. Keywords of several words come as one, in the case Settings ▸
     Format sets, and words already in the text come last.
-  - After FROM or JOIN: tables, views and the statement's CTEs. A table comes with an alias (`orders o`) unless you turn
+  - After FROM or JOIN: tables, views and the statement's CTEs; the space after FROM, JOIN, INTO, UPDATE or TABLE opens
+    the list. A table comes with an alias (`orders o`) unless you turn
     that off in Settings ▸ Editor. After JOIN the joins come first: those of foreign keys, real or defined by you, then
     those names suggest (`customer_id` to `customers.id`). After ON, the condition.
   - Columns come from tables, CTEs and subqueries alike, with the table's name when two have the same one; `alias.` lists
     that table's. ORDER BY, GROUP BY and HAVING offer the aliases of the select list too.
   - `SELECT nam` with no FROM yet offers every table's columns: choosing one adds its FROM.
   - Just after `*` or `t.*` in a select list, the list offers all the columns in its place.
+  - It works the same in the middle of a query you're changing, and in a tab of several queries with no `;` between
+    them: each is read as its own, though the first is underlined (**Expected ; before SELECT**), as the server would
+    refuse the text as it stands.
   - `INSERT INTO t (` offers the whole column list, then each column left. `VALUES (` offers a field for each column.
   - After `status = ` or inside `status = '` an ENUM or SET column offers its values. `ENGINE=`, `CHARSET` and `COLLATE`
     offer theirs, CALL the procedures, `@` the variables of the text, `@@` and SET the common server variables.
@@ -68,7 +72,7 @@ session of its own, so a long query in one tab leaves the others free.
   built-in ones, and the connection's **History** by day, each with a bar as long as it took. Double-click one to put it
   in at the cursor, or drag it into the editor (a column's name comes quoted where it needs to be, as completion puts it
   in). Right-click a snippet to edit or delete it; editing a built-in one makes a copy of your own.
-- **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor, with **Regular Expression**, **Match
+- **Edit ▸ Find** (⌘F) and **Find and Replace** (⌥⌘F) find in the editor (the word selected in a line, if there is one), with **Regular Expression**, **Match
   Case**, **Whole Words** and **In Selection** (the text selected when you tick it). With a regular expression, `$1`, `$2`… in the replacement put in its groups. **Replace All** is one change
   that **Undo** takes back.
 - Typing `(`, `[` or a quote adds its partner, or wraps the selection; typing the partner steps over it, and Delete
@@ -88,7 +92,8 @@ session of its own, so a long query in one tab leaves the others free.
 - **Edit ▸ SQL ▸ Go to Line…** (⌃G) goes to the line a message names. Long lines wrap at the editor's edge; **View ▸ Word Wrap**
   (also in Settings ▸ Editor) turns that off, for sideways scrolling.
 - **Edit ▸ SQL ▸ Comment Lines** (⌘/) comments the selected lines out with `--`, or takes the comment away. **Shift Right**
-  (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines.
+  (⌘]) and **Shift Left** (⌘[) indent; so do Tab and ⇧Tab on several lines. With nothing selected, they change the cursor's
+  line and the cursor stays where it was in it.
 - **Edit ▸ SQL ▸ Lines** works on the selected lines, or the cursor's: **Duplicate Line** (⌃D), **Delete Line** (⌃⇧K), **Move Line Up** and
   **Down** (⌥⇧↑, ⌥⇧↓), **Join Lines** (⌃⇧J; a line ending in a `--` comment, or a line break inside a string, stays), **Sort Lines** and
   **Reverse Lines**. ⌘C with nothing selected copies the line.
@@ -157,9 +162,12 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
 
 - **Fixes and Actions…** (⌥↩) lists what can be done at the cursor: the fixes for what's underlined there (the closest
   name for a typo, `IS NULL`, qualifying an ambiguous column, refreshing the schema, writing the ALTER TABLE for a
-  missing column), and changes such as quoting or qualifying a name, adding a table alias, expanding `*` to its columns,
+  missing column, the `;` between two queries), and changes such as quoting or qualifying a name, adding a table alias, expanding `*` to its columns,
   moving a subquery to WITH, and splitting or merging INSERTs or removing one of their columns. Each is one step of Undo.
 - **Go to Declaration** (⌘B) jumps to where an alias or WITH query is declared, and opens a table or routine.
+- **⌘-click** a name to go where it leads: an alias or WITH query to where it's declared, a table, view or column to
+  the table's rows in a tab (as **Open Table at Cursor**, F4, does), a routine to its editor. Right-click (or
+  Control-click) a name for the same commands in a menu.
 - **Find Usages…** (⌥F7) lists every place in the text that means the name at the cursor. The other places are also
   tinted when you stop on a name, and BEGIN, CASE and IF are tinted with their END.
 - **Rename Name…** (⇧F6) changes an alias, WITH query, column alias or `@variable` everywhere it's used. On a table or
@@ -186,6 +194,10 @@ Everything here is in **Query ▸ Code**, and none of it changes anything on the
 | Stop the statement that is running | ⌘. (Query ▸ Cancel) |
 
 The ▶ beside the line numbers, at the start of the statement at the cursor, runs it too.
+
+On a tab that isn't connected (after AirSQL opens again, or a Disconnect), Run connects first, with the usual password
+and trust prompts, then runs as it would have. If the connect fails or you cancel it, nothing runs. The empty results
+have a **Connect** button too.
 
 The statement that ran is highlighted for a moment, so there is no "which statement?" question. Statements are split
 on `;`, or on the delimiter a `DELIMITER` line sets, and sent one after another. If one fails with others to come, a
@@ -241,6 +253,7 @@ share the current database too.
 - Each result set gets a **result tab** under the editor, named after the comment just above its query (`-- Top
   customers` names it "Top customers"), else "Result 1", with its rows and columns. The next run replaces the result
   tabs, unless you **pin** one (right-click it, or Query ▸ Result ▸ Pin Result); a result with edits not yet applied stays too.
+  Hold the pointer over a result tab to see the first line of its statement.
   A tab's ✕ closes it. **Query ▸ Result ▸ Show Next Result** (⌥⌘]) and **Show Previous Result** (⌥⌘[) move along the tabs,
   Messages included.
 - **Query ▸ Result ▸ Run Result Again** (⇧⌘R) runs the shown result's statement once more and puts the new rows in its tab,
@@ -255,7 +268,7 @@ share the current database too.
 - **Messages** lists when and what each statement did: its rows or the rows it changed, how long it took, the server's
   warnings, or its error and the line it points to (that line is marked red beside the editor, the place the server
   names is underlined in red, and hovering over it shows the message, until you change the text). Double-click a message
-  to select its statement.
+  to select its statement, or an error's, the place the server names.
 - A result keeps at most its first 100,000 rows (**Settings ▸ Grid ▸ Most rows in a result**); the tab then says it is cut short.
 - **Edit ▸ Find** (⌘F) with a result's rows focused finds values in them, as in a [table tab](table-data.md): ⌘G and ⇧⌘G
   move between matches, and Options has Match Case, Regular Expression, Whole Words and Filter Rows. Replace is for

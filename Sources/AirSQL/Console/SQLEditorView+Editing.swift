@@ -59,16 +59,29 @@ extension SQLEditorView {
         return range
     }
 
-    /// Changes each selected line with `change` (nil: leaves it), as one edit, selecting the lines after.
+    /// Changes each selected line with `change` (nil: leaves it), as one edit, selecting the lines after; a caret with
+    /// nothing selected stays where it was in its line, so the next key typed doesn't replace the line.
     func changeLines(_ change: ([String]) -> [String]) {
-        let range = selectedLines
+        let range = selectedLines, selection = selectedRange()
         let block = (string as NSString).substring(with: range)
         let endsWithNewline = (block as NSString).hasSuffix("\n")
         var lines = block.components(separatedBy: "\n")
         if endsWithNewline { lines.removeLast() }
         let changed = change(lines).joined(separator: "\n") + (endsWithNewline ? "\n" : "")
         guard changed != block else { return }
-        replace(range, with: changed, select: NSRange(location: range.location, length: (changed as NSString).length))
+        var select = NSRange(location: range.location, length: (changed as NSString).length)
+        if selection.length == 0 {
+            // The part that changed lies between what the line keeps at its start and at its end: past it, the caret moves by
+            // what went in or out; inside it (a `--` taken away), to its start.
+            let old = Array(block.utf16), new = Array(changed.utf16), shorter = min(old.count, new.count)
+            var prefix = 0, suffix = 0
+            while prefix < shorter, old[prefix] == new[prefix] { prefix += 1 }
+            while suffix < shorter - prefix, old[old.count - 1 - suffix] == new[new.count - 1 - suffix] { suffix += 1 }
+            let caret = selection.location - range.location
+            select = NSRange(location: range.location + (caret >= old.count - suffix ? caret + new.count - old.count : min(caret, prefix)),
+                             length: 0)
+        }
+        replace(range, with: changed, select: select)
     }
 
     /// Comments the lines out with "-- " at their common indentation, or takes the comment away when every line that
@@ -231,7 +244,10 @@ extension SQLEditorView {
         if !NSLocationInRange(index, selectedRange()) { setSelectedRange(NSRange(location: index, length: 0)) }
         let menu = NSMenu(title: "SQL Editor")
         menu.add([Commands.runStatement, Commands.runSelection, Commands.explain, Commands.formatSQL, Commands.toggleComment,
-                  Commands.editAsTable, nil, Commands.cut, Commands.copy, Commands.paste, Commands.pastePlain])
+                  Commands.editAsTable, nil])
+        // The name under the pointer: where it leads.
+        if nameContext != nil { menu.add([Commands.openNameData, Commands.goToDeclaration, Commands.goToDDL, Commands.findUsages, nil]) }
+        menu.add([Commands.cut, Commands.copy, Commands.paste, Commands.pastePlain])
         return menu
     }
 

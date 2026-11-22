@@ -54,7 +54,8 @@ Exactly**, **Load More** and **Load All** stay. Right-click them to copy what th
 - **Data ▸ Columns ▸ Hide Column** hides the selected columns. A column comes back where it was.
 - **Data ▸ Columns ▸ Freeze** keeps the columns up to the focused one (the key column, say) at the left while you scroll across.
   Choose it on the last frozen column to unfreeze them. AirSQL remembers it for each table.
-- Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell.
+- Esc closes the find bar, leaves Record View and Transpose, then narrows the selection to the focused cell. In a query
+  tab's result, Esc once more goes back to the editor, as **Go to Editor** (⌥⌘2) does.
 - Drag a header to move its column, drag its right edge to resize it, and double-click the edge to fit its values.
   AirSQL remembers the columns' order, widths, hidden and frozen columns and display types for each table, and for
   each query in the query tab, so they open as you left them.

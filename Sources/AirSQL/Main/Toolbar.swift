@@ -2,6 +2,7 @@ import AirSQLCore
 import AppKit
 
 extension NSToolbarItem.Identifier {
+    static let newConnection = Self("newConnection")
     static let connection = Self("connection")
     static let database = Self("database")
     static let run = Self("run")
@@ -13,7 +14,7 @@ extension NSToolbarItem.Identifier {
     static let cancel = Self("cancel")
 }
 
-/// The main window's toolbar (plan §2.4): connection ▾ · database ▾ · Run · Run All · Explain · Tx ▾ · Commit · Rollback ·
+/// The main window's toolbar (plan §2.4): + (New Connection) · connection ▾ · database ▾ · Run · Run All · Explain · Tx ▾ · Commit · Rollback ·
 /// Cancel. Its buttons send their commands through the responder chain and are enabled only where something can
 /// handle them, saying why not when they can't.
 @MainActor
@@ -54,7 +55,7 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.connection, .database, .space, .run, .runAll, .explain, .space, .transactionMode, .commit, .rollback, .cancel, .flexibleSpace]
+        [.newConnection, .connection, .database, .space, .run, .runAll, .explain, .space, .transactionMode, .commit, .rollback, .cancel, .flexibleSpace]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -69,6 +70,9 @@ final class MainToolbar: NSObject, NSToolbarDelegate {
         case .database: return popupItem(identifier, flag ? databasePopup : NSPopUpButton(), label: "Database", width: (110, 170))
         case .transactionMode: return popupItem(identifier, flag ? transactionPopup : NSPopUpButton(), label: "Transaction Mode",
                                                 width: (110, 130))
+        case .newConnection: return CommandToolbarItem(identifier, Commands.newConnection, title: "New Connection", symbol: "plus",
+                                                       iconOnly: true, reason: "A sheet is open: answer it first",
+                                                       mongoReason: "A sheet is open: answer it first")
         case .run: return CommandToolbarItem(identifier, Commands.runStatement, title: "Run", symbol: "play.fill", primary: true,
                                              reason: "Open a query tab (⌘T) to run SQL",
                                              mongoReason: "Open a collection (double-click it in the tree) to find its documents")

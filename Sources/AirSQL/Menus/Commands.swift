@@ -39,6 +39,7 @@ import AppKit
     @objc optional func saveQueryAs(_ sender: Any?)
     @objc optional func closeTab(_ sender: Any?)
     @objc optional func closeOtherTabs(_ sender: Any?)
+    @objc optional func closeTabsToRight(_ sender: Any?)
     @objc optional func closeAllTabs(_ sender: Any?)
     @objc optional func reopenClosedTab(_ sender: Any?)
     @objc optional func quickOpen(_ sender: Any?)
@@ -389,6 +390,8 @@ enum Commands {
                                   tip: "Close the tab shown; asks first about unsaved text or pending edits")
     static let closeOtherTabs = Command("Close Other Tabs", #selector(AirSQLActions.closeOtherTabs(_:)), "w", [.command, .option],
                                         tip: "Close every tab but the one shown; asks first about unsaved work")
+    static let closeTabsToRight = Command("Close Tabs to the Right", #selector(AirSQLActions.closeTabsToRight(_:)),
+                                          tip: "Close the tabs after the one shown, but pinned ones; asks first about unsaved work")
     static let closeAllTabs = Command("Close All Tabs", #selector(AirSQLActions.closeAllTabs(_:)), "W", [.command, .option],
                                       tip: "Close every tab; asks first about unsaved work")
     static let reopenClosedTab = Command("Reopen Closed Tab", #selector(AirSQLActions.reopenClosedTab(_:)), "T",
@@ -966,7 +969,7 @@ enum Commands {
     /// Every command above, for the checks (the tab commands once).
     static let all: [Command] = [
         about, settings, hide, hideOthers, showAll, quit,
-        newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
+        newConnection, newQuery, open, quickOpen, closeTab, closeOtherTabs, closeTabsToRight, closeAllTabs, reopenClosedTab, closeWindow, save, saveAs, duplicateTab, renameTab, renameF2,
         revealInFinder,
         runSQLFile, importCSV, importClipboard, copyResultToTable, importSSHConfig, importConnections, exportConnections, newConnectionFromURL,
         undo, redo, cut, copy, copyWithHeaders, copyAs, copySummary, paste, pastePlain, delete, selectAll, extendSelection, shrinkSelection, copyName, copyPlainName, copyColumnName, copyCreate,

@@ -40,9 +40,10 @@ extension AppTests {
             }
             let tx = main.toolbarController.transactionPopup
             toolbar.validateVisibleItems()
-            #expect(button(.run)?.isEnabled == false && button(.run)?.toolTip?.hasPrefix("Connect first: double-click") == true)
+            // Not connected, Run would connect first; with nothing typed it has nothing to run.
+            #expect(button(.run)?.isEnabled == false && button(.run)?.toolTip == "Type a statement first")
             let help = AXNode.flatten(try #require(main.window)).first { $0.id == "toolbar.run" }?.help
-            #expect(help?.hasPrefix("Connect first: double-click") == true, "VoiceOver reads why too: \(help ?? "")")
+            #expect(help == "Type a statement first", "VoiceOver reads why too: \(help ?? "")")
             #expect(button(.commit)?.isEnabled == false && button(.commit)?.toolTip == "No transaction is open in this tab")
             #expect(button(.cancel)?.isEnabled == false && button(.cancel)?.toolTip == "Nothing is running in this tab")
             #expect(!tx.isEnabled && tx.toolTip?.hasPrefix("Connect first: double-click") == true)
@@ -524,6 +525,31 @@ extension AppTests {
             #expect(editor.string == "a\nb")
         }
 
+        /// ⌘/, ⌘] and ⌘[ with nothing selected keep the caret where it was in its line, moved with its text; a selection
+        /// stays on the lines. Each is one Undo.
+        @Test func lineCommandsKeepTheCaret() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            editor.setText("SELECT a\n  FROM t")
+            editor.setSelectedRange(NSRange(location: 13, length: 0))  // FR|OM
+            editor.toggleComment(nil)
+            #expect(editor.string == "SELECT a\n  -- FROM t" && editor.selectedRange() == NSRange(location: 16, length: 0))
+            editor.undoManager?.undo()
+            #expect(editor.string == "SELECT a\n  FROM t", "one Undo")
+            editor.setText("SELECT a\n  -- FROM t")
+            editor.setSelectedRange(NSRange(location: 12, length: 0))  // inside the --
+            editor.toggleComment(nil)
+            #expect(editor.string == "SELECT a\n  FROM t" && editor.selectedRange() == NSRange(location: 11, length: 0))
+            editor.setSelectedRange(NSRange(location: 13, length: 0))
+            editor.indentLines(nil)
+            #expect(editor.string == "SELECT a\n      FROM t" && editor.selectedRange() == NSRange(location: 17, length: 0))
+            editor.outdentLines(nil)
+            #expect(editor.string == "SELECT a\n  FROM t" && editor.selectedRange() == NSRange(location: 13, length: 0))
+            editor.setSelectedRange(NSRange(location: 2, length: 10))
+            editor.toggleComment(nil)
+            #expect(editor.string == "-- SELECT a\n--   FROM t" && editor.selectedRange() == NSRange(location: 0, length: 23))
+        }
+
         /// Openers bring their partners, outside strings; closers step over them; Delete takes an empty pair; ⌘Z undoes it.
         @Test func bracketsAndQuotesCloseThemselves() async throws {
             let (_, _, console) = try await Self.console()
@@ -789,6 +815,39 @@ extension AppTests {
             #expect(find.isHidden && console.view.window?.firstResponder === console.editor)
         }
 
+        /// ⌘F takes the word selected in a line as what to find; a selection over lines stays, for In Selection.
+        @Test func findTakesTheSelectedWord() async throws {
+            let (main, harness, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            let find = try #require(console.findBar)
+            defer { find.close(nil) }
+            editor.setText("SELECT total\nFROM orders")
+            editor.setSelectedRange(NSRange(location: 7, length: 5))
+            main.window?.makeFirstResponder(editor)
+            #expect(await call(harness, "menu", ["path": "Edit > Find > Find…"]).error == nil)
+            #expect(find.search.stringValue == "total" && find.matches()?.count == 1)
+            editor.setSelectedRange(NSRange(location: 0, length: 16))
+            main.window?.makeFirstResponder(editor)
+            #expect(await call(harness, "menu", ["path": "Edit > Find > Find…"]).error == nil)
+            #expect(find.search.stringValue == "total", "several lines: what In Selection searches")
+        }
+
+        /// Double-clicking an error in Messages selects the place the server named, underlined in red; another message
+        /// selects its statement.
+        @Test func anErrorRevealsItsPlace() async throws {
+            let (_, _, console) = try await Self.console()
+            let editor = try #require(console.editor)
+            editor.setText("SELECT 1;\nSELECT nope FROM t;")
+            editor.runProblem = SQLProblem(range: 17..<21, message: "Unknown column 'nope'")
+            let statement = NSRange(location: 10, length: 18)
+            console.reveal(ConsoleMessage(level: .error, range: statement, line: 2, statement: "SELECT nope FROM t", text: "Unknown column"))
+            #expect(editor.selectedRange() == NSRange(location: 17, length: 4))
+            console.reveal(ConsoleMessage(level: .ok, range: statement, line: 2, statement: "SELECT nope FROM t", text: "1 row"))
+            #expect(editor.selectedRange() == statement)
+            console.reveal(ConsoleMessage(level: .error, range: NSRange(location: 0, length: 8), line: 1, statement: "SELECT 1", text: "x"))
+            #expect(editor.selectedRange() == NSRange(location: 0, length: 8), "the place is in another statement")
+        }
+
         @Test func theSQLLogShowsFiltersAndClearsTheLog() async throws {
             let folder = try scratch()
             let log = SQLLog(fileURL: URL(fileURLWithPath: folder + "/SQL.log"))
@@ -846,6 +905,32 @@ extension AppTests {
             // Not inside a string.
             console.editor.insertText(" = 'o", replacementRange: console.editor.selectedRange())
             #expect(!popup.isShown)
+        }
+
+        /// A space after FROM, JOIN, INTO, UPDATE or TABLE opens the tables, before a letter is typed; not after a dot,
+        /// in a string or a comment, nor after another word.
+        @Test func aSpaceAfterFromOpensTheTables() async throws {
+            let (cache, _) = try await SchemaTests.loaded(SchemaFixtures.mariadb118)
+            ConsoleViewController.schemaCache = { _ in cache }
+            defer { ConsoleViewController.schemaCache = { _ in nil } }
+            var saved = Fixtures.local
+            saved.database = "airsql_fixture"
+            let (_, _, console) = try await Self.console(testModel([saved]), on: saved.id)
+            let editor = try #require(console.editor)
+            func type(_ text: String) { for character in text { editor.insertText(String(character), replacementRange: editor.selectedRange()) } }
+            func shown(after text: String) -> Bool {
+                editor.completionPopup?.close()
+                editor.setText("")
+                type(text)
+                return editor.completionPopup?.isShown == true
+            }
+            #expect(shown(after: "SELECT * FROM "))
+            #expect(editor.completionPopup?.items.contains { $0.kind == .table } == true)
+            #expect(shown(after: "SELECT * FROM orders o join "), "any case")
+            #expect(shown(after: "update "))
+            for text in ["SELECT o.from ", "SELECT 'FROM ", "-- FROM ", "SELECT * FROM orders "] {
+                #expect(!shown(after: text), "\(text)")
+            }
         }
 
         @Test func templatesExpandAndTabWalksTheirFields() async throws {
@@ -1076,12 +1161,34 @@ extension AppTests {
             ConsoleDocuments.shared.fileURL = ConsoleTabStore.fileURL
         }
 
-        @Test func runSaysToConnectFirst() async throws {
-            let (_, harness, console) = try await Self.console()
-            _ = await call(harness, "type", ["text": "SELECT 1"])
-            let run = await call(harness, "menu", ["path": "Query > Run Statement"])
-            #expect(run.error?.contains("Connect first") == true, "\(run.error ?? "")")
-            #expect(console.results.cancelButton.isHidden)
+        /// Run on a tab that isn't connected (after a relaunch, or a Disconnect) connects first: here nothing listens, so
+        /// the connect fails, its error shows and nothing runs. An agent's Run there is refused, as it always was.
+        @Test func runConnectsFirstAndRunsNothingWhenThatFails() async throws {
+            let closed = SavedConnection(name: "Closed port", host: "127.0.0.1", port: 1, user: "nobody")
+            let (main, harness, service) = try await AgentGateUITests.agents([closed])
+            defer { service.close() }
+            let model = main.model
+            func failed() -> Bool { if case .failed? = model.states[closed.id] { return true } else { return false } }
+            func dismiss() { if let sheet = main.window?.attachedSheet { main.window?.endSheet(sheet) } }
+            main.sidebar.select([closed.id])
+            #expect(await call(harness, "menu", ["path": "File > New Query"]).error == nil)
+            let console = try #require(main.selectedTab?.content as? ConsoleViewController)
+            #expect(await eventually(timeout: 10) { failed() })  // New Query's own connect
+            dismiss()
+            model.states[closed.id] = nil
+            main.window?.layoutIfNeeded()
+            let connect = try #require(find(NSButton.self, id: "console.emptyAction", in: console.view))
+            #expect(connect.title == "Connect" && connect.target === console && connect.toolTip?.isEmpty == false)
+            console.editor.setText("SELECT 1")
+            let refused = await agentCall(service, "menu", ["path": "Query > Run Statement"])
+            #expect(refused.error?.contains("Connect first") == true, "\(refused.error ?? "")")
+            #expect(model.states[closed.id] == nil, "the agent's Run connected nothing")
+            #expect(await call(harness, "menu", ["path": "Query > Run Statement"]).error == nil)
+            #expect(await eventually(timeout: 10) { failed() }, "the person's Run connected first")
+            #expect(await eventually(timeout: 5) { main.window?.attachedSheet != nil }, "the connect's error shows")
+            dismiss()
+            #expect(console.running == nil && console.lastOutcome == nil && console.results.cancelButton.isHidden)
+            #expect(!console.messagesView.messages.contains { $0.text.hasPrefix("Not connected") })
             let commit = await call(harness, "menu", ["path": "Query > Commit"])
             #expect(commit.error?.contains("No transaction is open") == true, "\(commit.error ?? "")")
         }
@@ -1314,5 +1421,20 @@ extension AppTests.ConsoleAppTests {
         let messages = try #require(console.results.tabButton(for: console.messagesTab))
         messages.otherMouseUp(with: try Self.middleClick())
         #expect(console.resultTabs.count == 1 && !console.resultTabs.contains { $0 === tab })
+    }
+
+    /// A result's tooltip has its statement's first line after its label, cut short; the tab keeps its name.
+    @Test func aResultsTooltipShowsItsStatement() async throws {
+        let (_, _, console) = try await Self.console()
+        console.addResult(ConsoleFixtures.customers(rows: 1), title: nil, summary: "")
+        let tab = try #require(console.resultTabs.last)
+        tab.sql = "\n  SELECT name FROM customers\nWHERE id = 1"
+        console.selectResult(tab)
+        let button = try #require(console.results.tabButton(for: tab))
+        #expect(button.toolTip?.hasPrefix(tab.label + " — SELECT name FROM customers: ") == true, "\(button.toolTip ?? "")")
+        #expect(tab.title.hasPrefix("Result "))
+        tab.sql = "SELECT '" + String(repeating: "x", count: 100) + "'"
+        console.selectResult(console.messagesTab)
+        #expect(button.toolTip?.contains(String(repeating: "x", count: 71) + "…:") == true, "\(button.toolTip ?? "")")
     }
 }

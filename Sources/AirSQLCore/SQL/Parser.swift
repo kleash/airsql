@@ -9,14 +9,17 @@ public struct SQLParser {
     /// Every statement of `text`, in order.
     public static func parse(_ text: String, noBackslashEscapes: Bool = false) -> [SQLParsedStatement] {
         withDeepStack {
-            SQLSplitter.statements(in: text, noBackslashEscapes: noBackslashEscapes).map { read($0, noBackslashEscapes: noBackslashEscapes) }
+            SQLSplitter.statements(in: text, noBackslashEscapes: noBackslashEscapes).flatMap { read($0, noBackslashEscapes: noBackslashEscapes) }
         }
     }
 
     /// One statement of `SQLSplitter`.
     public static func parse(_ statement: SQLStatement, noBackslashEscapes: Bool = false) -> SQLParsedStatement {
-        withDeepStack { read(statement, noBackslashEscapes: noBackslashEscapes) }
+        withDeepStack { read(statement, noBackslashEscapes: noBackslashEscapes)[0] }
     }
+
+    /// Words only a statement starts with where another has just ended.
+    private static let starters: Set<String> = ["SELECT", "WITH", "INSERT", "UPDATE", "DELETE", "REPLACE"]
 
     /// Runs `body`, which recurses over a tree, on a stack of its own: a dispatch queue's 512 KB holds only some 40
     /// brackets in a debug build.
@@ -34,7 +37,9 @@ public struct SQLParser {
 
     private final class Box<T> { var value: T? }
 
-    private static func read(_ statement: SQLStatement, noBackslashEscapes: Bool) -> SQLParsedStatement {
+    /// What `statement` reads as: one statement, or several when queries follow each other with no ; between them. The
+    /// server would refuse that, so the first keeps its error, but each is read: names resolve and complete in all of them.
+    private static func read(_ statement: SQLStatement, noBackslashEscapes: Bool) -> [SQLParsedStatement] {
         var lexer = SQLLexer(statement.sql, noBackslashEscapes: noBackslashEscapes)
         let offset = statement.range.lowerBound
         var tokens: [Token] = [], hasCode = false, open = false
@@ -50,13 +55,25 @@ public struct SQLParser {
             }
         }
         var parser = SQLParser(tokens: tokens, end: statement.range.upperBound)
-        var parsed = parser.statement()
-        parsed.range = statement.range
-        parsed.end = statement.end
-        parsed.query?.extent = statement.range.lowerBound..<max(statement.end, statement.range.upperBound)
-        if hasCode || open || parser.gaveUp { parsed.shallow = true }
-        parsed.errors = parsed.shallow ? [] : parser.errors
-        return parsed
+        var all: [SQLParsedStatement] = [], start = statement.range.lowerBound
+        while true {
+            let first = parser.index
+            parser.errors = []
+            var parsed = parser.statement()
+            if hasCode || open || parser.gaveUp { parsed.shallow = true }
+            let more = !parsed.shallow && !parser.atEnd && parser.index > first && starters.contains(parser.current.upper)
+            if more, parser.errors.first?.range == parser.current.range, parser.errors[0].message.hasPrefix("Unexpected ") {
+                parser.errors[0].message = "Expected ; before \(parser.current.text)"
+            }
+            let stop = more ? parser.lastEnd : statement.range.upperBound
+            parsed.range = start..<stop
+            parsed.end = more ? stop : statement.end
+            parsed.query?.extent = start..<(more ? parser.current.range.lowerBound : max(statement.end, statement.range.upperBound))
+            parsed.errors = parsed.shallow ? [] : parser.errors
+            all.append(parsed)
+            guard more else { return all }
+            start = parser.current.range.lowerBound
+        }
     }
 
     struct Token {

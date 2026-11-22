@@ -203,12 +203,28 @@ extension ConsoleViewController {
     private func withObject(_ body: @escaping (DatabaseObject, OpenConnection, MainWindowController) -> Void) {
         guard let main = mainWindow, let open = model.openConnection(connectionID) else { return }
         editor.withInsight { [weak self] analysis in
-            guard let self, let symbol = analysis.reference(at: self.editor.selectedRange().location)?.symbol, let object = open.object(of: symbol) else {
-                self?.editor.showNote("Nothing to Show Here", "Put the cursor on a table, a view or a routine.")
+            guard let self else { return }
+            let caret = self.editor.selectedRange().location
+            guard let object = (analysis.reference(at: caret)?.symbol).flatMap(open.object(of:)) ?? self.tableNamed(at: caret, on: open) else {
+                self.editor.showNote("Nothing to Show Here", "Put the cursor on a table, a view or a routine.")
                 return
             }
             body(object, open, main)
         }
+    }
+
+    /// The table the word at `caret` names, in the database written before it or this tab's, for statements the reading
+    /// takes no names from (SHOW CREATE TABLE shop.orders).
+    private func tableNamed(at caret: Int, on open: OpenConnection) -> DatabaseObject? {
+        let tokens = editor.tokens, text = editor.string as NSString
+        func isName(_ token: SQLToken) -> Bool { token.kind == .word || token.kind == .quotedName }
+        func word(_ token: SQLToken) -> String { SQLQuote.unquoted(text.substring(with: NSRange(token.range))) }
+        guard let index = tokens.firstIndex(where: { isName($0) && $0.range.lowerBound <= caret && caret <= $0.range.upperBound }),
+              tokens[index].range.upperBound <= text.length else { return nil }
+        let qualified = index >= 2 && isName(tokens[index - 2]) && text.substring(with: NSRange(tokens[index - 1].range)) == "."
+        guard let database = qualified ? word(tokens[index - 2]) : database, let table = open.snapshot.table(database, word(tokens[index])),
+              let kind = DatabaseObject.Kind(rawValue: table.kind.rawValue) else { return nil }
+        return DatabaseObject(kind, database, table.name)
     }
 
     @objc func quickDefinition(_ sender: Any?) {

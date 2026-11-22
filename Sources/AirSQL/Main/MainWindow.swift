@@ -523,6 +523,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         close(tabs.filter { $0 !== keep && !$0.pinned })
     }
 
+    @objc func closeTabsToRight(_ sender: Any?) {
+        guard let keep = selectedTab, let index = tabs.firstIndex(where: { $0 === keep }) else { return }
+        close(tabs[(index + 1)...].filter { !$0.pinned })
+    }
+
     @objc func closeAllTabs(_ sender: Any?) { close(tabs.filter { !$0.pinned }) }
 
     /// Pin Tab: pinned tabs go first in the strip, in their order.
@@ -716,6 +721,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case Commands.closeOtherTabs.action?:
             enabled = tabs.contains { $0 !== selectedTab && !$0.pinned }
             reason = tabs.count > 1 ? "The other tabs are pinned" : "Only one tab is open"
+        case Commands.closeTabsToRight.action?:
+            let after = tabs.firstIndex { $0 === selectedTab }.map { tabs[($0 + 1)...] } ?? []
+            enabled = after.contains { !$0.pinned }
+            reason = after.isEmpty ? "No tab is to the right of this one" : "The tabs to the right are pinned"
         case Commands.pinTab.action?:
             enabled = selectedTab != nil
             reason = "No tab is open"

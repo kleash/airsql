@@ -58,6 +58,22 @@ extension SidebarController: NSMenuItemValidation {
         return (open, name)
     }
 
+    /// What types `node`'s name into the tab in front, for a double-click: a query tab of the row's connection takes an
+    /// object's name or that of something a table holds, and a MongoDB aggregation's Shell or SQL page a collection's.
+    func nameTaker(_ node: SidebarNode) -> ((String) -> Void)? {
+        let front = main?.selectedTab?.content
+        switch node.kind {
+        case .object(let id, _), .detail(let id, _, _, _):
+            guard let console = front as? ConsoleViewController, console.connectionID == id else { return nil }
+            return console.insertName
+        case .mongo(let id, let item) where item.collection != nil && item.index == nil:
+            guard let tab = front as? MongoAggregationController, tab.connectionID == id else { return nil }
+            return tab.nameInserter
+        default:
+            return nil
+        }
+    }
+
     /// A single click shows the row in the preview tab: a database's tables, a table's rows, an object's definition.
     @objc func showSelectedObject() {
         if let main, selectedConnectionIDs.count == 1, selectedNodes.count == 1, let open = model.openConnection(selectedConnectionIDs[0]) {
@@ -135,7 +151,7 @@ extension SidebarController: NSMenuItemValidation {
         case .category:
             menu.add([Commands.createObject, Commands.refresh, nil, Commands.expandAll, Commands.collapseAll])
         case .object(_, let object) where object.kind.isTableLike:
-            menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.copyName, Commands.copyPlainName,
+            menu.add([Commands.openData, Commands.openStructure, Commands.selectTop, Commands.newQuery, Commands.copyName, Commands.copyPlainName,
                       Commands.copyCreate, Commands.createToConsole, Commands.sqlGenerator, Commands.favourite, Commands.findUsedBy, nil,
                       Commands.newColumn, Commands.newIndex, Commands.newForeignKey, Commands.editComment, nil, Commands.generateSelect,
                       Commands.generateInsert, Commands.generateUpdate, nil, Commands.export, Commands.copyTable,

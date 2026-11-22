@@ -83,12 +83,22 @@ Each field takes shell form, as mongosh writes it: `{ age: { $gt: 30 } }`, `Obje
 - **Collation** (how strings compare, such as `{ locale: "en", strength: 2 }`), **Hint** (an index's name, or its keys)
   and **Max Time** (milliseconds the server may spend before it stops the find).
 
-**Run** (⌘↩, or Return in any field) finds the documents. A field AirSQL can't read says what's wrong and where under
-the fields, and nothing runs. The fields autofill as you type (see [Autofill](#autofill)). The clock button (⌘Y)
+**Run** (⌘↩, or Return in any field) finds the documents. A field AirSQL can't read (or a sort direction other than 1
+or -1) says what's wrong and where under the fields, and nothing runs. Shell form has no comments: take out `//` and
+`/* */` ones. The fields autofill as you type (see [Autofill](#autofill)). The clock button (⌘Y)
 lists the collection's recent queries and its favourites: choose one to run it again, or keep the query in the bar
 among the favourites. They're kept per connection on this Mac, beside the SQL history.
 
 A click on a column's header sorts by that field on the server; ⇧-click adds it to the sort.
+
+**Data ▸ Collection ▸ Copy Query as JavaScript** puts the query bar's find on the clipboard as a script mongosh runs as
+it is, `db.getSiblingDB("shop").getCollection("orders").find({ status: "paid" }).sort({ total: -1 }).limit(50)`, with
+only the parts that are set; **Export Query as JavaScript…** saves it as `<collection>.js`. In an aggregation tab they
+write the pipeline, a stage a line, with `{ allowDiskUse: true }` and its Collation and Max Time. Values keep their
+types (`ObjectId("…")`, `ISODate("…")`, `NumberLong("…")`, and `Double(5.0)` for a whole double, which mongosh would
+otherwise send as an int32). The script names the database and collection only, never the connection's address, user
+or password. A field that doesn't parse is refused as Run refuses it, and so are `undefined` and `DBPointer(…)`,
+deprecated types mongosh can't write.
 
 ## Builder
 
@@ -103,14 +113,22 @@ never changes it.
   beside it: "contains — LIKE '%x%'", "is one of — IN", "has no value — IS NULL"), and the value: the sample's most
   common values are offered, between takes two, is one of a comma list, true/false a pop-up. Dates are UTC; a day alone
   is the whole day, and the calendar button fills in today, the last 7 days or this month. **Ignore case** sits on the
-  text operators. **+ Group** adds a group with its own all/any (parentheses in SQL), one level deep.
+  text operators. **+ Group** adds a group with its own all/any (parentheses in SQL); a group (and an item, below)
+  has its own **+ Condition**, **+ Group** and **+ Item** too, to any depth, each indented in its box, and starts as any inside all, all inside any. A filter of
+  `$and` and `$or` inside each other reads back as these groups.
+- **+ Item** adds **an item of** an array field **where** all / any of its own rows are true: one item has to meet
+  them together (MongoDB's `$elemMatch`; in SQL, an `EXISTS` over the array's rows). Its rows name the item's fields
+  (`sku`, `qty` for `items.sku`, `items.qty`); a row whose field is left empty is on **the item itself**, for an array
+  of plain values (an item of `scores` at least 80 and less than 85). A filter with `$elemMatch` reads back as items.
 - A row that makes no condition says why under it, in red, and Run refuses until it's fixed. Under a row also: a date
   typed for a field the sample holds as text (it compares as text), and conditions on fields of one array
-  (`items.sku`, `items.qty`), which may each match a different item.
+  (`items.sku`, `items.qty`), which may each match a different item: put them in an item to have one item meet them
+  all. Under an item, what keeps it from being a condition: no array field, or a row on the item itself beside rows on
+  its fields (MongoDB can't ask both of one item).
 - **Show** ticks the fields to show (`SELECT`), **Sort by** rows (`ORDER BY`), **Skip** (`OFFSET`), **Limit**
   (`LIMIT`), and **Ignore case in comparisons and sorting** (a collation, strength 2). Under them is the query in shell
   form, one line you can select and copy, with Hint and Max Time when set in Shell.
-- A part the builder can't show (a `$where`, `$elemMatch`, an exclusion projection, another collation…) shows its text
+- A part the builder can't show (a `$where`, `$size`, an exclusion projection, another collation…) shows its text
   field in place of its controls, while the others stay as controls; fix or clear the text to build it here again.
 
 In the grid, a cell's menu has **Quick Filter**: is, is not, greater than, less than and contains, from the value as it
@@ -289,7 +307,15 @@ time-series collection, or with edits not applied, both commands are off and say
 over the documents it gives. Type the stages in shell form, as an array or one after another:
 `[{ $match: { status: "paid" } }, { $group: { _id: "$customer", total: { $sum: "$amount" } } }]`. Each stage of
 several lines folds on its own, and the editor autofills stages, their keys and the fields (see
-[Autofill](#autofill)). A mistake is underlined where it is, and Run says which stage, line and column.
+[Autofill](#autofill)). A mistake is underlined where it is, and Run says which stage, line and column: text that
+doesn't parse, and what the server would refuse for sure (a stage without a key it needs, such as `$group`'s `_id` or
+`$lookup`'s `from`; `$limit` or `$skip` that isn't a whole number it takes; a `$sort` direction other than 1 or -1). A
+stage, a stage's key or a `$match` operator close to a known one gets a yellow underline instead (`$mach`: did
+you mean `$match`?), and Run still sends it, since a newer server may have the name.
+
+While the tab shows **Shell** or **SQL**, a double-click on a collection in the tree types its name at the cursor (as a
+string in Shell, as a name in SQL) instead of opening it, and a click only selects it, so the pipeline stays in front;
+Return, or **Open Collection** in its menu, opens it.
 
 **Run** (⌘↩) runs the pipeline; its documents load a batch at a time, with **Load More** (⌥⌘↓), and show in the same
 grid as a collection's. **Collation** and **Max Time** above the editor apply to the whole pipeline. **Cancel** (⌘.)
@@ -335,7 +361,8 @@ loaded, the last stage's count shows there too.
 **Save Pipeline…** (the bookmark button, or Data ▸ Collection) keeps the pipeline under a name for its collection, on
 this Mac beside the query history; the same menu opens a saved pipeline, and **Rename Saved Pipeline…** and **Delete
 Saved Pipeline…** act on the one open in the tab. **Export Documents…** (the share button) writes what the pipeline gives,
-in the same formats as a collection's export, a batch at a time.
+in the same formats as a collection's export, a batch at a time. **Copy Query as JavaScript** and **Export Query as
+JavaScript…** write the pipeline for mongosh (see [The query bar](#the-query-bar)).
 
 **Save as View…** makes a view on the collection that gives what the pipeline gives: name it, then the exact `create`
 command shows before it runs. A pipeline that writes (`$out`, `$merge`) can't be a view or be exported, and a read-only
@@ -358,10 +385,10 @@ its own stage, so the rest of what you typed stays as you typed it. Text that is
 its mistake underlined.
 
 Each card names what it does with SQL's word beside it: **Join — JOIN**, **Filter — WHERE**, **Group — GROUP BY**,
-**Sort — ORDER BY**, **Show fields — SELECT**, **Limit — LIMIT**, **Unwind** and **Shell**. Card 1 is the first stage,
-card 2 the second, and so on. Choose another kind in its pop-up to start the card again as that kind; ↑ and ↓ move it,
-the bin removes it, ⏭ runs the pipeline up to it (Run to Here), and after **Count Each Stage** it says how many
-documents it gives. **+ Stage**, after the cards (and **+** between them), adds one: Join comes first.
+**Sort — ORDER BY**, **Show fields — SELECT**, **Add field — SELECT a + b AS c**, **Limit — LIMIT**, **Skip — OFFSET**,
+**Count — COUNT(\*)**, **Unwind** and **Shell**. Card 1 is the first stage, card 2 the second, and so on. Choose
+another kind in its pop-up to start the card again as that kind; ↑ and ↓ move it, the bin removes it, ⏭ runs the
+pipeline up to it (Run to Here), and after **Count Each Stage** it says how many documents it gives. **+ Stage**, after the cards (and **+** between them), adds one: Join comes first.
 
 - **Join**: another collection of this database (**From**), this collection's field that must equal **their field**,
   and **As**, the field that gets the matching documents as a list. **One document per match** adds an Unwind card
@@ -372,14 +399,19 @@ documents it gives. **+ Stage**, after the cards (and **+** between them), adds 
 - **Group**: the fields to group **by** (none: every document in one group), then the results: Count, Sum, Average,
   Smallest, Largest, First, Last, List or Distinct list of a field, each named (`sum_total`; type another name).
 - **Sort**: fields, each ascending or descending. **Show fields**: tick the fields to keep, and `_id`. **Limit**: how
-  many documents. **Unwind**: one document per item of an array field.
+  many documents. **Skip**: how many to leave out first (`$skip`). **Count**: one document holding how many documents
+  there are, under the name you give it (`$count`). **Unwind**: one document per item of an array field.
+- **Add field**: a new field (its name, SQL's `AS`) worked out of two others: on each side a field (`price`), a number
+  (`1.5`) or text in quotes (`" - "`), between them **+**, **−**, **×**, **÷** or **joined with** (SQL's `CONCAT`, for
+  text). A richer `$addFields` (several fields, other expressions) is a Shell card.
 - **Filter**: the conditions as rows, as the query bar's [Builder](#builder) has them: a field, how it compares, a
-  value. **Shell**: the stage as text. A stage no card shows exactly
+  value, in groups and items. **Shell**: the stage as text. A stage no card shows exactly
   (`$facet`, `$bucket`, a `$lookup` with a pipeline…) is a Shell card of its own text, which goes into the pipeline as
   you type it.
 
 The field boxes offer the fields each stage sees: the collection's (from its sample), a join's `<As>.<their field>`,
-a group's `_id` and results, only those a Show fields card keeps. Any field typed works.
+a group's `_id` and results, an Add field's new field, a Count's name, only those a Show fields card keeps. Any field
+typed works.
 
 Aggregations run with `allowDiskUse`, so a big group or sort spills to disk on the server instead of stopping at its
 memory limit.

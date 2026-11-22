@@ -31,6 +31,12 @@ extension ConsoleViewController {
         return panel
     }
 
+    /// Types a name at the cursor, quoted only when it has to be: the tree's double-click.
+    func insertName(_ name: String) {
+        view.window?.makeFirstResponder(editor)
+        editor.insertText(SQLCompletion.quote(name), replacementRange: editor.selectedRange())
+    }
+
     /// The table selected in the tree, on this console's connection, for a statement that names none.
     private func columnsOfTheTreesTable(_ snapshot: SchemaSnapshot?) -> [(table: String, columns: [SQLColumnInfo])] {
         guard let node = mainWindow?.sidebar.selectedNodes.first, case .object(let id, let object) = node.kind, id == connectionID,
